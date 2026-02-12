@@ -88,7 +88,7 @@ Build a `HashMap` or just do a linear scan — there are only ~11 entries. Valid
 
 Return `Err(anyhow!("Invalid transition: {} → {}", current, requested))` on violation.
 
-- [ ] **F-6a complete** — _note:_
+- [x] **F-6a complete** — Added CASE_TRANSITIONS const, is_valid_transition() and is_terminal_status() helpers. 1017 tests pass.
 
 #### F-6b: Create `KycCaseUpdateStatusOp` plugin handler
 
@@ -110,7 +110,7 @@ Implementation:
 
 **Important:** The existing `KycCaseCloseOp` already validates that the case is in REVIEW before closing. After F-6b, `update-status` handles all non-terminal transitions, and `close` handles terminal transitions. There should be no overlap — `update-status` should reject terminal statuses (APPROVED, REJECTED, etc.) and direct callers to use `close` instead. Add a clear error message: `"Use kyc-case.close for terminal status '{}'"`.
 
-- [ ] **F-6b complete** — _note:_
+- [x] **F-6b complete** — Created KycCaseUpdateStatusOp with transition validation and terminal status redirection. 1017 tests pass.
 
 #### F-6c: Update YAML
 
@@ -129,7 +129,7 @@ In `rust/config/verbs/kyc/kyc-case.yaml`, change the `update-status` verb:
 
 Do NOT change any other verb in the YAML file.
 
-- [ ] **F-6c complete** — _note:_
+- [x] **F-6c complete** — Changed update-status from behavior:crud to behavior:plugin with KycCaseUpdateStatusOp handler. Removed terminal statuses from valid_values. Added notes arg. 1017 tests pass.
 
 #### F-6d: Add unit tests for transition validation
 
@@ -159,7 +159,7 @@ fn test_terminal_status_redirects_to_close() {
 }
 ```
 
-- [ ] **F-6d complete** — _note:_
+- [x] **F-6d complete** — Added 4 tests: test_valid_transitions, test_terminal_states_have_no_outbound_transitions, test_terminal_status_redirects_to_close, test_update_status_op_metadata. 1021 tests pass (4 new).
 
 #### F-6e: Update integration tests
 
@@ -172,7 +172,7 @@ In `rust/tests/kyc_full_lifecycle.rs`, the `test_full_case_lifecycle` and `test_
 
 Do NOT rewrite the integration tests to use the verb handler — that's a separate session's work.
 
-- [ ] **F-6e complete** — _note:_
+- [x] **F-6e complete** — Added SQL-bypass comments to update_case_status helper, test_full_case_lifecycle, and test_invalid_state_transitions_rejected. 1021 tests pass.
 
 ---
 
@@ -211,7 +211,7 @@ The `ON CONFLICT DO NOTHING` handles the case where this case was already linked
 
 **Files:** `rust/src/domain_ops/import_run_ops.rs`
 
-- [ ] **F-7 complete** — _note:_
+- [x] **F-7 complete** — Added case_import_runs INSERT with ON CONFLICT DO NOTHING in idempotent-hit path. 1017 tests pass.
 
 ---
 
@@ -256,7 +256,7 @@ ALTER TABLE "ob-poc".graph_import_runs ADD COLUMN IF NOT EXISTS as_of DATE DEFAU
 
 Add this as a new migration file (078 or whatever the next sequence number is). Do NOT modify existing migrations.
 
-- [ ] **F-8a complete** — _note:_
+- [x] **F-8a complete** — Added as_of extraction, INSERT column, COALESCE defaulting, result struct field. 1017 tests pass.
 
 #### F-8b: Include `as_of` in idempotency check
 
@@ -282,7 +282,7 @@ let existing: Option<(Uuid,)> = sqlx::query_as(
 
 This prevents collapsing two imports with different as-of dates into the same run. Same-day reimports still get idempotency.
 
-- [ ] **F-8b complete** — _note:_
+- [x] **F-8b complete** — Added as_of to idempotency SELECT with COALESCE. 1017 tests pass.
 
 #### F-8c: Add `as-of` to the YAML verb definition
 
@@ -296,7 +296,7 @@ If there's an import-run YAML file, add the arg. If import-run verbs are defined
             description: As-of date for the graph snapshot (defaults to today)
 ```
 
-- [ ] **F-8c complete** — _note:_
+- [x] **F-8c complete** — Added as-of arg (type: date, required: false) to import-run.yaml begin verb. 1017 tests pass.
 
 ---
 

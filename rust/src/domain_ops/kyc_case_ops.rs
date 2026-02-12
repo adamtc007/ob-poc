@@ -312,6 +312,271 @@ mod tests {
         assert_eq!(op.domain(), "entity-workstream");
         assert_eq!(op.verb(), "state");
     }
+
+    // ========================================================================
+    // F-6d: Transition validation tests
+    // ========================================================================
+
+    #[test]
+    fn test_valid_transitions() {
+        // INTAKE → DISCOVERY: allowed
+        assert!(is_valid_transition("INTAKE", "DISCOVERY"));
+        // INTAKE → WITHDRAWN: allowed
+        assert!(is_valid_transition("INTAKE", "WITHDRAWN"));
+        // INTAKE → ASSESSMENT: rejected (must go through DISCOVERY)
+        assert!(!is_valid_transition("INTAKE", "ASSESSMENT"));
+        // INTAKE → APPROVED: rejected (can't skip to terminal)
+        assert!(!is_valid_transition("INTAKE", "APPROVED"));
+
+        // DISCOVERY → ASSESSMENT: allowed
+        assert!(is_valid_transition("DISCOVERY", "ASSESSMENT"));
+        // DISCOVERY → BLOCKED: allowed
+        assert!(is_valid_transition("DISCOVERY", "BLOCKED"));
+        // DISCOVERY → REVIEW: rejected (must go through ASSESSMENT)
+        assert!(!is_valid_transition("DISCOVERY", "REVIEW"));
+
+        // ASSESSMENT → REVIEW: allowed
+        assert!(is_valid_transition("ASSESSMENT", "REVIEW"));
+        // ASSESSMENT → BLOCKED: allowed
+        assert!(is_valid_transition("ASSESSMENT", "BLOCKED"));
+
+        // REVIEW → APPROVED: allowed (close verb handles this, but it's in the map)
+        assert!(is_valid_transition("REVIEW", "APPROVED"));
+        // REVIEW → BLOCKED: allowed
+        assert!(is_valid_transition("REVIEW", "BLOCKED"));
+
+        // BLOCKED → DISCOVERY: allowed (unblock path)
+        assert!(is_valid_transition("BLOCKED", "DISCOVERY"));
+        // BLOCKED → ASSESSMENT: allowed (unblock path)
+        assert!(is_valid_transition("BLOCKED", "ASSESSMENT"));
+        // BLOCKED → REVIEW: allowed (unblock path)
+        assert!(is_valid_transition("BLOCKED", "REVIEW"));
+
+        // Unknown status: rejected
+        assert!(!is_valid_transition("NONEXISTENT", "DISCOVERY"));
+    }
+
+    #[test]
+    fn test_terminal_states_have_no_outbound_transitions() {
+        let terminal = &[
+            "APPROVED",
+            "REJECTED",
+            "WITHDRAWN",
+            "EXPIRED",
+            "REFER_TO_REGULATOR",
+            "DO_NOT_ONBOARD",
+        ];
+        let all_statuses = &[
+            "INTAKE",
+            "DISCOVERY",
+            "ASSESSMENT",
+            "REVIEW",
+            "BLOCKED",
+            "APPROVED",
+            "REJECTED",
+            "WITHDRAWN",
+            "EXPIRED",
+            "REFER_TO_REGULATOR",
+            "DO_NOT_ONBOARD",
+        ];
+
+        for &term in terminal {
+            for &target in all_statuses {
+                assert!(
+                    !is_valid_transition(term, target),
+                    "Terminal status {} should not allow transition to {}",
+                    term,
+                    target
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_terminal_status_redirects_to_close() {
+        // All terminal statuses should be detected by is_terminal_status
+        assert!(is_terminal_status("APPROVED"));
+        assert!(is_terminal_status("REJECTED"));
+        assert!(is_terminal_status("WITHDRAWN"));
+        assert!(is_terminal_status("EXPIRED"));
+        assert!(is_terminal_status("REFER_TO_REGULATOR"));
+        assert!(is_terminal_status("DO_NOT_ONBOARD"));
+
+        // Non-terminal statuses should NOT be flagged
+        assert!(!is_terminal_status("INTAKE"));
+        assert!(!is_terminal_status("DISCOVERY"));
+        assert!(!is_terminal_status("ASSESSMENT"));
+        assert!(!is_terminal_status("REVIEW"));
+        assert!(!is_terminal_status("BLOCKED"));
+    }
+
+    #[test]
+    fn test_update_status_op_metadata() {
+        let op = KycCaseUpdateStatusOp;
+        assert_eq!(op.domain(), "kyc-case");
+        assert_eq!(op.verb(), "update-status");
+        assert!(
+            op.rationale().contains("state machine"),
+            "Rationale should mention state machine enforcement"
+        );
+    }
+}
+
+// ============================================================================
+// Case Status Transition Map
+// ============================================================================
+
+/// Allowed case status transitions.
+/// Key = current status, Value = set of valid next statuses.
+/// Terminal statuses have no outbound transitions — use `kyc-case.close` instead.
+const CASE_TRANSITIONS: &[(&str, &[&str])] = &[
+    ("INTAKE", &["DISCOVERY", "WITHDRAWN"]),
+    ("DISCOVERY", &["ASSESSMENT", "BLOCKED", "WITHDRAWN"]),
+    ("ASSESSMENT", &["REVIEW", "BLOCKED", "WITHDRAWN"]),
+    (
+        "REVIEW",
+        &[
+            "APPROVED",
+            "REJECTED",
+            "REFER_TO_REGULATOR",
+            "DO_NOT_ONBOARD",
+            "BLOCKED",
+            "WITHDRAWN",
+        ],
+    ),
+    (
+        "BLOCKED",
+        &["DISCOVERY", "ASSESSMENT", "REVIEW", "WITHDRAWN"],
+    ),
+    // Terminal states — no outbound transitions (use kyc-case.close)
+    ("APPROVED", &[]),
+    ("REJECTED", &[]),
+    ("WITHDRAWN", &[]),
+    ("EXPIRED", &[]),
+    ("REFER_TO_REGULATOR", &[]),
+    ("DO_NOT_ONBOARD", &[]),
+];
+
+/// Terminal statuses allowed when closing a KYC case.
+const CLOSE_STATUSES: &[&str] = &[
+    "APPROVED",
+    "REJECTED",
+    "WITHDRAWN",
+    "EXPIRED",
+    "REFER_TO_REGULATOR",
+    "DO_NOT_ONBOARD",
+];
+
+/// Check whether a case status transition is valid.
+///
+/// Returns `true` if `from → to` is in the allowed transition map.
+/// Returns `false` if `from` is unknown or `to` is not in the allowed set.
+fn is_valid_transition(from: &str, to: &str) -> bool {
+    CASE_TRANSITIONS
+        .iter()
+        .find(|(status, _)| *status == from)
+        .map(|(_, allowed)| allowed.contains(&to))
+        .unwrap_or(false)
+}
+
+/// Check whether the target status is a terminal status (must use `close` verb).
+fn is_terminal_status(status: &str) -> bool {
+    CLOSE_STATUSES.contains(&status)
+}
+
+// ============================================================================
+// KycCaseUpdateStatusOp - Validated status transitions
+// ============================================================================
+
+/// Updates KYC case status with state machine validation.
+///
+/// Validates that the requested transition is allowed by the case state machine.
+/// Terminal statuses (APPROVED, REJECTED, etc.) are rejected with a message
+/// directing callers to use `kyc-case.close` instead.
+#[register_custom_op]
+pub struct KycCaseUpdateStatusOp;
+
+#[async_trait]
+impl CustomOperation for KycCaseUpdateStatusOp {
+    fn domain(&self) -> &'static str {
+        "kyc-case"
+    }
+
+    fn verb(&self) -> &'static str {
+        "update-status"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Enforces case state machine transitions — prevents skipping compliance stages"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let case_id = extract_uuid(verb_call, ctx, "case-id")?;
+        let requested_status = extract_string(verb_call, "status")?;
+        let notes = extract_string_opt(verb_call, "notes");
+
+        // Reject terminal statuses — callers must use kyc-case.close
+        if is_terminal_status(&requested_status) {
+            return Err(anyhow!(
+                "Use kyc-case.close for terminal status '{}'. The update-status verb handles non-terminal transitions only.",
+                requested_status
+            ));
+        }
+
+        // Load current case status
+        let current_status: String =
+            sqlx::query_scalar(r#"SELECT status FROM kyc.cases WHERE case_id = $1"#)
+                .bind(case_id)
+                .fetch_optional(pool)
+                .await?
+                .ok_or_else(|| anyhow!("KYC case not found: {}", case_id))?;
+
+        // Validate the transition
+        if !is_valid_transition(&current_status, &requested_status) {
+            return Err(anyhow!(
+                "Invalid transition: {} → {}. Allowed transitions from {}: [{}]",
+                current_status,
+                requested_status,
+                current_status,
+                CASE_TRANSITIONS
+                    .iter()
+                    .find(|(s, _)| *s == current_status.as_str())
+                    .map(|(_, allowed)| allowed.join(", "))
+                    .unwrap_or_else(|| "none".to_string())
+            ));
+        }
+
+        // Apply the transition
+        sqlx::query(
+            r#"UPDATE kyc.cases
+               SET status = $2,
+                   notes = COALESCE($3, notes),
+                   updated_at = NOW()
+               WHERE case_id = $1"#,
+        )
+        .bind(case_id)
+        .bind(&requested_status)
+        .bind(&notes)
+        .execute(pool)
+        .await?;
+
+        Ok(ExecutionResult::Affected(1))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow!("Database feature required"))
+    }
 }
 
 // ============================================================================
@@ -326,16 +591,6 @@ mod tests {
 /// knows the KYC gate is satisfied.
 #[register_custom_op]
 pub struct KycCaseCloseOp;
-
-/// Terminal statuses allowed when closing a KYC case.
-const CLOSE_STATUSES: &[&str] = &[
-    "APPROVED",
-    "REJECTED",
-    "WITHDRAWN",
-    "EXPIRED",
-    "REFER_TO_REGULATOR",
-    "DO_NOT_ONBOARD",
-];
 
 #[async_trait]
 impl CustomOperation for KycCaseCloseOp {

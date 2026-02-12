@@ -95,7 +95,9 @@ mod kyc_full_lifecycle {
             id
         }
 
-        /// Update case status.
+        /// Update case status via direct SQL.
+        /// NOTE: This bypasses KycCaseUpdateStatusOp transition validation.
+        /// Verb-level transition tests are in kyc_case_ops::tests.
         async fn update_case_status(&self, case_id: Uuid, status: &str) {
             sqlx::query(
                 r#"UPDATE kyc.cases SET status = $2, updated_at = NOW() WHERE case_id = $1"#,
@@ -438,6 +440,9 @@ mod kyc_full_lifecycle {
     // =========================================================================
 
     /// Full happy path: INTAKE -> skeleton build -> ASSESSMENT -> evidence -> REVIEW -> APPROVED
+    ///
+    /// NOTE: This test operates at SQL level, bypassing KycCaseUpdateStatusOp
+    /// transition validation. Verb-level transition tests are in kyc_case_ops::tests.
     #[tokio::test]
     #[ignore = "requires database"]
     async fn test_full_case_lifecycle() {
@@ -678,6 +683,9 @@ mod kyc_full_lifecycle {
     // =========================================================================
 
     /// Verify state machine rejects invalid transitions by checking data integrity.
+    ///
+    /// NOTE: This test operates at SQL level, bypassing KycCaseUpdateStatusOp
+    /// transition validation. Verb-level transition tests are in kyc_case_ops::tests.
     ///
     /// Since we operate at SQL level (no verb handler), we validate the state
     /// machine invariants that the verb handlers enforce:

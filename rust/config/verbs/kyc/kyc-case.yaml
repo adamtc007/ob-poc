@@ -92,7 +92,7 @@ domains:
             Returns KycCaseCreateResult with case_id, case_ref (KYC-YYYY-SEQ),
             deal_id (if linked), client_group_id, and status (INTAKE).
       update-status:
-        description: Update case status
+        description: Update case status with transition validation
         invocation_phrases:
           - "update case status"
           - "change case status"
@@ -104,12 +104,8 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: kyc_case
-        behavior: crud
-        crud:
-          operation: update
-          table: cases
-          schema: kyc
-          key: case_id
+        behavior: plugin
+        handler: KycCaseUpdateStatusOp
         emits_event: case.status-changed
         args:
           - name: case-id
@@ -131,13 +127,12 @@ domains:
               - DISCOVERY
               - ASSESSMENT
               - REVIEW
-              - APPROVED
-              - REJECTED
               - BLOCKED
               - WITHDRAWN
-              - EXPIRED
-              - REFER_TO_REGULATOR
-              - DO_NOT_ONBOARD
+          - name: notes
+            type: string
+            required: false
+            maps_to: notes
         returns:
           type: affected
       escalate:

@@ -70,6 +70,10 @@ domains:
             type: uuid
             required: false
             description: Link to research decision that triggered import
+          - name: as-of
+            type: date
+            required: false
+            description: As-of date for the graph snapshot (defaults to today)
         returns:
           type: record
           capture: true

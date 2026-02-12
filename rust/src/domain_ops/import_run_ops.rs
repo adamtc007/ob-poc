@@ -41,6 +41,7 @@ pub struct ImportRunBeginResult {
     pub run_kind: String,
     pub source: String,
     pub scope_root_entity_id: Uuid,
+    pub as_of: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -106,38 +107,57 @@ impl CustomOperation for ImportRunBeginOp {
             .unwrap_or_else(|| "SKELETON_BUILD".to_string());
         let source_ref = extract_string_opt(verb_call, "source-ref");
         let source_query = extract_string_opt(verb_call, "source-query");
+        let as_of = extract_string_opt(verb_call, "as-of");
         let case_id = extract_uuid_opt(verb_call, ctx, "case-id");
         let decision_id = extract_uuid_opt(verb_call, ctx, "decision-id");
 
-        // Check for idempotent match (same scope_root + source + source_ref + ACTIVE)
+        // Check for idempotent match (same scope_root + source + source_ref + as_of + ACTIVE)
         let existing: Option<(Uuid,)> = sqlx::query_as(
             r#"SELECT run_id FROM "ob-poc".graph_import_runs
                WHERE scope_root_entity_id = $1 AND source = $2
                  AND COALESCE(source_ref, '') = COALESCE($3, '')
                  AND status = 'ACTIVE' AND run_kind = $4
+                 AND as_of = COALESCE($5::date, CURRENT_DATE)
                LIMIT 1"#,
         )
         .bind(scope_root)
         .bind(&source)
         .bind(&source_ref)
         .bind(&run_kind)
+        .bind(&as_of)
         .fetch_optional(pool)
         .await?;
 
         if let Some((run_id,)) = existing {
+            // Invariant: any case-id provided MUST appear in case_import_runs
+            // regardless of whether the run was newly created or already existed.
+            if let Some(cid) = case_id {
+                sqlx::query(
+                    r#"INSERT INTO kyc.case_import_runs (case_id, run_id, decision_id)
+                       VALUES ($1, $2, $3)
+                       ON CONFLICT DO NOTHING"#,
+                )
+                .bind(cid)
+                .bind(run_id)
+                .bind(decision_id)
+                .execute(pool)
+                .await?;
+            }
+
             let result = ImportRunBeginResult {
                 run_id,
                 run_kind,
                 source,
                 scope_root_entity_id: scope_root,
+                as_of: as_of.clone().unwrap_or_else(|| "today".to_string()),
             };
             return Ok(ExecutionResult::Record(serde_json::to_value(result)?));
         }
 
         let run_id: Uuid = sqlx::query_scalar(
             r#"INSERT INTO "ob-poc".graph_import_runs
-               (scope_root_entity_id, source, run_kind, source_ref, source_query)
-               VALUES ($1, $2, $3, $4, $5)
+               (scope_root_entity_id, source, run_kind, source_ref, source_query, as_of)
+               VALUES ($1, $2, $3, $4, $5, COALESCE($6::date, CURRENT_DATE))
                RETURNING run_id"#,
         )
         .bind(scope_root)
@@ -145,6 +165,7 @@ impl CustomOperation for ImportRunBeginOp {
         .bind(&run_kind)
         .bind(&source_ref)
         .bind(&source_query)
+        .bind(&as_of)
         .fetch_one(pool)
         .await?;
 
@@ -167,6 +188,7 @@ impl CustomOperation for ImportRunBeginOp {
             run_kind,
             source,
             scope_root_entity_id: scope_root,
+            as_of: as_of.unwrap_or_else(|| "today".to_string()),
         };
         Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
