@@ -31,6 +31,7 @@ mod capital_ops;
 mod cbu_ops;
 mod cbu_role_ops;
 mod client_group_ops;
+mod control_compute_ops;
 mod control_ops;
 mod coverage_compute_ops;
 mod custody;
@@ -64,6 +65,7 @@ mod refdata_loader;
 mod regulatory_ops;
 mod request_ops;
 mod requirement_ops;
+mod research_normalize_ops;
 mod research_workflow_ops;
 mod resource_ops;
 pub mod rule_evaluator;
@@ -163,7 +165,10 @@ pub use trading_profile_ca_ops::{
     TradingProfileCaSetDefaultOp, TradingProfileCaSetElectionOp, TradingProfileCaSetNotificationOp,
 };
 pub use ubo_analysis::{UboCalculateOp, UboListOwnersOp, UboTraceChainsOp};
-pub use ubo_compute_ops::{OwnershipChain, UboCandidate, UboComputeChainsOp, UboComputeResult};
+pub use ubo_compute_ops::{
+    OwnershipChain, UboCandidate, UboChange, UboComputeChainsOp, UboComputeResult,
+    UboSnapshotCaptureOp, UboSnapshotCaptureResult, UboSnapshotDiffOp, UboSnapshotDiffResult,
+};
 
 // Domain-specific operation modules
 pub use attribute_ops::{
@@ -234,6 +239,7 @@ pub use capital_ops::{
     CapitalReconcileOp, CapitalShareClassCreateOp, CapitalShareClassGetSupplyOp, CapitalSplitOp,
     CapitalTransferOp,
 };
+pub use control_compute_ops::{ControlComputeOp, ControlComputeResult, ControllerRecord};
 pub use control_ops::{
     ClearBoardControllerOverrideOp, ControlAnalyzeOp, ControlBuildGraphOp, ControlIdentifyUbosOp,
     ControlReconcileOwnershipOp, ControlTraceChainOp, ImportGleifControlOp, ImportPscRegisterOp,
@@ -772,6 +778,7 @@ mod tests {
         // KYC Control Enhancement: Unified control operations
         assert!(registry.has("control", "analyze"));
         assert!(registry.has("control", "build-graph"));
+        assert!(registry.has("control", "compute-controllers"));
         assert!(registry.has("control", "identify-ubos"));
         assert!(registry.has("control", "trace-chain"));
         assert!(registry.has("control", "reconcile-ownership"));

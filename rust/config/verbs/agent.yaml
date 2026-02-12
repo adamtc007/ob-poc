@@ -31,6 +31,9 @@ domains:
           source_of_truth: session
           scope: cbu
           noun: agent_session
+          category: agent_control
+          context: interactive_only
+          side_effects: runtime_state
         behavior: plugin
         handler: AgentStartOp
         invocation_phrases:
@@ -81,6 +84,9 @@ domains:
           source_of_truth: session
           scope: cbu
           noun: agent_session
+          category: agent_control
+          context: interactive_only
+          side_effects: runtime_state
         behavior: plugin
         handler: AgentPauseOp
         invocation_phrases:
@@ -99,6 +105,9 @@ domains:
           source_of_truth: session
           scope: cbu
           noun: agent_session
+          category: agent_control
+          context: interactive_only
+          side_effects: runtime_state
         behavior: plugin
         handler: AgentResumeOp
         invocation_phrases:
@@ -117,6 +126,9 @@ domains:
           source_of_truth: session
           scope: cbu
           noun: agent_session
+          category: agent_control
+          context: interactive_only
+          side_effects: runtime_state
         behavior: plugin
         handler: AgentStopOp
         invocation_phrases:
@@ -138,6 +150,9 @@ domains:
           source_of_truth: session
           scope: cbu
           noun: agent_session
+          category: agent_control
+          context: interactive_only
+          side_effects: runtime_state
         behavior: plugin
         handler: AgentConfirmOp
         invocation_phrases:
@@ -167,6 +182,9 @@ domains:
           source_of_truth: session
           scope: cbu
           noun: agent_session
+          category: agent_control
+          context: interactive_only
+          side_effects: runtime_state
         behavior: plugin
         handler: AgentRejectOp
         invocation_phrases:
@@ -194,6 +212,9 @@ domains:
           source_of_truth: session
           scope: cbu
           noun: agent_session
+          category: agent_control
+          context: interactive_only
+          side_effects: runtime_state
         behavior: plugin
         handler: AgentSelectOp
         invocation_phrases:
@@ -224,6 +245,9 @@ domains:
           source_of_truth: session
           scope: cbu
           noun: agent_session
+          category: agent_task
+          context: scripted_ok
+          side_effects: facts_only
         behavior: plugin
         handler: AgentStatusOp
         invocation_phrases:
@@ -243,6 +267,9 @@ domains:
           source_of_truth: session
           scope: cbu
           noun: agent_session
+          category: agent_task
+          context: scripted_ok
+          side_effects: facts_only
         behavior: plugin
         handler: AgentHistoryOp
         invocation_phrases:
@@ -270,6 +297,9 @@ domains:
           source_of_truth: session
           scope: cbu
           noun: agent_session
+          category: agent_control
+          context: interactive_only
+          side_effects: runtime_state
         behavior: plugin
         handler: AgentSetThresholdOp
         args:
@@ -291,6 +321,9 @@ domains:
           source_of_truth: session
           scope: cbu
           noun: agent_session
+          category: agent_control
+          context: interactive_only
+          side_effects: runtime_state
         behavior: plugin
         handler: AgentSetModeOp
         args:
@@ -313,6 +346,9 @@ domains:
           source_of_truth: operational
           scope: global
           noun: phrase_mapping
+          category: agent_task
+          context: scripted_ok
+          side_effects: facts_only
         behavior: plugin
         handler: AgentTeachOp
         invocation_phrases:
@@ -345,6 +381,9 @@ domains:
           source_of_truth: operational
           scope: global
           noun: phrase_mapping
+          category: agent_task
+          context: scripted_ok
+          side_effects: facts_only
         behavior: plugin
         handler: AgentUnteachOp
         invocation_phrases:
@@ -377,6 +416,9 @@ domains:
           source_of_truth: operational
           scope: global
           noun: phrase_mapping
+          category: agent_task
+          context: scripted_ok
+          side_effects: facts_only
         behavior: plugin
         handler: AgentTeachingStatusOp
         invocation_phrases:
@@ -406,6 +448,9 @@ domains:
           source_of_truth: operational
           scope: global
           noun: phrase_embedding
+          category: agent_task
+          context: scripted_ok
+          side_effects: facts_only
         behavior: plugin
         handler: AgentLearnOp
         invocation_phrases:

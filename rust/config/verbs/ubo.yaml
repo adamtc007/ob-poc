@@ -111,6 +111,96 @@ domains:
           type: uuid
           name: relationship_id
           capture: true
+
+      # =========================================================================
+      # UBO Snapshot Capture + Diff (Phase 3.2)
+      # =========================================================================
+
+      snapshot.capture:
+        description: |
+          Capture a deterministic snapshot of a UBO determination run.
+          Serializes computed candidates and ownership chains into JSONB
+          output_snapshot + chains_snapshot columns, recording code_hash
+          and config_version for replay auditing.
+        invocation_phrases:
+          - "capture ubo snapshot"
+          - "snapshot determination run"
+          - "save ubo computation state"
+          - "persist ubo snapshot"
+        metadata:
+          tier: composite
+          source_of_truth: workflow
+          scope: cbu
+          noun: ubo
+        behavior: plugin
+        plugin:
+          handler: UboSnapshotCaptureOp
+        args:
+          - name: case-id
+            type: uuid
+            required: true
+            description: "KYC case ID"
+          - name: determination-run-id
+            type: uuid
+            required: true
+            description: "Determination run to snapshot"
+        returns:
+          type: record
+          fields:
+            - name: run_id
+              type: uuid
+            - name: code_hash
+              type: string
+            - name: config_version
+              type: string
+            - name: candidates_captured
+              type: integer
+            - name: chains_captured
+              type: integer
+
+      snapshot.diff:
+        description: |
+          Compare two UBO determination snapshots by run_id.
+          Returns added, removed, and changed candidates between
+          the two snapshots for audit trail and change review.
+        invocation_phrases:
+          - "diff ubo snapshots"
+          - "compare determination runs"
+          - "what changed between ubo runs"
+          - "ubo snapshot difference"
+        metadata:
+          tier: diagnostics
+          source_of_truth: workflow
+          scope: cbu
+          noun: ubo
+        behavior: plugin
+        plugin:
+          handler: UboSnapshotDiffOp
+        args:
+          - name: run-id-a
+            type: uuid
+            required: true
+            description: "First (older) determination run"
+          - name: run-id-b
+            type: uuid
+            required: true
+            description: "Second (newer) determination run"
+        returns:
+          type: record
+          fields:
+            - name: run_id_a
+              type: uuid
+            - name: run_id_b
+              type: uuid
+            - name: added
+              type: array
+              description: "Entity IDs added in run B"
+            - name: removed
+              type: array
+              description: "Entity IDs removed from run A"
+            - name: changed
+              type: array
+              description: "Changed fields between runs"
       update-ownership:
         description: Update ownership percentage or end date
         invocation_phrases:

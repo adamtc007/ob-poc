@@ -1,0 +1,53 @@
+domains:
+  research.generic:
+    description: "Generic research source operations - normalization, validation, hashing"
+
+    invocation_hints:
+      - "normalize research data"
+      - "validate source payload"
+      - "hash research input"
+
+    verbs:
+      normalize:
+        description: |
+          Normalize a raw research payload from an external source.
+          Takes a source name and raw JSON payload, validates against
+          config schema, produces canonical JSON with SHA-256 content hash.
+          Persists the normalized payload for audit and deduplication.
+        invocation_phrases:
+          - "normalize research payload"
+          - "normalize source data"
+          - "canonicalize research input"
+          - "validate and hash research data"
+        metadata:
+          tier: composite
+          source_of_truth: external
+          scope: global
+          noun: research
+        behavior: plugin
+        plugin:
+          handler: ResearchGenericNormalizeOp
+        args:
+          - name: source-name
+            type: string
+            required: true
+            description: "Name of the research source (e.g., GLEIF, COMPANIES_HOUSE)"
+          - name: raw-payload
+            type: string
+            required: true
+            description: "Raw JSON payload from the external source"
+        returns:
+          type: record
+          fields:
+            - name: payload_id
+              type: uuid
+            - name: source_name
+              type: string
+            - name: content_hash
+              type: string
+              description: "SHA-256 hash of the canonical JSON"
+            - name: canonical_payload
+              type: string
+              description: "Normalized canonical JSON"
+            - name: normalized_at
+              type: timestamp

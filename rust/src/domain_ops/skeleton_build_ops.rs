@@ -72,7 +72,7 @@ impl CustomOperation for SkeletonBuildOp {
         let mut steps_completed = Vec::new();
 
         // Step 1: Begin import run
-        let run_id = Uuid::now_v7();
+        let run_id = Uuid::new_v4();
         sqlx::query(
             r#"INSERT INTO "ob-poc".graph_import_runs
                (run_id, run_kind, source, scope_root_entity_id, status, started_at)
@@ -169,7 +169,7 @@ async fn run_graph_validate(pool: &PgPool, case_id: Uuid) -> Result<i64> {
 
 #[cfg(feature = "database")]
 async fn run_ubo_compute(pool: &PgPool, case_id: Uuid, threshold: f64) -> Result<(Uuid, i64)> {
-    let run_id = Uuid::now_v7();
+    let run_id = Uuid::new_v4();
 
     // Create determination run
     sqlx::query(
@@ -240,7 +240,7 @@ async fn run_outreach_plan(
     case_id: Uuid,
     determination_run_id: Uuid,
 ) -> Result<Option<Uuid>> {
-    let plan_id = Uuid::now_v7();
+    let plan_id = Uuid::new_v4();
 
     // Create outreach plan
     sqlx::query(
@@ -264,7 +264,7 @@ async fn run_tollgate_evaluate(
     determination_run_id: Uuid,
 ) -> Result<bool> {
     // Load tollgate definition for SKELETON_READY
-    let evaluation_id = Uuid::now_v7();
+    let evaluation_id = Uuid::new_v4();
 
     // Check if basic skeleton requirements are met
     let has_determination: bool = sqlx::query_scalar(

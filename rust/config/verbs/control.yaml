@@ -725,6 +725,61 @@ domains:
             - name: imported_at
               type: timestamp
 
+      # ============================================================
+      # Control Compute Controllers (Phase 3.1)
+      # Derives governance controller from CONTROL+MANAGEMENT edges
+      # ============================================================
+
+      compute-controllers:
+        description: |
+          Compute governance controllers for a case entity.
+          Loads CONTROL and MANAGEMENT edges, applies priority ordering,
+          bridges to cbu_entity_roles for officers, and outputs controller
+          candidates with control_type and basis.
+        invocation_phrases:
+          - "compute controllers"
+          - "derive governance controllers"
+          - "find who controls this entity"
+          - "calculate control hierarchy"
+        metadata:
+          tier: composite
+          source_of_truth: workflow
+          scope: cbu
+          noun: control
+        behavior: plugin
+        plugin:
+          handler: ControlComputeControllersOp
+        args:
+          - name: case-id
+            type: uuid
+            required: true
+            description: "KYC case ID to compute controllers for"
+          - name: entity-id
+            type: uuid
+            required: true
+            description: "Target entity to analyze control for"
+            lookup:
+              table: entities
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+        returns:
+          type: record
+          fields:
+            - name: entity_id
+              type: uuid
+            - name: controllers
+              type: array
+              description: "List of controller candidates with control_type and basis"
+            - name: controller_count
+              type: integer
+            - name: primary_controller_entity_id
+              type: uuid
+              description: "Top-ranked controller entity"
+            - name: primary_control_type
+              type: string
+              description: "BOARD_APPOINTMENT, MANAGEMENT_CONTRACT, VOTING_MAJORITY, etc."
+
       import-gleif-control:
         description: |
           Import control data from GLEIF (Global LEI Foundation).

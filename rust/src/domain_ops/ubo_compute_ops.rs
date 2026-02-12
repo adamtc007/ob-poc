@@ -482,3 +482,401 @@ impl CustomOperation for UboComputeChainsOp {
         })))
     }
 }
+
+// ============================================================================
+// Snapshot Result Types (typed structs per CLAUDE.md Non-Negotiable Rule #1)
+// ============================================================================
+
+/// Result of capturing a UBO determination snapshot.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UboSnapshotCaptureResult {
+    pub run_id: Uuid,
+    pub code_hash: String,
+    pub config_version: String,
+    pub candidates_captured: i64,
+    pub chains_captured: i64,
+}
+
+/// Result of diffing two UBO determination snapshots.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UboSnapshotDiffResult {
+    pub run_id_a: Uuid,
+    pub run_id_b: Uuid,
+    pub added: Vec<Uuid>,
+    pub removed: Vec<Uuid>,
+    pub changed: Vec<UboChange>,
+}
+
+/// A single field-level change between two UBO snapshots.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UboChange {
+    pub entity_id: Uuid,
+    pub field: String,
+    pub old_value: String,
+    pub new_value: String,
+}
+
+// ============================================================================
+// UboSnapshotCaptureOp
+// ============================================================================
+
+/// Serialize a determination run's computed candidates into output_snapshot +
+/// chains_snapshot JSONB columns, recording the code_hash and config_version
+/// for deterministic replay auditing.
+///
+/// Rationale: Aggregates data across ubo_registry and entity_relationships via
+/// subqueries into JSONB snapshots with cryptographic code hash — not expressible
+/// as a single CRUD operation.
+#[register_custom_op]
+pub struct UboSnapshotCaptureOp;
+
+#[async_trait]
+impl CustomOperation for UboSnapshotCaptureOp {
+    fn domain(&self) -> &'static str {
+        "ubo"
+    }
+
+    fn verb(&self) -> &'static str {
+        "snapshot.capture"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Aggregates ubo_registry candidates and entity_relationships chains into \
+         JSONB snapshots with SHA-256 code hash for deterministic replay auditing"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        use sha2::{Digest, Sha256};
+
+        // ------------------------------------------------------------------
+        // 1. Extract arguments
+        // ------------------------------------------------------------------
+        let case_id = extract_uuid(verb_call, ctx, "case-id")?;
+        let determination_run_id = extract_uuid(verb_call, ctx, "determination-run-id")?;
+
+        // ------------------------------------------------------------------
+        // 2. Compute code_hash (SHA-256 of algorithm identifier)
+        // ------------------------------------------------------------------
+        let mut hasher = Sha256::new();
+        hasher.update(b"ubo_compute_v1");
+        let code_hash = format!("{:x}", hasher.finalize());
+        let config_version = "1.0.0".to_string();
+
+        // ------------------------------------------------------------------
+        // 3. Capture snapshots via UPDATE with correlated subqueries
+        // ------------------------------------------------------------------
+        sqlx::query(
+            r#"UPDATE kyc.ubo_determination_runs
+               SET output_snapshot = (
+                     SELECT jsonb_agg(jsonb_build_object(
+                       'ubo_id', ur.ubo_id,
+                       'entity_id', ur.entity_id,
+                       'status', ur.status,
+                       'ownership_pct', ur.ownership_pct
+                     ))
+                     FROM kyc.ubo_registry ur
+                     WHERE ur.determination_run_id = $1
+                   ),
+                   chains_snapshot = (
+                     SELECT jsonb_agg(jsonb_build_object(
+                       'from_entity_id', er.from_entity_id,
+                       'to_entity_id', er.to_entity_id,
+                       'relationship_type', er.relationship_type,
+                       'ownership_pct', er.ownership_pct
+                     ))
+                     FROM "ob-poc".entity_relationships er
+                     JOIN kyc.entity_workstreams ew ON er.to_entity_id = ew.entity_id
+                     WHERE ew.case_id = $2
+                       AND er.relationship_type = 'OWNERSHIP'
+                       AND er.effective_to IS NULL
+                   ),
+                   code_hash = $3,
+                   config_version = $4,
+                   completed_at = NOW()
+               WHERE run_id = $1"#,
+        )
+        .bind(determination_run_id)
+        .bind(case_id)
+        .bind(&code_hash)
+        .bind(&config_version)
+        .execute(pool)
+        .await?;
+
+        // ------------------------------------------------------------------
+        // 4. Count captured items for the result
+        // ------------------------------------------------------------------
+        let candidates_captured: (Option<i64>,) = sqlx::query_as(
+            r#"SELECT jsonb_array_length(output_snapshot)::bigint
+               FROM kyc.ubo_determination_runs
+               WHERE run_id = $1"#,
+        )
+        .bind(determination_run_id)
+        .fetch_one(pool)
+        .await?;
+
+        let chains_captured: (Option<i64>,) = sqlx::query_as(
+            r#"SELECT jsonb_array_length(chains_snapshot)::bigint
+               FROM kyc.ubo_determination_runs
+               WHERE run_id = $1"#,
+        )
+        .bind(determination_run_id)
+        .fetch_one(pool)
+        .await?;
+
+        // Bind run_id for downstream DSL references
+        if let Some(ref binding) = verb_call.binding {
+            ctx.bind(binding, determination_run_id);
+        }
+
+        tracing::info!(
+            "ubo.snapshot.capture: run={} candidates={} chains={} code_hash={}",
+            determination_run_id,
+            candidates_captured.0.unwrap_or(0),
+            chains_captured.0.unwrap_or(0),
+            &code_hash[..12]
+        );
+
+        let result = UboSnapshotCaptureResult {
+            run_id: determination_run_id,
+            code_hash,
+            config_version,
+            candidates_captured: candidates_captured.0.unwrap_or(0),
+            chains_captured: chains_captured.0.unwrap_or(0),
+        };
+
+        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Record(serde_json::to_value(
+            UboSnapshotCaptureResult {
+                run_id: Uuid::nil(),
+                code_hash: String::new(),
+                config_version: "1.0.0".to_string(),
+                candidates_captured: 0,
+                chains_captured: 0,
+            },
+        )?))
+    }
+}
+
+// ============================================================================
+// UboSnapshotDiffOp
+// ============================================================================
+
+/// Compare two UBO determination snapshots and return added, removed, and changed
+/// candidates between them.
+///
+/// Rationale: Loads two JSONB snapshots, parses them in Rust, and performs set-diff
+/// logic with field-level change detection — not expressible as a CRUD operation.
+#[register_custom_op]
+pub struct UboSnapshotDiffOp;
+
+/// Internal representation of a snapshot candidate row for diffing.
+#[cfg(feature = "database")]
+#[derive(Debug, Clone, Deserialize)]
+struct SnapshotCandidate {
+    entity_id: Uuid,
+    status: Option<String>,
+    ownership_pct: Option<f64>,
+    #[allow(dead_code)]
+    ubo_id: Option<Uuid>,
+}
+
+#[async_trait]
+impl CustomOperation for UboSnapshotDiffOp {
+    fn domain(&self) -> &'static str {
+        "ubo"
+    }
+
+    fn verb(&self) -> &'static str {
+        "snapshot.diff"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Loads two JSONB snapshots by run_id, deserializes, and computes set-diff \
+         with field-level change detection for UBO candidates"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        // ------------------------------------------------------------------
+        // 1. Extract arguments
+        // ------------------------------------------------------------------
+        let run_id_a = extract_uuid(verb_call, ctx, "run-id-a")?;
+        let run_id_b = extract_uuid(verb_call, ctx, "run-id-b")?;
+
+        // ------------------------------------------------------------------
+        // 2. Load both snapshots in a single query
+        // ------------------------------------------------------------------
+        let run_ids = vec![run_id_a, run_id_b];
+        let rows: Vec<(Uuid, Option<serde_json::Value>, Option<serde_json::Value>)> =
+            sqlx::query_as(
+                r#"SELECT run_id, output_snapshot, chains_snapshot
+                   FROM kyc.ubo_determination_runs
+                   WHERE run_id = ANY($1)"#,
+            )
+            .bind(&run_ids)
+            .fetch_all(pool)
+            .await?;
+
+        // Find snapshots for each run
+        let snap_a = rows
+            .iter()
+            .find(|(rid, _, _)| *rid == run_id_a)
+            .ok_or_else(|| anyhow!("Determination run {} not found", run_id_a))?;
+        let snap_b = rows
+            .iter()
+            .find(|(rid, _, _)| *rid == run_id_b)
+            .ok_or_else(|| anyhow!("Determination run {} not found", run_id_b))?;
+
+        // ------------------------------------------------------------------
+        // 3. Parse output_snapshot arrays into candidate maps
+        // ------------------------------------------------------------------
+        let parse_candidates =
+            |snapshot: &Option<serde_json::Value>| -> Result<std::collections::HashMap<Uuid, SnapshotCandidate>> {
+                let mut map = std::collections::HashMap::new();
+                if let Some(val) = snapshot {
+                    let candidates: Vec<SnapshotCandidate> = serde_json::from_value(val.clone())
+                        .map_err(|e| anyhow!("Failed to parse output_snapshot: {}", e))?;
+                    for c in candidates {
+                        map.insert(c.entity_id, c);
+                    }
+                }
+                Ok(map)
+            };
+
+        let map_a = parse_candidates(&snap_a.1)?;
+        let map_b = parse_candidates(&snap_b.1)?;
+
+        // ------------------------------------------------------------------
+        // 4. Compute diff: added, removed, changed
+        // ------------------------------------------------------------------
+        let mut added: Vec<Uuid> = Vec::new();
+        let mut removed: Vec<Uuid> = Vec::new();
+        let mut changed: Vec<UboChange> = Vec::new();
+
+        // Entities in B but not in A → added
+        for entity_id in map_b.keys() {
+            if !map_a.contains_key(entity_id) {
+                added.push(*entity_id);
+            }
+        }
+
+        // Entities in A but not in B → removed
+        for entity_id in map_a.keys() {
+            if !map_b.contains_key(entity_id) {
+                removed.push(*entity_id);
+            }
+        }
+
+        // Entities in both → check for field-level changes
+        for (entity_id, cand_a) in &map_a {
+            if let Some(cand_b) = map_b.get(entity_id) {
+                // Compare status
+                if cand_a.status != cand_b.status {
+                    changed.push(UboChange {
+                        entity_id: *entity_id,
+                        field: "status".to_string(),
+                        old_value: cand_a.status.clone().unwrap_or_else(|| "null".to_string()),
+                        new_value: cand_b.status.clone().unwrap_or_else(|| "null".to_string()),
+                    });
+                }
+
+                // Compare ownership_pct (with tolerance for float comparison)
+                let pct_a = cand_a.ownership_pct.unwrap_or(0.0);
+                let pct_b = cand_b.ownership_pct.unwrap_or(0.0);
+                if (pct_a - pct_b).abs() > 0.001 {
+                    changed.push(UboChange {
+                        entity_id: *entity_id,
+                        field: "ownership_pct".to_string(),
+                        old_value: format!("{:.4}", pct_a),
+                        new_value: format!("{:.4}", pct_b),
+                    });
+                }
+            }
+        }
+
+        // Sort for deterministic output
+        added.sort();
+        removed.sort();
+        changed.sort_by(|a, b| a.entity_id.cmp(&b.entity_id).then(a.field.cmp(&b.field)));
+
+        tracing::info!(
+            "ubo.snapshot.diff: run_a={} run_b={} added={} removed={} changed={}",
+            run_id_a,
+            run_id_b,
+            added.len(),
+            removed.len(),
+            changed.len()
+        );
+
+        let result = UboSnapshotDiffResult {
+            run_id_a,
+            run_id_b,
+            added,
+            removed,
+            changed,
+        };
+
+        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Record(serde_json::to_value(
+            UboSnapshotDiffResult {
+                run_id_a: Uuid::nil(),
+                run_id_b: Uuid::nil(),
+                added: vec![],
+                removed: vec![],
+                changed: vec![],
+            },
+        )?))
+    }
+}
+
+// ============================================================================
+// Tests
+// ============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_snapshot_capture_metadata() {
+        let op = UboSnapshotCaptureOp;
+        assert_eq!(op.domain(), "ubo");
+        assert_eq!(op.verb(), "snapshot.capture");
+        assert!(!op.rationale().is_empty());
+    }
+
+    #[test]
+    fn test_snapshot_diff_metadata() {
+        let op = UboSnapshotDiffOp;
+        assert_eq!(op.domain(), "ubo");
+        assert_eq!(op.verb(), "snapshot.diff");
+        assert!(!op.rationale().is_empty());
+    }
+}
