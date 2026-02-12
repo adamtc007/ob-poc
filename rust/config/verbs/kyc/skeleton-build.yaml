@@ -1,0 +1,64 @@
+domains:
+  skeleton:
+    description: KYC skeleton build pipeline — orchestrates the full ownership discovery and validation sequence
+    verbs:
+      build:
+        description: Run the full skeleton build pipeline for a KYC case
+        invocation_phrases:
+          - "build skeleton"
+          - "run skeleton build"
+          - "skeleton build for case"
+          - "build ownership skeleton"
+          - "run kyc skeleton"
+          - "discover ownership structure"
+        metadata:
+          tier: composite
+          source_of_truth: workflow
+          scope: cbu
+          noun: skeleton_build
+        behavior: plugin
+        plugin:
+          handler: SkeletonBuildOp
+        args:
+          - name: case-id
+            type: uuid
+            required: true
+            description: The KYC case to build skeleton for
+            lookup:
+              table: cases
+              entity_type: kyc_case
+              schema: kyc
+              search_key: case_id
+              primary_key: case_id
+          - name: source
+            type: string
+            required: false
+            default: MANUAL
+            description: Source identifier for import edges
+          - name: threshold
+            type: decimal
+            required: false
+            default: "5.0"
+            description: UBO threshold percentage
+        returns:
+          type: record
+          description: Summary of the skeleton build pipeline execution
+          fields:
+            - name: case_id
+              type: uuid
+            - name: import_run_id
+              type: uuid
+            - name: determination_run_id
+              type: uuid
+            - name: anomalies_found
+              type: integer
+            - name: ubo_candidates_found
+              type: integer
+            - name: coverage_pct
+              type: decimal
+            - name: outreach_plan_id
+              type: uuid
+            - name: skeleton_ready
+              type: boolean
+            - name: steps_completed
+              type: list

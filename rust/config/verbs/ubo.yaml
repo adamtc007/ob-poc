@@ -815,6 +815,51 @@ domains:
         returns:
           type: record
 
+      compute-chains:
+        description: Compute UBO ownership chains for entities linked to a KYC case
+        invocation_phrases:
+          - "compute UBO chains"
+          - "compute ownership chains"
+          - "run UBO determination"
+          - "determine UBO chains"
+          - "calculate UBO chains"
+          - "compute beneficial ownership chains"
+          - "run chain computation"
+          - "find UBO chains for case"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: ubo
+          tags: [computation, ownership, graph-traversal, chain]
+        args:
+          - name: case-id
+            type: uuid
+            required: true
+            description: KYC case to compute chains for
+            lookup:
+              table: cases
+              entity_type: case
+              schema: kyc
+              search_key: case_ref
+              primary_key: case_id
+          - name: threshold
+            type: decimal
+            required: false
+            default: 5.0
+            description: Minimum ownership percentage to include (default 5%)
+          - name: workstream-id
+            type: uuid
+            required: false
+            description: Optional workstream to narrow computation to a single entity
+          - name: config-version
+            type: string
+            required: false
+            description: Config version tag for audit trail
+        returns:
+          type: record
+
       # =========================================================================
       # UBO Removal Operations (Convergence Model)
       # These plugin handlers manage lifecycle events that affect UBO status

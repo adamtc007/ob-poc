@@ -377,3 +377,59 @@ domains:
           expiry_date: "now()"
         returns:
           type: affected
+
+      # =========================================================================
+      # GATE-BASED EVALUATION (KYC/UBO Computed Architecture)
+      # =========================================================================
+
+      evaluate-gate:
+        description: "Evaluate a named tollgate against case state and coverage data"
+        invocation_phrases:
+          - "evaluate tollgate"
+          - "check tollgate"
+          - "evaluate skeleton ready"
+          - "check gate"
+          - "run gate evaluation"
+          - "tollgate check"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: tollgate
+        behavior: plugin
+        plugin:
+          handler: TollgateEvaluateGateOp
+        args:
+          - name: case-id
+            type: uuid
+            required: true
+            description: "KYC case to evaluate"
+            lookup:
+              table: cases
+              schema: kyc
+              search_key: case_id
+              primary_key: case_id
+          - name: gate-name
+            type: string
+            required: true
+            description: "Name of the tollgate to evaluate"
+            valid_values:
+              - SKELETON_READY
+              - EVIDENCE_COMPLETE
+              - REVIEW_COMPLETE
+          - name: determination-run-id
+            type: uuid
+            required: false
+            description: "Specific determination run to evaluate against"
+        returns:
+          type: record
+          fields:
+            - name: evaluation_id
+              type: uuid
+            - name: gate_name
+              type: string
+            - name: passed
+              type: boolean
+            - name: evaluation_detail
+              type: json
+              description: "Detailed evaluation results per criterion"

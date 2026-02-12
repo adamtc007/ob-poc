@@ -1,0 +1,112 @@
+domains:
+  edge:
+    description: Entity relationship edge management with end-and-insert semantics
+    verbs:
+      upsert:
+        description: Upsert entity relationship edge with natural key lookup and provenance
+        invocation_phrases:
+          - "upsert edge"
+          - "add relationship edge"
+          - "create entity relationship"
+          - "update entity edge"
+          - "set ownership edge"
+          - "link entities"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: entity_relationship
+        behavior: plugin
+        handler: EdgeUpsertOp
+        args:
+          - name: from-entity-id
+            type: uuid
+            required: true
+            description: Source entity of the relationship
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: to-entity-id
+            type: uuid
+            required: true
+            description: Target entity of the relationship
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: relationship-type
+            type: string
+            required: true
+            description: Type of relationship
+            valid_values:
+              - ownership
+              - control
+              - management
+              - trust_interest
+              - fund_role
+              - master_feeder
+              - umbrella_subfund
+              - parallel
+              - investment
+          - name: percentage
+            type: decimal
+            required: false
+            description: Ownership or interest percentage
+          - name: ownership-type
+            type: string
+            required: false
+            description: Type of ownership
+            valid_values:
+              - DIRECT
+              - INDIRECT
+              - BENEFICIAL
+              - NOMINEE
+          - name: control-type
+            type: string
+            required: false
+            description: Type of control
+            valid_values:
+              - BOARD_APPOINTMENT
+              - VOTING_RIGHTS
+              - MANAGEMENT_CONTRACT
+              - VETO_RIGHTS
+              - GOLDEN_SHARE
+              - MANAGEMENT
+          - name: effective-from
+            type: string
+            required: false
+            description: Effective date (YYYY-MM-DD)
+          - name: source
+            type: string
+            required: true
+            description: Source of the relationship data
+          - name: source-document-ref
+            type: string
+            required: false
+            description: Reference to source document
+          - name: confidence
+            type: string
+            required: false
+            description: Confidence level of the relationship
+            default: MEDIUM
+            valid_values:
+              - LOW
+              - MEDIUM
+              - HIGH
+              - VERIFIED
+          - name: import-run-id
+            type: uuid
+            required: false
+            description: ID of the import run that created this edge
+          - name: evidence-hint
+            type: string
+            required: false
+            description: Hint about supporting evidence
+        returns:
+          type: record
+          description: Edge upsert result with action taken (created, replaced, no_change)

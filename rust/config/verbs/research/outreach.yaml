@@ -280,3 +280,59 @@ domains:
             maps_to: request_id
         returns:
           type: record
+
+      # =======================================================================
+      # PLAN GENERATION (KYC/UBO Computed Architecture)
+      # =======================================================================
+
+      plan-generate:
+        description: "Generate outreach plan from coverage gaps and UBO candidates"
+        invocation_phrases:
+          - "generate outreach plan"
+          - "create outreach plan"
+          - "plan outreach"
+          - "generate document requests"
+          - "build outreach plan from gaps"
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: global
+          noun: outreach_plan
+          tags: [write, workflow, plan-generation]
+        behavior: plugin
+        plugin:
+          handler: OutreachPlanGenerateOp
+        args:
+          - name: case-id
+            type: uuid
+            required: true
+            description: "KYC case to generate plan for"
+            lookup:
+              table: cases
+              schema: kyc
+              search_key: case_id
+              primary_key: case_id
+          - name: determination-run-id
+            type: uuid
+            required: true
+            description: "Determination run whose coverage gaps to use"
+          - name: doc-preference
+            type: string
+            required: false
+            description: "Use 'fallback' to request alternative document types"
+            valid_values:
+              - primary
+              - fallback
+        returns:
+          type: record
+          capture: true
+          fields:
+            - name: plan_id
+              type: uuid
+            - name: case_id
+              type: uuid
+            - name: items_count
+              type: integer
+            - name: items
+              type: array
+              description: "Outreach items with gap_ref, doc_type, status"

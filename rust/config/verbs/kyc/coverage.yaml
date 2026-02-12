@@ -1,0 +1,65 @@
+# Coverage Computation Verbs
+# Phase 2.4 of KYC/UBO Computed Architecture
+#
+# Computes per-prong edge/evidence coverage for UBO determination runs,
+# generates stable gap identifiers, and checks blocking-at-gate conditions.
+
+domains:
+  coverage:
+    description: |
+      Coverage computation for KYC/UBO prongs.
+      Computes coverage across OWNERSHIP, IDENTITY, CONTROL, and SOURCE_OF_WEALTH
+      prongs for each UBO candidate in a determination run.
+
+    verbs:
+      compute:
+        description: "Compute per-prong coverage for a UBO determination run"
+        invocation_phrases:
+          - "compute coverage"
+          - "calculate coverage"
+          - "check coverage"
+          - "coverage analysis"
+          - "what's the coverage"
+          - "compute prong coverage"
+          - "gap analysis"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: coverage
+        behavior: plugin
+        plugin:
+          handler: CoverageComputeOp
+        args:
+          - name: case-id
+            type: uuid
+            required: true
+            description: "KYC case to compute coverage for"
+            lookup:
+              table: cases
+              schema: kyc
+              search_key: case_id
+              primary_key: case_id
+          - name: determination-run-id
+            type: uuid
+            required: true
+            description: "Determination run to compute coverage against"
+        returns:
+          type: record
+          fields:
+            - name: run_id
+              type: uuid
+            - name: case_id
+              type: uuid
+            - name: overall_coverage_pct
+              type: decimal
+              description: "Overall coverage percentage (average across prongs)"
+            - name: prong_coverage
+              type: array
+              description: "Per-prong coverage summaries"
+            - name: gaps
+              type: array
+              description: "Coverage gaps with stable gap_id identifiers"
+            - name: gaps_blocking_skeleton
+              type: integer
+              description: "Number of gaps blocking SKELETON_READY gate"

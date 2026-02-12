@@ -400,6 +400,53 @@ domains:
       # COMPARISON OPERATIONS
       # =========================================================================
 
+      # =========================================================================
+      # VALIDATION OPERATIONS
+      # =========================================================================
+
+      validate:
+        description: "Validate ownership/control graph integrity for a KYC case"
+        invocation_phrases:
+          - "validate graph"
+          - "check graph integrity"
+          - "detect ownership cycles"
+          - "validate ownership graph"
+          - "check for graph anomalies"
+          - "graph validation"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: graph
+        behavior: plugin
+        plugin:
+          handler: GraphValidateOp
+        args:
+          - name: case-id
+            type: uuid
+            required: false
+            description: "Scope validation to entities in this KYC case"
+            lookup:
+              table: cases
+              schema: kyc
+              search_key: case_id
+              primary_key: case_id
+        returns:
+          type: record
+          fields:
+            - name: anomalies_found
+              type: integer
+              description: "Number of anomalies detected"
+            - name: anomalies
+              type: array
+              description: "List of anomaly objects with type, entity_ids, detail, severity"
+            - name: edges_analysed
+              type: integer
+            - name: entities_analysed
+              type: integer
+            - name: anomalies_persisted
+              type: integer
+
       compare:
         description: "Compare two graph snapshots to find differences"
         metadata:

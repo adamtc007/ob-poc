@@ -32,6 +32,7 @@ mod cbu_ops;
 mod cbu_role_ops;
 mod client_group_ops;
 mod control_ops;
+mod coverage_compute_ops;
 mod custody;
 mod deal_ops;
 mod dilution_ops;
@@ -43,6 +44,7 @@ mod entity_ops;
 pub mod entity_query;
 mod evidence_ops;
 mod gleif_ops;
+mod graph_validate_ops;
 pub mod helpers;
 mod import_run_ops;
 mod investor_ops;
@@ -54,6 +56,7 @@ mod matrix_overlay_ops;
 mod observation_ops;
 mod onboarding;
 mod outreach_ops;
+mod outreach_plan_ops;
 mod ownership_ops;
 mod pack_ops;
 mod partnership_ops;
@@ -70,17 +73,20 @@ mod screening_ops;
 mod semantic_ops;
 mod service_pipeline_ops;
 mod session_ops;
+mod skeleton_build_ops;
 mod source_loader_ops;
 mod team_ops;
 pub mod template_ops;
 mod temporal_ops;
 
+mod tollgate_evaluate_ops;
 mod tollgate_ops;
 mod trading_matrix;
 mod trading_profile;
 mod trading_profile_ca_ops;
 mod trust_ops;
 mod ubo_analysis;
+mod ubo_compute_ops;
 pub mod ubo_graph_ops;
 mod ubo_registry_ops;
 mod verify_ops;
@@ -157,6 +163,7 @@ pub use trading_profile_ca_ops::{
     TradingProfileCaSetDefaultOp, TradingProfileCaSetElectionOp, TradingProfileCaSetNotificationOp,
 };
 pub use ubo_analysis::{UboCalculateOp, UboListOwnersOp, UboTraceChainsOp};
+pub use ubo_compute_ops::{OwnershipChain, UboCandidate, UboComputeChainsOp, UboComputeResult};
 
 // Domain-specific operation modules
 pub use attribute_ops::{
@@ -236,6 +243,7 @@ pub use dilution_ops::{
     DilutionCreateConvertibleNoteOp, DilutionCreateSafeOp, DilutionExerciseOp, DilutionForfeitOp,
     DilutionGetSummaryOp, DilutionGrantOptionsOp, DilutionIssueWarrantOp, DilutionListOp,
 };
+pub use outreach_plan_ops::OutreachPlanGenerateOp;
 pub use ownership_ops::{
     OwnershipAnalyzeGapsOp, OwnershipComputeOp, OwnershipControlPositionsOp,
     OwnershipReconcileFindingsOp, OwnershipReconcileOp, OwnershipSnapshotListOp,
@@ -245,6 +253,7 @@ pub use partnership_ops::{
     PartnershipAnalyzeControlOp, PartnershipContributionOp, PartnershipDistributionOp,
     PartnershipReconcileOp,
 };
+pub use tollgate_evaluate_ops::TollgateEvaluateGateOp;
 pub use tollgate_ops::{
     TollgateDecisionReadinessOp, TollgateEvaluateOp, TollgateGetMetricsOp, TollgateOverrideOp,
 };
@@ -646,6 +655,8 @@ mod tests {
         // KYC case state operations
         assert!(registry.has("kyc-case", "state"));
         assert!(registry.has("entity-workstream", "state"));
+        // UBO chain computation (Phase 2.3)
+        assert!(registry.has("ubo", "compute-chains"));
         // UBO removal operations (Phase 7)
         assert!(registry.has("ubo", "mark-deceased"));
         assert!(registry.has("ubo", "convergence-supersede"));
@@ -756,6 +767,8 @@ mod tests {
         assert!(registry.has("tollgate", "get-metrics"));
         assert!(registry.has("tollgate", "override"));
         assert!(registry.has("tollgate", "get-decision-readiness"));
+        // Coverage computation (KYC prong analysis)
+        assert!(registry.has("coverage", "compute"));
         // KYC Control Enhancement: Unified control operations
         assert!(registry.has("control", "analyze"));
         assert!(registry.has("control", "build-graph"));
