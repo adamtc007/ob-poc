@@ -371,13 +371,14 @@ domains:
       # =======================================================================
 
       audit-trail:
-        description: "Get research audit trail for an entity"
+        description: "Get research audit trail for an entity including import run history"
         invocation_phrases:
           - "show audit trail"
           - "what research was done"
           - "history of decisions"
           - "how did we get this data"
           - "where did this come from"
+          - "show import history"
         metadata:
           tier: diagnostics
           source_of_truth: workflow
@@ -412,6 +413,42 @@ domains:
             type: boolean
             required: false
             default: true
+          - name: include-import-runs
+            type: boolean
+            required: false
+            default: true
+            description: "Include graph import run history (supersession chain)"
+        returns:
+          type: record
+
+      supersession-trail:
+        description: "Get the full supersession chain for a KYC case — import runs, corrections, stale UBO runs, reset outreach plans, stale tollgates"
+        invocation_phrases:
+          - "show supersession trail"
+          - "what was superseded"
+          - "import run rollback history"
+          - "correction chain"
+          - "what changed after rollback"
+          - "supersession impact"
+        metadata:
+          tier: diagnostics
+          source_of_truth: workflow
+          scope: global
+          noun: supersession_trail
+          tags: [read, query, workflow, audit-trail, correction, supersession]
+        behavior: plugin
+        handler: WorkflowSupersessionTrailOp
+        args:
+          - name: case-id
+            type: uuid
+            required: true
+            description: "KYC case to trace supersession chain for"
+            lookup:
+              table: cases
+              entity_type: kyc_case
+              schema: kyc
+              search_key: case_id
+              primary_key: case_id
         returns:
           type: record
 

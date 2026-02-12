@@ -3,6 +3,18 @@
 //! Manages graph import provenance: begin, complete, and supersede import runs.
 //! Import runs track the source and scope of structural graph data imports,
 //! enabling rollback and correction replay.
+//!
+//! ## Supersession Cascade (Phase 4.2)
+//!
+//! When an import run is superseded, the following downstream re-derivation occurs:
+//! 1. Soft-end all edges from the run (existing)
+//! 2. Record corrections in `kyc.research_corrections` for linked decisions
+//! 3. Mark UBO determination runs as stale (nullify coverage_snapshot)
+//! 4. Mark outreach plans linked to stale determination runs as DRAFT
+//! 5. Insert stale tollgate evaluations for affected cases
+//!
+//! This ensures that downstream computations (UBO chains, coverage, outreach,
+//! tollgate checks) are re-derived after the graph data changes.
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -46,6 +58,18 @@ pub struct ImportRunSupersedeResult {
     pub superseded_by: Option<Uuid>,
     pub edges_ended: i64,
     pub cases_affected: i64,
+    pub corrections_logged: i64,
+    pub ubo_runs_staled: i64,
+    pub outreach_plans_reset: i64,
+    pub tollgates_staled: i64,
+}
+
+/// Row returned when querying linked cases with their decision IDs.
+#[cfg(feature = "database")]
+#[derive(Debug, Clone)]
+struct LinkedCaseRow {
+    case_id: Uuid,
+    decision_id: Option<Uuid>,
 }
 
 // ============================================================================
@@ -229,7 +253,7 @@ impl CustomOperation for ImportRunSupersedeOp {
     }
 
     fn rationale(&self) -> &'static str {
-        "Supersedes an import run: soft-ends all edges, logs corrections for linked cases"
+        "Supersedes an import run: soft-ends edges, logs corrections, triggers re-derivation cascade"
     }
 
     #[cfg(feature = "database")]
@@ -243,7 +267,16 @@ impl CustomOperation for ImportRunSupersedeOp {
         let reason = extract_string(verb_call, "reason")?;
         let superseded_by = extract_uuid_opt(verb_call, ctx, "superseded-by");
 
-        // Mark the run as superseded
+        // Resolve audit user for corrected_by (falls back to a system UUID)
+        let corrected_by: Uuid = ctx
+            .audit_user
+            .as_ref()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or_else(Uuid::nil);
+
+        // ====================================================================
+        // Step 1: Mark the run as superseded
+        // ====================================================================
         sqlx::query(
             r#"UPDATE "ob-poc".graph_import_runs
                SET status = 'SUPERSEDED', superseded_by = $2, superseded_reason = $3
@@ -255,7 +288,9 @@ impl CustomOperation for ImportRunSupersedeOp {
         .execute(pool)
         .await?;
 
-        // Soft-end all edges from this run
+        // ====================================================================
+        // Step 2: Soft-end all edges from this run
+        // ====================================================================
         let edges_ended = sqlx::query(
             r#"UPDATE "ob-poc".entity_relationships
                SET effective_to = CURRENT_DATE
@@ -266,33 +301,154 @@ impl CustomOperation for ImportRunSupersedeOp {
         .await?
         .rows_affected() as i64;
 
-        // Log corrections for linked cases
-        let cases_affected = sqlx::query_scalar::<_, i64>(
-            r#"SELECT count(*) FROM kyc.case_import_runs WHERE run_id = $1"#,
+        // ====================================================================
+        // Step 3: Find linked cases (with their decision IDs for corrections)
+        // ====================================================================
+        let linked_cases: Vec<LinkedCaseRow> = sqlx::query_as::<_, (Uuid, Option<Uuid>)>(
+            r#"SELECT case_id, decision_id FROM kyc.case_import_runs WHERE run_id = $1"#,
         )
         .bind(run_id)
-        .fetch_one(pool)
-        .await?;
+        .fetch_all(pool)
+        .await?
+        .into_iter()
+        .map(|(case_id, decision_id)| LinkedCaseRow {
+            case_id,
+            decision_id,
+        })
+        .collect();
 
-        // Record correction in research audit trail for each linked case
-        let linked_cases: Vec<(Uuid,)> =
-            sqlx::query_as(r#"SELECT case_id FROM kyc.case_import_runs WHERE run_id = $1"#)
-                .bind(run_id)
-                .fetch_all(pool)
-                .await?;
+        let cases_affected = linked_cases.len() as i64;
 
-        for (case_id,) in &linked_cases {
+        // ====================================================================
+        // Step 4: Record corrections in research_corrections for linked decisions
+        //
+        // research_corrections requires original_decision_id (NOT NULL) and
+        // corrected_by (NOT NULL). We can only insert when a decision_id exists
+        // in the case_import_runs linkage.
+        // ====================================================================
+        let mut corrections_logged: i64 = 0;
+        for linked in &linked_cases {
+            if let Some(decision_id) = linked.decision_id {
+                let correction_id = Uuid::new_v4();
+                let inserted = sqlx::query(
+                    r#"INSERT INTO kyc.research_corrections
+                       (correction_id, original_decision_id, correction_type,
+                        correction_reason, corrected_by)
+                       VALUES ($1, $2, 'STALE_DATA', $3, $4)"#,
+                )
+                .bind(correction_id)
+                .bind(decision_id)
+                .bind(format!(
+                    "Import run {} superseded (case {}): {}",
+                    run_id, linked.case_id, reason
+                ))
+                .bind(corrected_by)
+                .execute(pool)
+                .await;
+
+                if inserted.is_ok() {
+                    corrections_logged += 1;
+                }
+            }
+        }
+
+        // ====================================================================
+        // Step 5: Mark UBO determination runs as stale for affected cases
+        //
+        // ubo_determination_runs has no status column — it stores immutable
+        // snapshots. We mark staleness by nullifying coverage_snapshot so that
+        // downstream consumers know re-computation is needed. The chains_snapshot
+        // is preserved for audit/diff purposes.
+        // ====================================================================
+        let case_ids: Vec<Uuid> = linked_cases.iter().map(|lc| lc.case_id).collect();
+        let ubo_runs_staled: i64 = if !case_ids.is_empty() {
             sqlx::query(
-                r#"INSERT INTO kyc.research_corrections
-                   (case_id, correction_type, description, created_at)
-                   VALUES ($1, 'IMPORT_SUPERSEDED', $2, NOW())
-                   ON CONFLICT DO NOTHING"#,
+                r#"UPDATE kyc.ubo_determination_runs
+                   SET coverage_snapshot = NULL
+                   WHERE case_id = ANY($1)
+                     AND coverage_snapshot IS NOT NULL"#,
+            )
+            .bind(&case_ids)
+            .execute(pool)
+            .await?
+            .rows_affected() as i64
+        } else {
+            0
+        };
+
+        // ====================================================================
+        // Step 6: Reset outreach plans linked to stale determination runs
+        //
+        // Any DRAFT or APPROVED outreach plans whose determination_run_id
+        // points to an affected case should be reset to DRAFT so they get
+        // regenerated after re-computation.
+        // ====================================================================
+        let outreach_plans_reset: i64 = if !case_ids.is_empty() {
+            sqlx::query(
+                r#"UPDATE kyc.outreach_plans
+                   SET status = 'DRAFT'
+                   WHERE case_id = ANY($1)
+                     AND status IN ('APPROVED', 'SENT')
+                     AND determination_run_id IN (
+                         SELECT run_id FROM kyc.ubo_determination_runs
+                         WHERE case_id = ANY($1)
+                     )"#,
+            )
+            .bind(&case_ids)
+            .execute(pool)
+            .await?
+            .rows_affected() as i64
+        } else {
+            0
+        };
+
+        // ====================================================================
+        // Step 7: Mark existing tollgate evaluations as stale
+        //
+        // Insert a new evaluation for each affected case with passed=false
+        // and a detail payload explaining the supersession. This preserves
+        // the old evaluation for audit while signalling that re-evaluation
+        // is required.
+        // ====================================================================
+        let mut tollgates_staled: i64 = 0;
+        for case_id in &case_ids {
+            // Find tollgates that previously passed for this case
+            let passed_tollgates: Vec<(String,)> = sqlx::query_as(
+                r#"SELECT DISTINCT tollgate_id
+                   FROM kyc.tollgate_evaluations
+                   WHERE case_id = $1 AND passed = true"#,
             )
             .bind(case_id)
-            .bind(format!("Import run {} superseded: {}", run_id, reason))
-            .execute(pool)
-            .await
-            .ok(); // Best-effort — table may not exist yet
+            .fetch_all(pool)
+            .await?;
+
+            for (tollgate_id,) in &passed_tollgates {
+                let eval_id = Uuid::new_v4();
+                let detail = serde_json::json!({
+                    "stale_reason": "import_run_superseded",
+                    "superseded_run_id": run_id,
+                    "superseded_by": superseded_by,
+                    "reason": reason,
+                    "requires_recomputation": true
+                });
+
+                let inserted = sqlx::query(
+                    r#"INSERT INTO kyc.tollgate_evaluations
+                       (evaluation_id, case_id, tollgate_id, passed,
+                        evaluation_detail, config_version)
+                       VALUES ($1, $2, $3, false, $4, 'supersession')"#,
+                )
+                .bind(eval_id)
+                .bind(case_id)
+                .bind(tollgate_id)
+                .bind(detail)
+                .execute(pool)
+                .await;
+
+                if inserted.is_ok() {
+                    tollgates_staled += 1;
+                }
+            }
         }
 
         let result = ImportRunSupersedeResult {
@@ -300,6 +456,10 @@ impl CustomOperation for ImportRunSupersedeOp {
             superseded_by,
             edges_ended,
             cases_affected,
+            corrections_logged,
+            ubo_runs_staled,
+            outreach_plans_reset,
+            tollgates_staled,
         };
         Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }

@@ -112,7 +112,10 @@ pub use custody::{
     ValidateBookingCoverageOp,
 };
 pub use entity_query::{EntityQueryOp, EntityQueryResult};
-pub use kyc_case_ops::{KycCaseStateOp, WorkstreamStateOp};
+pub use kyc_case_ops::{
+    KycCaseCloseOp, KycCaseCloseResult, KycCaseCreateOp, KycCaseCreateResult, KycCaseStateOp,
+    WorkstreamStateOp,
+};
 pub use lifecycle_ops::{
     LifecycleAnalyzeGapsOp, LifecycleCheckReadinessOp, LifecycleDiscoverOp, LifecycleExecutePlanOp,
     LifecycleGeneratePlanOp, LifecycleProvisionOp,
@@ -658,7 +661,9 @@ mod tests {
         assert!(registry.has("document", "request"));
         assert!(registry.has("document", "upload"));
         assert!(registry.has("document", "waive-request"));
-        // KYC case state operations
+        // KYC case operations
+        assert!(registry.has("kyc-case", "create"));
+        assert!(registry.has("kyc-case", "close"));
         assert!(registry.has("kyc-case", "state"));
         assert!(registry.has("entity-workstream", "state"));
         // UBO chain computation (Phase 2.3)
