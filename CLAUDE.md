@@ -53,6 +53,8 @@
 > **BPMN-Lite Phase 4 (PostgresProcessStore):** ✅ Complete - Feature-gated (`postgres`) PostgreSQL-backed ProcessStore, 12 migrations, 29 async methods, `--database-url` CLI arg with MemoryStore fallback, 15 integration tests
 > **BPMN-Lite Authoring (Phases B-D):** ✅ Complete - Verb contracts + lint rules (5 rules), BPMN 2.0 XML export + IR↔DTO round-trip, template registry + atomic publish pipeline, PostgresTemplateStore, 123 core tests + 6 integration tests
 > **KYC/UBO Skeleton Build Pipeline:** ✅ Complete - 7-step build (import-run → graph validate → UBO compute → coverage → outreach plan → tollgate → complete), real computation in all ops, 12 integration tests with assertions
+> **KYC Skeleton Build Post-Audit (S1):** ✅ Complete - Decimal conversion (F-5), coverage ownership scoping (F-2), transaction boundary (F-1), configurable outreach cap (F-4), shared function extraction (F-3a-e)
+> **KYC Skeleton Build Post-Audit (S2):** ✅ Complete - Import run case linkage on idempotent hit (F-7), as_of date for import runs (F-8a-c), case status state machine with KycCaseUpdateStatusOp plugin (F-6a-e), 4 transition tests
 
 This is the root project guide for Claude Code. Domain-specific details are in annexes.
 
@@ -5539,6 +5541,9 @@ When you see these in a task, read the corresponding annex first:
 | "authoring", "VerbContract", "ContractRegistry", "lint_contracts", "LintDiagnostic" | CLAUDE.md §BPMN-Lite §Authoring Pipeline (Phases B-D) |
 | "export_bpmn", "dto_to_bpmn_xml", "BPMN XML export", "ir_to_dto", "round-trip" | CLAUDE.md §BPMN-Lite §Authoring Pipeline (Phases B-D) |
 | "TemplateStore", "WorkflowTemplate", "publish_workflow", "compile_and_publish", "TemplateState" | CLAUDE.md §BPMN-Lite §Authoring Pipeline (Phases B-D) |
+| "skeleton build", "skeleton_build_ops", "run_graph_validate", "run_ubo_compute", "run_coverage_compute", "run_outreach_plan", "run_tollgate_evaluate" | `rust/src/domain_ops/skeleton_build_ops.rs`, `KYC_SKELETON_FIXES.md` |
+| "case transition", "CASE_TRANSITIONS", "KycCaseUpdateStatusOp", "update-status plugin", "is_valid_transition" | `rust/src/domain_ops/kyc_case_ops.rs`, `KYC_SKELETON_FIXES_S2.md` |
+| "import run", "ImportRunBeginOp", "as_of", "idempotency", "case_import_runs" | `rust/src/domain_ops/import_run_ops.rs`, `rust/config/verbs/research/import-run.yaml` |
 
 ---
 
