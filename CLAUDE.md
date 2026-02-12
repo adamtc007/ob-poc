@@ -1,12 +1,12 @@
 # CLAUDE.md
 
-> **Last reviewed:** 2026-02-07
+> **Last reviewed:** 2026-02-12
 > **Frontend:** React/TypeScript (`ob-poc-ui-react/`) - Chat UI with scope panel, Inspector
 > **Backend:** Rust/Axum (`rust/crates/ob-poc-web/`) - Serves React + REST API
 > **Crates:** 18 active Rust crates (esper_* crates deprecated after React migration)
 > **Verbs:** 1,083 canonical verbs, 14,593 intent patterns (DB-sourced)
 > **Migrations:** 77 schema migrations (+ 072b seed)
-> **Schema Overview:** `migrations/OB_POC_SCHEMA_ENTITY_OVERVIEW.md` — living doc, 14 sections, ~150 tables, 10 mermaid ER diagrams
+> **Schema Overview:** `migrations/OB_POC_SCHEMA_ENTITY_OVERVIEW.md` — living doc, 14 sections, ~185 tables (ob-poc + kyc), 13 mermaid ER diagrams
 > **Embeddings:** Candle local (384-dim, BGE-small-en-v1.5) - 14,593 patterns vectorized
 > **React Migration (077):** ✅ Complete - egui/WASM replaced with React/TypeScript, 3-panel chat layout
 > **Verb Phrase Generation:** ✅ Complete - V1 YAML auto-generates phrases on load (no V2 registry)
@@ -52,6 +52,7 @@
 > **BPMN-Lite Integration (Phase B):** ✅ Complete - ob-poc ↔ bpmn-lite wiring: WorkflowDispatcher (queue-based resilience), JobWorker, EventBridge, SignalRelay, PendingDispatchWorker, correlation stores, 41 unit tests + 13 integration tests + 15 E2E choreography tests
 > **BPMN-Lite Phase 4 (PostgresProcessStore):** ✅ Complete - Feature-gated (`postgres`) PostgreSQL-backed ProcessStore, 12 migrations, 29 async methods, `--database-url` CLI arg with MemoryStore fallback, 15 integration tests
 > **BPMN-Lite Authoring (Phases B-D):** ✅ Complete - Verb contracts + lint rules (5 rules), BPMN 2.0 XML export + IR↔DTO round-trip, template registry + atomic publish pipeline, PostgresTemplateStore, 123 core tests + 6 integration tests
+> **KYC/UBO Skeleton Build Pipeline:** ✅ Complete - 7-step build (import-run → graph validate → UBO compute → coverage → outreach plan → tollgate → complete), real computation in all ops, 12 integration tests with assertions
 
 This is the root project guide for Claude Code. Domain-specific details are in annexes.
 

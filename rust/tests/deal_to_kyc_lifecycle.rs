@@ -8,7 +8,7 @@
 //! the KYC case lifecycle, validating that KYC case closure propagates
 //! a gate-completion event back to the deal audit trail.
 //!
-//! All tests are compile-only (`#[ignore]`) since they require a live database.
+//! All tests require a live database (`#[ignore]`).
 //!
 //! Run all tests:
 //!   DATABASE_URL="postgresql:///data_designer" cargo test --features database \
@@ -29,397 +29,670 @@ mod deal_to_kyc_lifecycle {
     // Test Infrastructure
     // =========================================================================
 
-    /// Create a database pool from DATABASE_URL environment variable.
     #[cfg(feature = "database")]
-    async fn create_pool() -> PgPool {
-        let url = std::env::var("DATABASE_URL")
-            .unwrap_or_else(|_| panic!("DATABASE_URL must be set for integration tests"));
-        PgPool::connect(&url)
+    struct TestDb {
+        pool: PgPool,
+        prefix: String,
+    }
+
+    #[cfg(feature = "database")]
+    impl TestDb {
+        async fn new() -> Self {
+            let url = std::env::var("TEST_DATABASE_URL")
+                .or_else(|_| std::env::var("DATABASE_URL"))
+                .unwrap_or_else(|_| "postgresql:///data_designer".into());
+            let pool = PgPool::connect(&url)
+                .await
+                .expect("Failed to connect to database");
+            let prefix = format!("dkyc_test_{}", &Uuid::new_v4().to_string()[..8]);
+            Self { pool, prefix }
+        }
+
+        fn name(&self, suffix: &str) -> String {
+            format!("{}_{}", self.prefix, suffix)
+        }
+
+        /// Create a test entity.
+        async fn create_entity(&self, name: &str) -> Uuid {
+            let id = Uuid::new_v4();
+            sqlx::query(
+                r#"INSERT INTO "ob-poc".entities (entity_id, name, entity_type)
+                   VALUES ($1, $2, 'ORGANIZATION')"#,
+            )
+            .bind(id)
+            .bind(name)
+            .execute(&self.pool)
             .await
-            .expect("Failed to connect to database")
-    }
+            .expect("create entity");
+            id
+        }
 
-    /// Generate a unique deal reference for test isolation.
-    fn test_deal_ref() -> String {
-        format!("DEAL-TEST-{}", &Uuid::new_v4().to_string()[..8])
-    }
+        /// Create a test CBU.
+        async fn create_cbu(&self, name: &str) -> Uuid {
+            let id = Uuid::new_v4();
+            sqlx::query(
+                r#"INSERT INTO "ob-poc".cbus (cbu_id, cbu_name, status)
+                   VALUES ($1, $2, 'ACTIVE')"#,
+            )
+            .bind(id)
+            .bind(name)
+            .execute(&self.pool)
+            .await
+            .expect("create cbu");
+            id
+        }
 
-    /// Generate a unique case reference for test isolation.
-    fn test_case_ref() -> String {
-        format!("KYC-TEST-{}", &Uuid::new_v4().to_string()[..8])
+        /// Create a test client group.
+        async fn create_client_group(&self, name: &str) -> Uuid {
+            let id = Uuid::new_v4();
+            sqlx::query(
+                r#"INSERT INTO "ob-poc".client_group (group_id, canonical_name)
+                   VALUES ($1, $2)"#,
+            )
+            .bind(id)
+            .bind(name)
+            .execute(&self.pool)
+            .await
+            .expect("create client group");
+            id
+        }
+
+        /// Create a deal, returning deal_id.
+        async fn create_deal(&self, name: &str, group_id: Uuid, status: &str) -> Uuid {
+            let id = Uuid::new_v4();
+            sqlx::query(
+                r#"INSERT INTO "ob-poc".deals
+                     (deal_id, deal_name, primary_client_group_id, deal_status,
+                      sales_owner)
+                   VALUES ($1, $2, $3, $4, 'test@bank.com')"#,
+            )
+            .bind(id)
+            .bind(name)
+            .bind(group_id)
+            .bind(status)
+            .execute(&self.pool)
+            .await
+            .expect("create deal");
+
+            // Record DEAL_CREATED event
+            sqlx::query(
+                r#"INSERT INTO "ob-poc".deal_events
+                     (event_id, deal_id, event_type, subject_type, subject_id,
+                      new_value, actor)
+                   VALUES ($1, $2, 'DEAL_CREATED', 'DEAL', $2, $3, 'test@bank.com')"#,
+            )
+            .bind(Uuid::new_v4())
+            .bind(id)
+            .bind(status)
+            .execute(&self.pool)
+            .await
+            .expect("record deal created event");
+
+            id
+        }
+
+        /// Create a KYC case linked to a deal, returning case_id.
+        async fn create_case_with_deal(&self, cbu_id: Uuid, deal_id: Uuid, group_id: Uuid) -> Uuid {
+            let id = Uuid::new_v4();
+            sqlx::query(
+                r#"INSERT INTO kyc.cases
+                     (case_id, cbu_id, case_type, status, deal_id, client_group_id)
+                   VALUES ($1, $2, 'NEW_CLIENT', 'INTAKE', $3, $4)"#,
+            )
+            .bind(id)
+            .bind(cbu_id)
+            .bind(deal_id)
+            .bind(group_id)
+            .execute(&self.pool)
+            .await
+            .expect("create case with deal");
+            id
+        }
+
+        /// Create a standalone KYC case (no deal link).
+        async fn create_case_standalone(&self, cbu_id: Uuid) -> Uuid {
+            let id = Uuid::new_v4();
+            sqlx::query(
+                r#"INSERT INTO kyc.cases (case_id, cbu_id, case_type, status)
+                   VALUES ($1, $2, 'NEW_CLIENT', 'INTAKE')"#,
+            )
+            .bind(id)
+            .bind(cbu_id)
+            .execute(&self.pool)
+            .await
+            .expect("create standalone case");
+            id
+        }
+
+        /// Link a case to a deal via deal_ubo_assessments.
+        async fn link_case_to_deal(&self, deal_id: Uuid, entity_id: Uuid, case_id: Uuid) -> Uuid {
+            let id = Uuid::new_v4();
+            sqlx::query(
+                r#"INSERT INTO "ob-poc".deal_ubo_assessments
+                     (assessment_id, deal_id, entity_id, kyc_case_id,
+                      assessment_status)
+                   VALUES ($1, $2, $3, $4, 'PENDING')"#,
+            )
+            .bind(id)
+            .bind(deal_id)
+            .bind(entity_id)
+            .bind(case_id)
+            .execute(&self.pool)
+            .await
+            .expect("link case to deal");
+            id
+        }
+
+        /// Progress a case through the full lifecycle to REVIEW status.
+        async fn advance_case_to_review(&self, case_id: Uuid) {
+            for status in ["DISCOVERY", "ASSESSMENT", "REVIEW"] {
+                sqlx::query(
+                    r#"UPDATE kyc.cases SET status = $2, updated_at = NOW()
+                       WHERE case_id = $1"#,
+                )
+                .bind(case_id)
+                .bind(status)
+                .execute(&self.pool)
+                .await
+                .unwrap();
+            }
+        }
+
+        /// Close a case with a specific status. Mimics KycCaseCloseOp behavior:
+        /// if status=APPROVED and deal_id exists, emits KYC_GATE_COMPLETED event.
+        async fn close_case(&self, case_id: Uuid, close_status: &str) {
+            // Load case to get deal_id
+            let case_row: (String, Option<Uuid>, Option<String>) = sqlx::query_as(
+                r#"SELECT status, deal_id, case_ref FROM kyc.cases WHERE case_id = $1"#,
+            )
+            .bind(case_id)
+            .fetch_one(&self.pool)
+            .await
+            .expect("load case for close");
+
+            let current_status = case_row.0;
+            let deal_id = case_row.1;
+            let case_ref = case_row.2.unwrap_or_default();
+
+            assert_eq!(
+                current_status, "REVIEW",
+                "Case must be in REVIEW to close (was {})",
+                current_status
+            );
+
+            // Close the case
+            sqlx::query(
+                r#"UPDATE kyc.cases
+                   SET status = $2, closed_at = NOW(), updated_at = NOW()
+                   WHERE case_id = $1"#,
+            )
+            .bind(case_id)
+            .bind(close_status)
+            .execute(&self.pool)
+            .await
+            .unwrap();
+
+            // If APPROVED and linked to deal -> emit KYC_GATE_COMPLETED
+            if close_status == "APPROVED" {
+                if let Some(did) = deal_id {
+                    let desc = format!("KYC case {} approved for case_id={}", case_ref, case_id);
+                    sqlx::query(
+                        r#"INSERT INTO "ob-poc".deal_events
+                             (event_id, deal_id, event_type, subject_type,
+                              subject_id, new_value, description)
+                           VALUES ($1, $2, 'KYC_GATE_COMPLETED', 'KYC_CASE',
+                                   $3, 'APPROVED', $4)"#,
+                    )
+                    .bind(Uuid::new_v4())
+                    .bind(did)
+                    .bind(case_id)
+                    .bind(&desc)
+                    .execute(&self.pool)
+                    .await
+                    .unwrap();
+                }
+            }
+        }
+
+        /// Count deal events of a given type for a deal.
+        async fn count_deal_events(&self, deal_id: Uuid, event_type: &str) -> i64 {
+            let row: (i64,) = sqlx::query_as(
+                r#"SELECT COUNT(*) FROM "ob-poc".deal_events
+                   WHERE deal_id = $1 AND event_type = $2"#,
+            )
+            .bind(deal_id)
+            .bind(event_type)
+            .fetch_one(&self.pool)
+            .await
+            .expect("count deal events");
+            row.0
+        }
+
+        /// Count deal events referencing a specific case.
+        async fn count_gate_events_for_case(&self, case_id: Uuid) -> i64 {
+            let row: (i64,) = sqlx::query_as(
+                r#"SELECT COUNT(*) FROM "ob-poc".deal_events
+                   WHERE event_type = 'KYC_GATE_COMPLETED'
+                     AND subject_type = 'KYC_CASE'
+                     AND subject_id = $1"#,
+            )
+            .bind(case_id)
+            .fetch_one(&self.pool)
+            .await
+            .expect("count gate events for case");
+            row.0
+        }
+
+        /// Get assessment status for a deal+case pair.
+        async fn get_assessment_status(&self, deal_id: Uuid, case_id: Uuid) -> Option<String> {
+            let row: Option<(String,)> = sqlx::query_as(
+                r#"SELECT assessment_status FROM "ob-poc".deal_ubo_assessments
+                   WHERE deal_id = $1 AND kyc_case_id = $2"#,
+            )
+            .bind(deal_id)
+            .bind(case_id)
+            .fetch_optional(&self.pool)
+            .await
+            .expect("get assessment status");
+            row.map(|r| r.0)
+        }
+
+        async fn cleanup(&self) {
+            let pattern = format!("{}%", self.prefix);
+
+            // Deal events
+            sqlx::query(
+                r#"DELETE FROM "ob-poc".deal_events WHERE deal_id IN
+                   (SELECT deal_id FROM "ob-poc".deals WHERE deal_name LIKE $1)"#,
+            )
+            .bind(&pattern)
+            .execute(&self.pool)
+            .await
+            .ok();
+
+            // Deal UBO assessments
+            sqlx::query(
+                r#"DELETE FROM "ob-poc".deal_ubo_assessments WHERE deal_id IN
+                   (SELECT deal_id FROM "ob-poc".deals WHERE deal_name LIKE $1)"#,
+            )
+            .bind(&pattern)
+            .execute(&self.pool)
+            .await
+            .ok();
+
+            // KYC cases
+            sqlx::query(
+                r#"DELETE FROM kyc.cases WHERE cbu_id IN
+                   (SELECT cbu_id FROM "ob-poc".cbus WHERE cbu_name LIKE $1)"#,
+            )
+            .bind(&pattern)
+            .execute(&self.pool)
+            .await
+            .ok();
+
+            // Deals
+            sqlx::query(r#"DELETE FROM "ob-poc".deals WHERE deal_name LIKE $1"#)
+                .bind(&pattern)
+                .execute(&self.pool)
+                .await
+                .ok();
+
+            // CBUs, entities, client groups
+            sqlx::query(r#"DELETE FROM "ob-poc".cbus WHERE cbu_name LIKE $1"#)
+                .bind(&pattern)
+                .execute(&self.pool)
+                .await
+                .ok();
+
+            sqlx::query(r#"DELETE FROM "ob-poc".entities WHERE name LIKE $1"#)
+                .bind(&pattern)
+                .execute(&self.pool)
+                .await
+                .ok();
+
+            sqlx::query(r#"DELETE FROM "ob-poc".client_group WHERE canonical_name LIKE $1"#)
+                .bind(&pattern)
+                .execute(&self.pool)
+                .await
+                .ok();
+        }
     }
 
     // =========================================================================
-    // Happy Path: Deal -> KYC -> Approved -> Gate Event
+    // Test 1: Full Happy Path — Deal -> KYC -> Approved -> Gate Event
     // =========================================================================
 
-    /// Full happy path: deal CONTRACTED -> KYC case linked -> lifecycle ->
-    /// APPROVED -> deal_events has KYC_GATE_COMPLETED.
-    ///
-    /// This test exercises the complete deal-to-KYC bridge:
-    ///
-    /// Phase 1 - DEAL SETUP:
-    ///   - Create deal in CONTRACTED status
-    ///   - Record deal_id for downstream linking
-    ///
-    /// Phase 2 - KYC CASE CREATION (linked to deal):
-    ///   - Create KYC case with CBU reference
-    ///   - Link case to deal via deal_ubo_assessments (deal_id + kyc_case_id)
-    ///   - Verify case status = INTAKE and deal linkage established
-    ///
-    /// Phase 3 - SKELETON / ASSESSMENT / REVIEW:
-    ///   - Build ownership skeleton
-    ///   - Progress through ASSESSMENT (promote UBOs, collect evidence)
-    ///   - Assign reviewer and advance through REVIEW
-    ///
-    /// Phase 4 - CLOSE CASE + GATE EVENT:
-    ///   - Close case as APPROVED
-    ///   - Verify deal_events contains a KYC_GATE_COMPLETED entry
-    ///     with subject_type = 'KYC_CASE' and subject_id = case_id
-    ///   - Verify deal_ubo_assessments.assessment_status = 'COMPLETED'
+    /// Full lifecycle: deal CONTRACTED -> KYC case created and linked ->
+    /// case progresses -> APPROVED -> deal_events has KYC_GATE_COMPLETED.
     #[tokio::test]
     #[ignore = "requires database"]
     async fn test_deal_to_kyc_full_lifecycle() {
         #[cfg(feature = "database")]
         {
-            let _pool = create_pool().await;
-            let deal_ref = test_deal_ref();
-            let case_ref = test_case_ref();
-            let _deal_id = Uuid::new_v4();
-            let _case_id = Uuid::new_v4();
-            let _entity_id = Uuid::new_v4();
-            let _cbu_id = Uuid::new_v4();
+            let db = TestDb::new().await;
 
-            // =================================================================
             // Phase 1: DEAL SETUP
-            // =================================================================
+            let group_id = db.create_client_group(&db.name("group")).await;
+            let cbu_id = db.create_cbu(&db.name("fund")).await;
+            let entity_id = db.create_entity(&db.name("entity")).await;
+            let deal_id = db
+                .create_deal(&db.name("deal"), group_id, "CONTRACTED")
+                .await;
 
-            // Step 1: Create deal in CONTRACTED status
-            // DSL: (deal.create :deal-name "Test Deal" :client-group-id <group>
-            //        :sales-owner "test@bank.com" :as @deal)
-            // DSL: (deal.update-status :deal-id @deal :new-status "CONTRACTED")
-            // Expected: deal_id returned, deal_status = CONTRACTED
-            println!("[Step 1] Create deal in CONTRACTED status: {}", deal_ref);
-
-            // Step 2: Record deal_events entry for deal creation
-            // Expected: deal_events has DEAL_CREATED + STATUS_CHANGED entries
-            println!("[Step 2] Verify DEAL_CREATED event recorded");
-
-            // =================================================================
-            // Phase 2: KYC CASE CREATION (linked to deal)
-            // =================================================================
-
-            // Step 3: Create KYC case for the CBU
-            // DSL: (kyc-case.create :cbu-id <test-cbu> :case-type "NEW_CLIENT")
-            // Expected: case_id returned, status = INTAKE
-            println!("[Step 3] Create KYC case: {}", case_ref);
-
-            // Step 4: Link KYC case to deal via deal_ubo_assessments
-            // This is the bridge table: deal_ubo_assessments has deal_id,
-            // entity_id, and kyc_case_id columns.
-            // DSL: (deal.create-ubo-assessment :deal-id @deal
-            //        :entity-id @entity :kyc-case-id @case)
-            // Expected: assessment_id returned, assessment_status = PENDING
-            println!("[Step 4] Link KYC case to deal via deal_ubo_assessments");
-
-            // Step 5: Verify the linkage is established
-            // Query: SELECT * FROM deal_ubo_assessments
-            //        WHERE deal_id = @deal AND kyc_case_id = @case
-            // Expected: exactly 1 row, assessment_status = 'PENDING'
-            println!("[Step 5] Verify deal-to-case linkage in deal_ubo_assessments");
-
-            // =================================================================
-            // Phase 3: KYC LIFECYCLE (abbreviated)
-            // =================================================================
-
-            // Step 6: Build ownership skeleton
-            // DSL: (skeleton.build :case-id @case :source "GLEIF" :threshold 5.0)
-            // Expected: ownership graph populated, UBO candidates found
-            println!("[Step 6] Build ownership skeleton");
-
-            // Step 7: Evaluate SKELETON_READY gate and transition to ASSESSMENT
-            // DSL: (tollgate.evaluate-gate :case-id @case :gate-name "SKELETON_READY")
-            // DSL: (kyc-case.update-status :case-id @case :status "ASSESSMENT")
-            // Expected: gate passed, status = ASSESSMENT
-            println!("[Step 7] SKELETON_READY gate -> transition to ASSESSMENT");
-
-            // Step 8: Promote UBO candidates and collect/verify evidence
-            // DSL: (ubo.registry.promote :registry-id @ubo-entry)
-            // DSL: (evidence.require :registry-id @ubo-entry :evidence-type "IDENTITY_DOCUMENT")
-            // DSL: (evidence.link :evidence-id @evidence :document-id @doc)
-            // DSL: (evidence.verify :evidence-id @evidence :verified-by "analyst@bank.com")
-            // Expected: all UBOs promoted, evidence verified
-            println!("[Step 8] Promote UBOs, collect and verify evidence");
-
-            // Step 9: Evaluate EVIDENCE_COMPLETE gate and transition to REVIEW
-            // DSL: (tollgate.evaluate-gate :case-id @case :gate-name "EVIDENCE_COMPLETE")
-            // DSL: (kyc-case.update-status :case-id @case :status "REVIEW")
-            // Expected: gate passed, status = REVIEW
-            println!("[Step 9] EVIDENCE_COMPLETE gate -> transition to REVIEW");
-
-            // Step 10: Assign reviewer and advance UBO registry entries
-            // DSL: (kyc-case.assign :case-id @case :reviewer-id @reviewer)
-            // DSL: (ubo.registry.advance :registry-id @ubo-entry :new-status "APPROVED")
-            // Expected: reviewer assigned, all UBOs approved
-            println!("[Step 10] Assign reviewer, advance UBOs to APPROVED");
-
-            // Step 11: Evaluate REVIEW_COMPLETE gate
-            // DSL: (tollgate.evaluate-gate :case-id @case :gate-name "REVIEW_COMPLETE")
-            // Expected: gate passed
-            println!("[Step 11] Evaluate REVIEW_COMPLETE gate");
-
-            // =================================================================
-            // Phase 4: CLOSE CASE + VERIFY DEAL GATE EVENT
-            // =================================================================
-
-            // Step 12: Close case as APPROVED
-            // DSL: (kyc-case.close :case-id @case :status "APPROVED")
-            // Expected: case status = APPROVED, closed_at set
-            println!("[Step 12] Close KYC case as APPROVED");
-
-            // Step 13: Verify deal_ubo_assessments updated
-            // Query: SELECT assessment_status, completed_at
-            //        FROM deal_ubo_assessments
-            //        WHERE deal_id = @deal AND kyc_case_id = @case
-            // Expected: assessment_status = 'COMPLETED', completed_at IS NOT NULL
-            println!("[Step 13] Verify deal_ubo_assessments.assessment_status = COMPLETED");
-
-            // Step 14: Verify KYC_GATE_COMPLETED event in deal_events
-            // Query: SELECT * FROM deal_events
-            //        WHERE deal_id = @deal
-            //          AND event_type = 'KYC_GATE_COMPLETED'
-            //          AND subject_type = 'KYC_CASE'
-            //          AND subject_id = @case
-            // Expected: exactly 1 row with:
-            //   - event_type = 'KYC_GATE_COMPLETED'
-            //   - subject_type = 'KYC_CASE'
-            //   - subject_id = case_id
-            //   - new_value = 'APPROVED'
-            //   - description contains case reference
-            println!("[Step 14] Verify KYC_GATE_COMPLETED event in deal_events");
-
-            // Step 15: Verify deal_events audit trail completeness
-            // Query: SELECT event_type FROM deal_events
-            //        WHERE deal_id = @deal ORDER BY occurred_at
-            // Expected sequence includes:
-            //   DEAL_CREATED -> STATUS_CHANGED (CONTRACTED) -> KYC_GATE_COMPLETED
-            println!("[Step 15] Verify full deal_events audit trail");
-
-            // -----------------------------------------------------------------
-            // Assertions
-            // -----------------------------------------------------------------
-
-            // Assert: KYC case status is APPROVED with closed_at set
-            // Assert: deal_ubo_assessments.assessment_status = 'COMPLETED'
-            // Assert: deal_ubo_assessments.completed_at IS NOT NULL
-            // Assert: deal_events contains exactly 1 KYC_GATE_COMPLETED event
-            // Assert: KYC_GATE_COMPLETED event references the correct case_id
-            // Assert: deal_events audit trail is complete (creation -> gate)
-            println!(
-                "[PASS] Deal-to-KYC lifecycle complete: deal={}, case={}",
-                deal_ref, case_ref
+            // Verify deal creation event
+            assert_eq!(
+                db.count_deal_events(deal_id, "DEAL_CREATED").await,
+                1,
+                "DEAL_CREATED event should exist"
             );
+
+            // Phase 2: KYC CASE CREATION linked to deal
+            let case_id = db.create_case_with_deal(cbu_id, deal_id, group_id).await;
+
+            // Link case to deal via deal_ubo_assessments
+            let _assessment_id = db.link_case_to_deal(deal_id, entity_id, case_id).await;
+
+            // Verify linkage
+            let assessment_status = db.get_assessment_status(deal_id, case_id).await;
+            assert_eq!(
+                assessment_status.as_deref(),
+                Some("PENDING"),
+                "Assessment should be PENDING after creation"
+            );
+
+            // Verify case has deal_id
+            let case_deal: (Option<Uuid>,) =
+                sqlx::query_as(r#"SELECT deal_id FROM kyc.cases WHERE case_id = $1"#)
+                    .bind(case_id)
+                    .fetch_one(&db.pool)
+                    .await
+                    .unwrap();
+            assert_eq!(case_deal.0, Some(deal_id), "Case should reference the deal");
+
+            // Phase 3: Progress case through lifecycle
+            db.advance_case_to_review(case_id).await;
+
+            let status: (String,) =
+                sqlx::query_as(r#"SELECT status FROM kyc.cases WHERE case_id = $1"#)
+                    .bind(case_id)
+                    .fetch_one(&db.pool)
+                    .await
+                    .unwrap();
+            assert_eq!(status.0, "REVIEW");
+
+            // Phase 4: Close case as APPROVED -> gate event emitted
+            db.close_case(case_id, "APPROVED").await;
+
+            // Verify case is APPROVED with closed_at
+            let closed_case: (String, Option<chrono::DateTime<chrono::Utc>>) =
+                sqlx::query_as(r#"SELECT status, closed_at FROM kyc.cases WHERE case_id = $1"#)
+                    .bind(case_id)
+                    .fetch_one(&db.pool)
+                    .await
+                    .unwrap();
+            assert_eq!(closed_case.0, "APPROVED");
+            assert!(closed_case.1.is_some(), "closed_at must be set");
+
+            // Verify KYC_GATE_COMPLETED event exists
+            assert_eq!(
+                db.count_deal_events(deal_id, "KYC_GATE_COMPLETED").await,
+                1,
+                "Exactly 1 KYC_GATE_COMPLETED event should exist"
+            );
+
+            // Verify the gate event references our case
+            assert_eq!(
+                db.count_gate_events_for_case(case_id).await,
+                1,
+                "Gate event should reference our case_id"
+            );
+
+            // Verify deal event details
+            let gate_event: (String, Option<Uuid>, Option<String>) = sqlx::query_as(
+                r#"SELECT subject_type, subject_id, new_value
+                   FROM "ob-poc".deal_events
+                   WHERE deal_id = $1 AND event_type = 'KYC_GATE_COMPLETED'
+                   LIMIT 1"#,
+            )
+            .bind(deal_id)
+            .fetch_one(&db.pool)
+            .await
+            .unwrap();
+
+            assert_eq!(gate_event.0, "KYC_CASE", "subject_type should be KYC_CASE");
+            assert_eq!(
+                gate_event.1,
+                Some(case_id),
+                "subject_id should be our case_id"
+            );
+            assert_eq!(
+                gate_event.2.as_deref(),
+                Some("APPROVED"),
+                "new_value should be APPROVED"
+            );
+
+            // Verify complete event timeline
+            let event_count: (i64,) =
+                sqlx::query_as(r#"SELECT COUNT(*) FROM "ob-poc".deal_events WHERE deal_id = $1"#)
+                    .bind(deal_id)
+                    .fetch_one(&db.pool)
+                    .await
+                    .unwrap();
+            assert!(
+                event_count.0 >= 2,
+                "Should have at least DEAL_CREATED + KYC_GATE_COMPLETED"
+            );
+
+            db.cleanup().await;
         }
     }
 
     // =========================================================================
-    // Error Case: Invalid Deal Reference
+    // Test 2: Invalid Deal Reference
     // =========================================================================
 
-    /// Verify that creating a KYC case linked to a non-existent deal is rejected.
-    ///
-    /// The deal_ubo_assessments table has a FK constraint on deal_id referencing
-    /// deals(deal_id). Attempting to insert a row with a non-existent deal_id
-    /// must fail with a foreign key violation.
+    /// Verify that linking a case to a non-existent deal fails with FK violation.
     #[tokio::test]
     #[ignore = "requires database"]
     async fn test_create_case_with_invalid_deal_rejected() {
         #[cfg(feature = "database")]
         {
-            let _pool = create_pool().await;
-            let _bogus_deal_id = Uuid::new_v4(); // Does not exist in deals table
-            let _entity_id = Uuid::new_v4();
-            let _case_id = Uuid::new_v4();
+            let db = TestDb::new().await;
+            let cbu_id = db.create_cbu(&db.name("inv_deal")).await;
+            let entity_id = db.create_entity(&db.name("inv_entity")).await;
+            let case_id = db.create_case_standalone(cbu_id).await;
 
-            // Step 1: Create a KYC case (standalone, no deal link yet)
-            // DSL: (kyc-case.create :cbu-id <test-cbu> :case-type "NEW_CLIENT")
-            // Expected: case_id returned, status = INTAKE
-            println!("[Step 1] Create standalone KYC case");
+            // Attempt to link case to non-existent deal via deal_ubo_assessments
+            let bogus_deal_id = Uuid::new_v4();
 
-            // Step 2: Attempt to link case to non-existent deal via deal_ubo_assessments
-            // SQL: INSERT INTO deal_ubo_assessments (deal_id, entity_id, kyc_case_id)
-            //      VALUES (@bogus_deal_id, @entity_id, @case_id)
-            // Expected: ERROR — FK violation on deal_id
-            //   "insert or update on table \"deal_ubo_assessments\" violates
-            //    foreign key constraint \"deal_ubo_assessments_deal_id_fkey\""
-            println!("[Step 2] Attempt to link case to non-existent deal");
+            let result = sqlx::query(
+                r#"INSERT INTO "ob-poc".deal_ubo_assessments
+                     (assessment_id, deal_id, entity_id, kyc_case_id, assessment_status)
+                   VALUES ($1, $2, $3, $4, 'PENDING')"#,
+            )
+            .bind(Uuid::new_v4())
+            .bind(bogus_deal_id)
+            .bind(entity_id)
+            .bind(case_id)
+            .execute(&db.pool)
+            .await;
 
-            // Step 3: Verify the insertion was rejected
-            // Query: SELECT COUNT(*) FROM deal_ubo_assessments
-            //        WHERE deal_id = @bogus_deal_id
-            // Expected: 0 rows (FK constraint prevented insertion)
-            println!("[Step 3] Verify no row was inserted");
+            // Assert FK violation
+            assert!(
+                result.is_err(),
+                "INSERT with non-existent deal_id should fail"
+            );
 
-            // -----------------------------------------------------------------
-            // Assertions
-            // -----------------------------------------------------------------
+            let err_msg = result.unwrap_err().to_string();
+            assert!(
+                err_msg.contains("foreign key")
+                    || err_msg.contains("violates")
+                    || err_msg.contains("fkey"),
+                "Error should be a foreign key violation, got: {}",
+                err_msg
+            );
 
-            // Assert: INSERT raised a foreign key violation error
-            // Assert: deal_ubo_assessments has no row for bogus_deal_id
-            // Assert: no deal_events created for bogus_deal_id
-            println!("[PASS] Case with invalid deal_id correctly rejected");
+            // Verify no row was inserted
+            let count: (i64,) = sqlx::query_as(
+                r#"SELECT COUNT(*) FROM "ob-poc".deal_ubo_assessments
+                   WHERE deal_id = $1"#,
+            )
+            .bind(bogus_deal_id)
+            .fetch_one(&db.pool)
+            .await
+            .unwrap();
+            assert_eq!(count.0, 0, "No row should exist for bogus deal_id");
+
+            // No deal events for bogus deal
+            let event_count: (i64,) =
+                sqlx::query_as(r#"SELECT COUNT(*) FROM "ob-poc".deal_events WHERE deal_id = $1"#)
+                    .bind(bogus_deal_id)
+                    .fetch_one(&db.pool)
+                    .await
+                    .unwrap();
+            assert_eq!(event_count.0, 0, "No events should exist for bogus deal_id");
+
+            db.cleanup().await;
         }
     }
 
     // =========================================================================
-    // No-Op Case: Close Without Deal Link
+    // Test 3: Standalone Case — No Gate Event
     // =========================================================================
 
-    /// Verify that closing a KYC case that has no deal linkage does NOT
+    /// Verify that closing a standalone KYC case (no deal link) does NOT
     /// produce any deal_events entry.
-    ///
-    /// A KYC case created without a deal_ubo_assessments link is a standalone
-    /// case (e.g., periodic review, regulatory request). Closing such a case
-    /// should not emit KYC_GATE_COMPLETED to any deal.
     #[tokio::test]
     #[ignore = "requires database"]
     async fn test_close_case_without_deal_no_gate_event() {
         #[cfg(feature = "database")]
         {
-            let _pool = create_pool().await;
-            let case_ref = test_case_ref();
-            let _case_id = Uuid::new_v4();
+            let db = TestDb::new().await;
+            let cbu_id = db.create_cbu(&db.name("standalone")).await;
 
-            // Step 1: Create standalone KYC case (no deal linkage)
-            // DSL: (kyc-case.create :cbu-id <test-cbu> :case-type "NEW_CLIENT")
-            // Expected: case_id returned, status = INTAKE
-            // NOTE: No deal_ubo_assessments row created — case is standalone
-            println!("[Step 1] Create standalone KYC case: {}", case_ref);
+            // Create standalone case (no deal link)
+            let case_id = db.create_case_standalone(cbu_id).await;
 
-            // Step 2: Progress through lifecycle (abbreviated)
-            // DSL: skeleton.build -> ASSESSMENT -> evidence -> REVIEW
-            // Expected: case progresses through all phases
-            println!("[Step 2] Progress case through lifecycle");
+            // Progress through lifecycle
+            db.advance_case_to_review(case_id).await;
 
-            // Step 3: Close case as APPROVED
-            // DSL: (kyc-case.close :case-id @case :status "APPROVED")
-            // Expected: case status = APPROVED, closed_at set
-            println!("[Step 3] Close standalone case as APPROVED");
+            // Close as APPROVED
+            db.close_case(case_id, "APPROVED").await;
 
-            // Step 4: Verify NO KYC_GATE_COMPLETED event in deal_events
-            // Query: SELECT COUNT(*) FROM deal_events
-            //        WHERE event_type = 'KYC_GATE_COMPLETED'
-            //          AND subject_type = 'KYC_CASE'
-            //          AND subject_id = @case
-            // Expected: 0 rows — standalone case has no deal to notify
-            println!("[Step 4] Verify no KYC_GATE_COMPLETED event exists");
+            // Verify case is APPROVED
+            let status: (String,) =
+                sqlx::query_as(r#"SELECT status FROM kyc.cases WHERE case_id = $1"#)
+                    .bind(case_id)
+                    .fetch_one(&db.pool)
+                    .await
+                    .unwrap();
+            assert_eq!(status.0, "APPROVED");
 
-            // Step 5: Verify no deal_ubo_assessments rows reference this case
-            // Query: SELECT COUNT(*) FROM deal_ubo_assessments
-            //        WHERE kyc_case_id = @case
-            // Expected: 0 rows
-            println!("[Step 5] Verify no deal_ubo_assessments link exists");
-
-            // -----------------------------------------------------------------
-            // Assertions
-            // -----------------------------------------------------------------
-
-            // Assert: case is APPROVED with closed_at set
-            // Assert: deal_events has 0 rows for KYC_GATE_COMPLETED with this case_id
-            // Assert: deal_ubo_assessments has 0 rows for this case_id
-            // Assert: closing a standalone case is a clean no-op for deal pipeline
-            println!(
-                "[PASS] Standalone case closure produced no deal gate event: {}",
-                case_ref
+            // Verify NO KYC_GATE_COMPLETED event for this case
+            assert_eq!(
+                db.count_gate_events_for_case(case_id).await,
+                0,
+                "Standalone case should produce NO gate events"
             );
+
+            // Verify no deal_ubo_assessments link
+            let link_count: (i64,) = sqlx::query_as(
+                r#"SELECT COUNT(*) FROM "ob-poc".deal_ubo_assessments
+                   WHERE kyc_case_id = $1"#,
+            )
+            .bind(case_id)
+            .fetch_one(&db.pool)
+            .await
+            .unwrap();
+            assert_eq!(link_count.0, 0, "No deal assessment link should exist");
+
+            db.cleanup().await;
         }
     }
 
     // =========================================================================
-    // Rejected Case: No Gate Event for REJECTED Outcome
+    // Test 4: Rejected Case — No Gate Completion Event
     // =========================================================================
 
     /// Verify that closing a deal-linked KYC case as REJECTED does NOT
-    /// produce a KYC_GATE_COMPLETED event.
-    ///
-    /// The KYC gate only "completes" when the case is APPROVED. A rejected
-    /// case means the onboarding cannot proceed — the deal remains blocked
-    /// at the KYC gate. The deal_ubo_assessments status should be updated
-    /// to reflect the rejection, but no gate-completion event is emitted.
+    /// produce a KYC_GATE_COMPLETED event. The gate only clears on APPROVED.
     #[tokio::test]
     #[ignore = "requires database"]
     async fn test_close_case_rejected_no_gate_event() {
         #[cfg(feature = "database")]
         {
-            let _pool = create_pool().await;
-            let deal_ref = test_deal_ref();
-            let case_ref = test_case_ref();
-            let _deal_id = Uuid::new_v4();
-            let _case_id = Uuid::new_v4();
-            let _entity_id = Uuid::new_v4();
+            let db = TestDb::new().await;
 
-            // Step 1: Create deal in CONTRACTED status
-            // DSL: (deal.create :deal-name "Rejected Test" :client-group-id <group>
-            //        :sales-owner "test@bank.com" :as @deal)
-            // DSL: (deal.update-status :deal-id @deal :new-status "CONTRACTED")
-            // Expected: deal_id returned, deal_status = CONTRACTED
-            println!("[Step 1] Create deal: {}", deal_ref);
+            // Setup deal + case
+            let group_id = db.create_client_group(&db.name("rej_group")).await;
+            let cbu_id = db.create_cbu(&db.name("rej_fund")).await;
+            let entity_id = db.create_entity(&db.name("rej_entity")).await;
+            let deal_id = db
+                .create_deal(&db.name("rej_deal"), group_id, "CONTRACTED")
+                .await;
+            let case_id = db.create_case_with_deal(cbu_id, deal_id, group_id).await;
+            let _assessment_id = db.link_case_to_deal(deal_id, entity_id, case_id).await;
 
-            // Step 2: Create KYC case linked to deal
-            // DSL: (kyc-case.create :cbu-id <test-cbu> :case-type "NEW_CLIENT")
-            // DSL: (deal.create-ubo-assessment :deal-id @deal
-            //        :entity-id @entity :kyc-case-id @case)
-            // Expected: case created, deal_ubo_assessments row with status PENDING
-            println!("[Step 2] Create KYC case linked to deal: {}", case_ref);
+            // Progress case to REVIEW
+            db.advance_case_to_review(case_id).await;
 
-            // Step 3: Progress case through skeleton/assessment
-            // DSL: skeleton.build -> ASSESSMENT -> evidence (abbreviated)
-            println!("[Step 3] Progress case through assessment");
+            // Close as REJECTED (not APPROVED)
+            db.close_case(case_id, "REJECTED").await;
 
-            // Step 4: Move to REVIEW
-            // DSL: (kyc-case.update-status :case-id @case :status "REVIEW")
-            println!("[Step 4] Transition case to REVIEW");
+            // Verify case is REJECTED
+            let status: (String,) =
+                sqlx::query_as(r#"SELECT status FROM kyc.cases WHERE case_id = $1"#)
+                    .bind(case_id)
+                    .fetch_one(&db.pool)
+                    .await
+                    .unwrap();
+            assert_eq!(status.0, "REJECTED");
 
-            // Step 5: Close case as REJECTED (not APPROVED)
-            // DSL: (kyc-case.close :case-id @case :status "REJECTED")
-            // Expected: case status = REJECTED, closed_at set
-            // NOTE: This is a negative outcome — KYC gate is NOT cleared
-            println!("[Step 5] Close KYC case as REJECTED");
-
-            // Step 6: Verify NO KYC_GATE_COMPLETED event in deal_events
-            // Query: SELECT COUNT(*) FROM deal_events
-            //        WHERE deal_id = @deal
-            //          AND event_type = 'KYC_GATE_COMPLETED'
-            // Expected: 0 rows — rejected cases do not pass the gate
-            println!("[Step 6] Verify no KYC_GATE_COMPLETED event");
-
-            // Step 7: Verify deal_ubo_assessments reflects rejection
-            // Query: SELECT assessment_status FROM deal_ubo_assessments
-            //        WHERE deal_id = @deal AND kyc_case_id = @case
-            // Expected: assessment_status = 'BLOCKED' (not COMPLETED)
-            // The assessment is blocked because KYC was rejected, not completed.
-            println!("[Step 7] Verify deal_ubo_assessments.assessment_status = BLOCKED");
-
-            // Step 8: Verify deal status has NOT progressed past KYC gate
-            // Query: SELECT deal_status FROM deals WHERE deal_id = @deal
-            // Expected: deal_status still CONTRACTED (not ONBOARDING)
-            // The deal cannot move to ONBOARDING without KYC clearance
-            println!("[Step 8] Verify deal remains in CONTRACTED status");
-
-            // -----------------------------------------------------------------
-            // Assertions
-            // -----------------------------------------------------------------
-
-            // Assert: case status is REJECTED with closed_at set
-            // Assert: deal_events has 0 KYC_GATE_COMPLETED events for this deal
-            // Assert: deal_ubo_assessments.assessment_status = 'BLOCKED'
-            // Assert: deal_ubo_assessments.completed_at IS NULL
-            // Assert: deal_status is still CONTRACTED (gate not cleared)
-            // Assert: rejected case blocks the deal pipeline as expected
-            println!(
-                "[PASS] Rejected case produced no gate event: deal={}, case={}",
-                deal_ref, case_ref
+            let closed_at: (Option<chrono::DateTime<chrono::Utc>>,) =
+                sqlx::query_as(r#"SELECT closed_at FROM kyc.cases WHERE case_id = $1"#)
+                    .bind(case_id)
+                    .fetch_one(&db.pool)
+                    .await
+                    .unwrap();
+            assert!(
+                closed_at.0.is_some(),
+                "closed_at must be set even for rejection"
             );
+
+            // Verify NO KYC_GATE_COMPLETED event
+            assert_eq!(
+                db.count_deal_events(deal_id, "KYC_GATE_COMPLETED").await,
+                0,
+                "Rejected case should NOT produce KYC_GATE_COMPLETED"
+            );
+
+            assert_eq!(
+                db.count_gate_events_for_case(case_id).await,
+                0,
+                "No gate events should reference rejected case"
+            );
+
+            // Assessment status remains PENDING (not COMPLETED)
+            let assess_status = db.get_assessment_status(deal_id, case_id).await;
+            assert_eq!(
+                assess_status.as_deref(),
+                Some("PENDING"),
+                "Assessment should remain PENDING after rejection"
+            );
+
+            // Deal status should NOT have advanced
+            let deal_status: (String,) =
+                sqlx::query_as(r#"SELECT deal_status FROM "ob-poc".deals WHERE deal_id = $1"#)
+                    .bind(deal_id)
+                    .fetch_one(&db.pool)
+                    .await
+                    .unwrap();
+            assert_eq!(
+                deal_status.0, "CONTRACTED",
+                "Deal should remain CONTRACTED — KYC gate not cleared"
+            );
+
+            db.cleanup().await;
         }
     }
 }

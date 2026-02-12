@@ -1,7 +1,7 @@
 # OB-POC — Schema Entity Overview
 
-> **Last reconciled:** 2026-02-11 — against 77 migrations, 58 DSL verb domains, CLAUDE.md
-> **Scope:** `"ob-poc"` schema only (226 tables). External schemas (`custody`, `kyc`, `agent`, `teams`) referenced but not detailed.
+> **Last reconciled:** 2026-02-12 — against 77 migrations, 58 DSL verb domains, CLAUDE.md
+> **Scope:** `"ob-poc"` schema (226 tables) + `"kyc"` schema (37 tables + 9 views) + `"ob_ref"` tollgate definitions. External schemas (`custody`, `agent`, `teams`) referenced but not detailed.
 > **Method:** SQL DDL cross-referenced with DSL verb YAML (`rust/config/verbs/*.yaml`) to validate domain groupings.
 > **Mermaid ER diagrams** render in GitHub, VS Code, and any CommonMark renderer with mermaid support.
 
@@ -964,17 +964,285 @@ Small but load-bearing — drives interpretation, UI grouping, and rule selectio
 
 ---
 
+## 14) KYC Schema — Case Management, UBO Registry & Skeleton Build Pipeline
+
+> **Schema:** `kyc` (37 tables + 9 views). Separate from `ob-poc` schema.
+> **Verb domains:** `kyc-case` (10 verbs), `entity-workstream` (8), `red-flag` (6), `doc-request` (8), `case-screening` (5), `skeleton` (3), `import-run` (4), `ubo-registry` (6), `ubo-evidence` (5), `tollgate` (3), `outreach` (4), `outstanding-request` (6), `research-workflow` (8)
+
+The `kyc` schema holds all KYC case management state. A case tracks the due diligence lifecycle for a CBU — from intake through ownership discovery, evidence collection, screening, and final approval. The skeleton build pipeline automates the discovery phase.
+
+### Case & Workstream Core
+
+```mermaid
+erDiagram
+    cases ||--o{ entity_workstreams : "case_id"
+    cases ||--o{ case_events : "case_id"
+    cases ||--o{ case_import_runs : "case_id"
+    cases ||--o{ red_flags : "case_id"
+    cases ||--o{ tollgate_evaluations : "case_id"
+    cases ||--o{ outreach_plans : "case_id"
+    entity_workstreams ||--o{ doc_requests : "workstream_id"
+    entity_workstreams ||--o{ screenings : "workstream_id"
+    entity_workstreams ||--o{ ubo_registry : "workstream_id"
+    entity_workstreams ||--o{ outstanding_requests : "workstream_id"
+
+    cases {
+        uuid case_id PK
+        uuid cbu_id FK
+        varchar case_ref UK
+        varchar status
+        varchar case_type
+        varchar escalation_level
+        varchar risk_rating
+        uuid assigned_analyst_id
+        uuid assigned_reviewer_id
+        uuid deal_id FK
+        uuid client_group_id FK
+        uuid subject_entity_id FK
+        varchar priority
+        date due_date
+        timestamptz opened_at
+        timestamptz closed_at
+    }
+
+    entity_workstreams {
+        uuid workstream_id PK
+        uuid case_id FK
+        uuid entity_id FK
+        varchar status
+        varchar risk_rating
+        jsonb risk_factors
+        boolean is_ubo
+        numeric ownership_percentage
+        boolean identity_verified
+        boolean ownership_proved
+        boolean screening_cleared
+        boolean evidence_complete
+        boolean requires_enhanced_dd
+        varchar blocker_type
+        uuid blocker_request_id
+        integer blocked_days_total
+    }
+
+    case_events {
+        uuid event_id PK
+        uuid case_id FK
+        uuid workstream_id FK
+        varchar event_type
+        jsonb event_data
+        uuid actor_id
+        varchar actor_type
+        timestamptz occurred_at
+    }
+```
+
+**Case state machine:** `INTAKE → DISCOVERY → ASSESSMENT → REVIEW → APPROVED | REJECTED`
+
+**Workstream state machine:** `PENDING → COLLECT → VERIFY → SCREEN → ASSESS → COMPLETE` (with `ENHANCED_DD` and `BLOCKED` side-paths)
+
+### UBO Registry & Evidence
+
+```mermaid
+erDiagram
+    ubo_registry ||--o{ ubo_evidence : "ubo_id"
+    ubo_registry }o--|| ubo_determination_runs : "determination_run_id"
+    ubo_determination_runs }o--|| cases : "case_id"
+
+    ubo_registry {
+        uuid ubo_id PK
+        uuid case_id FK
+        uuid workstream_id FK
+        uuid subject_entity_id FK
+        uuid ubo_person_id FK
+        varchar ubo_type
+        varchar status
+        uuid determination_run_id FK
+        numeric computed_percentage
+        text chain_description
+        text waiver_reason
+        varchar waiver_authority
+        date waiver_expiry
+        jsonb risk_flags
+        timestamptz identified_at
+        timestamptz proved_at
+        timestamptz approved_at
+    }
+
+    ubo_evidence {
+        uuid evidence_id PK
+        uuid ubo_id FK
+        varchar evidence_type
+        uuid document_id FK
+        uuid screening_id FK
+        uuid relationship_id FK
+        uuid determination_run_id FK
+        varchar status
+        timestamptz verified_at
+        uuid verified_by
+    }
+
+    ubo_determination_runs {
+        uuid run_id PK
+        uuid subject_entity_id FK
+        uuid case_id FK
+        date as_of
+        varchar config_version
+        numeric threshold_pct
+        integer candidates_found
+        jsonb output_snapshot
+        jsonb chains_snapshot
+        jsonb coverage_snapshot
+        integer computation_ms
+    }
+```
+
+**UBO status:** `IDENTIFIED → PROVED → REVIEWED → APPROVED` (also: `WAIVED`, `REMOVED`)
+
+### Screening, Red Flags & Tollgates
+
+| Table | Purpose |
+|-------|---------|
+| `screenings` | Per-workstream screening runs (SANCTIONS, PEP, ADVERSE_MEDIA) with provider, result_summary, match_count |
+| `red_flags` | Risk indicators per case/workstream with severity, resolution tracking, and waiver workflow |
+| `tollgate_evaluations` | Gate evaluation results (SKELETON_READY, EVIDENCE_COMPLETE, REVIEW_COMPLETE) with pass/fail, gaps, override support |
+| `doc_requests` | Per-workstream document requests with status tracking (PENDING → REQUESTED → RECEIVED → VERIFIED) |
+| `outstanding_requests` | Polymorphic request tracker (subject_type + subject_id) with escalation, reminders, fulfillment tracking |
+
+**Tollgate definitions** live in `ob_ref.tollgate_definitions`:
+
+| Tollgate ID | Default Threshold | Description |
+|-------------|------------------|-------------|
+| `SKELETON_READY` | `{"ownership_pct": 70}` | Ownership graph ≥ 70% resolved |
+| `EVIDENCE_COMPLETE` | `{"identity_pct": 100, "screening_pct": 100}` | Identity docs + screenings at 100% |
+| `REVIEW_COMPLETE` | `{"all_ubos_approved": true, "all_workstreams_closed": true}` | All UBOs approved, all workstreams closed |
+
+### Outreach Plans & Items
+
+```mermaid
+erDiagram
+    outreach_plans ||--o{ outreach_items : "plan_id"
+    outreach_plans }o--|| cases : "case_id"
+    outreach_plans }o--o| ubo_determination_runs : "determination_run_id"
+
+    outreach_plans {
+        uuid plan_id PK
+        uuid case_id FK
+        uuid workstream_id FK
+        uuid determination_run_id FK
+        varchar status
+        integer total_items
+        integer items_responded
+        timestamptz generated_at
+    }
+
+    outreach_items {
+        uuid item_id PK
+        uuid plan_id FK
+        varchar prong
+        uuid target_entity_id FK
+        text gap_description
+        text request_text
+        varchar doc_type_requested
+        integer priority
+        varchar status
+        uuid document_id FK
+        timestamptz responded_at
+    }
+```
+
+**Prong values:** `OWNERSHIP`, `IDENTITY`, `CONTROL`, `SOURCE_OF_WEALTH` — the 4-prong coverage model.
+
+**Gap-to-doc mapping:** OWNERSHIP→SHARE_REGISTER, IDENTITY→PASSPORT, CONTROL→BOARD_RESOLUTION, SOW→SOW_DECLARATION.
+
+### Research Audit Trail
+
+| Table | Purpose |
+|-------|---------|
+| `research_decisions` | Source provider search decisions with candidate ranking, selection confidence, auto-selection flag |
+| `research_actions` | Verb execution audit (entities/relationships created, duration, rollback tracking) |
+| `research_anomalies` | Data quality anomalies detected during import (rule_code, severity, expected vs actual) |
+| `research_corrections` | Post-hoc corrections to research decisions (wrong_key → correct_key with new action) |
+| `case_import_runs` | Links cases to determination runs and research decisions |
+
+### Ownership Snapshots & Reconciliation
+
+| Table | Purpose |
+|-------|---------|
+| `ownership_snapshots` | Point-in-time ownership records with multi-source provenance (GLEIF, BODS, holdings, documents) |
+| `ownership_reconciliation_runs` | Dual-source reconciliation runs comparing ownership percentages across sources |
+| `ownership_reconciliation_findings` | Per-entity discrepancies with delta_bps, severity, resolution tracking |
+
+### Capital Structure (Holdings Sub-Domain)
+
+These tables track share capital, investor positions, and corporate control:
+
+| Table | Purpose |
+|-------|---------|
+| `holdings` | Investor positions in share classes |
+| `share_classes` | Share class definitions per issuer entity |
+| `share_class_supply` | Authorized/issued/outstanding share counts |
+| `share_class_identifiers` | External identifiers (ISIN, SEDOL, etc.) |
+| `special_rights` | Veto/consent/drag-along rights per share class |
+| `dilution_instruments` | Warrants, options, convertibles that may dilute ownership |
+| `dilution_exercise_events` | Exercise/conversion events against dilution instruments |
+| `issuance_events` | New share issuance audit trail |
+| `holding_control_links` | Links holdings to control/voting relationships |
+| `investors` | Investor entities with classification |
+| `investor_role_profiles` | Investor role profiles (adviser, nominee, discretionary) |
+| `fund_vehicles` | Fund vehicle definitions |
+| `fund_compartments` | Sub-fund/compartment definitions |
+| `movements` | Holding movements (buys, sells, transfers) |
+| `issuer_control_config` | Per-issuer control thresholds and governance config |
+
+### Views
+
+| View | Purpose |
+|------|---------|
+| `v_case_summary` | Case with CBU name, workstream counts, status summary |
+| `v_workstream_detail` | Workstream with entity name, doc/screening/evidence status |
+| `v_pending_decisions` | Research decisions awaiting human verification |
+| `v_research_activity` | Recent research actions with entity context |
+| `v_share_class_summary` | Share class with supply and identifier details |
+| `v_capital_structure_extended` | Full capital structure with dilution-adjusted ownership |
+| `v_economic_edges_direct` | Direct economic ownership edges for graph traversal |
+| `v_dilution_summary` | Dilution instrument impact per share class |
+| `v_fund_vehicle_summary` | Fund vehicle with compartment and AUM summaries |
+| `v_current_role_profiles` | Active investor role profiles |
+
+### Skeleton Build Pipeline (7-Step)
+
+The skeleton build pipeline (`skeleton.build` verb) orchestrates the discovery phase of a KYC case:
+
+```
+1. import-run.begin       — Create determination run, snapshot ownership graph
+2. graph.validate         — Tarjan SCC cycle detection, supply checks, source conflicts
+3. ubo.compute            — DFS traversal with percentage multiplication (20-hop guard, 5% threshold)
+4. coverage.compute       — 4-prong scoring (OWNERSHIP, IDENTITY, CONTROL, SOW)
+5. outreach-plan.generate — Gap-to-doc mapping, priority ordering (max 8 items)
+6. tollgate.evaluate      — SKELETON_READY gate check (ownership ≥ 70%)
+7. import-run.complete    — Finalize run, emit IMPORT_RUN_COMPLETED event
+```
+
+**Key files:**
+- `rust/src/domain_ops/skeleton_build_ops.rs` — Orchestrator with real computation
+- `rust/src/domain_ops/import_run_ops.rs` — Import run lifecycle
+- `rust/src/domain_ops/kyc_case_ops.rs` — Case create/close (deal-aware gate events)
+
+---
+
 ## Schema Statistics
 
 | Metric | Count |
 |--------|-------|
 | Total `ob-poc` tables | 226 |
-| Tables with DSL verb domains | ~85 |
-| Tables in this document | ~150 (essential to data model) |
+| Total `kyc` tables | 37 (+ 9 views) |
+| Tables with DSL verb domains | ~120 |
+| Tables in this document | ~185 (essential to data model) |
 | Tables omitted (DSL engine, REPL, semantic search, layout cache) | ~76 |
 | DSL verb domains | 58 |
-| Total verb count | ~750+ |
+| Total verb count | ~1,083 |
 | Migrations | 77 (001–077 + 072b) |
+| Sections in this document | 14 |
 
 **Omitted infrastructure tables** (no verb domains, not essential to data model):
 - DSL engine: `dsl_verbs`, `dsl_sessions`, `dsl_instances`, `dsl_snapshots`, `dsl_*` (14 tables)
