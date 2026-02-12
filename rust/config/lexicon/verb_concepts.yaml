@@ -351,39 +351,7 @@ gleif.import-tree:
   target_types: [entity]
   crud_type: create
 
-# View Domain - ESPER navigation
-view.drill:
-  pref_label: "drill down"
-  alt_labels:
-    - "drill"
-    - "zoom in"
-    - "go deeper"
-    - "dive into"
-    - "enhance"
-  invocation_phrases:
-    - "drill down into this"
-    - "zoom in"
-    - "go deeper"
-    - "enhance"
-  domain: view
-  target_types: [entity, cbu]
-  crud_type: null
-
-view.surface:
-  pref_label: "surface up"
-  alt_labels:
-    - "surface"
-    - "zoom out"
-    - "go back up"
-    - "pull back"
-  invocation_phrases:
-    - "surface up"
-    - "zoom out"
-    - "go back up"
-  domain: view
-  target_types: []
-  crud_type: null
-
+# View Domain
 view.cbu:
   pref_label: "view cbu"
   alt_labels:

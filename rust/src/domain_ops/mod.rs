@@ -210,33 +210,9 @@ pub use bods_ops::{
 
 // View operations (session scope and selection management)
 pub use view_ops::{
-    ViewBackToOp,
-    ViewBlackHolesOp,
-    ViewBookOp,
-    ViewBreadcrumbsOp,
-    ViewCbuOp,
-    ViewClearOp,
-    ViewContextOp,
-    ViewDetailOp,
-    // Esper navigation operations (Phase 1: Blade Runner-inspired navigation)
-    ViewDrillOp,
-    ViewEntityForestOp,
-    ViewIlluminateOp,
-    ViewLayoutOp,
-    ViewOpResult,
-    ViewPeelOp,
-    ViewRedFlagOp,
-    ViewRefineOp,
-    ViewSelectOp,
-    ViewSelectionInfoOp,
-    ViewShadowOp,
-    ViewStatusOp,
-    ViewSurfaceOp,
-    ViewTraceOp,
-    ViewUniverseOp,
-    ViewXrayOp,
-    ViewZoomInOp,
-    ViewZoomOutOp,
+    ViewBackToOp, ViewBookOp, ViewBreadcrumbsOp, ViewCbuOp, ViewClearOp, ViewEntityForestOp,
+    ViewLayoutOp, ViewOpResult, ViewRefineOp, ViewSelectOp, ViewSelectionInfoOp, ViewStatusOp,
+    ViewUniverseOp, ViewZoomInOp, ViewZoomOutOp,
 };
 
 // KYC Control Enhancement operations (capital, board, trust, partnership, tollgate, control)
@@ -725,18 +701,7 @@ mod tests {
         assert!(registry.has("view", "zoom-out"));
         assert!(registry.has("view", "back-to"));
         assert!(registry.has("view", "breadcrumbs"));
-        // Esper navigation operations (Phase 1: Blade Runner-inspired navigation)
-        assert!(registry.has("view", "drill"));
-        assert!(registry.has("view", "surface"));
-        assert!(registry.has("view", "trace"));
-        assert!(registry.has("view", "xray"));
-        assert!(registry.has("view", "peel"));
-        assert!(registry.has("view", "illuminate"));
-        assert!(registry.has("view", "shadow"));
-        assert!(registry.has("view", "red-flag"));
-        assert!(registry.has("view", "black-holes"));
-        assert!(registry.has("view", "detail"));
-        assert!(registry.has("view", "context"));
+
         // KYC Control Enhancement: Capital operations
         assert!(registry.has("capital", "transfer"));
         assert!(registry.has("capital", "reconcile"));

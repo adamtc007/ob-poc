@@ -1252,29 +1252,22 @@ fn generate_commands_help() -> String {
 
 ---
 
-## View & Zoom (ESPER Navigation)
+## View & Zoom
 
 **Natural Language:**
 | Say | Effect |
 |-----|--------|
-| "enhance" / "zoom in" / "closer" | Zoom in on current view |
+| "zoom in" / "closer" | Zoom in on current view |
 | "zoom out" / "pull back" | Zoom out to wider view |
 | "universe" / "show everything" | View all CBUs |
 | "galaxy view" / "cluster" | View CBU groups |
 | "land on" / "system view" | Focus single CBU |
-| "drill through" / "go deeper" | Drill into entity |
-| "surface" / "come back up" | Return from drill |
-| "x-ray" / "show hidden" | Show hidden layers |
-| "follow the money" | Trace money flow |
-| "who controls this?" | Show control chain |
 
 **DSL Syntax:**
 ```clojure
 (view.universe)
 (view.book :apex-name "Allianz")
 (view.cbu :cbu-id @cbu :mode trading)
-(view.drill :entity-id @entity)
-(view.surface)
 ```
 
 ---

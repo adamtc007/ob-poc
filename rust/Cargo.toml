@@ -75,9 +75,6 @@ rand = "0.8"
 # Fuzzy matching for smart suggestions (Jaro-Winkler, Levenshtein, etc.)
 strsim = "0.11"
 
-# Trie for ESPER command phrase lookup
-radix_trie = "0.2"
-
 # Template rendering for research macros
 handlebars = "6.0"
 
@@ -225,11 +222,7 @@ members = [
     "crates/ob-semantic-matcher",
     "crates/viewport",
     "crates/ob-poc-macros",
-    "crates/esper_snapshot",
-    "crates/esper_core",
-    "crates/esper_input",
-    "crates/esper_compiler",
-    "crates/esper_policy",
+
     "xtask", "crates/playbook-core", "crates/playbook-lower",
     "crates/inspector-projection",
 ]

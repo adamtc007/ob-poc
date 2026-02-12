@@ -170,10 +170,8 @@ pub use verb_tiering_linter::{
     LintConfig, LintReport, LintTier, VerbLintResult,
 };
 pub use view_state::{
-    BatchOperation, ContextMode, CrossSectionAxis, DetailLevel, DrillDirection, GapType,
-    HighlightMode, IlluminateAspect, LayoutBounds, LayoutResult, NavStackEntry, NodePosition,
-    OperationPreview, PendingOperation, RedFlagCategory, Refinement, RiskThreshold, ScaleLevel,
-    TemporalMode, TraceMode, ViewState,
+    BatchOperation, LayoutBounds, LayoutResult, NodePosition, OperationPreview, PendingOperation,
+    Refinement, ViewState,
 };
 
 /// Unified session context - handles Visualization + Navigation

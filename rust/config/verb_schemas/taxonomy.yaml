@@ -22,7 +22,7 @@
 #   Level 3: Verb (e.g., "session.load-galaxy", "session.undo")
 
 version: 1
-generated: false  # Manual curation, not auto-generated
+generated: false # Manual curation, not auto-generated
 
 domains:
   # ===========================================================================
@@ -80,25 +80,23 @@ domains:
           - session.status
 
   # ===========================================================================
-  # VIEW / ESPER NAVIGATION
+  # VIEW / NAVIGATION
   # ===========================================================================
   - id: view
     label: View & Visualization
-    description: Navigate graph, zoom, filter, drill-down
+    description: Navigate graph, zoom, filter
     icon: eye
     priority: 2
     keywords:
       - view
       - show
-      - drill
-      - surface
       - zoom
-      - enhance
-      - xray
-      - trace
-      - drill down
       - zoom in
       - zoom out
+      - refine
+      - filter
+      - select
+      - layout
     categories:
       - id: zoom
         label: Zoom Levels
@@ -107,31 +105,25 @@ domains:
           - view.universe
           - view.book
           - view.cbu
-          - view.entity
-      - id: navigate
-        label: Navigate
-        description: Move through graph
-        verbs:
-          - view.drill
-          - view.surface
-          - view.focus
-          - view.center
-      - id: trace
-        label: Trace & Analyze
-        description: Follow relationships
-        verbs:
-          - view.trace
-          - view.xray
-          - view.follow-control
-          - view.follow-money
+          - view.entity-forest
+          - view.zoom-in
+          - view.zoom-out
+          - view.back-to
       - id: filter
-        label: Filter
+        label: Filter & Refine
         description: Filter visible items
         verbs:
           - view.refine
-          - view.filter
-          - view.show-only
-          - view.hide
+          - view.clear
+          - view.select
+      - id: layout
+        label: Layout
+        description: Change layout strategy
+        verbs:
+          - view.layout
+          - view.status
+          - view.selection-info
+          - view.breadcrumbs
 
   # ===========================================================================
   # UBO / OWNERSHIP

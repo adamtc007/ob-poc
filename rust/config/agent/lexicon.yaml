@@ -182,23 +182,16 @@ verbs:
     - set book
     - set jurisdiction
 
-  # View/visualization verbs (ESPER)
+  # View/visualization verbs
   view:
-    - drill
-    - drill into
-    - drill down
-    - surface
     - zoom in
     - zoom out
-    - trace
-    - xray
-    - x-ray
-    - peel
-    - illuminate
-    - highlight
-    - shadow
-    - red flag
-    - black holes
+    - show view
+    - refine
+    - filter
+    - select
+    - layout
+    - breadcrumbs
 
   # KYC/compliance workflow
   kyc:

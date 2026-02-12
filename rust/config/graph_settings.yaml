@@ -1,7 +1,7 @@
 # Graph Visualization Settings (Policy Configuration)
 #
 # This file controls LOD thresholds, layout spacing, animation, and rendering
-# for the ESPER graph visualization. Changes here don't require code changes.
+# for the graph visualization. Changes here don't require code changes.
 #
 # Policy versioning: Changes to this file produce a new policy_hash, which
 # invalidates cached snapshots and triggers recompilation.

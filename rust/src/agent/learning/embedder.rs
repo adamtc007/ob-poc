@@ -75,15 +75,13 @@ impl CandleEmbedder {
         })
     }
 
-    /// Blocking embed for synchronous code paths (like ESPER navigation).
+    /// Blocking embed for synchronous code paths.
     ///
-    /// Intended for rare trie misses where we need to fall back to semantic search.
     /// Takes ~5-15ms per embed, acceptable for occasional fallback.
     ///
     /// # Panics
     /// Must not be called from an async context (use `embed` instead).
     pub fn embed_blocking(&self, text: &str) -> Result<Embedding> {
-        // For ESPER, use query mode since it's user input
         self.embed_query_blocking(text)
     }
 
