@@ -1249,13 +1249,14 @@ fn infer_domain_from_phrase(phrase: &str) -> Option<String> {
     if words.iter().any(|w| {
         matches!(
             *w,
-            "session" | "load" | "unload" | "undo" | "redo" | "clear" | "history"
+            "session" | "load" | "unload" | "undo" | "redo" | "clear" | "history" | "use"
         )
     }) || lower.contains("set session")
         || lower.contains("load the")
         || lower.contains("load galaxy")
         || lower.contains("load book")
         || lower.contains("load cbu")
+        || lower.contains("use cbu")
     {
         return Some("session".to_string());
     }
@@ -1281,18 +1282,28 @@ fn infer_domain_from_phrase(phrase: &str) -> Option<String> {
         return Some("view".to_string());
     }
 
-    // CBU domain - explicit cbu mention OR fund/structure with action
-    if words.iter().any(|w| matches!(*w, "cbu" | "cbus"))
-        || (words
-            .iter()
-            .any(|w| matches!(*w, "structure" | "fund" | "funds" | "mandate"))
-            && words.iter().any(|w| {
-                matches!(
-                    *w,
-                    "create" | "delete" | "update" | "assign" | "list" | "get" | "show" | "all"
-                )
-            }))
-    {
+    // CBU domain - cbu/fund/structure with explicit action verb
+    // NOTE: bare "cbu"/"cbus" without an action verb is NOT enough to lock to cbu domain,
+    // because "cbu" appears as a noun in phrases across session/view/cbu domains.
+    if words.iter().any(|w| {
+        matches!(
+            *w,
+            "cbu" | "cbus" | "structure" | "fund" | "funds" | "mandate"
+        )
+    }) && words.iter().any(|w| {
+        matches!(
+            *w,
+            "create"
+                | "delete"
+                | "update"
+                | "assign"
+                | "list"
+                | "get"
+                | "add"
+                | "remove"
+                | "onboard"
+        )
+    }) {
         return Some("cbu".to_string());
     }
 
@@ -1990,6 +2001,19 @@ mod tests {
             infer_domain_from_phrase("upload document"),
             Some("document".to_string())
         );
+
+        // Session domain - "use" triggers session (navigation)
+        assert_eq!(
+            infer_domain_from_phrase("use aviva lux cbu"),
+            Some("session".to_string())
+        );
+        assert_eq!(
+            infer_domain_from_phrase("use allianz book"),
+            Some("session".to_string())
+        );
+
+        // Bare "cbu" without action verb should NOT lock to cbu domain
+        assert_eq!(infer_domain_from_phrase("aviva lux cbu"), None);
 
         // No domain inferred - allows full search
         assert_eq!(infer_domain_from_phrase("help me"), None);

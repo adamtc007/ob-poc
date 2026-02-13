@@ -92,6 +92,7 @@ domains:
           # Scope-setting trigger phrases (signal intent to set working scope)
           - "work on"
           - "focus on"
+          - "use"
           - "set scope to"
           - "set session to"
           - "switch to"
@@ -122,6 +123,9 @@ domains:
           - "work on allianz"
           - "work on blackrock"
           - "work on aviva"
+          - "use allianz"
+          - "use blackrock"
+          - "use aviva"
           - "focus on allianz"
           - "focus on blackrock"
           - "allianz book"

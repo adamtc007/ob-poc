@@ -1714,7 +1714,6 @@ impl AgentService {
             }
             Err(e) => {
                 let msg = format!("Execution failed: {}", e);
-                session.add_agent_message(msg.clone(), None, None);
                 Ok(self.fail(&msg, session))
             }
         }
