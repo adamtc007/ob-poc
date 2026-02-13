@@ -141,15 +141,11 @@ pub struct EntityLookup {
     pub jurisdiction_hint: Option<String>,
 }
 
-
-
 /// Parameters that should be resolved as codes (not raw strings) via EntityGateway.
 /// These are reference data lookups where user input needs fuzzy matching to canonical codes.
 /// UUID-based entity lookups (CBU, Entity, Document) are handled separately.
 
 /// Convert IntentArgValue to ParamValue for VerbIntent construction
-
-
 // ChatRequest is now the SINGLE source of truth - imported from ob-poc-types
 pub use ob_poc_types::ChatRequest;
 
@@ -269,7 +265,6 @@ impl ClientScope {
         self.accessible_cbus.first().copied()
     }
 }
-
 
 // ============================================================================
 // GRACEFUL RESPONSE HELPERS - For ambiguous/vague/nonsense input
@@ -759,7 +754,25 @@ impl AgentService {
                     decision: Some(pending.clone()),
                 });
             }
-            // Not a selection - clear pending and process as new input
+            // Not a number/keyword - try fuzzy match against choice labels
+            // This handles cases like typing "aviva" when the choices list
+            // contains "Aviva Investors"
+            let input_lower = input.trim().to_lowercase();
+            if let Some(matched) = pending
+                .choices
+                .iter()
+                .find(|c| c.label.to_lowercase().contains(&input_lower))
+            {
+                let choice = matched.clone();
+                let packet = pending.clone();
+                session.pending_decision = None;
+
+                return self
+                    .handle_decision_selection(session, &packet, &choice)
+                    .await;
+            }
+
+            // No match found - clear pending and process as new input
             session.pending_decision = None;
         }
 
@@ -1825,7 +1838,6 @@ impl AgentService {
             decision: None,
         }
     }
-
 
     /// Fail: return message to user
     fn fail(&self, msg: &str, session: &mut UnifiedSession) -> AgentChatResponse {
