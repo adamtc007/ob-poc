@@ -772,8 +772,33 @@ impl AgentService {
                     .await;
             }
 
-            // No match found - clear pending and process as new input
-            session.pending_decision = None;
+            // No match found against choice labels.
+            // For deal selection, treat unmatched input as implicit SKIP
+            // so the user can proceed to the intent pipeline (e.g. "show me lux cbu").
+            // For client group, the gate is mandatory so we re-prompt.
+            if matches!(pending.kind, ob_poc_types::DecisionKind::ClarifyDeal) {
+                let skip_choice = pending
+                    .choices
+                    .iter()
+                    .find(|c| c.id == "SKIP")
+                    .cloned()
+                    .unwrap_or_else(|| ob_poc_types::UserChoice {
+                        id: "SKIP".to_string(),
+                        label: "Skip for now".to_string(),
+                        description: String::new(),
+                        is_escape: true,
+                    });
+                let packet = pending.clone();
+                session.pending_decision = None;
+
+                // Auto-skip deal selection, then process the original input
+                let _ = self
+                    .handle_decision_selection(session, &packet, &skip_choice)
+                    .await;
+                // Fall through to process original input via intent pipeline
+            } else {
+                session.pending_decision = None;
+            }
         }
 
         // Clear pending intent tier if user typed something new
@@ -1049,8 +1074,8 @@ impl AgentService {
             DecisionPacket, DecisionTrace, SessionStateView, UserChoice,
         };
 
-        // Skip context check if session already has deal context
-        if session.context.deal_id.is_some() {
+        // Skip context check if session already has deal context or gate was skipped
+        if session.context.deal_id.is_some() || session.context.deal_gate_skipped {
             return None;
         }
 
@@ -1353,6 +1378,7 @@ impl AgentService {
                 } else if choice.id == "SKIP" {
                     session.context.deal_id = None;
                     session.context.deal_name = None;
+                    session.context.deal_gate_skipped = true;
                     "Continuing without deal context. You can set one later with 'load deal'."
                         .to_string()
                 } else {

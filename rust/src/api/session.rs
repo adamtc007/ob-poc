@@ -2219,6 +2219,10 @@ pub struct SessionContext {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub deal_name: Option<String>,
 
+    /// Whether the deal selection gate was skipped (don't re-prompt)
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub deal_gate_skipped: bool,
+
     // =========================================================================
     // View State Fields - For REPL/View synchronization
     // =========================================================================
