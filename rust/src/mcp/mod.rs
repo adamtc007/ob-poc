@@ -55,6 +55,7 @@ pub mod tools;
 pub mod types;
 pub mod verb_search;
 pub mod verb_search_factory;
+pub mod verb_search_intent_matcher;
 
 pub use enrichment::{EntityContext, EntityEnricher, EntityType, OwnershipContext, RoleContext};
 pub use macro_integration::{

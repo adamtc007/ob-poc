@@ -561,11 +561,153 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             tracing::info!("REPL V2 executor: RealDslExecutor (direct, no BPMN)");
         }
 
+        // =====================================================================
+        // Wire IntentService for semantic verb search in V2 REPL
+        //
+        // This is the critical wiring that enables the V2 orchestrator to resolve
+        // user utterances to DSL verbs via the same 10-tier search pipeline
+        // (Candle embeddings, learned phrases, macros, lexicon) that the V1
+        // agent chat uses.
+        // =====================================================================
+        {
+            use ob_poc::agent::learning::embedder::CandleEmbedder;
+            use ob_poc::agent::learning::warmup::LearningWarmup;
+            use ob_poc::dsl_v2::ConfigLoader;
+            use ob_poc::macros::OperatorMacroRegistry;
+            use ob_poc::mcp::verb_search_factory::VerbSearcherFactory;
+            use ob_poc::mcp::verb_search_intent_matcher::VerbSearchIntentMatcher;
+            use ob_poc::repl::intent_service::IntentService;
+            use ob_poc::repl::verb_config_index::VerbConfigIndex;
+
+            tracing::info!("Initializing V2 REPL IntentService...");
+            let intent_start = std::time::Instant::now();
+
+            // 1. Load VerbsConfig from YAML for VerbConfigIndex
+            let verb_config_index = {
+                let config_loader = ConfigLoader::from_env();
+                match config_loader.load_verbs() {
+                    Ok(verbs_config) => {
+                        let index = VerbConfigIndex::from_verbs_config(&verbs_config);
+                        tracing::info!("VerbConfigIndex loaded: {} verbs", index.len());
+                        Arc::new(index)
+                    }
+                    Err(e) => {
+                        tracing::warn!(
+                            "Failed to load verbs config for VerbConfigIndex: {}. Using empty index.",
+                            e
+                        );
+                        Arc::new(VerbConfigIndex::empty())
+                    }
+                }
+            };
+
+            // 2. Initialize Candle embedder for semantic search
+            let embedder_result = tokio::task::spawn_blocking(CandleEmbedder::new).await;
+            match embedder_result {
+                Ok(Ok(embedder)) => {
+                    let embedder = Arc::new(embedder);
+                    let dyn_embedder: Arc<dyn ob_poc::agent::learning::embedder::Embedder> =
+                        embedder.clone();
+
+                    // 3. Load learned data for exact phrase matching
+                    let warmup = LearningWarmup::new(pool.clone());
+                    let learned_data = match warmup.warmup().await {
+                        Ok((data, stats)) => {
+                            tracing::info!(
+                                "V2 REPL learned data: {} phrases, {} aliases",
+                                stats.invocation_phrases_loaded,
+                                stats.entity_aliases_loaded
+                            );
+                            Some(data)
+                        }
+                        Err(e) => {
+                            tracing::warn!("V2 REPL learned data warmup failed: {}", e);
+                            None
+                        }
+                    };
+
+                    // 4. Load lexicon snapshot
+                    let lexicon: Option<ob_poc::mcp::verb_search::SharedLexicon> = {
+                        use ob_poc::lexicon::{LexiconServiceImpl, LexiconSnapshot};
+                        let snapshot_paths = [
+                            std::path::Path::new("rust/assets/lexicon.snapshot.bin"),
+                            std::path::Path::new("assets/lexicon.snapshot.bin"),
+                            std::path::Path::new("../rust/assets/lexicon.snapshot.bin"),
+                        ];
+                        let mut loaded = None;
+                        for path in &snapshot_paths {
+                            if path.exists() {
+                                if let Ok(snapshot) = LexiconSnapshot::load_binary(path) {
+                                    loaded =
+                                        Some(Arc::new(LexiconServiceImpl::new(Arc::new(snapshot)))
+                                            as Arc<dyn ob_poc::lexicon::LexiconService>);
+                                    break;
+                                }
+                            }
+                        }
+                        loaded
+                    };
+
+                    // 5. Load macro registry for operator vocabulary
+                    let macro_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                        .join("../../config/verb_schemas/macros");
+                    let macro_reg = Arc::new(
+                        OperatorMacroRegistry::load_from_dir(&macro_dir)
+                            .unwrap_or_else(|_| OperatorMacroRegistry::new()),
+                    );
+
+                    // 6. Build HybridVerbSearcher via factory
+                    let searcher = Arc::new(VerbSearcherFactory::build(
+                        &pool,
+                        dyn_embedder,
+                        learned_data,
+                        macro_reg,
+                        lexicon,
+                    ));
+
+                    // 7. Wrap in IntentMatcher → IntentService
+                    let intent_matcher: Arc<dyn ob_poc::repl::IntentMatcher> =
+                        Arc::new(VerbSearchIntentMatcher::new(searcher));
+
+                    let intent_service = Arc::new(IntentService::new(
+                        intent_matcher.clone(),
+                        verb_config_index.clone(),
+                    ));
+
+                    // 8. Wire into orchestrator
+                    orchestrator = orchestrator
+                        .with_verb_config_index(verb_config_index)
+                        .with_intent_matcher(intent_matcher)
+                        .with_intent_service(intent_service);
+
+                    tracing::info!(
+                        "V2 REPL IntentService wired in {}ms (semantic verb search enabled)",
+                        intent_start.elapsed().as_millis()
+                    );
+                }
+                Ok(Err(e)) => {
+                    tracing::error!(
+                        "V2 REPL: Candle embedder init failed: {}. Semantic search disabled.",
+                        e
+                    );
+                    // Orchestrator continues without intent service — falls back to stub
+                    orchestrator = orchestrator.with_verb_config_index(verb_config_index);
+                }
+                Err(e) => {
+                    tracing::error!(
+                        "V2 REPL: Candle embedder task panicked: {}. Semantic search disabled.",
+                        e
+                    );
+                    orchestrator = orchestrator.with_verb_config_index(verb_config_index);
+                }
+            }
+        }
+
         let v2_state = ReplV2RouteState {
             orchestrator: Arc::new(orchestrator),
         };
 
-        tracing::info!("REPL V2 orchestrator initialized with bootstrap resolution");
+        tracing::info!("REPL V2 orchestrator initialized with semantic intent service");
 
         repl_routes_v2::router().with_state(v2_state)
     };
