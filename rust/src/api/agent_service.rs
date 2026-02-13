@@ -801,8 +801,92 @@ impl AgentService {
             }
         }
 
-        // Clear pending intent tier if user typed something new
-        session.pending_intent_tier = None;
+        // 4. Check for pending intent tier selection
+        if let Some(ref pending_tier) = session.pending_intent_tier.clone() {
+            // Check if input is a number selecting a tier option
+            if let Ok(selection) = input.trim().parse::<usize>() {
+                let intent_taxonomy = crate::dsl_v2::intent_tiers::intent_tier_taxonomy();
+
+                // Rebuild the tier options to check bounds
+                let tier_options = {
+                    let verbs: Vec<&str> = pending_tier
+                        .candidates
+                        .iter()
+                        .map(|c| c.verb.as_str())
+                        .collect();
+                    let analysis = intent_taxonomy.analyze_candidates(&verbs);
+                    intent_taxonomy.build_tier1_request(&pending_tier.original_input, &analysis)
+                };
+
+                if selection >= 1 && selection <= tier_options.options.len() {
+                    let selected_tier = &tier_options.options[selection - 1];
+                    let selected_id = selected_tier.id.clone();
+
+                    tracing::info!(
+                        selected_tier = %selected_id,
+                        original_input = %pending_tier.original_input,
+                        "User selected intent tier"
+                    );
+
+                    // Filter candidates to selected tier's verbs
+                    let filtered: Vec<crate::session::unified::VerbCandidate> = pending_tier
+                        .candidates
+                        .iter()
+                        .filter(|c| {
+                            intent_taxonomy
+                                .get_verb_tiers(&c.verb)
+                                .map(|(t1, _)| t1 == selected_id)
+                                .unwrap_or(false)
+                        })
+                        .cloned()
+                        .collect();
+
+                    session.pending_intent_tier = None;
+
+                    if filtered.len() == 1 {
+                        // Single verb in this tier — proceed directly
+                        let selected_verb = filtered[0].verb.clone();
+                        let original_input = pending_tier.original_input.clone();
+                        let all_candidates = pending_tier.candidates.clone();
+                        return self
+                            .handle_verb_selection(
+                                session,
+                                &original_input,
+                                &selected_verb,
+                                &all_candidates
+                                    .iter()
+                                    .map(|c| crate::session::unified::VerbCandidate {
+                                        verb: c.verb.clone(),
+                                        score: c.score,
+                                    })
+                                    .collect::<Vec<_>>(),
+                            )
+                            .await;
+                    } else if !filtered.is_empty() {
+                        // Multiple verbs in this tier — show verb disambiguation
+                        let search_results: Vec<crate::mcp::verb_search::VerbSearchResult> =
+                            filtered
+                                .iter()
+                                .map(|c| crate::mcp::verb_search::VerbSearchResult {
+                                    verb: c.verb.clone(),
+                                    score: c.score,
+                                    source: crate::mcp::verb_search::VerbSearchSource::Semantic,
+                                    matched_phrase: pending_tier.original_input.clone(),
+                                    description: None,
+                                })
+                                .collect();
+                        return Ok(self.build_verb_disambiguation_response(
+                            &pending_tier.original_input,
+                            &search_results,
+                            session,
+                        ));
+                    }
+                    // No verbs matched tier — fall through to pipeline
+                }
+            }
+            // Not a number or invalid — clear and process as new input
+            session.pending_intent_tier = None;
+        }
 
         // =====================================================================
         // SESSION CONTEXT CHECK - Client Group → Deal flow
@@ -941,6 +1025,61 @@ impl AgentService {
 
         match result {
             Ok(r) => {
+                // Handle scope resolution - "work on allianz", "switch to blackrock"
+                if let PipelineOutcome::ScopeResolved {
+                    ref group_id,
+                    ref group_name,
+                    entity_count,
+                } = r.outcome
+                {
+                    tracing::info!(
+                        group_id = %group_id,
+                        group_name = %group_name,
+                        entity_count = entity_count,
+                        "Scope resolved via pipeline, updating session context"
+                    );
+
+                    // Update session context with resolved scope
+                    if let Ok(uuid) = group_id.parse::<uuid::Uuid>() {
+                        let scope = crate::mcp::scope_resolution::ScopeContext::new()
+                            .with_client_group(uuid, group_name.clone());
+                        session.context.set_client_scope(scope);
+                        // Reset deal context when switching clients
+                        session.context.deal_id = None;
+                        session.context.deal_gate_skipped = false;
+                    }
+
+                    let msg = format!(
+                        "Now working with client: {} ({} entities in scope).",
+                        group_name, entity_count
+                    );
+                    session.add_agent_message(msg.clone(), None, None);
+                    return Ok(AgentChatResponse {
+                        message: msg,
+                        intents: vec![],
+                        validation_results: vec![],
+                        session_state: SessionState::New,
+                        can_execute: false,
+                        dsl_source: None,
+                        ast: None,
+                        disambiguation: None,
+                        commands: None,
+                        unresolved_refs: None,
+                        current_ref_index: None,
+                        dsl_hash: None,
+                        verb_disambiguation: None,
+                        intent_tier: None,
+                        decision: None,
+                    });
+                }
+
+                // Handle scope candidates - multiple client matches
+                if matches!(r.outcome, PipelineOutcome::ScopeCandidates) {
+                    if let Some(err) = r.validation_error {
+                        return Ok(self.fail(&err, session));
+                    }
+                }
+
                 // Handle macro expansion with explicit feedback
                 if let PipelineOutcome::MacroExpanded {
                     ref macro_verb,
