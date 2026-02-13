@@ -104,26 +104,21 @@
 use crate::agent::learning::embedder::CandleEmbedder;
 use crate::agentic::llm_client::LlmClient;
 use crate::api::client_group_adapter::ClientGroupEmbedderAdapter;
-use crate::api::dsl_builder::{build_dsl_program, build_user_dsl_program, validate_intent};
-use crate::api::intent::{IntentValidation, ParamValue, VerbIntent};
-use crate::api::session::{DisambiguationItem, DisambiguationRequest, EntityMatchOption};
-use crate::database::derive_semantic_state;
+use crate::api::intent::{IntentValidation, VerbIntent};
+use crate::api::session::DisambiguationRequest;
 use crate::dsl_v2::ast::AstNode;
 use crate::dsl_v2::gateway_resolver::{gateway_addr, GatewayRefResolver};
 use crate::dsl_v2::ref_resolver::ResolveResult;
-use crate::dsl_v2::semantic_validator::SemanticValidator;
-use crate::dsl_v2::validation::{RefType, Severity, ValidationContext, ValidationRequest};
+use crate::dsl_v2::validation::RefType;
 use crate::dsl_v2::{enrich_program, parse_program, runtime_registry, Statement};
 use crate::graph::GraphScope;
 use crate::macros::OperatorMacroRegistry;
-use crate::mcp::intent_pipeline::{compute_dsl_hash, IntentArgValue, IntentPipeline};
+use crate::mcp::intent_pipeline::IntentPipeline;
 use crate::mcp::verb_search_factory::VerbSearcherFactory;
-use crate::ontology::SemanticStageRegistry;
 use crate::session::SessionScope;
-use crate::session::{ResolutionSubSession, SessionState, UnifiedSession, UnresolvedRefInfo};
+use crate::session::{SessionState, UnifiedSession, UnresolvedRefInfo};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
-use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use uuid::Uuid;
 
@@ -144,8 +139,6 @@ pub struct EntityLookup {
 /// Parameters that should be resolved as codes (not raw strings) via EntityGateway.
 /// These are reference data lookups where user input needs fuzzy matching to canonical codes.
 /// UUID-based entity lookups (CBU, Entity, Document) are handled separately.
-
-/// Convert IntentArgValue to ParamValue for VerbIntent construction
 // ChatRequest is now the SINGLE source of truth - imported from ob-poc-types
 pub use ob_poc_types::ChatRequest;
 
@@ -567,36 +560,6 @@ impl AgentService {
 
         Some(lookup_svc)
     }
-
-    /// Pre-resolve available entities from EntityGateway before LLM call
-    ///
-    /// This is Enhancement #1: Query EntityGateway upfront and inject available
-    /// entities into the LLM prompt. The LLM can then only reference entities
-    /// that actually exist, eliminating "entity not found" retries.
-
-    /// Format pre-resolved entities for injection into LLM prompt
-
-    /// Derive semantic state for the active CBU and format it for the agent prompt.
-    /// Returns a formatted string showing onboarding journey progress.
-    ///
-    /// This helps the agent understand:
-    /// - What stages are complete, in progress, or blocked
-    /// - What entities are missing
-    /// - What the next actionable steps are
-
-    /// Derive taxonomy navigation context for the agent prompt.
-    /// Returns a formatted string showing the current navigation state.
-    ///
-    /// This helps the agent understand:
-    /// - Current position in the taxonomy (breadcrumb trail)
-    /// - Available navigation actions (drill down, zoom out)
-    /// - Visible entities at this level
-
-    /// Derive KYC case context when a case is active in the session.
-    /// Returns a formatted string showing case state with embedded workstream requests.
-    ///
-    /// This implements the "Domain Coherence" principle: requests appear as child
-    /// nodes of workstreams in `awaiting` arrays, not as a separate list.
 
     /// ONE PATH - all user prompts:
     /// 1. "run"/"execute"/"do it" → execute staged runbook
@@ -2224,12 +2187,6 @@ impl AgentService {
         }
     }
 
-    /// Build VerbIntent from pipeline result
-
-    /// Run semantic validation on DSL
-
-    /// Handle disambiguation response from user
-
     // =============================================================================
     // UNIFIED DSL PIPELINE - One Path, Same Path
     // =============================================================================
@@ -2245,29 +2202,6 @@ impl AgentService {
     // The result is always: valid DSL ready for execution.
     // One path. Same path. Quality design.
     // =============================================================================
-
-    /// Handle REPL control commands (run, execute, undo, clear, etc.)
-    ///
-    /// These are NOT DSL-generating commands - they control the REPL session state.
-    /// They bypass the LLM entirely because they're instant control commands.
-    ///
-    /// Returns Some(response) if the message is a REPL command, None otherwise.
-
-    /// Collect all entity lookups from intents
-    /// Unified reference resolution: resolves ALL references (entities + codes) in a single pass.
-    ///
-    /// This replaces the old 3-method approach:
-    /// - collect_lookups() → absorbed
-    /// - resolve_lookups() → absorbed
-    /// - inject_resolved_ids() → resolution modifies intents in place
-    ///
-    /// One method. One Gateway connection. One pattern.
-
-    /// Resolve only code values (products, roles, jurisdictions, etc.) in intents.
-    /// Used after disambiguation when entities are already resolved.
-
-    /// Build final response with DSL
-    /// Takes both execution DSL (with UUIDs for DB) and user DSL (with display names for chat)
 
     // ========================================================================
     // Public Entity Resolution API

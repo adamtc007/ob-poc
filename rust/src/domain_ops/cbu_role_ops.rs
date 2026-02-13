@@ -695,10 +695,10 @@ impl CustomOperation for CbuRoleAssignTrustOp {
         )
         .bind(participant_entity_id)
         .bind(trust_entity_id)
-        .bind(&relationship_type)
-        .bind(&interest_percentage)
-        .bind(&interest_type)
-        .bind(&class_description)
+        .bind(relationship_type)
+        .bind(interest_percentage)
+        .bind(interest_type)
+        .bind(class_description)
         .fetch_one(&mut *tx)
         .await?;
         let rel_result = rel_result.0;
@@ -880,10 +880,10 @@ impl CustomOperation for CbuRoleAssignFundOp {
             )
             .bind(entity_id)
             .bind(fund_id)
-            .bind(&relationship_type)
-            .bind(&investment_percentage)
-            .bind(&is_regulated)
-            .bind(&regulatory_jurisdiction)
+            .bind(relationship_type)
+            .bind(investment_percentage)
+            .bind(is_regulated)
+            .bind(regulatory_jurisdiction)
             .fetch_one(&mut *tx)
             .await?;
             let rel = rel.0;

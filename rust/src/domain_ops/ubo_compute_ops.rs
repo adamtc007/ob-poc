@@ -76,6 +76,7 @@ struct OwnershipEdge {
 #[cfg(feature = "database")]
 #[derive(Debug, Clone)]
 struct EntityMeta {
+    #[allow(dead_code)]
     entity_id: Uuid,
     name: Option<String>,
     is_natural_person: bool,
@@ -382,7 +383,7 @@ impl CustomOperation for UboComputeChainsOp {
         // ------------------------------------------------------------------
         let output_snapshot = serde_json::to_value(&all_candidates)?;
         let chains_snapshot = serde_json::to_value(
-            &all_candidates
+            all_candidates
                 .iter()
                 .flat_map(|c| {
                     c.chains.iter().map(move |chain| {

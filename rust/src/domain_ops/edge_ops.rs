@@ -168,7 +168,7 @@ impl CustomOperation for EdgeUpsertOp {
         {
             // Convert incoming percentage to Decimal for comparison
             let incoming_pct: Option<rust_decimal::Decimal> = percentage
-                .map(|p| rust_decimal::Decimal::try_from(p))
+                .map(rust_decimal::Decimal::try_from)
                 .transpose()
                 .map_err(|e| anyhow!("Failed to convert percentage to decimal: {}", e))?;
 
@@ -252,7 +252,7 @@ impl CustomOperation for EdgeUpsertOp {
         // 3c. Not found — insert new edge
         // ------------------------------------------------------------------
         let pct_decimal: Option<rust_decimal::Decimal> = percentage
-            .map(|p| rust_decimal::Decimal::try_from(p))
+            .map(rust_decimal::Decimal::try_from)
             .transpose()
             .map_err(|e| anyhow!("Failed to convert percentage to decimal: {}", e))?;
 

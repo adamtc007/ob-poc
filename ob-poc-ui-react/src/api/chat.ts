@@ -101,10 +101,56 @@ export const chatApi = {
 
   /** Create a new chat session */
   async createSession(title?: string): Promise<ChatSession> {
-    const backend = await api.post<BackendSession>("/session", {});
+    // Backend returns CreateSessionResponse: { session_id, created_at, state, welcome_message, decision? }
+    const backend = await api.post<
+      BackendSession & {
+        welcome_message?: string;
+        decision?: {
+          packet_id: string;
+          kind: string;
+          prompt: string;
+          choices: Array<{
+            id: string;
+            label: string;
+            description: string;
+            is_escape?: boolean;
+          }>;
+          confirm_token?: string;
+        };
+      }
+    >("/session", {});
     const session = mapBackendSession(backend);
     if (title) {
       session.title = title;
+    }
+
+    // If backend included a decision packet (e.g. client group selection),
+    // create an initial assistant message with the decision attached
+    if (backend.welcome_message && backend.decision) {
+      const initialMessage: ChatMessage = {
+        id: `${session.id}-welcome`,
+        role: "assistant",
+        content: backend.welcome_message,
+        timestamp: session.created_at,
+        decision_packet: {
+          id: backend.decision.packet_id,
+          kind: "clarification",
+          payload: {
+            question: backend.decision.prompt,
+            options: backend.decision.choices.map((choice) => ({
+              id: choice.id,
+              label: choice.label,
+              description: choice.description,
+              value: choice.id,
+            })),
+          },
+          confirm_token: backend.decision.confirm_token,
+        },
+      };
+      // Only add if mapBackendSession didn't already produce messages
+      if (session.messages.length === 0) {
+        session.messages.push(initialMessage);
+      }
     }
 
     // Store session ID locally for listing
@@ -127,14 +173,19 @@ export const chatApi = {
 
   /** Delete a chat session */
   async deleteSession(id: string): Promise<void> {
-    await api.delete(`/session/${id}`);
-
-    // Remove from local storage
+    // Always remove from local storage first — session list is localStorage-driven
     const stored = localStorage.getItem("ob-poc-sessions");
     if (stored) {
       const sessions: ChatSessionSummary[] = JSON.parse(stored);
       const filtered = sessions.filter((s) => s.id !== id);
       localStorage.setItem("ob-poc-sessions", JSON.stringify(filtered));
+    }
+
+    // Best-effort backend cleanup (idempotent — 204 even if not in memory)
+    try {
+      await api.delete(`/session/${id}`);
+    } catch {
+      // Backend delete is best-effort; localStorage is the source of truth for the session list
     }
   },
 
@@ -281,14 +332,35 @@ export const chatApi = {
     sessionId: string,
     reply: DecisionReply,
   ): Promise<ChatMessage> {
-    const response = await api.post<{ response?: string }>(
-      `/session/${sessionId}/decision/reply`,
-      reply,
-    );
+    // Map frontend DecisionReply to backend DecisionReplyRequest format
+    // Backend expects: { packet_id, reply: UserReply } where UserReply is a tagged enum
+    let userReply: unknown;
+    if (reply.selected_option !== undefined) {
+      // selected_option is the choice ID (e.g. "1", "2") — convert to 0-indexed
+      const index = parseInt(reply.selected_option, 10);
+      userReply = { Select: { index: isNaN(index) ? 0 : index - 1 } };
+    } else if (reply.freeform_response !== undefined) {
+      userReply = { TypeExact: { text: reply.freeform_response } };
+    } else if (reply.confirmed !== undefined) {
+      userReply = reply.confirmed
+        ? { Confirm: { token: reply.confirm_token || null } }
+        : "Cancel";
+    } else {
+      userReply = "Cancel";
+    }
+
+    const response = await api.post<{
+      message?: string;
+      response?: string;
+      next_packet?: unknown;
+    }>(`/session/${sessionId}/decision/reply`, {
+      packet_id: reply.packet_id,
+      reply: userReply,
+    });
     return {
       id: `${sessionId}-${Date.now()}`,
       role: "assistant",
-      content: response.response || "Decision recorded.",
+      content: response.message || response.response || "Decision recorded.",
       timestamp: new Date().toISOString(),
     };
   },

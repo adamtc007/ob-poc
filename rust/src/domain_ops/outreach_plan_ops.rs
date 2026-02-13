@@ -408,7 +408,7 @@ fn extract_gaps_from_snapshot(
     };
 
     arr.iter()
-        .filter_map(|item| {
+        .map(|item| {
             let prong = item
                 .get("prong")
                 .or_else(|| item.get("gap_type"))
@@ -428,11 +428,11 @@ fn extract_gaps_from_snapshot(
                 .unwrap_or("Coverage gap identified")
                 .to_string();
 
-            Some(CoverageGap {
+            CoverageGap {
                 prong,
                 entity_id,
                 description,
-            })
+            }
         })
         .collect()
 }

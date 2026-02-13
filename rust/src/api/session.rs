@@ -2982,7 +2982,7 @@ pub struct CreateSessionRequest {
 }
 
 /// Welcome message constant - agent's opening question
-pub const WELCOME_MESSAGE: &str = "Which client or CBU set would you like to work on?";
+pub const WELCOME_MESSAGE: &str = "Which client would you like to work with today?";
 
 /// Response after creating a session
 #[derive(Debug, Serialize)]
@@ -2995,6 +2995,9 @@ pub struct CreateSessionResponse {
     pub state: SessionState,
     /// Welcome message from agent - asks for scope selection
     pub welcome_message: String,
+    /// Decision packet for client group selection (populated on new sessions without initial_client)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub decision: Option<ob_poc_types::DecisionPacket>,
 }
 
 // ChatRequest is now in ob-poc-types - SINGLE source of truth

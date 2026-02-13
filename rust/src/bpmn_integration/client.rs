@@ -443,6 +443,7 @@ fn from_proto_flags(
 }
 
 /// Convert a domain lifecycle event from proto.
+#[allow(dead_code)]
 pub(crate) fn lifecycle_event_from_proto(event: proto::LifecycleEvent) -> BpmnLifecycleEvent {
     BpmnLifecycleEvent {
         sequence: event.sequence,

@@ -2,13 +2,13 @@
  * ChatSidebar - Session list sidebar
  */
 
-import { useQuery, useMutation } from '@tanstack/react-query';
-import { useNavigate, useParams } from 'react-router-dom';
-import { Plus, MessageSquare, Trash2, Loader2 } from 'lucide-react';
-import { chatApi } from '../../../api/chat';
-import { queryKeys, queryClient } from '../../../lib/query';
-import { cn, formatDate, truncate } from '../../../lib/utils';
-import type { ChatSessionSummary } from '../../../types/chat';
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useNavigate, useParams } from "react-router-dom";
+import { Plus, MessageSquare, Trash2, Loader2 } from "lucide-react";
+import { chatApi } from "../../../api/chat";
+import { queryKeys, queryClient } from "../../../lib/query";
+import { cn, formatDate, truncate } from "../../../lib/utils";
+import type { ChatSessionSummary } from "../../../types/chat";
 
 interface ChatSidebarProps {
   className?: string;
@@ -36,24 +36,29 @@ export function ChatSidebar({ className }: ChatSidebarProps) {
   // Delete session mutation
   const deleteMutation = useMutation({
     mutationFn: (id: string) => chatApi.deleteSession(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.chat.sessions() });
-      // Navigate away if we deleted the current session
-      if (sessionId && deleteMutation.variables === sessionId) {
-        navigate('/chat');
+    onSuccess: (_data, deletedId) => {
+      // Navigate away FIRST if we deleted the current session (prevents ChatPage refetch)
+      if (sessionId === deletedId) {
+        navigate("/chat");
       }
+      // Remove the deleted session's query from cache so it can't be refetched
+      queryClient.removeQueries({
+        queryKey: queryKeys.chat.session(deletedId),
+      });
+      // Refresh the session list
+      queryClient.invalidateQueries({ queryKey: queryKeys.chat.sessions() });
     },
   });
 
   const handleDelete = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    if (confirm('Delete this session?')) {
+    if (confirm("Delete this session?")) {
       deleteMutation.mutate(id);
     }
   };
 
   return (
-    <div className={cn('flex flex-col', className)}>
+    <div className={cn("flex flex-col", className)}>
       {/* Header */}
       <div className="flex items-center justify-between border-b border-[var(--border-primary)] px-4 py-3">
         <h2 className="font-semibold text-[var(--text-primary)]">Sessions</h2>
@@ -84,16 +89,16 @@ export function ChatSidebar({ className }: ChatSidebarProps) {
                 key={session.id}
                 onClick={() => navigate(`/chat/${session.id}`)}
                 className={cn(
-                  'group flex w-full items-start gap-2 rounded-lg px-3 py-2 text-left transition-colors',
+                  "group flex w-full items-start gap-2 rounded-lg px-3 py-2 text-left transition-colors",
                   sessionId === session.id
-                    ? 'bg-[var(--accent-blue)]/10 text-[var(--text-primary)]'
-                    : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
+                    ? "bg-[var(--accent-blue)]/10 text-[var(--text-primary)]"
+                    : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]",
                 )}
               >
                 <MessageSquare size={16} className="mt-0.5 flex-shrink-0" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">
-                    {session.title || 'Untitled Session'}
+                    {session.title || "Untitled Session"}
                   </p>
                   {session.last_message_preview && (
                     <p className="text-xs text-[var(--text-muted)] truncate">
@@ -101,7 +106,8 @@ export function ChatSidebar({ className }: ChatSidebarProps) {
                     </p>
                   )}
                   <p className="text-xs text-[var(--text-muted)]">
-                    {formatDate(session.updated_at)} · {session.message_count} messages
+                    {formatDate(session.updated_at)} · {session.message_count}{" "}
+                    messages
                   </p>
                 </div>
                 <button

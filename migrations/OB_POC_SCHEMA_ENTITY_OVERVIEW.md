@@ -1230,19 +1230,274 @@ The skeleton build pipeline (`skeleton.build` verb) orchestrates the discovery p
 
 ---
 
+## 15) Semantic Registry Schema (`sem_reg`)
+
+The Semantic Registry provides an immutable snapshot-based registry for the Semantic OS. All registry objects (13 types) share a single `sem_reg.snapshots` table with a JSONB `definition` column. Typed Rust structs provide compile-time safety over the JSONB bodies.
+
+**Migrations:** 078 (Phase 0), 079 (Phase 1), 081 (Phase 2), 082 (Phase 3), 083 (Phases 4-5), 084 (Phase 7), 085 (Phase 8), 086 (Phase 9)
+
+### Enums
+
+| Enum | Values | Purpose |
+|------|--------|---------|
+| `sem_reg.governance_tier` | `governed`, `operational` | Workflow rigour (NOT security posture) |
+| `sem_reg.trust_class` | `proof`, `decision_support`, `convenience` | Trust level (Proof requires Governed) |
+| `sem_reg.snapshot_status` | `draft`, `active`, `deprecated`, `retired` | Snapshot lifecycle |
+| `sem_reg.change_type` | `created`, `non_breaking`, `breaking`, `promotion`, `deprecation`, `retirement` | Transition type |
+| `sem_reg.object_type` | 13 values: `attribute_def`, `entity_type_def`, `relationship_type_def`, `verb_contract`, `taxonomy_def`, `taxonomy_node`, `membership_rule`, `view_def`, `policy_rule`, `evidence_requirement`, `document_type_def`, `observation_def`, `derivation_spec` | Object discriminator |
+
+### ER Diagram
+
+```mermaid
+erDiagram
+    snapshot_sets ||--o{ snapshots : "groups"
+    snapshots ||--o| snapshots : "predecessor"
+    agent_plans ||--o{ plan_steps : "contains"
+    agent_plans ||--o{ decision_records : "produces"
+    agent_plans ||--o{ disambiguation_prompts : "asks"
+    decision_records ||--o{ escalation_records : "escalates"
+    decision_records ||--o{ disambiguation_prompts : "triggers"
+    plan_steps ||--o{ decision_records : "records"
+    snapshots ||--o{ derivation_edges : "output"
+    snapshots ||--o| embedding_records : "embedded"
+    run_records ||--o{ derivation_edges : "produces"
+
+    snapshot_sets {
+        UUID snapshot_set_id PK
+        TEXT description
+        TEXT created_by
+        TIMESTAMPTZ created_at
+    }
+
+    snapshots {
+        UUID snapshot_id PK
+        UUID snapshot_set_id FK
+        object_type object_type
+        UUID object_id
+        INT version_major
+        INT version_minor
+        snapshot_status status
+        governance_tier governance_tier
+        trust_class trust_class
+        JSONB security_label
+        TIMESTAMPTZ effective_from
+        TIMESTAMPTZ effective_until
+        UUID predecessor_id FK
+        change_type change_type
+        TEXT change_rationale
+        TEXT created_by
+        TEXT approved_by
+        JSONB definition
+        TIMESTAMPTZ created_at
+    }
+
+    classification_levels {
+        SERIAL level_id PK
+        TEXT name UK
+        INT ordinal UK
+        TEXT description
+    }
+
+    agent_plans {
+        UUID plan_id PK
+        UUID case_id
+        TEXT goal
+        JSONB context_resolution_ref
+        JSONB steps
+        JSONB assumptions
+        JSONB risk_flags
+        VARCHAR security_clearance
+        VARCHAR status
+        VARCHAR created_by
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ updated_at
+    }
+
+    plan_steps {
+        UUID step_id PK
+        UUID plan_id FK
+        INT seq
+        UUID verb_id
+        UUID verb_snapshot_id
+        VARCHAR verb_fqn
+        JSONB params
+        JSONB expected_postconditions
+        JSONB fallback_steps
+        JSONB depends_on_steps
+        VARCHAR status
+        JSONB result
+        TEXT error
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ updated_at
+    }
+
+    decision_records {
+        UUID decision_id PK
+        UUID plan_id FK
+        UUID step_id FK
+        JSONB context_ref
+        VARCHAR chosen_action
+        TEXT chosen_action_description
+        JSONB alternatives_considered
+        JSONB evidence_for
+        JSONB evidence_against
+        JSONB negative_evidence
+        JSONB policy_verdicts
+        JSONB snapshot_manifest
+        DOUBLE confidence
+        BOOLEAN escalation_flag
+        UUID escalation_id
+        VARCHAR decided_by
+        TIMESTAMPTZ decided_at
+    }
+
+    disambiguation_prompts {
+        UUID prompt_id PK
+        UUID decision_id FK
+        UUID plan_id FK
+        TEXT question
+        JSONB options
+        JSONB context_snapshot
+        BOOLEAN answered
+        VARCHAR chosen_option
+        VARCHAR answered_by
+        TIMESTAMPTZ answered_at
+        TIMESTAMPTZ created_at
+    }
+
+    escalation_records {
+        UUID escalation_id PK
+        UUID decision_id FK
+        TEXT reason
+        VARCHAR severity
+        JSONB context_snapshot
+        TEXT required_human_action
+        VARCHAR assigned_to
+        TIMESTAMPTZ resolved_at
+        TEXT resolution
+        VARCHAR created_by
+        TIMESTAMPTZ created_at
+    }
+
+    derivation_edges {
+        UUID edge_id PK
+        UUID_ARRAY input_snapshot_ids
+        UUID output_snapshot_id FK
+        TEXT verb_fqn
+        UUID run_id FK
+        TIMESTAMPTZ created_at
+    }
+
+    run_records {
+        UUID run_id PK
+        UUID plan_id
+        UUID step_id
+        TEXT verb_fqn
+        TIMESTAMPTZ started_at
+        TIMESTAMPTZ completed_at
+        BIGINT duration_ms
+        INT input_count
+        INT output_count
+        JSONB metadata
+        TIMESTAMPTZ created_at
+    }
+
+    embedding_records {
+        UUID embedding_id PK
+        UUID snapshot_id FK_UK
+        TEXT object_type
+        TEXT version_hash
+        TEXT model_id
+        INT dimensions
+        JSONB embedding
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ updated_at
+    }
+```
+
+### Core Tables
+
+| Table | Purpose | Mutability |
+|-------|---------|------------|
+| `sem_reg.classification_levels` | Reference data: Public, Internal, Confidential, Restricted (ordinal 0-3) | Read-only (seed data) |
+| `sem_reg.snapshot_sets` | Named grouping of snapshots for atomic publish | INSERT-only |
+| `sem_reg.snapshots` | Universal immutable snapshot table for all 13 object types. JSONB `definition` column holds typed body. `security_label` JSONB for classification/PII/jurisdictions. CHECK constraint enforces proof rule (trust_class=proof requires governance_tier=governed). | INSERT-only (status can transition via supersede) |
+
+### Key Indexes on `snapshots`
+
+| Index | Type | Purpose |
+|-------|------|---------|
+| `uix_snapshots_active` | UNIQUE partial (WHERE effective_until IS NULL AND status = 'active') | At most one active snapshot per (object_type, object_id) |
+| `ix_snapshots_history` | B-tree (object_id, effective_from DESC) | Chronological history lookup |
+| `ix_snapshots_temporal` | B-tree (object_type, object_id, effective_from, effective_until) | Point-in-time resolution |
+| `ix_snapshots_set` | B-tree partial (WHERE snapshot_set_id IS NOT NULL) | Set membership lookup |
+| `ix_snapshots_type_status` | B-tree (object_type, status) | Type + status listing |
+
+### Agent Tables (Phase 8)
+
+| Table | Purpose | Mutability |
+|-------|---------|------------|
+| `sem_reg.agent_plans` | Agent plans with goal, context resolution ref, assumptions, risk flags, security clearance. Status: draft/active/completed/failed/cancelled. | INSERT + status/updated_at UPDATE |
+| `sem_reg.plan_steps` | Steps within a plan. Each pins `verb_id` + `verb_snapshot_id` for provenance. UNIQUE on (plan_id, seq). | INSERT + status/result/error UPDATE |
+| `sem_reg.decision_records` | Immutable decision records with `snapshot_manifest` (JSONB NOT NULL) — complete provenance chain. Confidence range 0.0-1.0 enforced by CHECK. | INSERT-only |
+| `sem_reg.disambiguation_prompts` | Disambiguation questions with options. Updatable: answered, chosen_option, answered_by, answered_at. | INSERT + answer UPDATE |
+| `sem_reg.escalation_records` | Human escalation records with severity (info/warning/critical). Updatable: resolved_at, resolution. | INSERT + resolution UPDATE |
+
+### Projection Tables (Phase 9)
+
+| Table | Purpose | Mutability |
+|-------|---------|------------|
+| `sem_reg.derivation_edges` | Immutable lineage edges: input_snapshot_ids[] → output_snapshot_id via verb_fqn. GIN index on input array for forward impact. FK to run_records. | INSERT-only (append) |
+| `sem_reg.run_records` | Immutable execution records per plan step. Timing (started_at, completed_at, duration_ms), I/O counts, metadata JSONB. | INSERT-only |
+| `sem_reg.embedding_records` | One embedding per snapshot (UNIQUE on snapshot_id). Version hash for staleness detection. Embedding stored as JSONB float array. | INSERT + UPDATE on re-embed |
+
+### SQL Functions
+
+| Function | Purpose |
+|----------|---------|
+| `sem_reg.resolve_active(object_type, object_id, as_of)` | Returns the active snapshot at a point in time |
+| `sem_reg.count_active(object_type)` | Returns active snapshot count by object type |
+
+### Key Views (across Phases 1-9)
+
+| View | Phase | Purpose |
+|------|-------|---------|
+| `v_active_attribute_defs` | 1 | Active attribute definitions (flattened JSONB) |
+| `v_active_entity_type_defs` | 1 | Active entity type definitions |
+| `v_active_verb_contracts` | 1 | Active verb contracts |
+| `v_registry_stats` | 1 | Object counts by type and status |
+| `v_active_taxonomy_defs` | 2 | Active taxonomy definitions |
+| `v_active_taxonomy_nodes` | 2 | Active taxonomy nodes |
+| `v_active_membership_rules` | 2 | Active membership rules |
+| `v_active_view_defs` | 2 | Active view definitions |
+| `v_active_policy_rules` | 3 | Active policy rules |
+| `v_active_evidence_reqs` | 3 | Active evidence requirements |
+| `v_active_document_type_defs` | 3 | Active document type definitions |
+| `v_active_observation_defs` | 3 | Active observation definitions |
+| `v_active_derivation_specs` | 5 | Active derivation specs |
+| `v_active_memberships_by_subject` | 7 | Fast taxonomy overlap lookup for context resolution |
+| `v_verb_precondition_status` | 7 | Precondition evaluability check |
+| `v_view_attribute_columns` | 7 | View attribute columns |
+| `v_stale_embeddings` | 9 | Embeddings needing refresh (version_hash mismatch) |
+| `v_lineage_summary` | 9 | Edge counts per verb (lineage overview) |
+| `v_run_performance` | 9 | Average duration by verb (performance monitoring) |
+
+---
+
 ## Schema Statistics
 
 | Metric | Count |
 |--------|-------|
 | Total `ob-poc` tables | 226 |
 | Total `kyc` tables | 37 (+ 9 views) |
+| Total `sem_reg` tables | 10 (+ 19 views, 2 functions) |
 | Tables with DSL verb domains | ~120 |
-| Tables in this document | ~185 (essential to data model) |
+| Tables in this document | ~195 (essential to data model) |
 | Tables omitted (DSL engine, REPL, semantic search, layout cache) | ~76 |
 | DSL verb domains | 58 |
 | Total verb count | ~1,083 |
-| Migrations | 77 (001–077 + 072b) |
-| Sections in this document | 14 |
+| Migrations | 85 (001–077 + 072b + 078–079, 081–086) |
+| Sections in this document | 15 |
 
 **Omitted infrastructure tables** (no verb domains, not essential to data model):
 - DSL engine: `dsl_verbs`, `dsl_sessions`, `dsl_instances`, `dsl_snapshots`, `dsl_*` (14 tables)

@@ -144,11 +144,10 @@ export function ChatPage() {
               {currentSession.messages.length === 0 ? (
                 <div className="py-12 text-center">
                   <h3 className="text-lg font-medium text-[var(--text-primary)]">
-                    New Conversation
+                    Loading...
                   </h3>
                   <p className="mt-2 text-sm text-[var(--text-secondary)]">
-                    Ask me to help with onboarding, KYC, trading profiles, or
-                    any other operation.
+                    Setting up your session.
                   </p>
                 </div>
               ) : (

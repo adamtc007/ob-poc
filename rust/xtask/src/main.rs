@@ -22,6 +22,7 @@ mod gleif_test;
 mod lexicon;
 mod replay_tuner;
 mod seed_allianz;
+mod sem_reg;
 mod ubo_test;
 mod verbs;
 
@@ -320,6 +321,14 @@ enum Command {
     Lexicon {
         #[command(subcommand)]
         action: LexiconAction,
+    },
+
+    /// Semantic Registry commands (stats, describe, list, history, scan)
+    ///
+    /// Manages the immutable snapshot-based Semantic OS registry.
+    SemReg {
+        #[command(subcommand)]
+        action: SemRegAction,
     },
 
     /// Test verb search and semantic matching
@@ -788,6 +797,122 @@ enum LexiconAction {
 }
 
 #[derive(Subcommand)]
+enum SemRegAction {
+    /// Show registry statistics (counts by object type)
+    Stats,
+
+    /// Describe an attribute definition by FQN
+    AttrDescribe {
+        /// Attribute FQN (e.g., "cbu.jurisdiction_code")
+        fqn: String,
+    },
+
+    /// List active attribute definitions
+    AttrList {
+        /// Maximum number of results
+        #[arg(long, short = 'n', default_value = "100")]
+        limit: i64,
+    },
+
+    /// Describe an entity type definition by FQN
+    EntityTypeDescribe {
+        /// Entity type FQN (e.g., "entity.fund")
+        fqn: String,
+    },
+
+    /// Describe a verb contract by FQN
+    VerbDescribe {
+        /// Verb FQN (e.g., "cbu.create")
+        fqn: String,
+    },
+
+    /// List active verb contracts
+    VerbList {
+        /// Maximum number of results
+        #[arg(long, short = 'n', default_value = "100")]
+        limit: i64,
+    },
+
+    /// Show snapshot history for a registry object
+    History {
+        /// Object type (attr, entity-type, verb, taxonomy, policy, evidence, etc.)
+        object_type: String,
+        /// Object FQN
+        fqn: String,
+    },
+
+    /// Scan verb YAML and bootstrap registry snapshots
+    Scan {
+        /// Report counts without writing to database
+        #[arg(long)]
+        dry_run: bool,
+        /// Show per-object detail
+        #[arg(long, short = 'v')]
+        verbose: bool,
+    },
+
+    /// Describe a derivation spec by FQN
+    DerivationDescribe {
+        /// Derivation FQN (e.g., "kyc.risk_score_derived")
+        fqn: String,
+    },
+
+    /// Backfill security labels on snapshots with default labels
+    BackfillLabels {
+        /// Report what would change without writing to database
+        #[arg(long)]
+        dry_run: bool,
+    },
+
+    /// Run publish gates against all active snapshots
+    Validate {
+        /// Fail with non-zero exit on errors (default: report-only)
+        #[arg(long)]
+        enforce: bool,
+    },
+
+    /// List available Semantic Registry MCP tools (Phase 8)
+    AgentTools,
+
+    /// Resolve context for a subject (Phase 7)
+    ///
+    /// Runs the 12-step context resolution pipeline and returns ranked verbs,
+    /// attributes, policy verdicts, and governance signals.
+    CtxResolve {
+        /// Subject ID (UUID)
+        subject: String,
+        /// Subject type: case, entity, document, task, view
+        #[arg(long, default_value = "entity")]
+        subject_type: String,
+        /// Actor type: agent, analyst, governance
+        #[arg(long, default_value = "analyst")]
+        actor: String,
+        /// Evidence mode: strict, normal, exploratory, governance
+        #[arg(long, default_value = "normal")]
+        mode: String,
+        /// Point-in-time (ISO 8601), omit for current
+        #[arg(long)]
+        as_of: Option<String>,
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Show governance coverage report (Phase 9)
+    ///
+    /// Aggregates classification, stewardship, policy attachment, evidence
+    /// freshness, and security label metrics across the registry.
+    Coverage {
+        /// Filter by governance tier: governed, operational, or all (default)
+        #[arg(long, default_value = "all")]
+        tier: String,
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
+}
+
+#[derive(Subcommand)]
 enum ReplayTunerAction {
     /// Run golden corpus with current scoring constants
     ///
@@ -1042,6 +1167,51 @@ fn main() -> Result<()> {
                 iterations,
             } => lexicon::bench(snapshot.as_deref(), iterations),
         },
+        Command::SemReg { action } => {
+            let rt = tokio::runtime::Runtime::new()?;
+            match action {
+                SemRegAction::Stats => rt.block_on(sem_reg::stats()),
+                SemRegAction::AttrDescribe { fqn } => rt.block_on(sem_reg::attr_describe(&fqn)),
+                SemRegAction::AttrList { limit } => rt.block_on(sem_reg::attr_list(limit)),
+                SemRegAction::EntityTypeDescribe { fqn } => {
+                    rt.block_on(sem_reg::entity_type_describe(&fqn))
+                }
+                SemRegAction::VerbDescribe { fqn } => rt.block_on(sem_reg::verb_describe(&fqn)),
+                SemRegAction::VerbList { limit } => rt.block_on(sem_reg::verb_list(limit)),
+                SemRegAction::History { object_type, fqn } => {
+                    rt.block_on(sem_reg::history(&object_type, &fqn))
+                }
+                SemRegAction::Scan { dry_run, verbose } => {
+                    rt.block_on(sem_reg::scan(dry_run, verbose))
+                }
+                SemRegAction::DerivationDescribe { fqn } => {
+                    rt.block_on(sem_reg::derivation_describe(&fqn))
+                }
+                SemRegAction::BackfillLabels { dry_run } => {
+                    rt.block_on(sem_reg::backfill_labels(dry_run))
+                }
+                SemRegAction::Validate { enforce } => rt.block_on(sem_reg::validate(enforce)),
+                SemRegAction::AgentTools => rt.block_on(sem_reg::agent_tools()),
+                SemRegAction::CtxResolve {
+                    subject,
+                    subject_type,
+                    actor,
+                    mode,
+                    as_of,
+                    json,
+                } => rt.block_on(sem_reg::ctx_resolve(
+                    &subject,
+                    &subject_type,
+                    &actor,
+                    &mode,
+                    as_of.as_deref(),
+                    json,
+                )),
+                SemRegAction::Coverage { tier, json } => {
+                    rt.block_on(sem_reg::coverage(&tier, json))
+                }
+            }
+        }
         Command::Entity { action } => {
             let rt = tokio::runtime::Runtime::new()?;
             match action {

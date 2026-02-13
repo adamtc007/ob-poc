@@ -211,8 +211,16 @@ pub async fn run_graph_validate(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     case_id: Uuid,
 ) -> Result<i64> {
+    type EdgeRow = (
+        Uuid,
+        Uuid,
+        Uuid,
+        String,
+        Option<rust_decimal::Decimal>,
+        Option<String>,
+    );
     // 1. Load edges scoped to this case's entity workstreams
-    let rows: Vec<(Uuid, Uuid, Uuid, String, Option<rust_decimal::Decimal>, Option<String>)> =
+    let rows: Vec<EdgeRow> =
         sqlx::query_as(
             r#"
             SELECT
@@ -392,8 +400,8 @@ fn detect_cycles(edges: &[Edge], anomalies: &mut Vec<GraphAnomaly>) {
                 let neighbor = neighbors[*ni];
                 *ni += 1;
 
-                if !indices.contains_key(&neighbor) {
-                    indices.insert(neighbor, index_counter);
+                if let std::collections::hash_map::Entry::Vacant(e) = indices.entry(neighbor) {
+                    e.insert(index_counter);
                     lowlinks.insert(neighbor, index_counter);
                     index_counter += 1;
                     stack.push(neighbor);
@@ -783,7 +791,7 @@ pub async fn run_ubo_compute(
     // 7. Build JSONB snapshots and persist
     let output_snapshot = serde_json::to_value(&all_candidates)?;
     let chains_snapshot = serde_json::to_value(
-        &all_candidates
+        all_candidates
             .iter()
             .flat_map(|c| {
                 c.chains.iter().map(move |chain| {
@@ -1187,7 +1195,7 @@ pub async fn run_outreach_plan(
 
     let mut planned_items: Vec<PlannedItem> = gaps
         .iter()
-        .filter_map(|gap| {
+        .map(|gap| {
             let prong = gap
                 .get("prong")
                 .and_then(|v| v.as_str())
@@ -1227,7 +1235,7 @@ pub async fn run_outreach_plan(
 
             let gap_ref = format!("{}:{}", prong, entity_id);
 
-            Some(PlannedItem {
+            PlannedItem {
                 entity_id,
                 prong: prong.to_string(),
                 gap_description: description.to_string(),
@@ -1235,7 +1243,7 @@ pub async fn run_outreach_plan(
                 request_text,
                 priority,
                 gap_ref,
-            })
+            }
         })
         .collect();
 

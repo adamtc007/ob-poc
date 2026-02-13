@@ -1,12 +1,12 @@
 # CLAUDE.md
 
-> **Last reviewed:** 2026-02-12
+> **Last reviewed:** 2026-02-13
 > **Frontend:** React/TypeScript (`ob-poc-ui-react/`) - Chat UI with scope panel, Inspector
 > **Backend:** Rust/Axum (`rust/crates/ob-poc-web/`) - Serves React + REST API
 > **Crates:** 16 active Rust crates (esper_* crates deprecated after React migration; ob-poc-graph + viewport removed)
 > **Verbs:** 1,083 canonical verbs, 14,593 intent patterns (DB-sourced)
-> **Migrations:** 77 schema migrations (+ 072b seed)
-> **Schema Overview:** `migrations/OB_POC_SCHEMA_ENTITY_OVERVIEW.md` — living doc, 14 sections, ~185 tables (ob-poc + kyc), 13 mermaid ER diagrams
+> **Migrations:** 85 schema migrations (001-077 + 072b seed + 078-079, 081-086 sem_reg)
+> **Schema Overview:** `migrations/OB_POC_SCHEMA_ENTITY_OVERVIEW.md` — living doc, 15 sections, ~195 tables (ob-poc + kyc + sem_reg), 14 mermaid ER diagrams
 > **Embeddings:** Candle local (384-dim, BGE-small-en-v1.5) - 14,593 patterns vectorized
 > **React Migration (077):** ✅ Complete - egui/WASM replaced with React/TypeScript, 3-panel chat layout
 > **Verb Phrase Generation:** ✅ Complete - V1 YAML auto-generates phrases on load (no V2 registry)
@@ -14,7 +14,7 @@
 > **Multi-CBU Viewport:** ✅ Complete - Scope graph endpoint, execution refresh
 > **REPL Session/Phased Execution:** ⚠️ Superseded by V2 REPL Architecture
 > **REPL Pipeline Redesign (077):** ⚠️ Superseded by V2 REPL Architecture — V1 types retained for reference
-> **V2 REPL Architecture (TODO-2):** ✅ Complete - Pack-scoped intent resolution, 7-state machine, ContextStack fold, preconditions engine, 320 tests
+> **V2 REPL Architecture (TODO-2):** ✅ Complete - Pack-scoped intent resolution, 7-state machine, ContextStack fold, preconditions engine, 3-pronged intent pipeline (semantic→pack→precondition), VerbSearchIntentMatcher bridge, 320 tests
 > **Candle Semantic Pipeline:** ✅ Complete - DB source of truth, populate_embeddings binary
 > **Agent Pipeline:** ✅ Unified - One path, all input → LLM intent → DSL (no special cases)
 > **Solar Navigation (038):** ✅ Complete - ViewState, NavigationHistory, orbit navigation
@@ -55,6 +55,7 @@
 > **KYC/UBO Skeleton Build Pipeline:** ✅ Complete - 7-step build (import-run → graph validate → UBO compute → coverage → outreach plan → tollgate → complete), real computation in all ops, 12 integration tests with assertions
 > **KYC Skeleton Build Post-Audit (S1):** ✅ Complete - Decimal conversion (F-5), coverage ownership scoping (F-2), transaction boundary (F-1), configurable outreach cap (F-4), shared function extraction (F-3a-e)
 > **KYC Skeleton Build Post-Audit (S2):** ✅ Complete - Import run case linkage on idempotent hit (F-7), as_of date for import runs (F-8a-c), case status state machine with KycCaseUpdateStatusOp plugin (F-6a-e), 4 transition tests
+> **Semantic OS (Phases 0-9, Migrations 078-086):** ✅ Complete - Immutable snapshot registry, 13 object types, ABAC + security labels, publish gates, context resolution API, agent control plane (plans/decisions/escalations), ~32 MCP tools, lineage/embeddings/coverage projections, 7 integration test scenarios, 32 Rust source files (~12,400 LOC), 8 SQL migrations (~1,000 LOC)
 
 This is the root project guide for Claude Code. Domain-specific details are in annexes.
 
@@ -3768,11 +3769,14 @@ See **V2 REPL Architecture** section below for the active implementation.
 
 ## V2 REPL Architecture — Pack-Scoped Intent Resolution
 
-> **Status:** ✅ Complete (2026-02-07) — Feature flag `vnext-repl` (enabled in web server)
+> **Status:** ✅ Complete (2026-02-13) — Feature flag `vnext-repl` (enabled in web server)
+> **Intent Wiring:** ✅ Complete — `VerbSearchIntentMatcher` bridges `HybridVerbSearcher` (10-tier) to V2 `IntentMatcher` trait
 > **Tests:** 320 unit tests + 5 golden corpus tests
 > **Invariants:** P-1 through P-5, E-1 through E-8 — see `docs/INVARIANT-VERIFICATION.md`
 
 **Problem Solved:** V1 REPL had no concept of "what the user is trying to accomplish" — every turn was an independent verb search. V2 introduces **packs** (journey templates) that scope intent resolution, a **ContextStack** (pure fold from runbook), and a **preconditions engine** that filters verbs by eligibility.
+
+**Critical wiring (2026-02-13):** The V2 REPL's `IntentMatcher` trait was disconnected from the production `HybridVerbSearcher` — all free-text utterances fell through to a stub matcher. `VerbSearchIntentMatcher` now bridges the 10-tier `HybridVerbSearcher` to the V2 `IntentMatcher` trait, and `IntentService` + `VerbConfigIndex` are fully wired in `main.rs`.
 
 ### 7-State Machine
 
@@ -3837,28 +3841,138 @@ Packs are YAML journey templates that scope intent resolution to a workflow:
 
 **PackRouter** selects pack: force-select > substring match > semantic match. Conversation-first design — question `options_source` values are suggestions, not gate constraints.
 
-### Scoring Pipeline
+### 3-Pronged Utterance → Intent Pipeline
+
+Every user utterance flows through **three sequential stages** that progressively narrow the candidate set. Each stage votes on candidates via scoring; the final result is a single `VerbDecision`.
 
 ```
-User input
-    │
-    ▼
-search_with_context(input, context_stack)     ← IntentService
-    │
-    ▼
-apply_pack_scoring(candidates, pack_context)  ← Pack verb boost/penalty
-    │
-    ▼
-apply_ambiguity_policy(candidates)            ← Margin-based disambiguation
-    │
-    ▼
-dual_decode(candidates, pack_context)         ← Joint pack+verb scoring
-    │
-    ▼
-VerbDecision: Clear | Ambiguous | NeedsContext | NoMatch
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  User utterance: "assign depositary to the fund"                            │
+│         │                                                                    │
+│         ▼                                                                    │
+│  ┌─────────────────────────────────────────────────────────────────────┐    │
+│  │  PRONG 1: RAW SEMANTIC SEARCH (VerbSearchIntentMatcher)             │    │
+│  │                                                                     │    │
+│  │  HybridVerbSearcher.search() — 10-tier priority:                   │    │
+│  │    T0: Operator macros (exact/fuzzy label match)         score 1.0  │    │
+│  │    T1: User learned exact                                score 1.0  │    │
+│  │    T2: Global learned exact                              score 1.0  │    │
+│  │    T3: User semantic (pgvector, BGE asymmetric)          0.5-0.95  │    │
+│  │    T5: Blocklist filter                                            │    │
+│  │    T6: Global semantic (cold-start + learned patterns)   0.5-0.95  │    │
+│  │    T7: Phonetic fallback (typo handling)                 0.80      │    │
+│  │                                                                     │    │
+│  │  Output: Vec<VerbCandidate> with raw scores                        │    │
+│  │  Example: [cbu-role.assign@0.82, party.assign@0.78, cbu.create@0.61] │  │
+│  └─────────────────────────────────────────────────────────────────────┘    │
+│         │                                                                    │
+│         ▼                                                                    │
+│  ┌─────────────────────────────────────────────────────────────────────┐    │
+│  │  PRONG 2: PACK SCORING (apply_pack_scoring)                         │    │
+│  │                                                                     │    │
+│  │  Context-aware score adjustments based on active pack + focus:      │    │
+│  │    • In-pack verb boost:     +0.10  (verb listed in pack template) │    │
+│  │    • Out-of-pack penalty:    -0.05  (verb not in pack)             │    │
+│  │    • Template step boost:    +0.15  (matches NEXT expected step)   │    │
+│  │    • Domain affinity boost:  +0.03  (domain matches FocusMode)    │    │
+│  │    • Absolute floor:          0.55  (below = discard)             │    │
+│  │                                                                     │    │
+│  │  Re-sorted by adjusted score, floor-filtered                       │    │
+│  │  Example: [cbu-role.assign@0.92, party.assign@0.73]                │    │
+│  │           (cbu.create dropped below floor after penalty)           │    │
+│  └─────────────────────────────────────────────────────────────────────┘    │
+│         │                                                                    │
+│         ▼                                                                    │
+│  ┌─────────────────────────────────────────────────────────────────────┐    │
+│  │  PRONG 3: PRECONDITION FILTERING (filter_by_preconditions)          │    │
+│  │                                                                     │    │
+│  │  DAG-aware eligibility check against ContextStack:                  │    │
+│  │    • requires_scope:cbu     — CBU must be in scope                 │    │
+│  │    • requires_prior:X       — verb X must have been executed       │    │
+│  │    • forbids_prior:X        — verb X must NOT have been executed   │    │
+│  │                                                                     │    │
+│  │  Ineligible verbs removed; "why not" suggestions generated:         │    │
+│  │    "party.assign requires entity.create first — try that first"    │    │
+│  │                                                                     │    │
+│  │  Re-evaluate ambiguity on surviving candidates                     │    │
+│  │  Example: [cbu-role.assign@0.92]  ← clear winner                  │    │
+│  └─────────────────────────────────────────────────────────────────────┘    │
+│         │                                                                    │
+│         ▼                                                                    │
+│  ┌─────────────────────────────────────────────────────────────────────┐    │
+│  │  AMBIGUITY POLICY (apply_ambiguity_policy)                          │    │
+│  │                                                                     │    │
+│  │  Four outcomes based on top candidate(s):                           │    │
+│  │    Confident:   score ≥ 0.70  AND  margin ≥ 0.05  → execute       │    │
+│  │    Proposed:    score ≥ 0.55  AND  margin ≥ 0.05  → confirm first │    │
+│  │    Ambiguous:   margin < 0.05 between top two     → ask user      │    │
+│  │    NoMatch:     score < 0.55 or no candidates     → re-prompt     │    │
+│  └─────────────────────────────────────────────────────────────────────┘    │
+│         │                                                                    │
+│         ▼                                                                    │
+│  VerbDecision: Clear | Ambiguous | NeedsContext | NoMatch                   │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-**Scoring Constants:**
+### VerbSearchIntentMatcher (Bridge Layer)
+
+The V2 REPL defines an `IntentMatcher` trait for pluggable verb matching. `VerbSearchIntentMatcher` bridges the production `HybridVerbSearcher` (V1's 10-tier search) to this trait.
+
+```rust
+// rust/src/mcp/verb_search_intent_matcher.rs
+pub struct VerbSearchIntentMatcher {
+    searcher: Arc<HybridVerbSearcher>,
+}
+
+impl IntentMatcher for VerbSearchIntentMatcher {
+    async fn match_intent(&self, utterance: &str, context: &MatchContext)
+        -> Result<IntentMatchResult>
+    {
+        // 1. Call HybridVerbSearcher.search() with user_id + domain_hint from context
+        // 2. Map VerbSearchResult → VerbCandidate (score, verb_fqn, description)
+        // 3. Derive MatchOutcome from candidate scores:
+        //    - No candidates → NoMatch
+        //    - Top score ≥ 0.55 with margin ≥ 0.05 → ClearWinner
+        //    - Multiple close scores → Ambiguous { top, runner_up, margin }
+        //    - Top score < 0.55 → NoMatch
+    }
+}
+```
+
+**Outcome derivation constants:**
+
+| Constant | Value | Purpose |
+|----------|-------|---------|
+| `THRESHOLD` | 0.55 | Minimum score to consider a candidate viable |
+| `MARGIN` | 0.05 | Minimum gap between top two for clear winner |
+| `STRONG_THRESHOLD` | 0.70 | Score above which match is auto-confident |
+
+### Server Wiring (main.rs)
+
+The intent pipeline is assembled in `ob-poc-web/src/main.rs` during V2 REPL initialization:
+
+```
+VerbsConfig (YAML)
+    │
+    ├─► VerbConfigIndex (in-memory verb metadata)
+    │
+    ├─► CandleEmbedder (BGE-small-en-v1.5, 384-dim)
+    │       │
+    │       └─► HybridVerbSearcher (10-tier priority search)
+    │               │
+    │               └─► VerbSearchIntentMatcher (IntentMatcher trait impl)
+    │                       │
+    │                       └─► IntentService (5-phase pipeline)
+    │
+    └─► ReplOrchestratorV2
+            .with_verb_config_index(verb_config_index)
+            .with_intent_matcher(intent_matcher)
+            .with_intent_service(intent_service)
+```
+
+If the `CandleEmbedder` fails to initialize (missing model files), the system logs a warning and falls back to stub matching. All components degrade gracefully.
+
+### Scoring Constants
 
 | Constant | Value | Purpose |
 |----------|-------|---------|
@@ -3868,6 +3982,7 @@ VerbDecision: Clear | Ambiguous | NeedsContext | NoMatch
 | `DOMAIN_AFFINITY_BOOST` | 0.03 | Domain matching from FocusMode |
 | `ABSOLUTE_FLOOR` | 0.55 | Minimum score cutoff |
 | `AMBIGUITY_MARGIN` | 0.05 | Gap required between top candidates |
+| `STRONG_THRESHOLD` | 0.70 | Score above which match is auto-confident |
 
 ### Preconditions Engine
 
@@ -3983,11 +4098,14 @@ CI gate: `test_corpus_total_at_least_50` ensures corpus doesn't regress.
 | `rust/src/repl/types_v2.rs` | `ReplStateV2`, `UserInputV2` types (11K) |
 | `rust/src/repl/response_v2.rs` | `ReplResponseV2` types (9K) |
 | **Intent & Scoring** | |
+| `rust/src/mcp/verb_search_intent_matcher.rs` | Bridge: `HybridVerbSearcher` → `IntentMatcher` trait |
 | `rust/src/repl/intent_service.rs` | 5-phase verb matching pipeline (26K) |
+| `rust/src/repl/intent_matcher.rs` | `IntentMatcher` trait + `search_with_context()` default |
 | `rust/src/repl/scoring.rs` | Pack scoring + ambiguity policy (29K) |
 | `rust/src/repl/preconditions.rs` | Precondition engine + "why not" (18K) |
 | `rust/src/repl/decision_log.rs` | Per-turn audit trail (32K) |
 | `rust/src/repl/verb_config_index.rs` | In-memory verb metadata (26K) |
+| `rust/src/mcp/verb_search_factory.rs` | Factory for consistent `HybridVerbSearcher` creation |
 | **Context & Runbook** | |
 | `rust/src/repl/context_stack.rs` | 7-layer ContextStack fold (81K) |
 | `rust/src/repl/runbook.rs` | Runbook entries + execution (66K) |
@@ -5354,6 +5472,9 @@ ob-poc/
 │       ├── domain_ops/         # CustomOperation implementations (~300+ ops)
 │       ├── lexicon/            # In-memory verb/domain/concept lookup (072)
 │       ├── entity_linking/     # In-memory entity resolution (073)
+│       ├── sem_reg/            # Semantic Registry (Phases 0-9, 32 files)
+│       │   ├── agent/          # Agent control plane (plans, decisions, MCP tools)
+│       │   └── projections/    # Lineage, embeddings, coverage metrics
 │       ├── session/            # Session state
 │       ├── graph/              # Graph builders
 │       └── api/                # REST routes
@@ -5443,7 +5564,8 @@ When you see these in a task, read the corresponding annex first:
 | "REPL redesign", "state machine", "V2 REPL", "ReplOrchestrator", "/api/repl" | CLAUDE.md §V2 REPL Architecture |
 | "context stack", "ContextStack", "runbook fold", "DerivedScope" | CLAUDE.md §V2 REPL Architecture |
 | "pack router", "PackManifest", "pack.select", "journey" | CLAUDE.md §V2 REPL Architecture |
-| "scoring", "pack scoring", "dual decode", "ambiguity policy" | CLAUDE.md §V2 REPL Architecture |
+| "scoring", "pack scoring", "dual decode", "ambiguity policy" | CLAUDE.md §V2 REPL Architecture §3-Pronged Intent Pipeline |
+| "VerbSearchIntentMatcher", "IntentMatcher", "intent wiring", "3-pronged" | CLAUDE.md §V2 REPL Architecture §VerbSearchIntentMatcher |
 | "preconditions", "EligibilityMode", "requires_scope" | CLAUDE.md §V2 REPL Architecture |
 | "decision log", "DecisionLog", "replay tuner", "golden corpus" | CLAUDE.md §V2 REPL Architecture |
 | "focus mode", "FocusMode", "domain affinity" | CLAUDE.md §V2 REPL Architecture |
@@ -5466,6 +5588,19 @@ When you see these in a task, read the corresponding annex first:
 | "skeleton build", "skeleton_build_ops", "run_graph_validate", "run_ubo_compute", "run_coverage_compute", "run_outreach_plan", "run_tollgate_evaluate" | `rust/src/domain_ops/skeleton_build_ops.rs`, `KYC_SKELETON_FIXES.md` |
 | "case transition", "CASE_TRANSITIONS", "KycCaseUpdateStatusOp", "update-status plugin", "is_valid_transition" | `rust/src/domain_ops/kyc_case_ops.rs`, `KYC_SKELETON_FIXES_S2.md` |
 | "import run", "ImportRunBeginOp", "as_of", "idempotency", "case_import_runs" | `rust/src/domain_ops/import_run_ops.rs`, `rust/config/verbs/research/import-run.yaml` |
+| "semantic registry", "sem_reg", "semantic os", "immutable snapshot", "registry service" | CLAUDE.md §Semantic OS (078-086) |
+| "GovernanceTier", "TrustClass", "Proof", "Governed", "Operational" | CLAUDE.md §Semantic OS §Core Types |
+| "SnapshotMeta", "SnapshotStore", "snapshot_sets", "publish gates", "gate framework" | CLAUDE.md §Semantic OS §Publish Gates |
+| "AttributeDefBody", "EntityTypeDefBody", "VerbContractBody", "object type" | CLAUDE.md §Semantic OS §13 Object Types |
+| "TaxonomyDef", "MembershipRule", "ViewDef", "PolicyRule", "EvidenceRequirement" | CLAUDE.md §Semantic OS §13 Object Types |
+| "ABAC", "AccessDecision", "ActorContext", "AccessPurpose", "evaluate_abac" | CLAUDE.md §Semantic OS §Core Types |
+| "SecurityLabel", "compute_inherited_label", "PII propagation", "classification" | CLAUDE.md §Semantic OS §Core Types |
+| "DerivationSpec", "DerivationFunctionRegistry", "derived attribute" | CLAUDE.md §Semantic OS §Phase Summary |
+| "resolve_context", "context resolution", "ContextResolutionRequest", "EvidenceMode" | CLAUDE.md §Semantic OS §Context Resolution API |
+| "AgentPlan", "PlanStep", "DecisionRecord", "EscalationRecord", "snapshot_manifest" | CLAUDE.md §Semantic OS §Agent Control Plane |
+| "sem_reg_describe", "sem_reg_search", "sem_reg_resolve_context", "sem_reg_create_plan" | CLAUDE.md §Semantic OS §MCP Tools |
+| "CoverageReport", "derivation_edges", "embedding_records", "lineage", "run_records" | CLAUDE.md §Semantic OS §Projections |
+| "cargo x sem-reg", "sem-reg stats", "sem-reg validate", "sem-reg ctx-resolve", "sem-reg coverage" | CLAUDE.md §Semantic OS §CLI Commands |
 
 ---
 
@@ -5683,6 +5818,412 @@ role:
 
 ---
 
+## Semantic OS — Immutable Registry & Context Resolution (078-086)
+
+> ✅ **IMPLEMENTED (2026-02-13)**: 10 phases (0-9), 32 Rust source files (~12,400 LOC), 8 SQL migrations (~1,000 LOC), ~32 MCP tools, 12 CLI subcommands, 7 integration test scenarios.
+
+**Problem Solved:** The system had no formal model for what attributes, verbs, entity types, policies, and evidence requirements exist, how they relate, or who can access them. The Semantic Registry provides an immutable, auditable, governance-aware knowledge base that the agent, runtime, and governance teams can query programmatically.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    SEMANTIC REGISTRY (sem_reg)                                │
+│                                                                              │
+│  All 13 object types share ONE table: sem_reg.snapshots                     │
+│  ┌─────────────────────────────────────────────────────────────────────┐    │
+│  │  snapshot_id (UUID) │ object_type │ object_id │ fqn │ version      │    │
+│  │  governance_tier    │ trust_class │ status    │ security_label     │    │
+│  │  definition (JSONB) │ created_at  │ created_by│ supersedes         │    │
+│  └─────────────────────────────────────────────────────────────────────┘    │
+│         │                                                                    │
+│         ├─► Typed Rust structs (AttributeDefBody, VerbContractBody, ...)   │
+│         ├─► Publish gates (proof rule, security, approval, version)        │
+│         ├─► ABAC access control (purpose, jurisdiction, clearance)         │
+│         ├─► Security label inheritance (PII propagation, classification)   │
+│         └─► Point-in-time resolution (resolve_active / resolve_at)         │
+│                                                                              │
+│  ┌─────────────────────────────────────────────────────────────────────┐    │
+│  │  Context Resolution (Phase 7)                                        │    │
+│  │  12-step pipeline: subject → entity type → views → verbs →           │    │
+│  │  attributes → preconditions → policies → access decisions →          │    │
+│  │  governance signals → confidence score                               │    │
+│  └─────────────────────────────────────────────────────────────────────┘    │
+│                                                                              │
+│  ┌─────────────────────────────────────────────────────────────────────┐    │
+│  │  Agent Control Plane (Phase 8)                                       │    │
+│  │  Plans → Steps → Decisions → Escalations                            │    │
+│  │  ~32 MCP tools across 6 categories                                  │    │
+│  │  Snapshot manifest provenance on every decision                     │    │
+│  └─────────────────────────────────────────────────────────────────────┘    │
+│                                                                              │
+│  ┌─────────────────────────────────────────────────────────────────────┐    │
+│  │  Projections (Phase 9)                                               │    │
+│  │  Lineage (derivation edges, run records, forward/reverse traversal) │    │
+│  │  Embeddings (semantic text, staleness tracking)                     │    │
+│  │  Metrics (coverage report, tier distribution)                       │    │
+│  └─────────────────────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Non-Negotiable Invariants
+
+1. **No in-place updates** — every change produces a new immutable snapshot
+2. **Proof Rule** — only `Governed` tier objects may have `TrustClass::Proof`
+3. **Security labels on both tiers** — classification, PII, jurisdictions apply regardless of governance tier
+4. **Operational auto-approved** — no governed approval gates on operational-tier iteration
+5. **Point-in-time resolution** — `resolve_active(type, id)` and `resolve_at(type, id, as_of)`
+6. **Snapshot manifest** — every decision record pins the exact snapshot IDs it relied on
+
+### 13 Object Types
+
+| Object Type | Body Struct | Domain |
+|-------------|-------------|--------|
+| `attribute_def` | `AttributeDefBody` | Data attributes with data types, constraints, sensitivity |
+| `entity_type_def` | `EntityTypeDefBody` | Entity kinds with required/optional attributes |
+| `relationship_type_def` | (JSONB) | Relationship types between entity types |
+| `verb_contract` | `VerbContractBody` | Verb preconditions, postconditions, required attributes |
+| `taxonomy_def` | `TaxonomyDefBody` | Taxonomy trees (hierarchical classification) |
+| `taxonomy_node` | `TaxonomyNodeBody` | Individual nodes within a taxonomy |
+| `membership_rule` | `MembershipRuleBody` | Rules governing taxonomy membership |
+| `view_def` | `ViewDefBody` | View definitions (verb surface + attribute prominence) |
+| `policy_rule` | `PolicyRuleBody` | Policy rules with conditions and verdicts |
+| `evidence_requirement` | `EvidenceRequirementBody` | Evidence freshness and source requirements |
+| `document_type_def` | `DocumentTypeDefBody` | Document type classification |
+| `observation_def` | `ObservationDefBody` | Observation recording templates |
+| `derivation_spec` | `DerivationSpecBody` | Derived/composite attribute computation specs |
+
+### Core Types
+
+```rust
+// Governance tier — determines workflow rigour, NOT security posture
+enum GovernanceTier { Governed, Operational }
+
+// Trust class — Proof only valid when governance_tier = Governed
+enum TrustClass { Proof, DecisionSupport, Convenience }
+
+// Snapshot lifecycle
+enum SnapshotStatus { Draft, Active, Deprecated, Retired }
+
+// Change type for transitions
+enum ChangeType { Created, NonBreaking, Breaking, Promotion, Deprecation, Retirement }
+
+// Security label (on every snapshot)
+struct SecurityLabel {
+    classification: Classification,  // Public, Internal, Confidential, Restricted
+    pii: bool,
+    jurisdictions: Vec<String>,
+    handling_controls: Vec<HandlingControl>,
+}
+
+// ABAC access control
+struct ActorContext {
+    actor_type: ActorType,  // Agent, Analyst, Governance, System
+    roles: Vec<String>,
+    clearance: Classification,
+    purpose: AccessPurpose,
+    jurisdiction: Option<String>,
+}
+enum AccessDecision { Allow, Deny { reason }, AllowWithConstraints { constraints } }
+```
+
+### Phase Summary
+
+| Phase | Migration | Module | Key Deliverable |
+|-------|-----------|--------|-----------------|
+| **0** | 078 | `types`, `store`, `gates` | Schema, `snapshots` + `snapshot_sets` tables, core enums, publish gate functions |
+| **1** | 079 | `attribute_def`, `entity_type_def`, `verb_contract`, `registry`, `scanner` | Body types, `RegistryService`, verb-first YAML scanner, convenience views |
+| **2** | 081 | `taxonomy_def`, `membership`, `view_def` | Taxonomy trees/nodes, membership rules, view definitions |
+| **3** | 082 | `policy_rule`, `evidence`, `observation_def`, `document_type_def`, `abac` | Policy engine, evidence requirements, ABAC access control |
+| **4** | 083 | `security` | Security label inheritance (PII propagation), label compatibility checks |
+| **5** | 083 | `derivation`, `derivation_spec` | Derived/composite attributes, `DerivationFunctionRegistry` |
+| **6** | — | `gates_governance`, `gates_technical` | Extended publish gate framework (severity, gate modes, gate chain) |
+| **7** | 084 | `context_resolution` | 12-step `resolve_context()` pipeline, evidence modes, governance signals |
+| **8** | 085 | `agent/` (5 files) | Agent plans/steps/decisions/escalations, ~32 MCP tools, snapshot manifest |
+| **9** | 086 | `projections/` (4 files) | Lineage (derivation edges, run records), embeddings, coverage metrics |
+
+### Context Resolution API (Phase 7)
+
+The `resolve_context()` function returns ranked verbs, attributes, views, policy verdicts, and governance signals for a given subject + actor + goal.
+
+```rust
+// Request
+struct ContextResolutionRequest {
+    subject: SubjectRef,              // CaseId | EntityId | DocumentId | TaskId | ViewId
+    intent: Option<String>,
+    actor: ActorContext,
+    goals: Vec<String>,
+    constraints: ResolutionConstraints,
+    evidence_mode: EvidenceMode,      // Strict | Normal | Exploratory | Governance
+    point_in_time: Option<DateTime<Utc>>,
+}
+
+// Response
+struct ContextResolutionResponse {
+    as_of_time: DateTime<Utc>,
+    applicable_views: Vec<ViewCandidate>,
+    candidate_verbs: Vec<VerbCandidate>,
+    candidate_attributes: Vec<AttributeCandidate>,
+    required_preconditions: Vec<PreconditionStatus>,
+    disambiguation_questions: Vec<String>,
+    evidence: Vec<EvidenceItem>,
+    policy_verdicts: Vec<PolicyVerdict>,
+    security_handling: SecurityHandling,
+    governance_signals: Vec<GovernanceSignal>,
+    confidence: f64,
+}
+```
+
+**12-Step Pipeline:**
+1. Determine snapshot epoch (point_in_time or now)
+2. Resolve subject → entity type + jurisdiction + state
+3. Select applicable ViewDefs by taxonomy overlap
+4. Extract verb surface + attribute prominence from top view
+5. Filter verbs by taxonomy membership + ABAC
+6. Filter attributes similarly
+7. Rank by ViewDef prominence weights
+8. Evaluate preconditions for top-N candidate verbs
+9. Evaluate PolicyRules → PolicyVerdicts with snapshot refs
+10. Compute composite AccessDecision
+11. Generate governance signals (unowned objects, stale evidence)
+12. Compute confidence score (deterministic heuristic)
+
+**Evidence Modes:**
+- `Strict`/`Normal`: Only Governed + Proof/DecisionSupport primary. Operational only if view allows, tagged `usable_for_proof = false`
+- `Exploratory`: All tiers, annotated with governance tier
+- `Governance`: Coverage metrics focus
+
+### Agent Control Plane (Phase 8)
+
+Plans, decisions, and escalations — all pinning snapshot IDs for full provenance.
+
+**Key Types:**
+
+| Type | Purpose |
+|------|---------|
+| `AgentPlan` | Plan with goal, steps, assumptions, risk flags, security clearance |
+| `PlanStep` | Step pinning `verb_id` + `verb_snapshot_id`, with params, postconditions, fallbacks |
+| `DecisionRecord` | Decision with `snapshot_manifest` (HashMap<Uuid, Uuid> — complete provenance chain) |
+| `EscalationRecord` | Human escalation with reason, context snapshot, required action |
+| `DisambiguationPrompt` | Disambiguation prompt with options and selected choice |
+
+**Status State Machines:**
+- Plan: `Draft → Active → Completed | Failed | Cancelled`
+- Step: `Pending → Running → Completed | Failed | Skipped`
+
+**~32 MCP Tools (6 categories):**
+
+| Category | Tools | Purpose |
+|----------|-------|---------|
+| Registry query | `sem_reg_describe_attribute`, `_verb`, `_entity_type`, `_policy`, `_search`, `_list_verbs`, `_list_attributes` | Read-only registry lookup |
+| Taxonomy | `sem_reg_taxonomy_tree`, `_members`, `_classify` | Taxonomy navigation |
+| Impact/lineage | `sem_reg_verb_surface`, `_attribute_producers`, `_impact_analysis`, `_lineage`, `_regulation_trace` | Dependency and provenance queries |
+| Context resolution | `sem_reg_resolve_context`, `_describe_view`, `_apply_view` | Context resolution pipeline |
+| Planning/decisions | `sem_reg_create_plan`, `_add_plan_step`, `_validate_plan`, `_execute_plan_step`, `_record_decision`, `_record_escalation`, `_record_disambiguation` | Agent planning and recording |
+| Evidence | `sem_reg_record_observation`, `_check_evidence_freshness`, `_identify_evidence_gaps` | Evidence management |
+
+### Projections (Phase 9)
+
+**Lineage:** Derivation edges + run records for forward impact analysis ("if this changes, what is affected?") and reverse provenance ("where did this value come from?").
+
+**Embeddings:** Semantic text generation from FQN + description + aliases + taxonomy paths. Staleness tracking compares `version_hash` against current snapshot.
+
+**Coverage Metrics:**
+
+```rust
+struct CoverageReport {
+    classification_coverage_pct: f64,
+    stewardship_coverage_pct: f64,
+    policy_attachment_pct: f64,
+    evidence_freshness_pct: f64,
+    retention_compliance: f64,
+    security_label_completeness_pct: f64,
+    proof_rule_compliance: f64,
+    tier_distribution: TierDistribution,
+    snapshot_volume: i64,
+}
+```
+
+### CLI Commands
+
+```bash
+cd rust/
+
+# Registry overview
+cargo x sem-reg stats                     # Counts by object type
+cargo x sem-reg validate [--enforce]      # Run publish gates on all active snapshots
+
+# Object inspection
+cargo x sem-reg attr-describe <fqn>       # e.g., "cbu.jurisdiction_code"
+cargo x sem-reg attr-list [-n 100]        # List active attribute definitions
+cargo x sem-reg entity-type-describe <fqn>
+cargo x sem-reg verb-describe <fqn>       # e.g., "cbu.create"
+cargo x sem-reg verb-list [-n 100]
+cargo x sem-reg derivation-describe <fqn>
+cargo x sem-reg history <type> <fqn>      # Snapshot history for an object
+
+# Bootstrap & maintenance
+cargo x sem-reg scan [--dry-run] [-v]     # Scan verb YAML → bootstrap registry snapshots
+cargo x sem-reg backfill-labels [--dry-run] # Backfill security labels on existing snapshots
+
+# Phase 7: Context resolution
+cargo x sem-reg ctx-resolve --subject <uuid> --subject-type <case|entity|view> \
+    --actor <agent|analyst|governance> --mode <strict|normal|exploratory|governance> \
+    [--as-of <ISO8601>] [--json]
+
+# Phase 8: MCP tool listing
+cargo x sem-reg agent-tools               # List all ~32 MCP tools with descriptions
+
+# Phase 9: Coverage metrics
+cargo x sem-reg coverage [--tier governed|operational|all] [--json]
+```
+
+### Database Schema (sem_reg)
+
+**Core Tables (Phase 0):**
+
+| Table | Purpose |
+|-------|---------|
+| `sem_reg.snapshots` | Universal immutable snapshot table (all 13 object types) |
+| `sem_reg.snapshot_sets` | Named grouping of snapshots for atomic publish |
+
+**Agent Tables (Phase 8):**
+
+| Table | Purpose |
+|-------|---------|
+| `sem_reg.agent_plans` | Immutable INSERT-only plans with goal + context_resolution_ref |
+| `sem_reg.plan_steps` | Steps with verb_id/verb_snapshot_id pinning, status mutable |
+| `sem_reg.decision_records` | Immutable decisions with snapshot_manifest JSONB |
+| `sem_reg.disambiguation_prompts` | Immutable disambiguation prompts |
+| `sem_reg.escalation_records` | Human escalation records (INSERT + UPDATE on resolution) |
+
+**Projection Tables (Phase 9):**
+
+| Table | Purpose |
+|-------|---------|
+| `sem_reg.derivation_edges` | Immutable append-only lineage edges |
+| `sem_reg.run_records` | Immutable derivation run records |
+| `sem_reg.embedding_records` | Versioned embeddings with staleness tracking |
+
+**Key Views (Phases 1-9):**
+
+| View | Purpose |
+|------|---------|
+| `sem_reg.v_active_attribute_defs` | Active attribute definitions (flattened from JSONB) |
+| `sem_reg.v_active_entity_type_defs` | Active entity type definitions |
+| `sem_reg.v_active_verb_contracts` | Active verb contracts |
+| `sem_reg.v_active_taxonomy_defs` | Active taxonomy definitions |
+| `sem_reg.v_active_taxonomy_nodes` | Active taxonomy nodes |
+| `sem_reg.v_active_membership_rules` | Active membership rules |
+| `sem_reg.v_active_view_defs` | Active view definitions |
+| `sem_reg.v_active_policy_rules` | Active policy rules |
+| `sem_reg.v_active_evidence_reqs` | Active evidence requirements |
+| `sem_reg.v_active_document_type_defs` | Active document type definitions |
+| `sem_reg.v_active_observation_defs` | Active observation definitions |
+| `sem_reg.v_active_derivation_specs` | Active derivation specs |
+| `sem_reg.v_registry_stats` | Object counts by type and status |
+| `sem_reg.v_active_memberships_by_subject` | Fast taxonomy overlap lookup (Phase 7) |
+| `sem_reg.v_verb_precondition_status` | Precondition evaluability check (Phase 7) |
+| `sem_reg.v_view_attribute_columns` | View attribute columns (Phase 7) |
+| `sem_reg.v_stale_embeddings` | Stale embeddings needing refresh (Phase 9) |
+| `sem_reg.v_lineage_summary` | Lineage summary (Phase 9) |
+| `sem_reg.v_run_performance` | Run performance metrics (Phase 9) |
+
+### Publish Gates
+
+Every snapshot must pass publish gates before transitioning to `Active`:
+
+| Gate | Phase | Description |
+|------|-------|-------------|
+| Proof Rule | 0 | `TrustClass::Proof` requires `GovernanceTier::Governed` |
+| Security Label | 0 | Label must be present and valid |
+| Governed Approval | 0 | Governed-tier objects require approval workflow |
+| Version Monotonicity | 0 | Version must increase on supersede |
+| Extended Framework | 6 | Pluggable gate chain with `GateMode` (Strict/Lenient/ReportOnly) and `GateSeverity` (Error/Warning/Info) |
+
+### Integration Tests (Phase 10)
+
+7 test scenarios in `rust/tests/sem_reg_integration.rs` (all `#[cfg(feature = "database")]` + `#[ignore]`):
+
+1. **UBO Discovery E2E** — resolve_context → create_plan → identify_evidence_gaps → add_plan_steps → validate_plan → execute → record_decision → verify snapshot_manifest
+2. **Sanctions Screening ABAC** — ABAC restricts sanctions-labelled attributes to SANCTIONS purpose actors
+3. **Proof Collection Lineage** — Evidence freshness checks, observation supersession chains
+4. **Governance Review** — Governance mode → coverage_report → drill-down → regulation_trace
+5. **Point-in-Time Audit** — Publish → advance time → supersede → resolve_context(as_of=earlier) → verify pinned snapshots
+6. **Proof Rule Enforcement** — Governed PolicyRule + Operational attribute → must fail. Operational evidence for Proof claim → must fail
+7. **Security/ABAC E2E** — Purpose mismatch → Deny. Jurisdiction mismatch → Deny. PII+Financial inputs → inherited Confidential label
+
+```bash
+DATABASE_URL="postgresql:///data_designer" \
+  cargo test --features database --test sem_reg_integration -- --ignored --nocapture
+```
+
+### Module Structure
+
+```
+rust/src/sem_reg/
+├── mod.rs                      # Module root, re-exports (105 LOC)
+├── types.rs                    # Core enums, SecurityLabel, SnapshotMeta (400 LOC)
+├── store.rs                    # SnapshotStore DB operations (560 LOC)
+├── gates.rs                    # Publish gate pure functions (560 LOC)
+├── attribute_def.rs            # AttributeDefBody (150 LOC)
+├── entity_type_def.rs          # EntityTypeDefBody (115 LOC)
+├── verb_contract.rs            # VerbContractBody (170 LOC)
+├── registry.rs                 # RegistryService typed publish/resolve (810 LOC)
+├── scanner.rs                  # Verb YAML → registry bootstrap (325 LOC)
+├── taxonomy_def.rs             # TaxonomyDefBody, TaxonomyNodeBody (200 LOC)
+├── membership.rs               # MembershipRuleBody (150 LOC)
+├── view_def.rs                 # ViewDefBody (160 LOC)
+├── policy_rule.rs              # PolicyRuleBody (170 LOC)
+├── evidence.rs                 # EvidenceRequirementBody (130 LOC)
+├── observation_def.rs          # ObservationDefBody (120 LOC)
+├── document_type_def.rs        # DocumentTypeDefBody (100 LOC)
+├── derivation_spec.rs          # DerivationSpecBody (120 LOC)
+├── abac.rs                     # ABAC evaluate, AccessDecision (400 LOC)
+├── security.rs                 # Security label inheritance (560 LOC)
+├── derivation.rs               # DerivationFunctionRegistry, evaluation (500 LOC)
+├── gates_governance.rs         # Governed approval gate (380 LOC)
+├── gates_technical.rs          # Technical gates (version, label) (435 LOC)
+├── context_resolution.rs       # 12-step resolve_context() (1,467 LOC)
+├── agent/
+│   ├── mod.rs                  # Agent module root (25 LOC)
+│   ├── plans.rs                # AgentPlan, PlanStep, PlanStore (700 LOC)
+│   ├── decisions.rs            # DecisionRecord, DecisionStore (580 LOC)
+│   ├── escalation.rs           # EscalationRecord, DisambiguationPrompt (370 LOC)
+│   └── mcp_tools.rs            # ~32 MCP tool specs + dispatch (1,800 LOC)
+└── projections/
+    ├── mod.rs                  # Projections module root (15 LOC)
+    ├── lineage.rs              # DerivationEdge, RunRecord, graph traversal (400 LOC)
+    ├── embeddings.rs           # SemanticText, EmbeddingRecord, staleness (300 LOC)
+    └── metrics.rs              # CoverageReport, TierDistribution (250 LOC)
+```
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `rust/src/sem_reg/mod.rs` | Module root with re-exports |
+| `rust/src/sem_reg/types.rs` | Core enums (GovernanceTier, TrustClass, ObjectType, etc.) |
+| `rust/src/sem_reg/store.rs` | `SnapshotStore` — INSERT-only + supersede DB ops |
+| `rust/src/sem_reg/gates.rs` | `evaluate_publish_gates()` — pure functions |
+| `rust/src/sem_reg/registry.rs` | `RegistryService` — typed publish/resolve for all 13 types |
+| `rust/src/sem_reg/context_resolution.rs` | `resolve_context()` — 12-step pipeline |
+| `rust/src/sem_reg/agent/mcp_tools.rs` | `all_tool_specs()` + `dispatch_tool()` — ~32 MCP tools |
+| `rust/src/sem_reg/agent/plans.rs` | `AgentPlan`, `PlanStep`, `PlanStore` |
+| `rust/src/sem_reg/agent/decisions.rs` | `DecisionRecord`, `DecisionStore` |
+| `rust/src/sem_reg/projections/lineage.rs` | Forward/reverse lineage traversal |
+| `rust/src/sem_reg/projections/metrics.rs` | `CoverageReport` computation |
+| `rust/src/sem_reg/scanner.rs` | Verb YAML bootstrap → registry snapshots |
+| `rust/src/sem_reg/abac.rs` | `evaluate_abac()` — ABAC access control |
+| `rust/src/sem_reg/security.rs` | `compute_inherited_label()` — PII propagation |
+| `rust/xtask/src/sem_reg.rs` | CLI subcommands (stats, validate, ctx-resolve, etc.) |
+| `rust/tests/sem_reg_integration.rs` | 7 integration test scenarios |
+| `migrations/078_sem_reg_phase0.sql` | Core schema, `snapshots` table, enums |
+| `migrations/085_sem_reg_phase8.sql` | Agent tables (plans, steps, decisions) |
+| `migrations/086_sem_reg_phase9.sql` | Projection tables (lineage, embeddings) |
+
+---
+
 ## Deprecated / Removed
 
 | Removed | Replaced By |
@@ -5740,3 +6281,4 @@ role:
 | `rule` | 3 | Individual eligibility rules within rulesets |
 | `rule-field` | 2 | Closed-world field dictionary for rule validation |
 | `contract-pack` | 3 | Contract template packs |
+| `sem_reg.*` | ~32 MCP | Semantic Registry: immutable snapshots, context resolution, agent plans/decisions, lineage, coverage |

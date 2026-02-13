@@ -705,11 +705,28 @@ async fn create_session(
         }
     });
 
+    // Build decision packet for client group selection if no client is set
+    let decision = if final_state == SessionState::New {
+        build_client_group_decision(&state.pool, session_id).await
+    } else {
+        None
+    };
+
+    // Store the decision as pending on the session so replies are handled
+    if let Some(ref packet) = decision {
+        let mut sessions = state.sessions.write().await;
+        if let Some(s) = sessions.get_mut(&session_id) {
+            s.pending_decision = Some(packet.clone());
+            s.add_agent_message(welcome_message.clone(), None, None);
+        }
+    }
+
     let response = CreateSessionResponse {
         session_id,
         created_at,
         state: final_state.into(),
         welcome_message,
+        decision,
     };
     tracing::info!(
         "Returning CreateSessionResponse: session_id={}, state={:?}, welcome_message={}",
@@ -718,6 +735,86 @@ async fn create_session(
         response.welcome_message
     );
     Ok(Json(response))
+}
+
+/// Build a client group decision packet for new sessions.
+async fn build_client_group_decision(
+    pool: &sqlx::PgPool,
+    session_id: Uuid,
+) -> Option<ob_poc_types::DecisionPacket> {
+    use crate::database::DealRepository;
+    use ob_poc_types::{
+        ClarificationPayload, DecisionKind, DecisionPacket, DecisionTrace,
+        GroupClarificationPayload, GroupOption, SessionStateView, UserChoice,
+    };
+
+    let client_groups = match DealRepository::get_all_client_groups(pool).await {
+        Ok(groups) => groups,
+        Err(e) => {
+            tracing::warn!(error = %e, "Failed to fetch client groups for session bootstrap");
+            return None;
+        }
+    };
+
+    if client_groups.is_empty() {
+        return None;
+    }
+
+    let group_options: Vec<GroupOption> = client_groups
+        .iter()
+        .map(|g| GroupOption {
+            id: g.id.to_string(),
+            alias: g.canonical_name.clone(),
+            score: 1.0,
+            method: "list".to_string(),
+        })
+        .collect();
+
+    let choices: Vec<UserChoice> = client_groups
+        .iter()
+        .enumerate()
+        .map(|(i, g)| UserChoice {
+            id: format!("{}", i + 1),
+            label: g.canonical_name.clone(),
+            description: format!("{} active deal(s)", g.deal_count),
+            is_escape: false,
+        })
+        .collect();
+
+    let prompt = "Which client would you like to work with today?".to_string();
+
+    Some(DecisionPacket {
+        packet_id: Uuid::new_v4().to_string(),
+        kind: DecisionKind::ClarifyGroup,
+        session: SessionStateView {
+            session_id: Some(session_id),
+            client_group_anchor: None,
+            client_group_name: None,
+            persona: None,
+            last_confirmed_verb: None,
+        },
+        utterance: String::new(),
+        payload: ClarificationPayload::Group(GroupClarificationPayload {
+            options: group_options,
+        }),
+        prompt,
+        choices,
+        best_plan: None,
+        alternatives: vec![],
+        requires_confirm: false,
+        confirm_token: None,
+        trace: DecisionTrace {
+            config_version: "1.0".to_string(),
+            entity_snapshot_hash: None,
+            lexicon_snapshot_hash: None,
+            semantic_lane_enabled: false,
+            embedding_model_id: None,
+            verb_margin: 0.0,
+            scope_margin: 0.0,
+            kind_margin: 0.0,
+            decision_reason: "session_bootstrap".to_string(),
+        },
+    })
 }
 
 /// Resolve initial client from client_id or client_name
@@ -854,14 +951,14 @@ async fn get_session(
     })
 }
 
-/// DELETE /api/session/:id - Delete session
+/// DELETE /api/session/:id - Delete session (idempotent)
 async fn delete_session(
     State(state): State<AgentState>,
     Path(session_id): Path<Uuid>,
-) -> Result<StatusCode, StatusCode> {
+) -> StatusCode {
     let mut sessions = state.sessions.write().await;
-    sessions.remove(&session_id).ok_or(StatusCode::NOT_FOUND)?;
-    Ok(StatusCode::NO_CONTENT)
+    sessions.remove(&session_id);
+    StatusCode::NO_CONTENT
 }
 
 /// GET /api/session/:id/watch - Long-poll for session changes

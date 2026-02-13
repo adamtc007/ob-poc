@@ -156,16 +156,18 @@ impl CustomOperation for GraphValidateOp {
 // Edge Loading
 // ============================================================================
 
+type EdgeRow = (
+    Uuid,
+    Uuid,
+    Uuid,
+    String,
+    Option<rust_decimal::Decimal>,
+    Option<String>,
+);
+
 #[cfg(feature = "database")]
 async fn load_edges(pool: &PgPool, case_id: Option<Uuid>) -> Result<Vec<Edge>> {
-    let rows: Vec<(
-        Uuid,
-        Uuid,
-        Uuid,
-        String,
-        Option<rust_decimal::Decimal>,
-        Option<String>,
-    )> = if let Some(cid) = case_id {
+    let rows: Vec<EdgeRow> = if let Some(cid) = case_id {
         // Scope to entities linked to this KYC case via entity_workstreams.
         sqlx::query_as(
                 r#"
@@ -284,9 +286,9 @@ fn detect_cycles(edges: &[Edge], anomalies: &mut Vec<GraphAnomaly>) {
                 let neighbor = neighbors[*ni];
                 *ni += 1;
 
-                if !indices.contains_key(&neighbor) {
+                if let std::collections::hash_map::Entry::Vacant(e) = indices.entry(neighbor) {
                     // Tree edge — push neighbor.
-                    indices.insert(neighbor, index_counter);
+                    e.insert(index_counter);
                     lowlinks.insert(neighbor, index_counter);
                     index_counter += 1;
                     stack.push(neighbor);

@@ -149,6 +149,10 @@ pub mod placeholder;
 // Clarify module - Unified DecisionPacket-based clarification UX
 pub mod clarify;
 
+// Semantic Registry — immutable snapshot-based registry for the Semantic OS
+#[cfg(feature = "database")]
+pub mod sem_reg;
+
 // Core domain capabilities
 pub use domains::{DomainHandler, DomainRegistry, DomainResult};
 
