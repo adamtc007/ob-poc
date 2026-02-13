@@ -1000,7 +1000,7 @@ pub async fn diff_document_vs_operational(
         }
     }
     for name in &op_ssi_names {
-        if !doc_ssi_names.contains(name) {
+        if !doc_ssi_names.contains::<String>(name) {
             operational_only.ssis.push(name.clone());
         }
     }
@@ -1025,7 +1025,7 @@ pub async fn diff_document_vs_operational(
         }
     }
     for name in &op_rule_names {
-        if !doc_rule_names.contains(name) {
+        if !doc_rule_names.contains::<String>(name) {
             operational_only.booking_rules.push(name.clone());
         }
     }
@@ -1057,7 +1057,7 @@ pub async fn diff_document_vs_operational(
         }
     }
     for mic in &op_mics {
-        if !doc_mics.contains(mic) {
+        if !doc_mics.contains::<String>(mic) {
             operational_only.universe_entries.push(mic.clone());
         }
     }
