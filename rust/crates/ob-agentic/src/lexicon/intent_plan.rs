@@ -404,7 +404,6 @@ pub fn intent_to_plan(intent: &IntentAst) -> Plan {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::lexicon::tokenizer::ResolvedEntity;
 
     #[test]
     fn test_counterparty_create_to_plan() {

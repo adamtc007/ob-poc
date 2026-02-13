@@ -3,7 +3,7 @@
 > **Last reviewed:** 2026-02-12
 > **Frontend:** React/TypeScript (`ob-poc-ui-react/`) - Chat UI with scope panel, Inspector
 > **Backend:** Rust/Axum (`rust/crates/ob-poc-web/`) - Serves React + REST API
-> **Crates:** 18 active Rust crates (esper_* crates deprecated after React migration)
+> **Crates:** 16 active Rust crates (esper_* crates deprecated after React migration; ob-poc-graph + viewport removed)
 > **Verbs:** 1,083 canonical verbs, 14,593 intent patterns (DB-sourced)
 > **Migrations:** 77 schema migrations (+ 072b seed)
 > **Schema Overview:** `migrations/OB_POC_SCHEMA_ENTITY_OVERVIEW.md` — living doc, 14 sections, ~185 tables (ob-poc + kyc), 13 mermaid ER diagrams
@@ -26,7 +26,7 @@
 > **Workflow Task Queue (049):** ✅ Complete - Async task return path, document entity, requirement guards
 > **Transactional Execution (050):** ✅ Complete - Atomic execution, advisory locks, expansion audit
 > **CustomOp Auto-Registration (051):** ✅ Complete - `#[register_custom_op]` macro, inventory-based registration
-> **Staged Runbook REPL (054):** ✅ Complete - Anti-hallucination staging, entity resolution, DAG ordering
+> **Staged Runbook REPL (054):** ❌ Removed - V1 staged runbook deleted (superseded by V2 REPL pack-guided runbook)
 > **Client Group Research Integration (055):** ✅ Complete - GLEIF import → client_group_entity staging → CBU creation with role mapping
 > **REPL Viewport Feedback Loop (056):** ✅ Complete - Scope propagation in execute_runbook triggers UI refresh
 > **Verb Disambiguation UI (057):** ✅ Complete - Ambiguous verb selection with gold-standard learning signals
@@ -2945,79 +2945,8 @@ DSL_LSP=warn cargo run -p dsl-lsp    # Errors only
 
 ## Staged Runbook REPL (054)
 
-> ✅ **IMPLEMENTED (2026-01-25)**: Anti-hallucination execution model with staged commands, entity resolution, DAG ordering.
-
-**Problem Solved:** Agent could hallucinate entity UUIDs or execute commands without user confirmation. The staged runbook provides a deterministic bridge from natural language → resolved UUIDs → safe execution.
-
-### Architecture
-
-```
-User prompt: "Show me Irish funds"
-    │
-    ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  STAGE (no execution)                                           │
-│  runbook_stage tool                                             │
-│  • Parse DSL                                                    │
-│  • Resolve entity arguments → UUIDs via DB search               │
-│  • Stage command in staged_runbook table                        │
-│  • Emit CommandStaged / ResolutionAmbiguous / StageFailed       │
-└─────────────────────────────────────────────────────────────────┘
-    │
-    ▼ (user reviews, may pick from ambiguous, may remove commands)
-    │
-    ▼ (explicit "run" / "execute" / "commit")
-┌─────────────────────────────────────────────────────────────────┐
-│  RUN (server-side ready gate)                                   │
-│  runbook_run tool                                               │
-│  • Validate all commands resolved                               │
-│  • Compute DAG order                                            │
-│  • Execute in order                                             │
-│  • Emit per-command results                                     │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### Non-Negotiable Invariants
-
-1. **No side-effects** unless user explicitly says `run/execute/commit`
-2. **No invented UUIDs** - All UUIDs from DB resolution or picker validation
-3. **Picker validation** - `runbook_pick` entity_ids must match stored candidates
-4. **Server-side ready gate** - `runbook_run` rejects if not all resolved
-5. **DAG ordering** - Dependencies detected and reordered transparently
-
-### MCP Tools
-
-| Tool | Description |
-|------|-------------|
-| `runbook_stage` | Stage a command (parse + resolve, no execute) |
-| `runbook_pick` | Select from ambiguous candidates |
-| `runbook_show` | Show current runbook state |
-| `runbook_preview` | Preview with readiness check |
-| `runbook_remove` | Remove a staged command |
-| `runbook_run` | Execute (explicit user confirmation required) |
-| `runbook_abort` | Clear all staged commands |
-
-### Key Files
-
-| File | Purpose |
-|------|---------|
-| `migrations/054_staged_runbook.sql` | Schema (staged_runbook, staged_command, etc.) |
-| `rust/src/repl/staged_runbook.rs` | Rust types (StagedRunbook, ResolutionStatus) |
-| `rust/src/repl/repository.rs` | DB access layer |
-| `rust/src/repl/resolver.rs` | EntityArgResolver (shorthand → UUID) |
-| `rust/src/repl/dag_analyzer.rs` | Dependency detection, topological sort |
-| `rust/src/repl/service.rs` | RunbookService (stage/pick/run/show/abort) |
-| `rust/src/mcp/handlers/runbook.rs` | MCP tool handlers |
-| `rust/config/verbs/runbook.yaml` | Verb definitions |
-
-### Database Tables
-
-| Table | Purpose |
-|-------|---------|
-| `staged_runbook` | Session-scoped runbook container |
-| `staged_command` | Individual DSL commands with resolution status |
-| `staged_command_entity` | Resolved entity footprint |
-| `staged_command_candidate` | Picker candidates for ambiguous resolution |
+> ❌ **REMOVED (2026-02-13)**: V1 staged runbook deleted. Superseded by V2 REPL pack-guided runbook architecture.
+> All source files, MCP tools, verb YAML, and CustomOp handlers removed. DB tables in migration 054 retained for reference.
 
 ---
 
@@ -4825,14 +4754,8 @@ For historical implementation details, see git history or `ai-thoughts/065-esper
 
 ## Graph Configuration (Policy-Driven)
 
-> **DEPRECATED (2026-02-01):** The graph configuration system (`config/graph_settings.yaml`)
-> was built for the esper_* visualization crates which are now deprecated. The configuration
-> file and `ob-poc-graph` crate still exist but are not used by the React frontend.
-
-**Key file retained:** `rust/config/graph_settings.yaml` — LOD, layout, animation, viewport config
-**Crate retained:** `rust/crates/ob-poc-graph/` — Graph data structures (still used for API responses)
-
-For historical details, see git history.
+> ❌ **REMOVED (2026-02-13)**: `ob-poc-graph` crate, `viewport` crate, and `config/graph_settings.yaml` deleted.
+> Built for esper_* visualization crates (deprecated). React frontend uses REST API directly.
 
 ---
 
@@ -5412,7 +5335,6 @@ ob-poc/
 │   │   ├── dsl-lsp/            # LSP server + Zed extension + tree-sitter grammar
 │   │   ├── ob-agentic/         # Onboarding pipeline (Intent→Plan→DSL)
 │   │   ├── ob-poc-macros/      # Proc macros (#[register_custom_op], #[derive(IdType)])
-│   │   ├── ob-poc-graph/       # Graph data structures
 │   │   ├── ob-poc-web/         # Axum web server (serves React + API)
 │   │   ├── inspector-projection/ # Projection schema generation
 │   │   └── esper_*/            # DEPRECATED — 6 crates retained for reference
@@ -5783,6 +5705,10 @@ role:
 | `ClientContext` / `JourneyContext` (mutable) | `ContextStack` (pure fold from runbook) |
 | `HybridVerbSearcher` (V1 agent chat) | `IntentService` + `search_with_context()` (V2 REPL) |
 | `IntentPipeline` (V1 agent chat) | `ReplOrchestratorV2.process()` (V2 REPL) |
+| V1 Staged Runbook (054) — 6 modules, MCP tools, verb YAML, CustomOps | V2 REPL pack-guided runbook |
+| `ob-poc-graph` crate | React frontend + REST API |
+| `viewport` crate | React frontend + REST API |
+| `config/graph_settings.yaml` | Deleted (esper_* visualization config) |
 
 ---
 

@@ -14,29 +14,14 @@
 //!     ├── Workflow handlers (workflow_status, etc.)
 //!     ├── Template handlers (template_list, etc.)
 //!     ├── Batch handlers (batch_start, etc.)
-//!     ├── Research handlers (research_list, etc.)
-//!     └── Runbook handlers (runbook_stage, runbook_pick, runbook_run, etc.)
+//!     └── Research handlers (research_list, etc.)
 //! ```
-//!
-//! ## Future Refactoring
-//!
-//! Handler implementations can be incrementally extracted to sub-modules:
-//! - `dsl.rs` - DSL validation, execution, planning handlers
-//! - `cbu.rs` - CBU get/list handlers
-//! - `entity.rs` - Entity get/search handlers
-//! - `workflow.rs` - Workflow orchestration handlers
-//! - `template.rs` - Template list/get/expand handlers
-//! - `batch.rs` - Batch execution handlers
-//! - `research.rs` - Research macro handlers
-//! - `runbook.rs` - Staged runbook execution handlers
 
 mod batch_tools;
 mod core;
 mod learning_tools;
 mod navigation_tools;
-pub mod runbook;
 mod session_tools;
 
 // Re-export the main ToolHandlers struct
 pub use core::ToolHandlers;
-pub use runbook::RunbookHandlers;

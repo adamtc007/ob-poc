@@ -16,7 +16,6 @@ pub mod cbu_entity_roles_service;
 pub mod cbu_service;
 pub mod context_discovery_service;
 pub mod crud_service;
-pub mod dictionary_service;
 pub mod document_service;
 pub mod dsl_repository;
 pub mod entity_service;
@@ -57,7 +56,6 @@ pub use bods_types::{
 pub use cbu_entity_roles_service::{CbuEntityRoleExpanded, CbuEntityRolesService, RoleRow};
 pub use cbu_service::{CbuRow, CbuService, NewCbuFields};
 pub use crud_service::{AssetType, CrudOperation, CrudService, OperationType};
-pub use dictionary_service::DictionaryDatabaseService;
 pub use document_service::{
     DocumentCatalogEntry, DocumentService, DocumentType, NewDocumentFields,
 };

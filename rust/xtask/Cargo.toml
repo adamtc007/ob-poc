@@ -21,7 +21,6 @@ ob-poc = { path = "..", features = ["database", "vnext-repl"] }
 dsl-core = { path = "../crates/dsl-core" }
 playbook-core = { path = "../crates/playbook-core" }
 playbook-lower = { path = "../crates/playbook-lower" }
-ob-poc-graph = { path = "../crates/ob-poc-graph" }
 csv = "1.3"
 serde_yaml = "0.9"
 sha2 = "0.10"

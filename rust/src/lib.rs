@@ -28,8 +28,6 @@ pub mod domains;
 // Database integration (when enabled)
 #[cfg(feature = "database")]
 pub mod database;
-#[cfg(feature = "database")]
-pub mod models;
 
 // Services for database integration
 #[cfg(feature = "database")]
@@ -150,10 +148,6 @@ pub mod placeholder;
 
 // Clarify module - Unified DecisionPacket-based clarification UX
 pub mod clarify;
-
-// Database integration re-exports (when database feature is enabled)
-#[cfg(feature = "database")]
-pub use database::DictionaryDatabaseService;
 
 // Core domain capabilities
 pub use domains::{DomainHandler, DomainRegistry, DomainResult};

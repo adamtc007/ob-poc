@@ -2599,10 +2599,8 @@ pub struct CbuSummary {
     pub updated_at: Option<chrono::DateTime<chrono::Utc>>,
 }
 
-// Backward compatibility aliases
-pub type GraphNodeLegacy = LegacyGraphNode;
+// Backward compatibility alias
 pub type GraphEdge = LegacyGraphEdge;
-pub type GraphStatsLegacy = LegacyGraphStats;
 
 // =============================================================================
 // TESTS

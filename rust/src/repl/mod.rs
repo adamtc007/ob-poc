@@ -1,16 +1,6 @@
 //! REPL Module
 //!
-//! This module contains two subsystems:
-//!
-//! ## 1. Staged Runbook REPL (Legacy)
-//!
-//! Anti-hallucination execution model for DSL commands:
-//! 1. Commands are staged (no side effects)
-//! 2. Entity references resolved to UUIDs via DB search
-//! 3. DAG analysis determines execution order
-//! 4. Execution only happens on explicit user confirmation
-//!
-//! ## 2. Pack-Guided Runbook REPL (V2, vnext-repl feature)
+//! Pack-Guided Runbook REPL (V2, vnext-repl feature)
 //!
 //! Clean redesign with explicit state machine, pack routing,
 //! proposal engine, and durable execution:
@@ -19,38 +9,6 @@
 //! - Intent matching via `intent_service` wrapping `IntentMatcher` trait
 //! - Proposal generation via `proposal_engine`
 //! - Runbook editing + execution via `runbook`
-
-// ============================================================================
-// Staged Runbook Subsystem (Legacy)
-// ============================================================================
-
-pub mod dag_analyzer;
-pub mod events;
-pub mod resolver;
-pub mod staged_runbook;
-
-#[cfg(feature = "database")]
-pub mod repository;
-
-#[cfg(feature = "database")]
-pub mod service;
-
-// Re-exports for staged runbook
-pub use dag_analyzer::{DagAnalyzer, DagError, DependencyEdge, ReorderDiff, ReorderMove};
-pub use events::{
-    BlockingCommand, CommandResult, EntityFootprintEntry, LearnedTag, PickerCandidate,
-    RunbookEvent, RunbookSummary, StagedCommandSummary,
-};
-pub use resolver::{EntityArgResolver, EntityMatch, MatchType, ResolutionResult};
-pub use staged_runbook::{
-    ResolutionSource, ResolutionStatus, ResolvedEntity, RunbookStatus, StagedCommand, StagedRunbook,
-};
-
-#[cfg(feature = "database")]
-pub use repository::StagedRunbookRepository;
-
-#[cfg(feature = "database")]
-pub use service::{PickError, PickResult, RunError, RunbookService, StageError, StageResult};
 
 // ============================================================================
 // Shared Intent Matching (used by V2)

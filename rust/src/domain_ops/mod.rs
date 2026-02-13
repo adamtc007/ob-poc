@@ -69,8 +69,6 @@ mod research_normalize_ops;
 mod research_workflow_ops;
 mod resource_ops;
 pub mod rule_evaluator;
-mod runbook_ops;
-
 mod screening_ops;
 mod semantic_ops;
 mod service_pipeline_ops;
@@ -943,14 +941,6 @@ mod tests {
         // Manco ops
         assert!(registry.has("manco", "book.summary"));
 
-        // Runbook ops (staged execution model)
-        assert!(registry.has("runbook", "stage"));
-        assert!(registry.has("runbook", "pick"));
-        assert!(registry.has("runbook", "run"));
-        assert!(registry.has("runbook", "show"));
-        assert!(registry.has("runbook", "preview"));
-        assert!(registry.has("runbook", "remove"));
-        assert!(registry.has("runbook", "abort"));
         // Pack operations (Journey Pack lifecycle)
         assert!(registry.has("pack", "select"));
         assert!(registry.has("pack", "answer"));
