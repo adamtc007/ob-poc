@@ -6,6 +6,7 @@ use anyhow::{Context, Result};
 use sqlx::PgPool;
 
 use ob_poc::sem_reg::{ObjectType, RegistryService, SnapshotStore};
+use ob_poc::sem_reg::types::{ChangeType, SnapshotMeta};
 
 /// Show registry statistics (counts by object type).
 pub async fn stats() -> Result<()> {
@@ -396,19 +397,30 @@ pub async fn backfill_labels(dry_run: bool) -> Result<()> {
             .unwrap_or_default();
 
         let suggested = ob_poc::sem_reg::scanner::suggest_security_label(fqn, domain, &tags);
-        let suggested_json = serde_json::to_value(&suggested)?;
-
         println!(
             "  {} ({:?}) → classification={:?}, pii={}",
             fqn, row.object_type, suggested.classification, suggested.pii
         );
 
         if !dry_run {
-            sqlx::query("UPDATE sem_reg.snapshots SET security_label = $1 WHERE snapshot_id = $2")
-                .bind(&suggested_json)
-                .bind(row.snapshot_id)
-                .execute(&pool)
-                .await?;
+            // Publish a successor snapshot with the new security label.
+            // This preserves immutability — the original snapshot is superseded.
+            let meta = SnapshotMeta {
+                object_type: row.object_type,
+                object_id: row.object_id,
+                version_major: row.version_major,
+                version_minor: row.version_minor + 1,
+                status: row.status,
+                governance_tier: row.governance_tier,
+                trust_class: row.trust_class,
+                security_label: suggested,
+                predecessor_id: Some(row.snapshot_id),
+                change_type: ChangeType::NonBreaking,
+                change_rationale: Some("Security label backfill".into()),
+                created_by: "xtask-backfill".into(),
+                approved_by: None,
+            };
+            SnapshotStore::publish_snapshot(&pool, &meta, &row.definition, None).await?;
             updated += 1;
         }
     }

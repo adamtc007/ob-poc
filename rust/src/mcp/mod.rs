@@ -52,6 +52,7 @@ pub mod scope_resolution;
 pub mod server;
 pub mod session;
 pub mod tools;
+pub mod tools_sem_reg;
 pub mod types;
 pub mod verb_search;
 pub mod verb_search_factory;

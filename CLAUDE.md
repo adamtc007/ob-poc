@@ -55,7 +55,7 @@
 > **KYC/UBO Skeleton Build Pipeline:** ✅ Complete - 7-step build (import-run → graph validate → UBO compute → coverage → outreach plan → tollgate → complete), real computation in all ops, 12 integration tests with assertions
 > **KYC Skeleton Build Post-Audit (S1):** ✅ Complete - Decimal conversion (F-5), coverage ownership scoping (F-2), transaction boundary (F-1), configurable outreach cap (F-4), shared function extraction (F-3a-e)
 > **KYC Skeleton Build Post-Audit (S2):** ✅ Complete - Import run case linkage on idempotent hit (F-7), as_of date for import runs (F-8a-c), case status state machine with KycCaseUpdateStatusOp plugin (F-6a-e), 4 transition tests
-> **Semantic OS (Phases 0-9, Migrations 078-086):** ✅ Complete - Immutable snapshot registry, 13 object types, ABAC + security labels, publish gates, context resolution API, agent control plane (plans/decisions/escalations), ~32 MCP tools, lineage/embeddings/coverage projections, 7 integration test scenarios, 32 Rust source files (~12,400 LOC), 8 SQL migrations (~1,000 LOC)
+> **Semantic OS (Phases 0-9, Migrations 078-086):** ✅ Complete - Immutable snapshot registry, 13 object types, ABAC + security labels (enforced at tool boundary), publish gates, context resolution API (paginated), agent control plane (plans/decisions/escalations), ~32 MCP tools (integrated into MCP server), deterministic object IDs (UUID v5), scanner drift detection, lineage/embeddings/coverage projections, 7 integration test scenarios, 35 Rust source files (~13,200 LOC), 8 SQL migrations (~1,000 LOC)
 
 This is the root project guide for Claude Code. Domain-specific details are in annexes.
 
@@ -5820,7 +5820,7 @@ role:
 
 ## Semantic OS — Immutable Registry & Context Resolution (078-086)
 
-> ✅ **IMPLEMENTED (2026-02-13)**: 10 phases (0-9), 32 Rust source files (~12,400 LOC), 8 SQL migrations (~1,000 LOC), ~32 MCP tools, 12 CLI subcommands, 7 integration test scenarios.
+> ✅ **IMPLEMENTED (2026-02-14)**: 10 phases (0-9), 35 Rust source files (~13,200 LOC), 8 SQL migrations (~1,000 LOC), ~32 MCP tools (integrated into MCP server), 12 CLI subcommands, 7 integration test scenarios. MCP hardening patch applied (ABAC enforcement, atomic publish, deterministic IDs, drift detection, pagination fix).
 
 **Problem Solved:** The system had no formal model for what attributes, verbs, entity types, policies, and evidence requirements exist, how they relate, or who can access them. The Semantic Registry provides an immutable, auditable, governance-aware knowledge base that the agent, runtime, and governance teams can query programmatically.
 
@@ -6223,6 +6223,24 @@ rust/src/sem_reg/
 | `migrations/086_sem_reg_phase9.sql` | Projection tables (lineage, embeddings) |
 
 ---
+
+### MCP Integration & Hardening (2026-02-14)
+
+Correctness and safety improvements applied across the Semantic OS:
+
+| Fix | Files | Description |
+|-----|-------|-------------|
+| **MCP tool surface** | `mcp/tools_sem_reg.rs`, `mcp/tools.rs`, `mcp/handlers/core.rs` | 29 sem_reg tools now appear in MCP `tools/list` and dispatch via `tools/call`. Single tool surface. |
+| **ABAC enforcement** | `sem_reg/enforce.rs`, `sem_reg/agent/mcp_tools.rs` | All tool reads check ABAC via `enforce_read()`. Denied snapshots return redacted stubs. |
+| **Atomic publish** | `sem_reg/store.rs` | `publish_snapshot()` wraps supersede + insert in a single transaction. Failed insert rolls back supersede. |
+| **Deterministic IDs** | `sem_reg/ids.rs`, `sem_reg/scanner.rs` | Object IDs use UUID v5 (deterministic from `object_type:fqn`). Same YAML on any machine produces same IDs. |
+| **Drift detection** | `sem_reg/scanner.rs` | Scanner compares definition hashes on re-scan. Changed definitions publish successor snapshots instead of being silently skipped. |
+| **Pagination fix** | `sem_reg/context_resolution.rs` | `load_typed_snapshots()` paginates instead of truncating at LIMIT 1000. |
+| **Stable serialization** | `sem_reg/scanner.rs` | Replaced 7 `format!("{:?}").to_lowercase()` calls with `to_wire_str()` using serde rename attributes. |
+| **Immutable backfill** | `xtask/src/sem_reg.rs` | `backfill_labels()` publishes successor snapshots instead of in-place UPDATEs. |
+
+**New files:** `sem_reg/ids.rs`, `sem_reg/enforce.rs`, `mcp/tools_sem_reg.rs`
+**New tests:** 16 unit tests (6 ids + 6 enforce + 4 tools_sem_reg bridge)
 
 ## Deprecated / Removed
 

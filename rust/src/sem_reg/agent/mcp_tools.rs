@@ -29,6 +29,7 @@ use crate::sem_reg::context_resolution::{
     resolve_context, ContextResolutionRequest, EvidenceMode, SubjectRef,
 };
 use crate::sem_reg::store::SnapshotStore;
+use crate::sem_reg::enforce::{enforce_read, redacted_stub, EnforceResult};
 use crate::sem_reg::types::{GovernanceTier, ObjectType, TrustClass};
 
 // ── Tool Context ──────────────────────────────────────────────
@@ -585,19 +586,27 @@ async fn handle_describe(
 
     match SnapshotStore::find_active_by_definition_field(ctx.pool, object_type, "fqn", fqn).await {
         Ok(Some(row)) => {
-            let result = serde_json::json!({
-                "snapshot_id": row.snapshot_id,
-                "object_id": row.object_id,
-                "object_type": row.object_type.to_string(),
-                "version": row.version_string(),
-                "governance_tier": row.governance_tier,
-                "trust_class": row.trust_class,
-                "status": row.status,
-                "definition": row.definition,
-                "created_by": row.created_by,
-                "created_at": row.created_at.to_rfc3339(),
-            });
-            SemRegToolResult::ok(result)
+            // ABAC enforcement
+            match enforce_read(ctx.actor, &row) {
+                EnforceResult::Deny { reason } => {
+                    SemRegToolResult::ok(redacted_stub(&row, &reason))
+                }
+                _ => {
+                    let result = serde_json::json!({
+                        "snapshot_id": row.snapshot_id,
+                        "object_id": row.object_id,
+                        "object_type": row.object_type.to_string(),
+                        "version": row.version_string(),
+                        "governance_tier": row.governance_tier,
+                        "trust_class": row.trust_class,
+                        "status": row.status,
+                        "definition": row.definition,
+                        "created_by": row.created_by,
+                        "created_at": row.created_at.to_rfc3339(),
+                    });
+                    SemRegToolResult::ok(result)
+                }
+            }
         }
         Ok(None) => SemRegToolResult::err(format!("Not found: {} {}", object_type, fqn)),
         Err(e) => SemRegToolResult::err(format!("Database error: {}", e)),
@@ -680,6 +689,11 @@ async fn handle_list(
         Ok(rows) => {
             let mut results: Vec<serde_json::Value> = Vec::new();
             for row in &rows {
+                // ABAC enforcement — skip denied rows
+                if let EnforceResult::Deny { .. } = enforce_read(ctx.actor, row) {
+                    continue;
+                }
+
                 let fqn = row
                     .definition
                     .get("fqn")

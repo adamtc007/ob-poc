@@ -7,7 +7,7 @@ use serde_json::json;
 
 /// Get all available MCP tools
 pub fn get_tools() -> Vec<Tool> {
-    vec![
+    let mut tools = vec![
         Tool {
             name: "dsl_validate".into(),
             description: "Validate DSL source code. Parses and runs CSG linting.".into(),
@@ -2711,5 +2711,10 @@ Use to check what's been taught and whether patterns are active."#.into(),
                 }
             }),
         },
-    ]
+    ];
+
+    // Append Semantic Registry tools
+    tools.extend(super::tools_sem_reg::sem_reg_tools());
+
+    tools
 }

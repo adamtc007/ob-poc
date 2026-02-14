@@ -1168,8 +1168,21 @@ async fn load_typed_snapshots(
         .await?;
         Ok(rows)
     } else {
-        // Load current active snapshots
-        SnapshotStore::list_active(pool, object_type, 1000, 0).await
+        // Load ALL current active snapshots via pagination.
+        // Avoids silent truncation when > 1000 snapshots exist for a type.
+        let page_size: i64 = 500;
+        let mut offset: i64 = 0;
+        let mut all_rows = Vec::new();
+        loop {
+            let page = SnapshotStore::list_active(pool, object_type, page_size, offset).await?;
+            let count = page.len();
+            all_rows.extend(page);
+            if (count as i64) < page_size {
+                break;
+            }
+            offset += page_size;
+        }
+        Ok(all_rows)
     }
 }
 

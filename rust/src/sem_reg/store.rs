@@ -5,7 +5,7 @@
 
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
-use sqlx::PgPool;
+use sqlx::{PgPool, Postgres};
 use uuid::Uuid;
 
 use super::types::{ObjectType, SnapshotMeta, SnapshotRow};
@@ -282,9 +282,13 @@ impl SnapshotStore {
         definition: &serde_json::Value,
         snapshot_set_id: Option<Uuid>,
     ) -> Result<Uuid> {
+        // Atomic publish: supersede + insert within a single transaction.
+        // If the insert fails, the supersede rolls back automatically.
+        let mut tx = pool.begin().await?;
+
         // Supersede predecessor if specified
         if let Some(pred_id) = meta.predecessor_id {
-            let affected = Self::supersede_snapshot(pool, pred_id).await?;
+            let affected = Self::supersede_snapshot_tx(&mut tx, pred_id).await?;
             if affected == 0 {
                 return Err(anyhow!(
                     "Predecessor snapshot {} not found or already superseded",
@@ -294,7 +298,77 @@ impl SnapshotStore {
         }
 
         // Insert the new snapshot
-        Self::insert_snapshot(pool, meta, definition, snapshot_set_id).await
+        let snapshot_id = Self::insert_snapshot_tx(&mut tx, meta, definition, snapshot_set_id).await?;
+
+        tx.commit().await?;
+        Ok(snapshot_id)
+    }
+
+    /// Supersede a snapshot within a transaction.
+    async fn supersede_snapshot_tx(
+        tx: &mut sqlx::Transaction<'_, Postgres>,
+        predecessor_id: Uuid,
+    ) -> Result<u64> {
+        let result = sqlx::query(
+            r#"
+            UPDATE sem_reg.snapshots
+            SET effective_until = now()
+            WHERE snapshot_id = 
+              AND effective_until IS NULL
+            "#,
+        )
+        .bind(predecessor_id)
+        .execute(&mut **tx)
+        .await?;
+        Ok(result.rows_affected())
+    }
+
+    /// Insert a snapshot within a transaction. Returns the generated snapshot_id.
+    async fn insert_snapshot_tx(
+        tx: &mut sqlx::Transaction<'_, Postgres>,
+        meta: &SnapshotMeta,
+        definition: &serde_json::Value,
+        snapshot_set_id: Option<Uuid>,
+    ) -> Result<Uuid> {
+        let security_label_json = serde_json::to_value(&meta.security_label)?;
+
+        let snapshot_id = sqlx::query_scalar::<_, Uuid>(
+            r#"
+            INSERT INTO sem_reg.snapshots (
+                snapshot_set_id, object_type, object_id,
+                version_major, version_minor, status,
+                governance_tier, trust_class, security_label,
+                predecessor_id, change_type, change_rationale,
+                created_by, approved_by, definition
+            ) VALUES (
+                , , ,
+                , , ,
+                , , ,
+                0, 1, 2,
+                3, 4, 5
+            )
+            RETURNING snapshot_id
+            "#,
+        )
+        .bind(snapshot_set_id)
+        .bind(meta.object_type)
+        .bind(meta.object_id)
+        .bind(meta.version_major)
+        .bind(meta.version_minor)
+        .bind(meta.status)
+        .bind(meta.governance_tier)
+        .bind(meta.trust_class)
+        .bind(&security_label_json)
+        .bind(meta.predecessor_id)
+        .bind(meta.change_type)
+        .bind(&meta.change_rationale)
+        .bind(&meta.created_by)
+        .bind(&meta.approved_by)
+        .bind(definition)
+        .fetch_one(&mut **tx)
+        .await?;
+
+        Ok(snapshot_id)
     }
 }
 

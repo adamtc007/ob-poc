@@ -337,6 +337,29 @@ impl ToolHandlers {
             "teach_phrase" => self.teach_phrase(args).await,
             "unteach_phrase" => self.unteach_phrase(args).await,
             "teaching_status" => self.teaching_status(args).await,
+            // Semantic Registry tools — dispatch to sem_reg agent handlers
+            name if name.starts_with("sem_reg_") => {
+                use crate::sem_reg::abac::ActorContext;
+                use crate::sem_reg::agent::mcp_tools::{dispatch_tool, SemRegToolContext};
+
+                let actor = ActorContext {
+                    actor_id: "mcp_server".into(),
+                    roles: vec!["operator".into()],
+                    department: None,
+                    clearance: None,
+                    jurisdictions: vec![],
+                };
+                let ctx = SemRegToolContext {
+                    pool: &self.pool,
+                    actor: &actor,
+                };
+                let result = dispatch_tool(&ctx, name, &args).await;
+                if result.success {
+                    Ok(result.data)
+                } else {
+                    Err(anyhow!(result.error.unwrap_or_else(|| "sem_reg tool failed".into())))
+                }
+            }
             _ => Err(anyhow!("Unknown tool: {}", name)),
         }
     }

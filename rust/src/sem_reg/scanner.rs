@@ -9,16 +9,16 @@ use std::collections::BTreeMap;
 
 use anyhow::Result;
 use sqlx::PgPool;
-use uuid::Uuid;
 
 use dsl_core::config::loader::ConfigLoader;
 use dsl_core::config::types::{ArgConfig, VerbConfig, VerbsConfig};
 
 use super::{
+    ids::{definition_hash, object_id_for},
     attribute_def::{AttributeDataType, AttributeDefBody, AttributeSource},
     entity_type_def::{DbTableMapping, EntityTypeDefBody},
     store::SnapshotStore,
-    types::{ObjectType, SnapshotMeta},
+    types::{ChangeType, ObjectType, SnapshotMeta},
     verb_contract::{
         VerbArgDef, VerbArgLookup, VerbContractBody, VerbContractMetadata, VerbPrecondition,
         VerbProducesSpec, VerbReturnSpec,
@@ -30,10 +30,13 @@ use super::{
 pub struct ScanReport {
     pub verb_contracts_published: usize,
     pub verb_contracts_skipped: usize,
+    pub verb_contracts_updated: usize,
     pub entity_types_published: usize,
     pub entity_types_skipped: usize,
+    pub entity_types_updated: usize,
     pub attributes_published: usize,
     pub attributes_skipped: usize,
+    pub attributes_updated: usize,
 }
 
 impl std::fmt::Display for ScanReport {
@@ -41,8 +44,8 @@ impl std::fmt::Display for ScanReport {
         writeln!(f, "Scan Report:")?;
         writeln!(
             f,
-            "  Verb contracts:  {} published, {} skipped (already exist)",
-            self.verb_contracts_published, self.verb_contracts_skipped
+            "  Verb contracts:  {} published, {} updated, {} skipped",
+            self.verb_contracts_published, self.verb_contracts_updated, self.verb_contracts_skipped
         )?;
         writeln!(
             f,
@@ -73,7 +76,7 @@ pub fn verb_config_to_contract(
         .iter()
         .map(|a| VerbArgDef {
             name: a.name.clone(),
-            arg_type: format!("{:?}", a.arg_type).to_lowercase(),
+            arg_type: to_wire_str(&a.arg_type),
             required: a.required,
             description: a.description.clone(),
             lookup: a.lookup.as_ref().map(|l| {
@@ -100,7 +103,7 @@ pub fn verb_config_to_contract(
         .collect();
 
     let returns = config.returns.as_ref().map(|r| VerbReturnSpec {
-        return_type: format!("{:?}", r.return_type).to_lowercase(),
+        return_type: to_wire_str(&r.return_type),
         schema: None,
     });
 
@@ -140,12 +143,12 @@ pub fn verb_config_to_contract(
         .unwrap_or_default();
 
     let metadata = config.metadata.as_ref().map(|m| VerbContractMetadata {
-        tier: m.tier.as_ref().map(|t| format!("{:?}", t).to_lowercase()),
+        tier: m.tier.as_ref().map(|t| to_wire_str(t)),
         source_of_truth: m
             .source_of_truth
             .as_ref()
-            .map(|s| format!("{:?}", s).to_lowercase()),
-        scope: m.scope.as_ref().map(|s| format!("{:?}", s).to_lowercase()),
+            .map(|s| to_wire_str(s)),
+        scope: m.scope.as_ref().map(|s| to_wire_str(s)),
         noun: m.noun.clone(),
         tags: m.tags.clone(),
     });
@@ -155,7 +158,7 @@ pub fn verb_config_to_contract(
         domain: domain.to_string(),
         action: action.to_string(),
         description: config.description.clone(),
-        behavior: format!("{:?}", config.behavior).to_lowercase(),
+        behavior: to_wire_str(&config.behavior),
         args,
         returns,
         preconditions,
@@ -249,6 +252,15 @@ pub fn infer_attributes_from_verbs(verbs_config: &VerbsConfig) -> Vec<AttributeD
     seen.into_values().collect()
 }
 
+/// Convert a serde-serializable enum to its stable snake_case wire name.
+///
+/// Replaces the anti-pattern `format!("{:?}", x).to_lowercase()` which
+/// depends on Debug formatting. This uses serde rename attributes instead.
+fn to_wire_str<T: serde::Serialize>(value: &T) -> String {
+    let json = serde_json::to_string(value).unwrap_or_default();
+    json.trim_matches('"').to_string()
+}
+
 /// Run the full onboarding scan.
 ///
 /// If `dry_run` is true, reports counts without writing to the database.
@@ -314,17 +326,35 @@ pub async fn run_onboarding_scan(
         )
         .await?;
 
-        if existing.is_some() {
-            report.verb_contracts_skipped += 1;
-            if verbose {
-                println!("  SKIP verb: {} (already exists)", contract.fqn);
+        let object_id = object_id_for(ObjectType::VerbContract, &contract.fqn);
+        let definition = serde_json::to_value(contract)?;
+        let new_hash = definition_hash(&definition);
+
+        if let Some(existing_row) = existing {
+            let old_hash = definition_hash(&existing_row.definition);
+            if old_hash == new_hash {
+                report.verb_contracts_skipped += 1;
+                if verbose {
+                    println!("  SKIP verb: {} (unchanged)", contract.fqn);
+                }
+            } else {
+                // Definition changed — publish successor snapshot
+                let mut meta = SnapshotMeta::new_operational(ObjectType::VerbContract, object_id, "scanner");
+                meta.predecessor_id = Some(existing_row.snapshot_id);
+                meta.version_major = existing_row.version_major;
+                meta.version_minor = existing_row.version_minor + 1;
+                meta.change_type = ChangeType::NonBreaking;
+                meta.change_rationale = Some("Scanner drift update".into());
+                SnapshotStore::publish_snapshot(pool, &meta, &definition, Some(set_id)).await?;
+                report.verb_contracts_updated += 1;
+                if verbose {
+                    println!("  UPD  verb: {} (definition changed)", contract.fqn);
+                }
             }
             continue;
         }
 
-        let object_id = Uuid::new_v4();
         let meta = SnapshotMeta::new_operational(ObjectType::VerbContract, object_id, "scanner");
-        let definition = serde_json::to_value(contract)?;
         SnapshotStore::insert_snapshot(pool, &meta, &definition, Some(set_id)).await?;
         report.verb_contracts_published += 1;
 
@@ -343,17 +373,34 @@ pub async fn run_onboarding_scan(
         )
         .await?;
 
-        if existing.is_some() {
-            report.entity_types_skipped += 1;
-            if verbose {
-                println!("  SKIP entity type: {} (already exists)", entity_type.fqn);
+        let object_id = object_id_for(ObjectType::EntityTypeDef, &entity_type.fqn);
+        let definition = serde_json::to_value(entity_type)?;
+        let new_hash = definition_hash(&definition);
+
+        if let Some(existing_row) = existing {
+            let old_hash = definition_hash(&existing_row.definition);
+            if old_hash == new_hash {
+                report.entity_types_skipped += 1;
+                if verbose {
+                    println!("  SKIP entity type: {} (unchanged)", entity_type.fqn);
+                }
+            } else {
+                let mut meta = SnapshotMeta::new_operational(ObjectType::EntityTypeDef, object_id, "scanner");
+                meta.predecessor_id = Some(existing_row.snapshot_id);
+                meta.version_major = existing_row.version_major;
+                meta.version_minor = existing_row.version_minor + 1;
+                meta.change_type = ChangeType::NonBreaking;
+                meta.change_rationale = Some("Scanner drift update".into());
+                SnapshotStore::publish_snapshot(pool, &meta, &definition, Some(set_id)).await?;
+                report.entity_types_updated += 1;
+                if verbose {
+                    println!("  UPD  entity type: {} (definition changed)", entity_type.fqn);
+                }
             }
             continue;
         }
 
-        let object_id = Uuid::new_v4();
         let meta = SnapshotMeta::new_operational(ObjectType::EntityTypeDef, object_id, "scanner");
-        let definition = serde_json::to_value(entity_type)?;
         SnapshotStore::insert_snapshot(pool, &meta, &definition, Some(set_id)).await?;
         report.entity_types_published += 1;
 
@@ -372,14 +419,28 @@ pub async fn run_onboarding_scan(
         )
         .await?;
 
-        if existing.is_some() {
-            report.attributes_skipped += 1;
+        let object_id = object_id_for(ObjectType::AttributeDef, &attr.fqn);
+        let definition = serde_json::to_value(attr)?;
+        let new_hash = definition_hash(&definition);
+
+        if let Some(existing_row) = existing {
+            let old_hash = definition_hash(&existing_row.definition);
+            if old_hash == new_hash {
+                report.attributes_skipped += 1;
+            } else {
+                let mut meta = SnapshotMeta::new_operational(ObjectType::AttributeDef, object_id, "scanner");
+                meta.predecessor_id = Some(existing_row.snapshot_id);
+                meta.version_major = existing_row.version_major;
+                meta.version_minor = existing_row.version_minor + 1;
+                meta.change_type = ChangeType::NonBreaking;
+                meta.change_rationale = Some("Scanner drift update".into());
+                SnapshotStore::publish_snapshot(pool, &meta, &definition, Some(set_id)).await?;
+                report.attributes_updated += 1;
+            }
             continue;
         }
 
-        let object_id = Uuid::new_v4();
         let meta = SnapshotMeta::new_operational(ObjectType::AttributeDef, object_id, "scanner");
-        let definition = serde_json::to_value(attr)?;
         SnapshotStore::insert_snapshot(pool, &meta, &definition, Some(set_id)).await?;
         report.attributes_published += 1;
     }
@@ -486,7 +547,7 @@ fn title_case(s: &str) -> String {
 }
 
 fn arg_type_to_attribute_type(arg: &ArgConfig) -> AttributeDataType {
-    match format!("{:?}", arg.arg_type).to_lowercase().as_str() {
+    match to_wire_str(&arg.arg_type).as_str() {
         "string" => AttributeDataType::String,
         "integer" | "int" => AttributeDataType::Integer,
         "decimal" | "number" | "float" => AttributeDataType::Decimal,
