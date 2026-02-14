@@ -2136,6 +2136,15 @@ async fn execute_session_dsl(
         // Determine DSL source - prefer explicit request, then run_sheet current entry
         let dsl_source = if let Some(ref req) = req {
             if let Some(ref dsl_str) = req.dsl {
+                // Gate: raw DSL requires explicit opt-in via allow_raw_dsl
+                if !req.allow_raw_dsl {
+                    tracing::warn!(
+                        session = %session_id,
+                        "Raw DSL execution blocked: allow_raw_dsl not set"
+                    );
+                    return Err(StatusCode::FORBIDDEN);
+                }
+                tracing::warn!(session = %session_id, "Raw DSL execution via /execute");
                 dsl_str.clone()
             } else {
                 session.run_sheet.combined_dsl().unwrap_or_default()
@@ -3693,4 +3702,20 @@ mod tests {
         assert!(domains.iter().any(|d| d == "cbu"));
         assert!(domains.iter().any(|d| d == "entity"));
     }
+
+    #[test]
+    fn test_execute_dsl_request_allow_raw_dsl_default() {
+        // Verify allow_raw_dsl defaults to false via serde
+        let json_str = r#"{"dsl": "(open-case)"}"#;
+        let req: super::ExecuteDslRequest = serde_json::from_str(json_str).unwrap();
+        assert!(!req.allow_raw_dsl, "allow_raw_dsl should default to false");
+    }
+
+    #[test]
+    fn test_execute_dsl_request_allow_raw_dsl_explicit() {
+        let json_str = r#"{"dsl": "(open-case)", "allow_raw_dsl": true}"#;
+        let req: super::ExecuteDslRequest = serde_json::from_str(json_str).unwrap();
+        assert!(req.allow_raw_dsl, "allow_raw_dsl should be true when set");
+    }
 }
+

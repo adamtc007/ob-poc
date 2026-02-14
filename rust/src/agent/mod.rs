@@ -4,6 +4,7 @@
 //! Navigation commands go through the unified intent pipeline (view.* and session.* verbs).
 
 pub mod learning;
+pub mod orchestrator;
 
 pub use learning::{
     spawn_agent_drain_task, AgentEvent, AgentEventEmitter, AgentEventPayload,

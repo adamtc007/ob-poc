@@ -341,13 +341,27 @@ impl ToolHandlers {
             name if name.starts_with("sem_reg_") => {
                 use crate::sem_reg::abac::ActorContext;
                 use crate::sem_reg::agent::mcp_tools::{dispatch_tool, SemRegToolContext};
+                use crate::sem_reg::types::Classification;
 
                 let actor = ActorContext {
-                    actor_id: "mcp_server".into(),
-                    roles: vec!["operator".into()],
-                    department: None,
-                    clearance: None,
-                    jurisdictions: vec![],
+                    actor_id: std::env::var("MCP_ACTOR_ID")
+                        .unwrap_or_else(|_| "mcp_anonymous".into()),
+                    roles: std::env::var("MCP_ROLES")
+                        .map(|r| r.split(',').map(String::from).collect())
+                        .unwrap_or_else(|_| vec!["viewer".into()]),
+                    department: std::env::var("MCP_DEPARTMENT").ok(),
+                    clearance: std::env::var("MCP_CLEARANCE").ok().and_then(|s| {
+                        match s.to_lowercase().as_str() {
+                            "public" => Some(Classification::Public),
+                            "internal" => Some(Classification::Internal),
+                            "confidential" => Some(Classification::Confidential),
+                            "restricted" => Some(Classification::Restricted),
+                            _ => None,
+                        }
+                    }),
+                    jurisdictions: std::env::var("MCP_JURISDICTIONS")
+                        .map(|j| j.split(',').map(String::from).collect())
+                        .unwrap_or_default(),
                 };
                 let ctx = SemRegToolContext {
                     pool: &self.pool,
@@ -1304,7 +1318,6 @@ impl ToolHandlers {
     /// 3. DSL assembled deterministically from structured intent
     /// 4. Validated before return
     async fn dsl_generate(&self, args: Value) -> Result<Value> {
-        use crate::mcp::intent_pipeline::IntentPipeline;
 
         let instruction = args["instruction"]
             .as_str()
@@ -1315,12 +1328,44 @@ impl ToolHandlers {
             .as_str()
             .and_then(|s| uuid::Uuid::parse_str(s).ok());
 
-        // Get verb searcher and create intent pipeline
+        // Route through unified orchestrator
         let searcher = self.get_verb_searcher().await?;
-        let pipeline = IntentPipeline::new(searcher);
-
-        // Process through structured pipeline
-        let result = pipeline.process(instruction, domain).await?;
+        let actor = {
+            use crate::sem_reg::abac::ActorContext;
+            use crate::sem_reg::types::Classification;
+            ActorContext {
+                actor_id: std::env::var("MCP_ACTOR_ID")
+                    .unwrap_or_else(|_| "mcp_anonymous".into()),
+                roles: std::env::var("MCP_ROLES")
+                    .map(|r| r.split(',').map(String::from).collect())
+                    .unwrap_or_else(|_| vec!["viewer".into()]),
+                department: std::env::var("MCP_DEPARTMENT").ok(),
+                clearance: std::env::var("MCP_CLEARANCE").ok().and_then(|s| {
+                    match s.to_lowercase().as_str() {
+                        "public" => Some(Classification::Public),
+                        "internal" => Some(Classification::Internal),
+                        "confidential" => Some(Classification::Confidential),
+                        "restricted" => Some(Classification::Restricted),
+                        _ => None,
+                    }
+                }),
+                jurisdictions: std::env::var("MCP_JURISDICTIONS")
+                    .map(|j| j.split(',').map(String::from).collect())
+                    .unwrap_or_default(),
+            }
+        };
+        let orch_ctx = crate::agent::orchestrator::OrchestratorContext {
+            actor,
+            session_id,
+            case_id: None,
+            scope: None,
+            pool: self.pool.clone(),
+            verb_searcher: std::sync::Arc::new(searcher),
+            lookup_service: None,
+            source: crate::agent::orchestrator::UtteranceSource::Mcp,
+        };
+        let outcome = crate::agent::orchestrator::handle_utterance(&orch_ctx, instruction).await?;
+        let result = outcome.pipeline_result;
 
         // Capture feedback for learning loop
         let _feedback_id = if let Some(ref feedback_svc) = self.feedback_service {

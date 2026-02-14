@@ -113,13 +113,12 @@ use crate::dsl_v2::validation::RefType;
 use crate::dsl_v2::{enrich_program, parse_program, runtime_registry, Statement};
 use crate::graph::GraphScope;
 use crate::macros::OperatorMacroRegistry;
-use crate::mcp::intent_pipeline::IntentPipeline;
 use crate::mcp::verb_search_factory::VerbSearcherFactory;
 use crate::session::SessionScope;
 use crate::session::{SessionState, UnifiedSession, UnresolvedRefInfo};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 use uuid::Uuid;
 
 // ============================================================================
@@ -537,9 +536,36 @@ impl AgentService {
     }
 
     /// Create IntentPipeline for processing user input
-    fn get_intent_pipeline(&self) -> IntentPipeline {
-        let searcher = self.build_verb_searcher();
-        IntentPipeline::with_pool(searcher, self.pool.clone())
+    /// Build an OrchestratorContext for the unified intent pipeline.
+    fn build_orchestrator_context(
+        &self,
+        session: &crate::session::UnifiedSession,
+        source: crate::agent::orchestrator::UtteranceSource,
+    ) -> crate::agent::orchestrator::OrchestratorContext {
+        use crate::agent::orchestrator::OrchestratorContext;
+        use crate::sem_reg::abac::ActorContext;
+
+        // Chat users are currently treated as operators (internal platform users).
+        // TODO: When auth is plumbed, derive roles from session/token claims.
+        // MCP defaults to "viewer" (least privilege) — see mcp/handlers/core.rs.
+        let actor = ActorContext {
+            actor_id: session.user_id.to_string(),
+            roles: vec!["operator".into()],
+            department: None,
+            clearance: None,
+            jurisdictions: vec![],
+        };
+
+        OrchestratorContext {
+            actor,
+            session_id: Some(session.id),
+            case_id: session.context.dominant_entity_id,
+            scope: session.context.client_scope.clone(),
+            pool: self.pool.clone(),
+            verb_searcher: std::sync::Arc::new(self.build_verb_searcher()),
+            lookup_service: self.get_lookup_service(),
+            source,
+        }
     }
 
     /// Get or build the LookupService for unified verb + entity discovery
@@ -977,14 +1003,17 @@ impl AgentService {
             session.context.dominant_entity_id = Some(entity_id);
         }
 
-        // ONE PIPELINE - generate/validate DSL
-        // Wrap session for macro expansion (macros need session state for prereqs/context)
-        let session_arc = Arc::new(RwLock::new(session.clone()));
-        let result = self
-            .get_intent_pipeline()
-            .with_session(session_arc)
-            .process_with_scope(&request.message, None, session.context.client_scope.clone())
-            .await;
+        // ONE PIPELINE - generate/validate DSL via unified orchestrator
+        let orch_ctx = self.build_orchestrator_context(
+            session,
+            crate::agent::orchestrator::UtteranceSource::Chat,
+        );
+        let orch_outcome = crate::agent::orchestrator::handle_utterance(
+            &orch_ctx,
+            &request.message,
+        )
+        .await;
+        let result = orch_outcome.map(|o| o.pipeline_result);
 
         match result {
             Ok(r) => {
@@ -1568,14 +1597,17 @@ impl AgentService {
         }
 
         // Re-run intent pipeline with selected verb as domain hint
-        // The verb is now known, so we generate DSL for it
-        let domain = selected_verb.split('.').next();
-        let session_arc = std::sync::Arc::new(std::sync::RwLock::new(session.clone()));
-        let result = self
-            .get_intent_pipeline()
-            .with_session(session_arc)
-            .process_with_scope(original_input, domain, session.context.client_scope.clone())
-            .await;
+        // Routes through unified orchestrator for SemReg + trace
+        let orch_ctx = self.build_orchestrator_context(
+            session,
+            crate::agent::orchestrator::UtteranceSource::Chat,
+        );
+        let orch_outcome = crate::agent::orchestrator::handle_utterance(
+            &orch_ctx,
+            original_input,
+        )
+        .await;
+        let result = orch_outcome.map(|o| o.pipeline_result);
 
         match result {
             Ok(r) => {

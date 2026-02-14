@@ -250,6 +250,9 @@ pub struct IntentPipeline {
     verb_searcher: HybridVerbSearcher,
     llm_client: Option<Arc<dyn LlmClient>>,
     scope_resolver: ScopeResolver,
+    /// Whether direct DSL bypass (input starting with '(') is allowed.
+    /// Default: false. Set to true only for operator-role actors.
+    allow_direct_dsl: bool,
     #[cfg(feature = "database")]
     pool: Option<PgPool>,
 }
@@ -262,6 +265,7 @@ impl IntentPipeline {
             llm_client: None,
             scope_resolver: ScopeResolver::new(),
             session: None,
+            allow_direct_dsl: false,
             #[cfg(feature = "database")]
             pool: None,
         }
@@ -274,6 +278,7 @@ impl IntentPipeline {
             llm_client: Some(llm_client),
             scope_resolver: ScopeResolver::new(),
             session: None,
+            allow_direct_dsl: false,
             #[cfg(feature = "database")]
             pool: None,
         }
@@ -287,6 +292,7 @@ impl IntentPipeline {
             llm_client: None,
             scope_resolver: ScopeResolver::new(),
             session: None,
+            allow_direct_dsl: false,
             pool: Some(pool),
         }
     }
@@ -303,6 +309,7 @@ impl IntentPipeline {
             llm_client: Some(llm_client),
             scope_resolver: ScopeResolver::new(),
             session: None,
+            allow_direct_dsl: false,
             pool: Some(pool),
         }
     }
@@ -310,6 +317,13 @@ impl IntentPipeline {
     /// Set session for macro expansion
     pub fn with_session(mut self, session: Arc<std::sync::RwLock<UnifiedSession>>) -> Self {
         self.session = Some(session);
+        self
+    }
+
+    /// Enable or disable direct DSL bypass (input starting with '(').
+    /// Should only be enabled for operator-role actors.
+    pub fn set_allow_direct_dsl(mut self, allow: bool) -> Self {
+        self.allow_direct_dsl = allow;
         self
     }
 
@@ -354,8 +368,9 @@ impl IntentPipeline {
         let trimmed = instruction.trim();
 
         // Fast path: Direct DSL input (starts with "(")
-        // Skip semantic search and LLM entirely
-        if trimmed.starts_with('(') {
+        // Skip semantic search and LLM entirely — gated by allow_direct_dsl flag
+        if trimmed.starts_with('(') && self.allow_direct_dsl {
+            tracing::info!(bypass = "direct_dsl", "Direct DSL bypass used (operator-gated)");
             return self.process_direct_dsl(trimmed, existing_scope).await;
         }
 
@@ -1876,6 +1891,20 @@ mod tests {
             }
             _ => false,
         }
+    }
+
+    #[test]
+    fn test_allow_direct_dsl_defaults_to_false() {
+        let searcher = HybridVerbSearcher::minimal();
+        let pipeline = IntentPipeline::new(searcher);
+        assert!(!pipeline.allow_direct_dsl, "allow_direct_dsl should default to false");
+    }
+
+    #[test]
+    fn test_set_allow_direct_dsl() {
+        let searcher = HybridVerbSearcher::minimal();
+        let pipeline = IntentPipeline::new(searcher).set_allow_direct_dsl(true);
+        assert!(pipeline.allow_direct_dsl, "allow_direct_dsl should be true after set");
     }
 
     #[test]

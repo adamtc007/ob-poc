@@ -29,7 +29,7 @@ use crate::sem_reg::context_resolution::{
     resolve_context, ContextResolutionRequest, EvidenceMode, SubjectRef,
 };
 use crate::sem_reg::store::SnapshotStore;
-use crate::sem_reg::enforce::{enforce_read, redacted_stub, EnforceResult};
+use crate::sem_reg::enforce::{enforce_read, enforce_read_label, redacted_stub, EnforceResult};
 use crate::sem_reg::types::{GovernanceTier, ObjectType, TrustClass};
 
 // ── Tool Context ──────────────────────────────────────────────
@@ -635,7 +635,7 @@ async fn handle_search(ctx: &SemRegToolContext<'_>, args: &serde_json::Value) ->
         r#"
         SELECT snapshot_id, object_id, object_type,
                definition->>'fqn' as fqn, definition->>'name' as name,
-               governance_tier, trust_class, created_at
+               governance_tier, trust_class, security_label, created_at
         FROM sem_reg.snapshots
         WHERE status = 'active' AND effective_until IS NULL
           AND (definition->>'fqn' ILIKE $1 OR definition->>'name' ILIKE $1)
@@ -656,6 +656,13 @@ async fn handle_search(ctx: &SemRegToolContext<'_>, args: &serde_json::Value) ->
         Ok(rows) => {
             let results: Vec<serde_json::Value> = rows
                 .iter()
+                .filter(|r| {
+                    // ABAC enforcement — skip denied rows (matches handle_list pattern)
+                    matches!(
+                        enforce_read_label(ctx.actor, &r.security_label),
+                        EnforceResult::Allow | EnforceResult::AllowWithMasking { .. }
+                    )
+                })
                 .map(|r| {
                     serde_json::json!({
                         "snapshot_id": r.snapshot_id,
@@ -1911,6 +1918,7 @@ struct SearchResultRow {
     name: Option<String>,
     governance_tier: GovernanceTier,
     trust_class: TrustClass,
+    security_label: serde_json::Value,
 }
 
 fn parse_object_type(s: &str) -> Option<ObjectType> {

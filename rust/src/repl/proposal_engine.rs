@@ -153,9 +153,13 @@ impl ProposalEngine {
     ) -> ProposalSet {
         let trimmed = input.trim();
 
-        // 1. Direct DSL check.
+        // 1. Direct DSL detection — log but route through normal proposal flow.
+        // Direct DSL bypass is gated at the IntentPipeline level (allow_direct_dsl flag).
         if trimmed.starts_with('(') {
-            return self.direct_dsl_proposal(trimmed);
+            tracing::debug!(
+                input = trimmed,
+                "ProposalEngine: detected DSL-shaped input, routing through proposals (not bypassing)"
+            );
         }
 
         let mut proposals = Vec::new();

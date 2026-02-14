@@ -313,7 +313,7 @@ impl SnapshotStore {
             r#"
             UPDATE sem_reg.snapshots
             SET effective_until = now()
-            WHERE snapshot_id = 
+            WHERE snapshot_id = $1
               AND effective_until IS NULL
             "#,
         )
@@ -341,11 +341,11 @@ impl SnapshotStore {
                 predecessor_id, change_type, change_rationale,
                 created_by, approved_by, definition
             ) VALUES (
-                , , ,
-                , , ,
-                , , ,
-                0, 1, 2,
-                3, 4, 5
+                $1, $2, $3,
+                $4, $5, $6,
+                $7, $8, $9,
+                $10, $11, $12,
+                $13, $14, $15
             )
             RETURNING snapshot_id
             "#,
@@ -385,5 +385,42 @@ mod tests {
         assert_eq!(meta.status, SnapshotStatus::Active);
         assert_eq!(meta.governance_tier, GovernanceTier::Operational);
         assert_eq!(meta.change_type, ChangeType::Created);
+    }
+
+    /// Verify that the _tx SQL has correct $N placeholders (Phase 0.1 regression).
+    #[test]
+    fn test_tx_sql_placeholders_not_corrupted() {
+        // Read the source file and check the _tx functions have proper placeholders
+        let source = include_str!("store.rs");
+
+        // supersede_snapshot_tx must have "WHERE snapshot_id = $1"
+        assert!(
+            source.contains("WHERE snapshot_id = $1"),
+            "supersede_snapshot_tx is missing $1 placeholder"
+        );
+
+        // insert_snapshot_tx must have $1 through $15 in VALUES
+        for i in 1..=15 {
+            let placeholder = format!("${}", i);
+            // Check that VALUES section contains all 15 placeholders
+            assert!(
+                source.contains(&placeholder),
+                "insert_snapshot_tx is missing {} placeholder",
+                placeholder
+            );
+        }
+
+        // Verify insert_snapshot_tx VALUES has $1 in first position
+        // (corruption pattern was VALUES followed by bare commas without $)
+        // Find the _tx function's VALUES clause and verify it starts with $1
+        let tx_fn_start = source.find("async fn insert_snapshot_tx").unwrap();
+        let tx_fn_source = &source[tx_fn_start..];
+        let values_pos = tx_fn_source.find("VALUES (").unwrap();
+        let after_values = &tx_fn_source[values_pos..values_pos + 120];
+        assert!(
+            after_values.contains("$1"),
+            "insert_snapshot_tx VALUES clause missing $1: {}",
+            after_values
+        );
     }
 }

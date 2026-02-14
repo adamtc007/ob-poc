@@ -143,12 +143,12 @@ pub fn verb_config_to_contract(
         .unwrap_or_default();
 
     let metadata = config.metadata.as_ref().map(|m| VerbContractMetadata {
-        tier: m.tier.as_ref().map(|t| to_wire_str(t)),
+        tier: m.tier.as_ref().map(to_wire_str),
         source_of_truth: m
             .source_of_truth
             .as_ref()
-            .map(|s| to_wire_str(s)),
-        scope: m.scope.as_ref().map(|s| to_wire_str(s)),
+            .map(to_wire_str),
+        scope: m.scope.as_ref().map(to_wire_str),
         noun: m.noun.clone(),
         tags: m.tags.clone(),
     });

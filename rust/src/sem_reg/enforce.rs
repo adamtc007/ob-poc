@@ -42,6 +42,28 @@ pub fn enforce_read(actor: &ActorContext, row: &SnapshotRow) -> EnforceResult {
     }
 }
 
+/// Check whether the actor may read a row identified only by its raw security_label JSON.
+///
+/// Used by search handlers that don't load full `SnapshotRow` objects.
+pub fn enforce_read_label(actor: &ActorContext, security_label: &serde_json::Value) -> EnforceResult {
+    let label: SecurityLabel = match serde_json::from_value(security_label.clone()) {
+        Ok(l) => l,
+        Err(_) => {
+            return EnforceResult::Deny {
+                reason: "Security label unparseable — access denied by default".into(),
+            };
+        }
+    };
+
+    match evaluate_abac(actor, &label, AccessPurpose::Operations) {
+        AccessDecision::Allow => EnforceResult::Allow,
+        AccessDecision::AllowWithMasking { masked_fields } => {
+            EnforceResult::AllowWithMasking { masked_fields }
+        }
+        AccessDecision::Deny { reason } => EnforceResult::Deny { reason },
+    }
+}
+
 /// Build a redacted stub for a denied snapshot — safe to return to the caller.
 pub fn redacted_stub(row: &SnapshotRow, reason: &str) -> serde_json::Value {
     let fqn = row
@@ -206,5 +228,23 @@ mod tests {
             }
             other => panic!("Expected Deny for bad label, got {:?}", std::mem::discriminant(&other)),
         }
+    }
+
+    #[test]
+    fn test_enforce_read_label_allow_public() {
+        let actor = unprivileged_actor();
+        let label = serde_json::json!({
+            "classification": "public",
+            "handling_controls": [],
+            "jurisdictions": []
+        });
+        assert!(matches!(enforce_read_label(&actor, &label), EnforceResult::Allow));
+    }
+
+    #[test]
+    fn test_enforce_read_label_deny_unparseable() {
+        let actor = unprivileged_actor();
+        let label = serde_json::json!("not_a_valid_label");
+        assert!(matches!(enforce_read_label(&actor, &label), EnforceResult::Deny { .. }));
     }
 }

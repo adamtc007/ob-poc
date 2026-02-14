@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-> **Last reviewed:** 2026-02-13
+> **Last reviewed:** 2026-02-14
 > **Frontend:** React/TypeScript (`ob-poc-ui-react/`) - Chat UI with scope panel, Inspector
 > **Backend:** Rust/Axum (`rust/crates/ob-poc-web/`) - Serves React + REST API
 > **Crates:** 16 active Rust crates (esper_* crates deprecated after React migration; ob-poc-graph + viewport removed)
@@ -16,7 +16,7 @@
 > **REPL Pipeline Redesign (077):** ⚠️ Superseded by V2 REPL Architecture — V1 types retained for reference
 > **V2 REPL Architecture (TODO-2):** ✅ Complete - Pack-scoped intent resolution, 7-state machine, ContextStack fold, preconditions engine, 3-pronged intent pipeline (semantic→pack→precondition), VerbSearchIntentMatcher bridge, 320 tests
 > **Candle Semantic Pipeline:** ✅ Complete - DB source of truth, populate_embeddings binary
-> **Agent Pipeline:** ✅ Unified - One path, all input → LLM intent → DSL (no special cases)
+> **Agent Pipeline:** ✅ Hardened - Unified orchestrator, SemReg on critical path, side-door prevention, IntentTrace audit
 > **Solar Navigation (038):** ✅ Complete - ViewState, NavigationHistory, orbit navigation
 > **Nav UX Messages:** ✅ Complete - NavReason codes, NavSuggestion, standardized error copy
 > **Promotion Pipeline (043):** ✅ Complete - Quality-gated pattern promotion with collision detection
@@ -6300,3 +6300,46 @@ Correctness and safety improvements applied across the Semantic OS:
 | `rule-field` | 2 | Closed-world field dictionary for rule validation |
 | `contract-pack` | 3 | Contract template packs |
 | `sem_reg.*` | ~32 MCP | Semantic Registry: immutable snapshots, context resolution, agent plans/decisions, lineage, coverage |
+
+### Agent Intent Pipeline Hardening
+
+> **Implemented:** 2026-02-14
+> **Tests:** 1220 unit tests passing (10 new tests added)
+
+**Summary:** Unified intent orchestrator, side-door prevention, SemReg on critical path.
+
+**Changes by Phase:**
+
+| Phase | What | Files |
+|-------|------|-------|
+| 0.1 | Fix corrupted SQL `$1..$15` placeholders in `_tx` functions | `sem_reg/store.rs` |
+| 0.3 | Map internal param types to valid JSON Schema (`uuid`→`string+format`, `json`→`object`) | `mcp/tools_sem_reg.rs` |
+| 0.4 | Config-based `ActorContext` for MCP (env vars, default least-privilege `viewer`) | `mcp/handlers/core.rs` |
+| 0.5 | ABAC-filter `handle_search()` results (was leaking existence of restricted objects) | `sem_reg/agent/mcp_tools.rs`, `sem_reg/enforce.rs` |
+| 1.1 | Unified `handle_utterance()` orchestrator: entity linking → SemReg → pipeline → post-filter → trace | `agent/orchestrator.rs` (NEW) |
+| 1.2 | Route Chat API through orchestrator | `api/agent_service.rs` |
+| 1.3 | Route MCP `dsl_generate` through orchestrator | `mcp/handlers/core.rs` |
+| 1.4 | Route REPL through orchestrator (pool + trace logging) | `repl/orchestrator_v2.rs` |
+| 2.1 | Gate direct DSL bypass (`starts_with('(')`) behind `allow_direct_dsl` flag (operator only) | `mcp/intent_pipeline.rs` |
+| 2.2 | Gate `/execute` raw DSL behind `allow_raw_dsl` field (403 if not set) | `api/agent_routes.rs`, `api/agent_types.rs` |
+| 2.3 | Remove duplicate `IntentPipeline` creation — dead `get_intent_pipeline()` removed | `api/agent_service.rs` |
+| 3 | SemReg `resolve_context()` filters verb candidates in orchestrator (post-filter with graceful fallback) | `agent/orchestrator.rs` |
+| 4 | `LookupService` results reused via orchestrator (no double verb/entity search) | `agent/orchestrator.rs` |
+| 5 | `IntentTrace` structured audit emitted for every utterance (source, verb filter, bypass flag) | `agent/orchestrator.rs` |
+
+**Key Architectural Decision:** The orchestrator **wraps** `IntentPipeline` rather than replacing it. SemReg verb filtering is a post-filter on pipeline results. Graceful degradation: if SemReg fails or filters all candidates, falls back to unfiltered results with governance warning.
+
+**Env Vars for MCP ActorContext:**
+- `MCP_ACTOR_ID` — actor identifier (default: `mcp_anonymous`)
+- `MCP_ROLES` — comma-separated roles (default: `viewer`)
+- `MCP_DEPARTMENT` — department (optional)
+- `MCP_CLEARANCE` — classification level: `public|internal|confidential|restricted` (optional)
+- `MCP_JURISDICTIONS` — comma-separated jurisdiction codes (optional)
+
+**Security Model:**
+- MCP: least-privilege `viewer` by default — env vars required to escalate (no hardcoded operator)
+- Chat: `operator` role (intentional — internal tool). TODO: derive from auth token when plumbed
+- `allow_direct_dsl`: `false` in all constructors, only set `true` for operator role via orchestrator
+- `allow_raw_dsl`: `false` by serde default, 403 if raw DSL sent without explicit opt-in
+- SemReg failure: structured `warn!` with fallback flag, trace shows `sem_reg_verb_filter: null` — never silent
+- Trace levels: INFO = summary (verb, confidence, source), DEBUG = full detail (utterance, entities, candidates)

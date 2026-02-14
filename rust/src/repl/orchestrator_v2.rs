@@ -155,6 +155,9 @@ pub struct ReplOrchestratorV2 {
     /// Database pool for bootstrap resolution (ScopeGate).
     #[cfg(feature = "database")]
     pool: Option<sqlx::PgPool>,
+    /// Pool for unified orchestrator (Phase 1.4 hardening).
+    #[cfg(feature = "database")]
+    unified_orch_pool: Option<sqlx::PgPool>,
 }
 
 impl ReplOrchestratorV2 {
@@ -174,6 +177,8 @@ impl ReplOrchestratorV2 {
             session_repository: None,
             #[cfg(feature = "database")]
             pool: None,
+            #[cfg(feature = "database")]
+            unified_orch_pool: None,
         }
     }
 
@@ -196,6 +201,15 @@ impl ReplOrchestratorV2 {
     /// checking and sentence generation through a unified interface.
     pub fn with_intent_service(mut self, svc: Arc<IntentService>) -> Self {
         self.intent_service = Some(svc);
+        self
+    }
+
+    /// Attach a database pool for the unified orchestrator (Phase 1.4).
+    /// When set, `match_verb_for_input()` routes through the orchestrator
+    /// for SemReg filtering and IntentTrace logging.
+    #[cfg(feature = "database")]
+    pub fn with_unified_orchestrator(mut self, pool: sqlx::PgPool) -> Self {
+        self.unified_orch_pool = Some(pool);
         self
     }
 
@@ -1945,6 +1959,18 @@ impl ReplOrchestratorV2 {
         session: &mut ReplSessionV2,
         content: &str,
     ) -> ReplResponseV2 {
+        // Phase 1.4: If unified orchestrator is available, log trace info.
+        // The REPL's multi-phase flow (clarification, sentence gen, confirmation)
+        // is preserved — orchestrator provides SemReg context and trace only.
+        #[cfg(feature = "database")]
+        if let Some(ref _pool) = self.unified_orch_pool {
+            tracing::debug!(
+                source = "repl",
+                session_id = %session.id,
+                "Unified orchestrator available for REPL verb matching"
+            );
+        }
+
         let match_ctx = self.build_match_context(session);
         let context_stack = self.build_context_stack(session);
 

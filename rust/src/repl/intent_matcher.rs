@@ -56,19 +56,15 @@ pub trait IntentMatcher: Send + Sync {
         context: &MatchContext,
         stack: &ContextStack,
     ) -> Result<IntentMatchResult> {
-        // Fast path: direct DSL input
+        // Direct DSL detection — log but do NOT bypass intent matching.
+        // The IntentPipeline.allow_direct_dsl flag controls whether DSL bypass
+        // is permitted (operator-only). At the trait level we always go through
+        // semantic search so SemReg filtering and IntentTrace are applied.
         if self.is_direct_dsl(utterance) {
-            return Ok(IntentMatchResult {
-                outcome: MatchOutcome::DirectDsl {
-                    source: utterance.to_string(),
-                },
-                verb_candidates: vec![],
-                entity_mentions: vec![],
-                scope_candidates: None,
-                generated_dsl: Some(utterance.to_string()),
-                unresolved_refs: vec![],
-                debug: None,
-            });
+            tracing::debug!(
+                input = utterance,
+                "REPL: detected DSL-shaped input, routing through intent matching (not bypassing)"
+            );
         }
 
         // Step 1: Raw semantic search
