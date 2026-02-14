@@ -114,6 +114,12 @@ pub struct IntentTrace {
     pub semreg_policy: String,
     /// Set when SemReg was unavailable but pipeline continued (non-strict)
     pub semreg_unavailable: bool,
+    /// Source of verb selection: "discovery", "user_choice", "macro"
+    pub selection_source: String,
+    /// True if macro-expanded DSL was checked against SemReg
+    pub macro_semreg_checked: bool,
+    /// Verbs in macro expansion that were denied by SemReg (empty if none)
+    pub macro_denied_verbs: Vec<String>,
 }
 
 /// Returns true for pipeline outcomes that are "early exits" -- scope resolution,
@@ -125,7 +131,6 @@ fn is_early_exit(outcome: &PipelineOutcome) -> bool {
         PipelineOutcome::ScopeResolved { .. }
             | PipelineOutcome::ScopeCandidates
             | PipelineOutcome::DirectDslNotAllowed
-            | PipelineOutcome::MacroExpanded { .. }
     )
 }
 
@@ -228,6 +233,119 @@ pub async fn handle_utterance(
             lookup_result,
             trace,
         });
+    }
+
+    // -- MacroExpanded: apply SemReg governance to expanded verbs --
+    if let PipelineOutcome::MacroExpanded { ref macro_verb, .. } = discovery_result.outcome {
+        if !discovery_result.dsl.is_empty() {
+            // Extract verb FQNs from expanded DSL statements
+            let expanded_verbs: Vec<String> = discovery_result.dsl
+                .lines()
+                .filter_map(|line| {
+                    let trimmed = line.trim();
+                    if trimmed.starts_with('(') {
+                        // Extract "domain.verb" from "(domain.verb ...)"
+                        trimmed.trim_start_matches('(')
+                            .split_whitespace()
+                            .next()
+                            .map(|v| v.trim_end_matches(')').to_string())
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+
+            let mut macro_denied: Vec<String> = vec![];
+            let macro_semreg_checked;
+
+            match &sem_reg_policy {
+                SemRegVerbPolicy::AllowedSet(allowed) => {
+                    macro_denied = expanded_verbs.iter()
+                        .filter(|v| !allowed.contains(v.as_str()))
+                        .cloned()
+                        .collect();
+                    macro_semreg_checked = true;
+                }
+                SemRegVerbPolicy::DenyAll => {
+                    macro_denied = expanded_verbs.clone();
+                    macro_semreg_checked = true;
+                }
+                SemRegVerbPolicy::Unavailable => {
+                    macro_semreg_checked = false;
+                    if policy.semreg_fail_closed() {
+                        // Strict mode: SemReg unavailable means deny
+                        macro_denied = expanded_verbs.clone();
+                    }
+                }
+            }
+
+            if !macro_denied.is_empty() && policy.semreg_fail_closed() {
+                tracing::warn!(
+                    macro_verb = %macro_verb,
+                    denied_verbs = ?macro_denied,
+                    "SemReg denied verbs in macro expansion (strict mode)"
+                );
+                let trace = build_trace(
+                    utterance, ctx, &entity_candidates, &dominant_entity_name,
+                    &sem_reg_verb_names, &pre_filter, &pre_filter,
+                    &chosen_verb_pre_semreg, &None,
+                    &discovery_result, &sem_reg_policy, None, true, false,
+                );
+                use crate::mcp::intent_pipeline::StructuredIntent;
+                return Ok(OrchestratorOutcome {
+                    pipeline_result: PipelineResult {
+                        intent: StructuredIntent::empty(),
+                        verb_candidates: vec![],
+                        dsl: String::new(),
+                        dsl_hash: None,
+                        valid: false,
+                        validation_error: Some(format!(
+                            "Macro '{}' contains verbs denied by SemReg: {:?}",
+                            macro_verb, macro_denied
+                        )),
+                        unresolved_refs: vec![],
+                        missing_required: vec![],
+                        outcome: PipelineOutcome::NoAllowedVerbs,
+                        scope_resolution: discovery_result.scope_resolution,
+                        scope_context: discovery_result.scope_context,
+                    },
+                    sem_reg_verbs: sem_reg_verb_names,
+                    lookup_result,
+                    trace,
+                });
+            }
+
+            if !macro_denied.is_empty() {
+                // Non-strict: log but allow
+                tracing::warn!(
+                    macro_verb = %macro_verb,
+                    denied_verbs = ?macro_denied,
+                    "SemReg would deny verbs in macro expansion (permissive mode, allowing)"
+                );
+            }
+
+            // Macro passed SemReg check (or non-strict allowed it)
+            tracing::info!(
+                macro_verb = %macro_verb,
+                verb_count = expanded_verbs.len(),
+                semreg_checked = macro_semreg_checked,
+                denied_count = macro_denied.len(),
+                "Macro expansion SemReg governance complete"
+            );
+
+            let trace = build_trace(
+                utterance, ctx, &entity_candidates, &dominant_entity_name,
+                &sem_reg_verb_names, &pre_filter, &pre_filter,
+                &chosen_verb_pre_semreg, &chosen_verb_pre_semreg,
+                &discovery_result, &sem_reg_policy, None, false, false,
+            );
+            return Ok(OrchestratorOutcome {
+                pipeline_result: discovery_result,
+                sem_reg_verbs: sem_reg_verb_names,
+                lookup_result,
+                trace,
+            });
+        }
     }
 
     // -- Stage A.2: Apply SemReg policy --
@@ -443,6 +561,9 @@ fn build_trace(
         chosen_verb_post_semreg: chosen_verb_post_semreg.clone(),
         semreg_policy: sem_reg_policy.label().to_string(),
         semreg_unavailable,
+        selection_source: "discovery".to_string(),
+        macro_semreg_checked: false,
+        macro_denied_verbs: vec![],
     }
 }
 
@@ -506,6 +627,9 @@ pub async fn handle_utterance_with_forced_verb(
         chosen_verb_post_semreg: Some(forced_verb_fqn.to_string()),
         semreg_policy: "unavailable".to_string(),
         semreg_unavailable: false,
+        selection_source: "user_choice".to_string(),
+        macro_semreg_checked: false,
+        macro_denied_verbs: vec![],
     };
 
     tracing::info!(
@@ -616,6 +740,9 @@ mod tests {
             chosen_verb_post_semreg: None,
             semreg_policy: "unavailable".into(),
             semreg_unavailable: false,
+            selection_source: "discovery".into(),
+            macro_semreg_checked: false,
+            macro_denied_verbs: vec![],
         }
     }
 
@@ -721,7 +848,7 @@ mod tests {
         }));
         assert!(is_early_exit(&PipelineOutcome::ScopeCandidates));
         assert!(is_early_exit(&PipelineOutcome::DirectDslNotAllowed));
-        assert!(is_early_exit(&PipelineOutcome::MacroExpanded {
+        assert!(!is_early_exit(&PipelineOutcome::MacroExpanded {
             macro_verb: "test.macro".into(),
             unlocks: vec![],
         }));
@@ -772,4 +899,35 @@ mod tests {
         let unavail_json = serde_json::to_string(&unavail).unwrap();
         assert_ne!(deny_json, unavail_json);
     }
+
+    #[test]
+    fn test_trace_selection_source_field() {
+        let mut trace = default_trace();
+        trace.selection_source = "user_choice".into();
+        let json = serde_json::to_string(&trace).unwrap();
+        assert!(json.contains(r#""selection_source":"user_choice""#));
+    }
+
+    #[test]
+    fn test_trace_macro_governance_fields() {
+        let mut trace = default_trace();
+        trace.macro_semreg_checked = true;
+        trace.macro_denied_verbs = vec!["bad.verb".into()];
+        trace.selection_source = "discovery".into();
+
+        let json = serde_json::to_string(&trace).unwrap();
+        assert!(json.contains(r#""macro_semreg_checked":true"#));
+        assert!(json.contains("bad.verb"));
+        assert!(json.contains("macro_denied_verbs"));
+    }
+
+    #[test]
+    fn test_macro_expanded_not_early_exit() {
+        // MacroExpanded must NOT be an early exit — it needs SemReg governance
+        assert!(!is_early_exit(&PipelineOutcome::MacroExpanded {
+            macro_verb: "onboarding.setup".into(),
+            unlocks: vec!["kyc.open-case".into()],
+        }));
+    }
+
 }

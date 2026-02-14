@@ -5,8 +5,6 @@
 
 use crate::api::agent_state::AgentState;
 use crate::api::agent_types::{ReportCorrectionRequest, ReportCorrectionResponse};
-use crate::dsl_v2::parse_program;
-use crate::session::UnifiedSession;
 
 use axum::{
     extract::{Path, State},
@@ -206,99 +204,16 @@ async fn store_correction_event(
 
 /// POST /api/session/:id/select-verb
 ///
-/// Called when user clicks a verb option in disambiguation UI.
-/// This is GOLD-STANDARD training data - user explicitly chose from alternatives.
-///
-/// Flow:
-/// 1. Record learning signal (input -> selected_verb, confidence=0.95)
-/// 2. Record negative signals for rejected alternatives
-/// 3. Re-run intent pipeline with selected verb to generate DSL
-/// 4. Return DSL ready for execution
+/// RETIRED: This endpoint bypassed orchestrator SemReg + PolicyGate.
+/// All verb selection now flows through `/decision/reply` -> orchestrator forced-verb.
+/// Returns 410 Gone.
 pub(crate) async fn select_verb_disambiguation(
-    State(state): State<AgentState>,
-    Path(session_id): Path<Uuid>,
-    Json(req): Json<ob_poc_types::VerbSelectionRequest>,
+    State(_state): State<AgentState>,
+    Path(_session_id): Path<Uuid>,
+    Json(_req): Json<ob_poc_types::VerbSelectionRequest>,
 ) -> Result<Json<ob_poc_types::VerbSelectionResponse>, StatusCode> {
-    tracing::info!(
-        session_id = %session_id,
-        selected_verb = %req.selected_verb,
-        original_input = %req.original_input,
-        num_candidates = req.all_candidates.len(),
-        "Recording verb disambiguation selection"
-    );
-
-    // 1. Record learning signal to database (gold-standard, confidence=0.95)
-    let learning_recorded = match record_verb_selection_signal(
-        &state.pool,
-        &req.original_input,
-        &req.selected_verb,
-        &req.all_candidates,
-    )
-    .await
-    {
-        Ok(_) => {
-            tracing::info!(
-                "Recorded gold-standard learning signal: '{}' -> '{}'",
-                req.original_input,
-                req.selected_verb
-            );
-            true
-        }
-        Err(e) => {
-            tracing::error!("Failed to record learning signal: {}", e);
-            false
-        }
-    };
-
-    // 2. Get session and re-run pipeline with selected verb
-    let mut sessions = state.sessions.write().await;
-    let session = match sessions.get_mut(&session_id) {
-        Some(s) => s,
-        None => {
-            return Ok(Json(ob_poc_types::VerbSelectionResponse {
-                recorded: learning_recorded,
-                execution_result: None,
-                message: "Session not found".to_string(),
-            }));
-        }
-    };
-
-    // 3. Generate DSL for the selected verb using the original input
-    // This goes through the normal pipeline but we force the verb selection
-    let dsl_result = generate_dsl_for_selected_verb(
-        &state.pool,
-        &req.original_input,
-        &req.selected_verb,
-        session,
-    )
-    .await;
-
-    match dsl_result {
-        Ok(dsl) => {
-            // Stage the DSL in session
-            let ast = parse_program(&dsl)
-                .map(|p| p.statements)
-                .unwrap_or_default();
-            session.set_pending_dsl(dsl.clone(), ast, None, false);
-
-            let msg = format!(
-                "Selected '{}'. Staged: {}\n\nSay 'run' to execute.",
-                req.selected_verb, dsl
-            );
-            session.add_agent_message(msg.clone(), None, Some(dsl));
-
-            Ok(Json(ob_poc_types::VerbSelectionResponse {
-                recorded: learning_recorded,
-                execution_result: None,
-                message: msg,
-            }))
-        }
-        Err(e) => Ok(Json(ob_poc_types::VerbSelectionResponse {
-            recorded: learning_recorded,
-            execution_result: None,
-            message: format!("Failed to generate DSL: {}", e),
-        })),
-    }
+    tracing::warn!("RETIRED endpoint /select-verb called -- returning 410 Gone");
+    Err(StatusCode::GONE)
 }
 
 /// Record verb selection as gold-standard learning signal
@@ -714,103 +629,6 @@ async fn record_abandon_event(
 // Decision Reply
 // ============================================================================
 
-/// Generate DSL for a user-selected verb
-///
-/// This bypasses verb search (we already know the verb) and goes straight
-/// to argument extraction and DSL building.
-async fn generate_dsl_for_selected_verb(
-    _pool: &PgPool,
-    original_input: &str,
-    selected_verb: &str,
-    _session: &mut UnifiedSession,
-) -> Result<String, String> {
-    use crate::dsl_v2::verb_registry::registry;
-
-    // Parse verb into domain.name format
-    let parts: Vec<&str> = selected_verb.splitn(2, '.').collect();
-    if parts.len() != 2 {
-        return Err(format!("Invalid verb format: {}", selected_verb));
-    }
-    let (domain, verb_name) = (parts[0], parts[1]);
-
-    // Get verb definition from registry
-    let reg = registry();
-    let verb_def = reg
-        .get_runtime_verb(domain, verb_name)
-        .ok_or_else(|| format!("Unknown verb: {}", selected_verb))?;
-
-    // For verbs with no required args, just generate the basic call
-    let required_args: Vec<_> = verb_def.args.iter().filter(|a| a.required).collect();
-
-    if required_args.is_empty() {
-        // No required args - generate simple verb call
-        return Ok(format!("({})", selected_verb));
-    }
-
-    // For verbs with required args, we need to extract them from the input
-    // This is a simplified version - full implementation would use LLM
-    // For now, generate a template with placeholders
-    let arg_placeholders: Vec<String> = required_args
-        .iter()
-        .map(|a| format!(":{} <{}>", a.name, a.name))
-        .collect();
-
-    // Try to extract simple values from input
-    // This handles cases like "list all cbus" -> (cbu.list) with no args needed
-    // Or "create fund Alpha" -> (cbu.create :name "Alpha")
-    let dsl = if arg_placeholders.is_empty() {
-        format!("({})", selected_verb)
-    } else {
-        // Check if we can extract any values from the input
-        let extracted_args = extract_simple_args(original_input, &required_args);
-        if extracted_args.is_empty() {
-            // Return template with placeholders for user to fill
-            format!("({} {})", selected_verb, arg_placeholders.join(" "))
-        } else {
-            format!("({} {})", selected_verb, extracted_args.join(" "))
-        }
-    };
-
-    Ok(dsl)
-}
-
-/// Extract simple argument values from user input
-fn extract_simple_args(
-    input: &str,
-    required_args: &[&crate::dsl_v2::runtime_registry::RuntimeArg],
-) -> Vec<String> {
-    use dsl_core::ArgType;
-
-    let mut args = Vec::new();
-    let words: Vec<&str> = input.split_whitespace().collect();
-
-    for arg in required_args {
-        match arg.arg_type {
-            ArgType::String => {
-                // Look for quoted strings or significant words
-                // Skip common words like "create", "add", "list", "show", etc.
-                let skip_words = [
-                    "create", "add", "list", "show", "get", "find", "search", "all", "the", "a",
-                    "an", "for", "to", "from", "with", "in", "on", "by",
-                ];
-                for word in &words {
-                    let lower = word.to_lowercase();
-                    if !skip_words.contains(&lower.as_str()) && word.len() > 2 {
-                        // Found a potential value
-                        args.push(format!(":{} \"{}\"", arg.name, word));
-                        break;
-                    }
-                }
-            }
-            _ => {
-                // For non-string types, skip (would need type-specific extraction)
-            }
-        }
-    }
-
-    args
-}
-
 /// POST /api/session/:id/decision/reply
 ///
 /// Unified endpoint for all decision packet responses.
@@ -878,7 +696,44 @@ pub(crate) async fn handle_decision_reply(
             // Route based on decision kind
             let message = match &packet.kind {
                 DecisionKind::ClarifyVerb => {
-                    format!("Selected verb option: {}", choice.label)
+                    // Extract verb_fqn from the VerbPayload
+                    let verb_fqn = if let ob_poc_types::ClarificationPayload::Verb(ref vp) = packet.payload {
+                        // choice.id is the index (1-based string); map to verb option
+                        choice.id.parse::<usize>().ok()
+                            .and_then(|idx| vp.options.get(idx.saturating_sub(1)))
+                            .map(|opt| opt.verb_fqn.clone())
+                    } else {
+                        None
+                    };
+
+                    if let Some(fqn) = verb_fqn {
+                        let original_utterance = packet.utterance.clone();
+                        let actor = crate::policy::ActorResolver::from_session_id(session_id);
+
+                        // Route through orchestrator forced-verb path
+                        match state.agent_service.process_forced_verb_selection(
+                            session,
+                            &original_utterance,
+                            &fqn,
+                            actor,
+                        ).await {
+                            Ok(resp) => {
+                                tracing::info!(
+                                    verb = %fqn,
+                                    dsl = ?resp.dsl_source,
+                                    "ClarifyVerb: forced-verb selection through orchestrator"
+                                );
+                                resp.message.clone()
+                            }
+                            Err(e) => {
+                                tracing::error!(error = %e, "ClarifyVerb forced-verb failed");
+                                format!("Failed to generate DSL for {}: {}", fqn, e)
+                            }
+                        }
+                    } else {
+                        tracing::warn!("ClarifyVerb: could not extract verb_fqn from payload");
+                        format!("Selected verb option: {}", choice.label)
+                    }
                 }
                 DecisionKind::ClarifyGroup => {
                     // Handle client group selection

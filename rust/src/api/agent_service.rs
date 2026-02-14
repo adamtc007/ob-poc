@@ -1573,6 +1573,27 @@ impl AgentService {
         })
     }
 
+    /// Public entry point for forced verb selection via decision reply.
+    ///
+    /// Called by `handle_decision_reply` when `ClarifyVerb` selection is made.
+    /// Delegates to `handle_verb_selection` which routes through orchestrator.
+    pub async fn process_forced_verb_selection(
+        &self,
+        session: &mut crate::session::UnifiedSession,
+        original_utterance: &str,
+        forced_verb_fqn: &str,
+        actor: crate::sem_reg::abac::ActorContext,
+    ) -> Result<AgentChatResponse, String> {
+        self.handle_verb_selection(
+            session,
+            original_utterance,
+            forced_verb_fqn,
+            &[], // No candidates list needed for forced selection
+            actor,
+        )
+        .await
+    }
+
     /// Handle verb selection from disambiguation (either numeric input or API call)
     ///
     /// Records learning signal and re-runs pipeline with selected verb
