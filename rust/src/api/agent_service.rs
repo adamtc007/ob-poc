@@ -557,7 +557,8 @@ impl AgentService {
         OrchestratorContext {
             actor,
             session_id: Some(session.id),
-            case_id: session.context.dominant_entity_id,
+            case_id: Some(session.id), // Use session ID as case ID
+            dominant_entity_id: session.context.dominant_entity_id,
             scope: session.context.client_scope.clone(),
             pool: self.pool.clone(),
             verb_searcher: std::sync::Arc::new(self.build_verb_searcher()),
@@ -1600,16 +1601,16 @@ impl AgentService {
             // Continue anyway - don't block the user
         }
 
-        // Re-run intent pipeline with selected verb as domain hint
-        // Routes through unified orchestrator for SemReg + trace
+        // Binding disambiguation: use forced-verb to ensure user's selection is honoured
         let orch_ctx = self.build_orchestrator_context(
             session,
             actor,
             crate::agent::orchestrator::UtteranceSource::Chat,
         );
-        let orch_outcome = crate::agent::orchestrator::handle_utterance(
+        let orch_outcome = crate::agent::orchestrator::handle_utterance_with_forced_verb(
             &orch_ctx,
             original_input,
+            selected_verb,
         )
         .await;
         let result = orch_outcome.map(|o| o.pipeline_result);

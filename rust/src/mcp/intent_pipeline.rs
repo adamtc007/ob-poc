@@ -146,6 +146,10 @@ pub enum PipelineOutcome {
     },
     /// Scope candidates need user selection
     ScopeCandidates,
+    /// Direct DSL was attempted but policy denied it
+    DirectDslNotAllowed,
+    /// SemReg denied all verb candidates (strict mode)
+    NoAllowedVerbs,
     /// Macro was expanded to primitive DSL statements
     MacroExpanded {
         /// Original macro verb
@@ -327,6 +331,117 @@ impl IntentPipeline {
         self
     }
 
+
+    /// Process with a forced verb selection (binding disambiguation).
+    ///
+    /// Skips verb search entirely. Looks up the forced verb in the registry,
+    /// extracts arguments via LLM, and assembles DSL. This ensures user
+    /// disambiguation selections are binding and cannot be overridden by
+    /// re-running free-form ranking.
+    pub async fn process_with_forced_verb(
+        &self,
+        instruction: &str,
+        forced_verb_fqn: &str,
+        existing_scope: Option<ScopeContext>,
+    ) -> Result<PipelineResult> {
+        let scope_ctx = existing_scope.unwrap_or_default();
+
+        // Validate verb exists in registry
+        let reg = registry();
+        let parts: Vec<&str> = forced_verb_fqn.splitn(2, '.').collect();
+        if parts.len() != 2 {
+            return Err(anyhow!("Invalid forced verb format: {}", forced_verb_fqn));
+        }
+
+        let verb_def = reg
+            .get_runtime_verb(parts[0], parts[1])
+            .ok_or_else(|| anyhow!("Forced verb not in registry: {}", forced_verb_fqn))?;
+
+        tracing::info!(
+            forced_verb = forced_verb_fqn,
+            instruction = instruction,
+            "Processing with forced verb (binding selection)"
+        );
+
+        // Extract arguments via LLM for the forced verb
+        let intent = self
+            .extract_arguments(instruction, forced_verb_fqn, verb_def, 1.0)
+            .await?;
+
+        // Check for missing required args
+        let missing_required: Vec<String> = intent
+            .arguments
+            .iter()
+            .filter_map(|arg| match &arg.value {
+                IntentArgValue::Missing { arg_name } => Some(arg_name.clone()),
+                _ => None,
+            })
+            .collect();
+
+        if !missing_required.is_empty() {
+            return Ok(PipelineResult {
+                intent,
+                verb_candidates: vec![],
+                dsl: String::new(),
+                dsl_hash: None,
+                valid: false,
+                validation_error: Some(format!(
+                    "Missing required arguments: {}",
+                    missing_required.join(", ")
+                )),
+                unresolved_refs: vec![],
+                missing_required,
+                outcome: PipelineOutcome::NeedsUserInput,
+                scope_resolution: None,
+                scope_context: if scope_ctx.has_scope() { Some(scope_ctx) } else { None },
+            });
+        }
+
+        // Assemble DSL
+        let dsl = self.assemble_dsl_string(&intent)?;
+
+        // Parse and enrich for unresolved refs
+        let (unresolved, parse_error) = match parse_program(&dsl) {
+            Ok(ast) => {
+                let registry = runtime_registry_arc();
+                let enriched = enrich_program(ast, &registry);
+                let locations = find_unresolved_ref_locations(&enriched.program);
+                let refs: Vec<UnresolvedRef> = locations
+                    .into_iter()
+                    .map(|loc| UnresolvedRef {
+                        param_name: loc.arg_key,
+                        search_value: loc.search_text,
+                        entity_type: Some(loc.entity_type),
+                        search_column: loc.search_column,
+                        ref_id: loc.ref_id,
+                    })
+                    .collect();
+                (refs, None)
+            }
+            Err(e) => (vec![], Some(format!("Parse error after assembly: {:?}", e))),
+        };
+
+        let (valid, validation_error) = match &parse_error {
+            Some(err) => (false, Some(err.clone())),
+            None => self.validate_dsl(&dsl),
+        };
+
+        let dsl_hash = if !dsl.is_empty() { Some(compute_dsl_hash(&dsl)) } else { None };
+
+        Ok(PipelineResult {
+            intent,
+            verb_candidates: vec![], // No candidates — forced selection
+            dsl,
+            dsl_hash,
+            valid,
+            validation_error,
+            unresolved_refs: unresolved,
+            missing_required: vec![],
+            outcome: if valid { PipelineOutcome::Ready } else { PipelineOutcome::NeedsUserInput },
+            scope_resolution: None,
+            scope_context: if scope_ctx.has_scope() { Some(scope_ctx) } else { None },
+        })
+    }
     fn get_llm(&self) -> Result<Arc<dyn LlmClient>> {
         if let Some(client) = &self.llm_client {
             Ok(Arc::clone(client))
@@ -374,7 +489,20 @@ impl IntentPipeline {
                 tracing::info!(bypass = "direct_dsl", "Direct DSL bypass used (operator-gated, dsl: prefix)");
                 return self.process_direct_dsl(raw_dsl, existing_scope).await;
             } else {
-                tracing::warn!(bypass = "direct_dsl_denied", "Direct DSL bypass attempted but not allowed");
+                tracing::warn!(bypass = "direct_dsl_denied", "Direct DSL bypass attempted but not allowed by PolicyGate");
+                return Ok(PipelineResult {
+                    intent: StructuredIntent::empty(),
+                    verb_candidates: vec![],
+                    dsl: String::new(),
+                    dsl_hash: None,
+                    valid: false,
+                    validation_error: Some("Direct DSL input is not allowed. Use natural language instead.".into()),
+                    unresolved_refs: vec![],
+                    missing_required: vec![],
+                    outcome: PipelineOutcome::DirectDslNotAllowed,
+                    scope_resolution: None,
+                    scope_context: None,
+                });
             }
         }
 
@@ -2125,5 +2253,64 @@ mod policy_gate_tests {
             violations.join("
 ")
         );
+    }
+}
+
+
+#[cfg(test)]
+mod correctness_tests {
+    use super::*;
+
+    #[test]
+    fn test_denied_dsl_returns_explicit_error() {
+        // With direct DSL disabled, dsl: prefix must return DirectDslNotAllowed
+        let searcher = HybridVerbSearcher::minimal();
+        let pipeline = IntentPipeline::new(searcher); // allow_direct_dsl defaults to false
+
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+
+        let result = rt.block_on(pipeline.process("dsl:(cbu.list)", None)).unwrap();
+
+        assert_eq!(result.outcome, PipelineOutcome::DirectDslNotAllowed);
+        assert!(result.dsl.is_empty(), "No DSL should be generated when dsl: is denied");
+        assert!(!result.valid);
+        assert!(result.validation_error.unwrap().contains("not allowed"));
+    }
+
+    #[test]
+    fn test_direct_dsl_without_prefix_is_not_bypass() {
+        // Input starting with '(' should NOT trigger direct DSL bypass
+        let searcher = HybridVerbSearcher::minimal();
+        let pipeline = IntentPipeline::new(searcher).set_allow_direct_dsl(true);
+
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+
+        // Parenthesized input without dsl: prefix should go through NL pipeline
+        let result = rt.block_on(pipeline.process("(cbu.list)", None)).unwrap();
+
+        // Should NOT produce DSL from direct bypass (no dsl: prefix)
+        assert_ne!(result.outcome, PipelineOutcome::Ready,
+            "Parenthesized input without dsl: prefix should not bypass");
+    }
+
+    #[test]
+    fn test_pipeline_outcome_no_allowed_verbs_variant() {
+        // Verify the NoAllowedVerbs variant exists and serializes
+        let outcome = PipelineOutcome::NoAllowedVerbs;
+        let json = serde_json::to_string(&outcome).unwrap();
+        assert!(json.contains("NoAllowedVerbs"));
+    }
+
+    #[test]
+    fn test_pipeline_outcome_direct_dsl_not_allowed_variant() {
+        let outcome = PipelineOutcome::DirectDslNotAllowed;
+        let json = serde_json::to_string(&outcome).unwrap();
+        assert!(json.contains("DirectDslNotAllowed"));
     }
 }

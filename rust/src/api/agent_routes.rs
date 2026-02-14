@@ -1981,7 +1981,7 @@ async fn chat_session(
         let first_intent = &response.intents[0];
 
         // Determine match method: DirectDsl if user typed DSL, Semantic if LLM generated
-        let is_direct_dsl = req.message.trim().starts_with('(');
+        let is_direct_dsl = req.message.trim().starts_with("dsl:");
         let match_method = if is_direct_dsl {
             ob_semantic_matcher::MatchMethod::DirectDsl
         } else {
@@ -2043,7 +2043,7 @@ async fn chat_session(
     // =========================================================================
     if let Some(ref dsl_source) = response.dsl_source {
         // Only set proposed_dsl if agent generated it (not DirectDsl)
-        let is_direct_dsl = req.message.trim().starts_with('(');
+        let is_direct_dsl = req.message.trim().starts_with("dsl:");
         if !is_direct_dsl {
             state
                 .session_manager

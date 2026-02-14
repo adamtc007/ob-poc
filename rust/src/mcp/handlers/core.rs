@@ -1315,6 +1315,7 @@ impl ToolHandlers {
             actor,
             session_id,
             case_id: None,
+            dominant_entity_id: None,
             scope: None,
             pool: self.pool.clone(),
             verb_searcher: std::sync::Arc::new(searcher),
