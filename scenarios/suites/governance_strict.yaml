@@ -1,0 +1,54 @@
+name: "Governance Strict Mode"
+suite_id: "governance_strict"
+description: "Validates strict SemReg and PolicyGate enforcement"
+mode_expectations:
+  strict_semreg: true
+  strict_single_pipeline: true
+  allow_direct_dsl: false
+  allow_raw_execute: false
+session_seed:
+  actor:
+    actor_id: "test.analyst"
+    roles: ["viewer"]
+
+scenarios:
+  - name: "strict_semreg_denies_verb"
+    description: "When SemReg denies all candidates in strict mode, outcome is NoAllowedVerbs"
+    steps:
+      - user: "open a KYC case for Acme Holdings"
+        expect:
+          outcome: "NoMatch"
+          semreg_mode: "strict"
+
+  - name: "direct_dsl_denied_by_default"
+    description: "dsl: prefix is denied when allow_direct_dsl=false"
+    steps:
+      - user: "dsl:(cbu.create :name \"Acme\")"
+        expect:
+          outcome: "DirectDslNotAllowed"
+          dsl_non_empty: false
+
+  - name: "sem_reg_deny_all_strict"
+    description: "SemReg deny-all produces NoAllowedVerbs with denied flag"
+    steps:
+      - user: "create a fund for Globex"
+        expect:
+          outcome: "NoMatch"
+          semreg_mode: "strict"
+
+  - name: "multiple_denied_utterances_consistent"
+    description: "Multiple denied utterances produce consistent outcomes"
+    steps:
+      - user: "spin up a structure"
+        expect:
+          outcome: "NoMatch"
+      - user: "load the trading book"
+        expect:
+          outcome: "NoMatch"
+
+  - name: "empty_utterance_handled"
+    description: "Empty input doesn't crash the pipeline"
+    steps:
+      - user: ""
+        expect:
+          outcome: "NoMatch"

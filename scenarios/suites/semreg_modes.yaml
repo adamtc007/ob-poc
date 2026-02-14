@@ -1,0 +1,45 @@
+name: "SemReg Modes"
+suite_id: "semreg_modes"
+description: "Validates SemReg strict vs permissive mode behavior"
+mode_expectations:
+  strict_semreg: true
+  strict_single_pipeline: true
+session_seed:
+  actor:
+    actor_id: "test.user"
+    roles: ["viewer"]
+
+scenarios:
+  - name: "strict_mode_label_in_trace"
+    description: "Strict SemReg mode is reflected in trace sem_reg_mode field"
+    steps:
+      - user: "create a new fund"
+        expect:
+          outcome: "NoMatch"
+          semreg_mode: "strict"
+
+  - name: "strict_mode_consistent_across_steps"
+    description: "SemReg mode stays consistent across multiple steps"
+    steps:
+      - user: "open a case"
+        expect:
+          semreg_mode: "strict"
+      - user: "list shareholders"
+        expect:
+          semreg_mode: "strict"
+
+  - name: "strict_denies_no_match_gracefully"
+    description: "Even in strict mode, NoMatch (no candidates found) is handled, not crashed"
+    steps:
+      - user: "completely unrelated query about weather"
+        expect:
+          outcome: "NoMatch"
+          semreg_mode: "strict"
+
+  - name: "no_sem_reg_denied_all_on_no_match"
+    description: "NoMatch doesn't trigger sem_reg_denied_all (there were no candidates to deny)"
+    steps:
+      - user: "random gibberish input"
+        expect:
+          outcome: "NoMatch"
+          sem_reg_denied_all: false

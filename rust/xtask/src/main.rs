@@ -10,6 +10,7 @@ use clap::{Parser, Subcommand};
 use xshell::{cmd, Shell};
 
 mod allianz_harness;
+mod harness;
 mod aviva_deal_harness;
 mod bpmn_lite;
 mod deal_harness;
@@ -523,12 +524,48 @@ enum Command {
         action: ReplayTunerAction,
     },
 
+    /// Agentic Scenario Harness — deterministic pipeline testing
+    ///
+    /// Drives multi-turn YAML scenarios through the orchestrator.
+    /// Asserts structured fields only (outcome, verb, SemReg, trace).
+    Harness {
+        #[command(subcommand)]
+        action: HarnessAction,
+    },
+
     /// BPMN-Lite service commands (build, test, clippy, docker, deploy)
     ///
     /// Manages the standalone bpmn-lite orchestration service at bpmn-lite/.
     BpmnLite {
         #[command(subcommand)]
         action: BpmnLiteAction,
+    },
+}
+
+#[derive(Subcommand)]
+enum HarnessAction {
+    /// List all scenario suites and counts
+    List,
+    /// Run scenarios
+    Run {
+        /// Path to a specific suite YAML file
+        #[arg(long)]
+        suite: Option<std::path::PathBuf>,
+        /// Run a specific scenario by name (searches all suites)
+        #[arg(long)]
+        scenario: Option<String>,
+        /// Run all suites
+        #[arg(long)]
+        all: bool,
+    },
+    /// Dump full artifacts for a scenario
+    Dump {
+        /// Scenario name to dump
+        #[arg(long)]
+        scenario: String,
+        /// Output file path
+        #[arg(long, default_value = "/tmp/harness_dump.json")]
+        out: std::path::PathBuf,
     },
 }
 
@@ -1311,6 +1348,41 @@ fn main() -> Result<()> {
                 verbose,
             } => replay_tuner::report(&session_log, verbose),
         },
+        Command::Harness { action } => {
+            let scenarios_dir = std::path::Path::new("scenarios/suites");
+            let rt = tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .build()?;
+            match action {
+                HarnessAction::List => {
+                    harness::list(scenarios_dir)?;
+                    Ok(())
+                }
+                HarnessAction::Run { suite, scenario, all } => {
+                    let db_url = std::env::var("DATABASE_URL")
+                        .unwrap_or_else(|_| "postgresql:///data_designer".into());
+                    let pool = rt.block_on(sqlx::PgPool::connect(&db_url))?;
+                    let passed = rt.block_on(harness::run(
+                        &pool,
+                        scenarios_dir,
+                        suite.as_deref(),
+                        scenario.as_deref(),
+                        all,
+                    ))?;
+                    if !passed {
+                        std::process::exit(1);
+                    }
+                    Ok(())
+                }
+                HarnessAction::Dump { scenario, out } => {
+                    let db_url = std::env::var("DATABASE_URL")
+                        .unwrap_or_else(|_| "postgresql:///data_designer".into());
+                    let pool = rt.block_on(sqlx::PgPool::connect(&db_url))?;
+                    rt.block_on(harness::dump(&pool, scenarios_dir, &scenario, &out))?;
+                    Ok(())
+                }
+            }
+        }
         Command::BpmnLite { action } => match action {
             BpmnLiteAction::Build { release } => bpmn_lite::build(&sh, release),
             BpmnLiteAction::Test { filter } => bpmn_lite::test(&sh, filter.as_deref()),

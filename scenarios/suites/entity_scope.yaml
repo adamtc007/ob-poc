@@ -1,0 +1,43 @@
+name: "Entity & Scope"
+suite_id: "entity_scope"
+description: "Validates scope resolution and entity context handling"
+mode_expectations:
+  strict_semreg: true
+  strict_single_pipeline: true
+session_seed:
+  scope: "Allianz GI"
+  actor:
+    actor_id: "test.user"
+    roles: ["viewer"]
+
+scenarios:
+  - name: "unknown_scope_no_crash"
+    description: "References to unknown scope don't crash the pipeline"
+    steps:
+      - user: "switch to NonExistent Corp"
+        expect:
+          outcome: "NoMatch"
+
+  - name: "entity_reference_no_crash"
+    description: "Entity references in utterance handled without crash"
+    steps:
+      - user: "find information about Acme Holdings Ltd"
+        expect:
+          outcome: "NoMatch"
+
+  - name: "scope_persists_across_steps"
+    description: "Session scope doesn't reset between steps"
+    steps:
+      - user: "list entities"
+        expect:
+          outcome: "NoMatch"
+      - user: "show details"
+        expect:
+          outcome: "NoMatch"
+
+  - name: "jurisdiction_hint_in_utterance"
+    description: "Jurisdiction hints in utterance processed without error"
+    steps:
+      - user: "Acme Luxembourg subsidiary details"
+        expect:
+          outcome: "NoMatch"

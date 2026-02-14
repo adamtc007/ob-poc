@@ -1,0 +1,53 @@
+name: "Pipeline Routing"
+suite_id: "pipeline_routing"
+description: "Validates correct routing through the orchestrator pipeline"
+mode_expectations:
+  strict_semreg: true
+  strict_single_pipeline: true
+session_seed:
+  actor:
+    actor_id: "test.user"
+    roles: ["viewer"]
+
+scenarios:
+  - name: "unknown_utterance_no_match"
+    description: "Unrecognized utterance with no verb match returns NoMatch"
+    steps:
+      - user: "the quick brown fox jumps over the lazy dog"
+        expect:
+          outcome: "NoMatch"
+          selection_source: "discovery"
+
+  - name: "gibberish_no_match"
+    description: "Gibberish input returns NoMatch gracefully"
+    steps:
+      - user: "asdfghjkl zxcvbnm qwerty"
+        expect:
+          outcome: "NoMatch"
+
+  - name: "direct_dsl_denied_strict"
+    description: "dsl: prefix denied in strict single-pipeline mode"
+    steps:
+      - user: "dsl:(session.load-galaxy :apex-name \"Allianz\")"
+        expect:
+          outcome: "DirectDslNotAllowed"
+
+  - name: "sequential_no_match_stable"
+    description: "Multiple sequential NoMatch outcomes are stable"
+    steps:
+      - user: "do something random"
+        expect:
+          outcome: "NoMatch"
+      - user: "another random thing"
+        expect:
+          outcome: "NoMatch"
+      - user: "third random utterance"
+        expect:
+          outcome: "NoMatch"
+
+  - name: "whitespace_only_handled"
+    description: "Whitespace-only input handled gracefully"
+    steps:
+      - user: "   "
+        expect:
+          outcome: "NoMatch"

@@ -1,0 +1,75 @@
+name: "Edge Cases"
+suite_id: "edge_cases"
+description: "Validates graceful handling of unusual inputs and boundary conditions"
+mode_expectations:
+  strict_semreg: true
+  strict_single_pipeline: true
+session_seed:
+  actor:
+    actor_id: "test.user"
+    roles: ["viewer"]
+
+scenarios:
+  - name: "empty_utterance"
+    description: "Empty string input handled gracefully"
+    steps:
+      - user: ""
+        expect:
+          outcome: "NoMatch"
+          run_sheet_delta: 0
+
+  - name: "very_long_utterance"
+    description: "500+ character utterance doesn't crash or hang"
+    steps:
+      - user: "This is a very long utterance that goes on and on about creating a complex fund structure for the Allianz group involving multiple sub-funds across jurisdictions including Luxembourg, Ireland, and the Cayman Islands, with various share classes and fee arrangements, custodian appointments, and transfer agent setups that need to be coordinated across multiple counterparties and service providers in the global custody network spanning Europe and Asia Pacific regions with complex netting arrangements."
+        expect:
+          outcome: "NoMatch"
+
+  - name: "special_characters"
+    description: "Special characters in input handled gracefully"
+    steps:
+      - user: "create <entity> with name=\"O'Brien & Sons (Ltd.)\" @#$%"
+        expect:
+          outcome: "NoMatch"
+
+  - name: "repeated_identical_utterances"
+    description: "Same utterance repeated produces same outcome (deterministic)"
+    steps:
+      - user: "hello world"
+        expect:
+          outcome: "NoMatch"
+      - user: "hello world"
+        expect:
+          outcome: "NoMatch"
+      - user: "hello world"
+        expect:
+          outcome: "NoMatch"
+
+  - name: "unicode_and_accents"
+    description: "Unicode characters in utterance handled"
+    steps:
+      - user: "créer une entité pour Société Générale"
+        expect:
+          outcome: "NoMatch"
+
+  - name: "numeric_only_input"
+    description: "Pure numeric input handled gracefully"
+    steps:
+      - user: "12345"
+        expect:
+          outcome: "NoMatch"
+
+  - name: "sql_injection_attempt"
+    description: "SQL-like input doesn't cause issues"
+    steps:
+      - user: "'; DROP TABLE users; --"
+        expect:
+          outcome: "NoMatch"
+          run_sheet_delta: 0
+
+  - name: "dsl_like_but_not_prefix"
+    description: "Input that looks like DSL but without dsl: prefix"
+    steps:
+      - user: "(cbu.create :name \"Test\")"
+        expect:
+          outcome: "NoMatch"

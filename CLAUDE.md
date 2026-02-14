@@ -66,6 +66,13 @@ This is the root project guide for Claude Code. Domain-specific details are in a
 ```bash
 cd rust/
 
+# Agentic Scenario Harness
+cargo x harness list                               # List all suites + scenario counts
+cargo x harness run --all                           # Run all 48 scenarios (needs DATABASE_URL)
+cargo x harness run --suite scenarios/suites/governance_strict.yaml  # Run one suite
+cargo x harness run --scenario direct_dsl_denied_viewer             # Run one scenario by name
+cargo x harness dump --scenario direct_dsl_denied_viewer            # Dump artifacts to JSON
+
 # Pre-commit (fast)
 cargo x pre-commit          # Format + clippy + unit tests
 
@@ -466,6 +473,14 @@ User says: "spin up a fund for Acme"
   - `store.rs`: `insert_intent_event()` — best-effort write, never fails pipeline
   - Single emission point: only `orchestrator.rs` calls `emit_telemetry()` (static guard test)
   - Migration 087: `agent.intent_events` table + 5 review views (clarify hotspots, SemReg overrides/denies, macro denies, failure modes)
+- `rust/src/agent/harness/` — Agentic Scenario Test Harness (deterministic pipeline testing)
+  - `mod.rs`: YAML schema types (`ScenarioSuite`, `Scenario`, `ScenarioStep`, `StepExpectation`), suite loader
+  - `assertions.rs`: Partial assertion engine — checks only specified fields (outcome, verb, SemReg, trace, run_sheet)
+  - `runner.rs`: Multi-turn state machine runner — drives orchestrator per step, tracks deltas, dumps artifacts on failure
+  - `stub.rs`: Stub `OrchestratorContext` builder using `HybridVerbSearcher::minimal()` + configurable `PolicyGate`
+  - `rust/xtask/src/harness.rs`: CLI runner (list/run/dump subcommands)
+  - `scenarios/suites/*.yaml`: 10 suites, 48 scenarios (governance, routing, macros, runsheet, clarification, DSL bypass, SemReg, trace, scope, edge cases)
+  - **Adding scenarios:** Create YAML in `scenarios/suites/`, follow schema (name, suite_id, mode_expectations, session_seed, scenarios[].steps[].user + expect)
 - `docs/architecture/SINGLE_PIPELINE_INVARIANTS.md` — Full invariant table
 
 **Policy Flags (env vars):**

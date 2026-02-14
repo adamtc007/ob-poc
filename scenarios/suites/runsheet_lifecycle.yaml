@@ -1,0 +1,62 @@
+name: "RunSheet Lifecycle"
+suite_id: "runsheet_lifecycle"
+description: "Validates run_sheet entry staging, execution, and replay prevention"
+mode_expectations:
+  strict_semreg: true
+  strict_single_pipeline: true
+session_seed:
+  actor:
+    actor_id: "test.user"
+    roles: ["viewer"]
+
+scenarios:
+  - name: "no_match_no_staging"
+    description: "NoMatch outcome doesn't stage any run_sheet entries"
+    steps:
+      - user: "random unrecognized phrase"
+        expect:
+          outcome: "NoMatch"
+          run_sheet_delta: 0
+          runnable_count: 0
+
+  - name: "sequential_no_match_no_accumulation"
+    description: "Multiple NoMatch steps don't accumulate run_sheet entries"
+    steps:
+      - user: "first random phrase"
+        expect:
+          outcome: "NoMatch"
+          run_sheet_delta: 0
+      - user: "second random phrase"
+        expect:
+          outcome: "NoMatch"
+          run_sheet_delta: 0
+          runnable_count: 0
+
+  - name: "run_sheet_starts_empty"
+    description: "Fresh session has empty run_sheet"
+    steps:
+      - user: "hello"
+        expect:
+          runnable_count: 0
+
+  - name: "direct_dsl_denied_no_staging"
+    description: "Denied direct DSL doesn't stage entries"
+    steps:
+      - user: "dsl:(cbu.create :name \"Test\")"
+        expect:
+          outcome: "DirectDslNotAllowed"
+          run_sheet_delta: 0
+          runnable_count: 0
+
+  - name: "multiple_denied_no_leakage"
+    description: "Multiple denied operations don't leak entries into run_sheet"
+    steps:
+      - user: "dsl:(entity.create :name \"A\")"
+        expect:
+          outcome: "DirectDslNotAllowed"
+          run_sheet_delta: 0
+      - user: "dsl:(entity.create :name \"B\")"
+        expect:
+          outcome: "DirectDslNotAllowed"
+          run_sheet_delta: 0
+          runnable_count: 0

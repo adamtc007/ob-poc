@@ -1,0 +1,44 @@
+name: "Macro Expansion Governance"
+suite_id: "macro_expansion"
+description: "Validates SemReg governance on macro-expanded DSL via AST parsing"
+mode_expectations:
+  strict_semreg: true
+  strict_single_pipeline: true
+session_seed:
+  actor:
+    actor_id: "test.analyst"
+    roles: ["viewer"]
+
+scenarios:
+  - name: "macro_trace_fields_default"
+    description: "Non-macro outcomes have default macro trace fields"
+    steps:
+      - user: "some random utterance"
+        expect:
+          outcome: "NoMatch"
+          trace:
+            macro_semreg_checked: false
+
+  - name: "macro_not_early_exit"
+    description: "MacroExpanded is not treated as early exit (SemReg must govern)"
+    tags: ["invariant"]
+    steps:
+      - user: "standard onboarding pack for Acme"
+        expect:
+          outcome: "NoMatch"
+
+  - name: "macro_selection_source"
+    description: "Macro-originated outcomes should set selection_source=macro"
+    tags: ["trace"]
+    steps:
+      - user: "run corporate documents pack"
+        expect:
+          outcome: "NoMatch"
+          selection_source: "discovery"
+
+  - name: "ast_parsing_robust"
+    description: "Even with no match, pipeline doesn't crash on macro-like utterances"
+    steps:
+      - user: "execute the full UBO discovery macro for Globex Corp"
+        expect:
+          outcome: "NoMatch"

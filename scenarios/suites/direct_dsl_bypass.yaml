@@ -1,0 +1,47 @@
+name: "Direct DSL Bypass"
+suite_id: "direct_dsl_bypass"
+description: "Validates PolicyGate enforcement of direct DSL bypass"
+mode_expectations:
+  strict_semreg: true
+  strict_single_pipeline: true
+  allow_direct_dsl: false
+session_seed:
+  actor:
+    actor_id: "test.user"
+    roles: ["viewer"]
+
+scenarios:
+  - name: "dsl_prefix_denied_viewer"
+    description: "Viewer role cannot use dsl: prefix when allow_direct_dsl=false"
+    steps:
+      - user: "dsl:(cbu.create :name \"Acme Corp\")"
+        expect:
+          outcome: "DirectDslNotAllowed"
+          dsl_non_empty: false
+
+  - name: "dsl_prefix_various_verbs"
+    description: "Multiple different dsl: attempts are all denied"
+    steps:
+      - user: "dsl:(entity.create :name \"Test\")"
+        expect:
+          outcome: "DirectDslNotAllowed"
+      - user: "dsl:(kyc.open-case :entity \"Acme\")"
+        expect:
+          outcome: "DirectDslNotAllowed"
+      - user: "dsl:(session.load-galaxy :apex-name \"Allianz\")"
+        expect:
+          outcome: "DirectDslNotAllowed"
+
+  - name: "dsl_prefix_with_malformed_dsl"
+    description: "Malformed dsl: prefix still denied before parsing"
+    steps:
+      - user: "dsl:not-valid-sexp"
+        expect:
+          outcome: "DirectDslNotAllowed"
+
+  - name: "non_dsl_prefix_not_blocked"
+    description: "Normal utterance starting with 'dsl' (no colon) is not blocked"
+    steps:
+      - user: "dsl generation workflow"
+        expect:
+          outcome: "NoMatch"

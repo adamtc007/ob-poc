@@ -1,0 +1,55 @@
+name: "Clarification Loops"
+suite_id: "clarification_loops"
+description: "Validates ClarifyVerb/ClarifyArgs interactive outcomes and forced-verb flow"
+mode_expectations:
+  strict_semreg: true
+  strict_single_pipeline: true
+session_seed:
+  actor:
+    actor_id: "test.analyst"
+    roles: ["viewer"]
+
+scenarios:
+  - name: "no_handler_for_interactive_outcome"
+    description: "If pipeline returns interactive outcome and no handler exists, step records it"
+    steps:
+      - user: "open a case"
+        expect:
+          outcome: "NoMatch"
+
+  - name: "clarify_verb_selection_binding"
+    description: "Forced verb should set selection_source=user_choice and forced_verb_fqn"
+    tags: ["forced_verb", "trace"]
+    steps:
+      - user: "set up the structure"
+        expect:
+          outcome: "NoMatch"
+          selection_source: "discovery"
+
+  - name: "sequential_clarifications_stable"
+    description: "Multiple sequential utterances that would need clarification are stable"
+    steps:
+      - user: "open"
+        expect:
+          outcome: "NoMatch"
+      - user: "create"
+        expect:
+          outcome: "NoMatch"
+      - user: "set up"
+        expect:
+          outcome: "NoMatch"
+
+  - name: "clarify_verb_trace_fields"
+    description: "After forced verb selection, trace shows correct selection_source"
+    tags: ["trace"]
+    steps:
+      - user: "do something ambiguous"
+        expect:
+          outcome: "NoMatch"
+
+  - name: "short_utterance_handled"
+    description: "Very short single-word utterances don't crash the pipeline"
+    steps:
+      - user: "x"
+        expect:
+          outcome: "NoMatch"

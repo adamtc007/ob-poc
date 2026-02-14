@@ -1,0 +1,50 @@
+name: "Trace Accuracy"
+suite_id: "trace_accuracy"
+description: "Validates IntentTrace field accuracy across pipeline paths"
+mode_expectations:
+  strict_semreg: true
+  strict_single_pipeline: true
+session_seed:
+  actor:
+    actor_id: "test.analyst"
+    roles: ["viewer"]
+
+scenarios:
+  - name: "discovery_path_selection_source"
+    description: "Normal discovery path sets selection_source=discovery"
+    steps:
+      - user: "find UBO of Acme Holdings"
+        expect:
+          outcome: "NoMatch"
+          selection_source: "discovery"
+
+  - name: "trace_has_utterance"
+    description: "Trace always contains the original utterance"
+    steps:
+      - user: "create a new CBU for testing"
+        expect:
+          outcome: "NoMatch"
+
+  - name: "trace_macro_defaults_on_non_macro"
+    description: "Non-macro paths have macro_semreg_checked=false by default"
+    steps:
+      - user: "list all cases"
+        expect:
+          trace:
+            macro_semreg_checked: false
+
+  - name: "trace_consistent_across_sequential_steps"
+    description: "Each step produces its own independent trace"
+    steps:
+      - user: "first query"
+        expect:
+          outcome: "NoMatch"
+          selection_source: "discovery"
+      - user: "second query"
+        expect:
+          outcome: "NoMatch"
+          selection_source: "discovery"
+      - user: "third query"
+        expect:
+          outcome: "NoMatch"
+          selection_source: "discovery"

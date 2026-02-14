@@ -6,6 +6,7 @@
 pub mod learning;
 pub mod orchestrator;
 pub mod telemetry;
+pub mod harness;
 
 pub use learning::{
     spawn_agent_drain_task, AgentEvent, AgentEventEmitter, AgentEventPayload,
