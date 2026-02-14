@@ -101,8 +101,28 @@ pub async fn run_scenario_stub(
 
         if passed {
             steps_passed += 1;
+            tracing::info!(
+                suite = %suite.suite_id,
+                scenario = %scenario.name,
+                step = idx,
+                utterance = %step.user,
+                outcome = %actual_outcome,
+                telemetry_persisted = outcome.trace.telemetry_persisted,
+                "HARNESS STEP PASS"
+            );
         } else {
             steps_failed += 1;
+            let failure_summary: Vec<String> = failures.iter().map(|f| format!("{}", f)).collect();
+            tracing::warn!(
+                suite = %suite.suite_id,
+                scenario = %scenario.name,
+                step = idx,
+                utterance = %step.user,
+                outcome = %actual_outcome,
+                failures = ?failure_summary,
+                telemetry_persisted = outcome.trace.telemetry_persisted,
+                "HARNESS STEP FAIL"
+            );
         }
 
         step_results.push(StepResult {
@@ -139,6 +159,15 @@ pub async fn run_scenario_stub(
 
     let all_passed = steps_failed == 0;
 
+    tracing::info!(
+        suite = %suite.suite_id,
+        scenario = %scenario.name,
+        passed = all_passed,
+        steps_passed = steps_passed,
+        steps_failed = steps_failed,
+        "HARNESS SCENARIO COMPLETE"
+    );
+
     ScenarioResult {
         scenario_name: scenario.name.clone(),
         suite_name: suite.name.clone(),
@@ -166,6 +195,14 @@ pub async fn run_suite(pool: &sqlx::PgPool, suite: &ScenarioSuite) -> SuiteResul
         }
         results.push(result);
     }
+
+    tracing::info!(
+        suite = %suite.suite_id,
+        passed = passed,
+        failed = failed,
+        total = suite.scenarios.len(),
+        "HARNESS SUITE COMPLETE"
+    );
 
     SuiteResult {
         suite_name: suite.name.clone(),
