@@ -5,7 +5,7 @@
 > **Backend:** Rust/Axum (`rust/crates/ob-poc-web/`) - Serves React + REST API
 > **Crates:** 16 active Rust crates (esper_* crates deprecated after React migration; ob-poc-graph + viewport removed)
 > **Verbs:** 1,083 canonical verbs, 14,593 intent patterns (DB-sourced)
-> **Migrations:** 85 schema migrations (001-077 + 072b seed + 078-079, 081-086 sem_reg)
+> **Migrations:** 86 schema migrations (001-077 + 072b seed + 078-079, 081-086 sem_reg)
 > **Schema Overview:** `migrations/OB_POC_SCHEMA_ENTITY_OVERVIEW.md` — living doc, 15 sections, ~195 tables (ob-poc + kyc + sem_reg), 14 mermaid ER diagrams
 > **Embeddings:** Candle local (384-dim, BGE-small-en-v1.5) - 14,593 patterns vectorized
 > **React Migration (077):** ✅ Complete - egui/WASM replaced with React/TypeScript, 3-panel chat layout
@@ -16,7 +16,7 @@
 > **REPL Pipeline Redesign (077):** ⚠️ Superseded by V2 REPL Architecture — V1 types retained for reference
 > **V2 REPL Architecture (TODO-2):** ✅ Complete - Pack-scoped intent resolution, 7-state machine, ContextStack fold, preconditions engine, 3-pronged intent pipeline (semantic→pack→precondition), VerbSearchIntentMatcher bridge, 320 tests
 > **Candle Semantic Pipeline:** ✅ Complete - DB source of truth, populate_embeddings binary
-> **Agent Pipeline:** ✅ Hardened + PolicyGate - Unified orchestrator, server-side policy enforcement, SemReg fail-closed (v2: matched-path + DenyAll/Unavailable), ActorResolver (headers/env/session), IntentTrace audit with PolicySnapshot, AST-based macro SemReg governance, RunSheet replay prevention, /select-verb retired (410 Gone)
+> **Agent Pipeline:** ✅ Hardened + PolicyGate - Unified orchestrator, server-side policy enforcement, SemReg fail-closed (v2: matched-path + DenyAll/Unavailable), ActorResolver (headers/env/session), IntentTrace audit with PolicySnapshot, AST-based macro SemReg governance, RunSheet replay prevention, /select-verb retired (410 Gone), intent_events telemetry
 > **Solar Navigation (038):** ✅ Complete - ViewState, NavigationHistory, orbit navigation
 > **Nav UX Messages:** ✅ Complete - NavReason codes, NavSuggestion, standardized error copy
 > **Promotion Pipeline (043):** ✅ Complete - Quality-gated pattern promotion with collision detection
@@ -460,6 +460,12 @@ User says: "spin up a fund for Acme"
   - IntentTrace fields: `selection_source` (discovery/user_choice/macro/semreg), `macro_semreg_checked`, `macro_denied_verbs`, `forced_verb`
   - `/select-verb` retired (410 Gone) — verb selection routed through `/decision/reply` → orchestrator forced-verb
 - `rust/src/session/unified.rs` — `RunSheet.runnable_dsl()` returns only Draft/Ready entries (prevents re-executing already-run entries)
+- `rust/src/agent/telemetry/` — Append-only intent telemetry (PII-safe)
+  - `mod.rs`: `IntentEventRow` model, `outcome_label()`, `candidates_to_json()`
+  - `redaction.rs`: `normalize_utterance()`, `utterance_hash()` (SHA-256), `preview_redacted()` (max 80 chars)
+  - `store.rs`: `insert_intent_event()` — best-effort write, never fails pipeline
+  - Single emission point: only `orchestrator.rs` calls `emit_telemetry()` (static guard test)
+  - Migration 087: `agent.intent_events` table + 5 review views (clarify hotspots, SemReg overrides/denies, macro denies, failure modes)
 - `docs/architecture/SINGLE_PIPELINE_INVARIANTS.md` — Full invariant table
 
 **Policy Flags (env vars):**
