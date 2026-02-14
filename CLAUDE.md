@@ -16,7 +16,7 @@
 > **REPL Pipeline Redesign (077):** ⚠️ Superseded by V2 REPL Architecture — V1 types retained for reference
 > **V2 REPL Architecture (TODO-2):** ✅ Complete - Pack-scoped intent resolution, 7-state machine, ContextStack fold, preconditions engine, 3-pronged intent pipeline (semantic→pack→precondition), VerbSearchIntentMatcher bridge, 320 tests
 > **Candle Semantic Pipeline:** ✅ Complete - DB source of truth, populate_embeddings binary
-> **Agent Pipeline:** ✅ Hardened + PolicyGate - Unified orchestrator, server-side policy enforcement, SemReg fail-closed, ActorResolver (headers/env/session), IntentTrace audit with PolicySnapshot
+> **Agent Pipeline:** ✅ Hardened + PolicyGate - Unified orchestrator, server-side policy enforcement, SemReg fail-closed (v2: matched-path + DenyAll/Unavailable), ActorResolver (headers/env/session), IntentTrace audit with PolicySnapshot, AST-based macro SemReg governance, RunSheet replay prevention, /select-verb retired (410 Gone)
 > **Solar Navigation (038):** ✅ Complete - ViewState, NavigationHistory, orbit navigation
 > **Nav UX Messages:** ✅ Complete - NavReason codes, NavSuggestion, standardized error copy
 > **Promotion Pipeline (043):** ✅ Complete - Quality-gated pattern promotion with collision detection
@@ -454,6 +454,12 @@ User says: "spin up a fund for Acme"
 **Key Files:**
 - `rust/src/policy/gate.rs` — `PolicyGate`, `ActorResolver`, `PolicySnapshot`
 - `rust/src/agent/orchestrator.rs` — Accepts `PolicyGate`, SemReg fail-closed, IntentTrace with PolicySnapshot
+  - `SemRegVerbPolicy` enum: `AllowedSet` | `DenyAll` | `Unavailable` (distinguishes unavailable from deny-all)
+  - Matched-path enforcement: re-generates DSL via `process_with_forced_verb` when SemReg changes winning verb
+  - AST-based macro governance: `parse_program()` + `VerbCall::full_name()` extracts verbs from macro expansions
+  - IntentTrace fields: `selection_source` (discovery/user_choice/macro/semreg), `macro_semreg_checked`, `macro_denied_verbs`, `forced_verb`
+  - `/select-verb` retired (410 Gone) — verb selection routed through `/decision/reply` → orchestrator forced-verb
+- `rust/src/session/unified.rs` — `RunSheet.runnable_dsl()` returns only Draft/Ready entries (prevents re-executing already-run entries)
 - `docs/architecture/SINGLE_PIPELINE_INVARIANTS.md` — Full invariant table
 
 **Policy Flags (env vars):**

@@ -2154,10 +2154,10 @@ async fn execute_session_dsl(
                 tracing::warn!(session = %session_id, actor = %actor.actor_id, "Raw DSL execution via /execute (PolicyGate approved)");
                 dsl_str.clone()
             } else {
-                session.run_sheet.combined_dsl().unwrap_or_default()
+                session.run_sheet.runnable_dsl().unwrap_or_default()
             }
         } else {
-            session.run_sheet.combined_dsl().unwrap_or_default()
+            session.run_sheet.runnable_dsl().unwrap_or_default()
         };
 
         // Note: UnifiedSession.RunSheetEntry doesn't store pre-compiled plan/ast

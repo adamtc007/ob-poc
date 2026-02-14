@@ -344,6 +344,21 @@ impl RunSheet {
         )
     }
 
+    /// Get DSL for runnable entries only (Draft + Ready).
+    /// Excludes Executed, Failed, Skipped, Cancelled entries.
+    /// This prevents re-running previously executed DSL when new entries are staged.
+    pub fn runnable_dsl(&self) -> Option<String> {
+        let runnable: Vec<&str> = self.entries
+            .iter()
+            .filter(|e| matches!(e.status, EntryStatus::Draft | EntryStatus::Ready))
+            .map(|e| e.dsl_source.as_str())
+            .collect();
+        if runnable.is_empty() {
+            return None;
+        }
+        Some(runnable.join("\n"))
+    }
+
     /// Check if there are runnable entries (draft or ready)
     pub fn has_runnable(&self) -> bool {
         self.entries
@@ -2903,6 +2918,75 @@ mod tests {
 
         session.mark_failed(id2, "Test error".to_string());
         assert_eq!(session.run_sheet.count_by_status(EntryStatus::Failed), 1);
+    }
+
+    #[test]
+    fn test_runnable_dsl_excludes_executed() {
+        let mut session = UnifiedSession::new();
+        let id1 = session.add_dsl(
+            "(entity.create :name \"Acme\")".to_string(),
+            "Create Acme".to_string(),
+        );
+        let _id2 = session.add_dsl(
+            "(kyc.open-case :entity \"Acme\")".to_string(),
+            "Open KYC".to_string(),
+        );
+
+        // Both are Draft — runnable_dsl returns both
+        let dsl = session.run_sheet.runnable_dsl().unwrap();
+        assert!(dsl.contains("entity.create"));
+        assert!(dsl.contains("kyc.open-case"));
+
+        // Mark first as executed
+        session.mark_executed(id1, vec![]);
+
+        // Now runnable_dsl only returns the second
+        let dsl2 = session.run_sheet.runnable_dsl().unwrap();
+        assert!(!dsl2.contains("entity.create"), "Executed entry should be excluded");
+        assert!(dsl2.contains("kyc.open-case"));
+
+        // combined_dsl still returns both
+        let combined = session.run_sheet.combined_dsl().unwrap();
+        assert!(combined.contains("entity.create"));
+        assert!(combined.contains("kyc.open-case"));
+    }
+
+    #[test]
+    fn test_runnable_dsl_empty_after_all_executed() {
+        let mut session = UnifiedSession::new();
+        let id1 = session.add_dsl(
+            "(entity.create :name \"Acme\")".to_string(),
+            "Create Acme".to_string(),
+        );
+
+        session.mark_executed(id1, vec![]);
+        assert!(session.run_sheet.runnable_dsl().is_none());
+        assert!(!session.run_sheet.has_runnable());
+    }
+
+    #[test]
+    fn test_mark_all_executed_only_draft_ready() {
+        let mut session = UnifiedSession::new();
+        let id1 = session.add_dsl(
+            "(entity.create :name \"Acme\")".to_string(),
+            "Create Acme".to_string(),
+        );
+        let id2 = session.add_dsl(
+            "(kyc.open-case :entity \"Acme\")".to_string(),
+            "Open KYC".to_string(),
+        );
+
+        // Fail one entry
+        session.mark_failed(id1, "Test error".to_string());
+
+        // mark_all_executed should only mark Draft/Ready, not Failed
+        session.run_sheet.mark_all_executed();
+
+        // id1 stays Failed, id2 becomes Executed
+        let e1 = session.run_sheet.entries.iter().find(|e| e.id == id1).unwrap();
+        assert_eq!(e1.status, EntryStatus::Failed, "Failed entry should stay Failed");
+        let e2 = session.run_sheet.entries.iter().find(|e| e.id == id2).unwrap();
+        assert_eq!(e2.status, EntryStatus::Executed);
     }
 
     #[test]

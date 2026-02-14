@@ -641,6 +641,7 @@ async fn record_abandon_event(
 pub(crate) async fn handle_decision_reply(
     State(state): State<AgentState>,
     Path(session_id): Path<Uuid>,
+    headers: axum::http::HeaderMap,
     Json(req): Json<ob_poc_types::DecisionReplyRequest>,
 ) -> Result<Json<ob_poc_types::DecisionReplyResponse>, StatusCode> {
     use crate::clarify::{validate_confirm_token, ConfirmTokenError};
@@ -708,7 +709,7 @@ pub(crate) async fn handle_decision_reply(
 
                     if let Some(fqn) = verb_fqn {
                         let original_utterance = packet.utterance.clone();
-                        let actor = crate::policy::ActorResolver::from_session_id(session_id);
+                        let actor = crate::policy::ActorResolver::from_headers(&headers);
 
                         // Route through orchestrator forced-verb path
                         match state.agent_service.process_forced_verb_selection(

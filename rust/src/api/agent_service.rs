@@ -1690,7 +1690,7 @@ impl AgentService {
         }
 
         // Get all pending DSL
-        let dsl = match session.run_sheet.combined_dsl() {
+        let dsl = match session.run_sheet.runnable_dsl() {
             Some(d) if !d.is_empty() => d,
             _ => return Ok(self.fail("No DSL to execute.", session)),
         };

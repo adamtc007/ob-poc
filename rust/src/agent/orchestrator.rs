@@ -21,6 +21,8 @@ use crate::policy::{PolicyGate, gate::PolicySnapshot};
 use crate::mcp::intent_pipeline::{IntentPipeline, PipelineOutcome, PipelineResult};
 use crate::mcp::scope_resolution::ScopeContext;
 use crate::mcp::verb_search::HybridVerbSearcher;
+use crate::dsl_v2::parse_program;
+use dsl_core::ast::Statement;
 use crate::sem_reg::abac::ActorContext;
 
 /// Context needed to run the unified orchestrator.
@@ -238,22 +240,24 @@ pub async fn handle_utterance(
     // -- MacroExpanded: apply SemReg governance to expanded verbs --
     if let PipelineOutcome::MacroExpanded { ref macro_verb, .. } = discovery_result.outcome {
         if !discovery_result.dsl.is_empty() {
-            // Extract verb FQNs from expanded DSL statements
-            let expanded_verbs: Vec<String> = discovery_result.dsl
-                .lines()
-                .filter_map(|line| {
-                    let trimmed = line.trim();
-                    if trimmed.starts_with('(') {
-                        // Extract "domain.verb" from "(domain.verb ...)"
-                        trimmed.trim_start_matches('(')
-                            .split_whitespace()
-                            .next()
-                            .map(|v| v.trim_end_matches(')').to_string())
+            // Extract verb FQNs from expanded DSL using AST parser
+            let expanded_verbs: Vec<String> = match parse_program(&discovery_result.dsl) {
+                Ok(program) => program.statements.iter().filter_map(|stmt| {
+                    if let Statement::VerbCall(vc) = stmt {
+                        Some(vc.full_name())
                     } else {
                         None
                     }
-                })
-                .collect();
+                }).collect(),
+                Err(e) => {
+                    tracing::warn!(
+                        macro_verb = %macro_verb,
+                        error = %e,
+                        "Failed to parse macro DSL for SemReg governance, falling back to empty"
+                    );
+                    vec![]
+                }
+            };
 
             let mut macro_denied: Vec<String> = vec![];
             let macro_semreg_checked;
@@ -285,12 +289,15 @@ pub async fn handle_utterance(
                     denied_verbs = ?macro_denied,
                     "SemReg denied verbs in macro expansion (strict mode)"
                 );
-                let trace = build_trace(
+                let mut trace = build_trace(
                     utterance, ctx, &entity_candidates, &dominant_entity_name,
                     &sem_reg_verb_names, &pre_filter, &pre_filter,
                     &chosen_verb_pre_semreg, &None,
                     &discovery_result, &sem_reg_policy, None, true, false,
                 );
+                trace.selection_source = "macro".to_string();
+                trace.macro_semreg_checked = macro_semreg_checked;
+                trace.macro_denied_verbs = macro_denied.clone();
                 use crate::mcp::intent_pipeline::StructuredIntent;
                 return Ok(OrchestratorOutcome {
                     pipeline_result: PipelineResult {
@@ -333,12 +340,15 @@ pub async fn handle_utterance(
                 "Macro expansion SemReg governance complete"
             );
 
-            let trace = build_trace(
+            let mut trace = build_trace(
                 utterance, ctx, &entity_candidates, &dominant_entity_name,
                 &sem_reg_verb_names, &pre_filter, &pre_filter,
                 &chosen_verb_pre_semreg, &chosen_verb_pre_semreg,
                 &discovery_result, &sem_reg_policy, None, false, false,
             );
+            trace.selection_source = "macro".to_string();
+            trace.macro_semreg_checked = macro_semreg_checked;
+            trace.macro_denied_verbs = macro_denied;
             return Ok(OrchestratorOutcome {
                 pipeline_result: discovery_result,
                 sem_reg_verbs: sem_reg_verb_names,
@@ -459,13 +469,21 @@ pub async fn handle_utterance(
     };
 
     // -- Step 6: Build IntentTrace --
-    let trace = build_trace(
+    let chosen_post = &chosen_verb_post_semreg;
+    let semreg_forced_regen = chosen_verb_pre_semreg.is_some()
+        && chosen_post.is_some()
+        && chosen_verb_pre_semreg != *chosen_post;
+    let mut trace = build_trace(
         utterance, ctx, &entity_candidates, &dominant_entity_name,
         &sem_reg_verb_names, &pre_filter, &post_filter,
-        &chosen_verb_pre_semreg, &chosen_verb_post_semreg,
+        &chosen_verb_pre_semreg, chosen_post,
         &result, &sem_reg_policy, None,
         sem_reg_denied_all, semreg_unavailable,
     );
+    if semreg_forced_regen {
+        trace.selection_source = "semreg".to_string();
+        trace.forced_verb = chosen_post.clone();
+    }
 
     tracing::info!(
         source = ?trace.source,
@@ -928,6 +946,70 @@ mod tests {
             macro_verb: "onboarding.setup".into(),
             unlocks: vec!["kyc.open-case".into()],
         }));
+    }
+
+    #[test]
+    fn test_ast_verb_extraction_from_dsl() {
+        // Verify that parse_program + VerbCall::full_name() correctly extracts verbs
+        use dsl_core::ast::Statement;
+        let dsl = "(entity.create :name \"Acme\")\n(kyc.open-case :entity \"Acme\")";
+        let program = parse_program(dsl).expect("valid DSL");
+        let verbs: Vec<String> = program.statements.iter().filter_map(|stmt| {
+            if let Statement::VerbCall(vc) = stmt {
+                Some(vc.full_name())
+            } else {
+                None
+            }
+        }).collect();
+        assert_eq!(verbs.len(), 2);
+        assert_eq!(verbs[0], "entity.create");
+        assert_eq!(verbs[1], "kyc.open-case");
+    }
+
+    #[test]
+    fn test_ast_verb_extraction_single_verb() {
+        use dsl_core::ast::Statement;
+        let dsl = "(cbu.create :name \"Test\")";
+        let program = parse_program(dsl).expect("valid DSL");
+        let verbs: Vec<String> = program.statements.iter().filter_map(|stmt| {
+            if let Statement::VerbCall(vc) = stmt {
+                Some(vc.full_name())
+            } else {
+                None
+            }
+        }).collect();
+        assert_eq!(verbs.len(), 1);
+        assert_eq!(verbs[0], "cbu.create");
+    }
+
+    #[test]
+    fn test_ast_verb_extraction_invalid_dsl_returns_empty() {
+        // The macro governance code falls back to empty vec on parse error
+        let dsl = "this is not valid dsl at all";
+        let result = parse_program(dsl);
+        assert!(result.is_err(), "Invalid DSL should fail to parse");
+    }
+
+    #[test]
+    fn test_trace_selection_source_semreg() {
+        let mut trace = default_trace();
+        trace.selection_source = "semreg".into();
+        trace.forced_verb = Some("kyc.open-case".into());
+        let json = serde_json::to_string(&trace).unwrap();
+        assert!(json.contains(r#""selection_source":"semreg""#));
+        assert!(json.contains(r#""forced_verb":"kyc.open-case""#));
+    }
+
+    #[test]
+    fn test_trace_selection_source_macro() {
+        let mut trace = default_trace();
+        trace.selection_source = "macro".into();
+        trace.macro_semreg_checked = true;
+        trace.macro_denied_verbs = vec!["denied.verb".into()];
+        let json = serde_json::to_string(&trace).unwrap();
+        assert!(json.contains(r#""selection_source":"macro""#));
+        assert!(json.contains(r#""macro_semreg_checked":true"#));
+        assert!(json.contains("denied.verb"));
     }
 
 }
