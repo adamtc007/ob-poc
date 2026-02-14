@@ -16,7 +16,7 @@
 > **REPL Pipeline Redesign (077):** ⚠️ Superseded by V2 REPL Architecture — V1 types retained for reference
 > **V2 REPL Architecture (TODO-2):** ✅ Complete - Pack-scoped intent resolution, 7-state machine, ContextStack fold, preconditions engine, 3-pronged intent pipeline (semantic→pack→precondition), VerbSearchIntentMatcher bridge, 320 tests
 > **Candle Semantic Pipeline:** ✅ Complete - DB source of truth, populate_embeddings binary
-> **Agent Pipeline:** ✅ Hardened - Unified orchestrator, SemReg on critical path, side-door prevention, IntentTrace audit
+> **Agent Pipeline:** ✅ Hardened + PolicyGate - Unified orchestrator, server-side policy enforcement, SemReg fail-closed, ActorResolver (headers/env/session), IntentTrace audit with PolicySnapshot
 > **Solar Navigation (038):** ✅ Complete - ViewState, NavigationHistory, orbit navigation
 > **Nav UX Messages:** ✅ Complete - NavReason codes, NavSuggestion, standardized error copy
 > **Promotion Pipeline (043):** ✅ Complete - Quality-gated pattern promotion with collision detection
@@ -446,6 +446,33 @@ User says: "spin up a fund for Acme"
                     ↓
             dsl_execute tool
 ```
+
+### PolicyGate (Single Pipeline Enforcement)
+
+> ✅ **IMPLEMENTED (2026-02-14)**: Server-side enforcement of single-pipeline invariants.
+
+**Key Files:**
+- `rust/src/policy/gate.rs` — `PolicyGate`, `ActorResolver`, `PolicySnapshot`
+- `rust/src/agent/orchestrator.rs` — Accepts `PolicyGate`, SemReg fail-closed, IntentTrace with PolicySnapshot
+- `docs/architecture/SINGLE_PIPELINE_INVARIANTS.md` — Full invariant table
+
+**Policy Flags (env vars):**
+
+| Variable | Default | Effect |
+|---|---|---|
+| `OBPOC_STRICT_SINGLE_PIPELINE` | `true` | Enables all single-pipeline gates |
+| `OBPOC_ALLOW_RAW_EXECUTE` | `false` | Allows `/execute` with raw DSL |
+| `OBPOC_ALLOW_DIRECT_DSL` | `false` | Allows `dsl:` prefix bypass |
+| `OBPOC_STRICT_SEMREG` | `true` | SemReg deny-all fails closed |
+| `OBPOC_ALLOW_LEGACY_GENERATE` | `false` | Allows legacy `/generate` endpoints |
+
+**Actor Resolution (no more hardcoded "operator"):**
+
+| Source | Resolver | Default Role |
+|---|---|---|
+| HTTP API | `ActorResolver::from_headers()` | `viewer` |
+| MCP | `ActorResolver::from_env()` | `viewer` |
+| REPL | `ActorResolver::from_session_id()` | `viewer` |
 
 ### Why This Matters: LLM Removed from Semantic Loop
 

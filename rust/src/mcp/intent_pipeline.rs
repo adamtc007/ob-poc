@@ -367,11 +367,15 @@ impl IntentPipeline {
     ) -> Result<PipelineResult> {
         let trimmed = instruction.trim();
 
-        // Fast path: Direct DSL input (starts with "(")
-        // Skip semantic search and LLM entirely — gated by allow_direct_dsl flag
-        if trimmed.starts_with('(') && self.allow_direct_dsl {
-            tracing::info!(bypass = "direct_dsl", "Direct DSL bypass used (operator-gated)");
-            return self.process_direct_dsl(trimmed, existing_scope).await;
+        // Fast path: Direct DSL input — requires explicit "dsl:" prefix + server allow flag.
+        // The old starts_with('(') path is removed to close the bypass trap door.
+        if let Some(raw_dsl) = trimmed.strip_prefix("dsl:").map(|s| s.trim()) {
+            if self.allow_direct_dsl {
+                tracing::info!(bypass = "direct_dsl", "Direct DSL bypass used (operator-gated, dsl: prefix)");
+                return self.process_direct_dsl(raw_dsl, existing_scope).await;
+            } else {
+                tracing::warn!(bypass = "direct_dsl_denied", "Direct DSL bypass attempted but not allowed");
+            }
         }
 
         // Infer domain from input phrase if no hint provided
@@ -2047,5 +2051,79 @@ mod tests {
         // No domain inferred - allows full search
         assert_eq!(infer_domain_from_phrase("help me"), None);
         assert_eq!(infer_domain_from_phrase("what can you do"), None);
+    }
+}
+
+
+#[cfg(test)]
+mod policy_gate_tests {
+    use super::*;
+
+    #[test]
+    fn test_allow_direct_dsl_defaults_to_false() {
+        let searcher = HybridVerbSearcher::minimal();
+        let pipeline = IntentPipeline::new(searcher);
+        assert!(!pipeline.allow_direct_dsl, "Direct DSL should be disabled by default");
+    }
+
+    #[test]
+    fn test_set_allow_direct_dsl() {
+        let searcher = HybridVerbSearcher::minimal();
+        let pipeline = IntentPipeline::new(searcher).set_allow_direct_dsl(true);
+        assert!(pipeline.allow_direct_dsl, "Direct DSL should be enabled after set_allow_direct_dsl(true)");
+    }
+
+    /// Static guard: IntentPipeline must ONLY be constructed in orchestrator.rs.
+    #[test]
+    fn test_no_duplicate_pipeline_outside_orchestrator() {
+        let src_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+        let mut violations = Vec::new();
+
+        fn scan_dir(dir: &std::path::Path, violations: &mut Vec<String>) {
+            let Ok(entries) = std::fs::read_dir(dir) else { return };
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    scan_dir(&path, violations);
+                } else if path.extension().map_or(false, |e| e == "rs") {
+                    let rel = path.file_name().unwrap().to_string_lossy().to_string();
+                    if rel == "orchestrator.rs" || rel == "intent_pipeline.rs" {
+                        continue;
+                    }
+                    if let Ok(content) = std::fs::read_to_string(&path) {
+                        let test_boundary = content.find("#[cfg(test)]").unwrap_or(content.len());
+                        let scannable = &content[..test_boundary];
+                        for (line_num, line) in scannable.lines().enumerate() {
+                            let trimmed = line.trim();
+                            if trimmed.starts_with("//") || trimmed.starts_with("///") {
+                                continue;
+                            }
+                            if trimmed.contains("IntentPipeline::new(")
+                                || trimmed.contains("IntentPipeline::with_pool(")
+                                || trimmed.contains("IntentPipeline::with_llm(")
+                                || trimmed.contains("IntentPipeline::with_llm_and_pool(")
+                            {
+                                violations.push(format!(
+                                    "{}:{}: {}",
+                                    path.display(),
+                                    line_num + 1,
+                                    trimmed
+                                ));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        scan_dir(&src_dir, &mut violations);
+
+        assert!(
+            violations.is_empty(),
+            "IntentPipeline constructed outside orchestrator.rs:
+{}",
+            violations.join("
+")
+        );
     }
 }

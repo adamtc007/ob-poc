@@ -361,6 +361,8 @@ pub struct AgentService {
     /// Entity linking service for in-memory entity mention extraction and resolution
     /// Used by LookupService for verb-first entity resolution
     entity_linker: Option<Arc<dyn crate::entity_linking::EntityLinkingService>>,
+    /// Server-side policy enforcement for single-pipeline invariants
+    policy_gate: Arc<crate::policy::PolicyGate>,
 }
 
 impl AgentService {
@@ -390,7 +392,14 @@ impl AgentService {
             learned_data,
             lexicon,
             entity_linker: None,
+            policy_gate: Arc::new(crate::policy::PolicyGate::from_env()),
         }
+    }
+
+    /// Set policy gate (overrides default from_env)
+    pub fn with_policy_gate(mut self, policy_gate: Arc<crate::policy::PolicyGate>) -> Self {
+        self.policy_gate = policy_gate;
+        self
     }
 
     /// Set entity linker for in-memory entity resolution
@@ -540,21 +549,10 @@ impl AgentService {
     fn build_orchestrator_context(
         &self,
         session: &crate::session::UnifiedSession,
+        actor: crate::sem_reg::abac::ActorContext,
         source: crate::agent::orchestrator::UtteranceSource,
     ) -> crate::agent::orchestrator::OrchestratorContext {
         use crate::agent::orchestrator::OrchestratorContext;
-        use crate::sem_reg::abac::ActorContext;
-
-        // Chat users are currently treated as operators (internal platform users).
-        // TODO: When auth is plumbed, derive roles from session/token claims.
-        // MCP defaults to "viewer" (least privilege) — see mcp/handlers/core.rs.
-        let actor = ActorContext {
-            actor_id: session.user_id.to_string(),
-            roles: vec!["operator".into()],
-            department: None,
-            clearance: None,
-            jurisdictions: vec![],
-        };
 
         OrchestratorContext {
             actor,
@@ -564,6 +562,7 @@ impl AgentService {
             pool: self.pool.clone(),
             verb_searcher: std::sync::Arc::new(self.build_verb_searcher()),
             lookup_service: self.get_lookup_service(),
+            policy_gate: self.policy_gate.clone(),
             source,
         }
     }
@@ -598,6 +597,7 @@ impl AgentService {
         session: &mut UnifiedSession,
         request: &ChatRequest,
         _llm_client: Arc<dyn LlmClient>,
+        actor: crate::sem_reg::abac::ActorContext,
     ) -> Result<AgentChatResponse, String> {
         use crate::dsl_v2::parse_program;
         use crate::mcp::intent_pipeline::PipelineOutcome;
@@ -647,6 +647,7 @@ impl AgentService {
                             &original_input,
                             &selected_verb,
                             &all_candidates,
+                            actor.clone(),
                         )
                         .await;
                 } else {
@@ -849,6 +850,7 @@ impl AgentService {
                                         score: c.score,
                                     })
                                     .collect::<Vec<_>>(),
+                                actor.clone(),
                             )
                             .await;
                     } else if !filtered.is_empty() {
@@ -1006,6 +1008,7 @@ impl AgentService {
         // ONE PIPELINE - generate/validate DSL via unified orchestrator
         let orch_ctx = self.build_orchestrator_context(
             session,
+            actor.clone(),
             crate::agent::orchestrator::UtteranceSource::Chat,
         );
         let orch_outcome = crate::agent::orchestrator::handle_utterance(
@@ -1578,6 +1581,7 @@ impl AgentService {
         original_input: &str,
         selected_verb: &str,
         all_candidates: &[crate::session::unified::VerbCandidate],
+        actor: crate::sem_reg::abac::ActorContext,
     ) -> Result<AgentChatResponse, String> {
         use crate::dsl_v2::parse_program;
 
@@ -1600,6 +1604,7 @@ impl AgentService {
         // Routes through unified orchestrator for SemReg + trace
         let orch_ctx = self.build_orchestrator_context(
             session,
+            actor,
             crate::agent::orchestrator::UtteranceSource::Chat,
         );
         let orch_outcome = crate::agent::orchestrator::handle_utterance(

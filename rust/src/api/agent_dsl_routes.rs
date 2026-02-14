@@ -974,7 +974,23 @@ fn parse_jurisdiction(input: &str) -> Option<String> {
 // ============================================================================
 
 /// POST /api/agent/generate - Generate DSL from natural language
-pub(crate) async fn generate_dsl(Json(req): Json<GenerateDslRequest>) -> Json<GenerateDslResponse> {
+///
+/// LEGACY endpoint — gated by PolicyGate. Use /api/session/:id/chat instead.
+pub(crate) async fn generate_dsl(
+    State(state): State<AgentState>,
+    headers: axum::http::HeaderMap,
+    Json(req): Json<GenerateDslRequest>,
+) -> Json<GenerateDslResponse> {
+    // PolicyGate: check if legacy generate is allowed
+    let actor = crate::policy::ActorResolver::from_headers(&headers);
+    if !state.policy_gate.can_use_legacy_generate(&actor) {
+        return Json(GenerateDslResponse {
+            dsl: None,
+            explanation: None,
+            error: Some("Legacy /generate endpoint is disabled. Use /api/session/:id/chat instead.".into()),
+        });
+    }
+
     // Get vocabulary for the prompt
     let vocab = build_vocab_prompt(req.domain.as_deref());
 
@@ -1145,8 +1161,19 @@ Respond with ONLY the DSL, no explanation. If you cannot generate valid DSL, res
 /// before generating DSL, preventing UUID hallucination.
 pub(crate) async fn generate_dsl_with_tools(
     State(state): State<AgentState>,
+    headers: axum::http::HeaderMap,
     Json(req): Json<GenerateDslRequest>,
 ) -> Json<GenerateDslResponse> {
+    // PolicyGate: check if legacy generate is allowed
+    let actor = crate::policy::ActorResolver::from_headers(&headers);
+    if !state.policy_gate.can_use_legacy_generate(&actor) {
+        return Json(GenerateDslResponse {
+            dsl: None,
+            explanation: None,
+            error: Some("Legacy /generate-with-tools endpoint is disabled. Use /api/session/:id/chat instead.".into()),
+        });
+    }
+
     let api_key = match std::env::var("ANTHROPIC_API_KEY") {
         Ok(key) => key,
         Err(_) => {
@@ -2030,15 +2057,28 @@ pub(crate) async fn extract_entity_mentions(
 /// complete onboarding workflows from natural language descriptions.
 pub(crate) async fn generate_onboarding_dsl(
     State(state): State<AgentState>,
+    headers: axum::http::HeaderMap,
     Json(req): Json<OnboardingRequest>,
 ) -> Json<OnboardingResponse> {
+    // PolicyGate: check if legacy generate is allowed
+    let actor = crate::policy::ActorResolver::from_headers(&headers);
+    if !state.policy_gate.can_use_legacy_generate(&actor) {
+        return Json(OnboardingResponse {
+            dsl: None,
+            explanation: None,
+            validation: None,
+            execution: None,
+            error: Some("Legacy /onboard endpoint is disabled. Use /api/session/:id/chat instead.".into()),
+        });
+    }
+
     // Use the existing generate_dsl logic with onboarding-focused instruction
     let generate_req = GenerateDslRequest {
         instruction: req.description.clone(),
         domain: None, // Let it use all domains including resource and delivery
     };
 
-    let gen_response = generate_dsl(Json(generate_req)).await;
+    let gen_response = generate_dsl(State(state.clone()), headers.clone(), Json(generate_req)).await;
 
     match (gen_response.dsl.clone(), gen_response.error.clone()) {
         (Some(dsl), None) => {

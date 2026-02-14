@@ -17,6 +17,7 @@ use uuid::Uuid;
 use sqlx::PgPool;
 
 use crate::lookup::LookupService;
+use crate::policy::{PolicyGate, gate::PolicySnapshot};
 use crate::mcp::intent_pipeline::{IntentPipeline, PipelineResult};
 use crate::mcp::scope_resolution::ScopeContext;
 use crate::mcp::verb_search::HybridVerbSearcher;
@@ -32,6 +33,8 @@ pub struct OrchestratorContext {
     pub pool: PgPool,
     pub verb_searcher: Arc<HybridVerbSearcher>,
     pub lookup_service: Option<LookupService>,
+    /// Server-side policy enforcement.
+    pub policy_gate: Arc<PolicyGate>,
     /// Source of this utterance (for trace/audit).
     pub source: UtteranceSource,
 }
@@ -70,6 +73,10 @@ pub struct IntentTrace {
     pub dsl_generated: Option<String>,
     pub dsl_hash: Option<String>,
     pub bypass_used: Option<String>,
+    pub dsl_source: Option<String>,
+    pub sem_reg_mode: String,
+    pub sem_reg_denied_all: bool,
+    pub policy_gate_snapshot: PolicySnapshot,
 }
 
 /// Process an utterance through the unified pipeline.
@@ -86,7 +93,7 @@ pub async fn handle_utterance(
     ctx: &OrchestratorContext,
     utterance: &str,
 ) -> anyhow::Result<OrchestratorOutcome> {
-    let is_operator = ctx.actor.roles.iter().any(|r| r == "operator" || r == "admin");
+    let policy = &ctx.policy_gate;
 
     // ── Step 1: Entity linking ──────────────────────────────────
     let lookup_result = if let Some(ref lookup_svc) = ctx.lookup_service {
@@ -118,7 +125,7 @@ pub async fn handle_utterance(
     // ── Step 3: Build and run IntentPipeline ────────────────────
     let searcher = (*ctx.verb_searcher).clone();
     let pipeline = IntentPipeline::with_pool(searcher, ctx.pool.clone())
-        .set_allow_direct_dsl(is_operator);
+        .set_allow_direct_dsl(policy.can_use_direct_dsl(&ctx.actor));
 
     let mut result = pipeline
         .process_with_scope(utterance, None, ctx.scope.clone())
@@ -132,23 +139,35 @@ pub async fn handle_utterance(
         .collect();
 
     // ── Step 5: Post-filter by SemReg allowed set ───────────────
+    let mut sem_reg_denied_all = false;
     if let Some(ref allowed) = allowed_verbs {
         let before_count = result.verb_candidates.len();
         result.verb_candidates.retain(|v| allowed.contains(&v.verb));
         if result.verb_candidates.is_empty() && before_count > 0 {
-            // All candidates filtered — log governance warning, restore originals
-            tracing::warn!(
-                before = before_count,
-                allowed_count = allowed.len(),
-                "SemReg filtered ALL verb candidates — falling back to unfiltered"
-            );
-            // Re-run without filter (graceful degradation)
-            let searcher2 = (*ctx.verb_searcher).clone();
-            let pipeline2 = IntentPipeline::with_pool(searcher2, ctx.pool.clone())
-                .set_allow_direct_dsl(is_operator);
-            result = pipeline2
-                .process_with_scope(utterance, None, ctx.scope.clone())
-                .await?;
+            sem_reg_denied_all = true;
+            if policy.semreg_fail_closed() {
+                // Strict mode: SemReg denied all → return empty (fail closed)
+                tracing::warn!(
+                    before = before_count,
+                    allowed_count = allowed.len(),
+                    strict = true,
+                    "SemReg filtered ALL verb candidates — fail-closed (strict mode)"
+                );
+            } else {
+                // Permissive mode: fallback to unfiltered
+                tracing::warn!(
+                    before = before_count,
+                    allowed_count = allowed.len(),
+                    strict = false,
+                    "SemReg filtered ALL verb candidates — falling back to unfiltered"
+                );
+                let searcher2 = (*ctx.verb_searcher).clone();
+                let pipeline2 = IntentPipeline::with_pool(searcher2, ctx.pool.clone())
+                    .set_allow_direct_dsl(policy.can_use_direct_dsl(&ctx.actor));
+                result = pipeline2
+                    .process_with_scope(utterance, None, ctx.scope.clone())
+                    .await?;
+            }
         }
     }
 
@@ -161,8 +180,10 @@ pub async fn handle_utterance(
     // ── Step 6: Build IntentTrace ───────────────────────────────
     let final_verb = result.verb_candidates.first().map(|v| v.verb.clone());
     let final_confidence = result.verb_candidates.first().map(|v| v.score).unwrap_or(0.0);
-    let bypass_used = if utterance.trim().starts_with('(') && is_operator {
+    let bypass_used = if utterance.trim().starts_with("dsl:") && policy.can_use_direct_dsl(&ctx.actor) {
         Some("direct_dsl".to_string())
+    } else if utterance.trim().starts_with('(') && policy.can_use_direct_dsl(&ctx.actor) {
+        Some("direct_dsl_legacy".to_string())
     } else {
         None
     };
@@ -180,6 +201,10 @@ pub async fn handle_utterance(
         dsl_generated: Some(result.dsl.clone()).filter(|d| !d.is_empty()),
         dsl_hash: result.dsl_hash.clone(),
         bypass_used,
+        dsl_source: Some(format!("{:?}", ctx.source)),
+        sem_reg_mode: if policy.semreg_fail_closed() { "strict".into() } else { "permissive".into() },
+        sem_reg_denied_all,
+        policy_gate_snapshot: policy.snapshot(),
     };
 
     tracing::info!(
@@ -188,6 +213,8 @@ pub async fn handle_utterance(
         confidence = trace.final_confidence,
         sem_reg_filtered = trace.sem_reg_verb_filter.is_some(),
         bypass = ?trace.bypass_used,
+        sem_reg_denied_all = trace.sem_reg_denied_all,
+        sem_reg_mode = %trace.sem_reg_mode,
         "IntentTrace"
     );
     tracing::debug!(trace = %serde_json::to_string(&trace).unwrap_or_default(), "IntentTrace detail");
@@ -278,6 +305,10 @@ mod tests {
             dsl_generated: Some("(kyc.open-case)".into()),
             dsl_hash: Some("abc123".into()),
             bypass_used: None,
+            dsl_source: Some("chat".into()),
+            sem_reg_mode: "strict".into(),
+            sem_reg_denied_all: false,
+            policy_gate_snapshot: crate::policy::PolicyGate::strict().snapshot(),
         };
 
         let json = serde_json::to_string(&trace).unwrap();

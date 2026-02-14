@@ -1828,6 +1828,7 @@ fn generate_verbs_help(domain_filter: Option<&str>) -> String {
 async fn chat_session(
     State(state): State<AgentState>,
     Path(session_id): Path<Uuid>,
+    headers: axum::http::HeaderMap,
     Json(req): Json<ChatRequest>,
 ) -> Result<Json<ChatResponse>, StatusCode> {
     tracing::info!("=== CHAT SESSION START ===");
@@ -1943,10 +1944,13 @@ async fn chat_session(
         llm_client.model_name()
     );
 
+    // Resolve actor from request headers (PolicyGate enforcement)
+    let actor = crate::policy::ActorResolver::from_headers(&headers);
+
     // Delegate to centralized AgentService (single pipeline)
     let response = match state
         .agent_service
-        .process_chat(&mut session, &req, llm_client)
+        .process_chat(&mut session, &req, llm_client, actor)
         .await
     {
         Ok(r) => r,
@@ -2099,6 +2103,7 @@ async fn chat_session(
 async fn execute_session_dsl(
     State(state): State<AgentState>,
     Path(session_id): Path<Uuid>,
+    headers: axum::http::HeaderMap,
     Json(req): Json<Option<ExecuteDslRequest>>,
 ) -> Result<Json<ExecuteResponse>, StatusCode> {
     tracing::debug!("[EXEC] Session {} - START execute_session_dsl", session_id);
@@ -2136,15 +2141,17 @@ async fn execute_session_dsl(
         // Determine DSL source - prefer explicit request, then run_sheet current entry
         let dsl_source = if let Some(ref req) = req {
             if let Some(ref dsl_str) = req.dsl {
-                // Gate: raw DSL requires explicit opt-in via allow_raw_dsl
-                if !req.allow_raw_dsl {
+                // Gate: raw DSL requires server-side PolicyGate approval
+                let actor = crate::policy::ActorResolver::from_headers(&headers);
+                if !state.policy_gate.can_execute_raw_dsl(&actor) {
                     tracing::warn!(
                         session = %session_id,
-                        "Raw DSL execution blocked: allow_raw_dsl not set"
+                        actor_id = %actor.actor_id,
+                        "Raw DSL execution blocked by PolicyGate"
                     );
                     return Err(StatusCode::FORBIDDEN);
                 }
-                tracing::warn!(session = %session_id, "Raw DSL execution via /execute");
+                tracing::warn!(session = %session_id, actor = %actor.actor_id, "Raw DSL execution via /execute (PolicyGate approved)");
                 dsl_str.clone()
             } else {
                 session.run_sheet.combined_dsl().unwrap_or_default()

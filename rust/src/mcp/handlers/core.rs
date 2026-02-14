@@ -339,30 +339,9 @@ impl ToolHandlers {
             "teaching_status" => self.teaching_status(args).await,
             // Semantic Registry tools — dispatch to sem_reg agent handlers
             name if name.starts_with("sem_reg_") => {
-                use crate::sem_reg::abac::ActorContext;
                 use crate::sem_reg::agent::mcp_tools::{dispatch_tool, SemRegToolContext};
-                use crate::sem_reg::types::Classification;
 
-                let actor = ActorContext {
-                    actor_id: std::env::var("MCP_ACTOR_ID")
-                        .unwrap_or_else(|_| "mcp_anonymous".into()),
-                    roles: std::env::var("MCP_ROLES")
-                        .map(|r| r.split(',').map(String::from).collect())
-                        .unwrap_or_else(|_| vec!["viewer".into()]),
-                    department: std::env::var("MCP_DEPARTMENT").ok(),
-                    clearance: std::env::var("MCP_CLEARANCE").ok().and_then(|s| {
-                        match s.to_lowercase().as_str() {
-                            "public" => Some(Classification::Public),
-                            "internal" => Some(Classification::Internal),
-                            "confidential" => Some(Classification::Confidential),
-                            "restricted" => Some(Classification::Restricted),
-                            _ => None,
-                        }
-                    }),
-                    jurisdictions: std::env::var("MCP_JURISDICTIONS")
-                        .map(|j| j.split(',').map(String::from).collect())
-                        .unwrap_or_default(),
-                };
+                let actor = crate::policy::ActorResolver::from_env();
                 let ctx = SemRegToolContext {
                     pool: &self.pool,
                     actor: &actor,
@@ -1330,30 +1309,8 @@ impl ToolHandlers {
 
         // Route through unified orchestrator
         let searcher = self.get_verb_searcher().await?;
-        let actor = {
-            use crate::sem_reg::abac::ActorContext;
-            use crate::sem_reg::types::Classification;
-            ActorContext {
-                actor_id: std::env::var("MCP_ACTOR_ID")
-                    .unwrap_or_else(|_| "mcp_anonymous".into()),
-                roles: std::env::var("MCP_ROLES")
-                    .map(|r| r.split(',').map(String::from).collect())
-                    .unwrap_or_else(|_| vec!["viewer".into()]),
-                department: std::env::var("MCP_DEPARTMENT").ok(),
-                clearance: std::env::var("MCP_CLEARANCE").ok().and_then(|s| {
-                    match s.to_lowercase().as_str() {
-                        "public" => Some(Classification::Public),
-                        "internal" => Some(Classification::Internal),
-                        "confidential" => Some(Classification::Confidential),
-                        "restricted" => Some(Classification::Restricted),
-                        _ => None,
-                    }
-                }),
-                jurisdictions: std::env::var("MCP_JURISDICTIONS")
-                    .map(|j| j.split(',').map(String::from).collect())
-                    .unwrap_or_default(),
-            }
-        };
+        let actor = crate::policy::ActorResolver::from_env();
+        let policy_gate = std::sync::Arc::new(crate::policy::PolicyGate::from_env());
         let orch_ctx = crate::agent::orchestrator::OrchestratorContext {
             actor,
             session_id,
@@ -1362,6 +1319,7 @@ impl ToolHandlers {
             pool: self.pool.clone(),
             verb_searcher: std::sync::Arc::new(searcher),
             lookup_service: None,
+            policy_gate,
             source: crate::agent::orchestrator::UtteranceSource::Mcp,
         };
         let outcome = crate::agent::orchestrator::handle_utterance(&orch_ctx, instruction).await?;

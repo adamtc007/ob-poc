@@ -15,6 +15,8 @@ use axum::Router;
 use sqlx::PgPool;
 use std::sync::Arc;
 
+use crate::policy::PolicyGate;
+
 // ============================================================================
 // State
 // ============================================================================
@@ -33,6 +35,8 @@ pub struct AgentState {
     pub expansion_audit: Arc<crate::database::ExpansionAuditRepository>,
     /// Entity linking service for in-memory entity resolution
     pub entity_linker: Arc<dyn EntityLinkingService>,
+    /// Server-side policy enforcement for single-pipeline invariants
+    pub policy_gate: Arc<PolicyGate>,
 }
 
 impl AgentState {
@@ -193,6 +197,15 @@ impl AgentState {
             })
         };
 
+        // Load server-side policy from environment (single-pipeline enforcement)
+        let policy_gate = Arc::new(PolicyGate::from_env());
+        tracing::info!(
+            strict = policy_gate.strict_single_pipeline,
+            allow_raw_execute = policy_gate.allow_raw_execute,
+            allow_direct_dsl = policy_gate.allow_direct_dsl,
+            "PolicyGate loaded from environment"
+        );
+
         // Build agent service with embedder, learned data, lexicon, and entity linker
         let agent_service = crate::api::agent_service::AgentService::new(
             pool.clone(),
@@ -216,6 +229,7 @@ impl AgentState {
             feedback_service,
             expansion_audit,
             entity_linker,
+            policy_gate,
         }
     }
 }
