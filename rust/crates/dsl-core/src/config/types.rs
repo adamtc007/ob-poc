@@ -262,6 +262,7 @@ pub enum ConfirmPolicyConfig {
 // VERB METADATA (Tiering & Organization)
 // =============================================================================
 
+
 /// Metadata for verb classification, tiering, and organization
 ///
 /// Used by:
@@ -338,6 +339,27 @@ pub struct VerbMetadata {
     /// Requires explicit confirmation or elevated permissions
     #[serde(default)]
     pub dangerous: bool,
+
+    // =========================================================================
+    // Entity-kind applicability fields
+    // =========================================================================
+    /// Entity kinds this verb applies to (e.g., ["cbu", "fund", "person"]).
+    /// Empty = applies to all kinds (no filtering).
+    #[serde(default)]
+    pub subject_kinds: Vec<String>,
+
+    /// Phase tags (e.g., ["onboarding", "review", "monitoring"]).
+    /// Empty = no phase restriction.
+    #[serde(default)]
+    pub phase_tags: Vec<String>,
+
+    /// Whether this verb requires a subject entity (default true).
+    #[serde(default = "default_true")]
+    pub requires_subject: bool,
+
+    /// Whether executing this verb should update session focus entity.
+    #[serde(default)]
+    pub produces_focus: bool,
 }
 
 /// Verb tier classification

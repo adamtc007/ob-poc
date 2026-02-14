@@ -231,6 +231,27 @@ fn check_trace(
             });
         }
     }
+
+    if let Some(ref exp_kind) = exp.dominant_entity_kind {
+        let actual_kind = trace.dominant_entity_kind.as_deref().unwrap_or("");
+        if actual_kind != exp_kind {
+            failures.push(AssertionFailure {
+                field: "trace.dominant_entity_kind".into(),
+                expected: exp_kind.clone(),
+                actual: actual_kind.to_string(),
+            });
+        }
+    }
+
+    if let Some(exp_filtered) = exp.entity_kind_filtered {
+        if trace.entity_kind_filtered != exp_filtered {
+            failures.push(AssertionFailure {
+                field: "trace.entity_kind_filtered".into(),
+                expected: format!("{}", exp_filtered),
+                actual: format!("{}", trace.entity_kind_filtered),
+            });
+        }
+    }
 }
 
 /// Global invariants checked on every step regardless of expectations.

@@ -123,6 +123,10 @@ pub struct IntentTrace {
     pub macro_semreg_checked: bool,
     /// Verbs in macro expansion that were denied by SemReg (empty if none)
     pub macro_denied_verbs: Vec<String>,
+    /// Entity kind of the dominant entity (e.g., "cbu", "fund")
+    pub dominant_entity_kind: Option<String>,
+    /// Whether entity-kind filtering was applied in SemReg context resolution
+    pub entity_kind_filtered: bool,
     /// Whether telemetry was persisted to agent.intent_events
     pub telemetry_persisted: bool,
 }
@@ -175,13 +179,18 @@ pub async fn handle_utterance(
         .and_then(|lr| lr.dominant_entity.as_ref())
         .map(|e| e.canonical_name.clone());
 
+    let dominant_entity_kind = lookup_result
+        .as_ref()
+        .and_then(|lr| lr.dominant_entity.as_ref())
+        .map(|e| e.entity_kind.clone());
+
     let entity_candidates: Vec<String> = lookup_result
         .as_ref()
         .map(|lr| lr.entities.iter().map(|e| e.mention_text.clone()).collect())
         .unwrap_or_default();
 
     // -- Step 2: SemReg context resolution --
-    let (sem_reg_policy, sem_reg_verb_names) = resolve_sem_reg_verbs(ctx).await;
+    let (sem_reg_policy, sem_reg_verb_names) = resolve_sem_reg_verbs(ctx, dominant_entity_kind.as_deref()).await;
 
     // -- Stage A: Discover candidates (no DSL generation yet) --
     let searcher = (*ctx.verb_searcher).clone();
@@ -208,7 +217,7 @@ pub async fn handle_utterance(
     if is_early_exit(&discovery_result.outcome) {
         let trace = build_trace(
             utterance, ctx, &entity_candidates, &dominant_entity_name,
-            &sem_reg_verb_names, &pre_filter, &pre_filter,
+            &dominant_entity_kind, &sem_reg_verb_names, &pre_filter, &pre_filter,
             &chosen_verb_pre_semreg, &chosen_verb_pre_semreg,
             &discovery_result, &sem_reg_policy, None, false, false,
         );
@@ -229,7 +238,7 @@ pub async fn handle_utterance(
     {
         let trace = build_trace(
             utterance, ctx, &entity_candidates, &dominant_entity_name,
-            &sem_reg_verb_names, &pre_filter, &pre_filter,
+            &dominant_entity_kind, &sem_reg_verb_names, &pre_filter, &pre_filter,
             &chosen_verb_pre_semreg, &chosen_verb_pre_semreg,
             &discovery_result, &sem_reg_policy,
             Some("direct_dsl".to_string()), false, false,
@@ -298,7 +307,7 @@ pub async fn handle_utterance(
                 );
                 let mut trace = build_trace(
                     utterance, ctx, &entity_candidates, &dominant_entity_name,
-                    &sem_reg_verb_names, &pre_filter, &pre_filter,
+                    &dominant_entity_kind, &sem_reg_verb_names, &pre_filter, &pre_filter,
                     &chosen_verb_pre_semreg, &None,
                     &discovery_result, &sem_reg_policy, None, true, false,
                 );
@@ -351,7 +360,7 @@ pub async fn handle_utterance(
 
             let mut trace = build_trace(
                 utterance, ctx, &entity_candidates, &dominant_entity_name,
-                &sem_reg_verb_names, &pre_filter, &pre_filter,
+                &dominant_entity_kind, &sem_reg_verb_names, &pre_filter, &pre_filter,
                 &chosen_verb_pre_semreg, &chosen_verb_pre_semreg,
                 &discovery_result, &sem_reg_policy, None, false, false,
             );
@@ -486,7 +495,7 @@ pub async fn handle_utterance(
         && chosen_verb_pre_semreg != *chosen_post;
     let mut trace = build_trace(
         utterance, ctx, &entity_candidates, &dominant_entity_name,
-        &sem_reg_verb_names, &pre_filter, &post_filter,
+        &dominant_entity_kind, &sem_reg_verb_names, &pre_filter, &post_filter,
         &chosen_verb_pre_semreg, chosen_post,
         &result, &sem_reg_policy, None,
         sem_reg_denied_all, semreg_unavailable,
@@ -529,6 +538,7 @@ fn build_trace(
     ctx: &OrchestratorContext,
     entity_candidates: &[String],
     dominant_entity_name: &Option<String>,
+    dominant_entity_kind: &Option<String>,
     sem_reg_verb_names: &Option<Vec<String>>,
     pre_filter: &[(String, f32)],
     post_filter: &[(String, f32)],
@@ -595,6 +605,8 @@ fn build_trace(
         selection_source: "discovery".to_string(),
         macro_semreg_checked: false,
         macro_denied_verbs: vec![],
+        dominant_entity_kind: dominant_entity_kind.clone(),
+        entity_kind_filtered: dominant_entity_kind.is_some(),
         telemetry_persisted: false,
     }
 }
@@ -655,6 +667,9 @@ async fn emit_telemetry(
         },
         prompt_version: None,
         error_code: trace.blocked_reason.as_ref().map(|_| "blocked".to_string()),
+        dominant_entity_id: ctx.dominant_entity_id,
+        dominant_entity_kind: trace.dominant_entity_kind.clone(),
+        entity_kind_filtered: trace.entity_kind_filtered,
     };
 
     let persisted = telemetry::store::insert_intent_event(&ctx.pool, &row).await;
@@ -684,6 +699,11 @@ pub async fn handle_utterance_with_forced_verb(
         .as_ref()
         .and_then(|lr| lr.dominant_entity.as_ref())
         .map(|e| e.canonical_name.clone());
+
+    let dominant_entity_kind = lookup_result
+        .as_ref()
+        .and_then(|lr| lr.dominant_entity.as_ref())
+        .map(|e| e.entity_kind.clone());
 
     let entity_candidates: Vec<String> = lookup_result
         .as_ref()
@@ -724,6 +744,8 @@ pub async fn handle_utterance_with_forced_verb(
         selection_source: "user_choice".to_string(),
         macro_semreg_checked: false,
         macro_denied_verbs: vec![],
+        dominant_entity_kind,
+        entity_kind_filtered: false,
         telemetry_persisted: false,
     };
 
@@ -752,6 +774,7 @@ pub async fn handle_utterance_with_forced_verb(
 #[cfg(feature = "database")]
 async fn resolve_sem_reg_verbs(
     ctx: &OrchestratorContext,
+    entity_kind: Option<&str>,
 ) -> (SemRegVerbPolicy, Option<Vec<String>>) {
     use crate::sem_reg::abac::AccessDecision;
     use crate::sem_reg::context_resolution::{
@@ -771,6 +794,7 @@ async fn resolve_sem_reg_verbs(
         constraints: Default::default(),
         evidence_mode: EvidenceMode::default(),
         point_in_time: None,
+        entity_kind: entity_kind.map(|s| s.to_string()),
     };
 
     match resolve_context(&ctx.pool, &request).await {
@@ -840,6 +864,8 @@ mod tests {
             selection_source: "discovery".into(),
             macro_semreg_checked: false,
             macro_denied_verbs: vec![],
+            dominant_entity_kind: None,
+            entity_kind_filtered: false,
             telemetry_persisted: false,
         }
     }

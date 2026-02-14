@@ -151,7 +151,42 @@ pub fn verb_config_to_contract(
         scope: m.scope.as_ref().map(to_wire_str),
         noun: m.noun.clone(),
         tags: m.tags.clone(),
+        subject_kinds: m.subject_kinds.clone(),
+        phase_tags: m.phase_tags.clone(),
     });
+
+    // Derive subject_kinds: explicit from metadata, else heuristic from produces
+    let subject_kinds = config
+        .metadata
+        .as_ref()
+        .map(|m| m.subject_kinds.clone())
+        .filter(|sk| !sk.is_empty())
+        .unwrap_or_else(|| {
+            // Heuristic: derive from produces.entity_type when not explicitly declared
+            config
+                .produces
+                .as_ref()
+                .map(|p| vec![p.produced_type.clone()])
+                .unwrap_or_default()
+        });
+
+    let phase_tags = config
+        .metadata
+        .as_ref()
+        .map(|m| m.phase_tags.clone())
+        .unwrap_or_default();
+
+    let requires_subject = config
+        .metadata
+        .as_ref()
+        .map(|m| m.requires_subject)
+        .unwrap_or(true);
+
+    let produces_focus = config
+        .metadata
+        .as_ref()
+        .map(|m| m.produces_focus)
+        .unwrap_or(false);
 
     VerbContractBody {
         fqn,
@@ -166,6 +201,10 @@ pub fn verb_config_to_contract(
         produces,
         consumes,
         invocation_phrases: config.invocation_phrases.clone(),
+        subject_kinds,
+        phase_tags,
+        requires_subject,
+        produces_focus,
         metadata,
     }
 }

@@ -45,6 +45,10 @@ pub struct IntentEventRow {
 
     pub prompt_version: Option<String>,
     pub error_code: Option<String>,
+
+    pub dominant_entity_id: Option<Uuid>,
+    pub dominant_entity_kind: Option<String>,
+    pub entity_kind_filtered: bool,
 }
 
 /// Map a PipelineOutcome to its telemetry string label.

@@ -26,6 +26,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: fund
+          subject_kinds: [fund]
         behavior: crud
         produces:
           type: entity
@@ -165,6 +166,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: fund
+          subject_kinds: [fund]
         behavior: crud
         produces:
           type: entity
@@ -264,6 +266,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: fund
+          subject_kinds: [fund]
         behavior: crud
         produces:
           type: entity
@@ -356,6 +359,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: fund
+          subject_kinds: [fund]
         behavior: crud
         produces:
           type: entity
@@ -452,6 +456,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: fund
+          subject_kinds: [fund]
         behavior: crud
         produces:
           type: entity
@@ -554,6 +559,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: fund
+          subject_kinds: [fund]
         behavior: crud
         produces:
           type: entity
@@ -645,6 +651,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: fund
+          subject_kinds: [fund]
         behavior: crud
         produces:
           type: entity
@@ -724,6 +731,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: fund
+          subject_kinds: [fund]
         behavior: crud
         produces:
           type: entity
@@ -799,6 +807,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: fund
+          subject_kinds: [fund]
         behavior: crud
         produces:
           type: entity
@@ -893,6 +902,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: fund
+          subject_kinds: [fund]
         behavior: crud
         crud:
           operation: upsert
@@ -950,6 +960,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: fund
+          subject_kinds: [fund]
         behavior: crud
         crud:
           operation: upsert
@@ -1002,6 +1013,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: fund
+          subject_kinds: [fund]
         behavior: crud
         crud:
           operation: upsert
@@ -1055,6 +1067,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: fund
+          subject_kinds: [fund]
         behavior: crud
         crud:
           operation: list_by_fk
@@ -1089,6 +1102,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: fund
+          subject_kinds: [fund]
         behavior: crud
         crud:
           operation: list_by_fk
@@ -1123,6 +1137,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: fund
+          subject_kinds: [fund]
         behavior: crud
         crud:
           operation: list_by_fk
@@ -1162,6 +1177,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: fund
+          subject_kinds: [fund]
         behavior: crud
         crud:
           operation: upsert
@@ -1235,6 +1251,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: fund
+          subject_kinds: [fund]
         behavior: crud
         crud:
           operation: update
@@ -1271,6 +1288,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: fund
+          subject_kinds: [fund]
         behavior: crud
         crud:
           operation: update
@@ -1303,6 +1321,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: fund
+          subject_kinds: [fund]
         behavior: crud
         crud:
           operation: list_by_fk
@@ -1337,6 +1356,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: fund
+          subject_kinds: [fund]
         behavior: crud
         crud:
           operation: list_by_fk

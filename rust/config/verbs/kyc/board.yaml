@@ -13,6 +13,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: board_member
+          subject_kinds: [cbu, company]
         behavior: crud
         crud:
           operation: upsert
@@ -121,6 +122,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: board_member
+          subject_kinds: [cbu, company]
         behavior: crud
         crud:
           operation: update
@@ -152,6 +154,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: board_member
+          subject_kinds: [cbu, company]
         behavior: crud
         crud:
           operation: list_by_fk
@@ -182,6 +185,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: board_member
+          subject_kinds: [cbu, company]
         behavior: crud
         crud:
           operation: list_by_fk
@@ -212,6 +216,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: board_member
+          subject_kinds: [cbu, company]
         behavior: crud
         crud:
           operation: upsert
@@ -325,6 +330,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: board_member
+          subject_kinds: [cbu, company]
         behavior: crud
         crud:
           operation: update
@@ -356,6 +362,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: board_member
+          subject_kinds: [cbu, company]
         behavior: crud
         crud:
           operation: list_by_fk
@@ -386,6 +393,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: board_member
+          subject_kinds: [cbu, company]
         behavior: crud
         crud:
           operation: list_by_fk
@@ -420,6 +428,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: board_member
+          subject_kinds: [cbu, company]
         behavior: plugin
         plugin:
           handler: BoardAnalyzeControlOp

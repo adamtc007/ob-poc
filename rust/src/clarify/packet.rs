@@ -164,6 +164,8 @@ impl DecisionPacketBuilder {
             (DecisionKind::ClarifyGroup, ClarificationPayload::Group(_)) => {}
             (DecisionKind::ClarifyVerb, ClarificationPayload::Verb(_)) => {}
             (DecisionKind::ClarifyScope, ClarificationPayload::Scope(_)) => {}
+            (DecisionKind::ClarifyEntity, ClarificationPayload::Entity(_)) => {}
+            (DecisionKind::ClarifyDeal, ClarificationPayload::Deal(_)) => {}
             (DecisionKind::Refuse, ClarificationPayload::Refuse(_)) => {}
             _ => {
                 return Err(PacketBuildError::InvalidPayload {
@@ -338,6 +340,36 @@ fn generate_prompt_and_choices(
                 description: "Acknowledge and try something else".to_string(),
                 is_escape: true,
             }];
+            (prompt, choices)
+        }
+
+        (DecisionKind::ClarifyEntity, ClarificationPayload::Entity(e)) => {
+            let prompt = custom_prompt
+                .clone()
+                .unwrap_or_else(|| format!(
+                    "Multiple entities match \"{}\". Which did you mean?",
+                    e.utterance_mention
+                ));
+            let choices = e
+                .candidates
+                .iter()
+                .enumerate()
+                .map(|(i, c)| UserChoice {
+                    id: letter_key(i),
+                    label: c.canonical_name.clone(),
+                    description: format!(
+                        "{} (confidence: {:.0}%)",
+                        c.entity_kind, c.confidence * 100.0
+                    ),
+                    is_escape: false,
+                })
+                .chain(std::iter::once(UserChoice {
+                    id: "TYPE".to_string(),
+                    label: "Type another name".to_string(),
+                    description: "Enter a more specific entity name".to_string(),
+                    is_escape: true,
+                }))
+                .collect();
             (prompt, choices)
         }
 

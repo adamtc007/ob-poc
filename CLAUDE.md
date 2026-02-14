@@ -16,7 +16,7 @@
 > **REPL Pipeline Redesign (077):** ⚠️ Superseded by V2 REPL Architecture — V1 types retained for reference
 > **V2 REPL Architecture (TODO-2):** ✅ Complete - Pack-scoped intent resolution, 7-state machine, ContextStack fold, preconditions engine, 3-pronged intent pipeline (semantic→pack→precondition), VerbSearchIntentMatcher bridge, 320 tests
 > **Candle Semantic Pipeline:** ✅ Complete - DB source of truth, populate_embeddings binary
-> **Agent Pipeline:** ✅ Hardened + PolicyGate - Unified orchestrator, server-side policy enforcement, SemReg fail-closed (v2: matched-path + DenyAll/Unavailable), ActorResolver (headers/env/session), IntentTrace audit with PolicySnapshot, AST-based macro SemReg governance, RunSheet replay prevention, /select-verb retired (410 Gone), intent_events telemetry
+> **Agent Pipeline:** ✅ Hardened + PolicyGate - Unified orchestrator, server-side policy enforcement, SemReg fail-closed (v2: matched-path + DenyAll/Unavailable), ActorResolver (headers/env/session), IntentTrace audit with PolicySnapshot, AST-based macro SemReg governance, RunSheet replay prevention, /select-verb retired (410 Gone), intent_events telemetry, entity-kind constrained verb selection + ClarifyEntity
 > **Solar Navigation (038):** ✅ Complete - ViewState, NavigationHistory, orbit navigation
 > **Nav UX Messages:** ✅ Complete - NavReason codes, NavSuggestion, standardized error copy
 > **Promotion Pipeline (043):** ✅ Complete - Quality-gated pattern promotion with collision detection
@@ -5362,6 +5362,39 @@ If no entity snapshot is available, `StubEntityLinkingService` is used:
 - Returns empty results for all lookups
 - Pipeline continues without entity pre-resolution
 - Full functionality restored when snapshot is compiled
+
+### Entity-Kind Constrained Verb Selection
+
+Verbs declare their applicable entity kinds via `subject_kinds` in VerbContractBody and verb YAML metadata. The pipeline filters verbs by entity kind when a dominant entity is known.
+
+**Contract fields** (`rust/src/sem_reg/verb_contract.rs`):
+- `subject_kinds: Vec<String>` — entity kinds this verb applies to (empty = all)
+- `phase_tags: Vec<String>` — phase tags (stored, not yet filtered)
+- `requires_subject: bool` — whether verb needs a subject entity (default true)
+- `produces_focus: bool` — whether execution updates session focus entity
+
+**Pipeline flow** (`rust/src/agent/orchestrator.rs`):
+1. Entity linking resolves `dominant_entity_kind` from LookupResult
+2. `entity_kind` passed to `ContextResolutionRequest` → `filter_and_rank_verbs()`
+3. Verbs with non-empty `subject_kinds` not containing the entity kind are hard-filtered
+4. Matching verbs get +0.15 rank boost
+5. If kind-filtering removes ALL candidates, falls back to unfiltered (graceful degradation)
+
+**ClarifyEntity** (`rust/crates/ob-poc-types/src/decision.rs`):
+- `DecisionKind::ClarifyEntity` — emitted when entity linking is ambiguous (no clear winner)
+- `EntityClarificationPayload` with `Vec<EntityChoice>` — candidate entities for user selection
+- Rendering and choices generation wired in `rust/src/clarify/render.rs` and `packet.rs`
+
+**Telemetry** (`migrations/088_intent_events_entity_kind.sql`):
+- `dominant_entity_id`, `dominant_entity_kind`, `entity_kind_filtered` columns on `agent.intent_events`
+
+**IntentTrace fields**: `dominant_entity_kind: Option<String>`, `entity_kind_filtered: bool`
+
+**Scanner heuristic** (`rust/src/sem_reg/scanner.rs`): When `subject_kinds` is not declared in YAML metadata, the scanner derives it from `produces.entity_type` (e.g., verb producing "cbu" gets subject_kinds=["cbu"]).
+
+**Annotated verb files**: fund.yaml, client.yaml, kyc/board.yaml, onboarding.yaml, gleif.yaml
+
+**Harness scenarios**: `scenarios/suites/entity_kind_ops.yaml` (10 scenarios)
 
 ---
 

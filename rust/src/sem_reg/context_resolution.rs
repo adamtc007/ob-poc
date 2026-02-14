@@ -122,6 +122,11 @@ pub struct ContextResolutionRequest {
     /// Point-in-time for historical resolution (None = now).
     #[serde(default)]
     pub point_in_time: Option<DateTime<Utc>>,
+    /// Entity kind of the dominant entity (for subject_kinds filtering).
+    /// When set, verbs with non-empty subject_kinds that don't include this
+    /// kind are filtered out.
+    #[serde(default)]
+    pub entity_kind: Option<String>,
 }
 
 // ── Response ──────────────────────────────────────────────────
@@ -415,7 +420,7 @@ pub async fn resolve_context(
     // Step 5: Filter verbs by taxonomy + ABAC + tier
     let all_verb_rows = load_typed_snapshots(pool, ObjectType::VerbContract, as_of).await?;
     let mut candidate_verbs =
-        filter_and_rank_verbs(&all_verb_rows, &req.actor, req.evidence_mode, top_view_body)?;
+        filter_and_rank_verbs(&all_verb_rows, &req.actor, req.evidence_mode, top_view_body, req.entity_kind.as_deref())?;
 
     // Step 6: Filter attributes similarly
     let all_attr_rows = load_typed_snapshots(pool, ObjectType::AttributeDef, as_of).await?;
@@ -675,6 +680,7 @@ fn filter_and_rank_verbs(
     actor: &ActorContext,
     mode: EvidenceMode,
     top_view: Option<&ViewDefBody>,
+    entity_kind: Option<&str>,
 ) -> Result<Vec<VerbCandidate>> {
     let mut candidates = Vec::new();
 
@@ -692,6 +698,23 @@ fn filter_and_rank_verbs(
             .unwrap_or("")
             .to_string();
 
+        // Entity-kind applicability filter
+        if let Some(kind) = entity_kind {
+            let subject_kinds: Vec<String> = body
+                .get("subject_kinds")
+                .and_then(|v| serde_json::from_value(v.clone()).ok())
+                .unwrap_or_default();
+            if !subject_kinds.is_empty() && !subject_kinds.iter().any(|sk| sk == kind) {
+                tracing::trace!(
+                    verb_fqn = %fqn,
+                    entity_kind = %kind,
+                    subject_kinds = ?subject_kinds,
+                    "Verb filtered out: entity kind not in subject_kinds"
+                );
+                continue;
+            }
+        }
+
         // Tier/trust filtering based on evidence mode
         if !tier_allowed(row.governance_tier, row.trust_class, mode) {
             continue;
@@ -705,7 +728,18 @@ fn filter_and_rank_verbs(
         }
 
         // Compute rank score from view prominence
-        let rank_score = compute_verb_prominence(&fqn, top_view);
+        let mut rank_score = compute_verb_prominence(&fqn, top_view);
+
+        // Boost verbs that explicitly match the entity kind
+        if let Some(kind) = entity_kind {
+            let subject_kinds: Vec<String> = body
+                .get("subject_kinds")
+                .and_then(|v| serde_json::from_value(v.clone()).ok())
+                .unwrap_or_default();
+            if subject_kinds.iter().any(|sk| sk == kind) {
+                rank_score += 0.15;
+            }
+        }
 
         // Determine usable_for_proof based on tier + trust
         let usable_for_proof = row.governance_tier == GovernanceTier::Governed
@@ -1213,6 +1247,7 @@ mod tests {
             constraints: ResolutionConstraints::default(),
             evidence_mode: EvidenceMode::Normal,
             point_in_time: None,
+            entity_kind: None,
         }
     }
 

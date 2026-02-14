@@ -615,6 +615,7 @@ pub async fn ctx_resolve(
         constraints: Default::default(),
         evidence_mode,
         point_in_time,
+        entity_kind: None,
     };
 
     let response = resolve_context(&pool, &req).await?;

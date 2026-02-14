@@ -1157,6 +1157,7 @@ async fn handle_resolve_context(
         constraints: Default::default(),
         evidence_mode: mode,
         point_in_time: None,
+        entity_kind: None,
     };
 
     match resolve_context(ctx.pool, &request).await {
@@ -1223,6 +1224,7 @@ async fn handle_apply_view(
         constraints: Default::default(),
         evidence_mode: EvidenceMode::Normal,
         point_in_time: None,
+        entity_kind: None,
     };
 
     match resolve_context(ctx.pool, &request).await {
@@ -1860,6 +1862,7 @@ async fn handle_identify_gaps(
         constraints: Default::default(),
         evidence_mode: mode,
         point_in_time: None,
+        entity_kind: None,
     };
 
     match resolve_context(ctx.pool, &request).await {

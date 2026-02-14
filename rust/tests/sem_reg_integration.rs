@@ -113,6 +113,10 @@ mod integration {
                 produces: None,
                 consumes: vec![],
                 invocation_phrases: vec![],
+                subject_kinds: vec![],
+                phase_tags: vec![],
+                requires_subject: true,
+                produces_focus: false,
                 metadata: None,
             };
             let sid =
@@ -200,6 +204,7 @@ mod integration {
             constraints: Default::default(),
             evidence_mode: EvidenceMode::Normal,
             point_in_time: None,
+            entity_kind: None,
         };
         let response = resolve_context(&db.pool, &request).await?;
         assert!(

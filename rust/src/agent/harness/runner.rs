@@ -7,7 +7,7 @@ use serde::Serialize;
 use std::path::Path;
 
 use super::assertions::{check_step, AssertionFailure};
-use super::{Scenario, ScenarioSuite, StepExpectation};
+use super::{Scenario, ScenarioSuite};
 use crate::session::unified::UnifiedSession;
 
 /// Result of running a single scenario.
@@ -256,7 +256,7 @@ pub fn print_suite_report(result: &SuiteResult) {
                 if !step.passed {
                     println!("      Step {}: \"{}\"", step.step_index, step.utterance);
                     for f in &step.failures {
-                        println!("        {} {}", "x", f);
+                        println!("        x {}", f);
                     }
                 }
             }

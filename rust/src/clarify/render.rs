@@ -5,7 +5,8 @@
 
 use ob_poc_types::{
     ClarificationPayload, DealClarificationPayload, DecisionPacket, EffectMode,
-    GroupClarificationPayload, ProposalPayload, RefusePayload, ScopePayload, VerbPayload,
+    EntityClarificationPayload, GroupClarificationPayload, ProposalPayload, RefusePayload,
+    ScopePayload, VerbPayload,
 };
 
 /// Render a DecisionPacket to user-facing markdown text.
@@ -19,6 +20,7 @@ pub fn render_decision_packet(packet: &DecisionPacket) -> String {
         ClarificationPayload::Deal(d) => render_deal_clarification(packet, d),
         ClarificationPayload::Verb(v) => render_verb_clarification(packet, v),
         ClarificationPayload::Scope(s) => render_scope_clarification(packet, s),
+        ClarificationPayload::Entity(e) => render_entity_clarification(packet, e),
         ClarificationPayload::Refuse(r) => render_refuse(packet, r),
     }
 }
@@ -446,4 +448,27 @@ mod tests {
         assert!(rendered.contains("session.load-galaxy"));
         assert!(rendered.contains("85%"));
     }
+}
+
+
+/// Render an entity disambiguation packet
+pub fn render_entity_clarification(packet: &DecisionPacket, payload: &EntityClarificationPayload) -> String {
+    let mut lines = Vec::new();
+
+    lines.push("## Entity Disambiguation".to_string());
+    lines.push(String::new());
+    lines.push(format!("Multiple entities match \"{}\". Please select one:", payload.utterance_mention));
+    lines.push(String::new());
+
+    for (i, choice) in packet.choices.iter().enumerate() {
+        let entity = payload.candidates.get(i);
+        let kind_label = entity.map(|e| e.entity_kind.as_str()).unwrap_or("unknown");
+        let conf = entity.map(|e| format!("{:.0}%", e.confidence * 100.0)).unwrap_or_default();
+        lines.push(format!("  **{}**. {} ({}) {}", choice.label, choice.description, kind_label, conf));
+    }
+
+    lines.push(String::new());
+    lines.push("Reply with a letter to select, or type a more specific name.".to_string());
+
+    lines.join("\n")
 }

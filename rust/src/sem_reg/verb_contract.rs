@@ -5,6 +5,8 @@
 
 use serde::{Deserialize, Serialize};
 
+fn default_true() -> bool { true }
+
 /// The JSONB body stored in `definition` for verb contracts.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VerbContractBody {
@@ -39,6 +41,20 @@ pub struct VerbContractBody {
     /// Natural language invocation phrases
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub invocation_phrases: Vec<String>,
+    /// Entity kinds this verb applies to (e.g., ["cbu", "fund", "person"]).
+    /// Empty = applies to all kinds (no filtering).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub subject_kinds: Vec<String>,
+    /// Phase tags (e.g., ["onboarding", "review", "monitoring"]).
+    /// Empty = no phase restriction.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub phase_tags: Vec<String>,
+    /// Whether this verb requires a subject entity (default true).
+    #[serde(default = "default_true")]
+    pub requires_subject: bool,
+    /// Whether executing this verb should update session focus entity.
+    #[serde(default)]
+    pub produces_focus: bool,
     /// Verb metadata
     #[serde(default)]
     pub metadata: Option<VerbContractMetadata>,
@@ -138,6 +154,12 @@ pub struct VerbContractMetadata {
     /// Tags for categorisation
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tags: Vec<String>,
+    /// Entity kinds this verb applies to (mirrors VerbContractBody for round-tripping)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub subject_kinds: Vec<String>,
+    /// Phase tags (mirrors VerbContractBody for round-tripping)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub phase_tags: Vec<String>,
 }
 
 #[cfg(test)]
@@ -190,12 +212,18 @@ mod tests {
             }),
             consumes: vec![],
             invocation_phrases: vec!["create CBU".into(), "new CBU".into()],
+            subject_kinds: vec!["cbu".into()],
+            phase_tags: vec!["onboarding".into()],
+            requires_subject: true,
+            produces_focus: true,
             metadata: Some(VerbContractMetadata {
                 tier: Some("intent".into()),
                 source_of_truth: Some("operational".into()),
                 scope: Some("global".into()),
                 noun: Some("cbu".into()),
                 tags: vec!["lifecycle".into(), "write".into()],
+                subject_kinds: vec!["cbu".into()],
+                phase_tags: vec!["onboarding".into()],
             }),
         };
 
@@ -205,6 +233,13 @@ mod tests {
         assert_eq!(back.args.len(), 2);
         assert!(back.args[1].lookup.is_some());
         assert_eq!(back.invocation_phrases.len(), 2);
+        assert_eq!(back.subject_kinds, vec!["cbu"]);
+        assert_eq!(back.phase_tags, vec!["onboarding"]);
+        assert!(back.requires_subject);
+        assert!(back.produces_focus);
+        let meta = back.metadata.unwrap();
+        assert_eq!(meta.subject_kinds, vec!["cbu"]);
+        assert_eq!(meta.phase_tags, vec!["onboarding"]);
     }
 
     #[test]
@@ -222,6 +257,10 @@ mod tests {
             produces: None,
             consumes: vec![],
             invocation_phrases: vec![],
+            subject_kinds: vec![],
+            phase_tags: vec![],
+            requires_subject: true,
+            produces_focus: false,
             metadata: None,
         };
 

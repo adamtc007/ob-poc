@@ -27,6 +27,8 @@ pub enum DecisionKind {
     ClarifyVerb,
     /// Ambiguous scope/tier (wraps IntentTierRequest)
     ClarifyScope,
+    /// Ambiguous entity — multiple candidates, none dominant
+    ClarifyEntity,
     /// Cannot safely proceed
     Refuse,
 }
@@ -124,6 +126,8 @@ pub enum ClarificationPayload {
     Verb(VerbPayload),
     /// Scope/tier disambiguation (wraps existing type)
     Scope(ScopePayload),
+    /// Entity disambiguation (multiple entity candidates)
+    Entity(EntityClarificationPayload),
     /// Cannot proceed
     Refuse(RefusePayload),
 }
@@ -280,6 +284,29 @@ pub struct RefusePayload {
     /// Suggestion for user
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub suggestion: Option<String>,
+}
+
+/// Entity disambiguation payload — presented when entity linking
+/// finds multiple candidates with no clear winner.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EntityClarificationPayload {
+    /// Candidate entities ranked by confidence
+    pub candidates: Vec<EntityChoice>,
+    /// The mention text from the utterance that triggered disambiguation
+    pub utterance_mention: String,
+}
+
+/// A candidate entity for disambiguation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EntityChoice {
+    /// Entity ID
+    pub entity_id: uuid::Uuid,
+    /// Entity kind (e.g., "cbu", "fund", "person")
+    pub entity_kind: String,
+    /// Canonical display name
+    pub canonical_name: String,
+    /// Confidence score from entity linking
+    pub confidence: f32,
 }
 
 /// Plan preview (what will execute)

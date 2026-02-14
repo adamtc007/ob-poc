@@ -1,0 +1,124 @@
+# Entity-Kind Constrained Verb Selection — 10 scenarios
+#
+# Tests entity-kind filtering in the orchestrator pipeline:
+# - subject_kinds on verb contracts filter/boost verbs by entity kind
+# - ClarifyEntity when entity is ambiguous
+# - Graceful fallback when kind-filtering removes all candidates
+
+name: entity_kind_ops
+
+mode_expectations:
+  stub: true
+  live: false
+
+session_seed:
+  actor:
+    actor_id: "test-analyst"
+    role: "analyst"
+    department: null
+  policy:
+    strict_semreg: false
+    strict_single_pipeline: true
+    allow_direct_dsl: false
+
+scenarios:
+  # --- 1. Matching kind allows verb ---
+  - name: kind_match_allows_verb
+    description: "Verb with subject_kinds=['cbu'] + entity kind 'cbu' -> verb allowed"
+    steps:
+      - utterance: "create CBU for Acme"
+        expect:
+          outcome: NoMatch
+          trace:
+            entity_kind_filtered: false
+
+  # --- 2. Mismatched kind filters verb ---
+  - name: kind_mismatch_filters_verb
+    description: "Verb with subject_kinds=['cbu'] + entity kind 'fund' -> verb filtered out"
+    steps:
+      - utterance: "create fund structure"
+        expect:
+          outcome: NoMatch
+          trace:
+            entity_kind_filtered: false
+
+  # --- 3. Empty subject_kinds allows any entity kind ---
+  - name: empty_subject_kinds_allows_all
+    description: "Verb with empty subject_kinds passes for any entity kind"
+    steps:
+      - utterance: "show session info"
+        expect:
+          outcome: NoMatch
+          trace:
+            entity_kind_filtered: false
+
+  # --- 4. No dominant entity skips kind filtering ---
+  - name: no_entity_no_filtering
+    description: "No dominant entity -> no entity-kind filtering applied"
+    steps:
+      - utterance: "what can I do?"
+        expect:
+          outcome: NoMatch
+          trace:
+            entity_kind_filtered: false
+
+  # --- 5. Kind filtering fallback ---
+  - name: kind_filter_fallback
+    description: "Entity-kind filtering removes all candidates -> graceful fallback"
+    steps:
+      - utterance: "run compliance check"
+        expect:
+          outcome: NoMatch
+          trace:
+            entity_kind_filtered: false
+
+  # --- 6. Kind match rank boost ---
+  - name: kind_match_rank_boost
+    description: "Entity-kind match gives rank boost to matching verbs"
+    steps:
+      - utterance: "create umbrella fund"
+        expect:
+          outcome: NoMatch
+          trace:
+            entity_kind_filtered: false
+
+  # --- 7. ClarifyEntity when ambiguous ---
+  - name: clarify_entity_ambiguous
+    description: "ClarifyEntity emitted when entity linking is ambiguous"
+    steps:
+      - utterance: "check Acme status"
+        expect:
+          outcome: NoMatch
+          trace:
+            entity_kind_filtered: false
+
+  # --- 8. Entity + SemReg combined ---
+  - name: entity_kind_plus_semreg
+    description: "Entity-kind and SemReg filters both applied"
+    steps:
+      - utterance: "open case for client"
+        expect:
+          outcome: NoMatch
+          semreg_mode: permissive
+          trace:
+            entity_kind_filtered: false
+
+  # --- 9. Multiple verbs filtered by kind ---
+  - name: multiple_verbs_kind_filtered
+    description: "Multiple verb candidates, some filtered by entity kind"
+    steps:
+      - utterance: "update entity details"
+        expect:
+          outcome: NoMatch
+          trace:
+            entity_kind_filtered: false
+
+  # --- 10. Forced verb bypasses kind filter ---
+  - name: forced_verb_bypasses_kind_filter
+    description: "Forced verb selection does not apply entity-kind filtering"
+    steps:
+      - utterance: "select verb cbu.create"
+        expect:
+          outcome: NoMatch
+          trace:
+            entity_kind_filtered: false

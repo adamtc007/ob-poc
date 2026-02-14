@@ -78,6 +78,8 @@ pub struct TraceExpectation {
     #[serde(default)]
     pub macro_denied_verbs_non_empty: Option<bool>,
     pub telemetry_persisted: Option<bool>,
+    pub dominant_entity_kind: Option<String>,
+    pub entity_kind_filtered: Option<bool>,
 }
 
 /// Action to take when an interactive outcome occurs.

@@ -292,6 +292,10 @@ mod tests {
             produces: None,
             consumes: vec![],
             invocation_phrases: vec![],
+            subject_kinds: vec![],
+            phase_tags: vec![],
+            requires_subject: true,
+            produces_focus: false,
             metadata: None,
         }
     }

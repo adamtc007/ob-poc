@@ -21,7 +21,8 @@ pub async fn insert_intent_event(pool: &PgPool, row: &IntentEventRow) -> bool {
             chosen_verb_fqn, selection_source, forced_verb_fqn,
             outcome, dsl_hash, run_sheet_entry_id,
             macro_semreg_checked, macro_denied_verbs,
-            prompt_version, error_code
+            prompt_version, error_code,
+            dominant_entity_id, dominant_entity_kind, entity_kind_filtered
         ) VALUES (
             $1, $2, $3, $4,
             $5, $6, $7,
@@ -31,7 +32,8 @@ pub async fn insert_intent_event(pool: &PgPool, row: &IntentEventRow) -> bool {
             $14, $15, $16,
             $17, $18, $19,
             $20, $21,
-            $22, $23
+            $22, $23,
+            $24, $25, $26
         )
         "#,
     )
@@ -58,6 +60,9 @@ pub async fn insert_intent_event(pool: &PgPool, row: &IntentEventRow) -> bool {
     .bind(&row.macro_denied_verbs)
     .bind(&row.prompt_version)
     .bind(&row.error_code)
+    .bind(row.dominant_entity_id)
+    .bind(&row.dominant_entity_kind)
+    .bind(row.entity_kind_filtered)
     .execute(pool)
     .await;
 

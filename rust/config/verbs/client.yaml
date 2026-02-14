@@ -23,6 +23,7 @@ verbs:
       internal: false
       noun: onboarding_status
       tags: [client-portal, read-only]
+      subject_kinds: [client, cbu]
     args:
       - name: cbu-id
         type: uuid
@@ -43,6 +44,7 @@ verbs:
       internal: false
       noun: outstanding_request
       tags: [client-portal, read-only]
+      subject_kinds: [client, cbu]
     args:
       - name: cbu-id
         type: uuid
@@ -68,6 +70,7 @@ verbs:
       internal: false
       noun: request_detail
       tags: [client-portal, read-only]
+      subject_kinds: [client, cbu]
     args:
       - name: request-id
         type: uuid
@@ -88,6 +91,7 @@ verbs:
       internal: false
       noun: entity_info
       tags: [client-portal, read-only]
+      subject_kinds: [client, cbu]
     args:
       - name: entity-id
         type: uuid
@@ -113,6 +117,7 @@ verbs:
       internal: false
       noun: document_submission
       tags: [client-portal, write]
+      subject_kinds: [client, cbu]
     args:
       - name: request-id
         type: uuid
@@ -150,6 +155,7 @@ verbs:
       internal: false
       noun: info_submission
       tags: [client-portal, write]
+      subject_kinds: [client, cbu]
     args:
       - name: request-id
         type: uuid
@@ -184,6 +190,7 @@ verbs:
       internal: false
       noun: request_note
       tags: [client-portal, write]
+      subject_kinds: [client, cbu]
     args:
       - name: request-id
         type: uuid
@@ -213,6 +220,7 @@ verbs:
       internal: false
       noun: clarification_request
       tags: [client-portal, write]
+      subject_kinds: [client, cbu]
     args:
       - name: request-id
         type: uuid
@@ -241,6 +249,7 @@ verbs:
       internal: false
       noun: collection_session
       tags: [client-portal, guided-collection]
+      subject_kinds: [client, cbu]
     args:
       - name: request-id
         type: uuid
@@ -261,6 +270,7 @@ verbs:
       internal: false
       noun: collection_response
       tags: [client-portal, guided-collection]
+      subject_kinds: [client, cbu]
     args:
       - name: field
         type: string
@@ -286,6 +296,7 @@ verbs:
       internal: false
       noun: collection_confirmation
       tags: [client-portal, guided-collection]
+      subject_kinds: [client, cbu]
     args:
       - name: confirmed
         type: boolean
@@ -311,6 +322,7 @@ verbs:
       internal: false
       noun: escalation_request
       tags: [client-portal, escalation]
+      subject_kinds: [client, cbu]
     args:
       - name: reason
         type: string

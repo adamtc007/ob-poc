@@ -29,6 +29,7 @@ domains:
           source_of_truth: external
           scope: global
           noun: lei
+          subject_kinds: [company, legal_entity]
           tags: [gleif, external-api, enrichment]
         args:
           - name: lei
@@ -67,6 +68,7 @@ domains:
           source_of_truth: external
           scope: global
           noun: lei
+          subject_kinds: [company, legal_entity]
           tags: [gleif, external-api, search]
         args:
           - name: name
@@ -115,6 +117,7 @@ domains:
           source_of_truth: external
           scope: global
           noun: lei
+          subject_kinds: [company, legal_entity]
           tags: [gleif, external-api, import, hierarchy]
         args:
           - name: root-lei
@@ -160,6 +163,7 @@ domains:
           source_of_truth: external
           scope: global
           noun: lei
+          subject_kinds: [company, legal_entity]
           tags: [gleif, external-api, import, funds]
         args:
           - name: manager-lei
@@ -199,6 +203,7 @@ domains:
           source_of_truth: external
           scope: global
           noun: lei
+          subject_kinds: [company, legal_entity]
           tags: [gleif, external-api, refresh]
         args:
           - name: entity-id
@@ -232,6 +237,7 @@ domains:
           source_of_truth: external
           scope: global
           noun: lei
+          subject_kinds: [company, legal_entity]
           tags: [gleif, external-api, lookup]
         args:
           - name: lei
@@ -249,6 +255,7 @@ domains:
           source_of_truth: external
           scope: global
           noun: lei
+          subject_kinds: [company, legal_entity]
           tags: [gleif, external-api, lookup, relationship]
         args:
           - name: lei
@@ -266,6 +273,7 @@ domains:
           source_of_truth: external
           scope: global
           noun: lei
+          subject_kinds: [company, legal_entity]
           tags: [gleif, external-api, lookup, relationship]
         args:
           - name: lei
@@ -293,6 +301,7 @@ domains:
           source_of_truth: external
           scope: global
           noun: lei
+          subject_kinds: [company, legal_entity]
           tags: [gleif, external-api, trace, ownership]
         args:
           - name: lei
@@ -322,6 +331,7 @@ domains:
           source_of_truth: external
           scope: global
           noun: lei
+          subject_kinds: [company, legal_entity]
           tags: [gleif, external-api, lookup, funds]
         args:
           - name: manager-lei
@@ -350,6 +360,7 @@ domains:
           source_of_truth: external
           scope: global
           noun: lei
+          subject_kinds: [company, legal_entity]
           tags: [gleif, external-api, lookup, successor]
         args:
           - name: lei
@@ -374,6 +385,7 @@ domains:
           source_of_truth: external
           scope: global
           noun: lei
+          subject_kinds: [company, legal_entity]
           tags: [gleif, external-api, lookup, relationship, funds]
         args:
           - name: lei
@@ -403,6 +415,7 @@ domains:
           source_of_truth: external
           scope: global
           noun: lei
+          subject_kinds: [company, legal_entity]
           tags: [gleif, external-api, lookup, relationship, funds]
         args:
           - name: lei
@@ -432,6 +445,7 @@ domains:
           source_of_truth: external
           scope: global
           noun: lei
+          subject_kinds: [company, legal_entity]
           tags: [gleif, external-api, lookup, relationship, funds]
         args:
           - name: lei
@@ -461,6 +475,7 @@ domains:
           source_of_truth: external
           scope: global
           noun: lei
+          subject_kinds: [company, legal_entity]
           tags: [gleif, external-api, lookup, isin]
         args:
           - name: isin
