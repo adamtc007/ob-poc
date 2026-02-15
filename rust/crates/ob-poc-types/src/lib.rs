@@ -427,96 +427,9 @@ pub struct DslState {
     #[serde(default)]
     pub can_execute: bool,
 
-    /// Validation status
-    #[serde(default)]
-    pub validation: Option<DslValidation>,
-
-    /// Intent information from agent (what verbs were extracted)
-    #[serde(default)]
-    pub intents: Option<Vec<VerbIntentInfo>>,
-
     /// Symbol bindings created by this DSL
     #[serde(default)]
     pub bindings: std::collections::HashMap<String, BoundEntityInfo>,
-}
-
-/// Validation result for DSL
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DslValidation {
-    /// Whether validation passed
-    pub valid: bool,
-    /// Validation errors (if any)
-    #[serde(default)]
-    pub errors: Vec<ValidationError>,
-    /// Validation warnings (if any)
-    #[serde(default)]
-    pub warnings: Vec<String>,
-}
-
-/// Information about an extracted verb intent
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VerbIntentInfo {
-    /// Full verb name (e.g., "cbu.assign-role")
-    pub verb: String,
-    /// Domain (e.g., "cbu")
-    pub domain: String,
-    /// Action (e.g., "assign-role")
-    pub action: String,
-    /// Parameter values (typed)
-    #[serde(default)]
-    pub params: std::collections::HashMap<String, ParamValue>,
-    /// Binding name if `:as @name` specified
-    #[serde(default)]
-    pub bind_as: Option<String>,
-    /// Validation status for this intent
-    #[serde(default)]
-    pub validation: Option<IntentValidationStatus>,
-}
-
-/// Parameter value in a verb intent
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
-pub enum ParamValue {
-    /// Literal string value
-    String { value: String },
-    /// Literal number value
-    Number { value: f64 },
-    /// Literal boolean value
-    Boolean { value: bool },
-    /// Symbol reference (@name)
-    SymbolRef { symbol: String },
-    /// Resolved entity reference
-    ResolvedEntity {
-        /// Display name for UI
-        display_name: String,
-        /// Resolved UUID
-        resolved_id: String,
-        /// Entity type
-        entity_type: String,
-    },
-    /// Unresolved entity lookup (needs resolution)
-    UnresolvedLookup {
-        /// Search text
-        search_text: String,
-        /// Expected entity type
-        entity_type: String,
-    },
-}
-
-/// Validation status for an intent
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct IntentValidationStatus {
-    /// Whether this intent is valid
-    pub valid: bool,
-    /// Error message if invalid
-    #[serde(default)]
-    pub error: Option<String>,
-    /// Missing required parameters
-    #[serde(default)]
-    pub missing_params: Vec<String>,
-    /// Unresolved entity references
-    #[serde(default)]
-    pub unresolved_refs: Vec<String>,
 }
 
 // ============================================================================

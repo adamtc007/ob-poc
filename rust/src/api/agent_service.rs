@@ -267,7 +267,7 @@ impl ClientScope {
 /// Usage:
 /// ```ignore
 /// let service = AgentService::new(pool, Some(embedder));
-/// let response = service.process_chat(&mut session, &request, llm_client).await?;
+/// let response = service.process_chat(&mut session, &request, actor).await?;
 /// ```
 pub struct AgentService {
     pool: PgPool,

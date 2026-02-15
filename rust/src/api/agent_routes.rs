@@ -304,8 +304,6 @@ fn build_dsl_state(
         source: dsl_source.cloned(),
         ast: api_ast,
         can_execute,
-        validation: None,
-        intents: None,
         bindings: api_bindings,
     })
 }
@@ -1981,21 +1979,7 @@ async fn execute_session_dsl(
 
     // =========================================================================
     // START GENERATION LOG
-    // Get feedback IDs from session context if available (set by chat handler)
     // =========================================================================
-    let (intent_feedback_id, pending_interaction_id) = {
-        let sessions = state.sessions.read().await;
-        sessions
-            .get(&session_id)
-            .map(|s| {
-                (
-                    s.context.pending_feedback_id,
-                    s.context.pending_interaction_id,
-                )
-            })
-            .unwrap_or((None, None))
-    };
-
     let log_id = state
         .generation_log
         .start_log(
@@ -2004,7 +1988,7 @@ async fn execute_session_dsl(
             Some(session_id),
             context.last_cbu_id,
             None,
-            intent_feedback_id,
+            None, // intent_feedback_id — only populated via MCP dsl_execute path
         )
         .await
         .ok();
@@ -2707,42 +2691,6 @@ async fn execute_session_dsl(
                     .record_execution_outcome(lid, ExecutionStatus::Executed, None, None)
                     .await;
             }
-
-            // Update intent_feedback outcome with DSL diff
-            if let Some(interaction_id) = pending_interaction_id {
-                let elapsed_ms = start_time.elapsed().as_millis() as i32;
-
-                // Convert DSL diff to feedback format
-                let (generated_dsl, final_dsl_str, user_edits_json) =
-                    if let Some(ref diff) = dsl_diff {
-                        let edits_json = if diff.edits.is_empty() {
-                            None
-                        } else {
-                            Some(serde_json::to_value(&diff.edits).unwrap_or_default())
-                        };
-                        (
-                            Some(diff.proposed.clone()),
-                            Some(diff.final_dsl.clone()),
-                            edits_json,
-                        )
-                    } else {
-                        (None, Some(dsl.clone()), None)
-                    };
-
-                let _ = state
-                    .feedback_service
-                    .record_outcome_with_dsl(
-                        interaction_id,
-                        ob_semantic_matcher::feedback::Outcome::Executed,
-                        None, // outcome_verb same as matched
-                        None, // no correction
-                        Some(elapsed_ms),
-                        generated_dsl,
-                        final_dsl_str,
-                        user_edits_json,
-                    )
-                    .await;
-            }
         }
         Err(e) => {
             all_success = false;
@@ -2782,21 +2730,6 @@ async fn execute_session_dsl(
                 let _ = state
                     .generation_log
                     .record_execution_outcome(lid, ExecutionStatus::Failed, Some(&error_msg), None)
-                    .await;
-            }
-
-            // Update intent_feedback outcome (execution failed)
-            if let Some(interaction_id) = pending_interaction_id {
-                let elapsed_ms = start_time.elapsed().as_millis() as i32;
-                let _ = state
-                    .feedback_service
-                    .record_outcome(
-                        interaction_id,
-                        ob_semantic_matcher::feedback::Outcome::Executed, // Still "executed" from feedback perspective
-                        None,
-                        None,
-                        Some(elapsed_ms),
-                    )
                     .await;
             }
 
