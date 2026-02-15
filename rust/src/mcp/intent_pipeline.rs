@@ -45,14 +45,10 @@ use ob_agentic::{create_llm_client, LlmClient};
 use crate::dsl_v2::ast::find_unresolved_ref_locations;
 use crate::dsl_v2::runtime_registry::{RuntimeArg, RuntimeVerb};
 use crate::dsl_v2::{compile, enrich_program, parse_program, registry, runtime_registry_arc};
-use crate::mcp::macro_integration::{
-    intent_args_to_macro_args, is_macro, try_expand_macro, MacroAttemptResult,
-};
 use crate::mcp::scope_resolution::{ScopeContext, ScopeResolutionOutcome, ScopeResolver};
 use crate::mcp::verb_search::{
     check_ambiguity, HybridVerbSearcher, VerbSearchOutcome, VerbSearchResult,
 };
-use crate::session::unified::UnifiedSession;
 
 #[cfg(feature = "database")]
 use sqlx::PgPool;
@@ -150,13 +146,6 @@ pub enum PipelineOutcome {
     DirectDslNotAllowed,
     /// SemReg denied all verb candidates (strict mode)
     NoAllowedVerbs,
-    /// Macro was expanded to primitive DSL statements
-    MacroExpanded {
-        /// Original macro verb
-        macro_verb: String,
-        /// Verbs unlocked after execution
-        unlocks: Vec<String>,
-    },
 }
 
 // =============================================================================
@@ -200,8 +189,6 @@ pub struct UnresolvedRef {
 
 /// Structured intent extraction pipeline
 pub struct IntentPipeline {
-    /// Optional session for macro expansion
-    session: Option<Arc<std::sync::RwLock<UnifiedSession>>>,
     verb_searcher: HybridVerbSearcher,
     llm_client: Option<Arc<dyn LlmClient>>,
     scope_resolver: ScopeResolver,
@@ -219,7 +206,6 @@ impl IntentPipeline {
             verb_searcher,
             llm_client: None,
             scope_resolver: ScopeResolver::new(),
-            session: None,
             allow_direct_dsl: false,
             #[cfg(feature = "database")]
             pool: None,
@@ -233,7 +219,6 @@ impl IntentPipeline {
             verb_searcher,
             llm_client: None,
             scope_resolver: ScopeResolver::new(),
-            session: None,
             allow_direct_dsl: false,
             pool: Some(pool),
         }
@@ -718,89 +703,6 @@ impl IntentPipeline {
         let intent = self
             .extract_arguments(instruction, &top_verb, verb_def, candidates[0].score)
             .await?;
-
-        // Step 3b: Check if this is a macro verb and expand it
-        if is_macro(&top_verb) {
-            tracing::info!(verb = top_verb, "Detected macro verb, attempting expansion");
-
-            // Convert intent args to macro args (HashMap<String, String>)
-            let macro_args = intent_args_to_macro_args(&intent);
-
-            // We need a session for macro expansion
-            if let Some(session_lock) = &self.session {
-                let session = session_lock
-                    .read()
-                    .map_err(|e| anyhow!("Session lock poisoned: {}", e))?;
-
-                match try_expand_macro(&top_verb, &macro_args, &session) {
-                    MacroAttemptResult::Expanded(expansion) => {
-                        // Join expanded statements into single DSL block
-                        let expanded_dsl = expansion.statements.join("\n");
-
-                        tracing::info!(
-                            macro_verb = top_verb,
-                            expanded_count = expansion.statements.len(),
-                            unlocks = ?expansion.unlocks,
-                            "Macro expanded successfully"
-                        );
-
-                        // Validate the expanded DSL
-                        let (valid, validation_error) = self.validate_dsl(&expanded_dsl);
-                        let dsl_hash = Some(compute_dsl_hash(&expanded_dsl));
-
-                        return Ok(PipelineResult {
-                            intent,
-                            verb_candidates: candidates,
-                            dsl: expanded_dsl,
-                            dsl_hash,
-                            valid,
-                            validation_error,
-                            unresolved_refs: vec![], // TODO: extract from expanded DSL
-                            missing_required: vec![],
-                            outcome: PipelineOutcome::MacroExpanded {
-                                macro_verb: top_verb.clone(),
-                                unlocks: expansion.unlocks,
-                            },
-                            scope_resolution: None,
-                            scope_context: if scope_ctx.has_scope() {
-                                Some(scope_ctx)
-                            } else {
-                                None
-                            },
-                        });
-                    }
-                    MacroAttemptResult::Failed(err) => {
-                        tracing::warn!(verb = top_verb, error = %err, "Macro expansion failed");
-                        return Ok(PipelineResult {
-                            intent,
-                            verb_candidates: candidates,
-                            dsl: String::new(),
-                            dsl_hash: None,
-                            valid: false,
-                            validation_error: Some(format!("Macro expansion failed: {}", err)),
-                            unresolved_refs: vec![],
-                            missing_required: vec![],
-                            outcome: PipelineOutcome::NeedsUserInput,
-                            scope_resolution: None,
-                            scope_context: if scope_ctx.has_scope() {
-                                Some(scope_ctx)
-                            } else {
-                                None
-                            },
-                        });
-                    }
-                    MacroAttemptResult::NotAMacro => {
-                        // Should not happen since we checked is_macro, but handle gracefully
-                        tracing::warn!(
-                            verb = top_verb,
-                            "is_macro returned true but try_expand_macro returned NotAMacro"
-                        );
-                    }
-                }
-            } else {
-                tracing::debug!(verb = top_verb, "Macro verb detected but no session available, falling through to normal processing");
-            }
-        }
 
         // Step 4: Check for missing required args BEFORE assembly (Problem B - fail early)
         let missing_required: Vec<String> = intent

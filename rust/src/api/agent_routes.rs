@@ -48,7 +48,7 @@ use ob_poc_types::{
         UnresolvedRefResponse as ApiUnresolvedRefResponse,
     },
     AstArgument, AstSpan, AstStatement, AstValue, BoundEntityInfo, ChatResponse, DslState,
-    DslValidation, SessionStateEnum, ValidationError as ApiValidationError, VerbIntentInfo,
+    SessionStateEnum,
 };
 
 use axum::{
@@ -270,118 +270,20 @@ fn to_api_ast_value(node: &dsl_core::AstNode) -> AstValue {
     }
 }
 
-/// Convert internal VerbIntent to API VerbIntentInfo
-fn to_api_verb_intent(intent: &crate::api::intent::VerbIntent) -> VerbIntentInfo {
-    use ob_poc_types::ParamValue as ApiParamValue;
-
-    // Split verb into domain.action
-    let parts: Vec<&str> = intent.verb.splitn(2, '.').collect();
-    let (domain, action) = if parts.len() == 2 {
-        (parts[0].to_string(), parts[1].to_string())
-    } else {
-        ("unknown".to_string(), intent.verb.clone())
-    };
-
-    // Convert params
-    let params: std::collections::HashMap<String, ApiParamValue> = intent
-        .params
-        .iter()
-        .map(|(k, v)| {
-            let api_val = match v {
-                crate::api::intent::ParamValue::String(s) => {
-                    ApiParamValue::String { value: s.clone() }
-                }
-                crate::api::intent::ParamValue::Number(n) => ApiParamValue::Number { value: *n },
-                crate::api::intent::ParamValue::Integer(n) => {
-                    ApiParamValue::Number { value: *n as f64 }
-                }
-                crate::api::intent::ParamValue::Boolean(b) => ApiParamValue::Boolean { value: *b },
-                crate::api::intent::ParamValue::Uuid(u) => ApiParamValue::String {
-                    value: u.to_string(),
-                },
-                crate::api::intent::ParamValue::ResolvedEntity {
-                    display_name,
-                    resolved_id,
-                } => ApiParamValue::ResolvedEntity {
-                    display_name: display_name.clone(),
-                    resolved_id: resolved_id.to_string(),
-                    entity_type: "entity".to_string(), // Default, could be enhanced
-                },
-                crate::api::intent::ParamValue::List(items) => {
-                    // For lists, just stringify for now
-                    ApiParamValue::String {
-                        value: format!("{:?}", items),
-                    }
-                }
-                crate::api::intent::ParamValue::Object(obj) => {
-                    // For objects, just stringify for now
-                    ApiParamValue::String {
-                        value: format!("{:?}", obj),
-                    }
-                }
-            };
-            (k.clone(), api_val)
-        })
-        .collect();
-
-    VerbIntentInfo {
-        verb: intent.verb.clone(),
-        domain,
-        action,
-        params,
-        bind_as: None, // VerbIntent doesn't have bind_as field
-        validation: None,
-    }
-}
-
 /// Build DslState from AgentChatResponse fields
 fn build_dsl_state(
     dsl_source: Option<&String>,
     ast: Option<&Vec<dsl_core::Statement>>,
     can_execute: bool,
-    intents: &[crate::api::intent::VerbIntent],
-    validation_results: &[crate::api::intent::IntentValidation],
     bindings: &std::collections::HashMap<String, crate::api::session::BoundEntity>,
 ) -> Option<DslState> {
     // Only create DslState if there's actual DSL content
-    if dsl_source.is_none() && ast.is_none() && intents.is_empty() {
+    if dsl_source.is_none() && ast.is_none() {
         return None;
     }
 
     // Convert AST
     let api_ast = ast.map(|stmts| stmts.iter().map(to_api_ast_statement).collect());
-
-    // Convert intents
-    let api_intents = if intents.is_empty() {
-        None
-    } else {
-        Some(intents.iter().map(to_api_verb_intent).collect())
-    };
-
-    // Build validation from validation_results
-    let validation = if validation_results.is_empty() {
-        None
-    } else {
-        let errors: Vec<ApiValidationError> = validation_results
-            .iter()
-            .filter(|v| !v.valid)
-            .flat_map(|v| {
-                // Convert each IntentError to ApiValidationError
-                v.errors.iter().map(|err| ApiValidationError {
-                    message: format!("[{}] {}", v.intent.verb, err.message),
-                    line: None,
-                    column: None,
-                    suggestion: err.param.clone(), // Use param as suggestion context
-                })
-            })
-            .collect();
-
-        Some(DslValidation {
-            valid: errors.is_empty(),
-            errors,
-            warnings: vec![],
-        })
-    };
 
     // Convert bindings (BoundEntity.display_name -> BoundEntityInfo.name)
     let api_bindings: std::collections::HashMap<String, BoundEntityInfo> = bindings
@@ -402,8 +304,8 @@ fn build_dsl_state(
         source: dsl_source.cloned(),
         ast: api_ast,
         can_execute,
-        validation,
-        intents: api_intents,
+        validation: None,
+        intents: None,
         bindings: api_bindings,
     })
 }
@@ -918,8 +820,7 @@ async fn get_session(
         entity_id: session.entity_id,
         state: session.state.clone().into(),
         message_count: session.messages.len(),
-        pending_intents: vec![], // Legacy - now in run_sheet
-        assembled_dsl: vec![],   // Legacy - now in run_sheet
+        assembled_dsl: vec![], // Legacy - now in run_sheet
         combined_dsl: session.run_sheet.combined_dsl(),
         context: session.context.clone(),
         messages: session.messages.iter().cloned().map(|m| m.into()).collect(),
@@ -1904,38 +1805,11 @@ async fn chat_session(
                 decision: None,
             }));
         }
-        _ => {} // Not a slash command, continue to LLM
+        _ => {} // Not a slash command, continue to orchestrator pipeline
     }
 
     // Make session mutable for the rest of the handler
     let mut session = session;
-
-    // Create LLM client (uses AGENT_BACKEND env var to select provider)
-    let llm_client = match crate::agentic::create_llm_client() {
-        Ok(client) => client,
-        Err(e) => {
-            let error_msg = format!("Error: LLM client initialization failed: {}", e);
-            return Ok(Json(ChatResponse {
-                message: error_msg,
-                dsl: None,
-                session_state: to_session_state_enum(&session.state),
-                commands: None,
-                disambiguation_request: None,
-                verb_disambiguation: None,
-                intent_tier: None,
-                unresolved_refs: None,
-                current_ref_index: None,
-                dsl_hash: None,
-                decision: None,
-            }));
-        }
-    };
-
-    tracing::info!(
-        "Chat session using {} ({})",
-        llm_client.provider_name(),
-        llm_client.model_name()
-    );
 
     // Resolve actor from request headers (PolicyGate enforcement)
     let actor = crate::policy::ActorResolver::from_headers(&headers);
@@ -1943,7 +1817,7 @@ async fn chat_session(
     // Delegate to centralized AgentService (single pipeline)
     let response = match state
         .agent_service
-        .process_chat(&mut session, &req, llm_client, actor)
+        .process_chat(&mut session, &req, actor)
         .await
     {
         Ok(r) => r,
@@ -1965,71 +1839,6 @@ async fn chat_session(
             }));
         }
     };
-
-    // =========================================================================
-    // CAPTURE FEEDBACK FOR LEARNING LOOP
-    // Record the verb match so we can correlate with execution outcome later
-    // =========================================================================
-    if !response.intents.is_empty() {
-        let first_intent = &response.intents[0];
-
-        // Determine match method: DirectDsl if user typed DSL, Semantic if LLM generated
-        let is_direct_dsl = req.message.trim().starts_with("dsl:");
-        let match_method = if is_direct_dsl {
-            ob_semantic_matcher::MatchMethod::DirectDsl
-        } else {
-            ob_semantic_matcher::MatchMethod::Semantic
-        };
-
-        // Build a MatchResult from the intent for feedback capture
-        let match_result = ob_semantic_matcher::MatchResult {
-            verb_name: first_intent.verb.clone(),
-            pattern_phrase: req.message.clone(), // The user's input
-            similarity: 1.0,                     // Direct DSL or LLM-selected verb
-            match_method,
-            category: "chat".to_string(),
-            is_agent_bound: true,
-        };
-
-        match state
-            .feedback_service
-            .capture_match(
-                session_id,
-                &req.message,
-                ob_semantic_matcher::feedback::InputSource::Chat,
-                Some(&match_result),
-                &[], // No alternatives from LLM path
-                session.context.domain_hint.as_deref(),
-                session.context.stage_focus.as_deref(),
-            )
-            .await
-        {
-            Ok(interaction_id) => {
-                // Store both interaction_id (for record_outcome) and feedback_id (for FK)
-                session.context.pending_interaction_id = Some(interaction_id);
-
-                // intent_feedback uses BIGSERIAL id, need to look it up by interaction_id
-                if let Ok(Some(feedback_id)) = sqlx::query_scalar::<_, i64>(
-                    r#"SELECT id FROM "ob-poc".intent_feedback WHERE interaction_id = $1"#,
-                )
-                .bind(interaction_id)
-                .fetch_optional(&state.pool)
-                .await
-                {
-                    session.context.pending_feedback_id = Some(feedback_id);
-                    tracing::debug!(
-                        "Captured feedback: interaction_id={}, feedback_id={}, method={:?}",
-                        interaction_id,
-                        feedback_id,
-                        match_method
-                    );
-                }
-            }
-            Err(e) => {
-                tracing::warn!("Failed to capture feedback: {}", e);
-            }
-        }
-    }
 
     // =========================================================================
     // TRACK PROPOSED DSL FOR DIFF (learning from user edits)
@@ -2059,8 +1868,6 @@ async fn chat_session(
         response.dsl_source.as_ref(),
         response.ast.as_ref(),
         response.can_execute,
-        &response.intents,
-        &response.validation_results,
         &session.context.bindings,
     );
 
@@ -3243,7 +3050,6 @@ async fn clear_session_dsl(
         entity_id: session.entity_id,
         state: session.state.clone().into(),
         message_count: session.messages.len(),
-        pending_intents: vec![],
         assembled_dsl: vec![],
         combined_dsl: None,
         context: session.context.clone(),

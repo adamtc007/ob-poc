@@ -64,7 +64,6 @@ pub fn outcome_label(outcome: &crate::mcp::intent_pipeline::PipelineOutcome) -> 
         PipelineOutcome::ScopeCandidates => "scope_candidates",
         PipelineOutcome::DirectDslNotAllowed => "direct_dsl_denied",
         PipelineOutcome::NoAllowedVerbs => "no_allowed_verbs",
-        PipelineOutcome::MacroExpanded { .. } => "macro_expanded",
     }
 }
 
@@ -117,13 +116,6 @@ mod tests {
         assert_eq!(
             outcome_label(&PipelineOutcome::NoAllowedVerbs),
             "no_allowed_verbs"
-        );
-        assert_eq!(
-            outcome_label(&PipelineOutcome::MacroExpanded {
-                macro_verb: "test".into(),
-                unlocks: vec![],
-            }),
-            "macro_expanded"
         );
     }
 }

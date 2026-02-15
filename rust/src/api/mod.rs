@@ -24,12 +24,6 @@ pub mod agent_routes;
 pub mod agent_state;
 
 #[cfg(feature = "server")]
-pub mod intent;
-
-#[cfg(feature = "server")]
-pub mod dsl_builder;
-
-#[cfg(feature = "server")]
 pub mod session;
 
 #[cfg(feature = "server")]
@@ -124,9 +118,6 @@ pub use session::{create_session_store, SessionStore};
 
 #[cfg(feature = "server")]
 pub use session_manager::{SessionManager, SessionSnapshot, SessionWatcher};
-
-#[cfg(feature = "server")]
-pub use intent::{AssembledDsl, IntentSequence, VerbIntent};
 
 #[cfg(feature = "server")]
 pub use agent_service::{AgentChatResponse, AgentCommand, AgentService, ChatRequest, ClientScope};

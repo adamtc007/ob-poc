@@ -1159,6 +1159,8 @@ Respond with ONLY the DSL, no explanation. If you cannot generate valid DSL, res
 
 /// POST /api/agent/generate-with-tools - Generate DSL using Claude tool_use
 ///
+/// LEGACY: gated behind OBPOC_ALLOW_LEGACY_GENERATE. Use /api/session/:id/chat instead.
+///
 /// This endpoint uses Claude's tool calling feature to look up real database IDs
 /// before generating DSL, preventing UUID hallucination.
 pub(crate) async fn generate_dsl_with_tools(
@@ -2054,6 +2056,8 @@ pub(crate) async fn extract_entity_mentions(
 // ============================================================================
 
 /// POST /api/agent/onboard - Generate onboarding DSL from natural language
+///
+/// LEGACY: gated behind OBPOC_ALLOW_LEGACY_GENERATE. Use /api/session/:id/chat instead.
 ///
 /// Uses the enhanced system prompt with onboarding context to generate
 /// complete onboarding workflows from natural language descriptions.

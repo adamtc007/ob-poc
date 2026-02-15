@@ -50,7 +50,7 @@
 //! ┌─────────────────────────────────────────────────────────────┐
 //! │  LLM Intent Extraction (with tool_use)                      │
 //! │  - Constrained to DSL verbs from YAML registry              │
-//! │  - Returns structured VerbIntent, NOT raw DSL               │
+//! │  - Returns structured intent via PipelineResult             │
 //! │  - Entity references go to "lookups" field                  │
 //! └─────────────────────────────────────────────────────────────┘
 //!       │
@@ -67,7 +67,7 @@
 //!       ▼
 //! ┌─────────────────────────────────────────────────────────────┐
 //! │  DSL Builder (DETERMINISTIC Rust code)                      │
-//! │  - VerbIntent + resolved UUIDs → DSL source                 │
+//! │  - Intent + resolved UUIDs → DSL source                     │
 //! │  - No LLM involved - pure Rust code                         │
 //! └─────────────────────────────────────────────────────────────┘
 //!       │
@@ -102,9 +102,8 @@
 //! Both `agentic_server` and `ob-poc-web` should use this service.
 
 use crate::agent::learning::embedder::CandleEmbedder;
-use crate::agentic::llm_client::LlmClient;
 use crate::api::client_group_adapter::ClientGroupEmbedderAdapter;
-use crate::api::intent::{IntentValidation, VerbIntent};
+
 use crate::api::session::DisambiguationRequest;
 use crate::dsl_v2::ast::AstNode;
 use crate::dsl_v2::gateway_resolver::{gateway_addr, GatewayRefResolver};
@@ -146,10 +145,6 @@ pub use ob_poc_types::ChatRequest;
 pub struct AgentChatResponse {
     /// Agent's response message
     pub message: String,
-    /// Extracted intents
-    pub intents: Vec<VerbIntent>,
-    /// Validation results for each intent
-    pub validation_results: Vec<IntentValidation>,
     /// Current session state
     pub session_state: SessionState,
     /// Whether the session can execute
@@ -518,7 +513,6 @@ impl AgentService {
         &self,
         session: &mut UnifiedSession,
         request: &ChatRequest,
-        _llm_client: Arc<dyn LlmClient>,
         actor: crate::sem_reg::abac::ActorContext,
     ) -> Result<AgentChatResponse, String> {
         use crate::dsl_v2::parse_program;
@@ -581,8 +575,7 @@ impl AgentService {
                     session.add_agent_message(msg.clone(), None, None);
                     return Ok(AgentChatResponse {
                         message: msg,
-                        intents: vec![],
-                        validation_results: vec![],
+
                         session_state: SessionState::PendingValidation,
                         can_execute: false,
                         dsl_source: None,
@@ -650,8 +643,7 @@ impl AgentService {
                 session.add_agent_message(msg.clone(), None, None);
                 return Ok(AgentChatResponse {
                     message: msg,
-                    intents: vec![],
-                    validation_results: vec![],
+
                     session_state: SessionState::PendingValidation,
                     can_execute: false,
                     dsl_source: None,
@@ -971,8 +963,7 @@ impl AgentService {
                     session.add_agent_message(msg.clone(), None, None);
                     return Ok(AgentChatResponse {
                         message: msg,
-                        intents: vec![],
-                        validation_results: vec![],
+
                         session_state: SessionState::New,
                         can_execute: false,
                         dsl_source: None,
@@ -993,42 +984,6 @@ impl AgentService {
                     if let Some(err) = r.validation_error {
                         return Ok(self.fail(&err, session));
                     }
-                }
-
-                // Handle macro expansion with explicit feedback
-                if let PipelineOutcome::MacroExpanded {
-                    ref macro_verb,
-                    ref unlocks,
-                } = r.outcome
-                {
-                    tracing::info!(
-                        macro_verb = %macro_verb,
-                        expanded_dsl = %r.dsl,
-                        unlocks = ?unlocks,
-                        "Macro expanded to primitive DSL"
-                    );
-                    // Stage the expanded primitive DSL
-                    let ast = parse_program(&r.dsl)
-                        .map(|p| p.statements)
-                        .unwrap_or_default();
-                    session.set_pending_dsl(r.dsl.clone(), ast, None, false);
-
-                    // Macro verbs that are structure/case/mandate operations auto-run
-                    let is_setup_macro = macro_verb.ends_with(".setup")
-                        || macro_verb.ends_with(".select")
-                        || macro_verb.ends_with(".list");
-
-                    if is_setup_macro {
-                        tracing::debug!(macro_verb = %macro_verb, "Auto-running setup macro");
-                        return self.execute_runbook(session).await;
-                    }
-
-                    let msg = format!(
-                        "Macro '{}' expanded to:\n{}\n\nSay 'run' to execute.",
-                        macro_verb, r.dsl
-                    );
-                    session.add_agent_message(msg.clone(), None, Some(r.dsl.clone()));
-                    return Ok(self.staged_response(r.dsl, msg));
                 }
 
                 // Got valid DSL?
@@ -1261,8 +1216,7 @@ impl AgentService {
 
         Some(AgentChatResponse {
             message,
-            intents: vec![],
-            validation_results: vec![],
+
             session_state: SessionState::PendingValidation,
             can_execute: false,
             dsl_source: None,
@@ -1373,8 +1327,7 @@ impl AgentService {
 
         Some(AgentChatResponse {
             message: prompt,
-            intents: vec![],
-            validation_results: vec![],
+
             session_state: SessionState::PendingValidation,
             can_execute: false,
             dsl_source: None,
@@ -1475,8 +1428,7 @@ impl AgentService {
 
         Ok(AgentChatResponse {
             message,
-            intents: vec![],
-            validation_results: vec![],
+
             session_state: SessionState::Scoped,
             can_execute: false,
             dsl_source: None,
@@ -1707,8 +1659,7 @@ impl AgentService {
                                     dsl_source: Some(combined_dsl.to_string()),
                                     can_execute: true, // Ready to run
                                     session_state: SessionState::ReadyToExecute,
-                                    intents: vec![],
-                                    validation_results: vec![],
+
                                     ast: None,
                                     disambiguation: None,
                                     commands: None,
@@ -1779,8 +1730,7 @@ impl AgentService {
                     dsl_source: Some(resolved_dsl),
                     can_execute: false, // Already executed
                     session_state: SessionState::Executed,
-                    intents: vec![],
-                    validation_results: vec![],
+
                     ast: None,
                     disambiguation: None,
                     commands: None,
@@ -1930,8 +1880,7 @@ impl AgentService {
             dsl_source: Some(dsl),
             can_execute: true,
             session_state: SessionState::ReadyToExecute,
-            intents: vec![],
-            validation_results: vec![],
+
             ast: None,
             disambiguation: None,
             commands: None,
@@ -1949,8 +1898,7 @@ impl AgentService {
         session.add_agent_message(msg.to_string(), None, None);
         AgentChatResponse {
             message: msg.to_string(),
-            intents: vec![],
-            validation_results: vec![],
+
             session_state: SessionState::New,
             can_execute: false,
             dsl_source: None,
@@ -2071,8 +2019,7 @@ impl AgentService {
         // The UI should check for this field and render clickable buttons
         AgentChatResponse {
             message,
-            intents: vec![],
-            validation_results: vec![],
+
             session_state: SessionState::PendingValidation,
             can_execute: false,
             dsl_source: None,
@@ -2148,8 +2095,7 @@ impl AgentService {
 
         AgentChatResponse {
             message,
-            intents: vec![],
-            validation_results: vec![],
+
             session_state: SessionState::PendingValidation,
             can_execute: false,
             dsl_source: None,

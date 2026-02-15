@@ -4,7 +4,6 @@
 //! Sessions accumulate AST statements, validate them, and track execution.
 //! The AST is the source of truth - DSL source is generated from it for display.
 
-use super::intent::VerbIntent;
 use crate::dsl_v2::ast::{Program, Statement};
 use crate::dsl_v2::batch_executor::BatchResultAccumulator;
 use crate::mcp::scope_resolution::ScopeContext;
@@ -1015,11 +1014,6 @@ pub struct AgentSession {
     #[serde(default)]
     pub run_sheet: ServerRunSheet,
 
-    /// Pending verb intents during disambiguation flow
-    /// Stored temporarily while user resolves entity ambiguities
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub pending_intents: Vec<super::intent::VerbIntent>,
-
     /// Context accumulated during session
     pub context: SessionContext,
 }
@@ -1050,7 +1044,6 @@ impl AgentSession {
             inherited_symbols: HashMap::new(),
             messages: Vec::new(),
             run_sheet: ServerRunSheet::default(),
-            pending_intents: Vec::new(),
             context: SessionContext {
                 domain_hint,
                 ..Default::default()
@@ -1090,7 +1083,6 @@ impl AgentSession {
             inherited_symbols,
             messages: Vec::new(),
             run_sheet: ServerRunSheet::default(),
-            pending_intents: Vec::new(),
             context: SessionContext {
                 // Inherit key context from parent
                 domain_hint: parent.context.domain_hint.clone(),
@@ -1355,7 +1347,7 @@ impl AgentSession {
     pub fn add_agent_message(
         &mut self,
         content: String,
-        intents: Option<Vec<VerbIntent>>,
+        _intents: Option<()>,
         dsl: Option<String>,
     ) -> Uuid {
         let id = Uuid::new_v4();
@@ -1364,27 +1356,20 @@ impl AgentSession {
             role: MessageRole::Agent,
             content,
             timestamp: Utc::now(),
-            intents,
+            intents: None,
             dsl,
         });
         self.updated_at = Utc::now();
         id
     }
 
-    /// Add intents and transition state
-    pub fn add_intents(&mut self, intents: Vec<VerbIntent>) {
-        self.pending_intents.extend(intents);
-        self.transition(SessionEvent::DslPendingValidation);
-    }
-
-    /// Set assembled DSL after validation (keep intents for execution-time resolution)
+    /// Set assembled DSL after validation
     /// Deprecated: Use set_pending_dsl which adds to run_sheet
     pub fn set_assembled_dsl(&mut self, dsl: Vec<String>) {
         // Add each DSL string to run sheet as draft
         for source in dsl {
             self.run_sheet.add_draft(source, Vec::new());
         }
-        // NOTE: Don't clear pending_intents - we need them for execution-time ref resolution
         self.transition(SessionEvent::DslReady);
     }
 
@@ -1450,9 +1435,9 @@ pub struct ChatMessage {
     pub content: String,
     /// When the message was sent
     pub timestamp: DateTime<Utc>,
-    /// Intents extracted from this message (if user message processed)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub intents: Option<Vec<VerbIntent>>,
+    /// Intents extracted from this message (legacy, always None)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub intents: Option<serde_json::Value>,
     /// DSL generated from this message (if any)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dsl: Option<String>,
@@ -3002,36 +2987,6 @@ pub struct CreateSessionResponse {
 
 // ChatRequest is now in ob-poc-types - SINGLE source of truth
 
-/// Response from a chat message (intent-based)
-#[derive(Debug, Serialize)]
-pub struct ChatResponse {
-    /// Agent's response message
-    pub message: String,
-    /// Extracted intents
-    pub intents: Vec<VerbIntent>,
-    /// Validation results for each intent
-    pub validation_results: Vec<super::intent::IntentValidation>,
-    /// Assembled DSL (if all intents valid)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub assembled_dsl: Option<super::intent::AssembledDsl>,
-    /// Current session state
-    pub session_state: SessionState,
-    /// Whether the session can execute
-    pub can_execute: bool,
-    /// DSL source rendered from AST (for display in UI)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub dsl_source: Option<String>,
-    /// The full AST for debugging (JSON serialized)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub ast: Option<Vec<Statement>>,
-    /// Session bindings with type info
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub bindings: Option<HashMap<String, BoundEntity>>,
-    /// Commands for the UI to execute (uses shared type from ob_poc_types)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub commands: Option<Vec<ob_poc_types::AgentCommand>>,
-}
-
 /// Response with session state
 #[derive(Debug, Serialize)]
 pub struct SessionStateResponse {
@@ -3046,9 +3001,6 @@ pub struct SessionStateResponse {
     pub state: SessionState,
     /// Number of messages in the session
     pub message_count: usize,
-    /// Pending intents awaiting validation (empty vec if none)
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub pending_intents: Vec<VerbIntent>,
     /// Assembled DSL statements (empty vec if none)
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub assembled_dsl: Vec<String>,
@@ -3135,9 +3087,9 @@ pub struct DisambiguationRequest {
     pub items: Vec<DisambiguationItem>,
     /// Human-readable prompt for the user
     pub prompt: String,
-    /// Original intents that need disambiguation (preserved for re-processing)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub original_intents: Option<Vec<VerbIntent>>,
+    /// Original intents that need disambiguation (legacy, always None)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub original_intents: Option<serde_json::Value>,
 }
 
 /// A single ambiguous item needing resolution
@@ -3293,21 +3245,13 @@ mod tests {
         let mut session = AgentSession::new(None);
         assert_eq!(session.state, SessionState::New);
 
-        // Add intents -> PendingValidation
-        session.add_intents(vec![VerbIntent {
-            verb: "cbu.ensure".to_string(),
-            params: Default::default(),
-            refs: Default::default(),
-            lookups: None,
-            sequence: None,
-        }]);
+        // Transition to PendingValidation
+        session.transition(SessionEvent::DslPendingValidation);
         assert_eq!(session.state, SessionState::PendingValidation);
 
         // Set assembled DSL -> ReadyToExecute
-        // NOTE: pending_intents are kept for execution-time ref resolution
         session.set_assembled_dsl(vec!["(cbu.ensure :cbu-name \"Test\")".to_string()]);
         assert_eq!(session.state, SessionState::ReadyToExecute);
-        assert_eq!(session.pending_intents.len(), 1); // Intents preserved
         assert!(session.run_sheet.has_runnable()); // Entry is draft/runnable
 
         // Get the entry ID to mark as executed

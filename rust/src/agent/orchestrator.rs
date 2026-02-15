@@ -17,14 +17,12 @@ use uuid::Uuid;
 use sqlx::PgPool;
 
 use crate::agent::telemetry;
-use crate::dsl_v2::parse_program;
 use crate::lookup::LookupService;
 use crate::mcp::intent_pipeline::{IntentPipeline, PipelineOutcome, PipelineResult};
 use crate::mcp::scope_resolution::ScopeContext;
 use crate::mcp::verb_search::HybridVerbSearcher;
 use crate::policy::{gate::PolicySnapshot, PolicyGate};
 use crate::sem_reg::abac::ActorContext;
-use dsl_core::ast::Statement;
 
 /// Context needed to run the unified orchestrator.
 pub struct OrchestratorContext {
@@ -273,158 +271,6 @@ pub async fn handle_utterance(
         };
         emit_telemetry(ctx, utterance, &mut outcome).await;
         return Ok(outcome);
-    }
-
-    // -- MacroExpanded: apply SemReg governance to expanded verbs --
-    if let PipelineOutcome::MacroExpanded { ref macro_verb, .. } = discovery_result.outcome {
-        if !discovery_result.dsl.is_empty() {
-            // Extract verb FQNs from expanded DSL using AST parser
-            let expanded_verbs: Vec<String> = match parse_program(&discovery_result.dsl) {
-                Ok(program) => program
-                    .statements
-                    .iter()
-                    .filter_map(|stmt| {
-                        if let Statement::VerbCall(vc) = stmt {
-                            Some(vc.full_name())
-                        } else {
-                            None
-                        }
-                    })
-                    .collect(),
-                Err(e) => {
-                    tracing::warn!(
-                        macro_verb = %macro_verb,
-                        error = %e,
-                        "Failed to parse macro DSL for SemReg governance, falling back to empty"
-                    );
-                    vec![]
-                }
-            };
-
-            let mut macro_denied: Vec<String> = vec![];
-            let macro_semreg_checked;
-
-            match &sem_reg_policy {
-                SemRegVerbPolicy::AllowedSet(allowed) => {
-                    macro_denied = expanded_verbs
-                        .iter()
-                        .filter(|v| !allowed.contains(v.as_str()))
-                        .cloned()
-                        .collect();
-                    macro_semreg_checked = true;
-                }
-                SemRegVerbPolicy::DenyAll => {
-                    macro_denied = expanded_verbs.clone();
-                    macro_semreg_checked = true;
-                }
-                SemRegVerbPolicy::Unavailable => {
-                    macro_semreg_checked = false;
-                    if policy.semreg_fail_closed() {
-                        // Strict mode: SemReg unavailable means deny
-                        macro_denied = expanded_verbs.clone();
-                    }
-                }
-            }
-
-            if !macro_denied.is_empty() && policy.semreg_fail_closed() {
-                tracing::warn!(
-                    macro_verb = %macro_verb,
-                    denied_verbs = ?macro_denied,
-                    "SemReg denied verbs in macro expansion (strict mode)"
-                );
-                let mut trace = build_trace(
-                    utterance,
-                    ctx,
-                    &entity_candidates,
-                    &dominant_entity_name,
-                    &dominant_entity_kind,
-                    &sem_reg_verb_names,
-                    &pre_filter,
-                    &pre_filter,
-                    &chosen_verb_pre_semreg,
-                    &None,
-                    &discovery_result,
-                    &sem_reg_policy,
-                    None,
-                    true,
-                    false,
-                );
-                trace.selection_source = "macro".to_string();
-                trace.macro_semreg_checked = macro_semreg_checked;
-                trace.macro_denied_verbs = macro_denied.clone();
-                use crate::mcp::intent_pipeline::StructuredIntent;
-                let mut outcome = OrchestratorOutcome {
-                    pipeline_result: PipelineResult {
-                        intent: StructuredIntent::empty(),
-                        verb_candidates: vec![],
-                        dsl: String::new(),
-                        dsl_hash: None,
-                        valid: false,
-                        validation_error: Some(format!(
-                            "Macro '{}' contains verbs denied by SemReg: {:?}",
-                            macro_verb, macro_denied
-                        )),
-                        unresolved_refs: vec![],
-                        missing_required: vec![],
-                        outcome: PipelineOutcome::NoAllowedVerbs,
-                        scope_resolution: discovery_result.scope_resolution,
-                        scope_context: discovery_result.scope_context,
-                    },
-                    sem_reg_verbs: sem_reg_verb_names,
-                    lookup_result,
-                    trace,
-                };
-                emit_telemetry(ctx, utterance, &mut outcome).await;
-                return Ok(outcome);
-            }
-
-            if !macro_denied.is_empty() {
-                // Non-strict: log but allow
-                tracing::warn!(
-                    macro_verb = %macro_verb,
-                    denied_verbs = ?macro_denied,
-                    "SemReg would deny verbs in macro expansion (permissive mode, allowing)"
-                );
-            }
-
-            // Macro passed SemReg check (or non-strict allowed it)
-            tracing::info!(
-                macro_verb = %macro_verb,
-                verb_count = expanded_verbs.len(),
-                semreg_checked = macro_semreg_checked,
-                denied_count = macro_denied.len(),
-                "Macro expansion SemReg governance complete"
-            );
-
-            let mut trace = build_trace(
-                utterance,
-                ctx,
-                &entity_candidates,
-                &dominant_entity_name,
-                &dominant_entity_kind,
-                &sem_reg_verb_names,
-                &pre_filter,
-                &pre_filter,
-                &chosen_verb_pre_semreg,
-                &chosen_verb_pre_semreg,
-                &discovery_result,
-                &sem_reg_policy,
-                None,
-                false,
-                false,
-            );
-            trace.selection_source = "macro".to_string();
-            trace.macro_semreg_checked = macro_semreg_checked;
-            trace.macro_denied_verbs = macro_denied;
-            let mut outcome = OrchestratorOutcome {
-                pipeline_result: discovery_result,
-                sem_reg_verbs: sem_reg_verb_names,
-                lookup_result,
-                trace,
-            };
-            emit_telemetry(ctx, utterance, &mut outcome).await;
-            return Ok(outcome);
-        }
     }
 
     // -- Stage A.2: Apply SemReg policy --
@@ -917,6 +763,7 @@ async fn resolve_sem_reg_verbs(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::dsl_v2::parse_program;
 
     /// Helper to build a default IntentTrace for tests.
     fn default_trace() -> IntentTrace {
@@ -1059,10 +906,6 @@ mod tests {
         }));
         assert!(is_early_exit(&PipelineOutcome::ScopeCandidates));
         assert!(is_early_exit(&PipelineOutcome::DirectDslNotAllowed));
-        assert!(!is_early_exit(&PipelineOutcome::MacroExpanded {
-            macro_verb: "test.macro".into(),
-            unlocks: vec![],
-        }));
         // These are NOT early exits
         assert!(!is_early_exit(&PipelineOutcome::Ready));
         assert!(!is_early_exit(&PipelineOutcome::NeedsClarification));
@@ -1130,15 +973,6 @@ mod tests {
         assert!(json.contains(r#""macro_semreg_checked":true"#));
         assert!(json.contains("bad.verb"));
         assert!(json.contains("macro_denied_verbs"));
-    }
-
-    #[test]
-    fn test_macro_expanded_not_early_exit() {
-        // MacroExpanded must NOT be an early exit — it needs SemReg governance
-        assert!(!is_early_exit(&PipelineOutcome::MacroExpanded {
-            macro_verb: "onboarding.setup".into(),
-            unlocks: vec!["kyc.open-case".into()],
-        }));
     }
 
     #[test]

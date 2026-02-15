@@ -39,7 +39,6 @@ fn outcome_label(outcome: &PipelineOutcome) -> &'static str {
         PipelineOutcome::ScopeCandidates => "ScopeCandidates",
         PipelineOutcome::DirectDslNotAllowed => "DirectDslNotAllowed",
         PipelineOutcome::NoAllowedVerbs => "NoAllowedVerbs",
-        PipelineOutcome::MacroExpanded { .. } => "MacroExpanded",
     }
 }
 
@@ -279,10 +278,6 @@ fn check_global_invariants(
             actual: format!("{} chars", result.dsl.len()),
         });
     }
-
-    // INV-2: MacroExpanded implies macro_semreg_checked (when SemReg is available)
-    // Note: this is checked conditionally via trace expectations, not forced globally
-    // since SemReg availability varies per test
 }
 
 #[cfg(test)]

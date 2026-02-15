@@ -143,9 +143,6 @@ pub struct UnifiedSession {
     /// Symbols inherited from parent session (pre-populated on creation)
     #[serde(default)]
     pub inherited_symbols: HashMap<String, BoundEntity>,
-    /// Pending verb intents during disambiguation flow
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub pending_intents: Vec<crate::api::intent::VerbIntent>,
     /// Domain hint for RAG context (duplicated in context for backward compat)
     #[serde(default)]
     pub domain_hint: Option<String>,
@@ -817,9 +814,9 @@ pub struct ChatMessage {
     pub role: MessageRole,
     pub content: String,
     pub timestamp: DateTime<Utc>,
-    /// Intents extracted from this message (if user message processed)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub intents: Option<Vec<crate::api::intent::VerbIntent>>,
+    /// Intents extracted from this message (legacy, always None)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub intents: Option<serde_json::Value>,
     /// DSL generated from this message (if any)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dsl: Option<String>,
@@ -1616,7 +1613,6 @@ impl UnifiedSession {
             parent_session_id: None,
             sub_session_type: SubSessionType::Root,
             inherited_symbols: HashMap::new(),
-            pending_intents: Vec::new(),
             domain_hint: None,
             // Session context (backward compatibility)
             context: crate::api::session::SessionContext::default(),
@@ -1773,17 +1769,6 @@ impl UnifiedSession {
             symbols.insert(name.clone(), bound.id);
         }
         symbols
-    }
-
-    /// Add intents and transition state
-    pub fn add_intents(&mut self, intents: Vec<crate::api::intent::VerbIntent>) {
-        self.pending_intents.extend(intents);
-        self.transition(SessionEvent::DslPendingValidation);
-    }
-
-    /// Clear pending intents
-    pub fn clear_pending_intents(&mut self) {
-        self.pending_intents.clear();
     }
 
     // =========================================================================
@@ -2085,7 +2070,7 @@ impl UnifiedSession {
     pub fn add_agent_message(
         &mut self,
         content: String,
-        intents: Option<Vec<crate::api::intent::VerbIntent>>,
+        _intents: Option<()>,
         dsl: Option<String>,
     ) -> Uuid {
         let id = Uuid::new_v4();
@@ -2094,7 +2079,7 @@ impl UnifiedSession {
             role: MessageRole::Agent,
             content,
             timestamp: Utc::now(),
-            intents,
+            intents: None,
             dsl,
         });
         self.updated_at = Utc::now();
