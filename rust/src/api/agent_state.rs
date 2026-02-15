@@ -2,6 +2,11 @@
 //!
 //! Contains `AgentState` (shared state for all agent route handlers)
 //! and the `create_agent_router_with_semantic()` entry point.
+//!
+//! Chat endpoints flow through the single intent pipeline (orchestrator →
+//! verb search → DSL generation → runbook execution). Non-chat endpoints
+//! (template authoring, research tools) may use LLM helpers for content
+//! generation, but execution remains runbook-gated.
 
 use crate::agent::learning::warmup::LearningWarmup;
 use crate::api::session::SessionStore;
@@ -31,7 +36,6 @@ pub struct AgentState {
     pub session_repo: Arc<crate::database::SessionRepository>,
     pub dsl_repo: Arc<crate::database::DslRepository>,
     pub agent_service: Arc<crate::api::agent_service::AgentService>,
-    pub feedback_service: Arc<ob_semantic_matcher::FeedbackService>,
     pub expansion_audit: Arc<crate::database::ExpansionAuditRepository>,
     /// Entity linking service for in-memory entity resolution
     pub entity_linker: Arc<dyn EntityLinkingService>,
@@ -51,7 +55,6 @@ impl AgentState {
         let generation_log = Arc::new(GenerationLogRepository::new(pool.clone()));
         let session_repo = Arc::new(crate::database::SessionRepository::new(pool.clone()));
         let dsl_repo = Arc::new(crate::database::DslRepository::new(pool.clone()));
-        let feedback_service = Arc::new(ob_semantic_matcher::FeedbackService::new(pool.clone()));
         let session_manager = crate::api::session_manager::SessionManager::new(sessions.clone());
 
         // Initialize embedder synchronously (blocks ~3-5s, but only at startup)
@@ -226,7 +229,6 @@ impl AgentState {
             session_repo,
             dsl_repo,
             agent_service: Arc::new(agent_service),
-            feedback_service,
             expansion_audit,
             entity_linker,
             policy_gate,

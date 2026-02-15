@@ -18,7 +18,7 @@
 //! | SentencePlayback    | Reject          | discard_proposal()     | InPack                  |
 //! | RunbookEditing      | Command(Run)    | execute_runbook()      | Executing               |
 //! | RunbookEditing      | Message         | handle_in_pack_msg()   | SentencePlayback        |
-//! | Executing           | (completion)    | record_outcomes()      | RunbookEditing          |
+//! | Executing           | (completion)    | execute_runbook_from() | RunbookEditing          |
 
 use std::collections::HashMap;
 use std::sync::Arc;
