@@ -30,7 +30,7 @@ pub struct MentionSpan {
 
 /// Configuration for mention extraction
 #[derive(Debug, Clone)]
-pub struct MentionExtractorConfig {
+pub(crate) struct MentionExtractorConfig {
     /// Maximum n-gram size to consider
     pub max_ngram: usize,
     /// Minimum score threshold to keep a span
@@ -56,11 +56,6 @@ pub struct MentionExtractor {
 }
 
 impl MentionExtractor {
-    /// Create with custom configuration
-    pub fn with_config(config: MentionExtractorConfig) -> Self {
-        Self { config }
-    }
-
     /// Extract non-overlapping mention spans from utterance
     pub fn extract(&self, utterance: &str, snapshot: &EntitySnapshot) -> Vec<MentionSpan> {
         let words = self.tokenize_with_positions(utterance);

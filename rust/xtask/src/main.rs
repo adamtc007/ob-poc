@@ -10,7 +10,6 @@ use clap::{Parser, Subcommand};
 use xshell::{cmd, Shell};
 
 mod allianz_harness;
-mod harness;
 mod aviva_deal_harness;
 mod bpmn_lite;
 mod deal_harness;
@@ -20,6 +19,7 @@ mod gleif_crawl_dsl;
 mod gleif_import;
 mod gleif_load;
 mod gleif_test;
+mod harness;
 mod lexicon;
 mod replay_tuner;
 mod seed_allianz;
@@ -1358,7 +1358,11 @@ fn main() -> Result<()> {
                     harness::list(scenarios_dir)?;
                     Ok(())
                 }
-                HarnessAction::Run { suite, scenario, all } => {
+                HarnessAction::Run {
+                    suite,
+                    scenario,
+                    all,
+                } => {
                     let db_url = std::env::var("DATABASE_URL")
                         .unwrap_or_else(|_| "postgresql:///data_designer".into());
                     let pool = rt.block_on(sqlx::PgPool::connect(&db_url))?;

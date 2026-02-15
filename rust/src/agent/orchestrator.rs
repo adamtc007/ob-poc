@@ -16,15 +16,15 @@ use uuid::Uuid;
 #[cfg(feature = "database")]
 use sqlx::PgPool;
 
+use crate::agent::telemetry;
+use crate::dsl_v2::parse_program;
 use crate::lookup::LookupService;
-use crate::policy::{PolicyGate, gate::PolicySnapshot};
 use crate::mcp::intent_pipeline::{IntentPipeline, PipelineOutcome, PipelineResult};
 use crate::mcp::scope_resolution::ScopeContext;
 use crate::mcp::verb_search::HybridVerbSearcher;
-use crate::dsl_v2::parse_program;
-use dsl_core::ast::Statement;
-use crate::agent::telemetry;
+use crate::policy::{gate::PolicySnapshot, PolicyGate};
 use crate::sem_reg::abac::ActorContext;
+use dsl_core::ast::Statement;
 
 /// Context needed to run the unified orchestrator.
 pub struct OrchestratorContext {
@@ -190,7 +190,8 @@ pub async fn handle_utterance(
         .unwrap_or_default();
 
     // -- Step 2: SemReg context resolution --
-    let (sem_reg_policy, sem_reg_verb_names) = resolve_sem_reg_verbs(ctx, dominant_entity_kind.as_deref()).await;
+    let (sem_reg_policy, sem_reg_verb_names) =
+        resolve_sem_reg_verbs(ctx, dominant_entity_kind.as_deref()).await;
 
     // -- Stage A: Discover candidates (no DSL generation yet) --
     let searcher = (*ctx.verb_searcher).clone();
@@ -216,10 +217,21 @@ pub async fn handle_utterance(
     // -- Early exit check --
     if is_early_exit(&discovery_result.outcome) {
         let trace = build_trace(
-            utterance, ctx, &entity_candidates, &dominant_entity_name,
-            &dominant_entity_kind, &sem_reg_verb_names, &pre_filter, &pre_filter,
-            &chosen_verb_pre_semreg, &chosen_verb_pre_semreg,
-            &discovery_result, &sem_reg_policy, None, false, false,
+            utterance,
+            ctx,
+            &entity_candidates,
+            &dominant_entity_name,
+            &dominant_entity_kind,
+            &sem_reg_verb_names,
+            &pre_filter,
+            &pre_filter,
+            &chosen_verb_pre_semreg,
+            &chosen_verb_pre_semreg,
+            &discovery_result,
+            &sem_reg_policy,
+            None,
+            false,
+            false,
         );
         let mut outcome = OrchestratorOutcome {
             pipeline_result: discovery_result,
@@ -237,11 +249,21 @@ pub async fn handle_utterance(
         && policy.can_use_direct_dsl(&ctx.actor)
     {
         let trace = build_trace(
-            utterance, ctx, &entity_candidates, &dominant_entity_name,
-            &dominant_entity_kind, &sem_reg_verb_names, &pre_filter, &pre_filter,
-            &chosen_verb_pre_semreg, &chosen_verb_pre_semreg,
-            &discovery_result, &sem_reg_policy,
-            Some("direct_dsl".to_string()), false, false,
+            utterance,
+            ctx,
+            &entity_candidates,
+            &dominant_entity_name,
+            &dominant_entity_kind,
+            &sem_reg_verb_names,
+            &pre_filter,
+            &pre_filter,
+            &chosen_verb_pre_semreg,
+            &chosen_verb_pre_semreg,
+            &discovery_result,
+            &sem_reg_policy,
+            Some("direct_dsl".to_string()),
+            false,
+            false,
         );
         let mut outcome = OrchestratorOutcome {
             pipeline_result: discovery_result,
@@ -258,13 +280,17 @@ pub async fn handle_utterance(
         if !discovery_result.dsl.is_empty() {
             // Extract verb FQNs from expanded DSL using AST parser
             let expanded_verbs: Vec<String> = match parse_program(&discovery_result.dsl) {
-                Ok(program) => program.statements.iter().filter_map(|stmt| {
-                    if let Statement::VerbCall(vc) = stmt {
-                        Some(vc.full_name())
-                    } else {
-                        None
-                    }
-                }).collect(),
+                Ok(program) => program
+                    .statements
+                    .iter()
+                    .filter_map(|stmt| {
+                        if let Statement::VerbCall(vc) = stmt {
+                            Some(vc.full_name())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect(),
                 Err(e) => {
                     tracing::warn!(
                         macro_verb = %macro_verb,
@@ -280,7 +306,8 @@ pub async fn handle_utterance(
 
             match &sem_reg_policy {
                 SemRegVerbPolicy::AllowedSet(allowed) => {
-                    macro_denied = expanded_verbs.iter()
+                    macro_denied = expanded_verbs
+                        .iter()
                         .filter(|v| !allowed.contains(v.as_str()))
                         .cloned()
                         .collect();
@@ -306,10 +333,21 @@ pub async fn handle_utterance(
                     "SemReg denied verbs in macro expansion (strict mode)"
                 );
                 let mut trace = build_trace(
-                    utterance, ctx, &entity_candidates, &dominant_entity_name,
-                    &dominant_entity_kind, &sem_reg_verb_names, &pre_filter, &pre_filter,
-                    &chosen_verb_pre_semreg, &None,
-                    &discovery_result, &sem_reg_policy, None, true, false,
+                    utterance,
+                    ctx,
+                    &entity_candidates,
+                    &dominant_entity_name,
+                    &dominant_entity_kind,
+                    &sem_reg_verb_names,
+                    &pre_filter,
+                    &pre_filter,
+                    &chosen_verb_pre_semreg,
+                    &None,
+                    &discovery_result,
+                    &sem_reg_policy,
+                    None,
+                    true,
+                    false,
                 );
                 trace.selection_source = "macro".to_string();
                 trace.macro_semreg_checked = macro_semreg_checked;
@@ -359,10 +397,21 @@ pub async fn handle_utterance(
             );
 
             let mut trace = build_trace(
-                utterance, ctx, &entity_candidates, &dominant_entity_name,
-                &dominant_entity_kind, &sem_reg_verb_names, &pre_filter, &pre_filter,
-                &chosen_verb_pre_semreg, &chosen_verb_pre_semreg,
-                &discovery_result, &sem_reg_policy, None, false, false,
+                utterance,
+                ctx,
+                &entity_candidates,
+                &dominant_entity_name,
+                &dominant_entity_kind,
+                &sem_reg_verb_names,
+                &pre_filter,
+                &pre_filter,
+                &chosen_verb_pre_semreg,
+                &chosen_verb_pre_semreg,
+                &discovery_result,
+                &sem_reg_policy,
+                None,
+                false,
+                false,
             );
             trace.selection_source = "macro".to_string();
             trace.macro_semreg_checked = macro_semreg_checked;
@@ -413,7 +462,8 @@ pub async fn handle_utterance(
             sem_reg_denied_all = true;
             if policy.semreg_fail_closed() {
                 tracing::warn!("SemReg returned DenyAll -- fail-closed (strict mode)");
-                blocked_reason = Some("SemReg denied all verbs for this subject (strict mode)".into());
+                blocked_reason =
+                    Some("SemReg denied all verbs for this subject (strict mode)".into());
                 filtered_candidates.clear();
             } else {
                 tracing::warn!("SemReg returned DenyAll -- fail-open (permissive mode)");
@@ -448,7 +498,11 @@ pub async fn handle_utterance(
             dsl: String::new(),
             dsl_hash: None,
             valid: false,
-            validation_error: Some(blocked_reason.clone().unwrap_or_else(|| "SemReg blocked (strict mode)".into())),
+            validation_error: Some(
+                blocked_reason
+                    .clone()
+                    .unwrap_or_else(|| "SemReg blocked (strict mode)".into()),
+            ),
             unresolved_refs: vec![],
             missing_required: vec![],
             outcome: PipelineOutcome::NoAllowedVerbs,
@@ -494,11 +548,21 @@ pub async fn handle_utterance(
         && chosen_post.is_some()
         && chosen_verb_pre_semreg != *chosen_post;
     let mut trace = build_trace(
-        utterance, ctx, &entity_candidates, &dominant_entity_name,
-        &dominant_entity_kind, &sem_reg_verb_names, &pre_filter, &post_filter,
-        &chosen_verb_pre_semreg, chosen_post,
-        &result, &sem_reg_policy, None,
-        sem_reg_denied_all, semreg_unavailable,
+        utterance,
+        ctx,
+        &entity_candidates,
+        &dominant_entity_name,
+        &dominant_entity_kind,
+        &sem_reg_verb_names,
+        &pre_filter,
+        &post_filter,
+        &chosen_verb_pre_semreg,
+        chosen_post,
+        &result,
+        &sem_reg_policy,
+        None,
+        sem_reg_denied_all,
+        semreg_unavailable,
     );
     if semreg_forced_regen {
         trace.selection_source = "semreg".to_string();
@@ -551,9 +615,22 @@ fn build_trace(
     semreg_unavailable: bool,
 ) -> IntentTrace {
     let policy = &ctx.policy_gate;
-    let final_verb = result.verb_candidates.first().map(|v| v.verb.clone())
-        .or_else(|| if !result.intent.verb.is_empty() { Some(result.intent.verb.clone()) } else { None });
-    let final_confidence = result.verb_candidates.first().map(|v| v.score).unwrap_or(0.0);
+    let final_verb = result
+        .verb_candidates
+        .first()
+        .map(|v| v.verb.clone())
+        .or_else(|| {
+            if !result.intent.verb.is_empty() {
+                Some(result.intent.verb.clone())
+            } else {
+                None
+            }
+        });
+    let final_confidence = result
+        .verb_candidates
+        .first()
+        .map(|v| v.score)
+        .unwrap_or(0.0);
 
     let bypass = bypass_used.or_else(|| {
         if utterance.trim().starts_with("dsl:") && policy.can_use_direct_dsl(&ctx.actor) {
@@ -610,7 +687,6 @@ fn build_trace(
         telemetry_persisted: false,
     }
 }
-
 
 /// Emit a telemetry event from an OrchestratorOutcome. Best-effort, never fails.
 #[cfg(feature = "database")]
@@ -732,7 +808,11 @@ pub async fn handle_utterance_with_forced_verb(
         dsl_hash: result.dsl_hash.clone(),
         bypass_used: None,
         dsl_source: Some(format!("{:?}", ctx.source)),
-        sem_reg_mode: if policy.semreg_fail_closed() { "strict".into() } else { "permissive".into() },
+        sem_reg_mode: if policy.semreg_fail_closed() {
+            "strict".into()
+        } else {
+            "permissive".into()
+        },
         sem_reg_denied_all: false,
         policy_gate_snapshot: policy.snapshot(),
         forced_verb: Some(forced_verb_fqn.to_string()),
@@ -784,7 +864,10 @@ async fn resolve_sem_reg_verbs(
     let subject = if let Some(entity_id) = ctx.dominant_entity_id {
         SubjectRef::EntityId(entity_id)
     } else {
-        SubjectRef::CaseId(ctx.case_id.unwrap_or_else(|| ctx.session_id.unwrap_or_else(Uuid::new_v4)))
+        SubjectRef::CaseId(
+            ctx.case_id
+                .unwrap_or_else(|| ctx.session_id.unwrap_or_else(Uuid::new_v4)),
+        )
     };
     let request = ContextResolutionRequest {
         subject,
@@ -877,7 +960,9 @@ mod tests {
         trace.entity_candidates = vec!["Allianz".into()];
         trace.dominant_entity = Some("Allianz".into());
         #[cfg(feature = "database")]
-        { trace.sem_reg_verb_filter = Some(vec!["kyc.open-case".into()]); }
+        {
+            trace.sem_reg_verb_filter = Some(vec!["kyc.open-case".into()]);
+        }
         trace.verb_candidates_pre_filter = vec![("kyc.open-case".into(), 0.95)];
         trace.verb_candidates_post_filter = vec![("kyc.open-case".into(), 0.95)];
         trace.final_verb = Some("kyc.open-case".into());
@@ -912,7 +997,9 @@ mod tests {
         let mut trace = default_trace();
         trace.utterance = "show cases".into();
         #[cfg(feature = "database")]
-        { trace.sem_reg_verb_filter = Some(vec![]); }
+        {
+            trace.sem_reg_verb_filter = Some(vec![]);
+        }
         trace.verb_candidates_pre_filter = vec![("kyc.open-case".into(), 0.9)];
         trace.sem_reg_denied_all = true;
         trace.blocked_reason = Some("SemReg denied all verb candidates (strict mode)".into());
@@ -1060,13 +1147,17 @@ mod tests {
         use dsl_core::ast::Statement;
         let dsl = "(entity.create :name \"Acme\")\n(kyc.open-case :entity \"Acme\")";
         let program = parse_program(dsl).expect("valid DSL");
-        let verbs: Vec<String> = program.statements.iter().filter_map(|stmt| {
-            if let Statement::VerbCall(vc) = stmt {
-                Some(vc.full_name())
-            } else {
-                None
-            }
-        }).collect();
+        let verbs: Vec<String> = program
+            .statements
+            .iter()
+            .filter_map(|stmt| {
+                if let Statement::VerbCall(vc) = stmt {
+                    Some(vc.full_name())
+                } else {
+                    None
+                }
+            })
+            .collect();
         assert_eq!(verbs.len(), 2);
         assert_eq!(verbs[0], "entity.create");
         assert_eq!(verbs[1], "kyc.open-case");
@@ -1077,13 +1168,17 @@ mod tests {
         use dsl_core::ast::Statement;
         let dsl = "(cbu.create :name \"Test\")";
         let program = parse_program(dsl).expect("valid DSL");
-        let verbs: Vec<String> = program.statements.iter().filter_map(|stmt| {
-            if let Statement::VerbCall(vc) = stmt {
-                Some(vc.full_name())
-            } else {
-                None
-            }
-        }).collect();
+        let verbs: Vec<String> = program
+            .statements
+            .iter()
+            .filter_map(|stmt| {
+                if let Statement::VerbCall(vc) = stmt {
+                    Some(vc.full_name())
+                } else {
+                    None
+                }
+            })
+            .collect();
         assert_eq!(verbs.len(), 1);
         assert_eq!(verbs[0], "cbu.create");
     }
@@ -1141,5 +1236,4 @@ mod tests {
         assert!(json.contains(r#""macro_semreg_checked":true"#));
         assert!(json.contains("denied.verb"));
     }
-
 }

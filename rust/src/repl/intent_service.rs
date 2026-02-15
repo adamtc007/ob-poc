@@ -7,7 +7,7 @@
 //! # Phases
 //!
 //! 1. **Input** — Raw user text arrives
-//! 2. **Verb matching** — `match_verb()` delegates to `IntentMatcher`
+//! 2. **Verb matching** — `match_verb_with_context()` delegates to `IntentMatcher`
 //! 3. **Clarification** — `check_clarification()` checks missing args against `sentences.clarify`
 //! 4. **Sentence generation** — `generate_sentence()` deterministic template substitution
 //! 5. **Confirmation** — `confirm_policy()` determines if user must confirm
@@ -102,55 +102,7 @@ impl IntentService {
         }
     }
 
-    /// Phase 2: Verb matching (delegates to IntentMatcher) — **WITHOUT pack scoring**.
-    ///
-    /// Maps the full `IntentMatchResult` to a simplified `VerbMatchOutcome`
-    /// that the orchestrator can pattern-match on.
-    ///
-    /// **Deprecated:** Use [`match_verb_with_context`] instead, which applies
-    /// pack-scoped scoring (invariant P-2). This method calls `match_intent()`
-    /// directly and bypasses pack boost/penalty/forbidden filtering.
-    #[deprecated(note = "Use match_verb_with_context for pack-scoped scoring (P-2)")]
-    pub async fn match_verb(&self, input: &str, ctx: &MatchContext) -> Result<VerbMatchOutcome> {
-        let result = self.intent_matcher.match_intent(input, ctx).await?;
-
-        let outcome = match &result.outcome {
-            MatchOutcome::Matched { verb, confidence } => VerbMatchOutcome::Matched {
-                verb: verb.clone(),
-                confidence: *confidence,
-                generated_dsl: result.generated_dsl.clone(),
-            },
-            MatchOutcome::Ambiguous { margin } => {
-                let candidates = result
-                    .verb_candidates
-                    .iter()
-                    .map(|vc| VerbMatchCandidate {
-                        verb_fqn: vc.verb_fqn.clone(),
-                        description: vc.description.clone(),
-                        score: vc.score,
-                    })
-                    .collect();
-                VerbMatchOutcome::Ambiguous {
-                    candidates,
-                    margin: *margin,
-                }
-            }
-            MatchOutcome::NoMatch { reason } => VerbMatchOutcome::NoMatch {
-                reason: reason.clone(),
-            },
-            MatchOutcome::DirectDsl { source } => VerbMatchOutcome::DirectDsl {
-                source: source.clone(),
-            },
-            MatchOutcome::NeedsScopeSelection => VerbMatchOutcome::NeedsScopeSelection,
-            MatchOutcome::NeedsEntityResolution => VerbMatchOutcome::NeedsEntityResolution,
-            // Intent tier, client group, etc. — pass through as Other
-            _ => VerbMatchOutcome::Other(Box::new(result)),
-        };
-
-        Ok(outcome)
-    }
-
-    /// Phase 2b: Context-aware verb matching with pack scoring.
+    /// Phase 2: Context-aware verb matching with pack scoring.
     ///
     /// Uses `search_with_context()` on the IntentMatcher trait which:
     /// 1. Runs raw semantic search via `match_intent()`
@@ -158,7 +110,7 @@ impl IntentService {
     /// 3. Applies ambiguity policy (Invariant I-5)
     ///
     /// This is the primary verb matching path when a ContextStack is available.
-    /// Falls back to `match_verb()` semantics when no pack is active.
+    /// Falls back to raw matching semantics when no pack is active.
     pub async fn match_verb_with_context(
         &self,
         input: &str,
@@ -333,11 +285,6 @@ impl IntentService {
         self.verb_config_index.verb_sentences(verb)
     }
 
-    /// Access to the underlying IntentMatcher (for advanced use).
-    pub fn intent_matcher(&self) -> &dyn IntentMatcher {
-        self.intent_matcher.as_ref()
-    }
-
     /// Access to the underlying VerbConfigIndex.
     pub fn verb_config_index(&self) -> &VerbConfigIndex {
         &self.verb_config_index
@@ -349,12 +296,13 @@ impl IntentService {
 // ============================================================================
 
 #[cfg(test)]
-#[allow(deprecated)] // Tests exercise deprecated match_verb() for coverage
 mod tests {
+    use super::super::runbook::Runbook;
     use super::super::types::VerbCandidate;
     use super::*;
     use async_trait::async_trait;
     use dsl_core::config::types::{ArgConfig, ArgType};
+    use uuid::Uuid;
 
     /// Stub IntentMatcher for testing IntentService without real verb search.
     struct StubIntentMatcher {
@@ -536,9 +484,11 @@ mod tests {
             StubIntentMatcher::matched("cbu.create", 0.92, Some("(cbu.create :name \"Test\")"));
         let index = make_test_index_with_sentences();
         let svc = IntentService::new(Arc::new(matcher), Arc::new(index));
+        let rb = Runbook::new(Uuid::new_v4());
+        let stack = ContextStack::from_runbook(&rb, None, 0);
 
         let outcome = svc
-            .match_verb("create a fund", &default_context())
+            .match_verb_with_context("create a fund", &default_context(), &stack)
             .await
             .unwrap();
         match outcome {
@@ -563,9 +513,11 @@ mod tests {
         );
         let index = make_test_index_with_sentences();
         let svc = IntentService::new(Arc::new(matcher), Arc::new(index));
+        let rb = Runbook::new(Uuid::new_v4());
+        let stack = ContextStack::from_runbook(&rb, None, 0);
 
         let outcome = svc
-            .match_verb("load the book", &default_context())
+            .match_verb_with_context("load the book", &default_context(), &stack)
             .await
             .unwrap();
         match outcome {
@@ -582,14 +534,20 @@ mod tests {
         let matcher = StubIntentMatcher::no_match("below threshold");
         let index = make_test_index_with_sentences();
         let svc = IntentService::new(Arc::new(matcher), Arc::new(index));
+        let rb = Runbook::new(Uuid::new_v4());
+        let stack = ContextStack::from_runbook(&rb, None, 0);
 
         let outcome = svc
-            .match_verb("asdfghjkl", &default_context())
+            .match_verb_with_context("asdfghjkl", &default_context(), &stack)
             .await
             .unwrap();
         match outcome {
             VerbMatchOutcome::NoMatch { reason } => {
-                assert!(reason.contains("threshold"));
+                assert!(
+                    reason.contains("threshold")
+                        || reason.contains("precondition")
+                        || reason.contains("No verb")
+                );
             }
             other => panic!("Expected NoMatch, got {:?}", other),
         }

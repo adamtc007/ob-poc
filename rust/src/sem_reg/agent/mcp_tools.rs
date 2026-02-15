@@ -28,8 +28,8 @@ use crate::sem_reg::abac::ActorContext;
 use crate::sem_reg::context_resolution::{
     resolve_context, ContextResolutionRequest, EvidenceMode, SubjectRef,
 };
-use crate::sem_reg::store::SnapshotStore;
 use crate::sem_reg::enforce::{enforce_read, enforce_read_label, redacted_stub, EnforceResult};
+use crate::sem_reg::store::SnapshotStore;
 use crate::sem_reg::types::{GovernanceTier, ObjectType, TrustClass};
 
 // ── Tool Context ──────────────────────────────────────────────

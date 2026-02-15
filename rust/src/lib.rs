@@ -152,7 +152,6 @@ pub mod clarify;
 // Policy module — server-side enforcement for single-pipeline invariants
 pub mod policy;
 
-
 // Semantic Registry — immutable snapshot-based registry for the Semantic OS
 #[cfg(feature = "database")]
 pub mod sem_reg;

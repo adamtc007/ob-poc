@@ -15,15 +15,12 @@
 use anyhow::{Context, Result};
 use std::path::{Path, PathBuf};
 
+use ob_poc::agent::harness::runner::{dump_failures, print_suite_report, run_suite, SuiteResult};
 use ob_poc::agent::harness::{load_all_suites, load_suite, ScenarioSuite};
-use ob_poc::agent::harness::runner::{
-    dump_failures, print_suite_report, run_suite, SuiteResult,
-};
 
 /// List all suites and their scenario counts.
 pub fn list(scenarios_dir: &Path) -> Result<()> {
-    let suites = load_all_suites(scenarios_dir)
-        .context("Failed to load scenario suites")?;
+    let suites = load_all_suites(scenarios_dir).context("Failed to load scenario suites")?;
 
     if suites.is_empty() {
         println!("No suites found in {}", scenarios_dir.display());
@@ -35,9 +32,16 @@ pub fn list(scenarios_dir: &Path) -> Result<()> {
     for suite in &suites {
         let count = suite.scenarios.len();
         total_scenarios += count;
-        println!("  {:30} {:>3} scenarios  ({})", suite.name, count, suite.suite_id);
+        println!(
+            "  {:30} {:>3} scenarios  ({})",
+            suite.name, count, suite.suite_id
+        );
     }
-    println!("\n  Total: {} scenarios across {} suites", total_scenarios, suites.len());
+    println!(
+        "\n  Total: {} scenarios across {} suites",
+        total_scenarios,
+        suites.len()
+    );
     Ok(())
 }
 
@@ -126,10 +130,15 @@ pub async fn dump(
 
     for suite in &suites {
         if let Some(scenario) = suite.scenarios.iter().find(|s| s.name == scenario_name) {
-            let result = ob_poc::agent::harness::runner::run_scenario_stub(pool, suite, scenario).await;
+            let result =
+                ob_poc::agent::harness::runner::run_scenario_stub(pool, suite, scenario).await;
             let json = serde_json::to_string_pretty(&result)?;
             std::fs::write(out_path, &json)?;
-            println!("Dumped scenario '{}' to {}", scenario_name, out_path.display());
+            println!(
+                "Dumped scenario '{}' to {}",
+                scenario_name,
+                out_path.display()
+            );
             return Ok(());
         }
     }

@@ -94,22 +94,42 @@ impl ActorResolver {
     #[cfg(feature = "server")]
     pub fn from_headers(headers: &axum::http::HeaderMap) -> ActorContext {
         use crate::sem_reg::types::Classification;
-        let actor_id = headers.get("x-obpoc-actor-id").and_then(|v| v.to_str().ok()).unwrap_or("anonymous").to_string();
-        let roles: Vec<String> = headers.get("x-obpoc-roles").and_then(|v| v.to_str().ok())
+        let actor_id = headers
+            .get("x-obpoc-actor-id")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("anonymous")
+            .to_string();
+        let roles: Vec<String> = headers
+            .get("x-obpoc-roles")
+            .and_then(|v| v.to_str().ok())
             .map(|r| r.split(',').map(|s| s.trim().to_string()).collect())
             .unwrap_or_else(|| vec!["viewer".into()]);
-        let department = headers.get("x-obpoc-department").and_then(|v| v.to_str().ok()).map(String::from);
-        let clearance = headers.get("x-obpoc-clearance").and_then(|v| v.to_str().ok()).and_then(|s| match s.to_lowercase().as_str() {
-            "public" => Some(Classification::Public),
-            "internal" => Some(Classification::Internal),
-            "confidential" => Some(Classification::Confidential),
-            "restricted" => Some(Classification::Restricted),
-            _ => None,
-        });
-        let jurisdictions: Vec<String> = headers.get("x-obpoc-jurisdictions").and_then(|v| v.to_str().ok())
+        let department = headers
+            .get("x-obpoc-department")
+            .and_then(|v| v.to_str().ok())
+            .map(String::from);
+        let clearance = headers
+            .get("x-obpoc-clearance")
+            .and_then(|v| v.to_str().ok())
+            .and_then(|s| match s.to_lowercase().as_str() {
+                "public" => Some(Classification::Public),
+                "internal" => Some(Classification::Internal),
+                "confidential" => Some(Classification::Confidential),
+                "restricted" => Some(Classification::Restricted),
+                _ => None,
+            });
+        let jurisdictions: Vec<String> = headers
+            .get("x-obpoc-jurisdictions")
+            .and_then(|v| v.to_str().ok())
             .map(|j| j.split(',').map(|s| s.trim().to_string()).collect())
             .unwrap_or_default();
-        ActorContext { actor_id, roles, department, clearance, jurisdictions }
+        ActorContext {
+            actor_id,
+            roles,
+            department,
+            clearance,
+            jurisdictions,
+        }
     }
 
     pub fn from_env() -> ActorContext {
@@ -119,24 +139,39 @@ impl ActorResolver {
             .map(|r| r.split(',').map(String::from).collect())
             .unwrap_or_else(|_| vec!["viewer".into()]);
         let department = std::env::var("MCP_DEPARTMENT").ok();
-        let clearance = std::env::var("MCP_CLEARANCE").ok().and_then(|s| match s.to_lowercase().as_str() {
-            "public" => Some(Classification::Public),
-            "internal" => Some(Classification::Internal),
-            "confidential" => Some(Classification::Confidential),
-            "restricted" => Some(Classification::Restricted),
-            _ => None,
-        });
+        let clearance =
+            std::env::var("MCP_CLEARANCE")
+                .ok()
+                .and_then(|s| match s.to_lowercase().as_str() {
+                    "public" => Some(Classification::Public),
+                    "internal" => Some(Classification::Internal),
+                    "confidential" => Some(Classification::Confidential),
+                    "restricted" => Some(Classification::Restricted),
+                    _ => None,
+                });
         let jurisdictions: Vec<String> = std::env::var("MCP_JURISDICTIONS")
             .map(|j| j.split(',').map(String::from).collect())
             .unwrap_or_default();
-        ActorContext { actor_id, roles, department, clearance, jurisdictions }
+        ActorContext {
+            actor_id,
+            roles,
+            department,
+            clearance,
+            jurisdictions,
+        }
     }
 
     pub fn from_session_id(session_id: uuid::Uuid) -> ActorContext {
         let roles: Vec<String> = std::env::var("REPL_ROLES")
             .map(|r| r.split(',').map(String::from).collect())
             .unwrap_or_else(|_| vec!["viewer".into()]);
-        ActorContext { actor_id: session_id.to_string(), roles, department: None, clearance: None, jurisdictions: vec![] }
+        ActorContext {
+            actor_id: session_id.to_string(),
+            roles,
+            department: None,
+            clearance: None,
+            jurisdictions: vec![],
+        }
     }
 }
 
@@ -151,15 +186,77 @@ fn env_bool(key: &str, default: bool) -> bool {
 mod tests {
     use super::*;
 
-    fn viewer() -> ActorContext { ActorContext { actor_id: "v".into(), roles: vec!["viewer".into()], department: None, clearance: None, jurisdictions: vec![] } }
-    fn operator() -> ActorContext { ActorContext { actor_id: "o".into(), roles: vec!["operator".into()], department: None, clearance: None, jurisdictions: vec![] } }
-    fn admin() -> ActorContext { ActorContext { actor_id: "a".into(), roles: vec!["admin".into()], department: None, clearance: None, jurisdictions: vec![] } }
+    fn viewer() -> ActorContext {
+        ActorContext {
+            actor_id: "v".into(),
+            roles: vec!["viewer".into()],
+            department: None,
+            clearance: None,
+            jurisdictions: vec![],
+        }
+    }
+    fn operator() -> ActorContext {
+        ActorContext {
+            actor_id: "o".into(),
+            roles: vec!["operator".into()],
+            department: None,
+            clearance: None,
+            jurisdictions: vec![],
+        }
+    }
+    fn admin() -> ActorContext {
+        ActorContext {
+            actor_id: "a".into(),
+            roles: vec!["admin".into()],
+            department: None,
+            clearance: None,
+            jurisdictions: vec![],
+        }
+    }
 
-    #[test] fn test_strict_denies_all() { let g = PolicyGate::strict(); assert!(!g.can_use_direct_dsl(&operator())); assert!(!g.can_execute_raw_dsl(&operator())); assert!(!g.can_use_legacy_generate(&operator())); assert!(g.semreg_fail_closed()); }
-    #[test] fn test_permissive_allows_operator() { let g = PolicyGate::permissive(); assert!(!g.can_use_direct_dsl(&viewer())); assert!(g.can_use_direct_dsl(&operator())); assert!(g.can_execute_raw_dsl(&operator())); }
-    #[test] fn test_admin_same_as_operator() { let g = PolicyGate::permissive(); assert!(g.can_use_direct_dsl(&admin())); assert!(g.can_execute_raw_dsl(&admin())); }
-    #[test] fn test_strict_with_legacy_flag() { let mut g = PolicyGate::strict(); g.allow_legacy_generate = true; assert!(!g.can_use_legacy_generate(&viewer())); assert!(g.can_use_legacy_generate(&operator())); }
-    #[test] fn test_non_strict_legacy_open() { let mut g = PolicyGate::strict(); g.strict_single_pipeline = false; assert!(g.can_use_legacy_generate(&viewer())); }
-    #[test] fn test_snapshot_serializes() { let s = PolicyGate::strict().snapshot(); let j = serde_json::to_string(&s).unwrap(); assert!(j.contains("strict_single_pipeline")); }
-    #[test] fn test_session_defaults_viewer() { let a = ActorResolver::from_session_id(uuid::Uuid::nil()); assert_eq!(a.roles, vec!["viewer"]); }
+    #[test]
+    fn test_strict_denies_all() {
+        let g = PolicyGate::strict();
+        assert!(!g.can_use_direct_dsl(&operator()));
+        assert!(!g.can_execute_raw_dsl(&operator()));
+        assert!(!g.can_use_legacy_generate(&operator()));
+        assert!(g.semreg_fail_closed());
+    }
+    #[test]
+    fn test_permissive_allows_operator() {
+        let g = PolicyGate::permissive();
+        assert!(!g.can_use_direct_dsl(&viewer()));
+        assert!(g.can_use_direct_dsl(&operator()));
+        assert!(g.can_execute_raw_dsl(&operator()));
+    }
+    #[test]
+    fn test_admin_same_as_operator() {
+        let g = PolicyGate::permissive();
+        assert!(g.can_use_direct_dsl(&admin()));
+        assert!(g.can_execute_raw_dsl(&admin()));
+    }
+    #[test]
+    fn test_strict_with_legacy_flag() {
+        let mut g = PolicyGate::strict();
+        g.allow_legacy_generate = true;
+        assert!(!g.can_use_legacy_generate(&viewer()));
+        assert!(g.can_use_legacy_generate(&operator()));
+    }
+    #[test]
+    fn test_non_strict_legacy_open() {
+        let mut g = PolicyGate::strict();
+        g.strict_single_pipeline = false;
+        assert!(g.can_use_legacy_generate(&viewer()));
+    }
+    #[test]
+    fn test_snapshot_serializes() {
+        let s = PolicyGate::strict().snapshot();
+        let j = serde_json::to_string(&s).unwrap();
+        assert!(j.contains("strict_single_pipeline"));
+    }
+    #[test]
+    fn test_session_defaults_viewer() {
+        let a = ActorResolver::from_session_id(uuid::Uuid::nil());
+        assert_eq!(a.roles, vec!["viewer"]);
+    }
 }

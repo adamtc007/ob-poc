@@ -7,18 +7,6 @@ use uuid::Uuid;
 use super::core::ToolHandlers;
 
 impl ToolHandlers {
-    pub(super) fn session_context(&self, args: Value) -> Result<Value> {
-        use crate::mcp::session;
-        use crate::mcp::types::SessionAction;
-
-        let action: SessionAction =
-            serde_json::from_value(args).map_err(|e| anyhow!("Invalid session action: {}", e))?;
-
-        let state = session::session_context(action).map_err(|e| anyhow!("{}", e))?;
-
-        serde_json::to_value(state).map_err(|e| anyhow!("Failed to serialize session state: {}", e))
-    }
-
     // =========================================================================
     // Session v2 Tools - Memory-first CBU session management
     // =========================================================================

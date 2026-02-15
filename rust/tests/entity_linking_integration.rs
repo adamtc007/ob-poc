@@ -264,29 +264,6 @@ fn test_resolve_no_matches() {
     assert_eq!(selected_count, 0, "Should not match nonsense input");
 }
 
-#[test]
-fn test_lookup_by_name() {
-    let snapshot = Arc::new(create_test_snapshot());
-    let service = EntityLinkingServiceImpl::new(snapshot);
-
-    let candidates = service.lookup_by_name("blackrock", 5);
-
-    assert!(!candidates.is_empty(), "Should find BlackRock");
-    assert_eq!(candidates[0].canonical_name, "BlackRock Inc");
-}
-
-#[test]
-fn test_lookup_by_id() {
-    let snapshot = Arc::new(create_test_snapshot());
-    let service = EntityLinkingServiceImpl::new(snapshot);
-
-    let entity_id = Uuid::parse_str("22222222-2222-2222-2222-222222222222").unwrap();
-    let row = service.lookup_by_id(&entity_id);
-
-    assert!(row.is_some());
-    assert_eq!(row.unwrap().canonical_name, "BlackRock Inc");
-}
-
 // ============================================================================
 // STUB SERVICE TESTS - Graceful degradation
 // ============================================================================
@@ -309,21 +286,6 @@ fn test_stub_entity_count_zero() {
 fn test_stub_snapshot_hash() {
     let stub = StubEntityLinkingService;
     assert_eq!(stub.snapshot_hash(), "stub-no-snapshot");
-}
-
-#[test]
-fn test_stub_lookup_by_name_empty() {
-    let stub = StubEntityLinkingService;
-    let candidates = stub.lookup_by_name("anything", 10);
-    assert!(candidates.is_empty());
-}
-
-#[test]
-fn test_stub_lookup_by_id_none() {
-    let stub = StubEntityLinkingService;
-    let entity_id = Uuid::new_v4();
-    let result = stub.lookup_by_id(&entity_id);
-    assert!(result.is_none());
 }
 
 // ============================================================================

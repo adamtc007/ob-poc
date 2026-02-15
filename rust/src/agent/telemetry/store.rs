@@ -82,7 +82,6 @@ pub async fn insert_intent_event(pool: &PgPool, row: &IntentEventRow) -> bool {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     /// Static guard: insert_intent_event must only be called from the orchestrator module.

@@ -628,26 +628,6 @@ pub struct SetFocusResponse {
     pub relevant_verbs: Vec<String>,
 }
 
-/// Request to set view mode on session (sync from egui client)
-#[derive(Debug, Deserialize)]
-pub struct SetViewModeRequest {
-    /// The view mode to set (e.g., "KYC_UBO", "SERVICE_DELIVERY", "TRADING")
-    pub view_mode: String,
-    /// Optional view level (e.g., "Universe", "Cluster", "System")
-    #[serde(default)]
-    pub view_level: Option<String>,
-}
-
-/// Response from setting view mode
-#[derive(Debug, Serialize)]
-pub struct SetViewModeResponse {
-    pub success: bool,
-    /// The view mode that was set
-    pub view_mode: String,
-    /// The view level that was set (if any)
-    pub view_level: Option<String>,
-}
-
 // ============================================================================
 // DSL Parse Types
 // ============================================================================
@@ -828,27 +808,6 @@ pub struct ExecuteDslRequest {
     /// Prevents accidental bypass of the intent pipeline.
     #[serde(default)]
     pub allow_raw_dsl: bool,
-}
-
-/// Request body for REPL edit events
-#[derive(Debug, Clone, Deserialize)]
-pub struct ReplEditRequest {
-    /// Current DSL content in the REPL editor
-    pub current_dsl: String,
-}
-
-/// Response for REPL edit events
-#[derive(Debug, Clone, Serialize)]
-pub struct ReplEditResponse {
-    /// Whether the edit was recorded
-    pub recorded: bool,
-    /// Whether the DSL differs from the proposed DSL
-    pub has_edits: bool,
-    /// Validation status of the current DSL
-    pub valid: bool,
-    /// Validation errors if any
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub errors: Option<Vec<String>>,
 }
 
 // NOTE: Direct /execute endpoint removed - use /api/session/:id/execute instead

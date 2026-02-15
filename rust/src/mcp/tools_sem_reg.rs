@@ -55,7 +55,6 @@ pub fn sem_reg_tools() -> Vec<Tool> {
     all_tool_specs().iter().map(spec_to_mcp_tool).collect()
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -63,7 +62,10 @@ mod tests {
     #[test]
     fn test_sem_reg_tools_not_empty() {
         let tools = sem_reg_tools();
-        assert!(!tools.is_empty(), "sem_reg_tools() should return at least one tool");
+        assert!(
+            !tools.is_empty(),
+            "sem_reg_tools() should return at least one tool"
+        );
     }
 
     #[test]
@@ -71,7 +73,11 @@ mod tests {
         let tools = sem_reg_tools();
         for tool in &tools {
             assert!(!tool.name.is_empty(), "Tool name should not be empty");
-            assert!(!tool.description.is_empty(), "Tool {} has empty description", tool.name);
+            assert!(
+                !tool.description.is_empty(),
+                "Tool {} has empty description",
+                tool.name
+            );
             assert!(
                 tool.input_schema.is_object(),
                 "Tool {} has non-object input schema",
@@ -103,13 +109,19 @@ mod tests {
         let valid_types = ["string", "integer", "number", "boolean", "object", "array"];
         let tools = sem_reg_tools();
         for tool in &tools {
-            if let Some(props) = tool.input_schema.get("properties").and_then(|p| p.as_object()) {
+            if let Some(props) = tool
+                .input_schema
+                .get("properties")
+                .and_then(|p| p.as_object())
+            {
                 for (param_name, param_schema) in props {
                     if let Some(t) = param_schema.get("type").and_then(|v| v.as_str()) {
                         assert!(
                             valid_types.contains(&t),
                             "Tool {} param {} has invalid JSON Schema type: {}",
-                            tool.name, param_name, t
+                            tool.name,
+                            param_name,
+                            t
                         );
                     }
                 }
@@ -121,6 +133,10 @@ mod tests {
     fn test_sem_reg_tools_count() {
         let tools = sem_reg_tools();
         // Should have ~29 tools from all_tool_specs()
-        assert!(tools.len() >= 20, "Expected at least 20 tools, got {}", tools.len());
+        assert!(
+            tools.len() >= 20,
+            "Expected at least 20 tools, got {}",
+            tools.len()
+        );
     }
 }

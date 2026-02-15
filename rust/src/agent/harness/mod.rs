@@ -115,7 +115,9 @@ impl Default for ModeExpectations {
     }
 }
 
-fn default_true() -> bool { true }
+fn default_true() -> bool {
+    true
+}
 
 /// Session seed for scenario initialization.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
@@ -149,8 +151,12 @@ impl Default for ActorSeed {
     }
 }
 
-fn default_actor_id() -> String { "test.user".into() }
-fn default_roles() -> Vec<String> { vec!["viewer".into()] }
+fn default_actor_id() -> String {
+    "test.user".into()
+}
+fn default_roles() -> Vec<String> {
+    vec!["viewer".into()]
+}
 
 /// Load a single suite from a YAML file.
 pub fn load_suite(path: &Path) -> anyhow::Result<ScenarioSuite> {
@@ -165,7 +171,11 @@ pub fn load_all_suites(dir: &Path) -> anyhow::Result<Vec<ScenarioSuite>> {
     for entry in std::fs::read_dir(dir)? {
         let entry = entry?;
         let path = entry.path();
-        if path.extension().map(|e| e == "yaml" || e == "yml").unwrap_or(false) {
+        if path
+            .extension()
+            .map(|e| e == "yaml" || e == "yml")
+            .unwrap_or(false)
+        {
             match load_suite(&path) {
                 Ok(suite) => suites.push(suite),
                 Err(e) => {
@@ -198,7 +208,10 @@ scenarios:
         assert_eq!(suite.name, "Test Suite");
         assert_eq!(suite.scenarios.len(), 1);
         assert_eq!(suite.scenarios[0].steps[0].user, "hello");
-        assert_eq!(suite.scenarios[0].steps[0].expect.outcome.as_deref(), Some("NoMatch"));
+        assert_eq!(
+            suite.scenarios[0].steps[0].expect.outcome.as_deref(),
+            Some("NoMatch")
+        );
     }
 
     #[test]

@@ -298,7 +298,8 @@ impl SnapshotStore {
         }
 
         // Insert the new snapshot
-        let snapshot_id = Self::insert_snapshot_tx(&mut tx, meta, definition, snapshot_set_id).await?;
+        let snapshot_id =
+            Self::insert_snapshot_tx(&mut tx, meta, definition, snapshot_set_id).await?;
 
         tx.commit().await?;
         Ok(snapshot_id)

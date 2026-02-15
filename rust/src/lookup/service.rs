@@ -67,19 +67,6 @@ impl LookupService {
         }
     }
 
-    /// Create with all components
-    pub fn with_all(
-        entity_linker: Arc<dyn EntityLinkingService>,
-        lexicon: Arc<dyn LexiconService>,
-        verb_searcher: Arc<HybridVerbSearcher>,
-    ) -> Self {
-        Self {
-            entity_linker,
-            lexicon: Some(lexicon),
-            verb_searcher: Some(verb_searcher),
-        }
-    }
-
     /// Set verb searcher
     pub fn with_verb_searcher(mut self, searcher: Arc<HybridVerbSearcher>) -> Self {
         self.verb_searcher = Some(searcher);
@@ -142,38 +129,6 @@ impl LookupService {
             expected_kinds,
             concepts: vec![], // Concepts not extracted in this version
             verb_matched,
-            entities_resolved: has_dominant,
-        }
-    }
-
-    /// Analyze with pre-known expected kinds (skip verb search)
-    pub fn analyze_entities_only(
-        &self,
-        utterance: &str,
-        expected_kinds: &[String],
-        limit: usize,
-    ) -> LookupResult {
-        let entities = self.entity_linker.resolve_mentions(
-            utterance,
-            if expected_kinds.is_empty() {
-                None
-            } else {
-                Some(expected_kinds)
-            },
-            None,
-            limit,
-        );
-
-        let dominant_entity = self.find_dominant(&entities);
-        let has_dominant = dominant_entity.is_some();
-
-        LookupResult {
-            verbs: vec![],
-            entities,
-            dominant_entity,
-            expected_kinds: expected_kinds.to_vec(),
-            concepts: vec![],
-            verb_matched: false,
             entities_resolved: has_dominant,
         }
     }
@@ -246,10 +201,10 @@ pub fn stub_lookup_service() -> LookupService {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_stub_lookup_service() {
+    #[tokio::test]
+    async fn test_stub_lookup_service() {
         let service = stub_lookup_service();
-        let result = service.analyze_entities_only("test input", &[], 5);
+        let result = service.analyze("test input", 5).await;
 
         assert!(result.entities.is_empty());
         assert!(result.dominant_entity.is_none());

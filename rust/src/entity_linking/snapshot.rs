@@ -95,14 +95,6 @@ impl EntitySnapshot {
         self.entities.iter().find(|e| &e.entity_id == id)
     }
 
-    /// Get entities by kind
-    pub fn get_by_kind(&self, kind: &str) -> Vec<&EntityRow> {
-        self.kind_index
-            .get(kind)
-            .map(|ids| ids.iter().filter_map(|id| self.get(id)).collect())
-            .unwrap_or_default()
-    }
-
     /// Lookup by exact normalized alias
     pub fn lookup_by_alias(&self, alias_norm: &str) -> Option<&SmallVec<[EntityId; 4]>> {
         self.alias_index.get(alias_norm)
@@ -121,14 +113,6 @@ impl EntitySnapshot {
     /// Get concept links for an entity
     pub fn get_concepts(&self, entity_id: &EntityId) -> Option<&SmallVec<[(String, f32); 8]>> {
         self.concept_links.get(entity_id)
-    }
-
-    /// Check if entity has a specific concept
-    pub fn has_concept(&self, entity_id: &EntityId, concept_id: &str) -> bool {
-        self.concept_links
-            .get(entity_id)
-            .map(|links| links.iter().any(|(c, _)| c == concept_id))
-            .unwrap_or(false)
     }
 
     /// Statistics for debugging

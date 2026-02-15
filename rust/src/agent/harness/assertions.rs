@@ -19,7 +19,11 @@ pub struct AssertionFailure {
 
 impl std::fmt::Display for AssertionFailure {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}: expected '{}', got '{}'", self.field, self.expected, self.actual)
+        write!(
+            f,
+            "{}: expected '{}', got '{}'",
+            self.field, self.expected, self.actual
+        )
     }
 }
 
@@ -135,10 +139,17 @@ pub fn check_step(
 
     // -- Runnable count --
     if let Some(exp_runnable) = expected.runnable_count {
-        let actual = session.run_sheet.entries.iter()
-            .filter(|e| matches!(e.status,
-                crate::session::unified::EntryStatus::Draft |
-                crate::session::unified::EntryStatus::Ready))
+        let actual = session
+            .run_sheet
+            .entries
+            .iter()
+            .filter(|e| {
+                matches!(
+                    e.status,
+                    crate::session::unified::EntryStatus::Draft
+                        | crate::session::unified::EntryStatus::Ready
+                )
+            })
             .count();
         if actual != exp_runnable {
             failures.push(AssertionFailure {
@@ -303,8 +314,17 @@ mod tests {
     fn test_outcome_label_coverage() {
         assert_eq!(outcome_label(&PipelineOutcome::Ready), "Ready");
         assert_eq!(outcome_label(&PipelineOutcome::NoMatch), "NoMatch");
-        assert_eq!(outcome_label(&PipelineOutcome::NeedsClarification), "NeedsClarification");
-        assert_eq!(outcome_label(&PipelineOutcome::DirectDslNotAllowed), "DirectDslNotAllowed");
-        assert_eq!(outcome_label(&PipelineOutcome::NoAllowedVerbs), "NoAllowedVerbs");
+        assert_eq!(
+            outcome_label(&PipelineOutcome::NeedsClarification),
+            "NeedsClarification"
+        );
+        assert_eq!(
+            outcome_label(&PipelineOutcome::DirectDslNotAllowed),
+            "DirectDslNotAllowed"
+        );
+        assert_eq!(
+            outcome_label(&PipelineOutcome::NoAllowedVerbs),
+            "NoAllowedVerbs"
+        );
     }
 }

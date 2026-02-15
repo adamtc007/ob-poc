@@ -101,9 +101,7 @@ mod tests {
 
     #[test]
     fn test_candidates_to_json_caps_at_10() {
-        let cands: Vec<(String, f32)> = (0..20)
-            .map(|i| (format!("v.{}", i), 0.5))
-            .collect();
+        let cands: Vec<(String, f32)> = (0..20).map(|i| (format!("v.{}", i), 0.5)).collect();
         let json = candidates_to_json(&cands).unwrap();
         assert_eq!(json.as_array().unwrap().len(), 10);
     }
@@ -112,11 +110,20 @@ mod tests {
     fn test_outcome_label_coverage() {
         use crate::mcp::intent_pipeline::PipelineOutcome;
         assert_eq!(outcome_label(&PipelineOutcome::Ready), "ready");
-        assert_eq!(outcome_label(&PipelineOutcome::NeedsClarification), "needs_clarification");
-        assert_eq!(outcome_label(&PipelineOutcome::NoAllowedVerbs), "no_allowed_verbs");
-        assert_eq!(outcome_label(&PipelineOutcome::MacroExpanded {
-            macro_verb: "test".into(),
-            unlocks: vec![],
-        }), "macro_expanded");
+        assert_eq!(
+            outcome_label(&PipelineOutcome::NeedsClarification),
+            "needs_clarification"
+        );
+        assert_eq!(
+            outcome_label(&PipelineOutcome::NoAllowedVerbs),
+            "no_allowed_verbs"
+        );
+        assert_eq!(
+            outcome_label(&PipelineOutcome::MacroExpanded {
+                macro_verb: "test".into(),
+                unlocks: vec![],
+            }),
+            "macro_expanded"
+        );
     }
 }

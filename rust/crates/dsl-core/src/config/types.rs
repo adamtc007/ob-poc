@@ -262,7 +262,6 @@ pub enum ConfirmPolicyConfig {
 // VERB METADATA (Tiering & Organization)
 // =============================================================================
 
-
 /// Metadata for verb classification, tiering, and organization
 ///
 /// Used by:

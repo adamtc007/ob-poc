@@ -46,10 +46,10 @@ pub mod view_def;
 
 // Phase 3: Policy, evidence, observations, ABAC
 pub mod abac;
-pub mod enforce;
-pub mod ids;
 pub mod document_type_def;
+pub mod enforce;
 pub mod evidence;
+pub mod ids;
 pub mod observation_def;
 pub mod policy_rule;
 

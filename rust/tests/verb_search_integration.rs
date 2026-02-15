@@ -1586,14 +1586,14 @@ fn test_ambiguity_detection() {
         VerbSearchResult {
             verb: "cbu.create".to_string(),
             score: 0.95,
-            source: VerbSearchSource::Semantic,
+            source: VerbSearchSource::PatternEmbedding,
             matched_phrase: "create cbu".to_string(),
             description: None,
         },
         VerbSearchResult {
             verb: "entity.create-limited-company".to_string(),
             score: 0.85,
-            source: VerbSearchSource::Semantic,
+            source: VerbSearchSource::PatternEmbedding,
             matched_phrase: "create company".to_string(),
             description: None,
         },
@@ -1609,14 +1609,14 @@ fn test_ambiguity_detection() {
         VerbSearchResult {
             verb: "cbu.create".to_string(),
             score: 0.92,
-            source: VerbSearchSource::Semantic,
+            source: VerbSearchSource::PatternEmbedding,
             matched_phrase: "create cbu".to_string(),
             description: None,
         },
         VerbSearchResult {
             verb: "entity.create-limited-company".to_string(),
             score: 0.90,
-            source: VerbSearchSource::Semantic,
+            source: VerbSearchSource::PatternEmbedding,
             matched_phrase: "create company".to_string(),
             description: None,
         },
@@ -1631,7 +1631,7 @@ fn test_ambiguity_detection() {
     let below = vec![VerbSearchResult {
         verb: "cbu.create".to_string(),
         score: 0.80,
-        source: VerbSearchSource::Semantic,
+        source: VerbSearchSource::PatternEmbedding,
         matched_phrase: "create cbu".to_string(),
         description: None,
     }];
@@ -1648,7 +1648,7 @@ fn test_normalize_candidates() {
         VerbSearchResult {
             verb: "cbu.create".to_string(),
             score: 0.80,
-            source: VerbSearchSource::LearnedSemantic,
+            source: VerbSearchSource::GlobalLearned,
             matched_phrase: "make a cbu".to_string(),
             description: None,
         },
@@ -1662,7 +1662,7 @@ fn test_normalize_candidates() {
         VerbSearchResult {
             verb: "entity.create-limited-company".to_string(),
             score: 0.85,
-            source: VerbSearchSource::Semantic,
+            source: VerbSearchSource::PatternEmbedding,
             matched_phrase: "create company".to_string(),
             description: None,
         },

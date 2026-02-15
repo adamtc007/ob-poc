@@ -62,7 +62,12 @@ pub async fn run_scenario_stub(
     use crate::mcp::intent_pipeline::PipelineOutcome;
 
     let session = UnifiedSession::new();
-    let ctx = build_stub_context(pool, session.id, &suite.session_seed, &suite.mode_expectations);
+    let ctx = build_stub_context(
+        pool,
+        session.id,
+        &suite.session_seed,
+        &suite.mode_expectations,
+    );
 
     let mut step_results = Vec::new();
     let mut steps_passed = 0;

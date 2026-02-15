@@ -45,7 +45,10 @@ pub fn enforce_read(actor: &ActorContext, row: &SnapshotRow) -> EnforceResult {
 /// Check whether the actor may read a row identified only by its raw security_label JSON.
 ///
 /// Used by search handlers that don't load full `SnapshotRow` objects.
-pub fn enforce_read_label(actor: &ActorContext, security_label: &serde_json::Value) -> EnforceResult {
+pub fn enforce_read_label(
+    actor: &ActorContext,
+    security_label: &serde_json::Value,
+) -> EnforceResult {
     let label: SecurityLabel = match serde_json::from_value(security_label.clone()) {
         Ok(l) => l,
         Err(_) => {
@@ -106,7 +109,6 @@ pub fn filter_by_abac<'a>(
     (allowed, redacted)
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -114,7 +116,11 @@ mod tests {
     use crate::sem_reg::types::*;
     use uuid::Uuid;
 
-    fn make_row(classification: Classification, pii: bool, handling: Vec<HandlingControl>) -> SnapshotRow {
+    fn make_row(
+        classification: Classification,
+        pii: bool,
+        handling: Vec<HandlingControl>,
+    ) -> SnapshotRow {
         SnapshotRow {
             snapshot_id: Uuid::new_v4(),
             snapshot_set_id: None,
@@ -178,7 +184,11 @@ mod tests {
     #[test]
     fn test_deny_restricted_for_internal_clearance() {
         let actor = unprivileged_actor();
-        let row = make_row(Classification::Restricted, false, vec![HandlingControl::NoLlmExternal]);
+        let row = make_row(
+            Classification::Restricted,
+            false,
+            vec![HandlingControl::NoLlmExternal],
+        );
         match enforce_read(&actor, &row) {
             EnforceResult::Deny { .. } => {} // expected
             other => panic!("Expected Deny, got {:?}", std::mem::discriminant(&other)),
@@ -208,7 +218,11 @@ mod tests {
     fn test_filter_by_abac_splits_correctly() {
         let actor = unprivileged_actor();
         let allowed_row = make_row(Classification::Internal, false, vec![]);
-        let denied_row = make_row(Classification::Restricted, false, vec![HandlingControl::NoLlmExternal]);
+        let denied_row = make_row(
+            Classification::Restricted,
+            false,
+            vec![HandlingControl::NoLlmExternal],
+        );
         let rows = vec![allowed_row, denied_row];
 
         let (allowed, redacted) = filter_by_abac(&actor, &rows);
@@ -226,7 +240,10 @@ mod tests {
             EnforceResult::Deny { reason } => {
                 assert!(reason.contains("unparseable"));
             }
-            other => panic!("Expected Deny for bad label, got {:?}", std::mem::discriminant(&other)),
+            other => panic!(
+                "Expected Deny for bad label, got {:?}",
+                std::mem::discriminant(&other)
+            ),
         }
     }
 
@@ -238,13 +255,19 @@ mod tests {
             "handling_controls": [],
             "jurisdictions": []
         });
-        assert!(matches!(enforce_read_label(&actor, &label), EnforceResult::Allow));
+        assert!(matches!(
+            enforce_read_label(&actor, &label),
+            EnforceResult::Allow
+        ));
     }
 
     #[test]
     fn test_enforce_read_label_deny_unparseable() {
         let actor = unprivileged_actor();
         let label = serde_json::json!("not_a_valid_label");
-        assert!(matches!(enforce_read_label(&actor, &label), EnforceResult::Deny { .. }));
+        assert!(matches!(
+            enforce_read_label(&actor, &label),
+            EnforceResult::Deny { .. }
+        ));
     }
 }

@@ -41,7 +41,10 @@ mod tests {
 
     #[test]
     fn test_normalize_lowercases() {
-        assert_eq!(normalize_utterance("Load Allianz Book"), "load allianz book");
+        assert_eq!(
+            normalize_utterance("Load Allianz Book"),
+            "load allianz book"
+        );
     }
 
     #[test]

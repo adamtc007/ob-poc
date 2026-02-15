@@ -5,7 +5,9 @@
 
 use serde::{Deserialize, Serialize};
 
-fn default_true() -> bool { true }
+fn default_true() -> bool {
+    true
+}
 
 /// The JSONB body stored in `definition` for verb contracts.
 #[derive(Debug, Clone, Serialize, Deserialize)]

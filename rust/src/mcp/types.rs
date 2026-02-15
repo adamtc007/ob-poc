@@ -3,7 +3,7 @@
 //! These types transform internal DSL structures into JSON-serializable
 //! formats optimized for agent consumption.
 
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use std::collections::HashMap;
 
 // ============================================================================
@@ -111,70 +111,6 @@ pub struct EntityMatch {
     pub score: f32,
     /// Additional context for disambiguation
     pub context: HashMap<String, String>,
-}
-
-// ============================================================================
-// session_context types
-// ============================================================================
-
-/// Session action for managing conversation state
-#[derive(Debug, Deserialize)]
-#[serde(tag = "action", rename_all = "snake_case")]
-pub enum SessionAction {
-    /// Create a new session
-    Create,
-    /// Get existing session state
-    Get { session_id: String },
-    /// Update session with new bindings
-    Update {
-        session_id: String,
-        bindings: HashMap<String, String>,
-    },
-    /// Undo last execution block
-    Undo { session_id: String },
-    /// Clear all bindings
-    Clear { session_id: String },
-    /// Set stage focus (e.g., "GLEIF_RESEARCH", "UBO_ANALYSIS")
-    /// When set, agent prioritizes verbs relevant to that stage
-    SetStageFocus {
-        session_id: String,
-        stage_code: Option<String>,
-    },
-    /// List available stages with their relevant verbs
-    ListStages,
-}
-
-/// Current session state
-#[derive(Debug, Serialize)]
-pub struct SessionState {
-    pub session_id: String,
-    pub bindings: HashMap<String, BindingInfo>,
-    pub history_count: usize,
-    pub can_undo: bool,
-    /// Currently focused stage (e.g., "GLEIF_RESEARCH")
-    pub stage_focus: Option<String>,
-    /// Verbs relevant to current stage focus
-    pub relevant_verbs: Option<Vec<String>>,
-    /// Available stages (only populated for ListStages action)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub available_stages: Option<Vec<StageInfo>>,
-}
-
-/// Available semantic stage with its relevant verbs
-#[derive(Debug, Serialize)]
-pub struct StageInfo {
-    pub code: String,
-    pub name: String,
-    pub description: String,
-    pub relevant_verbs: Vec<String>,
-}
-
-/// Information about a single binding
-#[derive(Debug, Clone, Serialize)]
-pub struct BindingInfo {
-    pub name: String,
-    pub uuid: String,
-    pub entity_type: String,
 }
 
 // ============================================================================

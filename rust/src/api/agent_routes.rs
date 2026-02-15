@@ -71,12 +71,12 @@ pub use crate::api::agent_types::{
     GenerateDslResponse, HealthResponse, MissingArg, OnboardingExecutionResult, OnboardingRequest,
     OnboardingResponse, ParseDiscriminatorsRequest, ParseDiscriminatorsResponse, ParseDslRequest,
     ParseDslResponse, ParsedDiscriminators, PipelineStage, RefId, RemainingUnresolvedRef,
-    ReplEditRequest, ReplEditResponse, ReportCorrectionRequest, ReportCorrectionResponse,
-    ResolutionState, ResolutionStats, ResolveByRefIdRequest, ResolveByRefIdResponse,
-    ResolveRefRequest, ResolveRefResponse, SetBindingRequest, SetBindingResponse, SetFocusRequest,
-    SetFocusResponse, SetViewModeRequest, SetViewModeResponse, SubSessionChatRequest,
-    SubSessionMessage, SubSessionStateResponse, UnresolvedRef, ValidationError, ValidationResult,
-    VerbInfo, VocabQuery, VocabResponse, WatchQuery, WatchResponse,
+    ReportCorrectionRequest, ReportCorrectionResponse, ResolutionState, ResolutionStats,
+    ResolveByRefIdRequest, ResolveByRefIdResponse, ResolveRefRequest, ResolveRefResponse,
+    SetBindingRequest, SetBindingResponse, SetFocusRequest, SetFocusResponse,
+    SubSessionChatRequest, SubSessionMessage, SubSessionStateResponse, UnresolvedRef,
+    ValidationError, ValidationResult, VerbInfo, VocabQuery, VocabResponse, WatchQuery,
+    WatchResponse,
 };
 
 // ============================================================================
@@ -500,12 +500,10 @@ pub(crate) fn create_agent_router_with_state(state: AgentState) -> Router {
         .route("/api/session/:id", delete(delete_session))
         .route("/api/session/:id/chat", post(chat_session))
         .route("/api/session/:id/execute", post(execute_session_dsl))
-        .route("/api/session/:id/repl-edit", post(repl_edit_session))
         .route("/api/session/:id/clear", post(clear_session_dsl))
         .route("/api/session/:id/bind", post(set_session_binding))
         .route("/api/session/:id/context", get(get_session_context))
         .route("/api/session/:id/focus", post(set_session_focus))
-        .route("/api/session/:id/view-mode", post(set_session_view_mode))
         .route("/api/session/:id/dsl/enrich", get(get_enriched_dsl))
         .route("/api/session/:id/watch", get(watch_session))
         // Sub-session management (create/get/complete/cancel only - chat goes through main pipeline)
@@ -592,11 +590,6 @@ pub(crate) fn create_agent_router_with_state(state: AgentState) -> Router {
         .route(
             "/api/session/:id/select-verb",
             post(crate::api::agent_learning_routes::select_verb_disambiguation),
-        )
-        // Verb disambiguation abandonment (user bailed - all options were wrong)
-        .route(
-            "/api/session/:id/abandon-disambiguation",
-            post(crate::api::agent_learning_routes::abandon_disambiguation),
         )
         // Unified decision reply (NEW - handles all clarification responses)
         .route(
@@ -3229,52 +3222,6 @@ async fn execute_session_dsl(
     }))
 }
 
-/// POST /api/session/:id/repl-edit - Record REPL edit event
-///
-/// Called by the UI when the user edits DSL in the REPL editor.
-/// This tracks the current_dsl so we can compute diff on execute.
-async fn repl_edit_session(
-    State(state): State<AgentState>,
-    Path(session_id): Path<Uuid>,
-    Json(req): Json<ReplEditRequest>,
-) -> Result<Json<ReplEditResponse>, StatusCode> {
-    use crate::dsl_v2::parse_program;
-
-    tracing::debug!(
-        "[REPL_EDIT] Session {} - DSL length: {}",
-        session_id,
-        req.current_dsl.len()
-    );
-
-    // Update current_dsl in session via SessionManager
-    state
-        .session_manager
-        .update_current_dsl(session_id, &req.current_dsl)
-        .await;
-
-    // Check if there are edits (proposed != current)
-    let has_edits = state.session_manager.has_dsl_edits(session_id).await;
-
-    // Validate the current DSL
-    let (valid, errors) = match parse_program(&req.current_dsl) {
-        Ok(ast) => {
-            // Parse succeeded, try compile
-            match crate::dsl_v2::compile(&ast) {
-                Ok(_) => (true, None),
-                Err(e) => (false, Some(vec![format!("Compile error: {:?}", e)])),
-            }
-        }
-        Err(e) => (false, Some(vec![format!("Parse error: {:?}", e)])),
-    };
-
-    Ok(Json(ReplEditResponse {
-        recorded: true,
-        has_edits,
-        valid,
-        errors,
-    }))
-}
-
 /// POST /api/session/:id/clear - Clear/cancel pending DSL
 async fn clear_session_dsl(
     State(state): State<AgentState>,
@@ -3417,41 +3364,6 @@ async fn set_session_binding(
         success: true,
         binding_name: actual_name_clone,
         bindings: bindings_clone,
-    }))
-}
-
-/// POST /api/session/:id/view-mode - Set view mode on session (sync from egui client)
-///
-/// This allows the UI to sync its current view mode (e.g., KYC_UBO, SERVICE_DELIVERY, TRADING)
-/// and view level (e.g., Universe, Cluster, System) to the server session.
-/// This is important for ensuring the server knows the visualization context.
-async fn set_session_view_mode(
-    State(state): State<AgentState>,
-    Path(session_id): Path<Uuid>,
-    Json(req): Json<SetViewModeRequest>,
-) -> Result<Json<SetViewModeResponse>, StatusCode> {
-    // Update session
-    {
-        let mut sessions = state.sessions.write().await;
-        let session = sessions.get_mut(&session_id).ok_or(StatusCode::NOT_FOUND)?;
-        session.context.view_mode = Some(req.view_mode.clone());
-        // Note: view_level could be stored in session context if needed in future
-    }
-
-    tracing::debug!(
-        "View mode set: session={} view_mode={} view_level={:?}",
-        session_id,
-        req.view_mode,
-        req.view_level
-    );
-
-    // Notify watchers that session changed
-    state.session_manager.notify(session_id).await;
-
-    Ok(Json(SetViewModeResponse {
-        success: true,
-        view_mode: req.view_mode,
-        view_level: req.view_level,
     }))
 }
 
@@ -3725,4 +3637,3 @@ mod tests {
         assert!(req.allow_raw_dsl, "allow_raw_dsl should be true when set");
     }
 }
-

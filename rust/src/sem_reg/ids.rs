@@ -14,8 +14,7 @@ use super::types::ObjectType;
 /// Generated once, never changed. All SemReg object IDs derive from this namespace.
 /// Value: UUID v5 of "semantic-os:ob-poc:sem_reg" under the DNS namespace.
 const SEM_REG_NAMESPACE: Uuid = Uuid::from_bytes([
-    0x7a, 0x3b, 0x9f, 0x42, 0xe1, 0xd4, 0x5a, 0x8b, 0x91, 0x0c, 0x4f, 0x2d, 0x6e, 0x8a, 0x1b,
-    0x3c,
+    0x7a, 0x3b, 0x9f, 0x42, 0xe1, 0xd4, 0x5a, 0x8b, 0x91, 0x0c, 0x4f, 0x2d, 0x6e, 0x8a, 0x1b, 0x3c,
 ]);
 
 /// Compute a deterministic `object_id` for a Semantic Registry object.
@@ -47,7 +46,6 @@ pub fn object_id_for(object_type: ObjectType, fqn: &str) -> Uuid {
 /// Uses canonical JSON serialization (sorted keys) followed by SHA-256.
 /// This detects definition drift even when field order changes.
 pub fn definition_hash(definition: &serde_json::Value) -> String {
-
     // Canonicalize by round-tripping through BTreeMap (sorted keys)
     let canonical = canonicalize_json(definition);
     let bytes = serde_json::to_vec(&canonical).unwrap_or_default();
@@ -60,7 +58,6 @@ pub fn definition_hash(definition: &serde_json::Value) -> String {
 
 /// Recursively sort JSON object keys for canonical serialization.
 fn canonicalize_json(value: &serde_json::Value) -> serde_json::Value {
-
     match value {
         serde_json::Value::Object(map) => {
             let sorted: BTreeMap<String, serde_json::Value> = map

@@ -5,7 +5,7 @@
 //! ## Deprecation Note (Phase 2)
 //!
 //! For the v2 REPL, use `IntentService::match_verb()` instead of
-//! `IntentPipeline::process()`. The IntentService provides a unified
+//! `IntentPipeline::process_with_scope()`. The IntentService provides a unified
 //! 5-phase pipeline with clarification checking via `sentences.clarify`
 //! templates. This module remains the entry point for the v1 agent
 //! pipeline (`/api/session/:id/chat`).
@@ -16,7 +16,7 @@
 //! User Input
 //!     │
 //!     ▼
-//! IntentPipeline.process()
+//! IntentPipeline.process_with_scope()
 //!     │
 //!     ├─► Direct DSL? (starts with "(")
 //!     │       └─► Parse → Validate → Return (no LLM)
@@ -163,55 +163,6 @@ pub enum PipelineOutcome {
 // INPUT QUALITY CLASSIFICATION - Graceful degradation for ambiguous input
 // =============================================================================
 
-/// Classification of input quality for UX decisions
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum InputQuality {
-    /// Clear intent, proceed normally
-    Clear,
-    /// Multiple verbs too close in score - need clarification
-    Ambiguous { candidates: Vec<VerbSearchResult> },
-    /// Score too low but have a guess - suggest to user
-    TooVague { best_guess: Option<String> },
-    /// No meaningful match - input is nonsense or too short
-    Nonsense,
-}
-
-/// Confidence tiers for UI treatment
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
-pub enum ConfidenceTier {
-    /// >= 0.85 - auto-execute
-    High,
-    /// 0.70-0.85 - proceed with "did you mean?"
-    Medium,
-    /// 0.55-0.70 - require confirmation
-    Low,
-    /// < 0.55 - require clarification
-    VeryLow,
-}
-
-impl From<f32> for ConfidenceTier {
-    fn from(score: f32) -> Self {
-        match score {
-            s if s >= 0.85 => ConfidenceTier::High,
-            s if s >= 0.70 => ConfidenceTier::Medium,
-            s if s >= 0.55 => ConfidenceTier::Low,
-            _ => ConfidenceTier::VeryLow,
-        }
-    }
-}
-
-impl ConfidenceTier {
-    /// Get threshold for this tier
-    pub fn threshold(&self) -> f32 {
-        match self {
-            ConfidenceTier::High => 0.85,
-            ConfidenceTier::Medium => 0.70,
-            ConfidenceTier::Low => 0.55,
-            ConfidenceTier::VeryLow => 0.0,
-        }
-    }
-}
-
 /// Pipeline result
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PipelineResult {
@@ -275,19 +226,6 @@ impl IntentPipeline {
         }
     }
 
-    /// Create pipeline with pre-initialized LLM client
-    pub fn with_llm(verb_searcher: HybridVerbSearcher, llm_client: Arc<dyn LlmClient>) -> Self {
-        Self {
-            verb_searcher,
-            llm_client: Some(llm_client),
-            scope_resolver: ScopeResolver::new(),
-            session: None,
-            allow_direct_dsl: false,
-            #[cfg(feature = "database")]
-            pool: None,
-        }
-    }
-
     /// Create pipeline with database pool for scope resolution
     #[cfg(feature = "database")]
     pub fn with_pool(verb_searcher: HybridVerbSearcher, pool: PgPool) -> Self {
@@ -301,36 +239,12 @@ impl IntentPipeline {
         }
     }
 
-    /// Create pipeline with LLM client and database pool
-    #[cfg(feature = "database")]
-    pub fn with_llm_and_pool(
-        verb_searcher: HybridVerbSearcher,
-        llm_client: Arc<dyn LlmClient>,
-        pool: PgPool,
-    ) -> Self {
-        Self {
-            verb_searcher,
-            llm_client: Some(llm_client),
-            scope_resolver: ScopeResolver::new(),
-            session: None,
-            allow_direct_dsl: false,
-            pool: Some(pool),
-        }
-    }
-
-    /// Set session for macro expansion
-    pub fn with_session(mut self, session: Arc<std::sync::RwLock<UnifiedSession>>) -> Self {
-        self.session = Some(session);
-        self
-    }
-
     /// Enable or disable direct DSL bypass (input starting with '(').
     /// Should only be enabled for operator-role actors.
     pub fn set_allow_direct_dsl(mut self, allow: bool) -> Self {
         self.allow_direct_dsl = allow;
         self
     }
-
 
     /// Process with a forced verb selection (binding disambiguation).
     ///
@@ -393,7 +307,11 @@ impl IntentPipeline {
                 missing_required,
                 outcome: PipelineOutcome::NeedsUserInput,
                 scope_resolution: None,
-                scope_context: if scope_ctx.has_scope() { Some(scope_ctx) } else { None },
+                scope_context: if scope_ctx.has_scope() {
+                    Some(scope_ctx)
+                } else {
+                    None
+                },
             });
         }
 
@@ -426,7 +344,11 @@ impl IntentPipeline {
             None => self.validate_dsl(&dsl),
         };
 
-        let dsl_hash = if !dsl.is_empty() { Some(compute_dsl_hash(&dsl)) } else { None };
+        let dsl_hash = if !dsl.is_empty() {
+            Some(compute_dsl_hash(&dsl))
+        } else {
+            None
+        };
 
         Ok(PipelineResult {
             intent,
@@ -437,9 +359,17 @@ impl IntentPipeline {
             validation_error,
             unresolved_refs: unresolved,
             missing_required: vec![],
-            outcome: if valid { PipelineOutcome::Ready } else { PipelineOutcome::NeedsUserInput },
+            outcome: if valid {
+                PipelineOutcome::Ready
+            } else {
+                PipelineOutcome::NeedsUserInput
+            },
             scope_resolution: None,
-            scope_context: if scope_ctx.has_scope() { Some(scope_ctx) } else { None },
+            scope_context: if scope_ctx.has_scope() {
+                Some(scope_ctx)
+            } else {
+                None
+            },
         })
     }
     fn get_llm(&self) -> Result<Arc<dyn LlmClient>> {
@@ -464,16 +394,8 @@ impl IntentPipeline {
     /// 1. Scope is always established before entity resolution
     /// 2. No spurious entity-search modals for client names
     /// 3. Deterministic UX: Resolved → chip, Candidates → picker, else → continue
-    pub async fn process(
-        &self,
-        instruction: &str,
-        domain_hint: Option<&str>,
-    ) -> Result<PipelineResult> {
-        self.process_with_scope(instruction, domain_hint, None)
-            .await
-    }
-
-    /// Process with existing scope context (for subsequent commands after scope is set)
+    ///
+    /// Pass `None` for `existing_scope` on first call; subsequent calls can pass scope context.
     pub async fn process_with_scope(
         &self,
         instruction: &str,
@@ -486,17 +408,25 @@ impl IntentPipeline {
         // The old starts_with('(') path is removed to close the bypass trap door.
         if let Some(raw_dsl) = trimmed.strip_prefix("dsl:").map(|s| s.trim()) {
             if self.allow_direct_dsl {
-                tracing::info!(bypass = "direct_dsl", "Direct DSL bypass used (operator-gated, dsl: prefix)");
+                tracing::info!(
+                    bypass = "direct_dsl",
+                    "Direct DSL bypass used (operator-gated, dsl: prefix)"
+                );
                 return self.process_direct_dsl(raw_dsl, existing_scope).await;
             } else {
-                tracing::warn!(bypass = "direct_dsl_denied", "Direct DSL bypass attempted but not allowed by PolicyGate");
+                tracing::warn!(
+                    bypass = "direct_dsl_denied",
+                    "Direct DSL bypass attempted but not allowed by PolicyGate"
+                );
                 return Ok(PipelineResult {
                     intent: StructuredIntent::empty(),
                     verb_candidates: vec![],
                     dsl: String::new(),
                     dsl_hash: None,
                     valid: false,
-                    validation_error: Some("Direct DSL input is not allowed. Use natural language instead.".into()),
+                    validation_error: Some(
+                        "Direct DSL input is not allowed. Use natural language instead.".into(),
+                    ),
                     unresolved_refs: vec![],
                     missing_required: vec![],
                     outcome: PipelineOutcome::DirectDslNotAllowed,
@@ -1364,7 +1294,7 @@ fn format_intent_value_string_only(value: &IntentArgValue) -> String {
 /// Used to verify that commit requests apply to the correct DSL version,
 /// preventing race conditions where DSL is modified between disambiguation
 /// and resolution commit.
-pub fn compute_dsl_hash(dsl: &str) -> String {
+pub(crate) fn compute_dsl_hash(dsl: &str) -> String {
     let mut hasher = Sha256::new();
     hasher.update(dsl.as_bytes());
     let result = hasher.finalize();
@@ -2029,14 +1959,20 @@ mod tests {
     fn test_allow_direct_dsl_defaults_to_false() {
         let searcher = HybridVerbSearcher::minimal();
         let pipeline = IntentPipeline::new(searcher);
-        assert!(!pipeline.allow_direct_dsl, "allow_direct_dsl should default to false");
+        assert!(
+            !pipeline.allow_direct_dsl,
+            "allow_direct_dsl should default to false"
+        );
     }
 
     #[test]
     fn test_set_allow_direct_dsl() {
         let searcher = HybridVerbSearcher::minimal();
         let pipeline = IntentPipeline::new(searcher).set_allow_direct_dsl(true);
-        assert!(pipeline.allow_direct_dsl, "allow_direct_dsl should be true after set");
+        assert!(
+            pipeline.allow_direct_dsl,
+            "allow_direct_dsl should be true after set"
+        );
     }
 
     #[test]
@@ -2182,7 +2118,6 @@ mod tests {
     }
 }
 
-
 #[cfg(test)]
 mod policy_gate_tests {
     use super::*;
@@ -2191,14 +2126,20 @@ mod policy_gate_tests {
     fn test_allow_direct_dsl_defaults_to_false() {
         let searcher = HybridVerbSearcher::minimal();
         let pipeline = IntentPipeline::new(searcher);
-        assert!(!pipeline.allow_direct_dsl, "Direct DSL should be disabled by default");
+        assert!(
+            !pipeline.allow_direct_dsl,
+            "Direct DSL should be disabled by default"
+        );
     }
 
     #[test]
     fn test_set_allow_direct_dsl() {
         let searcher = HybridVerbSearcher::minimal();
         let pipeline = IntentPipeline::new(searcher).set_allow_direct_dsl(true);
-        assert!(pipeline.allow_direct_dsl, "Direct DSL should be enabled after set_allow_direct_dsl(true)");
+        assert!(
+            pipeline.allow_direct_dsl,
+            "Direct DSL should be enabled after set_allow_direct_dsl(true)"
+        );
     }
 
     /// Static guard: IntentPipeline must ONLY be constructed in orchestrator.rs.
@@ -2208,7 +2149,9 @@ mod policy_gate_tests {
         let mut violations = Vec::new();
 
         fn scan_dir(dir: &std::path::Path, violations: &mut Vec<String>) {
-            let Ok(entries) = std::fs::read_dir(dir) else { return };
+            let Ok(entries) = std::fs::read_dir(dir) else {
+                return;
+            };
             for entry in entries.flatten() {
                 let path = entry.path();
                 if path.is_dir() {
@@ -2228,8 +2171,6 @@ mod policy_gate_tests {
                             }
                             if trimmed.contains("IntentPipeline::new(")
                                 || trimmed.contains("IntentPipeline::with_pool(")
-                                || trimmed.contains("IntentPipeline::with_llm(")
-                                || trimmed.contains("IntentPipeline::with_llm_and_pool(")
                             {
                                 violations.push(format!(
                                     "{}:{}: {}",
@@ -2250,12 +2191,13 @@ mod policy_gate_tests {
             violations.is_empty(),
             "IntentPipeline constructed outside orchestrator.rs:
 {}",
-            violations.join("
-")
+            violations.join(
+                "
+"
+            )
         );
     }
 }
-
 
 #[cfg(test)]
 mod correctness_tests {
@@ -2272,10 +2214,15 @@ mod correctness_tests {
             .build()
             .unwrap();
 
-        let result = rt.block_on(pipeline.process("dsl:(cbu.list)", None)).unwrap();
+        let result = rt
+            .block_on(pipeline.process_with_scope("dsl:(cbu.list)", None, None))
+            .unwrap();
 
         assert_eq!(result.outcome, PipelineOutcome::DirectDslNotAllowed);
-        assert!(result.dsl.is_empty(), "No DSL should be generated when dsl: is denied");
+        assert!(
+            result.dsl.is_empty(),
+            "No DSL should be generated when dsl: is denied"
+        );
         assert!(!result.valid);
         assert!(result.validation_error.unwrap().contains("not allowed"));
     }
@@ -2292,11 +2239,16 @@ mod correctness_tests {
             .unwrap();
 
         // Parenthesized input without dsl: prefix should go through NL pipeline
-        let result = rt.block_on(pipeline.process("(cbu.list)", None)).unwrap();
+        let result = rt
+            .block_on(pipeline.process_with_scope("(cbu.list)", None, None))
+            .unwrap();
 
         // Should NOT produce DSL from direct bypass (no dsl: prefix)
-        assert_ne!(result.outcome, PipelineOutcome::Ready,
-            "Parenthesized input without dsl: prefix should not bypass");
+        assert_ne!(
+            result.outcome,
+            PipelineOutcome::Ready,
+            "Parenthesized input without dsl: prefix should not bypass"
+        );
     }
 
     #[test]

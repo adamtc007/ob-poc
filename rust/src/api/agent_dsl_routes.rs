@@ -987,7 +987,9 @@ pub(crate) async fn generate_dsl(
         return Json(GenerateDslResponse {
             dsl: None,
             explanation: None,
-            error: Some("Legacy /generate endpoint is disabled. Use /api/session/:id/chat instead.".into()),
+            error: Some(
+                "Legacy /generate endpoint is disabled. Use /api/session/:id/chat instead.".into(),
+            ),
         });
     }
 
@@ -2068,7 +2070,9 @@ pub(crate) async fn generate_onboarding_dsl(
             explanation: None,
             validation: None,
             execution: None,
-            error: Some("Legacy /onboard endpoint is disabled. Use /api/session/:id/chat instead.".into()),
+            error: Some(
+                "Legacy /onboard endpoint is disabled. Use /api/session/:id/chat instead.".into(),
+            ),
         });
     }
 
@@ -2078,7 +2082,8 @@ pub(crate) async fn generate_onboarding_dsl(
         domain: None, // Let it use all domains including resource and delivery
     };
 
-    let gen_response = generate_dsl(State(state.clone()), headers.clone(), Json(generate_req)).await;
+    let gen_response =
+        generate_dsl(State(state.clone()), headers.clone(), Json(generate_req)).await;
 
     match (gen_response.dsl.clone(), gen_response.error.clone()) {
         (Some(dsl), None) => {

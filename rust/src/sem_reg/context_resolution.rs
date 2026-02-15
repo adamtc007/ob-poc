@@ -419,8 +419,13 @@ pub async fn resolve_context(
 
     // Step 5: Filter verbs by taxonomy + ABAC + tier
     let all_verb_rows = load_typed_snapshots(pool, ObjectType::VerbContract, as_of).await?;
-    let mut candidate_verbs =
-        filter_and_rank_verbs(&all_verb_rows, &req.actor, req.evidence_mode, top_view_body, req.entity_kind.as_deref())?;
+    let mut candidate_verbs = filter_and_rank_verbs(
+        &all_verb_rows,
+        &req.actor,
+        req.evidence_mode,
+        top_view_body,
+        req.entity_kind.as_deref(),
+    )?;
 
     // Step 6: Filter attributes similarly
     let all_attr_rows = load_typed_snapshots(pool, ObjectType::AttributeDef, as_of).await?;

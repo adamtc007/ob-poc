@@ -371,49 +371,6 @@ to create executable DSL."#.into(),
                 "required": ["instruction"]
             }),
         },
-        Tool {
-            name: "session_context".into(),
-            description: r#"Manage conversation session state and stage focus.
-
-Actions:
-- create: Start new session
-- get: Get current state (bindings, stage focus)
-- update: Add bindings
-- undo: Revert last execution
-- clear: Reset all bindings
-- set_stage_focus: Focus on a semantic stage (filters available verbs)
-- list_stages: List available stages
-
-Stage focus enables "research mode" - set stage_code to:
-- GLEIF_RESEARCH: GLEIF API lookups (search, enrich, get-parent, etc.)
-- UBO_ANALYSIS: Ownership tracing and UBO registration
-- ENTITY_ENRICHMENT: External registry enrichment
-- GRAPH_EXPLORATION: Navigate entity relationship graph
-- (or any onboarding stage like KYC_REVIEW, SETTLEMENT_INSTRUCTIONS, etc.)"#.into(),
-            input_schema: json!({
-                "type": "object",
-                "properties": {
-                    "action": {
-                        "type": "string",
-                        "enum": ["create", "get", "update", "undo", "clear", "set_stage_focus", "list_stages"],
-                        "description": "Session action"
-                    },
-                    "session_id": {
-                        "type": "string",
-                        "description": "Session ID (required for get/update/undo/clear/set_stage_focus)"
-                    },
-                    "bindings": {
-                        "type": "object",
-                        "description": "For update action: name → uuid mappings to add"
-                    },
-                    "stage_code": {
-                        "type": "string",
-                        "description": "For set_stage_focus: stage code (e.g., 'GLEIF_RESEARCH'). Pass null to clear focus."
-                    }
-                },
-                "required": ["action"]
-            }),
-        },
         // =====================================================================
         // Session v2 Tools - Simplified CBU session management
         // Memory-first with graceful DB persistence

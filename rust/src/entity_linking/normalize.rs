@@ -99,14 +99,6 @@ pub fn tokenize(s: &str) -> Vec<String> {
         .collect()
 }
 
-/// Tokenize without legal suffix stripping (for alias matching)
-pub fn tokenize_preserving_suffixes(s: &str) -> Vec<String> {
-    normalize_entity_text(s, false)
-        .split_whitespace()
-        .map(|s| s.to_string())
-        .collect()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

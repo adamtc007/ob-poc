@@ -465,167 +465,6 @@ fn generate_phrase_variants(phrase: &str) -> Vec<String> {
 }
 
 // ============================================================================
-// Abandon Disambiguation
-// ============================================================================
-
-/// POST /api/session/:id/abandon-disambiguation
-///
-/// Called when user abandons disambiguation without selecting any option.
-/// This is a NEGATIVE signal for ALL candidates - they were all wrong.
-///
-/// Triggers:
-/// - User types new input instead of clicking an option
-/// - User closes session or navigates away
-/// - Timeout (>30s with no interaction)
-pub(crate) async fn abandon_disambiguation(
-    State(state): State<AgentState>,
-    Path(session_id): Path<Uuid>,
-    Json(req): Json<ob_poc_types::AbandonDisambiguationRequest>,
-) -> Result<Json<ob_poc_types::AbandonDisambiguationResponse>, StatusCode> {
-    tracing::info!(
-        session_id = %session_id,
-        original_input = %req.original_input,
-        num_candidates = req.candidates.len(),
-        reason = ?req.abandon_reason,
-        "Recording disambiguation abandonment (all candidates rejected)"
-    );
-
-    let mut signals_recorded = 0;
-
-    // Record negative signals for ALL candidates - they were all wrong
-    for candidate in &req.candidates {
-        match record_abandon_negative_signal(
-            &state.pool,
-            &req.original_input,
-            candidate,
-            &req.abandon_reason,
-        )
-        .await
-        {
-            Ok(_) => signals_recorded += 1,
-            Err(e) => {
-                tracing::warn!(
-                    "Failed to record abandon signal for '{}' -> '{}': {}",
-                    req.original_input,
-                    candidate,
-                    e
-                );
-            }
-        }
-    }
-
-    if let Err(e) = record_abandon_event(&state.pool, &req).await {
-        tracing::warn!("Failed to record abandon event: {}", e);
-    }
-
-    tracing::info!(
-        "Recorded {} negative signals for abandoned disambiguation",
-        signals_recorded
-    );
-
-    Ok(Json(ob_poc_types::AbandonDisambiguationResponse {
-        recorded: signals_recorded > 0,
-        signals_recorded,
-    }))
-}
-
-/// Record a negative signal when user abandons disambiguation
-///
-/// Uses lower confidence (0.3) than explicit rejection (0.7) because:
-/// - User didn't explicitly say "this is wrong"
-/// - They just gave up - could be for other reasons
-/// - But still valuable signal that these options weren't helpful
-async fn record_abandon_negative_signal(
-    pool: &PgPool,
-    original_input: &str,
-    rejected_verb: &str,
-    reason: &Option<ob_poc_types::AbandonReason>,
-) -> Result<(), sqlx::Error> {
-    let reason_str = match reason {
-        Some(ob_poc_types::AbandonReason::TypedNewInput) => "abandon_typed_new",
-        Some(ob_poc_types::AbandonReason::ClosedSession) => "abandon_closed",
-        Some(ob_poc_types::AbandonReason::Timeout) => "abandon_timeout",
-        Some(ob_poc_types::AbandonReason::Cancelled) => "abandon_cancelled",
-        Some(ob_poc_types::AbandonReason::Other) | None => "abandon_other",
-    };
-
-    // Add to phrase_blocklist with lower-weight reason
-    // ON CONFLICT: accumulate evidence (increment a counter or update timestamp)
-    // Schema: phrase, blocked_verb, user_id, reason, embedding, embedding_model, expires_at, created_at
-    sqlx::query!(
-        r#"
-        INSERT INTO agent.phrase_blocklist (
-            phrase,
-            blocked_verb,
-            reason,
-            created_at
-        )
-        VALUES ($1, $2, $3, NOW())
-        ON CONFLICT (phrase, blocked_verb, COALESCE(user_id, '00000000-0000-0000-0000-000000000000'::uuid))
-        DO UPDATE SET
-            reason = EXCLUDED.reason,
-            created_at = NOW()
-        "#,
-        original_input,
-        rejected_verb,
-        reason_str,
-    )
-    .execute(pool)
-    .await?;
-
-    Ok(())
-}
-
-/// Record abandon event to feedback log for analysis
-async fn record_abandon_event(
-    pool: &PgPool,
-    req: &ob_poc_types::AbandonDisambiguationRequest,
-) -> Result<(), sqlx::Error> {
-    let reason_str = req
-        .abandon_reason
-        .as_ref()
-        .map(|r| format!("{:?}", r))
-        .unwrap_or_else(|| "unknown".to_string());
-
-    let candidates_json = serde_json::to_value(&req.candidates).unwrap_or_default();
-
-    // Record to intent_feedback for analysis
-    // Schema: session_id, user_input, user_input_hash, matched_verb, outcome, alternatives, created_at
-    sqlx::query!(
-        r#"
-        INSERT INTO "ob-poc".intent_feedback (
-            session_id,
-            user_input,
-            user_input_hash,
-            matched_verb,
-            outcome,
-            alternatives,
-            created_at
-        )
-        VALUES (
-            '00000000-0000-0000-0000-000000000000'::uuid,
-            $1,
-            md5($1),
-            NULL,
-            'abandoned',
-            $2,
-            NOW()
-        )
-        "#,
-        req.original_input,
-        serde_json::json!({
-            "request_id": req.request_id,
-            "candidates": candidates_json,
-            "abandon_reason": reason_str,
-        }),
-    )
-    .execute(pool)
-    .await?;
-
-    Ok(())
-}
-
-// ============================================================================
 // Decision Reply
 // ============================================================================
 
@@ -698,26 +537,34 @@ pub(crate) async fn handle_decision_reply(
             let message = match &packet.kind {
                 DecisionKind::ClarifyVerb => {
                     // Extract verb_fqn from the VerbPayload
-                    let verb_fqn = if let ob_poc_types::ClarificationPayload::Verb(ref vp) = packet.payload {
-                        // choice.id is the index (1-based string); map to verb option
-                        choice.id.parse::<usize>().ok()
-                            .and_then(|idx| vp.options.get(idx.saturating_sub(1)))
-                            .map(|opt| opt.verb_fqn.clone())
-                    } else {
-                        None
-                    };
+                    let verb_fqn =
+                        if let ob_poc_types::ClarificationPayload::Verb(ref vp) = packet.payload {
+                            // choice.id is the index (1-based string); map to verb option
+                            choice
+                                .id
+                                .parse::<usize>()
+                                .ok()
+                                .and_then(|idx| vp.options.get(idx.saturating_sub(1)))
+                                .map(|opt| opt.verb_fqn.clone())
+                        } else {
+                            None
+                        };
 
                     if let Some(fqn) = verb_fqn {
                         let original_utterance = packet.utterance.clone();
                         let actor = crate::policy::ActorResolver::from_headers(&headers);
 
                         // Route through orchestrator forced-verb path
-                        match state.agent_service.process_forced_verb_selection(
-                            session,
-                            &original_utterance,
-                            &fqn,
-                            actor,
-                        ).await {
+                        match state
+                            .agent_service
+                            .process_forced_verb_selection(
+                                session,
+                                &original_utterance,
+                                &fqn,
+                                actor,
+                            )
+                            .await
+                        {
                             Ok(resp) => {
                                 tracing::info!(
                                     verb = %fqn,

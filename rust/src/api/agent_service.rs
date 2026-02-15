@@ -259,79 +259,6 @@ impl ClientScope {
 }
 
 // ============================================================================
-// GRACEFUL RESPONSE HELPERS - For ambiguous/vague/nonsense input
-// ============================================================================
-
-use crate::mcp::intent_pipeline::{ConfidenceTier, InputQuality};
-
-/// Build a graceful response for various input quality levels
-pub fn build_graceful_response(
-    quality: &InputQuality,
-    has_scope: bool,
-    original_input: &str,
-) -> String {
-    match quality {
-        InputQuality::Clear => {
-            // Should not be called for Clear - handled normally
-            String::new()
-        }
-        InputQuality::Ambiguous { candidates } => {
-            let verb_list = candidates
-                .iter()
-                .map(|c| {
-                    let desc = c.description.as_deref().unwrap_or("No description");
-                    format!("• **{}**: {}", c.verb, desc)
-                })
-                .collect::<Vec<_>>()
-                .join("\n");
-            format!(
-                "I'm not sure which action you meant. Did you mean:\n\n{}\n\nPlease clarify.",
-                verb_list
-            )
-        }
-        InputQuality::TooVague { best_guess } => {
-            let suggestion = if has_scope {
-                "Try 'show CBUs' or 'list products'"
-            } else {
-                "Try 'work on [client name]' to set context first"
-            };
-            if let Some(guess) = best_guess {
-                format!(
-                    "I'm not sure what you meant by \"{}\". Did you mean **{}**?\n\n{}",
-                    original_input, guess, suggestion
-                )
-            } else {
-                format!(
-                    "I couldn't understand \"{}\". {}\n\nExamples: 'show Allianz CBUs', 'add custody product', 'create a new fund'",
-                    original_input, suggestion
-                )
-            }
-        }
-        InputQuality::Nonsense => {
-            format!(
-                "I couldn't understand \"{}\". Try a command like:\n\n\
-                 • 'show Allianz CBUs'\n\
-                 • 'add custody product'\n\
-                 • 'create a new fund for Blackrock'\n\
-                 • 'work on Allianz' (to set client context)\n\n\
-                 Type /commands for a full list of available commands.",
-                original_input
-            )
-        }
-    }
-}
-
-/// Get confidence tier from pipeline result
-pub fn get_confidence_tier(
-    candidates: &[crate::mcp::verb_search::VerbSearchResult],
-) -> ConfidenceTier {
-    candidates
-        .first()
-        .map(|c| ConfidenceTier::from(c.score))
-        .unwrap_or(ConfidenceTier::VeryLow)
-}
-
-// ============================================================================
 // Agent Service
 // ============================================================================
 
@@ -394,12 +321,6 @@ impl AgentService {
             entity_linker: None,
             policy_gate: Arc::new(crate::policy::PolicyGate::from_env()),
         }
-    }
-
-    /// Set policy gate (overrides default from_env)
-    pub fn with_policy_gate(mut self, policy_gate: Arc<crate::policy::PolicyGate>) -> Self {
-        self.policy_gate = policy_gate;
-        self
     }
 
     /// Set entity linker for in-memory entity resolution
@@ -862,7 +783,8 @@ impl AgentService {
                                 .map(|c| crate::mcp::verb_search::VerbSearchResult {
                                     verb: c.verb.clone(),
                                     score: c.score,
-                                    source: crate::mcp::verb_search::VerbSearchSource::Semantic,
+                                    source:
+                                        crate::mcp::verb_search::VerbSearchSource::PatternEmbedding,
                                     matched_phrase: pending_tier.original_input.clone(),
                                     description: None,
                                 })
@@ -1012,11 +934,8 @@ impl AgentService {
             actor.clone(),
             crate::agent::orchestrator::UtteranceSource::Chat,
         );
-        let orch_outcome = crate::agent::orchestrator::handle_utterance(
-            &orch_ctx,
-            &request.message,
-        )
-        .await;
+        let orch_outcome =
+            crate::agent::orchestrator::handle_utterance(&orch_ctx, &request.message).await;
         let result = orch_outcome.map(|o| o.pipeline_result);
 
         match result {
@@ -2272,11 +2191,7 @@ impl AgentService {
     /// or a list of suggestions if multiple/no matches.
     ///
     /// For client_group type, uses PgClientGroupResolver with semantic search.
-    pub async fn resolve_entity(
-        &self,
-        entity_type: &str,
-        name: &str,
-    ) -> Result<ResolveResult, String> {
+    async fn resolve_entity(&self, entity_type: &str, name: &str) -> Result<ResolveResult, String> {
         // Special handling for client_group - uses PgClientGroupResolver
         if entity_type == "client_group" || entity_type == "client" {
             return self.resolve_client_group(name).await;

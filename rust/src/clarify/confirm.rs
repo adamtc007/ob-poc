@@ -4,7 +4,6 @@
 //! Tokens are cryptographically random and short-lived.
 
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
-use rand::Rng;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use thiserror::Error;
 
@@ -28,31 +27,6 @@ pub enum ConfirmTokenError {
 
     #[error("Token generation failed: {0}")]
     GenerationFailed(String),
-}
-
-/// Generate a new confirm token with embedded timestamp.
-///
-/// The token contains:
-/// - 16 random bytes for uniqueness
-/// - 8 bytes for Unix timestamp (seconds)
-///
-/// Returns a URL-safe base64 encoded string.
-pub fn generate_confirm_token() -> Result<String, ConfirmTokenError> {
-    let mut rng = rand::thread_rng();
-    let mut token_bytes = [0u8; RANDOM_BYTES_LEN + 8];
-
-    // Fill random portion
-    rng.fill(&mut token_bytes[..RANDOM_BYTES_LEN]);
-
-    // Add timestamp
-    let timestamp = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_err(|e| ConfirmTokenError::GenerationFailed(e.to_string()))?
-        .as_secs();
-
-    token_bytes[RANDOM_BYTES_LEN..].copy_from_slice(&timestamp.to_le_bytes());
-
-    Ok(URL_SAFE_NO_PAD.encode(token_bytes))
 }
 
 /// Validate a confirm token.
@@ -108,7 +82,20 @@ pub fn validate_confirm_token(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rand::Rng;
     use std::thread::sleep;
+
+    fn generate_confirm_token() -> Result<String, ConfirmTokenError> {
+        let mut rng = rand::thread_rng();
+        let mut token_bytes = [0u8; RANDOM_BYTES_LEN + 8];
+        rng.fill(&mut token_bytes[..RANDOM_BYTES_LEN]);
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|e| ConfirmTokenError::GenerationFailed(e.to_string()))?
+            .as_secs();
+        token_bytes[RANDOM_BYTES_LEN..].copy_from_slice(&timestamp.to_le_bytes());
+        Ok(URL_SAFE_NO_PAD.encode(token_bytes))
+    }
 
     #[test]
     fn test_generate_token() {

@@ -6,8 +6,7 @@
 //! - Snapshot file is missing or corrupted
 //! - Running in a minimal test environment
 
-use super::resolver::{EntityCandidate, EntityLinkingService, EntityResolution};
-use super::snapshot::{EntityId, EntityRow};
+use super::resolver::{EntityLinkingService, EntityResolution};
 
 /// Stub implementation that returns empty results.
 /// Used for graceful degradation when no snapshot is available.
@@ -48,14 +47,6 @@ impl EntityLinkingService for StubEntityLinkingService {
     ) -> Vec<EntityResolution> {
         vec![] // No resolution without snapshot
     }
-
-    fn lookup_by_name(&self, _name: &str, _limit: usize) -> Vec<EntityCandidate> {
-        vec![]
-    }
-
-    fn lookup_by_id(&self, _entity_id: &EntityId) -> Option<EntityRow> {
-        None
-    }
 }
 
 #[cfg(test)]
@@ -70,7 +61,6 @@ mod tests {
         assert_eq!(stub.snapshot_version(), 0);
         assert_eq!(stub.entity_count(), 0);
         assert!(stub.resolve_mentions("test", None, None, 10).is_empty());
-        assert!(stub.lookup_by_name("test", 10).is_empty());
     }
 
     #[test]

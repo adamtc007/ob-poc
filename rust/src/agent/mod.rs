@@ -3,10 +3,10 @@
 //! Contains the agent learning infrastructure for continuous improvement.
 //! Navigation commands go through the unified intent pipeline (view.* and session.* verbs).
 
+pub mod harness;
 pub mod learning;
 pub mod orchestrator;
 pub mod telemetry;
-pub mod harness;
 
 pub use learning::{
     spawn_agent_drain_task, AgentEvent, AgentEventEmitter, AgentEventPayload,

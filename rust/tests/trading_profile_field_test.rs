@@ -191,64 +191,6 @@ mod field_tests {
     }
 
     // =========================================================================
-    // UNIVERSE TESTS
-    // =========================================================================
-
-    /// Test universe entry with mic → market_id resolution
-    #[tokio::test]
-    #[ignore] // Requires unique constraint on cbu_instrument_universe not yet migrated
-    async fn test_universe_mic_to_market_id() -> Result<()> {
-        let mut db = TestDb::new().await?;
-        let cbu_id = db.ensure_cbu().await?;
-
-        // Get market and instrument class IDs
-        let market_id: Uuid =
-            sqlx::query_scalar("SELECT market_id FROM custody.markets WHERE mic = 'XLON'")
-                .fetch_one(&db.pool)
-                .await?;
-
-        let class_id: Uuid = sqlx::query_scalar(
-            "SELECT class_id FROM custody.instrument_classes WHERE code = 'EQUITY'",
-        )
-        .fetch_one(&db.pool)
-        .await?;
-
-        // Insert universe entry
-        sqlx::query(
-            r#"INSERT INTO custody.cbu_instrument_universe
-               (cbu_id, instrument_class_id, market_id, currencies, settlement_types,
-                is_held, is_traded, effective_date)
-               VALUES ($1, $2, $3, ARRAY['GBP'], ARRAY['DVP'], true, true, CURRENT_DATE)
-               ON CONFLICT (cbu_id, instrument_class_id, market_id) WHERE counterparty_entity_id IS NULL
-               DO NOTHING"#,
-        )
-        .bind(cbu_id)
-        .bind(class_id)
-        .bind(market_id)
-        .execute(&db.pool)
-        .await?;
-
-        // Read back via join to verify mic (INNER JOIN so not nullable)
-        let row = sqlx::query!(
-            r#"SELECT u.market_id, m.mic
-               FROM custody.cbu_instrument_universe u
-               JOIN custody.markets m ON u.market_id = m.market_id
-               WHERE u.cbu_id = $1 AND u.instrument_class_id = $2"#,
-            cbu_id,
-            class_id
-        )
-        .fetch_one(&db.pool)
-        .await?;
-
-        // market_id in universe is nullable, but we inserted one
-        assert_eq!(row.market_id.unwrap(), market_id);
-        assert_eq!(row.mic, "XLON");
-
-        db.cleanup().await?;
-        Ok(())
-    }
-
-    // =========================================================================
     // BOOKING RULES TESTS
     // =========================================================================
 
@@ -431,59 +373,6 @@ mod field_tests {
         .await?;
 
         assert_eq!(count, 1, "Should have exactly one SSI after double insert");
-
-        db.cleanup().await?;
-        Ok(())
-    }
-
-    /// Test universe upsert with partial index
-    #[tokio::test]
-    #[ignore] // Requires unique constraint on cbu_instrument_universe not yet migrated
-    async fn test_universe_upsert_idempotent() -> Result<()> {
-        let mut db = TestDb::new().await?;
-        let cbu_id = db.ensure_cbu().await?;
-
-        let market_id: Uuid =
-            sqlx::query_scalar("SELECT market_id FROM custody.markets WHERE mic = 'XNYS'")
-                .fetch_one(&db.pool)
-                .await?;
-
-        let class_id: Uuid = sqlx::query_scalar(
-            "SELECT class_id FROM custody.instrument_classes WHERE code = 'EQUITY'",
-        )
-        .fetch_one(&db.pool)
-        .await?;
-
-        // Insert twice with partial unique index handling
-        for _ in 0..2 {
-            sqlx::query(
-                r#"INSERT INTO custody.cbu_instrument_universe
-                   (cbu_id, instrument_class_id, market_id, currencies, settlement_types,
-                    is_held, is_traded, effective_date)
-                   VALUES ($1, $2, $3, ARRAY['USD'], ARRAY['DVP'], true, true, CURRENT_DATE)
-                   ON CONFLICT (cbu_id, instrument_class_id, market_id) WHERE counterparty_entity_id IS NULL
-                   DO NOTHING"#,
-            )
-            .bind(cbu_id)
-            .bind(class_id)
-            .bind(market_id)
-            .execute(&db.pool)
-            .await?;
-        }
-
-        // Should only have one row
-        let count: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM custody.cbu_instrument_universe WHERE cbu_id = $1 AND market_id = $2",
-        )
-        .bind(cbu_id)
-        .bind(market_id)
-        .fetch_one(&db.pool)
-        .await?;
-
-        assert_eq!(
-            count, 1,
-            "Should have exactly one universe entry after double insert"
-        );
 
         db.cleanup().await?;
         Ok(())

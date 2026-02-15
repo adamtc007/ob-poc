@@ -6,8 +6,7 @@
 //! - Stable, serializable evidence for audit trails
 
 use super::mention::{MentionExtractor, MentionSpan};
-use super::normalize::normalize_entity_text;
-use super::snapshot::{EntityId, EntityRow, EntitySnapshot};
+use super::snapshot::{EntityId, EntitySnapshot};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::sync::Arc;
@@ -97,12 +96,6 @@ pub trait EntityLinkingService: Send + Sync {
         context_concepts: Option<&[String]>,
         limit: usize,
     ) -> Vec<EntityResolution>;
-
-    /// Direct lookup by name
-    fn lookup_by_name(&self, name: &str, limit: usize) -> Vec<EntityCandidate>;
-
-    /// Direct lookup by ID
-    fn lookup_by_id(&self, entity_id: &EntityId) -> Option<EntityRow>;
 }
 
 /// Default implementation of EntityLinkingService
@@ -120,20 +113,9 @@ impl EntityLinkingServiceImpl {
         }
     }
 
-    /// Load from default snapshot path
-    pub fn load_default() -> anyhow::Result<Self> {
-        let path = Path::new("rust/assets/entity.snapshot.bin");
-        Ok(Self::new(Arc::new(EntitySnapshot::load(path)?)))
-    }
-
     /// Load from specific path
     pub fn load_from(path: &Path) -> anyhow::Result<Self> {
         Ok(Self::new(Arc::new(EntitySnapshot::load(path)?)))
-    }
-
-    /// Get reference to underlying snapshot
-    pub fn snapshot(&self) -> &EntitySnapshot {
-        &self.snapshot
     }
 }
 
@@ -175,31 +157,6 @@ impl EntityLinkingService for EntityLinkingServiceImpl {
             .into_iter()
             .map(|span| self.resolve_span(span, expected_kinds, context_concepts, limit))
             .collect()
-    }
-
-    fn lookup_by_name(&self, name: &str, limit: usize) -> Vec<EntityCandidate> {
-        let normalized = normalize_entity_text(name, false);
-        let spans = self.extractor.extract(&normalized, &self.snapshot);
-
-        spans
-            .into_iter()
-            .flat_map(|s| s.candidate_ids.into_iter())
-            .filter_map(|id| {
-                let row = self.snapshot.get(&id)?;
-                Some(EntityCandidate {
-                    entity_id: id,
-                    entity_kind: row.entity_kind.clone(),
-                    canonical_name: row.canonical_name.clone(),
-                    score: 1.0,
-                    evidence: vec![],
-                })
-            })
-            .take(limit)
-            .collect()
-    }
-
-    fn lookup_by_id(&self, entity_id: &EntityId) -> Option<EntityRow> {
-        self.snapshot.get(entity_id).cloned()
     }
 }
 

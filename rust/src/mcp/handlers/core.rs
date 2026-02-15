@@ -244,7 +244,6 @@ impl ToolHandlers {
             "dsl_lookup" => self.dsl_lookup(args).await,
             "dsl_complete" => self.dsl_complete(args),
             "dsl_signature" => self.dsl_signature(args),
-            "session_context" => self.session_context(args),
             // Session v2 tools - simplified CBU session management
             "session_load_cbu" => self.session_load_cbu(args).await,
             "session_load_jurisdiction" => self.session_load_jurisdiction(args).await,
@@ -350,7 +349,9 @@ impl ToolHandlers {
                 if result.success {
                     Ok(result.data)
                 } else {
-                    Err(anyhow!(result.error.unwrap_or_else(|| "sem_reg tool failed".into())))
+                    Err(anyhow!(result
+                        .error
+                        .unwrap_or_else(|| "sem_reg tool failed".into())))
                 }
             }
             _ => Err(anyhow!("Unknown tool: {}", name)),
@@ -375,10 +376,6 @@ impl ToolHandlers {
         let source = args["source"]
             .as_str()
             .ok_or_else(|| anyhow!("source required"))?;
-
-        // Get session bindings if provided (for future use with known_symbols)
-        let session_id = args["session_id"].as_str();
-        let _binding_context = session_id.and_then(crate::mcp::session::get_session_bindings);
 
         // Load verb registry for planning
         let loader = ConfigLoader::from_env();
@@ -1297,7 +1294,6 @@ impl ToolHandlers {
     /// 3. DSL assembled deterministically from structured intent
     /// 4. Validated before return
     async fn dsl_generate(&self, args: Value) -> Result<Value> {
-
         let instruction = args["instruction"]
             .as_str()
             .ok_or_else(|| anyhow!("instruction required"))?;

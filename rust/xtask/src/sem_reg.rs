@@ -5,8 +5,8 @@
 use anyhow::{Context, Result};
 use sqlx::PgPool;
 
-use ob_poc::sem_reg::{ObjectType, RegistryService, SnapshotStore};
 use ob_poc::sem_reg::types::{ChangeType, SnapshotMeta};
+use ob_poc::sem_reg::{ObjectType, RegistryService, SnapshotStore};
 
 /// Show registry statistics (counts by object type).
 pub async fn stats() -> Result<()> {

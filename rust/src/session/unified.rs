@@ -348,7 +348,8 @@ impl RunSheet {
     /// Excludes Executed, Failed, Skipped, Cancelled entries.
     /// This prevents re-running previously executed DSL when new entries are staged.
     pub fn runnable_dsl(&self) -> Option<String> {
-        let runnable: Vec<&str> = self.entries
+        let runnable: Vec<&str> = self
+            .entries
             .iter()
             .filter(|e| matches!(e.status, EntryStatus::Draft | EntryStatus::Ready))
             .map(|e| e.dsl_source.as_str())
@@ -2942,7 +2943,10 @@ mod tests {
 
         // Now runnable_dsl only returns the second
         let dsl2 = session.run_sheet.runnable_dsl().unwrap();
-        assert!(!dsl2.contains("entity.create"), "Executed entry should be excluded");
+        assert!(
+            !dsl2.contains("entity.create"),
+            "Executed entry should be excluded"
+        );
         assert!(dsl2.contains("kyc.open-case"));
 
         // combined_dsl still returns both
@@ -2983,9 +2987,23 @@ mod tests {
         session.run_sheet.mark_all_executed();
 
         // id1 stays Failed, id2 becomes Executed
-        let e1 = session.run_sheet.entries.iter().find(|e| e.id == id1).unwrap();
-        assert_eq!(e1.status, EntryStatus::Failed, "Failed entry should stay Failed");
-        let e2 = session.run_sheet.entries.iter().find(|e| e.id == id2).unwrap();
+        let e1 = session
+            .run_sheet
+            .entries
+            .iter()
+            .find(|e| e.id == id1)
+            .unwrap();
+        assert_eq!(
+            e1.status,
+            EntryStatus::Failed,
+            "Failed entry should stay Failed"
+        );
+        let e2 = session
+            .run_sheet
+            .entries
+            .iter()
+            .find(|e| e.id == id2)
+            .unwrap();
         assert_eq!(e2.status, EntryStatus::Executed);
     }
 

@@ -14,9 +14,9 @@ use dsl_core::config::loader::ConfigLoader;
 use dsl_core::config::types::{ArgConfig, VerbConfig, VerbsConfig};
 
 use super::{
-    ids::{definition_hash, object_id_for},
     attribute_def::{AttributeDataType, AttributeDefBody, AttributeSource},
     entity_type_def::{DbTableMapping, EntityTypeDefBody},
+    ids::{definition_hash, object_id_for},
     store::SnapshotStore,
     types::{ChangeType, ObjectType, SnapshotMeta},
     verb_contract::{
@@ -144,10 +144,7 @@ pub fn verb_config_to_contract(
 
     let metadata = config.metadata.as_ref().map(|m| VerbContractMetadata {
         tier: m.tier.as_ref().map(to_wire_str),
-        source_of_truth: m
-            .source_of_truth
-            .as_ref()
-            .map(to_wire_str),
+        source_of_truth: m.source_of_truth.as_ref().map(to_wire_str),
         scope: m.scope.as_ref().map(to_wire_str),
         noun: m.noun.clone(),
         tags: m.tags.clone(),
@@ -378,7 +375,8 @@ pub async fn run_onboarding_scan(
                 }
             } else {
                 // Definition changed — publish successor snapshot
-                let mut meta = SnapshotMeta::new_operational(ObjectType::VerbContract, object_id, "scanner");
+                let mut meta =
+                    SnapshotMeta::new_operational(ObjectType::VerbContract, object_id, "scanner");
                 meta.predecessor_id = Some(existing_row.snapshot_id);
                 meta.version_major = existing_row.version_major;
                 meta.version_minor = existing_row.version_minor + 1;
@@ -424,7 +422,8 @@ pub async fn run_onboarding_scan(
                     println!("  SKIP entity type: {} (unchanged)", entity_type.fqn);
                 }
             } else {
-                let mut meta = SnapshotMeta::new_operational(ObjectType::EntityTypeDef, object_id, "scanner");
+                let mut meta =
+                    SnapshotMeta::new_operational(ObjectType::EntityTypeDef, object_id, "scanner");
                 meta.predecessor_id = Some(existing_row.snapshot_id);
                 meta.version_major = existing_row.version_major;
                 meta.version_minor = existing_row.version_minor + 1;
@@ -433,7 +432,10 @@ pub async fn run_onboarding_scan(
                 SnapshotStore::publish_snapshot(pool, &meta, &definition, Some(set_id)).await?;
                 report.entity_types_updated += 1;
                 if verbose {
-                    println!("  UPD  entity type: {} (definition changed)", entity_type.fqn);
+                    println!(
+                        "  UPD  entity type: {} (definition changed)",
+                        entity_type.fqn
+                    );
                 }
             }
             continue;
@@ -467,7 +469,8 @@ pub async fn run_onboarding_scan(
             if old_hash == new_hash {
                 report.attributes_skipped += 1;
             } else {
-                let mut meta = SnapshotMeta::new_operational(ObjectType::AttributeDef, object_id, "scanner");
+                let mut meta =
+                    SnapshotMeta::new_operational(ObjectType::AttributeDef, object_id, "scanner");
                 meta.predecessor_id = Some(existing_row.snapshot_id);
                 meta.version_major = existing_row.version_major;
                 meta.version_minor = existing_row.version_minor + 1;

@@ -21,9 +21,12 @@
 //! ## Usage
 //!
 //! ```rust,ignore
-//! use ob_poc::entity_linking::{EntityLinkingServiceImpl, EntityLinkingService};
+//! use ob_poc::entity_linking::{EntityLinkingServiceImpl, EntityLinkingService, EntitySnapshot};
+//! use std::path::Path;
+//! use std::sync::Arc;
 //!
-//! let service = EntityLinkingServiceImpl::load_default()?;
+//! let snapshot = EntitySnapshot::load(Path::new("rust/assets/entity.snapshot.bin"))?;
+//! let service = EntityLinkingServiceImpl::new(Arc::new(snapshot));
 //! let resolutions = service.resolve_mentions(
 //!     "Set up Goldman Sachs for OTC trading",
 //!     Some(&["company".to_string()]),
@@ -48,7 +51,7 @@ pub mod stub;
 
 // Re-exports
 pub use compiler::{compile_entity_snapshot, lint_entity_data, LintSeverity, LintWarning};
-pub use mention::{MentionExtractor, MentionExtractorConfig, MentionSpan};
+pub use mention::{MentionExtractor, MentionSpan};
 pub use normalize::{normalize_entity_text, tokenize};
 pub use resolver::{
     EntityCandidate, EntityLinkingService, EntityLinkingServiceImpl, EntityResolution, Evidence,
