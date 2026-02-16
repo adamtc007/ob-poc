@@ -126,6 +126,9 @@ pub mod feedback;
 #[cfg(feature = "database")]
 pub mod service_resources;
 
+// Compiled Runbook — sole executable truth (types + execution gate)
+pub mod runbook;
+
 // REPL module - Staged runbook with anti-hallucination guarantees
 #[cfg(feature = "database")]
 pub mod repl;
@@ -137,6 +140,10 @@ pub mod bpmn_integration;
 // Journey module - Pack-guided REPL v2 (Journey Packs, sentence templates, unified runbook)
 #[cfg(feature = "vnext-repl")]
 pub mod journey;
+
+// Plan Builder — compilation pipeline decomposition (verb classifier, constraint gate, plan assembler)
+#[cfg(feature = "vnext-repl")]
+pub mod plan_builder;
 
 // Document Bundles - Versioned document requirement sets for structure macros
 #[cfg(feature = "database")]

@@ -23,11 +23,11 @@ use crate::database::generation_log_repository::{
     CompileResult, GenerationAttempt, GenerationLogRepository, LintResult, ParseResult,
 };
 use crate::database::VisualizationRepository;
+use crate::dsl_v2::macros::MacroRegistry;
 use crate::dsl_v2::{
     compile, expand_templates_simple, gateway_resolver, parse_program, registry, runtime_registry,
     AtomicExecutionResult, BatchPolicy, BestEffortExecutionResult, DslExecutor, ExecutionContext,
 };
-use crate::macros::OperatorMacroRegistry;
 use crate::mcp::verb_search::HybridVerbSearcher;
 use crate::mcp::verb_search_factory::VerbSearcherFactory;
 
@@ -74,7 +74,7 @@ pub struct ToolHandlers {
     /// Feedback service for learning loop
     pub(super) feedback_service: Option<Arc<ob_semantic_matcher::FeedbackService>>,
     /// Operator macro registry for business vocabulary search
-    pub(super) macro_registry: Option<Arc<OperatorMacroRegistry>>,
+    pub(super) macro_registry: Option<Arc<MacroRegistry>>,
     /// Lexicon service for fast in-memory lexical verb search (Phase A of 072)
     pub(super) lexicon: Option<crate::mcp::verb_search::SharedLexicon>,
 }
@@ -165,7 +165,7 @@ impl ToolHandlers {
                 &self.pool,
                 self.embedder.clone(),
                 self.learned_data.clone(),
-                Arc::new(crate::macros::OperatorMacroRegistry::new()),
+                Arc::new(MacroRegistry::new()),
                 self.lexicon.clone(),
             )
         };

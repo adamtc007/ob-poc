@@ -15,6 +15,7 @@
 > **REPL Session/Phased Execution:** ⚠️ Superseded by V2 REPL Architecture
 > **REPL Pipeline Redesign (077):** ⚠️ Superseded by V2 REPL Architecture — V1 types retained for reference
 > **V2 REPL Architecture (TODO-2):** ✅ Complete - Pack-scoped intent resolution, 7-state machine, ContextStack fold, preconditions engine, 3-pronged intent pipeline (semantic→pack→precondition), VerbSearchIntentMatcher bridge, 320 tests
+> **Runbook Compilation Pipeline:** ✅ Complete - `process_utterance()` wired: classify_verb → compile_verb → OrchestratorResponse, CompiledRunbook attached to RunbookEntry on confirm, pack constraints from ContextStack, UnifiedSession derived from runbook fold (P-3 invariant), 14 integration tests
 > **Candle Semantic Pipeline:** ✅ Complete - DB source of truth, populate_embeddings binary
 > **Agent Pipeline:** ✅ Hardened + PolicyGate - Unified orchestrator, server-side policy enforcement, SemReg fail-closed (v2: matched-path + DenyAll/Unavailable), ActorResolver (headers/env/session), IntentTrace audit with PolicySnapshot, AST-based macro SemReg governance, RunSheet replay prevention, /select-verb retired (410 Gone), intent_events telemetry, entity-kind constrained verb selection + ClarifyEntity
 > **Solar Navigation (038):** ✅ Complete - ViewState, NavigationHistory, orbit navigation
@@ -5657,6 +5658,7 @@ When you see these in a task, read the corresponding annex first:
 | "decision log", "DecisionLog", "replay tuner", "golden corpus" | CLAUDE.md §V2 REPL Architecture |
 | "focus mode", "FocusMode", "domain affinity" | CLAUDE.md §V2 REPL Architecture |
 | "orchestrator v2", "ReplOrchestratorV2", "session v2" | CLAUDE.md §V2 REPL Architecture |
+| "process_utterance", "compile_verb", "CompiledRunbook", "compiled_runbook_id", "runbook compilation" | CLAUDE.md §Runbook Compilation Pipeline, `rust/src/runbook/` |
 | "invariant", "P-1", "P-2", "P-3", "P-4", "P-5" | `docs/INVARIANT-VERIFICATION.md` |
 | "BPMN", "bpmn-lite", "orchestration", "fiber VM", "durable workflow" | CLAUDE.md §BPMN-Lite Durable Orchestration Service |
 | "race", "WaitState::Race", "boundary timer", "race_plan", "RacePlanEntry" | CLAUDE.md §BPMN-Lite §Race Semantics (Phase 2) |

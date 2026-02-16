@@ -572,8 +572,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         {
             use ob_poc::agent::learning::embedder::CandleEmbedder;
             use ob_poc::agent::learning::warmup::LearningWarmup;
+            use ob_poc::dsl_v2::macros::{load_macro_registry_from_dir, MacroRegistry};
             use ob_poc::dsl_v2::ConfigLoader;
-            use ob_poc::macros::OperatorMacroRegistry;
             use ob_poc::mcp::verb_search_factory::VerbSearcherFactory;
             use ob_poc::mcp::verb_search_intent_matcher::VerbSearchIntentMatcher;
             use ob_poc::repl::intent_service::IntentService;
@@ -652,11 +652,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     let macro_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
                         .join("../../config/verb_schemas/macros");
                     let macro_reg = Arc::new(
-                        OperatorMacroRegistry::load_from_dir(&macro_dir)
-                            .unwrap_or_else(|_| OperatorMacroRegistry::new()),
+                        load_macro_registry_from_dir(&macro_dir)
+                            .unwrap_or_else(|_| MacroRegistry::new()),
                     );
 
                     // 6. Build HybridVerbSearcher via factory
+                    let macro_reg_for_orchestrator = macro_reg.clone();
                     let searcher = Arc::new(VerbSearcherFactory::build(
                         &pool,
                         dyn_embedder,
@@ -678,7 +679,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     orchestrator = orchestrator
                         .with_verb_config_index(verb_config_index)
                         .with_intent_matcher(intent_matcher)
-                        .with_intent_service(intent_service);
+                        .with_intent_service(intent_service)
+                        .with_macro_registry(macro_reg_for_orchestrator);
 
                     tracing::info!(
                         "V2 REPL IntentService wired in {}ms (semantic verb search enabled)",

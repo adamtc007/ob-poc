@@ -13,8 +13,10 @@
 //! These endpoints are used by the agent to get contextually relevant
 //! verb suggestions during DSL generation.
 
+use crate::dsl_v2::macros::{
+    load_macro_registry_from_dir, MacroFilter, MacroRegistry, MacroTaxonomy,
+};
 use crate::dsl_v2::verb_taxonomy::{verb_taxonomy, DomainSummary, VerbLocation};
-use crate::macros::{MacroFilter, MacroTaxonomy, OperatorMacroRegistry};
 use crate::session::{
     AgentVerbContext, CategoryInfo, DiscoveryQuery, VerbDiscoveryService, VerbSuggestion,
     WorkflowPhaseInfo,
@@ -37,7 +39,7 @@ use std::sync::Arc;
 #[derive(Clone)]
 pub struct VerbDiscoveryState {
     pub service: Arc<VerbDiscoveryService>,
-    pub macro_registry: Arc<OperatorMacroRegistry>,
+    pub macro_registry: Arc<MacroRegistry>,
 }
 
 impl VerbDiscoveryState {
@@ -46,11 +48,10 @@ impl VerbDiscoveryState {
         let config_dir = std::env::var("DSL_CONFIG_DIR").unwrap_or_else(|_| "config".to_string());
         let macros_dir = std::path::Path::new(&config_dir).join("verb_schemas/macros");
 
-        let macro_registry =
-            OperatorMacroRegistry::load_from_dir(&macros_dir).unwrap_or_else(|e| {
-                tracing::warn!("Failed to load operator macros: {}", e);
-                OperatorMacroRegistry::new()
-            });
+        let macro_registry = load_macro_registry_from_dir(&macros_dir).unwrap_or_else(|e| {
+            tracing::warn!("Failed to load operator macros: {}", e);
+            MacroRegistry::new()
+        });
 
         Self {
             service: Arc::new(VerbDiscoveryService::new(Arc::new(pool))),
@@ -58,7 +59,7 @@ impl VerbDiscoveryState {
         }
     }
 
-    pub fn with_macro_registry(pool: PgPool, registry: OperatorMacroRegistry) -> Self {
+    pub fn with_macro_registry(pool: PgPool, registry: MacroRegistry) -> Self {
         Self {
             service: Arc::new(VerbDiscoveryService::new(Arc::new(pool))),
             macro_registry: Arc::new(registry),
@@ -519,15 +520,15 @@ async fn get_macro_taxonomy(
     };
 
     // Get filtered macros
-    let macros = registry.list(filter);
+    let macros = registry.list(filter.as_ref());
     let total_macros = macros.len();
 
     // Build taxonomy tree
     let taxonomy = registry.build_taxonomy();
 
     // Get available domains and mode tags
-    let domains: Vec<String> = registry.domains().iter().map(|s| s.to_string()).collect();
-    let mode_tags: Vec<String> = registry.mode_tags().iter().map(|s| s.to_string()).collect();
+    let domains: Vec<String> = registry.domains().cloned().collect();
+    let mode_tags: Vec<String> = registry.mode_tags().cloned().collect();
 
     Ok(Json(MacroTaxonomyResponse {
         taxonomy,
@@ -550,96 +551,105 @@ async fn get_macro_schema(
 ) -> Result<Json<MacroSchemaResponse>, StatusCode> {
     let registry = &state.macro_registry;
 
-    let macro_def = registry.get(&fqn).ok_or_else(|| {
+    let macro_schema = registry.get(&fqn).ok_or_else(|| {
         tracing::warn!("Macro not found: {}", fqn);
         StatusCode::NOT_FOUND
     })?;
 
+    // Helper to convert V2 MacroArg to response format
+    fn convert_arg(
+        name: &str,
+        arg: &crate::dsl_v2::macros::MacroArg,
+        required: bool,
+    ) -> MacroSchemaArg {
+        MacroSchemaArg {
+            name: name.to_string(),
+            arg_type: format!("{:?}", arg.arg_type).to_lowercase(),
+            ui_label: arg.ui_label.clone(),
+            required,
+            valid_values: arg.valid_values.clone(),
+            enum_values: arg
+                .values
+                .iter()
+                .map(|v| MacroSchemaEnumValue {
+                    key: v.key.clone(),
+                    label: v.label.clone(),
+                    internal: Some(v.internal.clone()),
+                })
+                .collect(),
+            default_value: arg.default_key.clone().or_else(|| {
+                arg.default.as_ref().and_then(|v| {
+                    if let serde_json::Value::String(s) = v {
+                        Some(s.clone())
+                    } else {
+                        None
+                    }
+                })
+            }),
+            autofill_from: arg.autofill_from.clone(),
+            picker: arg.picker.clone(),
+        }
+    }
+
+    // Helper to convert V2 MacroPrereq to response format
+    fn convert_prereq(p: &crate::dsl_v2::macros::MacroPrereq) -> MacroSchemaPrereq {
+        match p {
+            crate::dsl_v2::macros::MacroPrereq::StateExists { key } => MacroSchemaPrereq {
+                prereq_type: "state_exists".to_string(),
+                key: Some(key.clone()),
+                verb: None,
+            },
+            crate::dsl_v2::macros::MacroPrereq::VerbCompleted { verb } => MacroSchemaPrereq {
+                prereq_type: "verb_completed".to_string(),
+                key: None,
+                verb: Some(verb.clone()),
+            },
+            crate::dsl_v2::macros::MacroPrereq::AnyOf { .. } => MacroSchemaPrereq {
+                prereq_type: "any_of".to_string(),
+                key: None,
+                verb: None,
+            },
+            crate::dsl_v2::macros::MacroPrereq::FactExists { .. } => MacroSchemaPrereq {
+                prereq_type: "fact_exists".to_string(),
+                key: None,
+                verb: None,
+            },
+        }
+    }
+
     // Convert to response format
     let response = MacroSchemaResponse {
-        fqn: macro_def.fqn.clone(),
+        fqn: fqn.clone(),
         ui: MacroSchemaUi {
-            label: macro_def.ui.label.clone(),
-            description: macro_def.ui.description.clone(),
-            target_label: macro_def.ui.target_label.clone(),
+            label: macro_schema.ui.label.clone(),
+            description: macro_schema.ui.description.clone(),
+            target_label: Some(macro_schema.ui.target_label.clone()),
         },
         routing: MacroSchemaRouting {
-            mode_tags: macro_def.routing.mode_tags.clone(),
-            operator_domain: macro_def.routing.operator_domain.clone(),
+            mode_tags: macro_schema.routing.mode_tags.clone(),
+            operator_domain: macro_schema
+                .routing
+                .operator_domain
+                .clone()
+                .unwrap_or_default(),
         },
         args: MacroSchemaArgs {
-            style: macro_def.args.style.clone(),
-            required: macro_def
+            style: format!("{:?}", macro_schema.args.style).to_lowercase(),
+            required: macro_schema
                 .args
                 .required
                 .iter()
-                .map(|(name, arg)| MacroSchemaArg {
-                    name: name.clone(),
-                    arg_type: arg.arg_type.clone(),
-                    ui_label: arg.ui_label.clone(),
-                    required: true,
-                    valid_values: arg.valid_values.clone(),
-                    enum_values: arg
-                        .values
-                        .iter()
-                        .map(|v| MacroSchemaEnumValue {
-                            key: v.key.clone(),
-                            label: v.label.clone(),
-                            internal: v.internal.clone(),
-                        })
-                        .collect(),
-                    default_value: arg.default_key.clone().or_else(|| arg.default.clone()),
-                    autofill_from: arg.autofill_from.clone(),
-                    picker: arg.picker.clone(),
-                })
+                .map(|(name, arg)| convert_arg(name, arg, true))
                 .collect(),
-            optional: macro_def
+            optional: macro_schema
                 .args
                 .optional
                 .iter()
-                .map(|(name, arg)| MacroSchemaArg {
-                    name: name.clone(),
-                    arg_type: arg.arg_type.clone(),
-                    ui_label: arg.ui_label.clone(),
-                    required: false,
-                    valid_values: arg.valid_values.clone(),
-                    enum_values: arg
-                        .values
-                        .iter()
-                        .map(|v| MacroSchemaEnumValue {
-                            key: v.key.clone(),
-                            label: v.label.clone(),
-                            internal: v.internal.clone(),
-                        })
-                        .collect(),
-                    default_value: arg.default_key.clone().or_else(|| arg.default.clone()),
-                    autofill_from: arg.autofill_from.clone(),
-                    picker: arg.picker.clone(),
-                })
+                .map(|(name, arg)| convert_arg(name, arg, false))
                 .collect(),
         },
-        prereqs: macro_def
-            .prereqs
-            .iter()
-            .map(|p| match p {
-                crate::macros::MacroPrereq::StateExists { key } => MacroSchemaPrereq {
-                    prereq_type: "state_exists".to_string(),
-                    key: Some(key.clone()),
-                    verb: None,
-                },
-                crate::macros::MacroPrereq::VerbCompleted { verb } => MacroSchemaPrereq {
-                    prereq_type: "verb_completed".to_string(),
-                    key: None,
-                    verb: Some(verb.clone()),
-                },
-                crate::macros::MacroPrereq::AnyOf { .. } => MacroSchemaPrereq {
-                    prereq_type: "any_of".to_string(),
-                    key: None,
-                    verb: None,
-                },
-            })
-            .collect(),
-        unlocks: macro_def.unlocks.clone(),
+        prereqs: macro_schema.prereqs.iter().map(convert_prereq).collect(),
+        unlocks: macro_schema.unlocks.clone(),
     };
 
     Ok(Json(response))

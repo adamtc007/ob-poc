@@ -47,8 +47,8 @@ use uuid::Uuid;
 use crate::agent::learning::embedder::SharedEmbedder;
 use crate::agent::learning::warmup::SharedLearnedData;
 use crate::database::VerbService;
+use crate::dsl_v2::macros::MacroRegistry;
 use crate::lexicon::LexiconService;
-use crate::macros::OperatorMacroRegistry;
 
 /// Shared lexicon service type alias
 pub type SharedLexicon = Arc<dyn LexiconService>;
@@ -236,7 +236,7 @@ pub struct HybridVerbSearcher {
     learned_data: Option<SharedLearnedData>,
     embedder: Option<SharedEmbedder>,
     /// Operator macro registry for business vocabulary search
-    macro_registry: Option<Arc<OperatorMacroRegistry>>,
+    macro_registry: Option<Arc<MacroRegistry>>,
     /// Lexicon service for fast lexical search (runs BEFORE semantic embedding)
     lexicon: Option<SharedLexicon>,
     /// Similarity threshold for learned semantic matches (high confidence, 0.80)
@@ -307,7 +307,7 @@ impl HybridVerbSearcher {
     }
 
     /// Add macro registry for operator vocabulary search
-    pub fn with_macro_registry(mut self, registry: Arc<OperatorMacroRegistry>) -> Self {
+    pub fn with_macro_registry(mut self, registry: Arc<MacroRegistry>) -> Self {
         self.macro_registry = Some(registry);
         self
     }
@@ -903,26 +903,26 @@ impl HybridVerbSearcher {
         let mut results = Vec::new();
 
         // 1. Exact FQN match
-        if let Some(macro_def) = registry.get(&query_lower) {
+        if let Some(schema) = registry.get(&query_lower) {
             results.push(VerbSearchResult {
-                verb: macro_def.fqn.clone(),
+                verb: query_lower.clone(),
                 score: 1.0,
                 source: VerbSearchSource::Macro,
-                matched_phrase: macro_def.ui.label.clone(),
-                description: Some(macro_def.ui.description.clone()),
+                matched_phrase: schema.ui.label.clone(),
+                description: Some(schema.ui.description.clone()),
             });
             return results; // Exact FQN is definitive
         }
 
         // 2. Exact label match (case-insensitive)
-        for macro_def in registry.list(None) {
-            if macro_def.ui.label.to_lowercase() == query_lower {
+        for (fqn, schema) in registry.all() {
+            if schema.ui.label.to_lowercase() == query_lower {
                 results.push(VerbSearchResult {
-                    verb: macro_def.fqn.clone(),
+                    verb: fqn.clone(),
                     score: 1.0,
                     source: VerbSearchSource::Macro,
-                    matched_phrase: macro_def.ui.label.clone(),
-                    description: Some(macro_def.ui.description.clone()),
+                    matched_phrase: schema.ui.label.clone(),
+                    description: Some(schema.ui.description.clone()),
                 });
             }
         }
@@ -939,10 +939,10 @@ impl HybridVerbSearcher {
             .filter(|w| w.len() > 2) // Skip tiny words like "a", "to"
             .collect();
 
-        for macro_def in registry.list(None) {
-            let label_lower = macro_def.ui.label.to_lowercase();
-            let desc_lower = macro_def.ui.description.to_lowercase();
-            let fqn_lower = macro_def.fqn.to_lowercase();
+        for (fqn, schema) in registry.all() {
+            let label_lower = schema.ui.label.to_lowercase();
+            let desc_lower = schema.ui.description.to_lowercase();
+            let fqn_lower = fqn.to_lowercase();
 
             // Combine label, description, and domain for matching
             let combined = format!("{} {} {}", label_lower, desc_lower, fqn_lower);
@@ -990,11 +990,11 @@ impl HybridVerbSearcher {
 
             if score > 0.7 {
                 results.push(VerbSearchResult {
-                    verb: macro_def.fqn.clone(),
+                    verb: fqn.clone(),
                     score,
                     source: VerbSearchSource::Macro,
-                    matched_phrase: macro_def.ui.label.clone(),
-                    description: Some(macro_def.ui.description.clone()),
+                    matched_phrase: schema.ui.label.clone(),
+                    description: Some(schema.ui.description.clone()),
                 });
             }
         }
@@ -1244,38 +1244,55 @@ mod tests {
     // Macro Search Tests
     // =========================================================================
 
+    /// Build a test macro registry with a single structure.setup macro
+    fn test_macro_registry() -> MacroRegistry {
+        use crate::dsl_v2::macros::{
+            MacroArgs, MacroKind, MacroRouting, MacroSchema, MacroTarget, MacroUi,
+        };
+
+        let mut registry = MacroRegistry::new();
+        registry.add(
+            "structure.setup".to_string(),
+            MacroSchema {
+                id: None,
+                kind: MacroKind::Macro,
+                tier: None,
+                aliases: vec![],
+                taxonomy: None,
+                ui: MacroUi {
+                    label: "Set up Structure".to_string(),
+                    description: "Create a new fund or mandate structure".to_string(),
+                    target_label: "Structure".to_string(),
+                },
+                routing: MacroRouting {
+                    mode_tags: vec!["onboarding".to_string()],
+                    operator_domain: Some("structure".to_string()),
+                },
+                target: MacroTarget {
+                    operates_on: "client-ref".to_string(),
+                    produces: Some("structure-ref".to_string()),
+                    allowed_structure_types: vec![],
+                },
+                args: MacroArgs {
+                    style: crate::dsl_v2::macros::ArgStyle::Keyworded,
+                    required: Default::default(),
+                    optional: Default::default(),
+                },
+                required_roles: vec![],
+                optional_roles: vec![],
+                docs_bundle: None,
+                prereqs: vec![],
+                expands_to: vec![],
+                sets_state: vec![],
+                unlocks: vec![],
+            },
+        );
+        registry
+    }
+
     #[test]
     fn test_macro_search_exact_fqn() {
-        use crate::macros::{MacroArgs, MacroRouting, MacroTarget, MacroUi, OperatorMacroDef};
-
-        let mut registry = OperatorMacroRegistry::new();
-        registry.register(OperatorMacroDef {
-            fqn: "structure.setup".to_string(),
-            kind: "macro".to_string(),
-            ui: MacroUi {
-                label: "Set up Structure".to_string(),
-                description: "Create a new fund or mandate structure".to_string(),
-                target_label: None,
-            },
-            routing: MacroRouting {
-                mode_tags: vec!["onboarding".to_string()],
-                operator_domain: "structure".to_string(),
-            },
-            target: MacroTarget {
-                operates_on: "client_ref".to_string(),
-                produces: Some("structure_ref".to_string()),
-            },
-            args: MacroArgs {
-                style: "keyworded".to_string(),
-                required: Default::default(),
-                optional: Default::default(),
-            },
-            prereqs: vec![],
-            expands_to: vec![],
-            sets_state: vec![],
-            unlocks: vec![],
-        });
-
+        let registry = test_macro_registry();
         let searcher =
             HybridVerbSearcher::minimal().with_macro_registry(std::sync::Arc::new(registry));
 
@@ -1288,36 +1305,7 @@ mod tests {
 
     #[test]
     fn test_macro_search_exact_label() {
-        use crate::macros::{MacroArgs, MacroRouting, MacroTarget, MacroUi, OperatorMacroDef};
-
-        let mut registry = OperatorMacroRegistry::new();
-        registry.register(OperatorMacroDef {
-            fqn: "structure.setup".to_string(),
-            kind: "macro".to_string(),
-            ui: MacroUi {
-                label: "Set up Structure".to_string(),
-                description: "Create a new fund or mandate structure".to_string(),
-                target_label: None,
-            },
-            routing: MacroRouting {
-                mode_tags: vec!["onboarding".to_string()],
-                operator_domain: "structure".to_string(),
-            },
-            target: MacroTarget {
-                operates_on: "client_ref".to_string(),
-                produces: Some("structure_ref".to_string()),
-            },
-            args: MacroArgs {
-                style: "keyworded".to_string(),
-                required: Default::default(),
-                optional: Default::default(),
-            },
-            prereqs: vec![],
-            expands_to: vec![],
-            sets_state: vec![],
-            unlocks: vec![],
-        });
-
+        let registry = test_macro_registry();
         let searcher =
             HybridVerbSearcher::minimal().with_macro_registry(std::sync::Arc::new(registry));
 
@@ -1330,36 +1318,7 @@ mod tests {
 
     #[test]
     fn test_macro_search_fuzzy_label() {
-        use crate::macros::{MacroArgs, MacroRouting, MacroTarget, MacroUi, OperatorMacroDef};
-
-        let mut registry = OperatorMacroRegistry::new();
-        registry.register(OperatorMacroDef {
-            fqn: "structure.setup".to_string(),
-            kind: "macro".to_string(),
-            ui: MacroUi {
-                label: "Set up Structure".to_string(),
-                description: "Create a new fund or mandate structure".to_string(),
-                target_label: None,
-            },
-            routing: MacroRouting {
-                mode_tags: vec!["onboarding".to_string()],
-                operator_domain: "structure".to_string(),
-            },
-            target: MacroTarget {
-                operates_on: "client_ref".to_string(),
-                produces: Some("structure_ref".to_string()),
-            },
-            args: MacroArgs {
-                style: "keyworded".to_string(),
-                required: Default::default(),
-                optional: Default::default(),
-            },
-            prereqs: vec![],
-            expands_to: vec![],
-            sets_state: vec![],
-            unlocks: vec![],
-        });
-
+        let registry = test_macro_registry();
         let searcher =
             HybridVerbSearcher::minimal().with_macro_registry(std::sync::Arc::new(registry));
 
@@ -1372,36 +1331,7 @@ mod tests {
 
     #[test]
     fn test_macro_search_no_match() {
-        use crate::macros::{MacroArgs, MacroRouting, MacroTarget, MacroUi, OperatorMacroDef};
-
-        let mut registry = OperatorMacroRegistry::new();
-        registry.register(OperatorMacroDef {
-            fqn: "structure.setup".to_string(),
-            kind: "macro".to_string(),
-            ui: MacroUi {
-                label: "Set up Structure".to_string(),
-                description: "Create a new fund or mandate structure".to_string(),
-                target_label: None,
-            },
-            routing: MacroRouting {
-                mode_tags: vec!["onboarding".to_string()],
-                operator_domain: "structure".to_string(),
-            },
-            target: MacroTarget {
-                operates_on: "client_ref".to_string(),
-                produces: Some("structure_ref".to_string()),
-            },
-            args: MacroArgs {
-                style: "keyworded".to_string(),
-                required: Default::default(),
-                optional: Default::default(),
-            },
-            prereqs: vec![],
-            expands_to: vec![],
-            sets_state: vec![],
-            unlocks: vec![],
-        });
-
+        let registry = test_macro_registry();
         let searcher =
             HybridVerbSearcher::minimal().with_macro_registry(std::sync::Arc::new(registry));
 

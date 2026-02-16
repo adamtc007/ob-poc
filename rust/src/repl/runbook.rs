@@ -115,6 +115,10 @@ pub struct RunbookEntry {
     /// Invocation record when entry is Parked (populated on park, cleared on resume).
     #[serde(default)]
     pub invocation: Option<InvocationRecord>,
+
+    /// ID of the CompiledRunbook produced by compile_verb(), if any.
+    #[serde(default)]
+    pub compiled_runbook_id: Option<crate::runbook::types::CompiledRunbookId>,
 }
 
 /// Per-entry lifecycle.
@@ -1237,6 +1241,7 @@ impl RunbookEntry {
             depends_on: Vec::new(),
             result: None,
             invocation: None,
+            compiled_runbook_id: None,
         }
     }
 }

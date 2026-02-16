@@ -107,11 +107,11 @@ use crate::api::client_group_adapter::ClientGroupEmbedderAdapter;
 use crate::api::session::DisambiguationRequest;
 use crate::dsl_v2::ast::AstNode;
 use crate::dsl_v2::gateway_resolver::{gateway_addr, GatewayRefResolver};
+use crate::dsl_v2::macros::{load_macro_registry_from_dir, MacroRegistry};
 use crate::dsl_v2::ref_resolver::ResolveResult;
 use crate::dsl_v2::validation::RefType;
 use crate::dsl_v2::{enrich_program, parse_program, runtime_registry, Statement};
 use crate::graph::GraphScope;
-use crate::macros::OperatorMacroRegistry;
 use crate::mcp::verb_search_factory::VerbSearcherFactory;
 use crate::session::SessionScope;
 use crate::session::{SessionState, UnifiedSession, UnresolvedRefInfo};
@@ -442,12 +442,12 @@ impl AgentService {
         // Build verb searcher with macro registry for operator vocabulary
         let macro_dir =
             std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("config/verb_schemas/macros");
-        let macro_reg = OperatorMacroRegistry::load_from_dir(&macro_dir).unwrap_or_else(|e| {
+        let macro_reg = load_macro_registry_from_dir(&macro_dir).unwrap_or_else(|e| {
             tracing::warn!(
                 "Failed to load operator macros: {}, using empty registry",
                 e
             );
-            OperatorMacroRegistry::new()
+            MacroRegistry::new()
         });
 
         // Use factory for consistent configuration across all call sites

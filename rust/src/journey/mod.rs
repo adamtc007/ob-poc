@@ -14,6 +14,8 @@
 
 pub mod handoff;
 pub mod pack;
+pub mod pack_manager;
+pub mod pack_state;
 pub mod playback;
 pub mod router;
 pub mod template;

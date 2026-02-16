@@ -6,6 +6,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
+use serde::{Deserialize, Serialize};
 use tracing::{debug, info, warn};
 
 use super::schema::{MacroKind, MacroSchema};
@@ -114,6 +115,20 @@ impl MacroRegistry {
         self.macros.insert(fqn, schema);
     }
 
+    /// List macros, optionally filtered
+    pub fn list(&self, filter: Option<&MacroFilter>) -> Vec<(&String, &MacroSchema)> {
+        self.macros
+            .iter()
+            .filter(|(fqn, schema)| {
+                if let Some(f) = filter {
+                    f.matches(fqn, schema)
+                } else {
+                    true
+                }
+            })
+            .collect()
+    }
+
     /// Merge another registry into this one
     pub fn merge(&mut self, other: MacroRegistry) {
         for (fqn, schema) in other.macros {
@@ -125,6 +140,128 @@ impl MacroRegistry {
     /// Get source files that were loaded
     pub fn source_files(&self) -> &[PathBuf] {
         &self.source_files
+    }
+
+    /// Build taxonomy tree for UI verb picker
+    pub fn build_taxonomy(&self) -> MacroTaxonomy {
+        let mut domains: HashMap<String, DomainNode> = HashMap::new();
+
+        for (fqn, schema) in &self.macros {
+            let domain = schema
+                .routing
+                .operator_domain
+                .clone()
+                .unwrap_or_else(|| fqn.split('.').next().unwrap_or(fqn).to_string());
+
+            let domain_node = domains.entry(domain.clone()).or_insert_with(|| DomainNode {
+                domain: domain.clone(),
+                label: domain_label(&domain),
+                macros: Vec::new(),
+            });
+
+            domain_node.macros.push(MacroNode {
+                fqn: fqn.clone(),
+                label: schema.ui.label.clone(),
+                description: schema.ui.description.clone(),
+            });
+        }
+
+        // Sort macros within each domain
+        for node in domains.values_mut() {
+            node.macros.sort_by(|a, b| a.label.cmp(&b.label));
+        }
+
+        // Sort domains
+        let mut domain_list: Vec<_> = domains.into_values().collect();
+        domain_list.sort_by(|a, b| a.label.cmp(&b.label));
+
+        MacroTaxonomy {
+            domains: domain_list,
+        }
+    }
+}
+
+/// Filter for listing macros
+#[derive(Debug, Clone, Default)]
+pub struct MacroFilter {
+    /// Filter by domain
+    pub domain: Option<String>,
+    /// Filter by mode tag
+    pub mode_tag: Option<String>,
+    /// Filter by search term (searches FQN, label, description)
+    pub search: Option<String>,
+}
+
+impl MacroFilter {
+    /// Check if a macro matches this filter
+    pub fn matches(&self, fqn: &str, schema: &MacroSchema) -> bool {
+        if let Some(ref domain) = self.domain {
+            let macro_domain = schema
+                .routing
+                .operator_domain
+                .as_deref()
+                .unwrap_or_else(|| fqn.split('.').next().unwrap_or(fqn));
+            if macro_domain != domain {
+                return false;
+            }
+        }
+
+        if let Some(ref tag) = self.mode_tag {
+            if !schema.routing.mode_tags.iter().any(|t| t == tag) {
+                return false;
+            }
+        }
+
+        if let Some(ref search) = self.search {
+            let search_lower = search.to_lowercase();
+            let matches_fqn = fqn.to_lowercase().contains(&search_lower);
+            let matches_label = schema.ui.label.to_lowercase().contains(&search_lower);
+            let matches_desc = schema.ui.description.to_lowercase().contains(&search_lower);
+
+            if !matches_fqn && !matches_label && !matches_desc {
+                return false;
+            }
+        }
+
+        true
+    }
+}
+
+/// Taxonomy tree for UI
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MacroTaxonomy {
+    pub domains: Vec<DomainNode>,
+}
+
+/// Domain node in taxonomy
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DomainNode {
+    pub domain: String,
+    pub label: String,
+    pub macros: Vec<MacroNode>,
+}
+
+/// Macro node in taxonomy
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MacroNode {
+    pub fqn: String,
+    pub label: String,
+    pub description: String,
+}
+
+/// Get display label for a domain
+fn domain_label(domain: &str) -> String {
+    match domain {
+        "structure" => "Structure".to_string(),
+        "case" => "KYC Case".to_string(),
+        "mandate" => "Mandate".to_string(),
+        other => {
+            let mut chars = other.chars();
+            match chars.next() {
+                None => String::new(),
+                Some(c) => c.to_uppercase().chain(chars).collect(),
+            }
+        }
     }
 }
 

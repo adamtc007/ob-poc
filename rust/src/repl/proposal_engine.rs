@@ -218,6 +218,7 @@ impl ProposalEngine {
     // Direct DSL
     // ------------------------------------------------------------------------
 
+    #[allow(dead_code)]
     fn direct_dsl_proposal(&self, input: &str) -> ProposalSet {
         let proposal = StepProposal {
             id: Uuid::new_v4(),
@@ -498,6 +499,7 @@ fn tokenize(s: &str) -> Vec<String> {
 }
 
 /// Truncate a string with ellipsis.
+#[allow(dead_code)]
 fn truncate(s: &str, max_len: usize) -> String {
     if s.len() <= max_len {
         s.to_string()

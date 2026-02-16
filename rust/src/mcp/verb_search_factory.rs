@@ -25,7 +25,7 @@ use sqlx::PgPool;
 use crate::agent::learning::embedder::SharedEmbedder;
 use crate::agent::learning::warmup::SharedLearnedData;
 use crate::database::VerbService;
-use crate::macros::OperatorMacroRegistry;
+use crate::dsl_v2::macros::MacroRegistry;
 use crate::mcp::verb_search::{HybridVerbSearcher, SharedLexicon};
 
 /// Factory for creating properly-configured `HybridVerbSearcher` instances.
@@ -55,7 +55,7 @@ impl VerbSearcherFactory {
         pool: &PgPool,
         embedder: SharedEmbedder,
         learned_data: Option<SharedLearnedData>,
-        macro_registry: Arc<OperatorMacroRegistry>,
+        macro_registry: Arc<MacroRegistry>,
         lexicon: Option<SharedLexicon>,
     ) -> HybridVerbSearcher {
         let verb_service = Arc::new(VerbService::new(pool.clone()));
@@ -87,7 +87,7 @@ mod tests {
             _pool: &PgPool,
             _embedder: SharedEmbedder,
             _learned_data: Option<SharedLearnedData>,
-            _macro_registry: Arc<OperatorMacroRegistry>,
+            _macro_registry: Arc<MacroRegistry>,
             _lexicon: Option<SharedLexicon>,
         ) -> HybridVerbSearcher {
             unimplemented!("type check only")

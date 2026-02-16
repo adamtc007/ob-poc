@@ -43,6 +43,7 @@ use super::sentence_gen::SentenceGenerator;
 use super::session_v2::{ClientContext, MessageRole, ReplSessionV2};
 use super::types_v2::{ExecutionProgress, ReplCommandV2, ReplStateV2, UserInputV2};
 use super::verb_config_index::VerbConfigIndex;
+use crate::dsl_v2::macros::MacroRegistry;
 use crate::journey::handoff::PackHandoff;
 use crate::journey::playback::PackPlayback;
 use crate::journey::router::{PackRouteOutcome, PackRouter};
@@ -146,6 +147,8 @@ pub struct ReplOrchestratorV2 {
     intent_service: Option<Arc<IntentService>>,
     /// Phase 3: Proposal engine (preferred over direct match_verb_for_input).
     proposal_engine: Option<Arc<ProposalEngine>>,
+    /// Macro registry for classify_verb() and compile_verb().
+    macro_registry: Option<Arc<MacroRegistry>>,
     sessions: Arc<RwLock<HashMap<Uuid, ReplSessionV2>>>,
     executor: Arc<dyn DslExecutor>,
     executor_v2: Option<Arc<dyn DslExecutorV2>>,
@@ -170,6 +173,7 @@ impl ReplOrchestratorV2 {
             intent_matcher: None,
             intent_service: None,
             proposal_engine: None,
+            macro_registry: None,
             sessions: Arc::new(RwLock::new(HashMap::new())),
             executor,
             executor_v2: None,
@@ -220,6 +224,12 @@ impl ReplOrchestratorV2 {
     /// The proposal engine returns ranked alternatives with evidence.
     pub fn with_proposal_engine(mut self, engine: Arc<ProposalEngine>) -> Self {
         self.proposal_engine = Some(engine);
+        self
+    }
+
+    /// Attach a MacroRegistry for classify_verb() and compile_verb().
+    pub fn with_macro_registry(mut self, registry: Arc<MacroRegistry>) -> Self {
+        self.macro_registry = Some(registry);
         self
     }
 
@@ -711,6 +721,12 @@ impl ReplOrchestratorV2 {
                     entry.args = args;
                     entry.arg_extraction_audit = session.pending_arg_audit.take();
                     entry.status = EntryStatus::Confirmed;
+
+                    // Compile the verb (classify → compile → attach runbook ID).
+                    if let Some(resp) = self.try_compile_entry(session, &mut entry) {
+                        return resp;
+                    }
+
                     session.runbook.add_entry(entry);
 
                     // Go to RunbookEditing (or back to InPack if pack is active).
@@ -1184,6 +1200,7 @@ impl ReplOrchestratorV2 {
             confirm_policy: ConfirmPolicy::Always,
             unresolved_refs: vec![],
             depends_on: vec![],
+            compiled_runbook_id: None,
             result: None,
             invocation: None,
         };
@@ -1430,6 +1447,7 @@ impl ReplOrchestratorV2 {
             confirm_policy: ConfirmPolicy::Always,
             unresolved_refs: vec![],
             depends_on: vec![],
+            compiled_runbook_id: None,
             result: Some(serde_json::json!({
                 "pack_id": pack_id,
                 "pack_name": pack_name,
@@ -1494,6 +1512,7 @@ impl ReplOrchestratorV2 {
             confirm_policy: ConfirmPolicy::Always,
             unresolved_refs: vec![],
             depends_on: vec![],
+            compiled_runbook_id: None,
             result: Some(serde_json::json!({
                 "field": field,
                 "value": value,
@@ -1823,6 +1842,12 @@ impl ReplOrchestratorV2 {
                 entry.args = p.args.clone();
                 entry.status = EntryStatus::Confirmed;
                 entry.confirm_policy = ConfirmPolicy::QuickConfirm;
+
+                // Compile the verb (classify → compile → attach runbook ID).
+                if let Some(resp) = self.try_compile_entry(session, &mut entry) {
+                    return resp;
+                }
+
                 session.runbook.add_entry(entry);
 
                 let next_state = if session.has_active_pack() {
@@ -2206,6 +2231,12 @@ impl ReplOrchestratorV2 {
                     entry.arg_extraction_audit = Some(audit);
                     entry.status = EntryStatus::Confirmed;
                     entry.confirm_policy = ConfirmPolicy::QuickConfirm;
+
+                    // Compile the verb (classify → compile → attach runbook ID).
+                    if let Some(resp) = self.try_compile_entry(session, &mut entry) {
+                        return resp;
+                    }
+
                     session.runbook.add_entry(entry);
 
                     let next_state = if session.has_active_pack() {
@@ -2499,6 +2530,12 @@ impl ReplOrchestratorV2 {
                     entry.arg_extraction_audit = Some(audit);
                     entry.status = EntryStatus::Confirmed;
                     entry.confirm_policy = ConfirmPolicy::QuickConfirm;
+
+                    // Compile the verb (classify → compile → attach runbook ID).
+                    if let Some(resp) = self.try_compile_entry(session, &mut entry) {
+                        return resp;
+                    }
+
                     session.runbook.add_entry(entry);
 
                     let next_state = if session.has_active_pack() {
@@ -3564,6 +3601,129 @@ impl ReplOrchestratorV2 {
                 "Handoff target pack not found, completing normally"
             );
             None
+        }
+    }
+
+    /// Try to compile a verb via the runbook compilation pipeline.
+    ///
+    /// If a `MacroRegistry` is wired, this calls `classify_verb()` →
+    /// `compile_verb()` and attaches the `compiled_runbook_id` to the entry.
+    /// Returns `Some(response)` if compilation produced a non-Compiled result
+    /// (Clarification or ConstraintViolation) that should be shown to the user
+    /// instead of adding the entry.
+    /// Returns `None` if compilation succeeded (entry was updated) or if
+    /// no `MacroRegistry` is configured (graceful degradation).
+    fn try_compile_entry(
+        &self,
+        session: &ReplSessionV2,
+        entry: &mut RunbookEntry,
+    ) -> Option<ReplResponseV2> {
+        use crate::journey::pack_manager::{ConstraintSource, EffectiveConstraints};
+        use crate::runbook::{classify_verb, compile_verb};
+        use crate::session::unified::UnifiedSession;
+
+        let macro_registry = self.macro_registry.as_ref()?;
+
+        // Derive constraints from the active pack context (staged preferred over executed).
+        let ctx = self.build_context_stack(session);
+
+        // Build a UnifiedSession entirely from the ContextStack (runbook fold).
+        // P-3 invariant: the runbook is the single source of truth.
+        let mut unified = UnifiedSession::new();
+        if let Some(cg_id) = ctx.derived_scope.client_group_id {
+            unified.client = Some(crate::session::unified::ClientRef {
+                client_id: cg_id,
+                display_name: ctx
+                    .derived_scope
+                    .client_group_name
+                    .clone()
+                    .unwrap_or_default(),
+            });
+        }
+        // Pack answers may contain structure_type (needed before StructureRef below)
+        if let Some(st_val) = ctx.accumulated_answers.get("structure_type") {
+            if let Ok(st) =
+                serde_json::from_value::<crate::session::unified::StructureType>(st_val.clone())
+            {
+                unified.structure_type = Some(st);
+            }
+        }
+        // Focus CBU → current_structure (macro ${session.current_structure})
+        if let Some(ref focus_cbu) = ctx.focus.cbu {
+            unified.current_structure = Some(crate::session::unified::StructureRef {
+                structure_id: focus_cbu.id,
+                display_name: focus_cbu.display_name.clone(),
+                structure_type: unified.structure_type.unwrap_or_default(),
+            });
+        }
+        // Focus case → current_case (macro ${session.current_case})
+        if let Some(ref focus_case) = ctx.focus.case {
+            unified.current_case = Some(crate::session::unified::CaseRef {
+                case_id: focus_case.id,
+                display_name: focus_case.display_name.clone(),
+            });
+        }
+        // Executed verbs → DAG completed set (prereq VerbCompleted checks)
+        unified.dag_state.completed = ctx.executed_verbs.clone();
+        let pack_ctx = ctx.pack_staged.as_ref().or(ctx.pack_executed.as_ref());
+        let constraints = if let Some(pc) = pack_ctx {
+            EffectiveConstraints {
+                allowed_verbs: if pc.allowed_verbs.is_empty() {
+                    None
+                } else {
+                    Some(pc.allowed_verbs.clone())
+                },
+                forbidden_verbs: pc.forbidden_verbs.clone(),
+                contributing_packs: vec![ConstraintSource {
+                    pack_id: pc.pack_id.clone(),
+                    pack_name: pc.pack_id.clone(),
+                    allowed_count: pc.allowed_verbs.len(),
+                    forbidden_count: pc.forbidden_verbs.len(),
+                }],
+            }
+        } else {
+            EffectiveConstraints::unconstrained()
+        };
+
+        let classification = classify_verb(&entry.verb, &self.verb_config_index, macro_registry);
+        let response = compile_verb(
+            session.id,
+            &classification,
+            &entry.args,
+            &unified,
+            macro_registry,
+            (session.runbook.entries.len() + 1) as u64,
+            &constraints,
+        );
+
+        match response {
+            crate::runbook::OrchestratorResponse::Compiled(summary) => {
+                entry.compiled_runbook_id = Some(summary.compiled_runbook_id);
+                None // success — caller continues with entry
+            }
+            crate::runbook::OrchestratorResponse::Clarification(c) => Some(ReplResponseV2 {
+                state: session.state.clone(),
+                kind: ReplResponseKindV2::Clarification {
+                    question: c.question.clone(),
+                    options: vec![], // no verb candidates — this is arg clarification
+                },
+                message: c.question,
+                runbook_summary: None,
+                step_count: session.runbook.entries.len(),
+            }),
+            crate::runbook::OrchestratorResponse::ConstraintViolation(v) => {
+                let msg = format!("Pack constraint violation: {}", v.explanation,);
+                Some(ReplResponseV2 {
+                    state: session.state.clone(),
+                    kind: ReplResponseKindV2::Error {
+                        error: msg.clone(),
+                        recoverable: true,
+                    },
+                    message: msg,
+                    runbook_summary: None,
+                    step_count: session.runbook.entries.len(),
+                })
+            }
         }
     }
 

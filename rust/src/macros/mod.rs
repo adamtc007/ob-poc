@@ -1,13 +1,15 @@
-//! Operator Macro Registry
+//! Operator Macro Registry (DEPRECATED)
 //!
-//! Loads and indexes operator macro definitions from YAML files.
-//! These macros provide business vocabulary (structure, case, mandate)
-//! over the technical DSL (cbu, kyc-case, trading-profile).
+//! This module is deprecated. Use `crate::dsl_v2::macros` instead.
+//! The V2 `MacroRegistry` is the single source of truth for macro definitions.
 //!
-//! See: rust/config/verb_schemas/macros/
+//! V1 types (`OperatorMacroDef`, `OperatorMacroRegistry`) are retained here
+//! for reference but should not be used in new code.
 
 mod definition;
 mod registry;
 
+#[allow(deprecated)]
 pub use definition::*;
+#[allow(deprecated)]
 pub use registry::*;

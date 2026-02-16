@@ -155,6 +155,7 @@ fn build_entry(
         confirm_policy: ConfirmPolicy::PackConfigured,
         unresolved_refs: Vec::new(),
         depends_on: Vec::new(),
+        compiled_runbook_id: None,
         result: None,
         invocation: None,
     }

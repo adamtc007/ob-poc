@@ -45,12 +45,15 @@ mod variable;
 
 pub use conditions::{evaluate_condition, ConditionContext, ConditionResult};
 pub use expander::{expand_macro, MacroExpansionError, MacroExpansionOutput};
-pub use registry::{load_macro_registry, load_macro_registry_from_dir, MacroRegistry};
+pub use registry::{
+    load_macro_registry, load_macro_registry_from_dir, DomainNode, MacroFilter, MacroNode,
+    MacroRegistry, MacroTaxonomy,
+};
 pub use schema::{
-    AllOfCondition, AnyOfCondition, ForEachStep, InvokeMacroStep, MacroArg, MacroArgType,
-    MacroEnumValue, MacroExpansionStep, MacroPrereq, MacroRouting, MacroSchema, MacroTarget,
-    MacroTier, MacroUi, NotCondition, RequiredIfComplex, RequiredIfExpr, RoleCardinality, RoleSpec,
-    SetState, TaxonomyRef, VerbCallStep, WhenCondition, WhenStep,
+    AllOfCondition, AnyOfCondition, ArgStyle, ForEachStep, InvokeMacroStep, MacroArg, MacroArgType,
+    MacroArgs, MacroEnumValue, MacroExpansionStep, MacroKind, MacroPrereq, MacroRouting,
+    MacroSchema, MacroTarget, MacroTier, MacroUi, NotCondition, RequiredIfComplex, RequiredIfExpr,
+    RoleCardinality, RoleSpec, SetState, TaxonomyRef, VerbCallStep, WhenCondition, WhenStep,
 };
 pub use scope::{BoundValue, MacroExpansionScope, MacroScopeError, SymbolScope};
 pub use variable::{substitute_variables, VariableContext, VariableError};
