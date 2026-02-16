@@ -111,9 +111,15 @@ impl ReplSessionV2 {
     /// Returns a unique, ascending version number starting from 1.
     /// Guarantees uniqueness within a session — no two compilations share
     /// the same version, even if entries are deleted or re-ordered.
+    ///
+    /// The counter lives on `runbook.next_version_counter` so it is persisted
+    /// when the runbook JSONB is saved. The legacy `self.next_runbook_version`
+    /// field is kept in sync for backward compatibility.
     pub fn allocate_runbook_version(&mut self) -> u64 {
-        self.next_runbook_version += 1;
-        self.next_runbook_version
+        self.runbook.next_version_counter += 1;
+        // Keep legacy field in sync (transient — not persisted).
+        self.next_runbook_version = self.runbook.next_version_counter;
+        self.runbook.next_version_counter
     }
 
     /// Add a message to the conversation history.

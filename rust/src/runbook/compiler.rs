@@ -43,7 +43,7 @@ use crate::session::unified::UnifiedSession;
 /// Phase 2 will use `VerbContractBody.writes_flags` or verb YAML `crud.table`
 /// to determine which args represent write targets vs read-only references.
 /// This requires contract integration which is deferred.
-fn derive_write_set(args: &HashMap<String, String>) -> Vec<Uuid> {
+pub(crate) fn derive_write_set(args: &HashMap<String, String>) -> Vec<Uuid> {
     args.values()
         .filter_map(|v| {
             let trimmed = v.trim().trim_matches(|c| c == '<' || c == '>');

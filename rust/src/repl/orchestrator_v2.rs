@@ -1036,26 +1036,40 @@ impl ReplOrchestratorV2 {
             .unwrap_or_default();
         session.runbook.resume_entry(&correlation_key, None);
 
-        // Now execute the DSL (was NOT executed before for HumanGate).
-        let dsl = session.runbook.entries[idx].dsl.clone();
+        // Now execute through the gate (INV-3: no raw DSL execution).
+        let fallback_version = session.allocate_runbook_version();
+        let entry_ref = &session.runbook.entries[idx];
         let runbook_id = session.runbook.id;
-        let outcome = self.execute_entry_v2(&dsl, entry_id, runbook_id).await;
+        let is_durable = entry_ref.execution_mode == ExecutionMode::Durable;
+        let outcome = self
+            .execute_entry_via_gate(
+                entry_ref,
+                session.id,
+                is_durable,
+                runbook_id,
+                fallback_version,
+            )
+            .await;
 
         match outcome {
-            DslExecutionOutcome::Completed(result) => {
+            StepOutcome::Completed { result } => {
                 session.runbook.entries[idx].status = EntryStatus::Completed;
                 session.runbook.entries[idx].result = Some(result);
             }
-            DslExecutionOutcome::Failed(err) => {
+            StepOutcome::Failed { error } => {
                 session.runbook.entries[idx].status = EntryStatus::Failed;
-                session.runbook.entries[idx].result = Some(serde_json::json!({"error": err}));
+                session.runbook.entries[idx].result = Some(serde_json::json!({"error": error}));
             }
-            DslExecutionOutcome::Parked { .. } => {
+            StepOutcome::Parked { .. } => {
                 // Edge case: approved human gate returns another park.
                 // This shouldn't normally happen. Mark failed.
                 session.runbook.entries[idx].status = EntryStatus::Failed;
                 session.runbook.entries[idx].result =
                     Some(serde_json::json!({"error": "Unexpected park after approval"}));
+            }
+            StepOutcome::Skipped { reason } => {
+                session.runbook.entries[idx].status = EntryStatus::Failed;
+                session.runbook.entries[idx].result = Some(serde_json::json!({"error": reason}));
             }
         }
 
@@ -1228,25 +1242,49 @@ impl ReplOrchestratorV2 {
         // 2. Add to the runbook — now it exists.
         let entry_id = session.runbook.add_entry(entry);
 
-        // 3. Execute through the executor — the runsheet is the single source of truth.
-        let exec_result = self.executor.execute(&dsl).await;
+        // 3. Execute through the gate (INV-3: no raw DSL execution).
+        let fallback_version = session.allocate_runbook_version();
+        let entry_ref = session
+            .runbook
+            .entries
+            .iter()
+            .find(|e| e.id == entry_id)
+            .expect("just added");
+        let outcome = self
+            .execute_entry_via_gate(
+                entry_ref,
+                session.id,
+                false,
+                session.runbook.id,
+                fallback_version,
+            )
+            .await;
 
         // 4. Record outcome on the runsheet entry.
-        let succeeded = exec_result.is_ok();
+        let succeeded = matches!(outcome, StepOutcome::Completed { .. });
         if let Some(entry) = session
             .runbook
             .entries
             .iter_mut()
             .find(|e| e.id == entry_id)
         {
-            match &exec_result {
-                Ok(val) => {
+            match &outcome {
+                StepOutcome::Completed { result } => {
                     entry.status = EntryStatus::Completed;
-                    entry.result = Some(val.clone());
+                    entry.result = Some(result.clone());
                 }
-                Err(err) => {
+                StepOutcome::Failed { error } => {
                     entry.status = EntryStatus::Failed;
-                    entry.result = Some(serde_json::json!({"error": err}));
+                    entry.result = Some(serde_json::json!({"error": error}));
+                }
+                StepOutcome::Skipped { reason } => {
+                    entry.status = EntryStatus::Failed;
+                    entry.result = Some(serde_json::json!({"error": reason}));
+                }
+                StepOutcome::Parked { .. } => {
+                    entry.status = EntryStatus::Failed;
+                    entry.result =
+                        Some(serde_json::json!({"error": "Unexpected park in scope gate"}));
                 }
             }
         }
@@ -3211,6 +3249,10 @@ impl ReplOrchestratorV2 {
                 continue;
             }
 
+            // Allocate a version for fallback compilation (only consumed if
+            // the entry lacks a compiled_runbook_id).
+            let fallback_version = session.allocate_runbook_version();
+
             match execution_mode {
                 ExecutionMode::HumanGate => {
                     // Park BEFORE execution — DSL is NOT called.
@@ -3251,6 +3293,7 @@ impl ReplOrchestratorV2 {
                             session.id,
                             true, // is_durable
                             runbook_id,
+                            fallback_version,
                         )
                         .await;
 
@@ -3334,6 +3377,7 @@ impl ReplOrchestratorV2 {
                             session.id,
                             false, // not durable
                             runbook_id,
+                            fallback_version,
                         )
                         .await;
 
@@ -3484,31 +3528,28 @@ impl ReplOrchestratorV2 {
         }
     }
 
-    /// Execute an entry using executor_v2 if available, falling back to executor.
-    async fn execute_entry_v2(
-        &self,
-        dsl: &str,
-        entry_id: Uuid,
-        runbook_id: Uuid,
-    ) -> DslExecutionOutcome {
-        if let Some(ref exec) = self.executor_v2 {
-            exec.execute_v2(dsl, entry_id, runbook_id).await
-        } else {
-            // Fallback: use the legacy executor (never parks).
-            match self.executor.execute(dsl).await {
-                Ok(v) => DslExecutionOutcome::Completed(v),
-                Err(e) => DslExecutionOutcome::Failed(e),
-            }
-        }
-    }
-
     /// Compile a runbook entry on-the-fly for entries that lack a `compiled_runbook_id`.
     ///
     /// This is the **fallback path** — entries created before the compile pipeline was
     /// wired, or entries from code paths not yet routing through `try_compile_entry()`.
     /// The fallback ALWAYS goes through compile → store → execute_runbook(id).
     /// Raw DSL execution without a `CompiledRunbookId` is never permitted (INV-3).
-    fn compile_entry_on_the_fly(&self, entry: &RunbookEntry, session_id: Uuid) -> CompiledRunbook {
+    ///
+    /// `version` must come from `session.allocate_runbook_version()` — the caller
+    /// is responsible for passing it since the session borrow is already active.
+    fn compile_entry_on_the_fly(
+        &self,
+        entry: &RunbookEntry,
+        session_id: Uuid,
+        version: u64,
+    ) -> CompiledRunbook {
+        use crate::runbook::compiler::derive_write_set;
+
+        let compiled_mode = match entry.execution_mode {
+            ExecutionMode::Sync => CompiledExecutionMode::Sync,
+            ExecutionMode::Durable => CompiledExecutionMode::Durable,
+            ExecutionMode::HumanGate => CompiledExecutionMode::HumanGate,
+        };
         let step = CompiledStep {
             step_id: entry.id,
             sentence: entry.sentence.clone(),
@@ -3516,10 +3557,10 @@ impl ReplOrchestratorV2 {
             dsl: entry.dsl.clone(),
             args: entry.args.clone(),
             depends_on: vec![],
-            execution_mode: CompiledExecutionMode::Sync,
-            write_set: vec![], // Phase 0: no locking for fallback path
+            execution_mode: compiled_mode,
+            write_set: derive_write_set(&entry.args),
         };
-        CompiledRunbook::new(session_id, 0, vec![step], ReplayEnvelope::empty())
+        CompiledRunbook::new(session_id, version, vec![step], ReplayEnvelope::empty())
     }
 
     /// Execute a runbook entry through the execution gate (INV-3).
@@ -3528,6 +3569,10 @@ impl ReplOrchestratorV2 {
     /// - Entry has `compiled_runbook_id` → fetch from store, execute through gate
     /// - Entry lacks `compiled_runbook_id` → compile on-the-fly, store, execute through gate
     ///
+    /// `fallback_version` is used only when the entry lacks a `compiled_runbook_id`
+    /// and must be compiled on-the-fly. The caller should pass
+    /// `session.allocate_runbook_version()` to ensure monotonic versioning.
+    ///
     /// Returns the `StepOutcome` from the single step in the compiled runbook.
     async fn execute_entry_via_gate(
         &self,
@@ -3535,6 +3580,7 @@ impl ReplOrchestratorV2 {
         session_id: Uuid,
         is_durable: bool,
         runbook_id: Uuid,
+        fallback_version: u64,
     ) -> StepOutcome {
         let store = match self.runbook_store.as_ref() {
             Some(s) => s,
@@ -3560,7 +3606,7 @@ impl ReplOrchestratorV2 {
                 verb = %entry.verb,
                 "Compiling entry on-the-fly (fallback path)"
             );
-            let compiled = self.compile_entry_on_the_fly(entry, session_id);
+            let compiled = self.compile_entry_on_the_fly(entry, session_id, fallback_version);
             let id = compiled.id;
             store.insert(compiled);
             id

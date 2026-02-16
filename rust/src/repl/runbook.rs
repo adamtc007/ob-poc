@@ -52,6 +52,13 @@ pub struct Runbook {
     /// Active invocations indexed by correlation_key for O(1) signal routing.
     #[serde(skip)]
     pub invocation_index: HashMap<String, Uuid>,
+
+    /// Monotonic counter for runbook version allocation.
+    /// Persisted in the runbook JSONB so it survives save/load cycles.
+    /// Each call to `ReplSessionV2::allocate_runbook_version()` reads and
+    /// increments this value, guaranteeing no version reuse across restarts.
+    #[serde(default)]
+    pub next_version_counter: u64,
 }
 
 /// Top-level runbook lifecycle.
@@ -574,6 +581,7 @@ impl Runbook {
             updated_at: now,
             undo_stack: Vec::new(),
             invocation_index: HashMap::new(),
+            next_version_counter: 0,
         }
     }
 

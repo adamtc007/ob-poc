@@ -150,16 +150,22 @@ impl SessionRepositoryV2 {
                     decision_log: super::decision_log::SessionDecisionLog::new(r.session_id),
                     created_at: r.created_at,
                     last_active_at: r.last_active_at,
-                    // Initialize version counter from existing entries to maintain
-                    // monotonicity across session restores.
-                    next_runbook_version: 0, // set below after runbook is accessible
+                    // Transient field — the authoritative counter is on `runbook.next_version_counter`
+                    // which is persisted in the runbook JSONB. We sync the legacy field below.
+                    next_runbook_version: 0, // set below from persisted counter
                 };
 
                 // Rebuild transient indexes after deserialization.
                 session.runbook.rebuild_invocation_index();
 
-                // Initialize monotonic version counter from existing entries.
-                session.next_runbook_version = session.runbook.entries.len() as u64;
+                // Sync the transient legacy field from the persisted counter.
+                // If loading an old session that pre-dates this field, serde(default)
+                // gives 0 and we fall back to entries.len() as a safe floor.
+                if session.runbook.next_version_counter == 0 && !session.runbook.entries.is_empty()
+                {
+                    session.runbook.next_version_counter = session.runbook.entries.len() as u64;
+                }
+                session.next_runbook_version = session.runbook.next_version_counter;
 
                 Ok(Some((session, r.version)))
             }
