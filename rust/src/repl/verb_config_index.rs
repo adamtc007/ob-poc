@@ -49,6 +49,10 @@ pub struct VerbIndexEntry {
     pub sentences: Option<VerbSentences>,
     /// Argument metadata.
     pub args: Vec<ArgSummary>,
+    /// CRUD key column for this verb (from YAML `crud.key`).
+    /// Used by contract-driven write_set derivation (INV-8) to identify the
+    /// primary key arg for update/delete verbs.
+    pub crud_key: Option<String>,
     /// Confirm policy for this verb.
     pub confirm_policy: ConfirmPolicy,
     /// Precondition checks from lifecycle config (e.g., `["requires_scope:cbu"]`).
@@ -62,6 +66,12 @@ pub struct ArgSummary {
     pub arg_type: String,
     pub required: bool,
     pub description: Option<String>,
+    /// Column this arg maps to in the target table (from YAML `maps_to`).
+    /// Used by contract-driven write_set derivation (INV-8).
+    pub maps_to: Option<String>,
+    /// Lookup config indicating this arg references an entity table.
+    /// Args with lookup config are entity references (potential write targets).
+    pub lookup_entity_type: Option<String>,
 }
 
 impl VerbConfigIndex {
@@ -124,6 +134,8 @@ impl VerbConfigIndex {
                         arg_type: format!("{:?}", a.arg_type),
                         required: a.required,
                         description: a.description.clone(),
+                        maps_to: a.maps_to.clone(),
+                        lookup_entity_type: a.lookup.as_ref().and_then(|l| l.entity_type.clone()),
                     })
                     .collect();
 
@@ -143,6 +155,7 @@ impl VerbConfigIndex {
                         sentence_templates: templates,
                         sentences: yaml_sentences,
                         args,
+                        crud_key: verb_config.crud.as_ref().and_then(|c| c.key.clone()),
                         confirm_policy: policy,
                         precondition_checks,
                     },

@@ -397,7 +397,7 @@ mod tests {
             sentence: format!("Execute {}", verb),
             verb: verb.to_string(),
             dsl: dsl.to_string(),
-            args: HashMap::new(),
+            args: std::collections::BTreeMap::new(),
             depends_on: vec![],
             execution_mode: ExecutionMode::Sync,
             write_set: vec![],

@@ -150,7 +150,7 @@ mod tests {
             sentence: "test step".into(),
             verb: "test.verb".into(),
             dsl: "(test.verb :arg1 \"value\")".into(),
-            args: HashMap::new(),
+            args: std::collections::BTreeMap::new(),
             depends_on: vec![],
             execution_mode: ExecutionMode::Sync,
             write_set: vec![],

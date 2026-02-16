@@ -28,33 +28,48 @@
 //! existing orchestrator pipeline. Full macro/pack/constraint integration
 //! is wired in Phases 1-3.
 
+pub mod canonical;
 #[cfg(feature = "vnext-repl")]
 pub mod compiler;
 #[cfg(feature = "vnext-repl")]
 pub mod constraint_gate;
 pub mod envelope;
+pub mod errors;
 pub mod executor;
 pub mod response;
+#[cfg(feature = "vnext-repl")]
+pub mod sem_reg_filter;
 #[cfg(feature = "vnext-repl")]
 pub mod step_executor_bridge;
 pub mod types;
 #[cfg(feature = "vnext-repl")]
 pub mod verb_classifier;
+#[cfg(feature = "vnext-repl")]
+pub mod write_set;
 
 // Re-export key types at module boundary
+pub use canonical::{
+    canonical_bytes_for_envelope, canonical_bytes_for_step, canonical_bytes_for_steps,
+    content_addressed_id, full_sha256,
+};
 #[cfg(feature = "vnext-repl")]
 pub use compiler::compile_verb;
 #[cfg(feature = "vnext-repl")]
 pub use constraint_gate::check_pack_constraints;
 pub use envelope::ReplayEnvelope;
+pub use errors::{CompilationError, CompilationErrorKind};
+#[cfg(feature = "database")]
+pub use executor::PostgresRunbookStore;
 pub use executor::{
-    execute_runbook, ExecutionError, LockStats, RunbookExecutionResult, RunbookStore,
+    execute_runbook, ExecutionError, LockStats, RunbookEvent, RunbookExecutionResult, RunbookStore,
     StepExecutionResult, StepExecutor, StepOutcome,
 };
 pub use response::{
     ClarificationContext, ClarificationRequest, CompiledRunbookSummary, ConstraintViolationDetail,
     MissingField, OrchestratorResponse, Remediation, StepPreview,
 };
+#[cfg(feature = "vnext-repl")]
+pub use sem_reg_filter::{filter_verbs_against_allowed_set, DeniedVerb, SemRegFilterResult};
 pub use types::{
     CompiledRunbook, CompiledRunbookId, CompiledRunbookStatus, CompiledStep, ExecutionMode,
     ParkReason, StepCursor,
@@ -103,6 +118,7 @@ pub fn compile_invocation(
     verb_config_index: &crate::repl::verb_config_index::VerbConfigIndex,
     constraints: &crate::journey::pack_manager::EffectiveConstraints,
     runbook_version: u64,
+    sem_reg_allowed_verbs: Option<&std::collections::HashSet<String>>,
 ) -> OrchestratorResponse {
     let classification = classify_verb(verb_fqn, verb_config_index, macro_registry);
     compile_verb(
@@ -113,6 +129,7 @@ pub fn compile_invocation(
         macro_registry,
         runbook_version,
         constraints,
+        sem_reg_allowed_verbs,
     )
 }
 
@@ -146,6 +163,7 @@ mod tests {
             &verb_index,
             &constraints,
             1,
+            None, // sem_reg_allowed_verbs
         );
         assert!(
             matches!(resp, OrchestratorResponse::Clarification(_)),
@@ -174,6 +192,7 @@ mod tests {
             &VerbConfigIndex::empty(),
             &EffectiveConstraints::unconstrained(),
             1,
+            None, // sem_reg_allowed_verbs
         );
         // cbu.create is not in empty VerbConfigIndex → Unknown → Clarification
         assert!(matches!(resp, OrchestratorResponse::Clarification(_)));

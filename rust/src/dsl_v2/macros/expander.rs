@@ -19,6 +19,7 @@
 use std::collections::HashMap;
 
 use chrono::Utc;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 use uuid::Uuid;
@@ -27,6 +28,40 @@ use super::registry::MacroRegistry;
 use super::schema::MacroSchema;
 use super::variable::{substitute_variables, ArgValue, VariableContext, VariableError};
 use crate::session::unified::UnifiedSession;
+
+// ---------------------------------------------------------------------------
+// ExpansionLimits — configurable bounds for fixpoint expansion (INV-12)
+// ---------------------------------------------------------------------------
+
+/// Configurable limits for fixpoint macro expansion.
+///
+/// Carried inside `MacroExpansionAudit` so that replay can verify the limits
+/// haven't changed since compilation (INV-12).
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ExpansionLimits {
+    /// Maximum recursion depth for nested macro invocations.
+    /// Paper §6.1: default 8.
+    pub max_depth: usize,
+
+    /// Maximum total expanded steps across all recursive expansions.
+    /// Paper §6.1: default 500.
+    pub max_steps: usize,
+}
+
+impl Default for ExpansionLimits {
+    fn default() -> Self {
+        Self {
+            max_depth: 8,
+            max_steps: 500,
+        }
+    }
+}
+
+/// Production expansion limits (compile-time constant).
+pub const EXPANSION_LIMITS: ExpansionLimits = ExpansionLimits {
+    max_depth: 8,
+    max_steps: 500,
+};
 
 /// Errors during macro expansion
 #[derive(Debug, Error)]
@@ -62,6 +97,15 @@ pub enum MacroExpansionError {
         role: String,
         structure_type: String,
     },
+
+    #[error("Maximum expansion depth exceeded: depth {depth} exceeds limit {limit}")]
+    MaxDepthExceeded { depth: usize, limit: usize },
+
+    #[error("Maximum expansion steps exceeded: {steps} steps exceeds limit {limit}")]
+    MaxStepsExceeded { steps: usize, limit: usize },
+
+    #[error("Cycle detected in macro expansion: {cycle:?}")]
+    CycleDetected { cycle: Vec<String> },
 }
 
 /// Output from macro expansion
@@ -182,6 +226,192 @@ pub fn expand_macro(
         unlocks,
         audit,
     })
+}
+
+// ---------------------------------------------------------------------------
+// Fixpoint macro expansion — recursive with per-path cycle detection (INV-4)
+// ---------------------------------------------------------------------------
+
+/// Fixpoint macro expansion: recursively expands all nested macro invocations
+/// until only primitive DSL statements remain.
+///
+/// ## Invariants
+///
+/// - **INV-4**: Per-path cycle detection via recursion-stack `Vec<String>`.
+///   The same macro may appear in separate non-cyclic branches.
+/// - **INV-12**: `ExpansionLimits` snapshot captured in every `MacroExpansionAudit`.
+///
+/// ## Algorithm
+///
+/// 1. Call `expand_macro()` (inner pass) to get initial expansion
+/// 2. Scan output for `";; @invoke-macro"` directives
+/// 3. For each directive, parse the macro FQN + args
+/// 4. Check depth limit, step limit, per-path cycle
+/// 5. Recursively expand, splicing results in-place
+/// 6. Repeat until no directives remain (fixpoint)
+pub fn expand_macro_fixpoint(
+    macro_fqn: &str,
+    args: &HashMap<String, String>,
+    session: &UnifiedSession,
+    registry: &MacroRegistry,
+    limits: ExpansionLimits,
+) -> Result<FixpointExpansionOutput, MacroExpansionError> {
+    let mut total_steps: usize = 0;
+    let mut path: Vec<String> = Vec::new();
+    let mut all_audits: Vec<MacroExpansionAudit> = Vec::new();
+
+    let statements = expand_macro_recursive(
+        macro_fqn,
+        args,
+        session,
+        registry,
+        limits,
+        0,
+        &mut total_steps,
+        &mut path,
+        &mut all_audits,
+    )?;
+
+    Ok(FixpointExpansionOutput {
+        statements,
+        audits: all_audits,
+        limits,
+        total_steps,
+    })
+}
+
+/// Output from fixpoint expansion — includes all nested audits.
+#[derive(Debug, Clone)]
+pub struct FixpointExpansionOutput {
+    /// Fully expanded DSL statements (no `@invoke-macro` directives remain).
+    pub statements: Vec<String>,
+
+    /// Audit records from every expansion (root + nested).
+    pub audits: Vec<MacroExpansionAudit>,
+
+    /// The limits that were in effect during expansion (INV-12).
+    pub limits: ExpansionLimits,
+
+    /// Total step count across all expansions.
+    pub total_steps: usize,
+}
+
+/// Inner recursive expansion with per-path cycle detection (INV-4).
+///
+/// `path` is the recursion stack: push FQN on entry, pop on return.
+/// If `path.contains(macro_fqn)` before recursing, we have a cycle.
+#[allow(clippy::too_many_arguments)]
+fn expand_macro_recursive(
+    macro_fqn: &str,
+    args: &HashMap<String, String>,
+    session: &UnifiedSession,
+    registry: &MacroRegistry,
+    limits: ExpansionLimits,
+    depth: usize,
+    total_steps: &mut usize,
+    path: &mut Vec<String>,
+    all_audits: &mut Vec<MacroExpansionAudit>,
+) -> Result<Vec<String>, MacroExpansionError> {
+    // Check depth limit
+    if depth > limits.max_depth {
+        return Err(MacroExpansionError::MaxDepthExceeded {
+            depth,
+            limit: limits.max_depth,
+        });
+    }
+
+    // Per-path cycle detection (INV-4): check if this macro is already
+    // on the current recursion path. This is per-path, NOT global —
+    // the same macro may appear in separate non-cyclic branches.
+    if path.contains(&macro_fqn.to_string()) {
+        let mut cycle = path.clone();
+        cycle.push(macro_fqn.to_string());
+        return Err(MacroExpansionError::CycleDetected { cycle });
+    }
+
+    // Push onto recursion path
+    path.push(macro_fqn.to_string());
+
+    // Expand this macro (inner pass)
+    let output = expand_macro(macro_fqn, args, session, registry)?;
+
+    // Record audit
+    all_audits.push(output.audit.clone());
+
+    // Process expanded statements, recursively expanding any @invoke-macro directives
+    let mut final_statements: Vec<String> = Vec::new();
+
+    for stmt in &output.statements {
+        if let Some(invoke) = parse_invoke_macro_directive(stmt) {
+            // Recursively expand the nested macro
+            let nested_statements = expand_macro_recursive(
+                &invoke.macro_id,
+                &invoke.args,
+                session,
+                registry,
+                limits,
+                depth + 1,
+                total_steps,
+                path,
+                all_audits,
+            )?;
+            final_statements.extend(nested_statements);
+        } else {
+            // Primitive statement — count it
+            *total_steps += 1;
+            if *total_steps > limits.max_steps {
+                // Pop before returning error
+                path.pop();
+                return Err(MacroExpansionError::MaxStepsExceeded {
+                    steps: *total_steps,
+                    limit: limits.max_steps,
+                });
+            }
+            final_statements.push(stmt.clone());
+        }
+    }
+
+    // Pop from recursion path on return
+    path.pop();
+
+    Ok(final_statements)
+}
+
+/// Parsed invoke-macro directive.
+struct InvokeMacroDirective {
+    macro_id: String,
+    args: HashMap<String, String>,
+}
+
+/// Parse a `";; @invoke-macro <id> import:[...] args:{json}"` directive.
+///
+/// Returns `None` if the line is not an invoke-macro directive.
+fn parse_invoke_macro_directive(line: &str) -> Option<InvokeMacroDirective> {
+    let trimmed = line.trim();
+    let rest = trimmed.strip_prefix(";; @invoke-macro ")?;
+
+    // Format: "<macro-id> import:[symbols] args:{json}"
+    // Find the macro_id (first token)
+    let parts: Vec<&str> = rest.splitn(2, " import:").collect();
+    if parts.is_empty() {
+        return None;
+    }
+
+    let macro_id = parts[0].trim().to_string();
+
+    // Parse args from the "args:{json}" portion
+    let args = if parts.len() > 1 {
+        if let Some(args_start) = parts[1].find("args:") {
+            let json_str = &parts[1][args_start + 5..];
+            serde_json::from_str::<HashMap<String, String>>(json_str).unwrap_or_default()
+        } else {
+            HashMap::new()
+        }
+    } else {
+        HashMap::new()
+    };
+
+    Some(InvokeMacroDirective { macro_id, args })
 }
 
 /// Validate provided arguments against schema
@@ -1100,5 +1330,643 @@ structure.assign-role:
             let output = result.unwrap();
             assert!(output.statements[0].contains(":role investment-manager"));
         }
+    }
+
+    // =========================================================================
+    // Fixpoint Expansion Tests (Phase 1: INV-4, INV-12)
+    // =========================================================================
+
+    /// Build a registry with nested macros for fixpoint testing.
+    ///
+    /// Layout:
+    /// - `leaf.alpha` — expands to a single verb call `(alpha.do :x "${arg.x}")`
+    /// - `leaf.beta`  — expands to a single verb call `(beta.do :y "${arg.y}")`
+    /// - `composite.ab` — invokes `leaf.alpha` then `leaf.beta` (simple nesting)
+    /// - `composite.deep` — invokes `composite.ab` (2 levels of nesting)
+    fn mock_registry_nested() -> MacroRegistry {
+        let yaml = r#"
+leaf.alpha:
+  kind: macro
+  ui:
+    label: "Alpha"
+    description: "Leaf alpha"
+    target-label: "Alpha"
+  routing:
+    mode-tags: []
+    operator-domain: leaf
+  target:
+    operates-on: client-ref
+    produces: structure-ref
+  args:
+    style: keyworded
+    required:
+      x:
+        type: str
+        ui-label: "X"
+    optional: {}
+  prereqs: []
+  expands-to:
+    - verb: alpha.do
+      args:
+        x: "${arg.x}"
+  unlocks: []
+
+leaf.beta:
+  kind: macro
+  ui:
+    label: "Beta"
+    description: "Leaf beta"
+    target-label: "Beta"
+  routing:
+    mode-tags: []
+    operator-domain: leaf
+  target:
+    operates-on: client-ref
+    produces: structure-ref
+  args:
+    style: keyworded
+    required:
+      y:
+        type: str
+        ui-label: "Y"
+    optional: {}
+  prereqs: []
+  expands-to:
+    - verb: beta.do
+      args:
+        y: "${arg.y}"
+  unlocks: []
+
+composite.ab:
+  kind: macro
+  ui:
+    label: "AB Composite"
+    description: "Invokes alpha then beta"
+    target-label: "AB"
+  routing:
+    mode-tags: []
+    operator-domain: composite
+  target:
+    operates-on: client-ref
+    produces: structure-ref
+  args:
+    style: keyworded
+    required:
+      x:
+        type: str
+        ui-label: "X"
+      y:
+        type: str
+        ui-label: "Y"
+    optional: {}
+  prereqs: []
+  expands-to:
+    - invoke-macro: leaf.alpha
+      args:
+        x: "${arg.x}"
+    - invoke-macro: leaf.beta
+      args:
+        y: "${arg.y}"
+  unlocks: []
+
+composite.deep:
+  kind: macro
+  ui:
+    label: "Deep Composite"
+    description: "Invokes composite.ab"
+    target-label: "Deep"
+  routing:
+    mode-tags: []
+    operator-domain: composite
+  target:
+    operates-on: client-ref
+    produces: structure-ref
+  args:
+    style: keyworded
+    required:
+      x:
+        type: str
+        ui-label: "X"
+      y:
+        type: str
+        ui-label: "Y"
+    optional: {}
+  prereqs: []
+  expands-to:
+    - invoke-macro: composite.ab
+      args:
+        x: "${arg.x}"
+        y: "${arg.y}"
+  unlocks: []
+"#;
+
+        let raw: HashMap<String, MacroSchema> = serde_yaml::from_str(yaml).unwrap();
+        let mut registry = MacroRegistry::new();
+        for (fqn, schema) in raw {
+            registry.add(fqn, schema);
+        }
+        registry
+    }
+
+    #[test]
+    fn test_fixpoint_simple_nested() {
+        // composite.ab invokes leaf.alpha + leaf.beta → both should expand
+        // to primitive verb calls with no @invoke-macro directives remaining.
+        let registry = mock_registry_nested();
+        let session = mock_session();
+
+        let mut args = HashMap::new();
+        args.insert("x".to_string(), "hello".to_string());
+        args.insert("y".to_string(), "world".to_string());
+
+        let result =
+            expand_macro_fixpoint("composite.ab", &args, &session, &registry, EXPANSION_LIMITS);
+        assert!(result.is_ok(), "Fixpoint expansion failed: {:?}", result);
+
+        let output = result.unwrap();
+
+        // Should have 2 primitive statements
+        assert_eq!(
+            output.statements.len(),
+            2,
+            "Expected 2 statements, got: {:?}",
+            output.statements
+        );
+        assert!(
+            output.statements[0].contains("alpha.do"),
+            "First statement should be alpha.do: {}",
+            output.statements[0]
+        );
+        assert!(
+            output.statements[0].contains(":x hello"),
+            "First statement should contain :x hello: {}",
+            output.statements[0]
+        );
+        assert!(
+            output.statements[1].contains("beta.do"),
+            "Second statement should be beta.do: {}",
+            output.statements[1]
+        );
+        assert!(
+            output.statements[1].contains(":y world"),
+            "Second statement should contain :y world: {}",
+            output.statements[1]
+        );
+
+        // No invoke-macro directives should remain
+        for stmt in &output.statements {
+            assert!(
+                !stmt.contains("@invoke-macro"),
+                "Directive should not remain in output: {}",
+                stmt
+            );
+        }
+
+        // Should have 3 audits: composite.ab, leaf.alpha, leaf.beta
+        assert_eq!(
+            output.audits.len(),
+            3,
+            "Expected 3 audits (1 composite + 2 leaves), got {}",
+            output.audits.len()
+        );
+        assert_eq!(output.total_steps, 2, "Should count 2 primitive steps");
+    }
+
+    #[test]
+    fn test_fixpoint_deep_nested() {
+        // composite.deep → composite.ab → leaf.alpha + leaf.beta
+        // 3 levels of nesting, should fully expand.
+        let registry = mock_registry_nested();
+        let session = mock_session();
+
+        let mut args = HashMap::new();
+        args.insert("x".to_string(), "deep-x".to_string());
+        args.insert("y".to_string(), "deep-y".to_string());
+
+        let result = expand_macro_fixpoint(
+            "composite.deep",
+            &args,
+            &session,
+            &registry,
+            EXPANSION_LIMITS,
+        );
+        assert!(result.is_ok(), "Deep fixpoint failed: {:?}", result);
+
+        let output = result.unwrap();
+
+        assert_eq!(output.statements.len(), 2);
+        assert!(output.statements[0].contains("alpha.do"));
+        assert!(output.statements[1].contains("beta.do"));
+
+        // 4 audits: deep, ab, alpha, beta
+        assert_eq!(output.audits.len(), 4);
+        assert_eq!(output.total_steps, 2);
+    }
+
+    #[test]
+    fn test_fixpoint_cycle_detection_per_path() {
+        // INV-4: Per-path cycle detection.
+        // Create A → B → A cycle. Should return CycleDetected.
+        let yaml = r#"
+cycle.a:
+  kind: macro
+  ui:
+    label: "A"
+    description: "A"
+    target-label: "A"
+  routing:
+    mode-tags: []
+    operator-domain: cycle
+  target:
+    operates-on: client-ref
+    produces: structure-ref
+  args:
+    style: keyworded
+    required: {}
+    optional: {}
+  prereqs: []
+  expands-to:
+    - invoke-macro: cycle.b
+      args: {}
+  unlocks: []
+
+cycle.b:
+  kind: macro
+  ui:
+    label: "B"
+    description: "B"
+    target-label: "B"
+  routing:
+    mode-tags: []
+    operator-domain: cycle
+  target:
+    operates-on: client-ref
+    produces: structure-ref
+  args:
+    style: keyworded
+    required: {}
+    optional: {}
+  prereqs: []
+  expands-to:
+    - invoke-macro: cycle.a
+      args: {}
+  unlocks: []
+"#;
+
+        let raw: HashMap<String, MacroSchema> = serde_yaml::from_str(yaml).unwrap();
+        let mut registry = MacroRegistry::new();
+        for (fqn, schema) in raw {
+            registry.add(fqn, schema);
+        }
+
+        let session = mock_session();
+        let result = expand_macro_fixpoint(
+            "cycle.a",
+            &HashMap::new(),
+            &session,
+            &registry,
+            EXPANSION_LIMITS,
+        );
+
+        assert!(
+            matches!(&result, Err(MacroExpansionError::CycleDetected { cycle }) if cycle.len() >= 3),
+            "Expected CycleDetected with at least 3 entries (A→B→A), got: {:?}",
+            result
+        );
+
+        if let Err(MacroExpansionError::CycleDetected { cycle }) = &result {
+            // cycle should be [cycle.a, cycle.b, cycle.a]
+            assert_eq!(cycle.first().unwrap(), "cycle.a");
+            assert_eq!(cycle.last().unwrap(), "cycle.a");
+        }
+    }
+
+    #[test]
+    fn test_fixpoint_diamond_not_cycle() {
+        // INV-4: Same macro in separate non-cyclic branches is NOT a cycle.
+        // diamond.root → leaf.alpha AND leaf.alpha (via two invoke-macros)
+        // This should succeed — alpha appears twice but at different branches,
+        // not on the same recursion path.
+        let yaml = r#"
+diamond.root:
+  kind: macro
+  ui:
+    label: "Root"
+    description: "Root"
+    target-label: "Root"
+  routing:
+    mode-tags: []
+    operator-domain: diamond
+  target:
+    operates-on: client-ref
+    produces: structure-ref
+  args:
+    style: keyworded
+    required:
+      x:
+        type: str
+        ui-label: "X"
+    optional: {}
+  prereqs: []
+  expands-to:
+    - invoke-macro: leaf.alpha
+      args:
+        x: "first"
+    - invoke-macro: leaf.alpha
+      args:
+        x: "second"
+  unlocks: []
+"#;
+
+        // Start with the nested registry that already has leaf.alpha
+        let mut registry = mock_registry_nested();
+        // Add the diamond root
+        let raw: HashMap<String, MacroSchema> = serde_yaml::from_str(yaml).unwrap();
+        for (fqn, schema) in raw {
+            registry.add(fqn, schema);
+        }
+
+        let session = mock_session();
+        let mut args = HashMap::new();
+        args.insert("x".to_string(), "unused".to_string());
+
+        let result =
+            expand_macro_fixpoint("diamond.root", &args, &session, &registry, EXPANSION_LIMITS);
+
+        assert!(
+            result.is_ok(),
+            "Diamond (same macro in separate branches) should NOT be a cycle: {:?}",
+            result
+        );
+
+        let output = result.unwrap();
+        // leaf.alpha invoked twice → 2 primitive statements
+        assert_eq!(output.statements.len(), 2);
+        assert!(output.statements[0].contains("alpha.do"));
+        assert!(output.statements[0].contains(":x first"));
+        assert!(output.statements[1].contains("alpha.do"));
+        assert!(output.statements[1].contains(":x second"));
+    }
+
+    #[test]
+    fn test_fixpoint_depth_limit() {
+        // Create a chain of 10 nested macros (depth 0..9).
+        // With max_depth=8 (indices 0-8 = 9 levels), depth 9 should fail.
+        // chain.0 → chain.1 → ... → chain.9 (leaf)
+        // At depth=9 the recursion enters chain.9, which exceeds max_depth=8.
+        let mut yaml_parts: Vec<String> = Vec::new();
+
+        for i in 0..10 {
+            if i == 9 {
+                // Leaf macro — just a verb call
+                yaml_parts.push(format!(
+                    r#"
+chain.{i}:
+  kind: macro
+  ui:
+    label: "Chain {i}"
+    description: "Chain {i}"
+    target-label: "C{i}"
+  routing:
+    mode-tags: []
+    operator-domain: chain
+  target:
+    operates-on: client-ref
+    produces: structure-ref
+  args:
+    style: keyworded
+    required: {{}}
+    optional: {{}}
+  prereqs: []
+  expands-to:
+    - verb: leaf.do
+      args:
+        step: "{i}"
+  unlocks: []
+"#,
+                ));
+            } else {
+                // Invoke next in chain
+                let next = i + 1;
+                yaml_parts.push(format!(
+                    r#"
+chain.{i}:
+  kind: macro
+  ui:
+    label: "Chain {i}"
+    description: "Chain {i}"
+    target-label: "C{i}"
+  routing:
+    mode-tags: []
+    operator-domain: chain
+  target:
+    operates-on: client-ref
+    produces: structure-ref
+  args:
+    style: keyworded
+    required: {{}}
+    optional: {{}}
+  prereqs: []
+  expands-to:
+    - invoke-macro: chain.{next}
+      args: {{}}
+  unlocks: []
+"#,
+                ));
+            }
+        }
+
+        let full_yaml = yaml_parts.join("\n");
+        let raw: HashMap<String, MacroSchema> = serde_yaml::from_str(&full_yaml).unwrap();
+        let mut registry = MacroRegistry::new();
+        for (fqn, schema) in raw {
+            registry.add(fqn, schema);
+        }
+
+        let session = mock_session();
+        let limits = ExpansionLimits {
+            max_depth: 8,
+            max_steps: 500,
+        };
+
+        let result = expand_macro_fixpoint("chain.0", &HashMap::new(), &session, &registry, limits);
+
+        assert!(
+            matches!(&result, Err(MacroExpansionError::MaxDepthExceeded { depth, limit })
+                if *limit == 8),
+            "Expected MaxDepthExceeded with limit=8, got: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_fixpoint_step_limit() {
+        // Create a macro that expands to many verb calls, exceeding max_steps.
+        // fan.out invokes fan.leaf 3 times, each producing 1 statement = 3 total.
+        // With max_steps=2, should fail on the 3rd step.
+        let yaml = r#"
+fan.leaf:
+  kind: macro
+  ui:
+    label: "Fan Leaf"
+    description: "Fan Leaf"
+    target-label: "Leaf"
+  routing:
+    mode-tags: []
+    operator-domain: fan
+  target:
+    operates-on: client-ref
+    produces: structure-ref
+  args:
+    style: keyworded
+    required:
+      n:
+        type: str
+        ui-label: "N"
+    optional: {}
+  prereqs: []
+  expands-to:
+    - verb: fan.do
+      args:
+        n: "${arg.n}"
+  unlocks: []
+
+fan.out:
+  kind: macro
+  ui:
+    label: "Fan Out"
+    description: "Fan Out"
+    target-label: "FO"
+  routing:
+    mode-tags: []
+    operator-domain: fan
+  target:
+    operates-on: client-ref
+    produces: structure-ref
+  args:
+    style: keyworded
+    required: {}
+    optional: {}
+  prereqs: []
+  expands-to:
+    - invoke-macro: fan.leaf
+      args:
+        n: "1"
+    - invoke-macro: fan.leaf
+      args:
+        n: "2"
+    - invoke-macro: fan.leaf
+      args:
+        n: "3"
+  unlocks: []
+"#;
+
+        let raw: HashMap<String, MacroSchema> = serde_yaml::from_str(yaml).unwrap();
+        let mut registry = MacroRegistry::new();
+        for (fqn, schema) in raw {
+            registry.add(fqn, schema);
+        }
+
+        let session = mock_session();
+        let limits = ExpansionLimits {
+            max_depth: 8,
+            max_steps: 2, // Only allow 2 steps — third should fail
+        };
+
+        let result = expand_macro_fixpoint("fan.out", &HashMap::new(), &session, &registry, limits);
+
+        assert!(
+            matches!(&result, Err(MacroExpansionError::MaxStepsExceeded { steps, limit })
+                if *limit == 2),
+            "Expected MaxStepsExceeded with limit=2, got: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_fixpoint_no_comment_directives_in_output() {
+        // After fixpoint expansion, no ";; @invoke-macro" directives should remain.
+        let registry = mock_registry_nested();
+        let session = mock_session();
+
+        // Test leaf (only needs x)
+        let mut leaf_args = HashMap::new();
+        leaf_args.insert("x".to_string(), "val".to_string());
+        let result = expand_macro_fixpoint(
+            "leaf.alpha",
+            &leaf_args,
+            &session,
+            &registry,
+            EXPANSION_LIMITS,
+        );
+        assert!(result.is_ok(), "Failed for leaf.alpha: {:?}", result);
+        for (i, stmt) in result.unwrap().statements.iter().enumerate() {
+            assert!(
+                !stmt.contains("@invoke-macro"),
+                "Directive found in leaf.alpha output at index {}: {}",
+                i,
+                stmt
+            );
+        }
+
+        // Test composite and deep (need both x and y)
+        let mut composite_args = HashMap::new();
+        composite_args.insert("x".to_string(), "val".to_string());
+        composite_args.insert("y".to_string(), "val".to_string());
+
+        for macro_fqn in ["composite.ab", "composite.deep"] {
+            let result = expand_macro_fixpoint(
+                macro_fqn,
+                &composite_args,
+                &session,
+                &registry,
+                EXPANSION_LIMITS,
+            );
+            assert!(result.is_ok(), "Failed for {}: {:?}", macro_fqn, result);
+
+            let output = result.unwrap();
+            for (i, stmt) in output.statements.iter().enumerate() {
+                assert!(
+                    !stmt.contains("@invoke-macro"),
+                    "Directive found in {} output at index {}: {}",
+                    macro_fqn,
+                    i,
+                    stmt
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_expansion_limits_in_audit() {
+        // INV-12: Every audit should carry the ExpansionLimits snapshot.
+        // The limits in FixpointExpansionOutput should match the input limits.
+        let registry = mock_registry_nested();
+        let session = mock_session();
+
+        let mut args = HashMap::new();
+        args.insert("x".to_string(), "v".to_string());
+        args.insert("y".to_string(), "v".to_string());
+
+        let custom_limits = ExpansionLimits {
+            max_depth: 4,
+            max_steps: 100,
+        };
+
+        let result =
+            expand_macro_fixpoint("composite.ab", &args, &session, &registry, custom_limits);
+        assert!(result.is_ok(), "Expansion failed: {:?}", result);
+
+        let output = result.unwrap();
+
+        // The output limits should match input
+        assert_eq!(
+            output.limits, custom_limits,
+            "Output limits should match input limits"
+        );
+
+        // The limits field is carried for INV-12 envelope embedding
+        assert_eq!(output.limits.max_depth, 4);
+        assert_eq!(output.limits.max_steps, 100);
     }
 }

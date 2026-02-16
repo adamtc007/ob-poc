@@ -185,7 +185,9 @@ pub struct TemplatePolicy {
 /// causing partial failures.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LockingPolicy {
-    /// Lock acquisition mode
+    /// Lock acquisition mode (not serialized — `Duration` is not serde-friendly;
+    /// use `timeout_ms` to configure timeout from YAML/JSON).
+    #[serde(skip, default)]
     pub mode: LockMode,
     /// Timeout in milliseconds (only used with `mode: block`)
     #[serde(default)]
@@ -195,14 +197,22 @@ pub struct LockingPolicy {
 }
 
 /// Lock acquisition mode
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[serde(rename_all = "snake_case")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum LockMode {
     /// Non-blocking: fail immediately if lock unavailable
     #[default]
     Try,
-    /// Blocking: wait for lock (with optional timeout)
+    /// Blocking: wait for lock indefinitely
     Block,
+    /// Blocking with timeout: wait up to `duration`, then fail with contention error.
+    ///
+    /// Implementation: `SET LOCAL statement_timeout = '<ms>'` before
+    /// `pg_advisory_xact_lock()`, then `RESET statement_timeout` after.
+    /// `SET LOCAL` scopes the timeout to the current transaction only —
+    /// it does NOT leak to the connection pool. If the lock is not acquired
+    /// within the duration, PostgreSQL raises error 57014 (query_canceled),
+    /// which is caught and converted to `LockError::Contention`.
+    Timeout(std::time::Duration),
 }
 
 /// Specifies which argument to lock and how

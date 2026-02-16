@@ -3543,7 +3543,7 @@ impl ReplOrchestratorV2 {
         session_id: Uuid,
         version: u64,
     ) -> CompiledRunbook {
-        use crate::runbook::compiler::derive_write_set;
+        use crate::runbook::write_set::derive_write_set;
 
         let compiled_mode = match entry.execution_mode {
             ExecutionMode::Sync => CompiledExecutionMode::Sync,
@@ -3555,10 +3555,16 @@ impl ReplOrchestratorV2 {
             sentence: entry.sentence.clone(),
             verb: entry.verb.clone(),
             dsl: entry.dsl.clone(),
-            args: entry.args.clone(),
+            args: entry
+                .args
+                .iter()
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect(),
             depends_on: vec![],
             execution_mode: compiled_mode,
-            write_set: derive_write_set(&entry.args),
+            write_set: derive_write_set(&entry.verb, &entry.args, None)
+                .into_iter()
+                .collect(),
         };
         CompiledRunbook::new(session_id, version, vec![step], ReplayEnvelope::empty())
     }
@@ -3633,6 +3639,7 @@ impl ReplOrchestratorV2 {
                     None,
                     &bridge,
                     self.pool.as_ref(),
+                    None,
                 )
                 .await
                 {
@@ -3650,6 +3657,7 @@ impl ReplOrchestratorV2 {
                     None,
                     &bridge,
                     self.pool.as_ref(),
+                    None,
                 )
                 .await
                 {
@@ -3661,8 +3669,15 @@ impl ReplOrchestratorV2 {
             }
         } else {
             let bridge = DslStepExecutor::new(Arc::clone(&self.executor));
-            match execute_runbook_with_pool(store, compiled_id, None, &bridge, self.pool.as_ref())
-                .await
+            match execute_runbook_with_pool(
+                store,
+                compiled_id,
+                None,
+                &bridge,
+                self.pool.as_ref(),
+                None,
+            )
+            .await
             {
                 Ok(result) => extract_first_outcome(result),
                 Err(e) => StepOutcome::Failed {
@@ -3949,6 +3964,7 @@ impl ReplOrchestratorV2 {
             macro_registry,
             version,
             &constraints,
+            None, // sem_reg_allowed_verbs — resolved upstream by orchestrator
         );
 
         match response {
@@ -3975,6 +3991,19 @@ impl ReplOrchestratorV2 {
             }),
             crate::runbook::OrchestratorResponse::ConstraintViolation(v) => {
                 let msg = format!("Pack constraint violation: {}", v.explanation,);
+                Some(ReplResponseV2 {
+                    state: session.state.clone(),
+                    kind: ReplResponseKindV2::Error {
+                        error: msg.clone(),
+                        recoverable: true,
+                    },
+                    message: msg,
+                    runbook_summary: None,
+                    step_count: session.runbook.entries.len(),
+                })
+            }
+            crate::runbook::OrchestratorResponse::CompilationError(e) => {
+                let msg = format!("Compilation failed ({}): {}", e.source_phase, e.kind);
                 Some(ReplResponseV2 {
                     state: session.state.clone(),
                     kind: ReplResponseKindV2::Error {

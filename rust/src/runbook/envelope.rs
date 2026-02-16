@@ -11,8 +11,10 @@
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use uuid::Uuid;
+
+use crate::dsl_v2::macros::ExpansionLimits;
 
 // ---------------------------------------------------------------------------
 // ReplayEnvelope
@@ -21,7 +23,7 @@ use uuid::Uuid;
 /// Captures the non-deterministic inputs that were resolved at compile time.
 ///
 /// Stored inside `CompiledRunbook` and never mutated after creation.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ReplayEnvelope {
     /// Session cursor at compilation time (monotonic sequence number).
     pub session_cursor: u64,
@@ -30,7 +32,9 @@ pub struct ReplayEnvelope {
     ///
     /// Key: entity reference text (e.g., `"Allianz"`).
     /// Value: resolved entity UUID.
-    pub entity_bindings: HashMap<String, Uuid>,
+    ///
+    /// Uses `BTreeMap` for deterministic serialization order (INV-2).
+    pub entity_bindings: BTreeMap<String, Uuid>,
 
     /// External lookups performed during compilation (e.g., GLEIF, screening).
     pub external_lookups: Vec<ExternalLookup>,
@@ -47,7 +51,7 @@ impl ReplayEnvelope {
     pub fn empty() -> Self {
         Self {
             session_cursor: 0,
-            entity_bindings: HashMap::new(),
+            entity_bindings: BTreeMap::new(),
             external_lookups: Vec::new(),
             macro_audits: Vec::new(),
             sealed_at: Utc::now(),
@@ -55,7 +59,7 @@ impl ReplayEnvelope {
     }
 
     /// Create an envelope with entity bindings.
-    pub fn with_bindings(session_cursor: u64, bindings: HashMap<String, Uuid>) -> Self {
+    pub fn with_bindings(session_cursor: u64, bindings: BTreeMap<String, Uuid>) -> Self {
         Self {
             session_cursor,
             entity_bindings: bindings,
@@ -71,7 +75,7 @@ impl ReplayEnvelope {
 // ---------------------------------------------------------------------------
 
 /// Record of an external lookup performed during compilation.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ExternalLookup {
     /// Source system (e.g., `"gleif"`, `"screening"`, `"client_group"`).
     pub source: String,
@@ -94,7 +98,12 @@ pub struct ExternalLookup {
 ///
 /// Mirrors the existing `dsl_v2::macros::expander::MacroExpansionAudit` but
 /// is owned by the runbook module to avoid cross-module coupling.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+///
+/// ## INV-12
+///
+/// `expansion_limits` captures the limits snapshot used during expansion
+/// so that replay can verify the limits haven't changed.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MacroExpansionAudit {
     /// Unique expansion ID.
     pub expansion_id: Uuid,
@@ -103,13 +112,23 @@ pub struct MacroExpansionAudit {
     pub macro_name: String,
 
     /// Parameters supplied to the macro.
-    pub params: HashMap<String, serde_json::Value>,
+    ///
+    /// Uses `BTreeMap` for deterministic serialization order (INV-2).
+    pub params: BTreeMap<String, serde_json::Value>,
 
     /// Autofill values that were resolved from session state.
-    pub resolved_autofill: HashMap<String, serde_json::Value>,
+    ///
+    /// Uses `BTreeMap` for deterministic serialization order (INV-2).
+    pub resolved_autofill: BTreeMap<String, serde_json::Value>,
 
     /// SHA-256 digest of the expanded DSL output.
     pub expansion_digest: String,
+
+    /// Expansion limits in effect during this expansion (INV-12).
+    ///
+    /// Captured so replay can verify the limits match. If limits change,
+    /// the bincode layout changes → different content-addressed ID (INV-13).
+    pub expansion_limits: ExpansionLimits,
 
     /// When the expansion was performed.
     pub expanded_at: DateTime<Utc>,
@@ -135,7 +154,7 @@ mod tests {
 
     #[test]
     fn envelope_with_bindings() {
-        let mut bindings = HashMap::new();
+        let mut bindings = BTreeMap::new();
         bindings.insert("Allianz".into(), Uuid::new_v4());
         let env = ReplayEnvelope::with_bindings(42, bindings.clone());
         assert_eq!(env.session_cursor, 42);

@@ -118,6 +118,7 @@ smallvec = { version = "1.11", features = ["serde"] }
 bpmn-lite-core = { path = "../bpmn-lite/bpmn-lite-core" }
 bpmn-lite-server = { path = "../bpmn-lite/bpmn-lite-server" }
 tokio-stream = "0.1"
+proptest = "1.4"
 
 [build-dependencies]
 tonic-build = "0.12"
@@ -197,6 +198,8 @@ server = ["database", "mcp", "dep:axum", "dep:tower", "dep:tower-http"]  # REST 
 cli = ["dep:clap", "dep:colored", "dep:atty", "dep:rustyline"]  # CLI tool for DSL testing
 mcp = ["database"]  # MCP/intent pipeline for semantic verb search
 vnext-repl = ["database"]  # Pack-guided REPL v2 (Journey Packs, sentence templates, unified runbook)
+write-set-contract = []  # Enables contract-driven write_set derivation from verb YAML metadata (INV-8)
+runbook-gate-vnext = ["database"]  # All execution paths through compile_invocation() + execute_runbook() (INV-1, INV-11)
 
 
 

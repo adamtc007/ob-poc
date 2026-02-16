@@ -1553,8 +1553,6 @@ impl AgentService {
         &self,
         session: &mut UnifiedSession,
     ) -> Result<AgentChatResponse, String> {
-        use crate::dsl_v2::{DslExecutor, ExecutionContext};
-
         // Check if there's anything to run
         if !session.run_sheet.has_runnable() {
             return Ok(self.fail("Nothing staged to run. Send a command first.", session));
@@ -1614,20 +1612,40 @@ impl AgentService {
         let resolved_dsl = program.to_dsl_string();
         tracing::debug!(resolved_dsl = %resolved_dsl, "Executing resolved DSL");
 
-        // 6. Execute
+        // 6. Execute — gated path (INV-1, INV-11)
+        //
+        // When `runbook-gate-vnext` is enabled, ALL execution goes through
+        // compile_invocation() + execute_runbook(). When disabled, the legacy
+        // DslExecutor::execute_dsl() path is used.
+        self.execute_resolved_dsl(session, resolved_dsl, program)
+            .await
+    }
+
+    /// Legacy execution path — bypasses runbook compilation gate.
+    ///
+    /// Retained under `#[cfg(not(feature = "runbook-gate-vnext"))]` as fallback.
+    /// When `runbook-gate-vnext` is enabled, this is dead code and `execute_via_runbook_gate`
+    /// is used instead.
+    #[cfg(not(feature = "runbook-gate-vnext"))]
+    async fn execute_resolved_dsl(
+        &self,
+        session: &mut UnifiedSession,
+        resolved_dsl: String,
+        _program: crate::dsl_v2::ast::Program,
+    ) -> Result<AgentChatResponse, String> {
+        use crate::dsl_v2::{DslExecutor, ExecutionContext};
+
         let executor = DslExecutor::new(self.pool.clone());
         let mut exec_ctx = ExecutionContext::new();
         match executor.execute_dsl(&resolved_dsl, &mut exec_ctx).await {
             Ok(results) => {
                 // Check if any result is a macro that returned combined_dsl to stage
-                // This handles verbs like cbu.create-from-client-group that generate DSL batches
                 for result in &results {
                     if let crate::dsl_v2::ExecutionResult::Record(json) = result {
                         if let Some(combined_dsl) =
                             json.get("combined_dsl").and_then(|v| v.as_str())
                         {
                             if !combined_dsl.is_empty() {
-                                // Macro returned DSL to stage - clear current runsheet and stage the new DSL
                                 session.run_sheet.entries.clear();
 
                                 let ast = parse_program(combined_dsl)
@@ -1657,7 +1675,7 @@ impl AgentService {
                                 return Ok(AgentChatResponse {
                                     message: response_msg,
                                     dsl_source: Some(combined_dsl.to_string()),
-                                    can_execute: true, // Ready to run
+                                    can_execute: true,
                                     session_state: SessionState::ReadyToExecute,
 
                                     ast: None,
@@ -1677,47 +1695,7 @@ impl AgentService {
 
                 // Normal execution - mark as executed
                 session.run_sheet.mark_all_executed();
-
-                // Sync unified session if any CBUs were loaded
-                // This propagates scope to session.context so the watch endpoint
-                // returns scope_type, which triggers UI viewport refresh
-                if let Some(unified_session) = exec_ctx.take_pending_session() {
-                    let loaded = unified_session.cbu_ids_vec();
-                    let cbu_count = loaded.len();
-
-                    // Merge loaded CBUs into context
-                    for cbu_id in &loaded {
-                        if !session.context.cbu_ids.contains(cbu_id) {
-                            session.context.cbu_ids.push(*cbu_id);
-                        }
-                    }
-
-                    // Set scope definition so UI knows to trigger scope_graph refetch
-                    // Use Custom scope for multi-CBU loads, SingleCbu for single CBU
-                    let scope_def = if cbu_count == 1 {
-                        GraphScope::SingleCbu {
-                            cbu_id: loaded[0],
-                            cbu_name: unified_session.name.clone().unwrap_or_default(),
-                        }
-                    } else if cbu_count > 1 {
-                        // Multi-CBU scope - use Custom with session name or description
-                        GraphScope::Custom {
-                            description: unified_session
-                                .name
-                                .clone()
-                                .unwrap_or_else(|| format!("{} CBUs", cbu_count)),
-                        }
-                    } else {
-                        GraphScope::Empty
-                    };
-
-                    session.context.scope = Some(SessionScope::from_graph_scope(scope_def));
-                    tracing::info!(
-                        "[EXEC] Set context.scope with {} CBUs, scope_type={:?}",
-                        cbu_count,
-                        session.context.scope.as_ref().map(|s| &s.definition)
-                    );
-                }
+                self.sync_scope_from_exec_ctx(session, &mut exec_ctx);
 
                 let msg = format!(
                     "Executed {} statement(s). {} CBUs in scope.",
@@ -1728,7 +1706,7 @@ impl AgentService {
                 Ok(AgentChatResponse {
                     message: msg,
                     dsl_source: Some(resolved_dsl),
-                    can_execute: false, // Already executed
+                    can_execute: false,
                     session_state: SessionState::Executed,
 
                     ast: None,
@@ -1746,6 +1724,163 @@ impl AgentService {
                 let msg = format!("Execution failed: {}", e);
                 Ok(self.fail(&msg, session))
             }
+        }
+    }
+
+    /// Runbook-gated execution path (INV-1, INV-11).
+    ///
+    /// Routes all Chat API execution through `compile_invocation()` + `execute_runbook()`.
+    /// No raw DSL execution — the only executable truth is the compiled runbook.
+    ///
+    /// INV-1: Every verb call is wrapped in a `CompiledRunbook` and executed
+    /// through `execute_runbook()`. No raw `DslExecutor::execute_dsl()` call.
+    #[cfg(feature = "runbook-gate-vnext")]
+    async fn execute_resolved_dsl(
+        &self,
+        session: &mut UnifiedSession,
+        resolved_dsl: String,
+        program: crate::dsl_v2::ast::Program,
+    ) -> Result<AgentChatResponse, String> {
+        use crate::repl::executor_bridge::RealDslExecutor;
+        use crate::runbook::step_executor_bridge::DslStepExecutor;
+        use crate::runbook::{
+            envelope::ReplayEnvelope,
+            execute_runbook,
+            types::{CompiledStep, ExecutionMode},
+            write_set::derive_write_set_heuristic,
+            CompiledRunbook, RunbookStore,
+        };
+
+        let store = RunbookStore::new();
+        let session_id = session.id;
+        let mut executed_count = 0usize;
+
+        for stmt in &program.statements {
+            if let crate::dsl_v2::ast::Statement::VerbCall(vc) = stmt {
+                let verb_fqn = vc.full_name();
+                let args: std::collections::BTreeMap<String, String> = vc
+                    .arguments
+                    .iter()
+                    .map(|a| (a.key.clone(), a.value.to_dsl_string()))
+                    .collect();
+                let dsl_source = vc.to_dsl_string();
+
+                // Derive write_set from args (heuristic UUID extraction)
+                let args_hashmap: std::collections::HashMap<String, String> =
+                    args.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
+                let write_set: Vec<uuid::Uuid> = derive_write_set_heuristic(&args_hashmap)
+                    .into_iter()
+                    .collect();
+
+                let step = CompiledStep {
+                    step_id: uuid::Uuid::new_v4(),
+                    sentence: dsl_source.clone(),
+                    verb: verb_fqn.clone(),
+                    dsl: dsl_source,
+                    args: args.clone(),
+                    depends_on: vec![],
+                    execution_mode: ExecutionMode::Sync,
+                    write_set: write_set.clone(),
+                };
+
+                let envelope = ReplayEnvelope {
+                    session_cursor: 0,
+                    entity_bindings: std::collections::BTreeMap::new(),
+                    external_lookups: vec![],
+                    macro_audits: vec![],
+                    sealed_at: chrono::Utc::now(),
+                };
+
+                let runbook = CompiledRunbook::new(
+                    session_id,
+                    0, // version — not critical for Chat API path
+                    vec![step],
+                    envelope,
+                );
+                let runbook_id = runbook.id;
+                store.insert(runbook);
+
+                // Execute through the gate (INV-1)
+                let real_executor = RealDslExecutor::new(self.pool.clone());
+                let step_executor = DslStepExecutor::new(std::sync::Arc::new(real_executor));
+                match execute_runbook(&store, runbook_id, None, &step_executor).await {
+                    Ok(_result) => {
+                        executed_count += 1;
+                    }
+                    Err(e) => {
+                        let msg = format!("Runbook execution failed: {}", e);
+                        return Ok(self.fail(&msg, session));
+                    }
+                }
+            }
+        }
+
+        // Mark as executed
+        session.run_sheet.mark_all_executed();
+
+        let msg = format!(
+            "Executed {} statement(s) via runbook gate. {} CBUs in scope.",
+            executed_count,
+            session.context.cbu_ids.len()
+        );
+        session.add_agent_message(msg.clone(), None, None);
+        Ok(AgentChatResponse {
+            message: msg,
+            dsl_source: Some(resolved_dsl),
+            can_execute: false,
+            session_state: SessionState::Executed,
+
+            ast: None,
+            disambiguation: None,
+            commands: None,
+            unresolved_refs: None,
+            current_ref_index: None,
+            dsl_hash: None,
+            verb_disambiguation: None,
+            intent_tier: None,
+            decision: None,
+        })
+    }
+
+    /// Sync scope from execution context into session (legacy path only).
+    #[cfg(not(feature = "runbook-gate-vnext"))]
+    fn sync_scope_from_exec_ctx(
+        &self,
+        session: &mut UnifiedSession,
+        exec_ctx: &mut crate::dsl_v2::ExecutionContext,
+    ) {
+        if let Some(unified_session) = exec_ctx.take_pending_session() {
+            let loaded = unified_session.cbu_ids_vec();
+            let cbu_count = loaded.len();
+
+            for cbu_id in &loaded {
+                if !session.context.cbu_ids.contains(cbu_id) {
+                    session.context.cbu_ids.push(*cbu_id);
+                }
+            }
+
+            let scope_def = if cbu_count == 1 {
+                GraphScope::SingleCbu {
+                    cbu_id: loaded[0],
+                    cbu_name: unified_session.name.clone().unwrap_or_default(),
+                }
+            } else if cbu_count > 1 {
+                GraphScope::Custom {
+                    description: unified_session
+                        .name
+                        .clone()
+                        .unwrap_or_else(|| format!("{} CBUs", cbu_count)),
+                }
+            } else {
+                GraphScope::Empty
+            };
+
+            session.context.scope = Some(SessionScope::from_graph_scope(scope_def));
+            tracing::info!(
+                "[EXEC] Set context.scope with {} CBUs, scope_type={:?}",
+                cbu_count,
+                session.context.scope.as_ref().map(|s| &s.definition)
+            );
         }
     }
 

@@ -202,18 +202,55 @@ pub async fn acquire_locks(
     // Deduplicate - same lock shouldn't be acquired twice
     sorted_locks.dedup();
 
+    // For Timeout mode, set a transaction-local statement_timeout BEFORE
+    // acquiring locks. `SET LOCAL` scopes it to this transaction only —
+    // it does NOT leak to the connection pool. On timeout, PostgreSQL raises
+    // error 57014 (query_canceled) which we catch below.
+    if let LockMode::Timeout(duration) = mode {
+        let ms = duration.as_millis() as i64;
+        sqlx::query(&format!("SET LOCAL statement_timeout = '{ms}'"))
+            .execute(&mut **tx)
+            .await?;
+    }
+
     for lock in &sorted_locks {
         let key = lock_key_from_struct(lock);
 
-        let lock_acquired = match mode {
+        let lock_result = match mode {
             LockMode::Try => {
-                // Non-blocking - fail fast if lock unavailable
-                try_advisory_xact_lock(tx, key).await?
+                // Non-blocking — fail fast if lock unavailable
+                try_advisory_xact_lock(tx, key).await
             }
-            LockMode::Block => {
-                // Blocking - wait for lock
-                advisory_xact_lock(tx, key).await?;
-                true
+            LockMode::Block | LockMode::Timeout(_) => {
+                // Blocking — wait for lock (with optional statement_timeout).
+                // On timeout (57014), sqlx returns Err(sqlx::Error::Database(..)).
+                advisory_xact_lock(tx, key).await.map(|()| true)
+            }
+        };
+
+        let lock_acquired = match lock_result {
+            Ok(acquired) => acquired,
+            Err(e) => {
+                // Check for PostgreSQL error 57014 (query_canceled / statement_timeout).
+                let is_timeout = e
+                    .as_database_error()
+                    .map(|db_err| db_err.code().is_some_and(|c| c == "57014"))
+                    .unwrap_or(false);
+
+                if is_timeout {
+                    // Timeout mode: convert to contention error.
+                    tracing::warn!(
+                        entity_type = %lock.entity_type,
+                        entity_id = %lock.entity_id,
+                        "Lock acquisition timed out (statement_timeout)"
+                    );
+                    return Err(LockError::Contention {
+                        entity_type: lock.entity_type.clone(),
+                        entity_id: lock.entity_id.clone(),
+                        acquired_so_far: acquired,
+                    });
+                }
+                return Err(LockError::Database(e));
             }
         };
 
@@ -238,6 +275,13 @@ pub async fn acquire_locks(
                 acquired_so_far: acquired,
             });
         }
+    }
+
+    // Reset statement_timeout after all locks acquired (Timeout mode only).
+    if matches!(mode, LockMode::Timeout(_)) {
+        sqlx::query("RESET statement_timeout")
+            .execute(&mut **tx)
+            .await?;
     }
 
     let wait_time_ms = start.elapsed().as_millis() as u64;

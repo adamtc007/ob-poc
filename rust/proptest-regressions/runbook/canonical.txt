@@ -1,0 +1,8 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc d3b3626606912e20f18e40dea6802763f63bfead864d64e0fea6ed333b58e429 # shrinks to audit = MacroExpansionAudit { expansion_id: 00000000-0000-0000-0000-000000000000, macro_name: "a.a", params: {}, resolved_autofill: {"a": String("")}, expansion_digest: "00a0a0aaa0a00000aaaaaa000a0aa0000a000a0a0aaaaa0aa00a00a0a0aa0a0a", expansion_limits: ExpansionLimits { max_depth: 1, max_steps: 1 }, expanded_at: 2020-01-01T00:00:00Z }
+cc 07009b0636ece9e7d1b690a8dc1cef8e26152436917d8a142dee3d58db64b103 # shrinks to env = ReplayEnvelope { session_cursor: 0, entity_bindings: {}, external_lookups: [], macro_audits: [MacroExpansionAudit { expansion_id: 00000000-0000-0000-0000-000000000000, macro_name: "a.a", params: {}, resolved_autofill: {"a": String("")}, expansion_digest: "0aaaa0a00aaaaa0000aa00a00a00a0aaa00a0a00a0a000a0aaaaaaa0a0a00aaa", expansion_limits: ExpansionLimits { max_depth: 1, max_steps: 1 }, expanded_at: 2020-01-01T00:00:00Z }], sealed_at: 2020-01-01T00:00:00Z }

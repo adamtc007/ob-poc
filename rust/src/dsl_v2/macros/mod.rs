@@ -44,7 +44,10 @@ mod scope;
 mod variable;
 
 pub use conditions::{evaluate_condition, ConditionContext, ConditionResult};
-pub use expander::{expand_macro, MacroExpansionError, MacroExpansionOutput};
+pub use expander::{
+    expand_macro, expand_macro_fixpoint, ExpansionLimits, FixpointExpansionOutput,
+    MacroExpansionError, MacroExpansionOutput, EXPANSION_LIMITS,
+};
 pub use registry::{
     load_macro_registry, load_macro_registry_from_dir, DomainNode, MacroFilter, MacroNode,
     MacroRegistry, MacroTaxonomy,

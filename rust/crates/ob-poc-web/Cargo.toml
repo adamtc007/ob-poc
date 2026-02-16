@@ -28,7 +28,7 @@ futures = "0.3"
 uuid = { version = "1", features = ["serde", "v4"] }
 
 # Re-use existing ob-poc types
-ob-poc = { path = "../..", features = ["server", "vnext-repl"] }
+ob-poc = { path = "../..", features = ["server", "vnext-repl", "runbook-gate-vnext"] }
 
 # Shared API types (single source of truth for all boundaries)
 ob-poc-types = { path = "../ob-poc-types" }

@@ -1,6 +1,6 @@
 //! Orchestrator response types for the compile surface.
 //!
-//! `compile_invocation()` returns exactly one of three variants:
+//! `compile_invocation()` returns exactly one of four variants:
 //!
 //! 1. **Compiled** — a `CompiledRunbook` was successfully created and is ready
 //!    for `execute_runbook()`.
@@ -8,10 +8,13 @@
 //!    proceed (missing args, ambiguous entity, etc.).
 //! 3. **ConstraintViolation** — the expanded plan violates active pack
 //!    constraints; includes remediation options.
+//! 4. **CompilationError** — a typed compilation error from one of the §6.2
+//!    pipeline phases (INV-7).
 
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use super::errors::CompilationError;
 use super::types::{CompiledRunbook, CompiledRunbookId};
 
 // ---------------------------------------------------------------------------
@@ -33,6 +36,9 @@ pub enum OrchestratorResponse {
 
     /// The expanded plan violates active pack constraints.
     ConstraintViolation(ConstraintViolationDetail),
+
+    /// A typed compilation error from one of the §6.2 pipeline phases (INV-7).
+    CompilationError(CompilationError),
 }
 
 impl OrchestratorResponse {

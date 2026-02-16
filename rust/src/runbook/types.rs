@@ -18,6 +18,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use super::canonical::content_addressed_id;
 use super::envelope::ReplayEnvelope;
 
 // ---------------------------------------------------------------------------
@@ -31,11 +32,16 @@ use super::envelope::ReplayEnvelope;
 pub struct CompiledRunbookId(pub Uuid);
 
 impl CompiledRunbookId {
+    /// Create a random ID for testing only.
+    ///
+    /// Production code must use `canonical::content_addressed_id()`.
+    #[cfg(test)]
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }
 }
 
+#[cfg(test)]
 impl Default for CompiledRunbookId {
     fn default() -> Self {
         Self::new()
@@ -81,15 +87,19 @@ pub struct CompiledRunbook {
 }
 
 impl CompiledRunbook {
-    /// Create a new compiled runbook in `Compiled` status.
+    /// Create a new compiled runbook with a content-addressed ID (INV-2).
+    ///
+    /// The ID is derived from `SHA-256(bincode(steps) ++ bincode(envelope))`
+    /// truncated to 128 bits. Same inputs always produce the same ID.
     pub fn new(
         session_id: Uuid,
         version: u64,
         steps: Vec<CompiledStep>,
         envelope: ReplayEnvelope,
     ) -> Self {
+        let id = content_addressed_id(&steps, &envelope);
         Self {
-            id: CompiledRunbookId::new(),
+            id,
             session_id,
             version,
             steps,
@@ -121,7 +131,7 @@ impl CompiledRunbook {
 ///
 /// Maps 1:1 with the existing `RunbookEntry` but is frozen and cannot be
 /// edited after compilation.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CompiledStep {
     /// Stable step ID (from the originating `RunbookEntry.id`).
     pub step_id: Uuid,
@@ -136,7 +146,9 @@ pub struct CompiledStep {
     pub dsl: String,
 
     /// Extracted arguments for audit/display.
-    pub args: std::collections::HashMap<String, String>,
+    ///
+    /// Uses `BTreeMap` for deterministic serialization order (INV-2).
+    pub args: std::collections::BTreeMap<String, String>,
 
     /// Step IDs this step depends on (DAG edges).
     pub depends_on: Vec<Uuid>,

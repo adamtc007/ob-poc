@@ -30,9 +30,9 @@ use ob_poc::journey::pack_manager::{ConstraintSource, EffectiveConstraints};
 use ob_poc::repl::verb_config_index::VerbConfigIndex;
 use ob_poc::runbook::verb_classifier::{classify_verb, VerbClassification};
 use ob_poc::runbook::{
-    compile_verb, execute_runbook, CompiledRunbook, CompiledRunbookId, CompiledRunbookStatus,
-    CompiledStep, ExecutionMode, OrchestratorResponse, ParkReason, ReplayEnvelope, RunbookStore,
-    StepCursor, StepExecutor, StepOutcome,
+    compile_verb, execute_runbook, CompiledRunbook, CompiledRunbookStatus, CompiledStep,
+    ExecutionMode, OrchestratorResponse, ParkReason, ReplayEnvelope, RunbookStore, StepCursor,
+    StepExecutor, StepOutcome,
 };
 use ob_poc::session::unified::{ClientRef, StructureType, UnifiedSession};
 
@@ -293,7 +293,7 @@ fn make_step(verb: &str) -> CompiledStep {
         sentence: format!("Do {verb}"),
         verb: verb.into(),
         dsl: format!("({verb})"),
-        args: HashMap::new(),
+        args: std::collections::BTreeMap::new(),
         depends_on: vec![],
         execution_mode: ExecutionMode::Sync,
         write_set: vec![],
@@ -322,6 +322,7 @@ async fn compile_and_execute(
         registry,
         1,
         constraints,
+        None, // sem_reg_allowed_verbs
     );
 
     if let OrchestratorResponse::Compiled(ref summary) = resp {
@@ -534,6 +535,7 @@ async fn replay_determinism() {
         &registry,
         1,
         &constraints,
+        None, // sem_reg_allowed_verbs
     );
     let resp2 = compile_verb(
         Uuid::new_v4(),
@@ -543,6 +545,7 @@ async fn replay_determinism() {
         &registry,
         1,
         &constraints,
+        None, // sem_reg_allowed_verbs
     );
 
     // Both should compile
@@ -652,7 +655,9 @@ async fn execution_gate_rejects_raw() {
     let store = RunbookStore::new();
 
     // 1. Non-existent runbook → NotFound
-    let fake_id = CompiledRunbookId::new();
+    // Build a content-addressed ID from dummy data that won't be in the store.
+    let fake_rb = CompiledRunbook::new(Uuid::new_v4(), 1, vec![], ReplayEnvelope::empty());
+    let fake_id = fake_rb.id;
     let result = execute_runbook(&store, fake_id, None, &SuccessExecutor).await;
     assert!(
         matches!(
@@ -766,6 +771,7 @@ async fn constraint_violation_remediation() {
         &registry,
         1,
         &constraints,
+        None, // sem_reg_allowed_verbs
     );
 
     // Must be a ConstraintViolation
@@ -977,6 +983,7 @@ async fn primitive_verb_compile_and_execute() {
         &registry,
         1,
         &constraints,
+        None, // sem_reg_allowed_verbs
     );
 
     assert!(resp.is_compiled());
@@ -1029,6 +1036,7 @@ fn compile_invocation_missing_macro_args() {
         &verb_index,
         &constraints,
         1,
+        None, // sem_reg_allowed_verbs
     );
 
     assert!(
@@ -1081,6 +1089,7 @@ fn compile_invocation_end_to_end() {
         &verb_index,
         &constraints,
         1,
+        None, // sem_reg_allowed_verbs
     );
 
     assert!(
@@ -1135,6 +1144,7 @@ fn compile_invocation_constraint_violation() {
         &verb_index,
         &constraints,
         1,
+        None, // sem_reg_allowed_verbs
     );
 
     assert!(
