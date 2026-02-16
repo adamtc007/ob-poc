@@ -1,6 +1,6 @@
 //! Runbook Pipeline Integration Tests
 //!
-//! Canonical harness exercising the full `process_utterance` → `execute_runbook`
+//! Canonical harness exercising the full `compile_invocation` → `execute_runbook`
 //! path. All integration tests for the runbook compilation + execution pipeline
 //! live here.
 //!
@@ -1004,23 +1004,23 @@ async fn primitive_verb_compile_and_execute() {
 }
 
 // =============================================================================
-// Test: process_utterance missing macro args → Clarification
+// Test: compile_invocation missing macro args → Clarification
 // =============================================================================
 
 /// When a macro verb is invoked with incomplete required args, the
-/// `process_utterance` function should return a Clarification with
+/// `compile_invocation` function should return a Clarification with
 /// the missing field names.
 #[test]
-fn process_utterance_missing_macro_args() {
+fn compile_invocation_missing_macro_args() {
     let registry = macro_registry_with_structure_setup();
     let verb_index = VerbConfigIndex::empty();
     let session = test_session();
     let constraints = EffectiveConstraints::unconstrained();
 
-    // Call process_utterance with NO args — "name" is required by the macro
+    // Call compile_invocation with NO args — "name" is required by the macro
     let args = HashMap::new();
 
-    let resp = ob_poc::runbook::process_utterance(
+    let resp = ob_poc::runbook::compile_invocation(
         Uuid::new_v4(),
         "structure.setup",
         &args,
@@ -1057,13 +1057,13 @@ fn process_utterance_missing_macro_args() {
 }
 
 // =============================================================================
-// Test: process_utterance end-to-end with complete args
+// Test: compile_invocation end-to-end with complete args
 // =============================================================================
 
-/// Verify that `process_utterance` with complete args produces a Compiled
+/// Verify that `compile_invocation` with complete args produces a Compiled
 /// response, confirming the full classify → compile pipeline works.
 #[test]
-fn process_utterance_end_to_end() {
+fn compile_invocation_end_to_end() {
     let registry = macro_registry_with_structure_setup();
     let verb_index = VerbConfigIndex::empty();
     let session = test_session();
@@ -1072,7 +1072,7 @@ fn process_utterance_end_to_end() {
     let mut args = HashMap::new();
     args.insert("name".to_string(), "E2E Fund".to_string());
 
-    let resp = ob_poc::runbook::process_utterance(
+    let resp = ob_poc::runbook::compile_invocation(
         Uuid::new_v4(),
         "structure.setup",
         &args,
@@ -1098,13 +1098,13 @@ fn process_utterance_end_to_end() {
 }
 
 // =============================================================================
-// Test: process_utterance with constraint violation
+// Test: compile_invocation with constraint violation
 // =============================================================================
 
-/// Verify that `process_utterance` returns ConstraintViolation when the
+/// Verify that `compile_invocation` returns ConstraintViolation when the
 /// expanded verb is outside the pack's allowed set.
 #[test]
-fn process_utterance_constraint_violation() {
+fn compile_invocation_constraint_violation() {
     let registry = macro_registry_with_structure_setup();
     let verb_index = VerbConfigIndex::empty();
     let session = test_session();
@@ -1126,7 +1126,7 @@ fn process_utterance_constraint_violation() {
     let mut args = HashMap::new();
     args.insert("name".to_string(), "Blocked Fund".to_string());
 
-    let resp = ob_poc::runbook::process_utterance(
+    let resp = ob_poc::runbook::compile_invocation(
         Uuid::new_v4(),
         "structure.setup",
         &args,

@@ -1,6 +1,6 @@
 //! Orchestrator response types for the compile surface.
 //!
-//! `process_utterance()` returns exactly one of three variants:
+//! `compile_invocation()` returns exactly one of three variants:
 //!
 //! 1. **Compiled** — a `CompiledRunbook` was successfully created and is ready
 //!    for `execute_runbook()`.
@@ -12,13 +12,13 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use super::types::CompiledRunbookId;
+use super::types::{CompiledRunbook, CompiledRunbookId};
 
 // ---------------------------------------------------------------------------
 // OrchestratorResponse
 // ---------------------------------------------------------------------------
 
-/// The compile-surface response from `process_utterance()`.
+/// The compile-surface response from `compile_invocation()`.
 ///
 /// Exactly one variant is returned per utterance. The caller (REPL, Chat API,
 /// MCP) pattern-matches to decide what to show the user.
@@ -48,8 +48,9 @@ impl OrchestratorResponse {
 
 /// Summary returned when compilation succeeds.
 ///
-/// Does NOT contain the full `CompiledRunbook` — the caller uses the
-/// `compiled_runbook_id` to pass to `execute_runbook()`.
+/// Contains the full `CompiledRunbook` so the caller can store it
+/// in `RunbookStore` before execution. The runbook is skipped during
+/// JSON serialization (API responses use the summary fields only).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CompiledRunbookSummary {
     /// The execution handle to pass to `execute_runbook()`.
@@ -66,6 +67,11 @@ pub struct CompiledRunbookSummary {
 
     /// Human-readable preview of the first few steps.
     pub preview: Vec<StepPreview>,
+
+    /// The full compiled runbook artifact. Store in `RunbookStore` before
+    /// calling `execute_runbook()`.
+    #[serde(skip)]
+    pub compiled_runbook: Option<CompiledRunbook>,
 }
 
 /// Preview of a single compiled step (for UI display before execution).
@@ -205,6 +211,7 @@ mod tests {
                 verb: "cbu.create".into(),
                 sentence: "Create a new fund structure".into(),
             }],
+            compiled_runbook: None,
         };
         let resp = OrchestratorResponse::Compiled(summary);
         let json = serde_json::to_string(&resp).unwrap();

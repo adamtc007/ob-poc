@@ -173,6 +173,71 @@ pub fn compute_write_set(steps: &[CompiledStep], cursor: Option<&StepCursor>) ->
 // execute_runbook — the execution gate
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Advisory lock acquisition helper
+// ---------------------------------------------------------------------------
+
+/// Acquire advisory locks on the write_set using `try_advisory_xact_lock` (fail-fast).
+///
+/// Locks are acquired in sorted UUID order to prevent deadlocks. On contention,
+/// returns `ExecutionError::LockContention` immediately — no blocking.
+async fn acquire_advisory_locks(
+    pool: &sqlx::PgPool,
+    write_set: &BTreeSet<Uuid>,
+) -> Result<LockStats, ExecutionError> {
+    use crate::database::locks::{acquire_locks, LockError, LockKey, LockMode};
+
+    let lock_start = std::time::Instant::now();
+
+    // Build sorted lock keys from entity UUIDs.
+    let lock_keys: Vec<LockKey> = write_set
+        .iter()
+        .map(|id| LockKey::write("entity", id.to_string()))
+        .collect();
+
+    let mut tx = pool
+        .begin()
+        .await
+        .map_err(|e| ExecutionError::Database(e.to_string()))?;
+
+    match acquire_locks(&mut tx, &lock_keys, LockMode::Try).await {
+        Ok(result) => {
+            // Locks acquired — commit the transaction to release them.
+            // Note: In a full implementation, steps would execute WITHIN this
+            // transaction so locks cover the entire execution window.
+            // For now, we acquire and immediately release (proof of concept).
+            tx.commit()
+                .await
+                .map_err(|e| ExecutionError::Database(e.to_string()))?;
+
+            Ok(LockStats {
+                locks_acquired: result.acquired.len(),
+                lock_wait_ms: lock_start.elapsed().as_millis() as u64,
+            })
+        }
+        Err(LockError::Contention {
+            entity_type,
+            entity_id,
+            ..
+        }) => {
+            // Fail-fast: roll back and surface contention error.
+            let _ = tx.rollback().await;
+            Err(ExecutionError::LockContention {
+                entity_type,
+                entity_id,
+            })
+        }
+        Err(LockError::Database(e)) => {
+            let _ = tx.rollback().await;
+            Err(ExecutionError::Database(e.to_string()))
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// execute_runbook — the execution gate
+// ---------------------------------------------------------------------------
+
 /// Execute a compiled runbook through the gate.
 ///
 /// This is the **sole entry point** for running compiled DSL (INV-3).
@@ -200,6 +265,23 @@ pub async fn execute_runbook(
     cursor: Option<StepCursor>,
     executor: &dyn StepExecutor,
 ) -> Result<RunbookExecutionResult, ExecutionError> {
+    execute_runbook_with_pool(store, runbook_id, cursor, executor, None).await
+}
+
+/// Execute a compiled runbook with optional advisory locking.
+///
+/// When `pool` is `Some`, advisory locks are acquired on the write_set
+/// using `try_advisory_xact_lock` (fail-fast on contention). Locks are
+/// sorted by UUID to prevent deadlocks and auto-release on tx commit/rollback.
+///
+/// When `pool` is `None` (tests, in-memory mode), locking is skipped.
+pub async fn execute_runbook_with_pool(
+    store: &RunbookStore,
+    runbook_id: CompiledRunbookId,
+    cursor: Option<StepCursor>,
+    executor: &dyn StepExecutor,
+    pool: Option<&sqlx::PgPool>,
+) -> Result<RunbookExecutionResult, ExecutionError> {
     let start = std::time::Instant::now();
 
     // 1. Look up runbook
@@ -224,11 +306,19 @@ pub async fn execute_runbook(
         },
     )?;
 
-    // 4. Compute pre-lock set (for future database locking)
+    // 4. Compute pre-lock set and acquire advisory locks if pool available.
     let write_set = compute_write_set(&runbook.steps, cursor.as_ref());
-    let lock_stats = LockStats {
-        locks_acquired: write_set.len(),
-        lock_wait_ms: 0, // No actual locking in Phase 0
+    let lock_stats = if !write_set.is_empty() {
+        if let Some(pool) = pool {
+            acquire_advisory_locks(pool, &write_set).await?
+        } else {
+            LockStats {
+                locks_acquired: write_set.len(),
+                lock_wait_ms: 0, // No pool — skip locking
+            }
+        }
+    } else {
+        LockStats::default()
     };
 
     // 5. Execute steps

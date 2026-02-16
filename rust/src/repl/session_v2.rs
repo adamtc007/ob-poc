@@ -71,6 +71,11 @@ pub struct ReplSessionV2 {
     pub decision_log: SessionDecisionLog,
     pub created_at: DateTime<Utc>,
     pub last_active_at: DateTime<Utc>,
+    /// Monotonic counter for runbook version allocation.
+    /// Each call to `allocate_runbook_version()` returns a unique, ascending value.
+    /// Initialized at 0; first allocation returns 1.
+    #[serde(default)]
+    pub(super) next_runbook_version: u64,
 }
 
 impl ReplSessionV2 {
@@ -97,7 +102,18 @@ impl ReplSessionV2 {
             decision_log: SessionDecisionLog::new(id),
             created_at: now,
             last_active_at: now,
+            next_runbook_version: 0,
         }
+    }
+
+    /// Allocate the next monotonic runbook version.
+    ///
+    /// Returns a unique, ascending version number starting from 1.
+    /// Guarantees uniqueness within a session — no two compilations share
+    /// the same version, even if entries are deleted or re-ordered.
+    pub fn allocate_runbook_version(&mut self) -> u64 {
+        self.next_runbook_version += 1;
+        self.next_runbook_version
     }
 
     /// Add a message to the conversation history.
@@ -494,6 +510,40 @@ required_context:
             ctx.handoff_source.as_ref().unwrap().target_pack_id,
             "onboarding-request"
         );
+    }
+
+    #[test]
+    fn test_monotonic_version_allocator() {
+        let mut session = ReplSessionV2::new();
+
+        // First allocation starts at 1.
+        let v1 = session.allocate_runbook_version();
+        assert_eq!(v1, 1);
+
+        // Subsequent allocations are strictly ascending.
+        let v2 = session.allocate_runbook_version();
+        let v3 = session.allocate_runbook_version();
+        assert_eq!(v2, 2);
+        assert_eq!(v3, 3);
+        assert!(v3 > v2);
+        assert!(v2 > v1);
+    }
+
+    #[test]
+    fn test_version_allocator_survives_serde_roundtrip() {
+        let mut session = ReplSessionV2::new();
+
+        // Allocate some versions.
+        let _ = session.allocate_runbook_version(); // 1
+        let _ = session.allocate_runbook_version(); // 2
+
+        // Serialize and deserialize.
+        let json = serde_json::to_string(&session).unwrap();
+        let mut restored: ReplSessionV2 = serde_json::from_str(&json).unwrap();
+
+        // Next allocation must be > 2 (preserved via serde).
+        let v3 = restored.allocate_runbook_version();
+        assert_eq!(v3, 3, "Version should continue from serialized counter");
     }
 
     #[test]

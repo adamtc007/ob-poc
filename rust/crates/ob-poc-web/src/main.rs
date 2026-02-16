@@ -546,8 +546,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let legacy_executor: Arc<dyn ob_poc::repl::orchestrator_v2::DslExecutor> =
             Arc::new(RealDslExecutor::new(pool.clone()));
 
-        let mut orchestrator =
-            ReplOrchestratorV2::new(pack_router, legacy_executor).with_pool(pool.clone());
+        // Create RunbookStore — shared store for compiled runbook artifacts.
+        // INV-3: all execution must go through execute_runbook(CompiledRunbookId).
+        let runbook_store = Arc::new(ob_poc::runbook::RunbookStore::new());
+
+        let mut orchestrator = ReplOrchestratorV2::new(pack_router, legacy_executor)
+            .with_pool(pool.clone())
+            .with_runbook_store(runbook_store);
 
         // Wire the V2 executor that supports parking (WorkflowDispatcher or RealDslExecutor)
         if let Some(ref bpmn_exec) = bpmn_executor_v2 {

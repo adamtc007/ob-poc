@@ -18,7 +18,7 @@
 //!
 //! 4. **Completion widening**: When a pack transitions to `Completed`,
 //!    its constraints are removed from the effective set, widening
-//!    what's available for the NEXT `process_utterance` call.
+//!    what's available for the NEXT `compile_invocation` call.
 
 use std::collections::{HashMap, HashSet};
 
@@ -110,7 +110,7 @@ impl PackManager {
     ///
     /// After completion, the pack's constraints are removed from the
     /// effective set, **widening** what is available for the next
-    /// `process_utterance` call (INV-1a: does not affect currently
+    /// `compile_invocation` call (INV-1a: does not affect currently
     /// executing runbook).
     pub fn complete_pack(&mut self, pack_id: &str) -> Result<(), PackManagerError> {
         let state = self

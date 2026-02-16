@@ -54,7 +54,7 @@ impl std::fmt::Display for CompiledRunbookId {
 
 /// An immutable compilation artifact that wraps a set of runbook steps.
 ///
-/// Created by `process_utterance()`, consumed by `execute_runbook()`.
+/// Created by `compile_invocation()`, consumed by `execute_runbook()`.
 /// The step list and envelope are frozen at creation time and never mutated.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CompiledRunbook {

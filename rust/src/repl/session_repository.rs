@@ -150,10 +150,16 @@ impl SessionRepositoryV2 {
                     decision_log: super::decision_log::SessionDecisionLog::new(r.session_id),
                     created_at: r.created_at,
                     last_active_at: r.last_active_at,
+                    // Initialize version counter from existing entries to maintain
+                    // monotonicity across session restores.
+                    next_runbook_version: 0, // set below after runbook is accessible
                 };
 
                 // Rebuild transient indexes after deserialization.
                 session.runbook.rebuild_invocation_index();
+
+                // Initialize monotonic version counter from existing entries.
+                session.next_runbook_version = session.runbook.entries.len() as u64;
 
                 Ok(Some((session, r.version)))
             }

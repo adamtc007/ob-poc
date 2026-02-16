@@ -50,6 +50,13 @@ use crate::journey::router::{PackRouteOutcome, PackRouter};
 use crate::journey::template::instantiate_template;
 use crate::repl::intent_matcher::IntentMatcher;
 use crate::repl::types::{MatchContext, MatchOutcome};
+use crate::runbook::envelope::ReplayEnvelope;
+use crate::runbook::executor::{execute_runbook_with_pool, StepOutcome};
+use crate::runbook::step_executor_bridge::{DslExecutorV2StepExecutor, DslStepExecutor};
+use crate::runbook::types::{
+    CompiledRunbook, CompiledStep, ExecutionMode as CompiledExecutionMode,
+};
+use crate::runbook::RunbookStore;
 
 // ---------------------------------------------------------------------------
 // DslExecutor trait (abstraction for stub/real execution)
@@ -155,6 +162,9 @@ pub struct ReplOrchestratorV2 {
     /// Phase 5: Session persistence for durable execution / human gates.
     #[cfg(feature = "database")]
     session_repository: Option<Arc<super::session_repository::SessionRepositoryV2>>,
+    /// Compiled runbook store — artifacts from compile_invocation() stored
+    /// here for execute_runbook() to retrieve by ID.
+    runbook_store: Option<Arc<RunbookStore>>,
     /// Database pool for bootstrap resolution (ScopeGate).
     #[cfg(feature = "database")]
     pool: Option<sqlx::PgPool>,
@@ -179,6 +189,7 @@ impl ReplOrchestratorV2 {
             executor_v2: None,
             #[cfg(feature = "database")]
             session_repository: None,
+            runbook_store: None,
             #[cfg(feature = "database")]
             pool: None,
             #[cfg(feature = "database")]
@@ -230,6 +241,15 @@ impl ReplOrchestratorV2 {
     /// Attach a MacroRegistry for classify_verb() and compile_verb().
     pub fn with_macro_registry(mut self, registry: Arc<MacroRegistry>) -> Self {
         self.macro_registry = Some(registry);
+        self
+    }
+
+    /// Attach a RunbookStore for compiled runbook artifacts.
+    ///
+    /// When set, `try_compile_entry()` stores the `CompiledRunbook` artifact
+    /// so `execute_runbook()` can retrieve it by ID during execution.
+    pub fn with_runbook_store(mut self, store: Arc<RunbookStore>) -> Self {
+        self.runbook_store = Some(store);
         self
     }
 
@@ -3223,13 +3243,19 @@ impl ReplOrchestratorV2 {
                 }
 
                 ExecutionMode::Durable => {
-                    // Execute, but handle Parked outcome from executor_v2.
-                    let outcome = self
-                        .execute_entry_v2(&entry_dsl, entry_id, runbook_id)
+                    // Route through execution gate (INV-3).
+                    let entry_snapshot = session.runbook.entries[idx].clone();
+                    let gate_outcome = self
+                        .execute_entry_via_gate(
+                            &entry_snapshot,
+                            session.id,
+                            true, // is_durable
+                            runbook_id,
+                        )
                         .await;
 
-                    match outcome {
-                        DslExecutionOutcome::Completed(result) => {
+                    match gate_outcome {
+                        StepOutcome::Completed { result } => {
                             let entry = &mut session.runbook.entries[idx];
                             entry.status = EntryStatus::Completed;
                             entry.result = Some(result.clone());
@@ -3242,10 +3268,8 @@ impl ReplOrchestratorV2 {
                                 result: Some(result),
                             });
                         }
-                        DslExecutionOutcome::Parked {
-                            task_id,
+                        StepOutcome::Parked {
                             correlation_key,
-                            timeout,
                             message,
                         } => {
                             let mut invocation = InvocationRecord::new(
@@ -3255,8 +3279,6 @@ impl ReplOrchestratorV2 {
                                 correlation_key.clone(),
                                 GateType::DurableTask,
                             );
-                            invocation.task_id = Some(task_id);
-                            invocation.timeout_at = timeout.map(|d| chrono::Utc::now() + d);
                             invocation.captured_context = serde_json::json!({"dsl": entry_dsl});
                             session.runbook.park_entry(entry_id, invocation);
                             session.runbook.set_status(RunbookStatus::Parked);
@@ -3275,7 +3297,7 @@ impl ReplOrchestratorV2 {
                             parked = true;
                             break;
                         }
-                        DslExecutionOutcome::Failed(err) => {
+                        StepOutcome::Failed { error } => {
                             let entry = &mut session.runbook.entries[idx];
                             entry.status = EntryStatus::Failed;
                             results.push(StepResult {
@@ -3283,7 +3305,17 @@ impl ReplOrchestratorV2 {
                                 sequence: entry_sequence,
                                 sentence: entry_sentence,
                                 success: false,
-                                message: Some(err),
+                                message: Some(error),
+                                result: None,
+                            });
+                        }
+                        StepOutcome::Skipped { reason } => {
+                            results.push(StepResult {
+                                entry_id,
+                                sequence: entry_sequence,
+                                sentence: entry_sentence,
+                                success: true,
+                                message: Some(format!("Skipped: {}", reason)),
                                 result: None,
                             });
                         }
@@ -3291,11 +3323,23 @@ impl ReplOrchestratorV2 {
                 }
 
                 ExecutionMode::Sync => {
-                    // Standard synchronous execution (unchanged from Phase 4).
+                    // Route through execution gate (INV-3).
+                    let entry_snapshot = session.runbook.entries[idx].clone();
                     let entry = &mut session.runbook.entries[idx];
                     entry.status = EntryStatus::Executing;
-                    match self.executor.execute(&entry_dsl).await {
-                        Ok(result) => {
+
+                    let gate_outcome = self
+                        .execute_entry_via_gate(
+                            &entry_snapshot,
+                            session.id,
+                            false, // not durable
+                            runbook_id,
+                        )
+                        .await;
+
+                    match gate_outcome {
+                        StepOutcome::Completed { result } => {
+                            let entry = &mut session.runbook.entries[idx];
                             entry.status = EntryStatus::Completed;
                             entry.result = Some(result.clone());
                             results.push(StepResult {
@@ -3307,14 +3351,54 @@ impl ReplOrchestratorV2 {
                                 result: Some(result),
                             });
                         }
-                        Err(err) => {
+                        StepOutcome::Failed { error } => {
+                            let entry = &mut session.runbook.entries[idx];
                             entry.status = EntryStatus::Failed;
                             results.push(StepResult {
                                 entry_id,
                                 sequence: entry_sequence,
                                 sentence: entry_sentence,
                                 success: false,
-                                message: Some(err),
+                                message: Some(error),
+                                result: None,
+                            });
+                        }
+                        StepOutcome::Parked {
+                            correlation_key,
+                            message,
+                        } => {
+                            // Unexpected park from sync path — treat as parked.
+                            let mut invocation = InvocationRecord::new(
+                                entry_id,
+                                runbook_id,
+                                session.id,
+                                correlation_key.clone(),
+                                GateType::DurableTask,
+                            );
+                            invocation.captured_context = serde_json::json!({"dsl": entry_dsl});
+                            session.runbook.park_entry(entry_id, invocation);
+                            session.runbook.set_status(RunbookStatus::Parked);
+                            results.push(StepResult {
+                                entry_id,
+                                sequence: entry_sequence,
+                                sentence: entry_sentence,
+                                success: true,
+                                message: Some(format!(
+                                    "Parked: {} (key: {})",
+                                    message, correlation_key
+                                )),
+                                result: None,
+                            });
+                            parked = true;
+                            break;
+                        }
+                        StepOutcome::Skipped { reason } => {
+                            results.push(StepResult {
+                                entry_id,
+                                sequence: entry_sequence,
+                                sentence: entry_sentence,
+                                success: true,
+                                message: Some(format!("Skipped: {}", reason)),
                                 result: None,
                             });
                         }
@@ -3414,6 +3498,130 @@ impl ReplOrchestratorV2 {
             match self.executor.execute(dsl).await {
                 Ok(v) => DslExecutionOutcome::Completed(v),
                 Err(e) => DslExecutionOutcome::Failed(e),
+            }
+        }
+    }
+
+    /// Compile a runbook entry on-the-fly for entries that lack a `compiled_runbook_id`.
+    ///
+    /// This is the **fallback path** — entries created before the compile pipeline was
+    /// wired, or entries from code paths not yet routing through `try_compile_entry()`.
+    /// The fallback ALWAYS goes through compile → store → execute_runbook(id).
+    /// Raw DSL execution without a `CompiledRunbookId` is never permitted (INV-3).
+    fn compile_entry_on_the_fly(&self, entry: &RunbookEntry, session_id: Uuid) -> CompiledRunbook {
+        let step = CompiledStep {
+            step_id: entry.id,
+            sentence: entry.sentence.clone(),
+            verb: entry.verb.clone(),
+            dsl: entry.dsl.clone(),
+            args: entry.args.clone(),
+            depends_on: vec![],
+            execution_mode: CompiledExecutionMode::Sync,
+            write_set: vec![], // Phase 0: no locking for fallback path
+        };
+        CompiledRunbook::new(session_id, 0, vec![step], ReplayEnvelope::empty())
+    }
+
+    /// Execute a runbook entry through the execution gate (INV-3).
+    ///
+    /// Two cases:
+    /// - Entry has `compiled_runbook_id` → fetch from store, execute through gate
+    /// - Entry lacks `compiled_runbook_id` → compile on-the-fly, store, execute through gate
+    ///
+    /// Returns the `StepOutcome` from the single step in the compiled runbook.
+    async fn execute_entry_via_gate(
+        &self,
+        entry: &RunbookEntry,
+        session_id: Uuid,
+        is_durable: bool,
+        runbook_id: Uuid,
+    ) -> StepOutcome {
+        let store = match self.runbook_store.as_ref() {
+            Some(s) => s,
+            None => {
+                // No store available — cannot enforce gate. This should not happen
+                // in production (store is always wired in main.rs).
+                tracing::error!(
+                    "RunbookStore not available — cannot enforce execution gate (INV-3)"
+                );
+                return StepOutcome::Failed {
+                    error: "Internal error: RunbookStore not configured".into(),
+                };
+            }
+        };
+
+        // Resolve or create the CompiledRunbookId.
+        let compiled_id = if let Some(id) = entry.compiled_runbook_id {
+            id
+        } else {
+            // Fallback: compile on-the-fly → store → gate
+            tracing::debug!(
+                entry_id = %entry.id,
+                verb = %entry.verb,
+                "Compiling entry on-the-fly (fallback path)"
+            );
+            let compiled = self.compile_entry_on_the_fly(entry, session_id);
+            let id = compiled.id;
+            store.insert(compiled);
+            id
+        };
+
+        // Build the appropriate StepExecutor bridge and execute through the gate.
+        let extract_first_outcome = |result: crate::runbook::executor::RunbookExecutionResult| {
+            result
+                .step_results
+                .into_iter()
+                .next()
+                .map(|sr| sr.outcome)
+                .unwrap_or(StepOutcome::Failed {
+                    error: "No step results from execution gate".into(),
+                })
+        };
+
+        if is_durable {
+            if let Some(ref exec) = self.executor_v2 {
+                let bridge = DslExecutorV2StepExecutor::new(exec.clone(), runbook_id);
+                match execute_runbook_with_pool(
+                    store,
+                    compiled_id,
+                    None,
+                    &bridge,
+                    self.pool.as_ref(),
+                )
+                .await
+                {
+                    Ok(result) => extract_first_outcome(result),
+                    Err(e) => StepOutcome::Failed {
+                        error: format!("Execution gate error: {}", e),
+                    },
+                }
+            } else {
+                // No V2 executor — fall back to sync bridge (never parks).
+                let bridge = DslStepExecutor::new(Arc::clone(&self.executor));
+                match execute_runbook_with_pool(
+                    store,
+                    compiled_id,
+                    None,
+                    &bridge,
+                    self.pool.as_ref(),
+                )
+                .await
+                {
+                    Ok(result) => extract_first_outcome(result),
+                    Err(e) => StepOutcome::Failed {
+                        error: format!("Execution gate error: {}", e),
+                    },
+                }
+            }
+        } else {
+            let bridge = DslStepExecutor::new(Arc::clone(&self.executor));
+            match execute_runbook_with_pool(store, compiled_id, None, &bridge, self.pool.as_ref())
+                .await
+            {
+                Ok(result) => extract_first_outcome(result),
+                Err(e) => StepOutcome::Failed {
+                    error: format!("Execution gate error: {}", e),
+                },
             }
         }
     }
@@ -3615,7 +3823,7 @@ impl ReplOrchestratorV2 {
     /// no `MacroRegistry` is configured (graceful degradation).
     fn try_compile_entry(
         &self,
-        session: &ReplSessionV2,
+        session: &mut ReplSessionV2,
         entry: &mut RunbookEntry,
     ) -> Option<ReplResponseV2> {
         use crate::journey::pack_manager::{ConstraintSource, EffectiveConstraints};
@@ -3686,19 +3894,27 @@ impl ReplOrchestratorV2 {
         };
 
         let classification = classify_verb(&entry.verb, &self.verb_config_index, macro_registry);
+        let version = session.allocate_runbook_version();
         let response = compile_verb(
             session.id,
             &classification,
             &entry.args,
             &unified,
             macro_registry,
-            (session.runbook.entries.len() + 1) as u64,
+            version,
             &constraints,
         );
 
         match response {
             crate::runbook::OrchestratorResponse::Compiled(summary) => {
                 entry.compiled_runbook_id = Some(summary.compiled_runbook_id);
+                // Store the compiled runbook artifact so execute_runbook() can
+                // retrieve it by ID. INV-3: no execution without a stored artifact.
+                if let Some(ref store) = self.runbook_store {
+                    if let Some(runbook) = summary.compiled_runbook {
+                        store.insert(runbook);
+                    }
+                }
                 None // success — caller continues with entry
             }
             crate::runbook::OrchestratorResponse::Clarification(c) => Some(ReplResponseV2 {

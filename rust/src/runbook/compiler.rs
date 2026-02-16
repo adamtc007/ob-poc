@@ -29,6 +29,29 @@ use crate::dsl_v2::macros::{expand_macro, MacroExpansionError, MacroRegistry, Ma
 use crate::journey::pack_manager::EffectiveConstraints;
 use crate::session::unified::UnifiedSession;
 
+// ---------------------------------------------------------------------------
+// derive_write_set — extract entity UUIDs from resolved args
+// ---------------------------------------------------------------------------
+
+/// Phase 1 write_set derivation: extract any arg value that parses as a UUID.
+///
+/// This catches the common case where entity IDs are passed as resolved
+/// argument values (e.g., `:entity-id <uuid>`, `:cbu-id <uuid>`).
+///
+/// ## Future: Contract-Driven Extraction (Phase 2)
+///
+/// Phase 2 will use `VerbContractBody.writes_flags` or verb YAML `crud.table`
+/// to determine which args represent write targets vs read-only references.
+/// This requires contract integration which is deferred.
+fn derive_write_set(args: &HashMap<String, String>) -> Vec<Uuid> {
+    args.values()
+        .filter_map(|v| {
+            let trimmed = v.trim().trim_matches(|c| c == '<' || c == '>');
+            Uuid::parse_str(trimmed).ok()
+        })
+        .collect()
+}
+
 use crate::plan_builder::plan_assembler::assemble_plan;
 
 use super::constraint_gate::check_pack_constraints;
@@ -183,6 +206,11 @@ fn compile_macro(
 
     // 4. Build CompiledSteps from expanded DSL statements, then run through
     //    PlanAssembler to resolve binding dependencies and compute phases.
+    // Derive write_set from top-level args as a conservative approximation.
+    // Macro expansion doesn't carry per-step args, so we use the parent args
+    // for all expanded steps. Phase 2 will use contract-driven extraction.
+    let macro_write_set = derive_write_set(args);
+
     let raw_steps: Vec<CompiledStep> = expansion
         .statements
         .iter()
@@ -197,7 +225,7 @@ fn compile_macro(
                 args: HashMap::new(),
                 depends_on: vec![],
                 execution_mode: ExecutionMode::Sync,
-                write_set: vec![],
+                write_set: macro_write_set.clone(),
             }
         })
         .collect();
@@ -253,6 +281,7 @@ fn compile_macro(
         step_count: runbook.step_count(),
         envelope_entity_count: runbook.envelope.entity_bindings.len(),
         preview,
+        compiled_runbook: Some(runbook),
     })
 }
 
@@ -280,7 +309,7 @@ fn compile_primitive(
         args: args.clone(),
         depends_on: vec![],
         execution_mode: ExecutionMode::Sync,
-        write_set: vec![],
+        write_set: derive_write_set(args),
     };
 
     let runbook = CompiledRunbook::new(
@@ -301,6 +330,7 @@ fn compile_primitive(
             verb: step.verb,
             sentence: step.sentence,
         }],
+        compiled_runbook: Some(runbook),
     })
 }
 
@@ -692,5 +722,90 @@ mod tests {
         assert!(dsl.starts_with("(cbu.create"));
         assert!(dsl.contains(":name Acme"));
         assert!(dsl.ends_with(')'));
+    }
+
+    // -----------------------------------------------------------------------
+    // R4 / R7: write_set derivation behavioral tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_write_set_derived_from_args() {
+        let id1 = Uuid::new_v4();
+        let id2 = Uuid::new_v4();
+        let mut args = HashMap::new();
+        args.insert("entity-id".to_string(), id1.to_string());
+        args.insert("cbu-id".to_string(), format!("<{}>", id2));
+
+        let ws = derive_write_set(&args);
+        assert_eq!(ws.len(), 2, "Expected 2 UUIDs, got {:?}", ws);
+        assert!(ws.contains(&id1));
+        assert!(ws.contains(&id2));
+    }
+
+    #[test]
+    fn test_write_set_ignores_non_uuid_args() {
+        let mut args = HashMap::new();
+        args.insert("name".to_string(), "Acme Corp".to_string());
+        args.insert("jurisdiction".to_string(), "LU".to_string());
+        args.insert("count".to_string(), "42".to_string());
+        args.insert("empty".to_string(), String::new());
+
+        let ws = derive_write_set(&args);
+        assert!(ws.is_empty(), "Expected empty write_set, got {:?}", ws);
+    }
+
+    #[test]
+    fn test_write_set_mixed_args() {
+        let id = Uuid::new_v4();
+        let mut args = HashMap::new();
+        args.insert("entity-id".to_string(), id.to_string());
+        args.insert("name".to_string(), "Test".to_string());
+        args.insert("mode".to_string(), "trading".to_string());
+
+        let ws = derive_write_set(&args);
+        assert_eq!(ws.len(), 1);
+        assert_eq!(ws[0], id);
+    }
+
+    #[test]
+    fn test_compile_primitive_populates_write_set() {
+        let registry = MacroRegistry::new();
+        let session = test_session();
+        let constraints = EffectiveConstraints::unconstrained();
+        let entity_id = Uuid::new_v4();
+
+        let classification = VerbClassification::Primitive {
+            fqn: "entity.update".to_string(),
+        };
+
+        let mut args = HashMap::new();
+        args.insert("entity-id".to_string(), entity_id.to_string());
+        args.insert("name".to_string(), "Updated Name".to_string());
+
+        let resp = compile_verb(
+            Uuid::new_v4(),
+            &classification,
+            &args,
+            &session,
+            &registry,
+            1,
+            &constraints,
+        );
+
+        assert!(resp.is_compiled());
+        if let OrchestratorResponse::Compiled(summary) = resp {
+            let runbook = summary
+                .compiled_runbook
+                .expect("Should have compiled_runbook");
+            assert!(
+                !runbook.steps[0].write_set.is_empty(),
+                "write_set should contain the entity UUID"
+            );
+            assert!(
+                runbook.steps[0].write_set.contains(&entity_id),
+                "write_set should contain {:?}",
+                entity_id
+            );
+        }
     }
 }
