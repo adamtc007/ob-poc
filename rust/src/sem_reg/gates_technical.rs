@@ -16,36 +16,65 @@ use super::verb_contract::VerbContractBody;
 
 // ── Gate 1: Type correctness ─────────────────────────────────
 
-/// Check that a verb's I/O argument types match the attribute dictionary.
+/// Check that a verb's I/O argument types match the attribute and entity type dictionaries.
 ///
-/// For each verb arg that references an attribute (via `lookup` or `maps_to`),
-/// verify the attribute exists in the provided set.
+/// Validates three surfaces:
+/// 1. `produces.entity_type` — must resolve to a known entity type FQN
+/// 2. `consumes` — each consumed FQN must exist in the attribute dictionary
+/// 3. `args[].lookup.entity_type` — entity type references should resolve
 pub fn check_type_correctness(
     verb: &VerbContractBody,
     known_attribute_fqns: &HashSet<String>,
+    known_entity_type_fqns: &HashSet<String>,
 ) -> Vec<GateFailure> {
     let mut failures = Vec::new();
 
+    // Check args with entity type lookups
     for arg in &verb.args {
-        // Check if arg references an attribute via lookup
         if let Some(ref lookup) = arg.lookup {
-            let entity_type_fqn = format!("{}.{}", verb.domain, lookup.entity_type);
-            // This is an entity lookup, not an attribute reference — skip for type correctness
-            let _ = entity_type_fqn;
+            let entity_type_fqn = format!("entity.{}", lookup.entity_type);
+            if !known_entity_type_fqns.contains(&entity_type_fqn)
+                && !known_entity_type_fqns.contains(&lookup.entity_type)
+            {
+                failures.push(
+                    GateFailure::warning(
+                        "type_correctness",
+                        "verb_contract",
+                        format!(
+                            "Verb '{}' arg '{}' has lookup referencing entity type '{}' \
+                             which is not in the entity type registry",
+                            verb.fqn, arg.name, lookup.entity_type
+                        ),
+                    )
+                    .with_fqn(&verb.fqn)
+                    .with_hint("Register the entity type via the scanner or publish it manually"),
+                );
+            }
         }
-
-        // Check valid_values against known enums if strict checking needed
-        // (for now, valid_values are self-contained in the verb definition)
     }
 
     // Check produces: if a verb produces an entity type, verify it exists
     if let Some(ref produces) = verb.produces {
-        let produced_fqn = format!("{}.{}", verb.domain, produces.entity_type);
-        // Entity type, not attribute — tracked separately
-        let _ = produced_fqn;
+        let produced_fqn = format!("entity.{}", produces.entity_type);
+        if !known_entity_type_fqns.contains(&produced_fqn)
+            && !known_entity_type_fqns.contains(&produces.entity_type)
+        {
+            failures.push(
+                GateFailure::warning(
+                    "type_correctness",
+                    "verb_contract",
+                    format!(
+                        "Verb '{}' produces entity type '{}' which is not in the entity type registry",
+                        verb.fqn, produces.entity_type
+                    ),
+                )
+                .with_fqn(&verb.fqn)
+                .with_hint("Register the entity type or check for typos in the produces spec"),
+            );
+        }
     }
 
-    // Check consumes: verify consumed types exist
+    // Check consumes: verify consumed attribute FQNs exist
     for consumed in &verb.consumes {
         let consumed_fqn = format!("{}.{}", verb.domain, consumed);
         if !known_attribute_fqns.contains(&consumed_fqn) && !known_attribute_fqns.contains(consumed)
@@ -121,11 +150,20 @@ pub fn check_security_label_presence(snapshot: &SnapshotRow) -> Vec<GateFailure>
 
 /// Check that every attribute a verb reads/writes appears in its I/O surface
 /// (args + produces + consumes).
+///
+/// When an attribute has an `AttributeSink` declaring this verb as a consumer,
+/// but the verb's declared surface (args + produces + consumes) doesn't include it,
+/// this gate emits a Warning.
+///
+/// Also checks that attributes with `AttributeSource.producing_verb` pointing to
+/// this verb are reflected in its `produces` spec.
 pub fn check_verb_surface_disclosure(
     verb: &VerbContractBody,
-    known_attribute_fqns: &HashSet<String>,
+    _known_attribute_fqns: &HashSet<String>,
+    attribute_sinks_for_verb: &[String],
+    attribute_sources_from_verb: &[String],
 ) -> Vec<GateFailure> {
-    let failures = Vec::new();
+    let mut failures = Vec::new();
 
     // Build the verb's declared I/O surface
     let mut declared_surface: HashSet<String> = HashSet::new();
@@ -145,18 +183,61 @@ pub fn check_verb_surface_disclosure(
         declared_surface.insert(consumed.clone());
     }
 
-    // Check: any known attribute in the verb's domain that ISN'T in the surface
-    // is a potential undisclosed dependency. We only warn for same-domain attributes.
-    let verb_domain_prefix = format!("{}.", verb.domain);
-    for attr_fqn in known_attribute_fqns {
-        if attr_fqn.starts_with(&verb_domain_prefix) {
-            let short_name = &attr_fqn[verb_domain_prefix.len()..];
-            // Only warn if the verb has args that suggest it touches this domain
-            // but doesn't declare this attribute
-            if !declared_surface.contains(attr_fqn) && !declared_surface.contains(short_name) {
-                // This is informational — not all attributes need to appear in every verb
-                // Only flag if there's a naming match suggesting the verb should reference it
-                // For now, this gate is intentionally lenient
+    // Check sinks: attributes that declare this verb as a consumer
+    // should appear in the verb's declared surface
+    for sink_attr_fqn in attribute_sinks_for_verb {
+        if !declared_surface.contains(sink_attr_fqn) {
+            // Check short name too (without domain prefix)
+            let short_name = sink_attr_fqn
+                .split('.')
+                .next_back()
+                .unwrap_or(sink_attr_fqn.as_str());
+            if !declared_surface.contains(short_name) {
+                failures.push(
+                    GateFailure::warning(
+                        "verb_surface_disclosure",
+                        "verb_contract",
+                        format!(
+                            "Attribute '{}' declares verb '{}' as a consumer, \
+                             but the verb does not include it in its I/O surface \
+                             (args, produces, or consumes)",
+                            sink_attr_fqn, verb.fqn
+                        ),
+                    )
+                    .with_fqn(&verb.fqn)
+                    .with_hint(
+                        "Add this attribute to the verb's consumes list \
+                         or update the attribute's sinks",
+                    ),
+                );
+            }
+        }
+    }
+
+    // Check sources: attributes that declare this verb as their producer
+    // should be reflected in the verb's surface
+    for source_attr_fqn in attribute_sources_from_verb {
+        if !declared_surface.contains(source_attr_fqn) {
+            let short_name = source_attr_fqn
+                .split('.')
+                .next_back()
+                .unwrap_or(source_attr_fqn.as_str());
+            if !declared_surface.contains(short_name) {
+                failures.push(
+                    GateFailure::warning(
+                        "verb_surface_disclosure",
+                        "verb_contract",
+                        format!(
+                            "Attribute '{}' declares verb '{}' as its producing verb, \
+                             but the verb does not include it in its I/O surface",
+                            source_attr_fqn, verb.fqn
+                        ),
+                    )
+                    .with_fqn(&verb.fqn)
+                    .with_hint(
+                        "Update the verb's produces spec or add the attribute to its args list",
+                    ),
+                );
             }
         }
     }
@@ -329,8 +410,9 @@ mod tests {
     #[test]
     fn test_type_correctness_no_consumes_passes() {
         let verb = sample_verb();
-        let known: HashSet<String> = HashSet::new();
-        let failures = check_type_correctness(&verb, &known);
+        let attrs: HashSet<String> = HashSet::new();
+        let entities: HashSet<String> = HashSet::new();
+        let failures = check_type_correctness(&verb, &attrs, &entities);
         assert!(failures.is_empty());
     }
 
@@ -338,8 +420,9 @@ mod tests {
     fn test_type_correctness_unknown_consumed_warns() {
         let mut verb = sample_verb();
         verb.consumes = vec!["unknown_type".into()];
-        let known: HashSet<String> = HashSet::new();
-        let failures = check_type_correctness(&verb, &known);
+        let attrs: HashSet<String> = HashSet::new();
+        let entities: HashSet<String> = HashSet::new();
+        let failures = check_type_correctness(&verb, &attrs, &entities);
         assert_eq!(failures.len(), 1);
         assert!(failures[0].message.contains("consumes"));
     }
@@ -348,10 +431,58 @@ mod tests {
     fn test_type_correctness_known_consumed_passes() {
         let mut verb = sample_verb();
         verb.consumes = vec!["entity".into()];
-        let mut known: HashSet<String> = HashSet::new();
-        known.insert("cbu.entity".into());
-        let failures = check_type_correctness(&verb, &known);
+        let mut attrs: HashSet<String> = HashSet::new();
+        attrs.insert("cbu.entity".into());
+        let entities: HashSet<String> = HashSet::new();
+        let failures = check_type_correctness(&verb, &attrs, &entities);
         assert!(failures.is_empty());
+    }
+
+    #[test]
+    fn test_type_correctness_unknown_produces_warns() {
+        let mut verb = sample_verb();
+        verb.produces = Some(VerbProducesSpec {
+            entity_type: "nonexistent".into(),
+            resolved: false,
+        });
+        let attrs: HashSet<String> = HashSet::new();
+        let entities: HashSet<String> = HashSet::new();
+        let failures = check_type_correctness(&verb, &attrs, &entities);
+        assert_eq!(failures.len(), 1);
+        assert!(failures[0].message.contains("produces entity type"));
+    }
+
+    #[test]
+    fn test_type_correctness_known_produces_passes() {
+        let mut verb = sample_verb();
+        verb.produces = Some(VerbProducesSpec {
+            entity_type: "cbu".into(),
+            resolved: false,
+        });
+        let attrs: HashSet<String> = HashSet::new();
+        let mut entities: HashSet<String> = HashSet::new();
+        entities.insert("entity.cbu".into());
+        let failures = check_type_correctness(&verb, &attrs, &entities);
+        assert!(failures.is_empty());
+    }
+
+    #[test]
+    fn test_type_correctness_unknown_lookup_entity_type_warns() {
+        let mut verb = sample_verb();
+        verb.args[0].lookup = Some(VerbArgLookup {
+            table: "entities".into(),
+            entity_type: "missing_type".into(),
+            schema: None,
+            search_key: None,
+            primary_key: None,
+        });
+        let attrs: HashSet<String> = HashSet::new();
+        let entities: HashSet<String> = HashSet::new();
+        let failures = check_type_correctness(&verb, &attrs, &entities);
+        assert_eq!(failures.len(), 1);
+        assert!(failures[0]
+            .message
+            .contains("lookup referencing entity type"));
     }
 
     // ── Dependency correctness ────────────────────────────────
@@ -434,11 +565,45 @@ mod tests {
     // ── Verb surface disclosure ───────────────────────────────
 
     #[test]
-    fn test_verb_surface_disclosure_passes() {
+    fn test_verb_surface_disclosure_no_sinks_passes() {
         let verb = sample_verb();
         let known: HashSet<String> = HashSet::new();
-        let failures = check_verb_surface_disclosure(&verb, &known);
+        let failures = check_verb_surface_disclosure(&verb, &known, &[], &[]);
         assert!(failures.is_empty());
+    }
+
+    #[test]
+    fn test_verb_surface_disclosure_undeclared_sink_warns() {
+        let verb = sample_verb();
+        let known: HashSet<String> = HashSet::new();
+        // Attribute says this verb consumes it, but verb doesn't declare it
+        let sinks = vec!["cbu.hidden_field".to_string()];
+        let failures = check_verb_surface_disclosure(&verb, &known, &sinks, &[]);
+        assert_eq!(failures.len(), 1);
+        assert!(failures[0].message.contains("declares verb"));
+        assert!(failures[0].message.contains("consumer"));
+        assert_eq!(failures[0].gate_name, "verb_surface_disclosure");
+    }
+
+    #[test]
+    fn test_verb_surface_disclosure_declared_sink_passes() {
+        let verb = sample_verb();
+        let known: HashSet<String> = HashSet::new();
+        // Attribute says verb consumes "name" — verb has "name" in its args
+        let sinks = vec!["cbu.name".to_string()];
+        let failures = check_verb_surface_disclosure(&verb, &known, &sinks, &[]);
+        assert!(failures.is_empty());
+    }
+
+    #[test]
+    fn test_verb_surface_disclosure_undeclared_source_warns() {
+        let verb = sample_verb();
+        let known: HashSet<String> = HashSet::new();
+        // Attribute says this verb produces it, but verb doesn't declare it
+        let sources = vec!["cbu.secret_output".to_string()];
+        let failures = check_verb_surface_disclosure(&verb, &known, &[], &sources);
+        assert_eq!(failures.len(), 1);
+        assert!(failures[0].message.contains("producing verb"));
     }
 
     // ── Snapshot integrity ────────────────────────────────────

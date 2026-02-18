@@ -401,6 +401,7 @@ mod tests {
             depends_on: vec![],
             execution_mode: ExecutionMode::Sync,
             write_set: vec![],
+            verb_contract_snapshot_id: None,
         }
     }
 

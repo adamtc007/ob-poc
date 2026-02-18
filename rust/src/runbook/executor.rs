@@ -92,6 +92,22 @@ pub enum ExecutionError {
     LockContention {
         entity_type: String,
         entity_id: String,
+        /// Best-effort holder of the contested lock (INV-10).
+        holder_runbook_id: Option<uuid::Uuid>,
+    },
+
+    /// Lock acquisition timed out (INV-10: 30s timeout).
+    ///
+    /// Carries the full write_set and all entity IDs that could not be locked,
+    /// plus best-effort holder identification.
+    #[error("Lock timeout on {} entities (write_set size: {})", entity_ids.len(), write_set.len())]
+    LockTimeout {
+        /// Entity UUIDs that could not be locked.
+        entity_ids: Vec<Uuid>,
+        /// Full write_set that was requested.
+        write_set: std::collections::BTreeSet<Uuid>,
+        /// Best-effort: the runbook currently holding the contested lock.
+        holder_runbook_id: Option<CompiledRunbookId>,
     },
 
     #[error("Database error: {0}")]
@@ -120,33 +136,113 @@ impl RunbookStore {
         }
     }
 
-    /// Store a compiled runbook.
-    pub fn insert(&self, runbook: CompiledRunbook) {
-        let id = runbook.id;
-        self.runbooks.write().unwrap().insert(id, runbook);
-    }
-
-    /// Retrieve a compiled runbook by ID.
-    pub fn get(&self, id: &CompiledRunbookId) -> Option<CompiledRunbook> {
-        self.runbooks.read().unwrap().get(id).cloned()
-    }
-
-    /// Update the status of a compiled runbook.
-    pub fn update_status(
-        &self,
-        id: &CompiledRunbookId,
-        status: CompiledRunbookStatus,
-    ) -> Result<(), ExecutionError> {
-        let mut map = self.runbooks.write().unwrap();
-        let rb = map.get_mut(id).ok_or(ExecutionError::NotFound(*id))?;
-        rb.status = status;
-        Ok(())
+    /// Synchronous insert for callers that are not in an async context
+    /// (e.g. `try_compile_entry` in the REPL orchestrator). Delegates to
+    /// the same in-memory map that the async trait method uses.
+    pub fn insert_sync(&self, runbook: &CompiledRunbook) {
+        self.runbooks
+            .write()
+            .expect("RunbookStore RwLock poisoned")
+            .insert(runbook.id, runbook.clone());
     }
 }
 
 impl Default for RunbookStore {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// RunbookStoreBackend — unified trait for compiled runbook stores (INV-9)
+// ---------------------------------------------------------------------------
+
+/// Unified store trait for compiled runbooks (INV-9).
+///
+/// Both in-memory (dev/test) and Postgres (prod) backends implement this.
+/// The executor accepts `&dyn RunbookStoreBackend` — one path, one trait.
+#[async_trait::async_trait]
+pub trait RunbookStoreBackend: Send + Sync {
+    /// Insert a compiled runbook. Content-addressed dedup: same ID = no-op.
+    async fn insert(&self, runbook: &CompiledRunbook) -> Result<(), ExecutionError>;
+
+    /// Retrieve a compiled runbook by ID. Returns None if not found.
+    async fn get(&self, id: &CompiledRunbookId) -> Result<Option<CompiledRunbook>, ExecutionError>;
+
+    /// Append an event to the audit log (INSERT-only).
+    async fn append_event(&self, event: RunbookEvent) -> Result<(), ExecutionError>;
+
+    /// Derive current status from the latest status_change event.
+    async fn current_status(
+        &self,
+        id: &CompiledRunbookId,
+    ) -> Result<CompiledRunbookStatus, ExecutionError>;
+
+    /// Update status (in-memory impl mutates; Postgres impl appends status_change event).
+    async fn update_status(
+        &self,
+        id: &CompiledRunbookId,
+        old_status: &str,
+        new_status: CompiledRunbookStatus,
+    ) -> Result<(), ExecutionError>;
+
+    /// Best-effort lookup of which runbook holds a lock on the given entity.
+    async fn lookup_lock_holder(&self, entity_type: &str, entity_id: &str) -> Option<Uuid>;
+}
+
+// ---------------------------------------------------------------------------
+// RunbookStoreBackend impl for RunbookStore (in-memory)
+// ---------------------------------------------------------------------------
+
+#[async_trait::async_trait]
+impl RunbookStoreBackend for RunbookStore {
+    async fn insert(&self, runbook: &CompiledRunbook) -> Result<(), ExecutionError> {
+        let id = runbook.id;
+        self.runbooks
+            .write()
+            .expect("RunbookStore RwLock poisoned")
+            .insert(id, runbook.clone());
+        Ok(())
+    }
+
+    async fn get(&self, id: &CompiledRunbookId) -> Result<Option<CompiledRunbook>, ExecutionError> {
+        Ok(self
+            .runbooks
+            .read()
+            .expect("RunbookStore RwLock poisoned")
+            .get(id)
+            .cloned())
+    }
+
+    async fn append_event(&self, _event: RunbookEvent) -> Result<(), ExecutionError> {
+        // In-memory store has no event log — no-op.
+        Ok(())
+    }
+
+    async fn current_status(
+        &self,
+        id: &CompiledRunbookId,
+    ) -> Result<CompiledRunbookStatus, ExecutionError> {
+        let map = self.runbooks.read().expect("RunbookStore RwLock poisoned");
+        let rb = map.get(id).ok_or(ExecutionError::NotFound(*id))?;
+        Ok(rb.status.clone())
+    }
+
+    async fn update_status(
+        &self,
+        id: &CompiledRunbookId,
+        _old_status: &str,
+        new_status: CompiledRunbookStatus,
+    ) -> Result<(), ExecutionError> {
+        let mut map = self.runbooks.write().expect("RunbookStore RwLock poisoned");
+        let rb = map.get_mut(id).ok_or(ExecutionError::NotFound(*id))?;
+        rb.status = new_status;
+        Ok(())
+    }
+
+    async fn lookup_lock_holder(&self, _entity_type: &str, _entity_id: &str) -> Option<Uuid> {
+        // In-memory store has no event log to query.
+        None
     }
 }
 
@@ -336,6 +432,95 @@ impl PostgresRunbookStore {
             _ => Ok(CompiledRunbookStatus::Compiled),
         }
     }
+
+    /// Best-effort lookup for the compiled runbook currently holding a lock on an entity.
+    ///
+    /// Queries `compiled_runbook_events` for the most recent `lock_acquired` event
+    /// whose `detail` JSON contains the contested entity in its write_set, and which
+    /// has no subsequent `lock_released` event for the same runbook.
+    ///
+    /// Returns `None` on any error or if no holder is found (advisory locks are
+    /// anonymous in PostgreSQL — this is a heuristic).
+    pub async fn lookup_lock_holder(&self, entity_type: &str, entity_id: &str) -> Option<Uuid> {
+        // Suppress unused-variable warnings when feature is enabled but
+        // the query references them via bind parameters.
+        let _ = entity_type;
+
+        // Find the most recent lock_acquired event where write_set contains
+        // the contested entity_id and no corresponding lock_released follows.
+        let row: Option<(Uuid,)> = sqlx::query_as(
+            r#"
+            SELECT a.compiled_runbook_id
+            FROM "ob-poc".compiled_runbook_events a
+            WHERE a.event_type = 'lock_acquired'
+              AND a.detail @> $1::jsonb
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM "ob-poc".compiled_runbook_events r
+                  WHERE r.compiled_runbook_id = a.compiled_runbook_id
+                    AND r.event_type = 'lock_released'
+                    AND r.created_at > a.created_at
+              )
+            ORDER BY a.created_at DESC
+            LIMIT 1
+            "#,
+        )
+        .bind(serde_json::json!({ "write_set": [entity_id] }))
+        .fetch_optional(&self.pool)
+        .await
+        .ok()
+        .flatten();
+
+        row.map(|(id,)| id)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// RunbookStoreBackend impl for PostgresRunbookStore (INV-9)
+// ---------------------------------------------------------------------------
+
+#[cfg(feature = "database")]
+#[async_trait::async_trait]
+impl RunbookStoreBackend for PostgresRunbookStore {
+    async fn insert(&self, runbook: &CompiledRunbook) -> Result<(), ExecutionError> {
+        PostgresRunbookStore::insert(self, runbook).await
+    }
+
+    async fn get(&self, id: &CompiledRunbookId) -> Result<Option<CompiledRunbook>, ExecutionError> {
+        PostgresRunbookStore::get(self, id).await
+    }
+
+    async fn append_event(&self, event: RunbookEvent) -> Result<(), ExecutionError> {
+        PostgresRunbookStore::append_event(self, event).await
+    }
+
+    async fn current_status(
+        &self,
+        id: &CompiledRunbookId,
+    ) -> Result<CompiledRunbookStatus, ExecutionError> {
+        PostgresRunbookStore::current_status(self, id).await
+    }
+
+    async fn update_status(
+        &self,
+        id: &CompiledRunbookId,
+        old_status: &str,
+        new_status: CompiledRunbookStatus,
+    ) -> Result<(), ExecutionError> {
+        // Append-only: status is tracked via events, never mutated on the row.
+        self.append_event(RunbookEvent {
+            compiled_runbook_id: *id,
+            event_type: "status_change".into(),
+            old_status: Some(old_status.to_string()),
+            new_status: Some(status_to_string(&new_status).to_string()),
+            detail: status_detail(&new_status),
+        })
+        .await
+    }
+
+    async fn lookup_lock_holder(&self, entity_type: &str, entity_id: &str) -> Option<Uuid> {
+        PostgresRunbookStore::lookup_lock_holder(self, entity_type, entity_id).await
+    }
 }
 
 /// Row type for compiled_runbooks table queries.
@@ -496,7 +681,7 @@ pub fn compute_write_set(steps: &[CompiledStep], cursor: Option<&StepCursor>) ->
 /// Acquire advisory locks on the write_set using `try_advisory_xact_lock` (fail-fast).
 ///
 /// Locks are acquired in sorted UUID order to prevent deadlocks. On contention,
-/// returns `ExecutionError::LockContention` immediately — no blocking.
+/// returns `ExecutionError::LockTimeout` with the full write_set and holder info (INV-10).
 ///
 /// Returns the open transaction that holds the locks. The caller MUST keep this
 /// transaction alive during step execution and commit/rollback when done.
@@ -504,6 +689,7 @@ pub fn compute_write_set(steps: &[CompiledStep], cursor: Option<&StepCursor>) ->
 async fn acquire_advisory_locks(
     pool: &sqlx::PgPool,
     write_set: &BTreeSet<Uuid>,
+    store: &dyn RunbookStoreBackend,
 ) -> Result<(sqlx::Transaction<'static, sqlx::Postgres>, LockStats), ExecutionError> {
     use crate::database::locks::{acquire_locks, LockError, LockKey, LockMode};
 
@@ -537,13 +723,28 @@ async fn acquire_advisory_locks(
         Err(LockError::Contention {
             entity_type,
             entity_id,
+            holder_runbook_id,
             ..
         }) => {
-            // Fail-fast: roll back and surface contention error.
+            // Roll back and surface timeout error with full write_set (INV-10).
             let _ = tx.rollback().await;
-            Err(ExecutionError::LockContention {
-                entity_type,
-                entity_id,
+
+            // Attempt holder lookup via store if not already known.
+            let holder = if holder_runbook_id.is_some() {
+                holder_runbook_id.map(CompiledRunbookId)
+            } else {
+                store
+                    .lookup_lock_holder(&entity_type, &entity_id)
+                    .await
+                    .map(CompiledRunbookId)
+            };
+
+            let entity_uuid = Uuid::parse_str(&entity_id).unwrap_or(Uuid::nil());
+
+            Err(ExecutionError::LockTimeout {
+                entity_ids: vec![entity_uuid],
+                write_set: write_set.clone(),
+                holder_runbook_id: holder,
             })
         }
         Err(LockError::Database(e)) => {
@@ -579,12 +780,12 @@ async fn acquire_advisory_locks(
 /// In Phase 0 (no database), locking is skipped and execution proceeds
 /// directly.
 pub async fn execute_runbook(
-    store: &RunbookStore,
+    store: &dyn RunbookStoreBackend,
     runbook_id: CompiledRunbookId,
     cursor: Option<StepCursor>,
     executor: &dyn StepExecutor,
 ) -> Result<RunbookExecutionResult, ExecutionError> {
-    execute_runbook_with_pool(store, runbook_id, cursor, executor, None, None).await
+    execute_runbook_with_pool(store, runbook_id, cursor, executor, None).await
 }
 
 /// Execute a compiled runbook with optional advisory locking.
@@ -595,23 +796,22 @@ pub async fn execute_runbook(
 ///
 /// When `pool` is `None` (tests, in-memory mode), locking is skipped.
 ///
-/// When `pg_store` is `Some`, lock acquire/release/contention events are logged
-/// to `compiled_runbook_events` (INV-10).
-#[allow(clippy::too_many_arguments)]
+/// The store backend handles event emission: the Postgres backend appends
+/// status_change events on `update_status()` and persists lock/step events
+/// via `append_event()`. The in-memory backend no-ops on events.
 pub async fn execute_runbook_with_pool(
-    store: &RunbookStore,
+    store: &dyn RunbookStoreBackend,
     runbook_id: CompiledRunbookId,
     cursor: Option<StepCursor>,
     executor: &dyn StepExecutor,
     pool: Option<&sqlx::PgPool>,
-    #[cfg(feature = "database")] pg_store: Option<&PostgresRunbookStore>,
-    #[cfg(not(feature = "database"))] _pg_store: Option<&()>,
 ) -> Result<RunbookExecutionResult, ExecutionError> {
     let start = std::time::Instant::now();
 
     // 1. Look up runbook
     let runbook = store
         .get(&runbook_id)
+        .await?
         .ok_or(ExecutionError::NotFound(runbook_id))?;
 
     // 2. Validate status
@@ -634,37 +834,33 @@ pub async fn execute_runbook_with_pool(
     // This makes locking real (Fix 2): locks cover the entire execution window.
     let (_lock_tx, lock_stats) = if !write_set.is_empty() {
         if let Some(pool) = pool {
-            let result = acquire_advisory_locks(pool, &write_set).await;
+            let result = acquire_advisory_locks(pool, &write_set, store).await;
 
             // Log lock contention event (INV-10)
-            #[cfg(feature = "database")]
-            if let Err(ExecutionError::LockContention {
-                ref entity_type,
-                ref entity_id,
+            if let Err(ExecutionError::LockTimeout {
+                ref entity_ids,
+                ref write_set,
+                ref holder_runbook_id,
             }) = result
             {
-                if let Some(pg) = pg_store {
-                    let _ = pg.append_event(RunbookEvent {
+                let _ = store.append_event(RunbookEvent {
                         compiled_runbook_id: runbook_id,
                         event_type: "lock_contention".into(),
                         old_status: None,
                         new_status: None,
                         detail: Some(serde_json::json!({
-                            "entity_type": entity_type,
-                            "entity_id": entity_id,
+                            "entity_ids": entity_ids.iter().map(|id| id.to_string()).collect::<Vec<_>>(),
                             "write_set": write_set.iter().map(|id| id.to_string()).collect::<Vec<_>>(),
-                            "holder_runbook_id": null,
+                            "holder_runbook_id": holder_runbook_id.map(|h| h.0.to_string()),
                         })),
                     }).await;
-                }
             }
 
             let (tx, stats) = result?;
 
             // Log lock_acquired event (INV-10)
-            #[cfg(feature = "database")]
-            if let Some(pg) = pg_store {
-                let _ = pg.append_event(RunbookEvent {
+            let _ = store
+                .append_event(RunbookEvent {
                     compiled_runbook_id: runbook_id,
                     event_type: "lock_acquired".into(),
                     old_status: None,
@@ -674,8 +870,8 @@ pub async fn execute_runbook_with_pool(
                         "lock_wait_ms": stats.lock_wait_ms,
                         "write_set": write_set.iter().map(|id| id.to_string()).collect::<Vec<_>>(),
                     })),
-                }).await;
-            }
+                })
+                .await;
 
             (Some(tx), stats)
         } else {
@@ -699,12 +895,15 @@ pub async fn execute_runbook_with_pool(
     };
 
     // 4. Transition to Executing — only AFTER locks are acquired.
-    store.update_status(
-        &runbook_id,
-        CompiledRunbookStatus::Executing {
-            current_step: start_idx,
-        },
-    )?;
+    store
+        .update_status(
+            &runbook_id,
+            "compiled",
+            CompiledRunbookStatus::Executing {
+                current_step: start_idx,
+            },
+        )
+        .await?;
 
     // 5. Execute steps (advisory locks held via `_lock_tx` throughout)
     let mut step_results = Vec::with_capacity(runbook.steps.len());
@@ -735,6 +934,21 @@ pub async fn execute_runbook_with_pool(
 
         if dep_failed {
             failed_steps.insert(step.step_id);
+            // Emit step_skipped event (INV-9, Phase E-2)
+            let _ = store
+                .append_event(RunbookEvent {
+                    compiled_runbook_id: runbook_id,
+                    event_type: "step_skipped".into(),
+                    old_status: None,
+                    new_status: None,
+                    detail: Some(serde_json::json!({
+                        "step_id": step.step_id.to_string(),
+                        "verb": &step.verb,
+                        "step_index": idx,
+                        "reason": "Dependency failed",
+                    })),
+                })
+                .await;
             step_results.push(StepExecutionResult {
                 step_id: step.step_id,
                 verb: step.verb.clone(),
@@ -746,13 +960,37 @@ pub async fn execute_runbook_with_pool(
         }
 
         // Update current step
-        store.update_status(
-            &runbook_id,
-            CompiledRunbookStatus::Executing { current_step: idx },
-        )?;
+        store
+            .update_status(
+                &runbook_id,
+                "executing",
+                CompiledRunbookStatus::Executing { current_step: idx },
+            )
+            .await?;
 
         // Execute the step
         let outcome = executor.execute_step(step).await;
+
+        // Emit per-step event (INV-9, Phase E-2)
+        let step_event_type = match &outcome {
+            StepOutcome::Completed { .. } => "step_completed",
+            StepOutcome::Failed { .. } => "step_failed",
+            StepOutcome::Parked { .. } => "step_parked",
+            StepOutcome::Skipped { .. } => "step_skipped",
+        };
+        let _ = store
+            .append_event(RunbookEvent {
+                compiled_runbook_id: runbook_id,
+                event_type: step_event_type.into(),
+                old_status: None,
+                new_status: None,
+                detail: Some(serde_json::json!({
+                    "step_id": step.step_id.to_string(),
+                    "verb": &step.verb,
+                    "step_index": idx,
+                })),
+            })
+            .await;
 
         // Determine whether this step terminates the runbook loop
         let should_break = match &outcome {
@@ -792,7 +1030,22 @@ pub async fn execute_runbook_with_pool(
 
         if let Some(skip_reason) = should_break {
             // Fill remaining steps as skipped
-            for remaining in runbook.steps.iter().skip(idx + 1) {
+            for (rem_idx, remaining) in runbook.steps.iter().enumerate().skip(idx + 1) {
+                // Emit step_skipped event for remaining steps (INV-9, Phase E-2)
+                let _ = store
+                    .append_event(RunbookEvent {
+                        compiled_runbook_id: runbook_id,
+                        event_type: "step_skipped".into(),
+                        old_status: None,
+                        new_status: None,
+                        detail: Some(serde_json::json!({
+                            "step_id": remaining.step_id.to_string(),
+                            "verb": &remaining.verb,
+                            "step_index": rem_idx,
+                            "reason": skip_reason,
+                        })),
+                    })
+                    .await;
                 step_results.push(StepExecutionResult {
                     step_id: remaining.step_id,
                     verb: remaining.verb.clone(),
@@ -806,7 +1059,9 @@ pub async fn execute_runbook_with_pool(
     }
 
     // 6. Update final status
-    store.update_status(&runbook_id, final_status.clone())?;
+    store
+        .update_status(&runbook_id, "executing", final_status.clone())
+        .await?;
 
     // 7. Release advisory locks by committing (or dropping) the lock transaction.
     //    On success we commit; on any error path above we return early and _lock_tx
@@ -815,21 +1070,18 @@ pub async fn execute_runbook_with_pool(
         let _ = lock_tx.commit().await;
 
         // Log lock_released event (INV-10)
-        #[cfg(feature = "database")]
-        if let Some(pg) = pg_store {
-            let _ = pg
-                .append_event(RunbookEvent {
-                    compiled_runbook_id: runbook_id,
-                    event_type: "lock_released".into(),
-                    old_status: None,
-                    new_status: None,
-                    detail: Some(serde_json::json!({
-                        "locks_released": lock_stats.locks_acquired,
-                        "total_execution_ms": start.elapsed().as_millis() as u64,
-                    })),
-                })
-                .await;
-        }
+        let _ = store
+            .append_event(RunbookEvent {
+                compiled_runbook_id: runbook_id,
+                event_type: "lock_released".into(),
+                old_status: None,
+                new_status: None,
+                detail: Some(serde_json::json!({
+                    "locks_released": lock_stats.locks_acquired,
+                    "total_execution_ms": start.elapsed().as_millis() as u64,
+                })),
+            })
+            .await;
     }
 
     let elapsed_ms = start.elapsed().as_millis() as u64;
@@ -927,6 +1179,7 @@ mod tests {
             depends_on: vec![],
             execution_mode: ExecutionMode::Sync,
             write_set: vec![],
+            verb_contract_snapshot_id: None,
         }
     }
 
@@ -941,7 +1194,7 @@ mod tests {
         let store = RunbookStore::new();
         let rb = CompiledRunbook::new(Uuid::new_v4(), 1, vec![], ReplayEnvelope::empty());
         let id = rb.id;
-        store.insert(rb);
+        store.insert(&rb).await.unwrap();
 
         let result = execute_runbook(&store, id, None, &SuccessExecutor)
             .await
@@ -959,7 +1212,7 @@ mod tests {
         let steps = vec![make_step("cbu.create"), make_step("entity.create")];
         let rb = CompiledRunbook::new(Uuid::new_v4(), 1, steps, ReplayEnvelope::empty());
         let id = rb.id;
-        store.insert(rb);
+        store.insert(&rb).await.unwrap();
 
         let result = execute_runbook(&store, id, None, &SuccessExecutor)
             .await
@@ -981,7 +1234,7 @@ mod tests {
         let steps = vec![make_step("cbu.create"), make_step("entity.create")];
         let rb = CompiledRunbook::new(Uuid::new_v4(), 1, steps, ReplayEnvelope::empty());
         let id = rb.id;
-        store.insert(rb);
+        store.insert(&rb).await.unwrap();
 
         let executor = FailOnVerb("cbu.create".into());
         let result = execute_runbook(&store, id, None, &executor).await.unwrap();
@@ -1006,7 +1259,7 @@ mod tests {
         let steps = vec![make_step("cbu.create"), make_step("doc.solicit")];
         let rb = CompiledRunbook::new(Uuid::new_v4(), 1, steps, ReplayEnvelope::empty());
         let id = rb.id;
-        store.insert(rb);
+        store.insert(&rb).await.unwrap();
 
         let executor = ParkOnVerb("doc.solicit".into());
         let result = execute_runbook(&store, id, None, &executor).await.unwrap();
@@ -1033,7 +1286,7 @@ mod tests {
         let steps = vec![step1, step2];
         let rb = CompiledRunbook::new(Uuid::new_v4(), 1, steps, ReplayEnvelope::empty());
         let id = rb.id;
-        store.insert(rb);
+        store.insert(&rb).await.unwrap();
 
         let executor = FailOnVerb("cbu.create".into());
         let result = execute_runbook(&store, id, None, &executor).await.unwrap();
@@ -1062,7 +1315,7 @@ mod tests {
         let store = RunbookStore::new();
         let rb = CompiledRunbook::new(Uuid::new_v4(), 1, vec![], ReplayEnvelope::empty());
         let id = rb.id;
-        store.insert(rb);
+        store.insert(&rb).await.unwrap();
 
         // First execution succeeds
         let _ = execute_runbook(&store, id, None, &SuccessExecutor)
@@ -1084,7 +1337,7 @@ mod tests {
         let steps = vec![step1, step2, step3];
         let rb = CompiledRunbook::new(Uuid::new_v4(), 1, steps, ReplayEnvelope::empty());
         let id = rb.id;
-        store.insert(rb);
+        store.insert(&rb).await.unwrap();
 
         // First execution parks at step 2
         let executor = ParkOnVerb("doc.solicit".into());
@@ -1098,6 +1351,7 @@ mod tests {
         store
             .update_status(
                 &id,
+                "parked",
                 CompiledRunbookStatus::Parked {
                     reason: ParkReason::AwaitingCallback {
                         correlation_key: "test".into(),
@@ -1108,6 +1362,7 @@ mod tests {
                     },
                 },
             )
+            .await
             .unwrap();
 
         // Resume from step 2 with success executor
@@ -1142,6 +1397,7 @@ mod tests {
                 depends_on: vec![],
                 execution_mode: ExecutionMode::Sync,
                 write_set: vec![id1, id2],
+                verb_contract_snapshot_id: None,
             },
             CompiledStep {
                 step_id: Uuid::new_v4(),
@@ -1152,6 +1408,7 @@ mod tests {
                 depends_on: vec![],
                 execution_mode: ExecutionMode::Sync,
                 write_set: vec![id2, id3],
+                verb_contract_snapshot_id: None,
             },
         ];
 
@@ -1197,7 +1454,7 @@ mod tests {
         let steps = vec![make_step("cbu.create")];
         let rb = CompiledRunbook::new(Uuid::new_v4(), 1, steps, ReplayEnvelope::empty());
         let id = rb.id;
-        store.insert(rb);
+        store.insert(&rb).await.unwrap();
 
         let result = execute_runbook(&store, id, None, &SuccessExecutor)
             .await
@@ -1210,7 +1467,7 @@ mod tests {
         ));
 
         // Store also reflects Completed.
-        let stored = store.get(&id).unwrap();
+        let stored = store.get(&id).await.unwrap().unwrap();
         assert!(matches!(
             stored.status,
             CompiledRunbookStatus::Completed { .. }
@@ -1226,7 +1483,7 @@ mod tests {
         let id1 = Uuid::new_v4();
         let id2 = Uuid::new_v4();
 
-        let mut args = std::collections::HashMap::new();
+        let mut args = std::collections::BTreeMap::new();
         args.insert("entity-id".to_string(), id1.to_string());
         args.insert("cbu-id".to_string(), format!("<{}>", id2));
         args.insert("name".to_string(), "not-a-uuid".to_string());
@@ -1246,7 +1503,7 @@ mod tests {
     fn test_derive_write_set_ignores_non_uuids() {
         use crate::runbook::write_set::derive_write_set;
 
-        let args = std::collections::HashMap::new();
+        let args = std::collections::BTreeMap::new();
 
         let ws: Vec<Uuid> = derive_write_set("test.verb", &args, None)
             .into_iter()
@@ -1387,6 +1644,170 @@ mod tests {
             "INV-11 VIOLATION: orchestrator_v2.rs does not contain 'execute_runbook'. \
              The REPL must go through the runbook execution gate."
         );
+    }
+
+    // -----------------------------------------------------------------------
+    // EventCapturingStore — test backend for asserting event emission (E-4)
+    // -----------------------------------------------------------------------
+
+    /// Test backend that delegates to `RunbookStore` for storage but captures
+    /// all `append_event` calls in a `Vec<RunbookEvent>` behind a `Mutex`.
+    struct EventCapturingStore {
+        inner: RunbookStore,
+        events: std::sync::Mutex<Vec<RunbookEvent>>,
+    }
+
+    impl EventCapturingStore {
+        fn new() -> Self {
+            Self {
+                inner: RunbookStore::new(),
+                events: std::sync::Mutex::new(Vec::new()),
+            }
+        }
+
+        fn captured_events(&self) -> Vec<RunbookEvent> {
+            self.events.lock().expect("events Mutex poisoned").clone()
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl RunbookStoreBackend for EventCapturingStore {
+        async fn insert(&self, runbook: &CompiledRunbook) -> Result<(), ExecutionError> {
+            RunbookStoreBackend::insert(&self.inner, runbook).await
+        }
+
+        async fn get(
+            &self,
+            id: &CompiledRunbookId,
+        ) -> Result<Option<CompiledRunbook>, ExecutionError> {
+            RunbookStoreBackend::get(&self.inner, id).await
+        }
+
+        async fn append_event(&self, event: RunbookEvent) -> Result<(), ExecutionError> {
+            self.events
+                .lock()
+                .expect("events Mutex poisoned")
+                .push(event);
+            Ok(())
+        }
+
+        async fn current_status(
+            &self,
+            id: &CompiledRunbookId,
+        ) -> Result<CompiledRunbookStatus, ExecutionError> {
+            RunbookStoreBackend::current_status(&self.inner, id).await
+        }
+
+        async fn update_status(
+            &self,
+            id: &CompiledRunbookId,
+            old_status: &str,
+            new_status: CompiledRunbookStatus,
+        ) -> Result<(), ExecutionError> {
+            // Capture the status_change event AND delegate to inner for mutation
+            self.append_event(RunbookEvent {
+                compiled_runbook_id: *id,
+                event_type: "status_change".into(),
+                old_status: Some(old_status.to_string()),
+                new_status: Some(format!("{:?}", new_status)),
+                detail: None,
+            })
+            .await?;
+            RunbookStoreBackend::update_status(&self.inner, id, old_status, new_status).await
+        }
+
+        async fn lookup_lock_holder(&self, _entity_type: &str, _entity_id: &str) -> Option<Uuid> {
+            None
+        }
+    }
+
+    /// Phase E-4: Verify event emission for a 3-step execution.
+    ///
+    /// Expected events (no pool = no locks):
+    /// - 1× status_change (compiled → executing)
+    /// - 3× step_completed
+    /// - 1× status_change (executing → completed)
+    /// = 5 events minimum
+    #[tokio::test]
+    async fn test_event_emission_count() {
+        let store = EventCapturingStore::new();
+        let steps = vec![
+            make_step("cbu.create"),
+            make_step("entity.create"),
+            make_step("trading-profile.create"),
+        ];
+        let rb = CompiledRunbook::new(Uuid::new_v4(), 1, steps, ReplayEnvelope::empty());
+        let id = rb.id;
+        store.insert(&rb).await.unwrap();
+
+        let result = execute_runbook(&store, id, None, &SuccessExecutor)
+            .await
+            .unwrap();
+        assert!(matches!(
+            result.final_status,
+            CompiledRunbookStatus::Completed { .. }
+        ));
+
+        let events = store.captured_events();
+
+        // Must have at least 5 events: 2 status_change + 3 step_completed
+        assert!(
+            events.len() >= 5,
+            "Expected ≥5 events for 3-step execution, got {}: {:?}",
+            events.len(),
+            events.iter().map(|e| &e.event_type).collect::<Vec<_>>()
+        );
+
+        // Count by type
+        let status_changes = events
+            .iter()
+            .filter(|e| e.event_type == "status_change")
+            .count();
+        let step_completed = events
+            .iter()
+            .filter(|e| e.event_type == "step_completed")
+            .count();
+
+        assert!(
+            status_changes >= 2,
+            "Expected ≥2 status_change events, got {}",
+            status_changes
+        );
+        assert_eq!(
+            step_completed, 3,
+            "Expected exactly 3 step_completed events, got {}",
+            step_completed
+        );
+    }
+
+    /// Phase E-4: Verify step_failed event is emitted on failure.
+    #[tokio::test]
+    async fn test_event_emission_on_failure() {
+        let store = EventCapturingStore::new();
+        let steps = vec![make_step("cbu.create"), make_step("entity.create")];
+        let rb = CompiledRunbook::new(Uuid::new_v4(), 1, steps, ReplayEnvelope::empty());
+        let id = rb.id;
+        store.insert(&rb).await.unwrap();
+
+        let executor = FailOnVerb("cbu.create".into());
+        let result = execute_runbook(&store, id, None, &executor).await.unwrap();
+        assert!(matches!(
+            result.final_status,
+            CompiledRunbookStatus::Failed { .. }
+        ));
+
+        let events = store.captured_events();
+        let step_failed = events
+            .iter()
+            .filter(|e| e.event_type == "step_failed")
+            .count();
+        let step_skipped = events
+            .iter()
+            .filter(|e| e.event_type == "step_skipped")
+            .count();
+
+        assert_eq!(step_failed, 1, "Expected 1 step_failed event");
+        assert_eq!(step_skipped, 1, "Expected 1 step_skipped event");
     }
 
     /// INV-10: Lock events must be logged in `execute_runbook_with_pool()`.

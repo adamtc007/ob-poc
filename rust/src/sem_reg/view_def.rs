@@ -31,6 +31,11 @@ pub struct ViewDefBody {
     /// Default sort order
     #[serde(default)]
     pub sort_order: Vec<ViewSortField>,
+    /// Whether this view includes Operational-tier snapshots in Normal evidence mode.
+    /// When `false` (default), Normal mode only shows Governed snapshots.
+    /// When `true`, Operational snapshots are included but tagged as non-proof.
+    #[serde(default)]
+    pub includes_operational: bool,
 }
 
 /// A column in a view definition.
@@ -128,6 +133,7 @@ mod tests {
                 attribute_fqn: "cbu.name".into(),
                 direction: SortDirection::Ascending,
             }],
+            includes_operational: false,
         };
         let json = serde_json::to_value(&body).unwrap();
         let round: ViewDefBody = serde_json::from_value(json).unwrap();

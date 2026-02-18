@@ -52,7 +52,7 @@ impl ClassificationError {
             context: ClarificationContext {
                 verb: Some(self.verb_name),
                 is_macro: false,
-                extracted_args: std::collections::HashMap::new(),
+                extracted_args: std::collections::BTreeMap::new(),
             },
         })
     }
@@ -116,7 +116,7 @@ impl AssemblyError {
             context: ClarificationContext {
                 verb: None,
                 is_macro: false,
-                extracted_args: std::collections::HashMap::new(),
+                extracted_args: std::collections::BTreeMap::new(),
             },
         })
     }

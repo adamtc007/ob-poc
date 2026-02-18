@@ -9,12 +9,15 @@ use sqlx::PgPool;
 
 use super::handlers::ToolHandlers;
 use super::protocol::*;
+use super::resources_sem_reg;
 use super::tools::get_tools;
 use crate::agent::learning::embedder::SharedEmbedder;
+use crate::policy::ActorResolver;
 
 /// MCP Server
 pub struct McpServer {
     handlers: ToolHandlers,
+    pool: PgPool,
 }
 
 impl McpServer {
@@ -23,7 +26,8 @@ impl McpServer {
     /// There is only ONE path - all MCP tools require the Candle embedder.
     pub fn new(pool: PgPool, embedder: SharedEmbedder) -> Self {
         Self {
-            handlers: ToolHandlers::new(pool, embedder),
+            handlers: ToolHandlers::new(pool.clone(), embedder),
+            pool,
         }
     }
 
@@ -84,6 +88,9 @@ impl McpServer {
                         tools: ToolsCapability {
                             list_changed: false,
                         },
+                        resources: Some(ResourcesCapability {
+                            list_changed: false,
+                        }),
                     },
                     server_info: ServerInfo {
                         name: "dsl-mcp".into(),
@@ -101,6 +108,41 @@ impl McpServer {
             }
 
             "notifications/initialized" => JsonRpcResponse::success(id, Value::Null),
+
+            "resources/list" => {
+                let result = ResourcesListResult {
+                    resources: resources_sem_reg::static_resources(),
+                    resource_templates: resources_sem_reg::resource_templates(),
+                };
+                match serde_json::to_value(result) {
+                    Ok(v) => JsonRpcResponse::success(id, v),
+                    Err(e) => JsonRpcResponse::error(
+                        id,
+                        INTERNAL_ERROR,
+                        format!("Serialization error: {}", e),
+                    ),
+                }
+            }
+
+            "resources/read" => {
+                let params: ResourceReadParams = match serde_json::from_value(req.params) {
+                    Ok(p) => p,
+                    Err(e) => return JsonRpcResponse::error(id, INVALID_PARAMS, e.to_string()),
+                };
+
+                eprintln!("[dsl_mcp] Reading resource: {}", params.uri);
+                let actor = ActorResolver::from_env();
+                let result =
+                    resources_sem_reg::read_resource(&params.uri, &self.pool, &actor).await;
+                match serde_json::to_value(result) {
+                    Ok(v) => JsonRpcResponse::success(id, v),
+                    Err(e) => JsonRpcResponse::error(
+                        id,
+                        INTERNAL_ERROR,
+                        format!("Serialization error: {}", e),
+                    ),
+                }
+            }
 
             "tools/list" => {
                 let result = ToolsListResult { tools: get_tools() };

@@ -34,6 +34,7 @@ pub mod types;
 pub mod attribute_def;
 pub mod entity_type_def;
 pub mod registry;
+pub mod relationship_type_def;
 pub mod verb_contract;
 
 // Phase 1.4: Verb-first onboarding scanner
@@ -64,6 +65,15 @@ pub mod derivation_spec;
 pub mod gates_governance;
 pub mod gates_technical;
 
+// Taxonomy + view seeds
+pub mod seeds;
+
+// Onboarding pipeline
+pub mod onboarding;
+
+// Evidence instance layer (migration 090)
+pub mod evidence_instances;
+
 // Phase 7: Context resolution API
 pub mod context_resolution;
 
@@ -86,6 +96,7 @@ pub use attribute_def::AttributeDefBody;
 pub use entity_type_def::EntityTypeDefBody;
 pub use membership::{MembershipKind, MembershipRuleBody};
 pub use registry::RegistryService;
+pub use relationship_type_def::RelationshipTypeDefBody;
 pub use taxonomy_def::{TaxonomyDefBody, TaxonomyNodeBody};
 pub use verb_contract::VerbContractBody;
 pub use view_def::ViewDefBody;
@@ -101,7 +112,10 @@ pub use security::{compute_inherited_label, validate_verb_security_compatibility
 
 // Re-export Phase 5-6 types
 pub use derivation::{DerivationFunctionRegistry, DerivationResult};
-pub use gates::{ExtendedPublishGateResult, GateFailure, GateMode, GateSeverity};
+pub use gates::{
+    evaluate_all_publish_gates, ExtendedGateContext, ExtendedPublishGateResult, GateFailure,
+    GateMode, GateSeverity, UnifiedPublishGateResult,
+};
 pub use registry::PublishOutcome;
 
 // Re-export Phase 7 types
@@ -113,6 +127,15 @@ pub use context_resolution::{
 pub use agent::{
     all_tool_specs, dispatch_tool, AgentPlan, AgentPlanStatus, DecisionRecord, DecisionStore,
     PlanStep, PlanStepStatus, PlanStore, SemRegToolContext, SemRegToolResult,
+};
+
+// Re-export onboarding pipeline types
+pub use onboarding::{OnboardingPipeline, OnboardingRequest, OnboardingResult, StepResult};
+
+// Re-export evidence instance types
+pub use evidence_instances::{
+    ArchiveAction, DocumentInstance, DocumentInstanceStatus, EvidenceGrade, EvidenceInstanceStore,
+    Observation, ProvenanceEdge, ProvenanceEdgeClass, RetentionPolicy,
 };
 
 // Re-export Phase 9 types

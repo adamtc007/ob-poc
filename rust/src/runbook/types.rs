@@ -159,6 +159,17 @@ pub struct CompiledStep {
     /// Entity UUIDs that this step will write to (derived at compile time).
     /// Used to compute the pre-lock set.
     pub write_set: Vec<Uuid>,
+
+    /// Pinned verb contract snapshot from the Semantic Registry.
+    ///
+    /// When present, this is the `snapshot_id` of the active `VerbContract`
+    /// snapshot that was resolved at compilation time. Enables exact-replay
+    /// and governance audit: if the contract is superseded between compilation
+    /// and execution, the pinned ID records what was authoritative.
+    ///
+    /// `None` when sem_reg is unavailable (graceful degradation).
+    #[serde(default)]
+    pub verb_contract_snapshot_id: Option<Uuid>,
 }
 
 // ---------------------------------------------------------------------------

@@ -47,6 +47,7 @@ pub mod intent_pipeline;
 pub mod macro_integration;
 pub mod protocol;
 pub mod resolution;
+pub mod resources_sem_reg;
 pub mod scope_resolution;
 pub mod server;
 pub mod tools;

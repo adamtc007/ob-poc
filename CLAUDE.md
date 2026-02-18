@@ -1,11 +1,11 @@
 # CLAUDE.md
 
-> **Last reviewed:** 2026-02-14
+> **Last reviewed:** 2026-02-16
 > **Frontend:** React/TypeScript (`ob-poc-ui-react/`) - Chat UI with scope panel, Inspector
 > **Backend:** Rust/Axum (`rust/crates/ob-poc-web/`) - Serves React + REST API
 > **Crates:** 16 active Rust crates (esper_* crates deprecated after React migration; ob-poc-graph + viewport removed)
 > **Verbs:** 1,083 canonical verbs, 14,593 intent patterns (DB-sourced)
-> **Migrations:** 86 schema migrations (001-077 + 072b seed + 078-079, 081-086 sem_reg)
+> **Migrations:** 90 schema migrations (001-077 + 072b seed + 078-079, 081-090 sem_reg + 087-089 agent/runbook)
 > **Schema Overview:** `migrations/OB_POC_SCHEMA_ENTITY_OVERVIEW.md` — living doc, 15 sections, ~195 tables (ob-poc + kyc + sem_reg), 14 mermaid ER diagrams
 > **Embeddings:** Candle local (384-dim, BGE-small-en-v1.5) - 14,593 patterns vectorized
 > **React Migration (077):** ✅ Complete - egui/WASM replaced with React/TypeScript, 3-panel chat layout
@@ -56,7 +56,7 @@
 > **KYC/UBO Skeleton Build Pipeline:** ✅ Complete - 7-step build (import-run → graph validate → UBO compute → coverage → outreach plan → tollgate → complete), real computation in all ops, 12 integration tests with assertions
 > **KYC Skeleton Build Post-Audit (S1):** ✅ Complete - Decimal conversion (F-5), coverage ownership scoping (F-2), transaction boundary (F-1), configurable outreach cap (F-4), shared function extraction (F-3a-e)
 > **KYC Skeleton Build Post-Audit (S2):** ✅ Complete - Import run case linkage on idempotent hit (F-7), as_of date for import runs (F-8a-c), case status state machine with KycCaseUpdateStatusOp plugin (F-6a-e), 4 transition tests
-> **Semantic OS (Phases 0-9, Migrations 078-086):** ✅ Complete - Immutable snapshot registry, 13 object types, ABAC + security labels (enforced at tool boundary), publish gates, context resolution API (paginated), agent control plane (plans/decisions/escalations), ~32 MCP tools (integrated into MCP server), deterministic object IDs (UUID v5), scanner drift detection, lineage/embeddings/coverage projections, 7 integration test scenarios, 35 Rust source files (~13,200 LOC), 8 SQL migrations (~1,000 LOC)
+> **Semantic OS (Phases 0-9, Migrations 078-090):** ✅ Complete + Gap Remediation (S1-S19) - Immutable snapshot registry, 13 object types, ABAC + security labels (enforced at tool boundary), publish gates (unified simple + extended framework), context resolution API (paginated, taxonomy-filtered), agent control plane (plans/decisions/escalations), ~32 MCP tools (integrated into MCP server), deterministic object IDs (UUID v5), scanner drift detection, lineage/embeddings/coverage projections, evidence instance layer (observations, document_instances, provenance_edges, retention_policies), stub gate fixes (verb_surface_disclosure, type_correctness), tier_allowed + includes_operational fix, 5 governance gates (regulatory_linkage, review_cycle, version_consistency, continuation_completeness, macro_expansion_integrity), RelationshipTypeDef (13th type), evidence MCP tool realignment, grounding context + embedding ranking, 10 integration test scenarios + 15 invariant tests, 39 Rust source files (~14,700 LOC), 9 SQL migrations (~1,050 LOC)
 
 This is the root project guide for Claude Code. Domain-specific details are in annexes.
 
@@ -5907,9 +5907,9 @@ role:
 
 ---
 
-## Semantic OS — Immutable Registry & Context Resolution (078-086)
+## Semantic OS — Immutable Registry & Context Resolution (078-090)
 
-> ✅ **IMPLEMENTED (2026-02-14)**: 10 phases (0-9), 35 Rust source files (~13,200 LOC), 8 SQL migrations (~1,000 LOC), ~32 MCP tools (integrated into MCP server), 12 CLI subcommands, 7 integration test scenarios. MCP hardening patch applied (ABAC enforcement, atomic publish, deterministic IDs, drift detection, pagination fix).
+> ✅ **IMPLEMENTED (2026-02-16)**: 10 phases (0-9) + S1-S19 gap remediation, 39 Rust source files (~14,700 LOC), 9 SQL migrations (~1,050 LOC), ~32 MCP tools (integrated into MCP server), 12 CLI subcommands, 10 integration test scenarios + 15 invariant tests. Gap remediation: stub gate fixes, tier_allowed fix, evidence instance layer (4 tables + immutability trigger), evidence MCP realignment, unified gate framework (5 new governance gates), RelationshipTypeDef, grounding context + embedding ranking. MCP hardening patch applied (ABAC enforcement, atomic publish, deterministic IDs, drift detection, pagination fix).
 
 **Problem Solved:** The system had no formal model for what attributes, verbs, entity types, policies, and evidence requirements exist, how they relate, or who can access them. The Semantic Registry provides an immutable, auditable, governance-aware knowledge base that the agent, runtime, and governance teams can query programmatically.
 
@@ -6026,10 +6026,11 @@ enum AccessDecision { Allow, Deny { reason }, AllowWithConstraints { constraints
 | **3** | 082 | `policy_rule`, `evidence`, `observation_def`, `document_type_def`, `abac` | Policy engine, evidence requirements, ABAC access control |
 | **4** | 083 | `security` | Security label inheritance (PII propagation), label compatibility checks |
 | **5** | 083 | `derivation`, `derivation_spec` | Derived/composite attributes, `DerivationFunctionRegistry` |
-| **6** | — | `gates_governance`, `gates_technical` | Extended publish gate framework (severity, gate modes, gate chain) |
-| **7** | 084 | `context_resolution` | 12-step `resolve_context()` pipeline, evidence modes, governance signals |
+| **6** | — | `gates_governance`, `gates_technical` | Extended publish gate framework (severity, gate modes, gate chain), 5 new governance gates (S6) |
+| **7** | 084 | `context_resolution` | 12-step `resolve_context()` pipeline, evidence modes, governance signals, taxonomy-based verb/attribute filtering (S15) |
 | **8** | 085 | `agent/` (5 files) | Agent plans/steps/decisions/escalations, ~32 MCP tools, snapshot manifest |
-| **9** | 086 | `projections/` (4 files) | Lineage (derivation edges, run records), embeddings, coverage metrics |
+| **9** | 086 | `projections/` (4 files) | Lineage (derivation edges, run records), embeddings (with grounding context + similarity ranking, S18), coverage metrics |
+| **Evidence** | 090 | `evidence_instances` | Observations, document instances, provenance edges, retention policies, immutability trigger on snapshots (S4-S5) |
 
 ### Context Resolution API (Phase 7)
 
@@ -6232,7 +6233,9 @@ Every snapshot must pass publish gates before transitioning to `Active`:
 
 ### Integration Tests (Phase 10)
 
-7 test scenarios in `rust/tests/sem_reg_integration.rs` (all `#[cfg(feature = "database")]` + `#[ignore]`):
+10 test scenarios in `rust/tests/sem_reg_integration.rs` + 15 invariant tests in `rust/tests/sem_reg_invariants.rs` (all `#[cfg(feature = "database")]` + `#[ignore]`):
+
+**Integration Scenarios:**
 
 1. **UBO Discovery E2E** — resolve_context → create_plan → identify_evidence_gaps → add_plan_steps → validate_plan → execute → record_decision → verify snapshot_manifest
 2. **Sanctions Screening ABAC** — ABAC restricts sanctions-labelled attributes to SANCTIONS purpose actors
@@ -6241,50 +6244,63 @@ Every snapshot must pass publish gates before transitioning to `Active`:
 5. **Point-in-Time Audit** — Publish → advance time → supersede → resolve_context(as_of=earlier) → verify pinned snapshots
 6. **Proof Rule Enforcement** — Governed PolicyRule + Operational attribute → must fail. Operational evidence for Proof claim → must fail
 7. **Security/ABAC E2E** — Purpose mismatch → Deny. Jurisdiction mismatch → Deny. PII+Financial inputs → inherited Confidential label
+8. **Onboarding Pipeline Round-Trip** — Full 6-step onboarding: entity_type → attributes → verb_contracts → taxonomy placement → view assignment → evidence requirements
+9. **Gate Unification** — Proof rule blocks publish; taxonomy warning does NOT block; ReportOnly mode allows all
+10. **Taxonomy Filtering in Context Resolution** — Verbs filtered by taxonomy membership overlap; unconstrained verbs pass through
+
+**Invariant Tests (15):** INV-1 (no in-place updates), INV-2 (snapshot pinning), INV-3 (proof rule), INV-4 (ABAC both tiers), INV-5 (operational auto-approve), INV-6 (derivation spec required), plus gate, evidence, and context resolution invariants.
 
 ```bash
+# Integration tests
 DATABASE_URL="postgresql:///data_designer" \
   cargo test --features database --test sem_reg_integration -- --ignored --nocapture
+
+# Invariant tests
+DATABASE_URL="postgresql:///data_designer" \
+  cargo test --features database --test sem_reg_invariants -- --ignored --nocapture
 ```
 
 ### Module Structure
 
 ```
 rust/src/sem_reg/
-├── mod.rs                      # Module root, re-exports (105 LOC)
-├── types.rs                    # Core enums, SecurityLabel, SnapshotMeta (400 LOC)
-├── store.rs                    # SnapshotStore DB operations (560 LOC)
-├── gates.rs                    # Publish gate pure functions (560 LOC)
-├── attribute_def.rs            # AttributeDefBody (150 LOC)
-├── entity_type_def.rs          # EntityTypeDefBody (115 LOC)
-├── verb_contract.rs            # VerbContractBody (170 LOC)
-├── registry.rs                 # RegistryService typed publish/resolve (810 LOC)
-├── scanner.rs                  # Verb YAML → registry bootstrap (325 LOC)
-├── taxonomy_def.rs             # TaxonomyDefBody, TaxonomyNodeBody (200 LOC)
-├── membership.rs               # MembershipRuleBody (150 LOC)
-├── view_def.rs                 # ViewDefBody (160 LOC)
-├── policy_rule.rs              # PolicyRuleBody (170 LOC)
-├── evidence.rs                 # EvidenceRequirementBody (130 LOC)
-├── observation_def.rs          # ObservationDefBody (120 LOC)
-├── document_type_def.rs        # DocumentTypeDefBody (100 LOC)
-├── derivation_spec.rs          # DerivationSpecBody (120 LOC)
-├── abac.rs                     # ABAC evaluate, AccessDecision (400 LOC)
-├── security.rs                 # Security label inheritance (560 LOC)
-├── derivation.rs               # DerivationFunctionRegistry, evaluation (500 LOC)
-├── gates_governance.rs         # Governed approval gate (380 LOC)
-├── gates_technical.rs          # Technical gates (version, label) (435 LOC)
-├── context_resolution.rs       # 12-step resolve_context() (1,467 LOC)
+├── mod.rs                      # Module root, re-exports
+├── types.rs                    # Core enums, SecurityLabel, SnapshotMeta
+├── store.rs                    # SnapshotStore DB operations
+├── ids.rs                      # Deterministic UUID v5 object IDs
+├── enforce.rs                  # ABAC enforcement helpers (enforce_read)
+├── gates.rs                    # Publish gate pure functions (unified framework)
+├── attribute_def.rs            # AttributeDefBody
+├── entity_type_def.rs          # EntityTypeDefBody
+├── verb_contract.rs            # VerbContractBody
+├── registry.rs                 # RegistryService typed publish/resolve
+├── scanner.rs                  # Verb YAML → registry bootstrap + drift detection
+├── evidence_instances.rs       # Evidence instance layer (S4): Observation, DocumentInstance, ProvenanceEdge, RetentionPolicy
+├── taxonomy_def.rs             # TaxonomyDefBody, TaxonomyNodeBody
+├── membership.rs               # MembershipRuleBody
+├── view_def.rs                 # ViewDefBody (+ includes_operational field, S3)
+├── policy_rule.rs              # PolicyRuleBody
+├── evidence.rs                 # EvidenceRequirementBody
+├── observation_def.rs          # ObservationDefBody
+├── document_type_def.rs        # DocumentTypeDefBody
+├── derivation_spec.rs          # DerivationSpecBody
+├── abac.rs                     # ABAC evaluate, AccessDecision
+├── security.rs                 # Security label inheritance
+├── derivation.rs               # DerivationFunctionRegistry, evaluation
+├── gates_governance.rs         # 8 governance gates (3 original + 5 added in S6)
+├── gates_technical.rs          # Technical gates: type_correctness, verb_surface_disclosure (fixed S2)
+├── context_resolution.rs       # 12-step resolve_context() with taxonomy filtering (S15), tier_allowed fix (S3)
 ├── agent/
-│   ├── mod.rs                  # Agent module root (25 LOC)
-│   ├── plans.rs                # AgentPlan, PlanStep, PlanStore (700 LOC)
-│   ├── decisions.rs            # DecisionRecord, DecisionStore (580 LOC)
-│   ├── escalation.rs           # EscalationRecord, DisambiguationPrompt (370 LOC)
-│   └── mcp_tools.rs            # ~32 MCP tool specs + dispatch (1,800 LOC)
+│   ├── mod.rs                  # Agent module root
+│   ├── plans.rs                # AgentPlan, PlanStep, PlanStore
+│   ├── decisions.rs            # DecisionRecord, DecisionStore
+│   ├── escalation.rs           # EscalationRecord, DisambiguationPrompt
+│   └── mcp_tools.rs            # ~32 MCP tool specs + dispatch + grounding context (S18)
 └── projections/
-    ├── mod.rs                  # Projections module root (15 LOC)
-    ├── lineage.rs              # DerivationEdge, RunRecord, graph traversal (400 LOC)
-    ├── embeddings.rs           # SemanticText, EmbeddingRecord, staleness (300 LOC)
-    └── metrics.rs              # CoverageReport, TierDistribution (250 LOC)
+    ├── mod.rs                  # Projections module root
+    ├── lineage.rs              # DerivationEdge, RunRecord, graph traversal
+    ├── embeddings.rs           # SemanticText, EmbeddingRecord, staleness + similarity ranking (S18)
+    └── metrics.rs              # CoverageReport, TierDistribution
 ```
 
 ### Key Files
@@ -6306,10 +6322,15 @@ rust/src/sem_reg/
 | `rust/src/sem_reg/abac.rs` | `evaluate_abac()` — ABAC access control |
 | `rust/src/sem_reg/security.rs` | `compute_inherited_label()` — PII propagation |
 | `rust/xtask/src/sem_reg.rs` | CLI subcommands (stats, validate, ctx-resolve, etc.) |
-| `rust/tests/sem_reg_integration.rs` | 7 integration test scenarios |
+| `rust/src/sem_reg/ids.rs` | Deterministic UUID v5 object IDs |
+| `rust/src/sem_reg/enforce.rs` | ABAC enforcement helpers (`enforce_read()`) |
+| `rust/src/sem_reg/evidence_instances.rs` | Evidence instance types + store methods (S4) |
+| `rust/tests/sem_reg_integration.rs` | 10 integration test scenarios |
+| `rust/tests/sem_reg_invariants.rs` | 15 invariant tests (INV-1 through INV-6 + extensions) |
 | `migrations/078_sem_reg_phase0.sql` | Core schema, `snapshots` table, enums |
 | `migrations/085_sem_reg_phase8.sql` | Agent tables (plans, steps, decisions) |
 | `migrations/086_sem_reg_phase9.sql` | Projection tables (lineage, embeddings) |
+| `migrations/090_sem_reg_evidence_instances.sql` | Evidence tables + snapshots immutability trigger (S4) |
 
 ---
 

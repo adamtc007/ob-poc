@@ -34,8 +34,8 @@ use ob_poc::runbook::errors::CompilationErrorKind;
 use ob_poc::runbook::verb_classifier::{classify_verb, VerbClassification};
 use ob_poc::runbook::{
     compile_invocation, compile_verb, execute_runbook, CompiledRunbook, CompiledRunbookStatus,
-    CompiledStep, ExecutionMode, OrchestratorResponse, ReplayEnvelope, RunbookStore, StepExecutor,
-    StepOutcome,
+    CompiledStep, ExecutionMode, OrchestratorResponse, ReplayEnvelope, RunbookStore,
+    RunbookStoreBackend, StepExecutor, StepOutcome,
 };
 use ob_poc::session::unified::{ClientRef, StructureType, UnifiedSession};
 
@@ -64,6 +64,7 @@ fn make_step(verb: &str) -> CompiledStep {
         depends_on: vec![],
         execution_mode: ExecutionMode::Sync,
         write_set: vec![],
+        verb_contract_snapshot_id: None,
     }
 }
 
@@ -81,6 +82,7 @@ fn make_step_with_args(verb: &str, args: &[(&str, &str)]) -> CompiledStep {
         depends_on: vec![],
         execution_mode: ExecutionMode::Sync,
         write_set: vec![],
+        verb_contract_snapshot_id: None,
     }
 }
 
@@ -94,6 +96,7 @@ fn make_step_with_write_set(verb: &str, write_set: Vec<Uuid>) -> CompiledStep {
         depends_on: vec![],
         execution_mode: ExecutionMode::Sync,
         write_set,
+        verb_contract_snapshot_id: None,
     }
 }
 
@@ -228,7 +231,7 @@ async fn test_primitive_verb_round_trip() {
         fqn: "cbu.create".to_string(),
     };
 
-    let mut args = HashMap::new();
+    let mut args = BTreeMap::new();
     args.insert("name".to_string(), "E2E Fund".to_string());
 
     let resp = compile_verb(
@@ -240,6 +243,7 @@ async fn test_primitive_verb_round_trip() {
         1,
         &constraints,
         None,
+        None, // verb_snapshot_pins
     );
 
     assert!(
@@ -259,10 +263,14 @@ async fn test_primitive_verb_round_trip() {
     let steps: Vec<_> = summary.preview.iter().map(|p| make_step(&p.verb)).collect();
     let rb = CompiledRunbook::new(Uuid::new_v4(), 1, steps, ReplayEnvelope::empty());
     let id = rb.id;
-    store.insert(rb);
+    store.insert(&rb).await.unwrap();
 
     // Step 3: Retrieve from store and verify (INV-9)
-    let retrieved = store.get(&id).expect("Must retrieve stored runbook");
+    let retrieved = store
+        .get(&id)
+        .await
+        .unwrap()
+        .expect("Must retrieve stored runbook");
     assert_eq!(retrieved.steps.len(), 1);
     assert!(matches!(retrieved.status, CompiledRunbookStatus::Compiled));
 
@@ -278,7 +286,7 @@ async fn test_primitive_verb_round_trip() {
     assert_eq!(result.step_results.len(), 1);
 
     // Step 5: Verify status updated in store
-    let after = store.get(&id).unwrap();
+    let after = store.get(&id).await.unwrap().unwrap();
     assert!(matches!(
         after.status,
         CompiledRunbookStatus::Completed { .. }
@@ -316,7 +324,7 @@ async fn test_macro_expands_to_primitives() {
     );
 
     let session = test_session();
-    let mut args = HashMap::new();
+    let mut args = BTreeMap::new();
     args.insert("name".to_string(), "Macro Test Fund".to_string());
 
     // Expand via fixpoint
@@ -358,6 +366,7 @@ async fn test_macro_expands_to_primitives() {
         1,
         &constraints,
         None,
+        None, // verb_snapshot_pins
     );
 
     assert!(resp.is_compiled(), "Macro must compile: {:?}", resp);
@@ -372,7 +381,7 @@ async fn test_macro_expands_to_primitives() {
     let steps: Vec<_> = summary.preview.iter().map(|p| make_step(&p.verb)).collect();
     let rb = CompiledRunbook::new(Uuid::new_v4(), 1, steps, ReplayEnvelope::empty());
     let id = rb.id;
-    store.insert(rb);
+    store.insert(&rb).await.unwrap();
 
     let result = execute_runbook(&store, id, None, &SuccessExecutor)
         .await
@@ -450,7 +459,7 @@ async fn test_nested_macro_fixpoint() {
     );
 
     let session = test_session();
-    let mut args = HashMap::new();
+    let mut args = BTreeMap::new();
     args.insert("name".to_string(), "Nested Fund".to_string());
     args.insert("party-name".to_string(), "GP Entity".to_string());
 
@@ -550,7 +559,7 @@ fn test_cycle_detection() {
     );
 
     let session = test_session();
-    let mut args = HashMap::new();
+    let mut args = BTreeMap::new();
     args.insert("x".to_string(), "test".to_string());
 
     let result = expand_macro_fixpoint("cycle.a", &args, &session, &registry, Default::default());
@@ -617,7 +626,7 @@ fn test_depth_limit() {
     }
 
     let session = test_session();
-    let mut args = HashMap::new();
+    let mut args = BTreeMap::new();
     args.insert("x".to_string(), "test".to_string());
 
     let limits = ExpansionLimits {
@@ -686,7 +695,7 @@ fn test_pack_constraint_blocks_forbidden_verb() {
         }],
     };
 
-    let mut args = HashMap::new();
+    let mut args = BTreeMap::new();
     args.insert("name".to_string(), "Blocked Fund".to_string());
 
     let resp = compile_invocation(
@@ -699,6 +708,7 @@ fn test_pack_constraint_blocks_forbidden_verb() {
         &constraints,
         1,
         None,
+        None, // verb_snapshot_pins
     );
 
     assert!(
@@ -749,6 +759,7 @@ fn test_content_addressed_id_determinism() {
         depends_on: vec![],
         execution_mode: ExecutionMode::Sync,
         write_set: vec![],
+        verb_contract_snapshot_id: None,
     };
     let identical_step_b = identical_step_a.clone();
 
@@ -773,6 +784,7 @@ fn test_content_addressed_id_determinism() {
         depends_on: vec![],
         execution_mode: ExecutionMode::Sync,
         write_set: vec![],
+        verb_contract_snapshot_id: None,
     };
 
     let id_c = content_addressed_id(&[step_different], &env);
@@ -793,6 +805,7 @@ fn test_content_addressed_id_determinism() {
             depends_on: vec![],
             execution_mode: ExecutionMode::Sync,
             write_set: vec![],
+            verb_contract_snapshot_id: None,
         },
         CompiledStep {
             step_id: Uuid::nil(),
@@ -803,6 +816,7 @@ fn test_content_addressed_id_determinism() {
             depends_on: vec![],
             execution_mode: ExecutionMode::Sync,
             write_set: vec![],
+            verb_contract_snapshot_id: None,
         },
     ];
     let id_d = content_addressed_id(&two_steps, &env);
@@ -891,7 +905,7 @@ async fn test_write_set_locks_acquired() {
         ReplayEnvelope::empty(),
     );
     let id = rb.id;
-    store.insert(rb);
+    store.insert(&rb).await.unwrap();
 
     let recorder = RecordingExecutor::new();
     let result = execute_runbook(&store, id, None, &recorder).await.unwrap();
@@ -922,7 +936,7 @@ async fn test_write_set_locks_acquired() {
     );
 
     // INV-8: Verify heuristic write_set derivation works
-    let mut heuristic_args = HashMap::new();
+    let mut heuristic_args = BTreeMap::new();
     heuristic_args.insert("entity-id".to_string(), entity_id_1.to_string());
     heuristic_args.insert("name".to_string(), "Acme Corp".to_string());
     let heuristic_ws = ob_poc::runbook::write_set::derive_write_set_heuristic(&heuristic_args);
@@ -978,12 +992,12 @@ async fn test_concurrent_lock_contention() {
         ReplayEnvelope::empty(),
     );
     let id1 = rb1.id;
-    store1.insert(rb1);
+    store1.insert(&rb1).await.unwrap();
 
     let store2 = RunbookStore::new();
     let rb2 = CompiledRunbook::new(Uuid::new_v4(), 1, vec![rb2_step1], ReplayEnvelope::empty());
     let id2 = rb2.id;
-    store2.insert(rb2);
+    store2.insert(&rb2).await.unwrap();
 
     // Execute both — without Postgres, locks are skipped but execution works
     let r1 = execute_runbook(&store1, id1, None, &SuccessExecutor)
@@ -1036,7 +1050,7 @@ async fn test_no_execution_without_compiled_id() {
     let step = make_step("cbu.create");
     let rb = CompiledRunbook::new(Uuid::new_v4(), 1, vec![step], ReplayEnvelope::empty());
     let id = rb.id;
-    store.insert(rb);
+    store.insert(&rb).await.unwrap();
 
     let result = execute_runbook(&store, id, None, &SuccessExecutor)
         .await

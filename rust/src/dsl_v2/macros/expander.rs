@@ -16,7 +16,7 @@
 //! Expanded: (cbu.create :kind private-equity :name "Acme Fund" :client_id uuid-123)
 //! ```
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
@@ -157,7 +157,7 @@ pub struct MacroExpansionAudit {
 /// Expanded DSL statements ready for the normal pipeline
 pub fn expand_macro(
     macro_fqn: &str,
-    args: &HashMap<String, String>,
+    args: &BTreeMap<String, String>,
     session: &UnifiedSession,
     registry: &MacroRegistry,
 ) -> Result<MacroExpansionOutput, MacroExpansionError> {
@@ -251,7 +251,7 @@ pub fn expand_macro(
 /// 6. Repeat until no directives remain (fixpoint)
 pub fn expand_macro_fixpoint(
     macro_fqn: &str,
-    args: &HashMap<String, String>,
+    args: &BTreeMap<String, String>,
     session: &UnifiedSession,
     registry: &MacroRegistry,
     limits: ExpansionLimits,
@@ -303,7 +303,7 @@ pub struct FixpointExpansionOutput {
 #[allow(clippy::too_many_arguments)]
 fn expand_macro_recursive(
     macro_fqn: &str,
-    args: &HashMap<String, String>,
+    args: &BTreeMap<String, String>,
     session: &UnifiedSession,
     registry: &MacroRegistry,
     limits: ExpansionLimits,
@@ -344,9 +344,15 @@ fn expand_macro_recursive(
     for stmt in &output.statements {
         if let Some(invoke) = parse_invoke_macro_directive(stmt) {
             // Recursively expand the nested macro
+            // Convert HashMap → BTreeMap at internal/API boundary (INV-2)
+            let invoke_args_btree: BTreeMap<String, String> = invoke
+                .args
+                .iter()
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect();
             let nested_statements = expand_macro_recursive(
                 &invoke.macro_id,
-                &invoke.args,
+                &invoke_args_btree,
                 session,
                 registry,
                 limits,
@@ -417,7 +423,7 @@ fn parse_invoke_macro_directive(line: &str) -> Option<InvokeMacroDirective> {
 /// Validate provided arguments against schema
 fn validate_args(
     schema: &MacroSchema,
-    args: &HashMap<String, String>,
+    args: &BTreeMap<String, String>,
 ) -> Result<(), MacroExpansionError> {
     // Check all required args are present
     for (name, _spec) in schema.required_args() {
@@ -471,7 +477,7 @@ fn validate_args(
 /// Check if a required-if condition is satisfied
 fn is_required_if_satisfied(
     expr: &super::schema::RequiredIfExpr,
-    args: &HashMap<String, String>,
+    args: &BTreeMap<String, String>,
 ) -> bool {
     use super::schema::RequiredIfExpr;
 
@@ -503,7 +509,7 @@ fn is_required_if_satisfied(
 }
 
 /// Evaluate a simple condition like "structure-type = ucits"
-fn evaluate_simple_required_if(condition: &str, args: &HashMap<String, String>) -> bool {
+fn evaluate_simple_required_if(condition: &str, args: &BTreeMap<String, String>) -> bool {
     let condition = condition.trim();
 
     // Handle equality: "var = value"
@@ -615,7 +621,7 @@ fn check_prereqs(
 /// Check structure type constraints for role assignments
 fn check_structure_type_constraints(
     schema: &MacroSchema,
-    args: &HashMap<String, String>,
+    args: &BTreeMap<String, String>,
     session: &UnifiedSession,
 ) -> Result<(), MacroExpansionError> {
     // Check target.allowed_structure_types
@@ -658,7 +664,7 @@ fn check_structure_type_constraints(
 /// Build variable context from args, scope, and session
 fn build_variable_context(
     schema: &MacroSchema,
-    args: &HashMap<String, String>,
+    args: &BTreeMap<String, String>,
     session: &UnifiedSession,
 ) -> Result<VariableContext, MacroExpansionError> {
     // Merge required and optional arg specs
@@ -1024,7 +1030,7 @@ structure.setup:
         let registry = mock_registry();
         let session = mock_session();
 
-        let mut args = HashMap::new();
+        let mut args = BTreeMap::new();
         args.insert("structure-type".to_string(), "pe".to_string());
         args.insert("name".to_string(), "Acme Fund".to_string());
 
@@ -1053,7 +1059,7 @@ structure.setup:
         let registry = mock_registry();
         let session = mock_session();
 
-        let mut args = HashMap::new();
+        let mut args = BTreeMap::new();
         // Missing required "name" argument
         args.insert("structure-type".to_string(), "pe".to_string());
 
@@ -1069,7 +1075,7 @@ structure.setup:
         let registry = mock_registry();
         let session = mock_session();
 
-        let mut args = HashMap::new();
+        let mut args = BTreeMap::new();
         args.insert("structure-type".to_string(), "invalid".to_string());
         args.insert("name".to_string(), "Acme".to_string());
 
@@ -1085,7 +1091,7 @@ structure.setup:
         let registry = mock_registry();
         let session = mock_session();
 
-        let result = expand_macro("unknown.macro", &HashMap::new(), &session, &registry);
+        let result = expand_macro("unknown.macro", &BTreeMap::new(), &session, &registry);
         assert!(matches!(result, Err(MacroExpansionError::UnknownMacro(_))));
     }
 
@@ -1182,7 +1188,7 @@ structure.assign-role:
         let registry = mock_registry_with_assign_role();
         let session = mock_session_pe();
 
-        let mut args = HashMap::new();
+        let mut args = BTreeMap::new();
         args.insert(
             "structure".to_string(),
             "22222222-2222-2222-2222-222222222222".to_string(),
@@ -1209,7 +1215,7 @@ structure.assign-role:
         let registry = mock_registry_with_assign_role();
         let session = mock_session_sicav();
 
-        let mut args = HashMap::new();
+        let mut args = BTreeMap::new();
         args.insert(
             "structure".to_string(),
             "22222222-2222-2222-2222-222222222222".to_string(),
@@ -1242,7 +1248,7 @@ structure.assign-role:
         let registry = mock_registry_with_assign_role();
         let session = mock_session_sicav();
 
-        let mut args = HashMap::new();
+        let mut args = BTreeMap::new();
         args.insert(
             "structure".to_string(),
             "22222222-2222-2222-2222-222222222222".to_string(),
@@ -1269,7 +1275,7 @@ structure.assign-role:
         let registry = mock_registry_with_assign_role();
         let session = mock_session_pe();
 
-        let mut args = HashMap::new();
+        let mut args = BTreeMap::new();
         args.insert(
             "structure".to_string(),
             "22222222-2222-2222-2222-222222222222".to_string(),
@@ -1308,7 +1314,7 @@ structure.assign-role:
         ] {
             let session = session_fn();
 
-            let mut args = HashMap::new();
+            let mut args = BTreeMap::new();
             args.insert(
                 "structure".to_string(),
                 "22222222-2222-2222-2222-222222222222".to_string(),
@@ -1475,7 +1481,7 @@ composite.deep:
         let registry = mock_registry_nested();
         let session = mock_session();
 
-        let mut args = HashMap::new();
+        let mut args = BTreeMap::new();
         args.insert("x".to_string(), "hello".to_string());
         args.insert("y".to_string(), "world".to_string());
 
@@ -1539,7 +1545,7 @@ composite.deep:
         let registry = mock_registry_nested();
         let session = mock_session();
 
-        let mut args = HashMap::new();
+        let mut args = BTreeMap::new();
         args.insert("x".to_string(), "deep-x".to_string());
         args.insert("y".to_string(), "deep-y".to_string());
 
@@ -1622,7 +1628,7 @@ cycle.b:
         let session = mock_session();
         let result = expand_macro_fixpoint(
             "cycle.a",
-            &HashMap::new(),
+            &BTreeMap::new(),
             &session,
             &registry,
             EXPANSION_LIMITS,
@@ -1687,7 +1693,7 @@ diamond.root:
         }
 
         let session = mock_session();
-        let mut args = HashMap::new();
+        let mut args = BTreeMap::new();
         args.insert("x".to_string(), "unused".to_string());
 
         let result =
@@ -1789,7 +1795,8 @@ chain.{i}:
             max_steps: 500,
         };
 
-        let result = expand_macro_fixpoint("chain.0", &HashMap::new(), &session, &registry, limits);
+        let result =
+            expand_macro_fixpoint("chain.0", &BTreeMap::new(), &session, &registry, limits);
 
         assert!(
             matches!(&result, Err(MacroExpansionError::MaxDepthExceeded { depth, limit })
@@ -1873,7 +1880,8 @@ fan.out:
             max_steps: 2, // Only allow 2 steps — third should fail
         };
 
-        let result = expand_macro_fixpoint("fan.out", &HashMap::new(), &session, &registry, limits);
+        let result =
+            expand_macro_fixpoint("fan.out", &BTreeMap::new(), &session, &registry, limits);
 
         assert!(
             matches!(&result, Err(MacroExpansionError::MaxStepsExceeded { steps, limit })
@@ -1890,7 +1898,7 @@ fan.out:
         let session = mock_session();
 
         // Test leaf (only needs x)
-        let mut leaf_args = HashMap::new();
+        let mut leaf_args = BTreeMap::new();
         leaf_args.insert("x".to_string(), "val".to_string());
         let result = expand_macro_fixpoint(
             "leaf.alpha",
@@ -1910,7 +1918,7 @@ fan.out:
         }
 
         // Test composite and deep (need both x and y)
-        let mut composite_args = HashMap::new();
+        let mut composite_args = BTreeMap::new();
         composite_args.insert("x".to_string(), "val".to_string());
         composite_args.insert("y".to_string(), "val".to_string());
 
@@ -1944,7 +1952,7 @@ fan.out:
         let registry = mock_registry_nested();
         let session = mock_session();
 
-        let mut args = HashMap::new();
+        let mut args = BTreeMap::new();
         args.insert("x".to_string(), "v".to_string());
         args.insert("y".to_string(), "v".to_string());
 

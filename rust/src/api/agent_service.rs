@@ -1742,6 +1742,7 @@ impl AgentService {
         program: crate::dsl_v2::ast::Program,
     ) -> Result<AgentChatResponse, String> {
         use crate::repl::executor_bridge::RealDslExecutor;
+        use crate::runbook::executor::RunbookStoreBackend;
         use crate::runbook::step_executor_bridge::DslStepExecutor;
         use crate::runbook::{
             envelope::ReplayEnvelope,
@@ -1751,7 +1752,16 @@ impl AgentService {
             CompiledRunbook, RunbookStore,
         };
 
-        let store = RunbookStore::new();
+        // Phase D: use Postgres store when pool available for event emission.
+        #[cfg(feature = "database")]
+        let pg_store = crate::runbook::executor::PostgresRunbookStore::new(self.pool.clone());
+        #[cfg(feature = "database")]
+        let store: &dyn RunbookStoreBackend = &pg_store;
+
+        #[cfg(not(feature = "database"))]
+        let mem_store = RunbookStore::new();
+        #[cfg(not(feature = "database"))]
+        let store: &dyn RunbookStoreBackend = &mem_store;
         let session_id = session.id;
         let mut executed_count = 0usize;
 
@@ -1766,11 +1776,8 @@ impl AgentService {
                 let dsl_source = vc.to_dsl_string();
 
                 // Derive write_set from args (heuristic UUID extraction)
-                let args_hashmap: std::collections::HashMap<String, String> =
-                    args.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
-                let write_set: Vec<uuid::Uuid> = derive_write_set_heuristic(&args_hashmap)
-                    .into_iter()
-                    .collect();
+                let write_set: Vec<uuid::Uuid> =
+                    derive_write_set_heuristic(&args).into_iter().collect();
 
                 let step = CompiledStep {
                     step_id: uuid::Uuid::new_v4(),
@@ -1781,11 +1788,17 @@ impl AgentService {
                     depends_on: vec![],
                     execution_mode: ExecutionMode::Sync,
                     write_set: write_set.clone(),
+                    verb_contract_snapshot_id: None,
                 };
 
                 let envelope = ReplayEnvelope {
-                    session_cursor: 0,
-                    entity_bindings: std::collections::BTreeMap::new(),
+                    core: crate::runbook::envelope::EnvelopeCore {
+                        session_cursor: 0,
+                        entity_bindings: std::collections::BTreeMap::new(),
+                        external_lookup_digests: vec![],
+                        macro_audit_digests: vec![],
+                        snapshot_manifest: std::collections::HashMap::new(),
+                    },
                     external_lookups: vec![],
                     macro_audits: vec![],
                     sealed_at: chrono::Utc::now(),
@@ -1798,12 +1811,15 @@ impl AgentService {
                     envelope,
                 );
                 let runbook_id = runbook.id;
-                store.insert(runbook);
+                if let Err(e) = store.insert(&runbook).await {
+                    let msg = format!("Failed to store compiled runbook: {}", e);
+                    return Ok(self.fail(&msg, session));
+                }
 
                 // Execute through the gate (INV-1)
                 let real_executor = RealDslExecutor::new(self.pool.clone());
                 let step_executor = DslStepExecutor::new(std::sync::Arc::new(real_executor));
-                match execute_runbook(&store, runbook_id, None, &step_executor).await {
+                match execute_runbook(store, runbook_id, None, &step_executor).await {
                     Ok(_result) => {
                         executed_count += 1;
                     }

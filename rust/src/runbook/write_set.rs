@@ -14,7 +14,7 @@
 //! strategies (contract ∪ heuristic, deduplicated) when the feature is
 //! enabled, or just the heuristic when it is not.
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet};
 use uuid::Uuid;
 
 #[cfg(feature = "write-set-contract")]
@@ -30,7 +30,7 @@ use crate::repl::verb_config_index::VerbConfigIndex;
 /// argument values (e.g., `:entity-id <uuid>`, `:cbu-id <uuid>`).
 ///
 /// Returns a `BTreeSet` for deterministic ordering (INV-2).
-pub fn derive_write_set_heuristic(args: &HashMap<String, String>) -> BTreeSet<Uuid> {
+pub fn derive_write_set_heuristic(args: &BTreeMap<String, String>) -> BTreeSet<Uuid> {
     args.values()
         .filter_map(|v| {
             let trimmed = v.trim().trim_matches(|c| c == '<' || c == '>');
@@ -55,7 +55,7 @@ pub fn derive_write_set_heuristic(args: &HashMap<String, String>) -> BTreeSet<Uu
 #[cfg(feature = "write-set-contract")]
 pub fn derive_write_set_from_contract(
     verb_fqn: &str,
-    args: &HashMap<String, String>,
+    args: &BTreeMap<String, String>,
     verb_config_index: &VerbConfigIndex,
 ) -> BTreeSet<Uuid> {
     let mut write_set = BTreeSet::new();
@@ -121,7 +121,7 @@ pub fn derive_write_set_from_contract(
 #[cfg(feature = "write-set-contract")]
 pub fn derive_write_set(
     verb_fqn: &str,
-    args: &HashMap<String, String>,
+    args: &BTreeMap<String, String>,
     verb_config_index: Option<&VerbConfigIndex>,
 ) -> BTreeSet<Uuid> {
     let mut result = derive_write_set_heuristic(args);
@@ -138,7 +138,7 @@ pub fn derive_write_set(
 #[cfg(not(feature = "write-set-contract"))]
 pub fn derive_write_set(
     _verb_fqn: &str,
-    args: &HashMap<String, String>,
+    args: &BTreeMap<String, String>,
     _verb_config_index: Option<&()>,
 ) -> BTreeSet<Uuid> {
     derive_write_set_heuristic(args)
@@ -156,7 +156,7 @@ mod tests {
     fn test_heuristic_extracts_uuids_from_args() {
         let id1 = Uuid::new_v4();
         let id2 = Uuid::new_v4();
-        let mut args = HashMap::new();
+        let mut args = BTreeMap::new();
         args.insert("entity-id".to_string(), id1.to_string());
         args.insert("cbu-id".to_string(), format!("<{}>", id2));
         args.insert("name".to_string(), "Acme Corp".to_string());
@@ -169,7 +169,7 @@ mod tests {
 
     #[test]
     fn test_heuristic_ignores_non_uuids() {
-        let mut args = HashMap::new();
+        let mut args = BTreeMap::new();
         args.insert("name".to_string(), "Acme Corp".to_string());
         args.insert("jurisdiction".to_string(), "LU".to_string());
         args.insert("count".to_string(), "42".to_string());
@@ -181,7 +181,7 @@ mod tests {
     #[test]
     fn test_heuristic_fallback_when_no_contract() {
         let id = Uuid::new_v4();
-        let mut args = HashMap::new();
+        let mut args = BTreeMap::new();
         args.insert("entity-id".to_string(), id.to_string());
 
         // With no verb_config_index, derive_write_set falls back to heuristic
@@ -202,7 +202,7 @@ mod tests {
         // INV-2: output must be BTreeSet, not HashSet
         let id1 = Uuid::new_v4();
         let id2 = Uuid::new_v4();
-        let mut args = HashMap::new();
+        let mut args = BTreeMap::new();
         args.insert("a".to_string(), id1.to_string());
         args.insert("b".to_string(), id2.to_string());
 
@@ -287,7 +287,7 @@ mod tests {
         fn test_contract_extracts_crud_key_arg() {
             let index = test_index();
             let cbu_id = Uuid::new_v4();
-            let mut args = HashMap::new();
+            let mut args = BTreeMap::new();
             args.insert("cbu-id".to_string(), cbu_id.to_string());
             args.insert("name".to_string(), "New Name".to_string());
 
@@ -303,7 +303,7 @@ mod tests {
         fn test_contract_extracts_entity_lookup_arg() {
             let index = test_index();
             let parent_id = Uuid::new_v4();
-            let mut args = HashMap::new();
+            let mut args = BTreeMap::new();
             args.insert("name".to_string(), "Child Corp".to_string());
             args.insert("parent-entity-id".to_string(), parent_id.to_string());
 
@@ -319,7 +319,7 @@ mod tests {
             let index = test_index();
             let cbu_id = Uuid::new_v4();
             let extra_id = Uuid::new_v4();
-            let mut args = HashMap::new();
+            let mut args = BTreeMap::new();
             args.insert("cbu-id".to_string(), cbu_id.to_string());
             // An arg not in the contract but contains a UUID — heuristic picks it up
             args.insert("extra-ref".to_string(), extra_id.to_string());
@@ -333,7 +333,7 @@ mod tests {
         #[test]
         fn test_contract_unknown_verb_returns_empty() {
             let index = test_index();
-            let mut args = HashMap::new();
+            let mut args = BTreeMap::new();
             args.insert("id".to_string(), Uuid::new_v4().to_string());
 
             let result = derive_write_set_from_contract("nonexistent.verb", &args, &index);

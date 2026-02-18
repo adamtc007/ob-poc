@@ -49,20 +49,20 @@ pub mod write_set;
 
 // Re-export key types at module boundary
 pub use canonical::{
-    canonical_bytes_for_envelope, canonical_bytes_for_step, canonical_bytes_for_steps,
-    content_addressed_id, full_sha256,
+    canonical_bytes_for_envelope, canonical_bytes_for_envelope_core, canonical_bytes_for_step,
+    canonical_bytes_for_steps, content_addressed_id, full_sha256,
 };
 #[cfg(feature = "vnext-repl")]
 pub use compiler::compile_verb;
 #[cfg(feature = "vnext-repl")]
 pub use constraint_gate::check_pack_constraints;
-pub use envelope::ReplayEnvelope;
+pub use envelope::{EnvelopeCore, ReplayEnvelope};
 pub use errors::{CompilationError, CompilationErrorKind};
 #[cfg(feature = "database")]
 pub use executor::PostgresRunbookStore;
 pub use executor::{
     execute_runbook, ExecutionError, LockStats, RunbookEvent, RunbookExecutionResult, RunbookStore,
-    StepExecutionResult, StepExecutor, StepOutcome,
+    RunbookStoreBackend, StepExecutionResult, StepExecutor, StepOutcome,
 };
 pub use response::{
     ClarificationContext, ClarificationRequest, CompiledRunbookSummary, ConstraintViolationDetail,
@@ -112,13 +112,14 @@ pub use verb_classifier::{classify_verb, VerbClassification};
 pub fn compile_invocation(
     session_id: uuid::Uuid,
     verb_fqn: &str,
-    args: &std::collections::HashMap<String, String>,
+    args: &std::collections::BTreeMap<String, String>,
     session: &crate::session::unified::UnifiedSession,
     macro_registry: &crate::dsl_v2::macros::MacroRegistry,
     verb_config_index: &crate::repl::verb_config_index::VerbConfigIndex,
     constraints: &crate::journey::pack_manager::EffectiveConstraints,
     runbook_version: u64,
     sem_reg_allowed_verbs: Option<&std::collections::HashSet<String>>,
+    verb_snapshot_pins: Option<&std::collections::HashMap<String, (uuid::Uuid, uuid::Uuid)>>,
 ) -> OrchestratorResponse {
     let classification = classify_verb(verb_fqn, verb_config_index, macro_registry);
     compile_verb(
@@ -130,6 +131,7 @@ pub fn compile_invocation(
         runbook_version,
         constraints,
         sem_reg_allowed_verbs,
+        verb_snapshot_pins,
     )
 }
 
@@ -157,13 +159,14 @@ mod tests {
         let resp = compile_invocation(
             uuid::Uuid::new_v4(),
             "nonexistent.verb",
-            &std::collections::HashMap::new(),
+            &std::collections::BTreeMap::new(),
             &session,
             &macro_reg,
             &verb_index,
             &constraints,
             1,
             None, // sem_reg_allowed_verbs
+            None, // verb_snapshot_pins
         );
         assert!(
             matches!(resp, OrchestratorResponse::Clarification(_)),
@@ -186,13 +189,14 @@ mod tests {
         let resp = compile_invocation(
             uuid::Uuid::new_v4(),
             "cbu.create",
-            &std::collections::HashMap::new(),
+            &std::collections::BTreeMap::new(),
             &UnifiedSession::new(),
             &MacroRegistry::new(),
             &VerbConfigIndex::empty(),
             &EffectiveConstraints::unconstrained(),
             1,
             None, // sem_reg_allowed_verbs
+            None, // verb_snapshot_pins
         );
         // cbu.create is not in empty VerbConfigIndex → Unknown → Clarification
         assert!(matches!(resp, OrchestratorResponse::Clarification(_)));

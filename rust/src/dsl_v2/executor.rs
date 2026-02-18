@@ -1871,6 +1871,7 @@ impl DslExecutor {
                         entity_type,
                         entity_id,
                         acquired_so_far,
+                        ..
                     }) => {
                         // Rollback and return contention error
                         tx.rollback().await?;

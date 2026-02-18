@@ -78,6 +78,8 @@ pub struct InitializeResult {
 #[derive(Debug, Serialize)]
 pub struct ServerCapabilities {
     pub tools: ToolsCapability,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub resources: Option<ResourcesCapability>,
 }
 
 /// Tools capability
@@ -131,6 +133,92 @@ pub struct ToolContent {
     #[serde(rename = "type")]
     pub content_type: String,
     pub text: String,
+}
+
+// ── MCP Resource Types ─────────────────────────────────────────
+
+/// Resource template definition (advertised via `resources/list`)
+#[derive(Debug, Serialize)]
+pub struct ResourceTemplate {
+    /// URI template with placeholders, e.g. `sem_reg://attributes/{fqn}`
+    #[serde(rename = "uriTemplate")]
+    pub uri_template: String,
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(rename = "mimeType", skip_serializing_if = "Option::is_none")]
+    pub mime_type: Option<String>,
+}
+
+/// Static resource definition (advertised via `resources/list`)
+#[derive(Debug, Serialize)]
+pub struct Resource {
+    pub uri: String,
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(rename = "mimeType", skip_serializing_if = "Option::is_none")]
+    pub mime_type: Option<String>,
+}
+
+/// Result for `resources/list`
+#[derive(Debug, Serialize)]
+pub struct ResourcesListResult {
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub resources: Vec<Resource>,
+    #[serde(rename = "resourceTemplates", skip_serializing_if = "Vec::is_empty")]
+    pub resource_templates: Vec<ResourceTemplate>,
+}
+
+/// Parameters for `resources/read`
+#[derive(Debug, Deserialize)]
+pub struct ResourceReadParams {
+    pub uri: String,
+}
+
+/// A single content block returned by `resources/read`
+#[derive(Debug, Serialize)]
+pub struct ResourceContent {
+    pub uri: String,
+    #[serde(rename = "mimeType", skip_serializing_if = "Option::is_none")]
+    pub mime_type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub text: Option<String>,
+}
+
+/// Result for `resources/read`
+#[derive(Debug, Serialize)]
+pub struct ResourceReadResult {
+    pub contents: Vec<ResourceContent>,
+}
+
+impl ResourceReadResult {
+    pub fn json_content(uri: &str, value: &serde_json::Value) -> Self {
+        Self {
+            contents: vec![ResourceContent {
+                uri: uri.to_string(),
+                mime_type: Some("application/json".into()),
+                text: Some(serde_json::to_string_pretty(value).unwrap_or_default()),
+            }],
+        }
+    }
+
+    pub fn not_found(uri: &str) -> Self {
+        Self {
+            contents: vec![ResourceContent {
+                uri: uri.to_string(),
+                mime_type: Some("text/plain".into()),
+                text: Some(format!("Resource not found: {}", uri)),
+            }],
+        }
+    }
+}
+
+/// Resources capability
+#[derive(Debug, Serialize)]
+pub struct ResourcesCapability {
+    #[serde(rename = "listChanged")]
+    pub list_changed: bool,
 }
 
 impl ToolCallResult {

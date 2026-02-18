@@ -32,6 +32,40 @@ use crate::sem_reg::enforce::{enforce_read, enforce_read_label, redacted_stub, E
 use crate::sem_reg::store::SnapshotStore;
 use crate::sem_reg::types::{GovernanceTier, ObjectType, TrustClass};
 
+// ── Grounding Context ─────────────────────────────────────────
+
+/// Structured grounding metadata attached to tool responses so the agent can
+/// reference exact snapshot IDs, governance tiers, and confidence in decisions.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GroundingContext {
+    /// Snapshot IDs consulted during this tool invocation — keyed by FQN or
+    /// object description for traceability.
+    pub snapshot_ids: HashMap<String, Uuid>,
+    /// Distribution of governance tiers among the consulted snapshots.
+    pub governance_tiers: HashMap<String, usize>,
+    /// Overall confidence score (0.0–1.0) when available.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub confidence: Option<f64>,
+    /// Evidence mode that was applied (if context resolution was involved).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub evidence_mode: Option<String>,
+    /// Snapshot IDs whose embeddings are stale (version_hash mismatch).
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub stale_embeddings: Vec<Uuid>,
+}
+
+impl GroundingContext {
+    pub fn empty() -> Self {
+        Self {
+            snapshot_ids: HashMap::new(),
+            governance_tiers: HashMap::new(),
+            confidence: None,
+            evidence_mode: None,
+            stale_embeddings: Vec::new(),
+        }
+    }
+}
+
 // ── Tool Context ──────────────────────────────────────────────
 
 /// Context passed to every MCP tool handler.
@@ -149,10 +183,10 @@ fn registry_query_specs() -> Vec<SemRegToolSpec> {
         },
         SemRegToolSpec {
             name: "sem_reg_search".into(),
-            description: "Search registry objects by name/FQN pattern (ILIKE)".into(),
+            description: "Search registry objects by name/FQN pattern. Supports optional embedding-based semantic ranking when query_embedding is provided.".into(),
             category: "registry_query".into(),
             parameters: vec![
-                param("query", "Search pattern", "string", true),
+                param("query", "Search pattern (text)", "string", true),
                 param(
                     "object_type",
                     "Filter by object type (optional)",
@@ -160,6 +194,12 @@ fn registry_query_specs() -> Vec<SemRegToolSpec> {
                     false,
                 ),
                 param("limit", "Max results (default 20)", "integer", false),
+                param(
+                    "query_embedding",
+                    "Pre-computed embedding vector for semantic ranking (array of floats, optional). When provided, results are ranked by cosine similarity instead of ILIKE.",
+                    "array",
+                    false,
+                ),
             ],
         },
         SemRegToolSpec {
@@ -445,45 +485,34 @@ fn evidence_specs() -> Vec<SemRegToolSpec> {
     vec![
         SemRegToolSpec {
             name: "sem_reg_record_observation".into(),
-            description: "Record a derivation edge linking input snapshots to an output snapshot"
-                .into(),
+            description: "Record an evidence observation for a registry snapshot".into(),
             category: "evidence".into(),
             parameters: vec![
-                param(
-                    "verb_fqn",
-                    "Verb that produced the derivation",
-                    "string",
-                    true,
-                ),
-                param(
-                    "input_snapshot_ids",
-                    "Array of input snapshot UUIDs",
-                    "array",
-                    false,
-                ),
-                param("output_snapshot_id", "Output snapshot UUID", "uuid", true),
-                param("run_id", "Optional run record UUID", "uuid", false),
+                param("snapshot_id", "Snapshot UUID this observation is evidence for", "uuid", true),
+                param("observer_id", "Who or what made the observation (e.g. 'agent:kyc-bot')", "string", true),
+                param("evidence_grade", "Grade: primary_document, secondary_document, self_declaration, third_party_attestation, system_derived, manual_override", "string", true),
+                param("raw_payload", "Evidence payload (JSON object)", "object", false),
+                param("supersedes", "UUID of previous observation in the chain", "uuid", false),
             ],
         },
         SemRegToolSpec {
             name: "sem_reg_check_evidence_freshness".into(),
-            description: "Check if embeddings for snapshots are fresh or stale".into(),
+            description: "Check evidence freshness for snapshots against observation recency".into(),
             category: "evidence".into(),
-            parameters: vec![param(
-                "snapshot_ids",
-                "Array of snapshot UUIDs to check",
-                "array",
-                true,
-            )],
+            parameters: vec![
+                param("snapshot_ids", "Array of snapshot UUIDs to check", "array", true),
+                param("max_age_days", "Maximum age in days before evidence is considered stale (default: 365)", "integer", false),
+            ],
         },
         SemRegToolSpec {
             name: "sem_reg_identify_evidence_gaps".into(),
-            description: "Identify missing or stale evidence for a subject".into(),
+            description: "Identify missing or insufficient evidence for a subject, checking observation existence, grade, and freshness".into(),
             category: "evidence".into(),
             parameters: vec![
                 param("subject_id", "Subject UUID", "uuid", true),
-                param("subject_type", "Subject type", "string", true),
+                param("subject_type", "Subject type: entity, case", "string", true),
                 param("mode", "Evidence mode: strict, normal", "string", false),
+                param("max_age_days", "Maximum observation age in days (default: 365)", "integer", false),
             ],
         },
         // Phase 9: Coverage metrics
@@ -592,6 +621,19 @@ async fn handle_describe(
                     SemRegToolResult::ok(redacted_stub(&row, &reason))
                 }
                 _ => {
+                    let mut grounding = GroundingContext::empty();
+                    let label = row
+                        .definition
+                        .get("fqn")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("unknown")
+                        .to_string();
+                    grounding.snapshot_ids.insert(label, row.snapshot_id);
+                    *grounding
+                        .governance_tiers
+                        .entry(format!("{:?}", row.governance_tier))
+                        .or_insert(0) += 1;
+
                     let result = serde_json::json!({
                         "snapshot_id": row.snapshot_id,
                         "object_id": row.object_id,
@@ -603,6 +645,7 @@ async fn handle_describe(
                         "definition": row.definition,
                         "created_by": row.created_by,
                         "created_at": row.created_at.to_rfc3339(),
+                        "grounding": grounding,
                     });
                     SemRegToolResult::ok(result)
                 }
@@ -614,18 +657,77 @@ async fn handle_describe(
 }
 
 async fn handle_search(ctx: &SemRegToolContext<'_>, args: &serde_json::Value) -> SemRegToolResult {
+    use crate::sem_reg::projections::embeddings::EmbeddingStore;
+
     let query = match args.get("query").and_then(|v| v.as_str()) {
         Some(q) => q,
         None => return SemRegToolResult::err("Missing required parameter: query"),
     };
-    let limit = args.get("limit").and_then(|v| v.as_i64()).unwrap_or(20);
+    let limit = args.get("limit").and_then(|v| v.as_i64()).unwrap_or(20) as usize;
 
     let object_type_filter = args
         .get("object_type")
         .and_then(|v| v.as_str())
         .and_then(parse_object_type);
 
-    // Search by ILIKE on definition->>'fqn' and definition->>'name'
+    // Check if caller provided a pre-computed query embedding for semantic ranking.
+    // This allows callers with an embedder to get ranked results.
+    let query_embedding: Option<Vec<f32>> = args
+        .get("query_embedding")
+        .and_then(|v| v.as_array())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|v| v.as_f64().map(|f| f as f32))
+                .collect()
+        });
+
+    // If we have a query embedding, try embedding-based similarity search first
+    if let Some(ref embedding) = query_embedding {
+        let ot_str = object_type_filter.map(|ot| ot.to_string());
+        match EmbeddingStore::similarity_search(ctx.pool, embedding, ot_str.as_deref(), limit).await
+        {
+            Ok(sim_results) if !sim_results.is_empty() => {
+                let mut grounding = GroundingContext::empty();
+                let mut results: Vec<serde_json::Value> = Vec::new();
+                let mut stale_ids: Vec<Uuid> = Vec::new();
+
+                for sr in &sim_results {
+                    grounding.snapshot_ids.insert(
+                        sr.name.clone().unwrap_or_else(|| sr.object_type.clone()),
+                        sr.snapshot_id,
+                    );
+                    *grounding
+                        .governance_tiers
+                        .entry(sr.object_type.clone())
+                        .or_insert(0) += 1;
+                    if sr.stale {
+                        stale_ids.push(sr.snapshot_id);
+                    }
+                    results.push(serde_json::json!({
+                        "snapshot_id": sr.snapshot_id,
+                        "object_id": sr.object_id,
+                        "object_type": sr.object_type,
+                        "name": sr.name,
+                        "similarity_score": sr.score,
+                        "stale_embedding": sr.stale,
+                    }));
+                }
+                grounding.stale_embeddings = stale_ids;
+
+                return SemRegToolResult::ok(serde_json::json!({
+                    "count": results.len(),
+                    "search_method": "embedding_similarity",
+                    "results": results,
+                    "grounding": grounding,
+                }));
+            }
+            _ => {
+                // Fall through to ILIKE search
+            }
+        }
+    }
+
+    // Fallback: ILIKE search on definition->>'fqn' and definition->>'name'
     let type_clause = match object_type_filter {
         Some(ot) => format!("AND object_type = '{}'", ot),
         None => String::new(),
@@ -649,11 +751,12 @@ async fn handle_search(ctx: &SemRegToolContext<'_>, args: &serde_json::Value) ->
     let pattern = format!("%{}%", query);
     match sqlx::query_as::<_, SearchResultRow>(&sql)
         .bind(&pattern)
-        .bind(limit)
+        .bind(limit as i64)
         .fetch_all(ctx.pool)
         .await
     {
         Ok(rows) => {
+            let mut grounding = GroundingContext::empty();
             let results: Vec<serde_json::Value> = rows
                 .iter()
                 .filter(|r| {
@@ -664,6 +767,15 @@ async fn handle_search(ctx: &SemRegToolContext<'_>, args: &serde_json::Value) ->
                     )
                 })
                 .map(|r| {
+                    let fqn_str = r.fqn.as_deref().unwrap_or("unknown");
+                    grounding
+                        .snapshot_ids
+                        .insert(fqn_str.to_string(), r.snapshot_id);
+                    *grounding
+                        .governance_tiers
+                        .entry(format!("{:?}", r.governance_tier))
+                        .or_insert(0) += 1;
+
                     serde_json::json!({
                         "snapshot_id": r.snapshot_id,
                         "object_id": r.object_id,
@@ -677,7 +789,9 @@ async fn handle_search(ctx: &SemRegToolContext<'_>, args: &serde_json::Value) ->
                 .collect();
             SemRegToolResult::ok(serde_json::json!({
                 "count": results.len(),
+                "search_method": "ilike",
                 "results": results,
+                "grounding": grounding,
             }))
         }
         Err(e) => SemRegToolResult::err(format!("Search error: {}", e)),
@@ -1160,11 +1274,60 @@ async fn handle_resolve_context(
         entity_kind: None,
     };
 
+    let mode_str = match mode {
+        EvidenceMode::Strict => "strict",
+        EvidenceMode::Normal => "normal",
+        EvidenceMode::Exploratory => "exploratory",
+        EvidenceMode::Governance => "governance",
+    };
+
     match resolve_context(ctx.pool, &request).await {
-        Ok(response) => match serde_json::to_value(&response) {
-            Ok(json) => SemRegToolResult::ok(json),
-            Err(e) => SemRegToolResult::err(format!("Serialization error: {}", e)),
-        },
+        Ok(response) => {
+            // Build grounding context from the resolution response
+            let mut grounding = GroundingContext::empty();
+            grounding.confidence = Some(response.confidence);
+            grounding.evidence_mode = Some(mode_str.to_string());
+
+            // Collect snapshot IDs from verb candidates
+            for vc in &response.candidate_verbs {
+                grounding
+                    .snapshot_ids
+                    .insert(format!("verb:{}", vc.fqn), vc.verb_snapshot_id);
+                *grounding
+                    .governance_tiers
+                    .entry(format!("{:?}", vc.governance_tier))
+                    .or_insert(0) += 1;
+            }
+            // Collect snapshot IDs from attribute candidates
+            for ac in &response.candidate_attributes {
+                grounding
+                    .snapshot_ids
+                    .insert(format!("attr:{}", ac.fqn), ac.attribute_snapshot_id);
+                *grounding
+                    .governance_tiers
+                    .entry(format!("{:?}", ac.governance_tier))
+                    .or_insert(0) += 1;
+            }
+            // Collect snapshot IDs from view candidates
+            for rv in &response.applicable_views {
+                grounding
+                    .snapshot_ids
+                    .insert(format!("view:{}", rv.fqn), rv.view_snapshot_id);
+            }
+
+            match serde_json::to_value(&response) {
+                Ok(mut json) => {
+                    // Attach grounding context as a top-level field
+                    if let Some(obj) = json.as_object_mut() {
+                        if let Ok(gc) = serde_json::to_value(&grounding) {
+                            obj.insert("grounding".to_string(), gc);
+                        }
+                    }
+                    SemRegToolResult::ok(json)
+                }
+                Err(e) => SemRegToolResult::err(format!("Serialization error: {}", e)),
+            }
+        }
         Err(e) => SemRegToolResult::err(format!("Resolution error: {}", e)),
     }
 }
@@ -1699,56 +1862,62 @@ async fn handle_record_observation(
     ctx: &SemRegToolContext<'_>,
     args: &serde_json::Value,
 ) -> SemRegToolResult {
-    use crate::sem_reg::projections::lineage::LineageStore;
+    use crate::sem_reg::evidence_instances::{EvidenceGrade, EvidenceInstanceStore};
 
-    let verb_fqn = match args.get("verb_fqn").and_then(|v| v.as_str()) {
-        Some(f) => f,
-        None => return SemRegToolResult::err("Missing required parameter: verb_fqn"),
-    };
-
-    let input_snapshot_ids: Vec<Uuid> = args
-        .get("input_snapshot_ids")
-        .and_then(|v| v.as_array())
-        .map(|arr| {
-            arr.iter()
-                .filter_map(|v| v.as_str().and_then(|s| Uuid::parse_str(s).ok()))
-                .collect()
-        })
-        .unwrap_or_default();
-
-    let output_snapshot_id = match args
-        .get("output_snapshot_id")
+    let snapshot_id = match args
+        .get("snapshot_id")
         .and_then(|v| v.as_str())
         .and_then(|s| Uuid::parse_str(s).ok())
     {
         Some(id) => id,
-        None => {
-            return SemRegToolResult::err(
-                "Missing or invalid required parameter: output_snapshot_id",
-            )
-        }
+        None => return SemRegToolResult::err("Missing or invalid required parameter: snapshot_id"),
     };
 
-    let run_id = args
-        .get("run_id")
+    let observer_id = match args.get("observer_id").and_then(|v| v.as_str()) {
+        Some(o) => o,
+        None => return SemRegToolResult::err("Missing required parameter: observer_id"),
+    };
+
+    let evidence_grade = match args.get("evidence_grade").and_then(|v| v.as_str()) {
+        Some(g) => match g {
+            "primary_document" => EvidenceGrade::PrimaryDocument,
+            "secondary_document" => EvidenceGrade::SecondaryDocument,
+            "self_declaration" => EvidenceGrade::SelfDeclaration,
+            "third_party_attestation" => EvidenceGrade::ThirdPartyAttestation,
+            "system_derived" => EvidenceGrade::SystemDerived,
+            "manual_override" => EvidenceGrade::ManualOverride,
+            _ => return SemRegToolResult::err(format!("Invalid evidence_grade: {g}. Valid values: primary_document, secondary_document, self_declaration, third_party_attestation, system_derived, manual_override")),
+        },
+        None => return SemRegToolResult::err("Missing required parameter: evidence_grade"),
+    };
+
+    let raw_payload = args
+        .get("raw_payload")
+        .cloned()
+        .unwrap_or(serde_json::json!({}));
+
+    let supersedes = args
+        .get("supersedes")
         .and_then(|v| v.as_str())
         .and_then(|s| Uuid::parse_str(s).ok());
 
-    match LineageStore::record_derivation_edge(
+    match EvidenceInstanceStore::insert_observation(
         ctx.pool,
-        &input_snapshot_ids,
-        output_snapshot_id,
-        verb_fqn,
-        run_id,
+        snapshot_id,
+        observer_id,
+        &evidence_grade,
+        &raw_payload,
+        supersedes,
     )
     .await
     {
-        Ok(edge_id) => SemRegToolResult::ok(serde_json::json!({
-            "edge_id": edge_id,
-            "verb_fqn": verb_fqn,
+        Ok(observation_id) => SemRegToolResult::ok(serde_json::json!({
+            "observation_id": observation_id,
+            "snapshot_id": snapshot_id,
+            "evidence_grade": evidence_grade.as_str(),
             "status": "recorded",
         })),
-        Err(e) => SemRegToolResult::err(format!("Failed to record observation: {}", e)),
+        Err(e) => SemRegToolResult::err(format!("Failed to record observation: {e}")),
     }
 }
 
@@ -1767,56 +1936,64 @@ async fn handle_check_freshness(
         .unwrap_or_default();
 
     if snapshot_ids.is_empty() {
-        return SemRegToolResult::err("Missing required parameter: snapshot_ids (array of UUIDs)");
+        return SemRegToolResult::err("snapshot_ids array is empty");
     }
 
-    use crate::sem_reg::projections::embeddings::EmbeddingStore;
+    let max_age_days = args
+        .get("max_age_days")
+        .and_then(|v| v.as_i64())
+        .unwrap_or(365);
 
-    let mut stale_items = Vec::new();
+    let cutoff = chrono::Utc::now() - chrono::Duration::days(max_age_days);
+
+    let mut items = Vec::new();
 
     for sid in &snapshot_ids {
-        // Compute current hash from the snapshot definition
-        let current_hash: Option<String> = sqlx::query_scalar(
-            "SELECT md5(definition::text) FROM sem_reg.snapshots WHERE snapshot_id = $1",
+        // Query the most recent observation for this snapshot
+        let row: Option<(chrono::DateTime<chrono::Utc>, String)> = sqlx::query_as(
+            r#"SELECT observed_at, evidence_grade
+               FROM sem_reg.observations
+               WHERE snapshot_id = $1
+               ORDER BY observed_at DESC
+               LIMIT 1"#,
         )
         .bind(sid)
         .fetch_optional(ctx.pool)
         .await
         .unwrap_or(None);
 
-        let Some(hash) = current_hash else {
-            stale_items.push(serde_json::json!({
-                "snapshot_id": sid,
-                "stale": true,
-                "reason": "snapshot_not_found",
-            }));
-            continue;
-        };
-
-        match EmbeddingStore::check_staleness(ctx.pool, *sid, &hash).await {
-            Ok(is_stale) => {
-                if is_stale {
-                    stale_items.push(serde_json::json!({
-                        "snapshot_id": sid,
-                        "stale": true,
-                    }));
-                }
-            }
-            Err(_) => {
-                stale_items.push(serde_json::json!({
+        match row {
+            Some((observed_at, grade)) => {
+                let is_fresh = observed_at >= cutoff;
+                let age_days = (chrono::Utc::now() - observed_at).num_days();
+                let days_remaining = max_age_days - age_days;
+                items.push(serde_json::json!({
                     "snapshot_id": sid,
-                    "stale": true,
-                    "reason": "no_embedding_record",
+                    "fresh": is_fresh,
+                    "last_observed_at": observed_at.to_rfc3339(),
+                    "evidence_grade": grade,
+                    "age_days": age_days,
+                    "days_remaining": days_remaining.max(0),
+                }));
+            }
+            None => {
+                items.push(serde_json::json!({
+                    "snapshot_id": sid,
+                    "fresh": false,
+                    "reason": "no_observations",
                 }));
             }
         }
     }
 
+    let stale_count = items.iter().filter(|i| i["fresh"] == false).count();
+
     SemRegToolResult::ok(serde_json::json!({
         "checked_count": snapshot_ids.len(),
-        "all_fresh": stale_items.is_empty(),
-        "stale_count": stale_items.len(),
-        "stale_items": stale_items,
+        "all_fresh": stale_count == 0,
+        "stale_count": stale_count,
+        "max_age_days": max_age_days,
+        "items": items,
     }))
 }
 
@@ -1847,7 +2024,14 @@ async fn handle_identify_gaps(
         })
         .unwrap_or(EvidenceMode::Normal);
 
-    // Use context resolution to identify gaps
+    let max_age_days = args
+        .get("max_age_days")
+        .and_then(|v| v.as_i64())
+        .unwrap_or(365);
+
+    let cutoff = chrono::Utc::now() - chrono::Duration::days(max_age_days);
+
+    // Use context resolution to identify structural gaps (missing attributes)
     let subject = match subject_type {
         "case" => SubjectRef::CaseId(subject_id),
         "entity" => SubjectRef::EntityId(subject_id),
@@ -1867,28 +2051,76 @@ async fn handle_identify_gaps(
 
     match resolve_context(ctx.pool, &request).await {
         Ok(response) => {
-            let gaps: Vec<serde_json::Value> = response
-                .candidate_attributes
-                .iter()
-                .filter(|a| a.required && !a.present)
-                .map(|a| {
-                    serde_json::json!({
-                        "attribute_fqn": a.fqn,
-                        "attribute_name": a.name,
-                        "governance_tier": a.governance_tier,
-                        "trust_class": a.trust_class,
-                    })
-                })
-                .collect();
+            let mut gaps = Vec::new();
+
+            for attr in &response.candidate_attributes {
+                if !attr.required {
+                    continue;
+                }
+
+                // Check observation existence and freshness for each required attribute
+                let sid = attr.attribute_snapshot_id;
+                let obs_row: Option<(chrono::DateTime<chrono::Utc>, String)> = sqlx::query_as(
+                    r#"SELECT observed_at, evidence_grade
+                           FROM sem_reg.observations
+                           WHERE snapshot_id = $1
+                           ORDER BY observed_at DESC
+                           LIMIT 1"#,
+                )
+                .bind(sid)
+                .fetch_optional(ctx.pool)
+                .await
+                .unwrap_or(None);
+
+                let (has_observation, is_fresh, evidence_grade, remediation) = match obs_row {
+                    Some((observed_at, grade)) => {
+                        let fresh = observed_at >= cutoff;
+                        let hint = if !fresh {
+                            format!("Evidence is stale (observed {} days ago, max {} days). Re-collect evidence.", (chrono::Utc::now() - observed_at).num_days(), max_age_days)
+                        } else if !attr.present {
+                            "Attribute definition present but value not populated. Collect evidence.".into()
+                        } else {
+                            String::new()
+                        };
+                        (true, fresh, Some(grade), hint)
+                    }
+                    None => {
+                        let hint = if !attr.present {
+                            "No attribute value and no observation recorded. Collect evidence."
+                                .into()
+                        } else {
+                            "Attribute value exists but no observation recorded to substantiate it."
+                                .into()
+                        };
+                        (false, false, None, hint)
+                    }
+                };
+
+                // Report as gap if: no value, no observation, or stale observation
+                if !attr.present || !has_observation || !is_fresh {
+                    gaps.push(serde_json::json!({
+                        "attribute_fqn": attr.fqn,
+                        "attribute_name": attr.name,
+                        "governance_tier": attr.governance_tier,
+                        "trust_class": attr.trust_class,
+                        "has_value": attr.present,
+                        "has_observation": has_observation,
+                        "observation_fresh": is_fresh,
+                        "evidence_grade": evidence_grade,
+                        "remediation": remediation,
+                    }));
+                }
+            }
 
             SemRegToolResult::ok(serde_json::json!({
                 "subject_id": subject_id,
                 "gap_count": gaps.len(),
                 "gaps": gaps,
                 "governance_signals": response.governance_signals.len(),
+                "max_age_days": max_age_days,
             }))
         }
-        Err(e) => SemRegToolResult::err(format!("Gap identification error: {}", e)),
+        Err(e) => SemRegToolResult::err(format!("Gap identification error: {e}")),
     }
 }
 

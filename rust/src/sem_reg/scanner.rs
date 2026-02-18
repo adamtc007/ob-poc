@@ -9,6 +9,7 @@ use std::collections::BTreeMap;
 
 use anyhow::Result;
 use sqlx::PgPool;
+use uuid::Uuid;
 
 use dsl_core::config::loader::ConfigLoader;
 use dsl_core::config::types::{ArgConfig, VerbConfig, VerbsConfig};
@@ -37,6 +38,21 @@ pub struct ScanReport {
     pub attributes_published: usize,
     pub attributes_skipped: usize,
     pub attributes_updated: usize,
+    pub taxonomies_published: usize,
+    pub taxonomies_skipped: usize,
+    pub taxonomies_updated: usize,
+    pub taxonomy_nodes_published: usize,
+    pub taxonomy_nodes_skipped: usize,
+    pub taxonomy_nodes_updated: usize,
+    pub views_published: usize,
+    pub views_skipped: usize,
+    pub views_updated: usize,
+    pub policies_published: usize,
+    pub policies_skipped: usize,
+    pub policies_updated: usize,
+    pub derivation_specs_published: usize,
+    pub derivation_specs_skipped: usize,
+    pub derivation_specs_updated: usize,
 }
 
 impl std::fmt::Display for ScanReport {
@@ -57,8 +73,41 @@ impl std::fmt::Display for ScanReport {
             "  Attributes:      {} published, {} skipped",
             self.attributes_published, self.attributes_skipped
         )?;
-        let total =
-            self.verb_contracts_published + self.entity_types_published + self.attributes_published;
+        writeln!(
+            f,
+            "  Taxonomies:      {} published, {} updated, {} skipped",
+            self.taxonomies_published, self.taxonomies_updated, self.taxonomies_skipped
+        )?;
+        writeln!(
+            f,
+            "  Taxonomy nodes:  {} published, {} updated, {} skipped",
+            self.taxonomy_nodes_published, self.taxonomy_nodes_updated, self.taxonomy_nodes_skipped
+        )?;
+        writeln!(
+            f,
+            "  Views:           {} published, {} updated, {} skipped",
+            self.views_published, self.views_updated, self.views_skipped
+        )?;
+        writeln!(
+            f,
+            "  Policies:        {} published, {} updated, {} skipped",
+            self.policies_published, self.policies_updated, self.policies_skipped
+        )?;
+        writeln!(
+            f,
+            "  Derivation specs:{} published, {} updated, {} skipped",
+            self.derivation_specs_published,
+            self.derivation_specs_updated,
+            self.derivation_specs_skipped
+        )?;
+        let total = self.verb_contracts_published
+            + self.entity_types_published
+            + self.attributes_published
+            + self.taxonomies_published
+            + self.taxonomy_nodes_published
+            + self.views_published
+            + self.policies_published
+            + self.derivation_specs_published;
         write!(f, "  Total new snapshots: {}", total)
     }
 }
@@ -341,10 +390,28 @@ pub async fn run_onboarding_scan(
         report.verb_contracts_published = contracts.len();
         report.entity_types_published = entity_types.len();
         report.attributes_published = attributes.len();
+        // Seed reports in dry_run mode
+        let tax_report = super::seeds::seed_taxonomies(pool, Uuid::nil(), true, verbose).await?;
+        report.taxonomies_published = tax_report.taxonomies_published;
+        report.taxonomy_nodes_published = tax_report.nodes_published;
+        let view_report = super::seeds::seed_views(pool, Uuid::nil(), true, verbose).await?;
+        report.views_published = view_report.views_published;
+        let policy_report = super::seeds::seed_policies(pool, Uuid::nil(), true, verbose).await?;
+        report.policies_published = policy_report.policies_published;
+        let derivation_report =
+            super::seeds::seed_derivation_specs(pool, Uuid::nil(), true, verbose).await?;
+        report.derivation_specs_published = derivation_report.derivations_published;
         println!("\n[DRY RUN] Would publish:");
         println!("  {} verb contracts", contracts.len());
         println!("  {} entity types", entity_types.len());
         println!("  {} attributes", attributes.len());
+        println!(
+            "  {} taxonomies ({} nodes)",
+            report.taxonomies_published, report.taxonomy_nodes_published
+        );
+        println!("  {} views", report.views_published);
+        println!("  {} policies", report.policies_published);
+        println!("  {} derivation specs", report.derivation_specs_published);
         return Ok(report);
     }
 
@@ -486,6 +553,46 @@ pub async fn run_onboarding_scan(
         SnapshotStore::insert_snapshot(pool, &meta, &definition, Some(set_id)).await?;
         report.attributes_published += 1;
     }
+
+    // 8. Seed taxonomies
+    if verbose {
+        println!("\nSeeding taxonomies...");
+    }
+    let tax_report = super::seeds::seed_taxonomies(pool, set_id, dry_run, verbose).await?;
+    report.taxonomies_published = tax_report.taxonomies_published;
+    report.taxonomies_skipped = tax_report.taxonomies_skipped;
+    report.taxonomies_updated = tax_report.taxonomies_updated;
+    report.taxonomy_nodes_published = tax_report.nodes_published;
+    report.taxonomy_nodes_skipped = tax_report.nodes_skipped;
+    report.taxonomy_nodes_updated = tax_report.nodes_updated;
+
+    // 9. Seed views
+    if verbose {
+        println!("\nSeeding views...");
+    }
+    let view_report = super::seeds::seed_views(pool, set_id, dry_run, verbose).await?;
+    report.views_published = view_report.views_published;
+    report.views_skipped = view_report.views_skipped;
+    report.views_updated = view_report.views_updated;
+
+    // 10. Seed policies
+    if verbose {
+        println!("\nSeeding policies...");
+    }
+    let policy_report = super::seeds::seed_policies(pool, set_id, dry_run, verbose).await?;
+    report.policies_published = policy_report.policies_published;
+    report.policies_skipped = policy_report.policies_skipped;
+    report.policies_updated = policy_report.policies_updated;
+
+    // 11. Seed derivation specs
+    if verbose {
+        println!("\nSeeding derivation specs...");
+    }
+    let derivation_report =
+        super::seeds::seed_derivation_specs(pool, set_id, dry_run, verbose).await?;
+    report.derivation_specs_published = derivation_report.derivations_published;
+    report.derivation_specs_skipped = derivation_report.derivations_skipped;
+    report.derivation_specs_updated = derivation_report.derivations_updated;
 
     Ok(report)
 }

@@ -7,6 +7,8 @@ pub mod embeddings;
 pub mod lineage;
 pub mod metrics;
 
-pub use embeddings::{EmbeddingRecord, EmbeddingStore, SemanticText};
+pub use embeddings::{
+    cosine_similarity, EmbeddingRecord, EmbeddingStore, SemanticText, SimilarityResult,
+};
 pub use lineage::{DerivationEdge, LineageDirection, LineageStore, RunRecord};
 pub use metrics::{CoverageReport, MetricsStore, TierDistribution};

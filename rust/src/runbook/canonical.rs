@@ -28,7 +28,7 @@
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
-use super::envelope::{MacroExpansionAudit, ReplayEnvelope};
+use super::envelope::{EnvelopeCore, MacroExpansionAudit, ReplayEnvelope};
 use super::types::{CompiledRunbookId, CompiledStep};
 
 // ---------------------------------------------------------------------------
@@ -37,16 +37,32 @@ use super::types::{CompiledRunbookId, CompiledStep};
 
 /// Serialize a slice of compiled steps to deterministic bincode bytes.
 pub fn canonical_bytes_for_steps(steps: &[CompiledStep]) -> Vec<u8> {
+    // SAFETY: all fields are primitives, BTreeMaps, Vecs, and Strings —
+    // bincode serialization cannot fail for these types.
     bincode::serialize(steps).expect("bincode serialization of CompiledStep slice is infallible")
 }
 
-/// Serialize a replay envelope to deterministic bincode bytes.
+/// Serialize an envelope core to deterministic bincode bytes.
+///
+/// Only the `EnvelopeCore` (no timestamps) feeds into the content-addressed
+/// hash. The full `ReplayEnvelope` is stored for audit but not hashed.
+pub fn canonical_bytes_for_envelope_core(core: &EnvelopeCore) -> Vec<u8> {
+    // SAFETY: all fields are primitives, BTreeMaps, Vecs, and Strings —
+    // bincode serialization cannot fail for these types.
+    bincode::serialize(core).expect("bincode serialization of EnvelopeCore is infallible")
+}
+
+/// Serialize a full replay envelope to deterministic bincode bytes.
+///
+/// Used for storage/integrity checks, NOT for content-addressed ID hashing.
+/// For ID hashing, use `canonical_bytes_for_envelope_core()`.
 pub fn canonical_bytes_for_envelope(envelope: &ReplayEnvelope) -> Vec<u8> {
     bincode::serialize(envelope).expect("bincode serialization of ReplayEnvelope is infallible")
 }
 
 /// Serialize a single compiled step to deterministic bincode bytes.
 pub fn canonical_bytes_for_step(step: &CompiledStep) -> Vec<u8> {
+    // SAFETY: all fields are primitives, BTreeMaps, Vecs, and Strings.
     bincode::serialize(step).expect("bincode serialization of CompiledStep is infallible")
 }
 
@@ -59,11 +75,15 @@ pub fn canonical_bytes_for_audit(audit: &MacroExpansionAudit) -> Vec<u8> {
 // Content-addressed ID computation
 // ---------------------------------------------------------------------------
 
-/// Compute a content-addressed `CompiledRunbookId` from steps + envelope.
+/// Compute a content-addressed `CompiledRunbookId` from steps + envelope core.
 ///
 /// ```text
-/// SHA-256(bincode(steps) ++ bincode(envelope)) → truncate 128 bits → UUID
+/// SHA-256(bincode(steps) ++ bincode(envelope.core)) → truncate 128 bits → UUID
 /// ```
+///
+/// Only the deterministic `EnvelopeCore` (no timestamps) feeds into the hash.
+/// This ensures that two compilations of the same input at different times
+/// produce the same `CompiledRunbookId`.
 ///
 /// This is the **only** way to derive a `CompiledRunbookId` in production.
 /// `CompiledRunbookId::new()` (random UUID) is retained only for `#[cfg(test)]`.
@@ -73,7 +93,7 @@ pub fn content_addressed_id(
 ) -> CompiledRunbookId {
     let mut hasher = Sha256::new();
     hasher.update(canonical_bytes_for_steps(steps));
-    hasher.update(canonical_bytes_for_envelope(envelope));
+    hasher.update(canonical_bytes_for_envelope_core(&envelope.core));
     let hash = hasher.finalize();
 
     // Truncate SHA-256 (32 bytes) to 128 bits (16 bytes) → UUID
@@ -85,12 +105,12 @@ pub fn content_addressed_id(
 
 /// Compute the full SHA-256 hash (32 bytes) for integrity verification.
 ///
-/// Used when storing the canonical hash alongside the JSONB representation
-/// in PostgreSQL — the full hash is stored for tamper detection.
+/// Uses the deterministic `EnvelopeCore` — same hash basis as
+/// `content_addressed_id()` so truncated ID matches full hash prefix.
 pub fn full_sha256(steps: &[CompiledStep], envelope: &ReplayEnvelope) -> [u8; 32] {
     let mut hasher = Sha256::new();
     hasher.update(canonical_bytes_for_steps(steps));
-    hasher.update(canonical_bytes_for_envelope(envelope));
+    hasher.update(canonical_bytes_for_envelope_core(&envelope.core));
     hasher.finalize().into()
 }
 
@@ -118,6 +138,7 @@ mod tests {
             depends_on: vec![],
             execution_mode: super::super::types::ExecutionMode::Sync,
             write_set: vec![],
+            verb_contract_snapshot_id: None,
         }
     }
 
@@ -125,8 +146,13 @@ mod tests {
         let mut bindings = BTreeMap::new();
         bindings.insert("Allianz".to_string(), Uuid::nil());
         ReplayEnvelope {
-            session_cursor: 42,
-            entity_bindings: bindings,
+            core: super::super::envelope::EnvelopeCore {
+                session_cursor: 42,
+                entity_bindings: bindings,
+                external_lookup_digests: vec![],
+                macro_audit_digests: vec![],
+                snapshot_manifest: std::collections::HashMap::new(),
+            },
             external_lookups: vec![],
             macro_audits: vec![],
             sealed_at: chrono::DateTime::UNIX_EPOCH.into(),
@@ -200,10 +226,56 @@ mod tests {
         let steps = vec![sample_step("cbu.create", &[])];
         let env_a = ReplayEnvelope::empty();
         let mut env_b = ReplayEnvelope::empty();
-        env_b.session_cursor = 99;
+        env_b.core.session_cursor = 99;
         let id_a = content_addressed_id(&steps, &env_a);
         let id_b = content_addressed_id(&steps, &env_b);
         assert_ne!(id_a, id_b, "Different envelopes must produce different IDs");
+    }
+
+    /// Phase A regression test: same inputs at different times produce same ID.
+    #[test]
+    fn test_timestamp_excluded_from_hash() {
+        let steps = vec![sample_step("cbu.create", &[("name", "Acme")])];
+        let mut env_a = ReplayEnvelope::empty();
+        let mut env_b = ReplayEnvelope::empty();
+        // Different sealed_at timestamps
+        env_a.sealed_at = chrono::DateTime::UNIX_EPOCH.into();
+        env_b.sealed_at = chrono::Utc::now();
+        let id_a = content_addressed_id(&steps, &env_a);
+        let id_b = content_addressed_id(&steps, &env_b);
+        assert_eq!(
+            id_a, id_b,
+            "Timestamps must not affect content-addressed ID"
+        );
+    }
+
+    /// Phase A-3 regression test: compile same input twice, assert identical
+    /// `CompiledRunbookId`. Exercises `CompiledRunbook::new()` which calls
+    /// `content_addressed_id()` internally.
+    #[test]
+    fn test_same_input_same_id() {
+        use crate::runbook::types::CompiledRunbook;
+        let session_id = Uuid::new_v4();
+        let version = 1u64;
+        let steps = vec![sample_step(
+            "cbu.create",
+            &[("name", "Acme"), ("kind", "fund")],
+        )];
+        let env = ReplayEnvelope::with_bindings(
+            42,
+            std::collections::BTreeMap::from([("cbu".to_string(), Uuid::nil())]),
+        );
+
+        let rb1 = CompiledRunbook::new(session_id, version, steps.clone(), env.clone());
+        // Simulate a second compilation at a different time
+        let mut env2 = env;
+        env2.sealed_at = chrono::Utc::now() + chrono::Duration::hours(1);
+        let rb2 = CompiledRunbook::new(session_id, version, steps, env2);
+
+        assert_eq!(
+            rb1.id, rb2.id,
+            "Identical inputs must produce identical CompiledRunbookId regardless of timestamp"
+        );
     }
 
     // -- Round-trip tests (bincode serialize → deserialize) --
@@ -282,6 +354,7 @@ mod tests {
             depends_on: vec![],
             execution_mode: super::super::types::ExecutionMode::Sync,
             write_set: vec![],
+            verb_contract_snapshot_id: None,
         };
         let step_b = CompiledStep {
             step_id: Uuid::nil(),
@@ -292,6 +365,7 @@ mod tests {
             depends_on: vec![],
             execution_mode: super::super::types::ExecutionMode::Sync,
             write_set: vec![],
+            verb_contract_snapshot_id: None,
         };
 
         let bytes_a = canonical_bytes_for_step(&step_a);
@@ -382,27 +456,10 @@ mod proptests {
         ]
     }
 
-    /// Arbitrary JSON values — restricted to `String` only.
-    ///
-    /// `bincode` does not support `deserialize_any()` which `serde_json::Value`
-    /// uses for non-String variants. Since our canonical bytes are used for
-    /// one-way hashing (never deserialized from bincode in production), this
-    /// restriction only affects property test round-trips. String values
-    /// exercise the full serialize→deserialize path.
-    fn arb_json_value() -> impl Strategy<Value = serde_json::Value> {
-        "[a-zA-Z0-9 _-]{0,20}".prop_map(serde_json::Value::String)
-    }
-
     fn arb_btreemap_string_string(
         max_size: usize,
     ) -> impl Strategy<Value = BTreeMap<String, String>> {
         prop::collection::btree_map("[a-z]{1,8}", ".*", 0..max_size)
-    }
-
-    fn arb_btreemap_string_json(
-        max_size: usize,
-    ) -> impl Strategy<Value = BTreeMap<String, serde_json::Value>> {
-        prop::collection::btree_map("[a-z]{1,8}", arb_json_value(), 0..max_size)
     }
 
     // -- Arbitrary types --
@@ -429,6 +486,7 @@ mod proptests {
                         depends_on,
                         execution_mode,
                         write_set,
+                        verb_contract_snapshot_id: None,
                     }
                 },
             )
@@ -456,8 +514,8 @@ mod proptests {
         (
             arb_uuid(),
             "[a-z]+\\.[a-z]+",
-            arb_btreemap_string_json(4),
-            arb_btreemap_string_json(4),
+            arb_btreemap_string_string(4),
+            arb_btreemap_string_string(4),
             "[a-f0-9]{64}",
             arb_expansion_limits(),
             arb_datetime(),
@@ -485,39 +543,53 @@ mod proptests {
             )
     }
 
-    fn arb_replay_envelope() -> impl Strategy<Value = ReplayEnvelope> {
+    fn arb_envelope_core() -> impl Strategy<Value = crate::runbook::envelope::EnvelopeCore> {
         (
             any::<u64>(),
             prop::collection::btree_map("[a-z]{1,8}", arb_uuid(), 0..5),
+            prop::collection::vec("[a-f0-9]{64}", 0..3),
+            prop::collection::vec("[a-f0-9]{64}", 0..3),
+        )
+            .prop_map(
+                |(
+                    session_cursor,
+                    entity_bindings,
+                    external_lookup_digests,
+                    macro_audit_digests,
+                )| {
+                    crate::runbook::envelope::EnvelopeCore {
+                        session_cursor,
+                        entity_bindings,
+                        external_lookup_digests,
+                        macro_audit_digests,
+                        snapshot_manifest: std::collections::HashMap::new(),
+                    }
+                },
+            )
+    }
+
+    fn arb_replay_envelope() -> impl Strategy<Value = ReplayEnvelope> {
+        (
+            arb_envelope_core(),
             prop::collection::vec(arb_external_lookup(), 0..3),
             prop::collection::vec(arb_macro_audit(), 0..3),
             arb_datetime(),
         )
             .prop_map(
-                |(session_cursor, entity_bindings, external_lookups, macro_audits, sealed_at)| {
-                    ReplayEnvelope {
-                        session_cursor,
-                        entity_bindings,
-                        external_lookups,
-                        macro_audits,
-                        sealed_at,
-                    }
+                |(core, external_lookups, macro_audits, sealed_at)| ReplayEnvelope {
+                    core,
+                    external_lookups,
+                    macro_audits,
+                    sealed_at,
                 },
             )
     }
 
     // -- Property tests (INV-3) --
     //
-    // `CompiledStep` contains no `serde_json::Value` fields, so it supports
-    // full bincode round-trip (serialize → deserialize → equal).
-    //
-    // `MacroExpansionAudit` and `ReplayEnvelope` contain `BTreeMap<String, serde_json::Value>`
-    // for `params` / `resolved_autofill`. bincode serializes `Value` fine, but
-    // `Value::deserialize()` calls `deserialize_any()` which bincode rejects.
-    // This is acceptable: canonical bytes are used for one-way SHA-256 hashing
-    // (INV-2), never deserialized from bincode in production. For these types
-    // we verify **serialization determinism** (same input → same bytes) which
-    // is the property that matters for content-addressed IDs.
+    // All canonical types use only primitives, `BTreeMap<String, String>`,
+    // and `Vec` — fully supported by bincode for round-trip. Every proptest
+    // verifies serialize → deserialize → assert_eq (not just determinism).
 
     proptest! {
         #[test]
@@ -528,25 +600,22 @@ mod proptests {
             prop_assert_eq!(step, decoded);
         }
 
-        /// Serialization determinism for ReplayEnvelope (INV-3).
-        ///
-        /// Verifies that the same envelope always produces identical canonical
-        /// bytes — the property that guarantees content-addressed ID stability.
+        /// Full bincode round-trip for ReplayEnvelope (INV-3).
         #[test]
-        fn replay_envelope_deterministic(env in arb_replay_envelope()) {
-            let bytes1 = canonical_bytes_for_envelope(&env);
-            let bytes2 = canonical_bytes_for_envelope(&env);
-            prop_assert_eq!(bytes1, bytes2,
-                "Same ReplayEnvelope must produce identical canonical bytes");
+        fn replay_envelope_round_trip(env in arb_replay_envelope()) {
+            let bytes = canonical_bytes_for_envelope(&env);
+            let decoded: ReplayEnvelope = bincode::deserialize(&bytes)
+                .expect("bincode round-trip deserialize");
+            prop_assert_eq!(env, decoded);
         }
 
-        /// Serialization determinism for MacroExpansionAudit (INV-3).
+        /// Full bincode round-trip for MacroExpansionAudit (INV-3).
         #[test]
-        fn macro_audit_deterministic(audit in arb_macro_audit()) {
-            let bytes1 = canonical_bytes_for_audit(&audit);
-            let bytes2 = canonical_bytes_for_audit(&audit);
-            prop_assert_eq!(bytes1, bytes2,
-                "Same MacroExpansionAudit must produce identical canonical bytes");
+        fn macro_audit_round_trip(audit in arb_macro_audit()) {
+            let bytes = canonical_bytes_for_audit(&audit);
+            let decoded: MacroExpansionAudit = bincode::deserialize(&bytes)
+                .expect("bincode round-trip deserialize");
+            prop_assert_eq!(audit, decoded);
         }
 
         #[test]
@@ -560,18 +629,22 @@ mod proptests {
         }
     }
 
-    // Non-proptest round-trip tests for ReplayEnvelope and MacroExpansionAudit
-    // using empty JSON maps (no `serde_json::Value` deserialization issues).
+    // Non-proptest round-trip tests with realistic data.
 
     #[test]
-    fn replay_envelope_round_trip_no_json_values() {
+    fn replay_envelope_round_trip_realistic() {
         let env = ReplayEnvelope {
-            session_cursor: 42,
-            entity_bindings: {
-                let mut m = BTreeMap::new();
-                m.insert("allianz".into(), Uuid::new_v4());
-                m.insert("blackrock".into(), Uuid::new_v4());
-                m
+            core: crate::runbook::envelope::EnvelopeCore {
+                session_cursor: 42,
+                entity_bindings: {
+                    let mut m = BTreeMap::new();
+                    m.insert("allianz".into(), Uuid::new_v4());
+                    m.insert("blackrock".into(), Uuid::new_v4());
+                    m
+                },
+                external_lookup_digests: vec!["abc123".into()],
+                macro_audit_digests: vec!["def456".into()],
+                snapshot_manifest: std::collections::HashMap::new(),
             },
             external_lookups: vec![ExternalLookup {
                 source: "gleif".into(),
@@ -582,7 +655,7 @@ mod proptests {
             macro_audits: vec![MacroExpansionAudit {
                 expansion_id: Uuid::new_v4(),
                 macro_name: "structure.setup".into(),
-                params: BTreeMap::new(), // empty — avoids serde_json::Value
+                params: BTreeMap::new(),
                 resolved_autofill: BTreeMap::new(),
                 expansion_digest: "def456".into(),
                 expansion_limits: ExpansionLimits::default(),
@@ -597,7 +670,7 @@ mod proptests {
     }
 
     #[test]
-    fn macro_audit_round_trip_no_json_values() {
+    fn macro_audit_round_trip_realistic() {
         let audit = MacroExpansionAudit {
             expansion_id: Uuid::new_v4(),
             macro_name: "party.assign".into(),
@@ -614,5 +687,24 @@ mod proptests {
         let decoded: MacroExpansionAudit =
             bincode::deserialize(&bytes).expect("round-trip with empty JSON maps");
         assert_eq!(audit, decoded);
+    }
+
+    #[test]
+    fn envelope_core_round_trip() {
+        let core = crate::runbook::envelope::EnvelopeCore {
+            session_cursor: 99,
+            entity_bindings: {
+                let mut m = BTreeMap::new();
+                m.insert("test".into(), Uuid::new_v4());
+                m
+            },
+            external_lookup_digests: vec!["digest1".into(), "digest2".into()],
+            macro_audit_digests: vec!["macro_digest".into()],
+            snapshot_manifest: std::collections::HashMap::new(),
+        };
+        let bytes = canonical_bytes_for_envelope_core(&core);
+        let decoded: crate::runbook::envelope::EnvelopeCore =
+            bincode::deserialize(&bytes).expect("EnvelopeCore round-trip");
+        assert_eq!(core, decoded);
     }
 }

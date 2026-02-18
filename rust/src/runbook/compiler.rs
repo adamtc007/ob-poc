@@ -21,7 +21,7 @@
 //!
 //! Gated behind `vnext-repl` because it depends on `VerbConfigIndex`.
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use uuid::Uuid;
 
@@ -71,6 +71,10 @@ use super::verb_classifier::VerbClassification;
 /// * `sem_reg_allowed_verbs` — optional SemReg allowed verb set (INV-6 Step 4).
 ///   When `Some`, expanded verbs are filtered against this set after pack gate.
 ///   When `None`, SemReg filtering is skipped (graceful degradation).
+/// * `verb_snapshot_pins` — optional pre-resolved verb FQN → snapshot_id map.
+///   When `Some`, each compiled step pins the verb contract snapshot for audit.
+///   When `None`, snapshot pinning is skipped (graceful degradation).
+///   The caller resolves these from SemReg asynchronously before calling this function.
 ///
 /// # Returns
 ///
@@ -83,12 +87,13 @@ use super::verb_classifier::VerbClassification;
 pub fn compile_verb(
     session_id: Uuid,
     classification: &VerbClassification<'_>,
-    args: &HashMap<String, String>,
+    args: &BTreeMap<String, String>,
     session: &UnifiedSession,
     macro_registry: &MacroRegistry,
     runbook_version: u64,
     constraints: &EffectiveConstraints,
     sem_reg_allowed_verbs: Option<&std::collections::HashSet<String>>,
+    verb_snapshot_pins: Option<&HashMap<String, (Uuid, Uuid)>>,
 ) -> OrchestratorResponse {
     match classification {
         VerbClassification::Macro { fqn, schema } => compile_macro(
@@ -101,6 +106,7 @@ pub fn compile_verb(
             runbook_version,
             constraints,
             sem_reg_allowed_verbs,
+            verb_snapshot_pins,
         ),
         VerbClassification::Primitive { fqn } => compile_primitive(
             session_id,
@@ -109,6 +115,7 @@ pub fn compile_verb(
             runbook_version,
             constraints,
             sem_reg_allowed_verbs,
+            verb_snapshot_pins,
         ),
         VerbClassification::Unknown { name } => {
             OrchestratorResponse::Clarification(ClarificationRequest {
@@ -140,12 +147,13 @@ fn compile_macro(
     session_id: Uuid,
     fqn: &str,
     schema: &MacroSchema,
-    args: &HashMap<String, String>,
+    args: &BTreeMap<String, String>,
     session: &UnifiedSession,
     macro_registry: &MacroRegistry,
     runbook_version: u64,
     constraints: &EffectiveConstraints,
     sem_reg_allowed_verbs: Option<&std::collections::HashSet<String>>,
+    verb_snapshot_pins: Option<&HashMap<String, (Uuid, Uuid)>>,
 ) -> OrchestratorResponse {
     // Pre-check required args — give a user-friendly clarification
     // before attempting expansion (which also checks, but with less context).
@@ -211,6 +219,9 @@ fn compile_macro(
         .enumerate()
         .map(|(i, dsl)| {
             let verb = extract_verb_from_dsl(dsl);
+            let snapshot_id = verb_snapshot_pins
+                .and_then(|pins| pins.get(&verb))
+                .map(|(_obj_id, snap_id)| *snap_id);
             CompiledStep {
                 step_id: Uuid::new_v4(),
                 sentence: format!("Step {}: {}", i + 1, verb),
@@ -220,6 +231,7 @@ fn compile_macro(
                 depends_on: vec![],
                 execution_mode: ExecutionMode::Sync,
                 write_set: vec![], // Populated in Step 5
+                verb_contract_snapshot_id: snapshot_id,
             }
         })
         .collect();
@@ -272,10 +284,7 @@ fn compile_macro(
         .map(|a| envelope::MacroExpansionAudit {
             expansion_id: a.expansion_id,
             macro_name: a.macro_fqn.clone(),
-            params: args
-                .iter()
-                .map(|(k, v)| (k.clone(), serde_json::Value::String(v.clone())))
-                .collect(),
+            params: args.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
             resolved_autofill: std::collections::BTreeMap::new(),
             expansion_digest: a.output_digest.clone(),
             expansion_limits: fixpoint.limits,
@@ -283,9 +292,31 @@ fn compile_macro(
         })
         .collect();
 
+    // Collect deterministic digests for EnvelopeCore (no timestamps).
+    let macro_audit_digests: Vec<String> = macro_audits
+        .iter()
+        .map(|a| a.expansion_digest.clone())
+        .collect();
+
+    // Build snapshot manifest from verb_snapshot_pins for all expanded verbs.
+    let snapshot_manifest: HashMap<Uuid, Uuid> = verb_snapshot_pins
+        .map(|pins| {
+            expanded_verbs
+                .iter()
+                .filter_map(|v| pins.get(v.as_str()))
+                .map(|(obj_id, snap_id)| (*obj_id, *snap_id))
+                .collect()
+        })
+        .unwrap_or_default();
+
     let envelope = ReplayEnvelope {
-        session_cursor: runbook_version,
-        entity_bindings: std::collections::BTreeMap::new(),
+        core: envelope::EnvelopeCore {
+            session_cursor: runbook_version,
+            entity_bindings: std::collections::BTreeMap::new(),
+            external_lookup_digests: vec![],
+            macro_audit_digests,
+            snapshot_manifest,
+        },
         external_lookups: vec![],
         macro_audits,
         sealed_at: chrono::Utc::now(),
@@ -307,7 +338,7 @@ fn compile_macro(
         compiled_runbook_id: runbook.id,
         runbook_version: runbook.version,
         step_count: runbook.step_count(),
-        envelope_entity_count: runbook.envelope.entity_bindings.len(),
+        envelope_entity_count: runbook.envelope.entity_bindings().len(),
         preview,
         compiled_runbook: Some(runbook),
     })
@@ -325,10 +356,11 @@ fn compile_macro(
 fn compile_primitive(
     session_id: Uuid,
     fqn: &str,
-    args: &HashMap<String, String>,
+    args: &BTreeMap<String, String>,
     runbook_version: u64,
     constraints: &EffectiveConstraints,
     sem_reg_allowed_verbs: Option<&std::collections::HashSet<String>>,
+    verb_snapshot_pins: Option<&HashMap<String, (Uuid, Uuid)>>,
 ) -> OrchestratorResponse {
     // §6.2 Step 3: pack gate
     if let Err(violation) = check_pack_constraints(&[fqn.to_string()], constraints) {
@@ -353,6 +385,11 @@ fn compile_primitive(
     // §6.2 Step 5: write_set
     let dsl = build_dsl_from_args(fqn, args);
 
+    // Pin verb contract snapshot if available (S16: execution snapshot pinning).
+    let snapshot_id = verb_snapshot_pins
+        .and_then(|pins| pins.get(fqn))
+        .map(|(_obj_id, snap_id)| *snap_id);
+
     let step = CompiledStep {
         step_id: Uuid::new_v4(),
         sentence: format!("Execute {}", fqn),
@@ -362,15 +399,34 @@ fn compile_primitive(
         depends_on: vec![],
         execution_mode: ExecutionMode::Sync,
         write_set: derive_write_set(fqn, args, None).into_iter().collect(),
+        verb_contract_snapshot_id: snapshot_id,
+    };
+
+    // Build snapshot manifest for the envelope (single verb for primitives).
+    let snapshot_manifest: HashMap<Uuid, Uuid> = verb_snapshot_pins
+        .and_then(|pins| pins.get(fqn))
+        .map(|(obj_id, snap_id)| {
+            let mut m = HashMap::new();
+            m.insert(*obj_id, *snap_id);
+            m
+        })
+        .unwrap_or_default();
+
+    let envelope = ReplayEnvelope {
+        core: envelope::EnvelopeCore {
+            session_cursor: runbook_version,
+            entity_bindings: std::collections::BTreeMap::new(),
+            external_lookup_digests: vec![],
+            macro_audit_digests: vec![],
+            snapshot_manifest,
+        },
+        external_lookups: vec![],
+        macro_audits: vec![],
+        sealed_at: chrono::Utc::now(),
     };
 
     // §6.2 Step 6: store — freeze as CompiledRunbook
-    let runbook = CompiledRunbook::new(
-        session_id,
-        runbook_version,
-        vec![step.clone()],
-        ReplayEnvelope::empty(),
-    );
+    let runbook = CompiledRunbook::new(session_id, runbook_version, vec![step.clone()], envelope);
 
     OrchestratorResponse::Compiled(CompiledRunbookSummary {
         compiled_runbook_id: runbook.id,
@@ -389,7 +445,7 @@ fn compile_primitive(
 /// Find missing required arguments for a macro schema.
 fn find_missing_required_args(
     schema: &MacroSchema,
-    args: &HashMap<String, String>,
+    args: &BTreeMap<String, String>,
 ) -> Vec<MissingField> {
     let mut missing = Vec::new();
 
@@ -433,7 +489,10 @@ fn extract_verb_from_dsl(dsl: &str) -> String {
 }
 
 /// Build a DSL s-expression from verb FQN and args.
-fn build_dsl_from_args(fqn: &str, args: &HashMap<String, String>) -> String {
+///
+/// BTreeMap iteration is deterministic (sorted by key), so no explicit
+/// sorting is needed (INV-2, Phase C).
+fn build_dsl_from_args(fqn: &str, args: &BTreeMap<String, String>) -> String {
     let mut parts = vec![format!("({}", fqn)];
     for (name, value) in args {
         if value.contains(' ') {
@@ -457,7 +516,7 @@ mod tests {
     use crate::repl::verb_config_index::VerbConfigIndex;
     use crate::runbook::verb_classifier::classify_verb;
     use crate::session::unified::{ClientRef, StructureType};
-    use std::collections::HashSet;
+    use std::collections::{HashMap, HashSet};
 
     fn test_session() -> UnifiedSession {
         UnifiedSession {
@@ -547,7 +606,7 @@ mod tests {
         let classification = classify_verb("structure.setup", &verb_index, &registry);
         let constraints = EffectiveConstraints::unconstrained();
 
-        let mut args = HashMap::new();
+        let mut args = BTreeMap::new();
         args.insert("name".to_string(), "Acme Fund".to_string());
 
         let resp = compile_verb(
@@ -559,6 +618,7 @@ mod tests {
             1,
             &constraints,
             None, // sem_reg_allowed_verbs
+            None, // verb_snapshot_pins
         );
 
         assert!(resp.is_compiled(), "Expected Compiled, got {:?}", resp);
@@ -577,7 +637,7 @@ mod tests {
         let classification = classify_verb("structure.setup", &verb_index, &registry);
         let constraints = EffectiveConstraints::unconstrained();
 
-        let args = HashMap::new(); // Missing required "name"
+        let args = BTreeMap::new(); // Missing required "name"
 
         let resp = compile_verb(
             Uuid::new_v4(),
@@ -588,6 +648,7 @@ mod tests {
             1,
             &constraints,
             None, // sem_reg_allowed_verbs
+            None, // verb_snapshot_pins
         );
 
         assert!(
@@ -612,7 +673,7 @@ mod tests {
             fqn: "cbu.create".to_string(),
         };
 
-        let mut args = HashMap::new();
+        let mut args = BTreeMap::new();
         args.insert("name".to_string(), "Test Fund".to_string());
 
         let resp = compile_verb(
@@ -624,6 +685,7 @@ mod tests {
             1,
             &constraints,
             None, // sem_reg_allowed_verbs
+            None, // verb_snapshot_pins
         );
 
         assert!(resp.is_compiled());
@@ -646,12 +708,13 @@ mod tests {
         let resp = compile_verb(
             Uuid::new_v4(),
             &classification,
-            &HashMap::new(),
+            &BTreeMap::new(),
             &session,
             &registry,
             1,
             &constraints,
             None, // sem_reg_allowed_verbs
+            None, // verb_snapshot_pins
         );
 
         assert!(matches!(resp, OrchestratorResponse::Clarification(_)));
@@ -668,7 +731,7 @@ mod tests {
         let classification = classify_verb("structure.setup", &verb_index, &registry);
         let constraints = EffectiveConstraints::unconstrained();
 
-        let mut args = HashMap::new();
+        let mut args = BTreeMap::new();
         args.insert("name".to_string(), "Audit Test".to_string());
 
         let resp = compile_verb(
@@ -680,6 +743,7 @@ mod tests {
             1,
             &constraints,
             None, // sem_reg_allowed_verbs
+            None, // verb_snapshot_pins
         );
 
         assert!(resp.is_compiled());
@@ -701,7 +765,7 @@ mod tests {
             contributing_packs: vec![],
         };
 
-        let mut args = HashMap::new();
+        let mut args = BTreeMap::new();
         args.insert("name".to_string(), "Acme Fund".to_string());
 
         let resp = compile_verb(
@@ -713,6 +777,7 @@ mod tests {
             1,
             &constraints,
             None, // sem_reg_allowed_verbs
+            None, // verb_snapshot_pins
         );
 
         assert!(
@@ -746,12 +811,13 @@ mod tests {
         let resp = compile_verb(
             Uuid::new_v4(),
             &classification,
-            &HashMap::new(),
+            &BTreeMap::new(),
             &session,
             &registry,
             1,
             &constraints,
             None, // sem_reg_allowed_verbs
+            None, // verb_snapshot_pins
         );
 
         assert!(
@@ -776,7 +842,7 @@ mod tests {
 
     #[test]
     fn test_build_dsl_from_args() {
-        let mut args = HashMap::new();
+        let mut args = BTreeMap::new();
         args.insert("name".to_string(), "Acme".to_string());
         let dsl = build_dsl_from_args("cbu.create", &args);
         assert!(dsl.starts_with("(cbu.create"));
@@ -792,7 +858,7 @@ mod tests {
     fn test_write_set_derived_from_args() {
         let id1 = Uuid::new_v4();
         let id2 = Uuid::new_v4();
-        let mut args = HashMap::new();
+        let mut args = BTreeMap::new();
         args.insert("entity-id".to_string(), id1.to_string());
         args.insert("cbu-id".to_string(), format!("<{}>", id2));
 
@@ -806,7 +872,7 @@ mod tests {
 
     #[test]
     fn test_write_set_ignores_non_uuid_args() {
-        let mut args = HashMap::new();
+        let mut args = BTreeMap::new();
         args.insert("name".to_string(), "Acme Corp".to_string());
         args.insert("jurisdiction".to_string(), "LU".to_string());
         args.insert("count".to_string(), "42".to_string());
@@ -821,7 +887,7 @@ mod tests {
     #[test]
     fn test_write_set_mixed_args() {
         let id = Uuid::new_v4();
-        let mut args = HashMap::new();
+        let mut args = BTreeMap::new();
         args.insert("entity-id".to_string(), id.to_string());
         args.insert("name".to_string(), "Test".to_string());
         args.insert("mode".to_string(), "trading".to_string());
@@ -844,7 +910,7 @@ mod tests {
             fqn: "entity.update".to_string(),
         };
 
-        let mut args = HashMap::new();
+        let mut args = BTreeMap::new();
         args.insert("entity-id".to_string(), entity_id.to_string());
         args.insert("name".to_string(), "Updated Name".to_string());
 
@@ -857,6 +923,7 @@ mod tests {
             1,
             &constraints,
             None, // sem_reg_allowed_verbs
+            None, // verb_snapshot_pins
         );
 
         assert!(resp.is_compiled());
@@ -887,7 +954,7 @@ mod tests {
         let verb_index = VerbConfigIndex::empty();
         let classification = classify_verb("structure.setup", &verb_index, &registry);
 
-        let mut args = HashMap::new();
+        let mut args = BTreeMap::new();
         args.insert("name".to_string(), "SemReg Test".to_string());
 
         // SemReg allows only "session.load-galaxy" — the expanded cbu.create will be denied.
@@ -902,6 +969,7 @@ mod tests {
             1,
             &constraints,
             Some(&allowed),
+            None, // verb_snapshot_pins
         );
 
         assert!(
@@ -927,7 +995,7 @@ mod tests {
             fqn: "cbu.create".to_string(),
         };
 
-        let mut args = HashMap::new();
+        let mut args = BTreeMap::new();
         args.insert("name".to_string(), "Denied Fund".to_string());
 
         // Allow only "entity.create" — cbu.create is NOT in the set.
@@ -942,6 +1010,7 @@ mod tests {
             1,
             &constraints,
             Some(&allowed),
+            None, // verb_snapshot_pins
         );
 
         assert!(
@@ -966,7 +1035,7 @@ mod tests {
         let verb_index = VerbConfigIndex::empty();
         let classification = classify_verb("structure.setup", &verb_index, &registry);
 
-        let mut args = HashMap::new();
+        let mut args = BTreeMap::new();
         args.insert("name".to_string(), "Allowed Fund".to_string());
 
         // Allow the verb that structure.setup expands to.
@@ -981,6 +1050,7 @@ mod tests {
             1,
             &constraints,
             Some(&allowed),
+            None, // verb_snapshot_pins
         );
 
         assert!(
@@ -999,7 +1069,7 @@ mod tests {
         let verb_index = VerbConfigIndex::empty();
         let classification = classify_verb("structure.setup", &verb_index, &registry);
 
-        let mut args = HashMap::new();
+        let mut args = BTreeMap::new();
         args.insert("name".to_string(), "Fallback Fund".to_string());
 
         let resp = compile_verb(
@@ -1011,6 +1081,7 @@ mod tests {
             1,
             &constraints,
             None, // SemReg unavailable
+            None, // verb_snapshot_pins
         );
 
         assert!(
@@ -1036,7 +1107,7 @@ mod tests {
         let classification = classify_verb("structure.setup", &verb_index, &registry);
 
         // No args — "name" is required
-        let args = HashMap::new();
+        let args = BTreeMap::new();
 
         let resp = compile_verb(
             Uuid::new_v4(),
@@ -1047,6 +1118,7 @@ mod tests {
             1,
             &constraints,
             None,
+            None, // verb_snapshot_pins
         );
 
         // Must be Clarification (missing required arg), proving expansion ran first.
@@ -1066,7 +1138,7 @@ mod tests {
         let verb_index = VerbConfigIndex::empty();
         let classification = classify_verb("structure.setup", &verb_index, &registry);
 
-        let mut args = HashMap::new();
+        let mut args = BTreeMap::new();
         args.insert("name".to_string(), "Blocked Fund".to_string());
 
         // Forbid the expanded verb
@@ -1090,6 +1162,7 @@ mod tests {
             1,
             &constraints,
             Some(&allowed),
+            None, // verb_snapshot_pins
         );
 
         // Must be ConstraintViolation (pack gate), NOT CompilationError::SemRegDenied
@@ -1138,6 +1211,104 @@ mod tests {
                 "Display for {:?} must be non-empty",
                 kind
             );
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // S16: Snapshot pinning tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn primitive_compile_pins_snapshot_when_provided() {
+        let registry = MacroRegistry::new();
+        let session = test_session();
+        let classification = VerbClassification::Primitive {
+            fqn: "cbu.create".to_string(),
+        };
+        let constraints = EffectiveConstraints::unconstrained();
+
+        let obj_id = Uuid::parse_str("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa").unwrap();
+        let snap_id = Uuid::parse_str("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb").unwrap();
+
+        let mut pins = HashMap::new();
+        pins.insert("cbu.create".to_string(), (obj_id, snap_id));
+
+        let mut args = BTreeMap::new();
+        args.insert("name".to_string(), "TestFund".to_string());
+
+        let resp = compile_verb(
+            Uuid::new_v4(),
+            &classification,
+            &args,
+            &session,
+            &registry,
+            1,
+            &constraints,
+            None,        // sem_reg_allowed_verbs
+            Some(&pins), // verb_snapshot_pins
+        );
+
+        match resp {
+            OrchestratorResponse::Compiled(summary) => {
+                let rb = summary
+                    .compiled_runbook
+                    .expect("must have compiled runbook");
+                assert_eq!(rb.steps.len(), 1);
+                assert_eq!(
+                    rb.steps[0].verb_contract_snapshot_id,
+                    Some(snap_id),
+                    "S16: step must carry pinned snapshot ID"
+                );
+                assert_eq!(
+                    rb.envelope.core.snapshot_manifest.get(&obj_id),
+                    Some(&snap_id),
+                    "S16: envelope manifest must contain object→snapshot mapping"
+                );
+            }
+            other => panic!("Expected Compiled, got: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn primitive_compile_without_pins_has_none() {
+        let registry = MacroRegistry::new();
+        let session = test_session();
+        let classification = VerbClassification::Primitive {
+            fqn: "cbu.create".to_string(),
+        };
+        let constraints = EffectiveConstraints::unconstrained();
+
+        let mut args = BTreeMap::new();
+        args.insert("name".to_string(), "TestFund".to_string());
+
+        let resp = compile_verb(
+            Uuid::new_v4(),
+            &classification,
+            &args,
+            &session,
+            &registry,
+            1,
+            &constraints,
+            None, // sem_reg_allowed_verbs
+            None, // verb_snapshot_pins
+        );
+
+        match resp {
+            OrchestratorResponse::Compiled(summary) => {
+                let rb = summary
+                    .compiled_runbook
+                    .expect("must have compiled runbook");
+                assert_eq!(rb.steps.len(), 1);
+                assert_eq!(
+                    rb.steps[0].verb_contract_snapshot_id, None,
+                    "S16: step must have None when no pins provided"
+                );
+                assert!(
+                    rb.envelope.core.snapshot_manifest.is_empty(),
+                    "S16: envelope manifest must be empty when no pins"
+                );
+            }
+            other => panic!("Expected Compiled, got: {:?}", other),
         }
     }
 }

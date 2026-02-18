@@ -23,7 +23,7 @@
 //! 11. Generate governance signals
 //! 12. Compute confidence score
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use anyhow::Result;
 use chrono::{DateTime, Utc};
@@ -393,6 +393,56 @@ struct ResolvedSubject {
     state: Option<String>,
 }
 
+/// A loaded taxonomy membership record from `v_active_memberships_by_subject`.
+#[derive(Debug, Clone)]
+struct TaxonomyMembership {
+    /// The taxonomy this membership belongs to (e.g., "domain.kyc-tier")
+    taxonomy_fqn: String,
+    /// The specific taxonomy node (e.g., "domain.kyc-tier.high")
+    #[allow(dead_code)] // Loaded from DB; reserved for node-level filtering
+    node_fqn: String,
+    /// What type of registry object is classified
+    target_type: String,
+    /// FQN of the classified object
+    target_fqn: String,
+    /// Kind of membership (direct, inherited, conditional, excluded)
+    membership_kind: String,
+}
+
+/// Aggregated membership context for the subject — computed once and passed through.
+#[derive(Debug, Clone, Default)]
+struct SubjectMemberships {
+    /// Taxonomy FQNs the subject's entity type belongs to
+    subject_taxonomy_fqns: HashSet<String>,
+    /// All loaded memberships (for filtering verbs/attributes by taxonomy overlap)
+    all_memberships: Vec<TaxonomyMembership>,
+}
+
+impl SubjectMemberships {
+    /// Returns the set of taxonomy FQNs that a given target (verb/attribute) belongs to.
+    fn taxonomy_fqns_for_target(&self, target_fqn: &str) -> HashSet<String> {
+        self.all_memberships
+            .iter()
+            .filter(|m| m.target_fqn == target_fqn && m.membership_kind != "excluded")
+            .map(|m| m.taxonomy_fqn.clone())
+            .collect()
+    }
+
+    /// Returns true if the subject has any taxonomy memberships.
+    fn has_memberships(&self) -> bool {
+        !self.subject_taxonomy_fqns.is_empty()
+    }
+
+    /// Returns the number of overlapping taxonomy FQNs between the subject and a target.
+    #[allow(dead_code)]
+    fn taxonomy_overlap_count(&self, target_fqn: &str) -> usize {
+        let target_taxonomies = self.taxonomy_fqns_for_target(target_fqn);
+        self.subject_taxonomy_fqns
+            .intersection(&target_taxonomies)
+            .count()
+    }
+}
+
 // ── Resolution Engine ─────────────────────────────────────────
 
 /// The top-level context resolution function.
@@ -410,9 +460,13 @@ pub async fn resolve_context(
     // Step 2: Resolve subject → entity type + jurisdiction + state
     let subject = resolve_subject(pool, &req.subject, as_of).await?;
 
+    // Step 2b: Load taxonomy memberships for the subject and all registry objects.
+    // This enables taxonomy-aware filtering in Steps 3, 5, and 6.
+    let memberships = load_subject_memberships(pool, &subject).await?;
+
     // Step 3: Select applicable ViewDefs by taxonomy overlap
     let all_views = load_view_defs(pool, as_of).await?;
-    let mut ranked_views = rank_views_by_overlap(&all_views, &subject);
+    let mut ranked_views = rank_views_by_overlap(&all_views, &subject, &memberships);
 
     // Step 4: Extract verb_surface + attribute_prominence from top view
     let top_view_body = ranked_views.first().map(|rv| &rv.body);
@@ -425,12 +479,18 @@ pub async fn resolve_context(
         req.evidence_mode,
         top_view_body,
         req.entity_kind.as_deref(),
+        &memberships,
     )?;
 
     // Step 6: Filter attributes similarly
     let all_attr_rows = load_typed_snapshots(pool, ObjectType::AttributeDef, as_of).await?;
-    let mut candidate_attributes =
-        filter_and_rank_attributes(&all_attr_rows, &req.actor, req.evidence_mode, top_view_body)?;
+    let mut candidate_attributes = filter_and_rank_attributes(
+        &all_attr_rows,
+        &req.actor,
+        req.evidence_mode,
+        top_view_body,
+        &memberships,
+    )?;
 
     // Step 7: Rank by ViewDef prominence weights
     // (already applied during Steps 5-6; sort descending)
@@ -466,8 +526,25 @@ pub async fn resolve_context(
     let security_handling = compute_composite_access(&candidate_verbs, &policy_verdicts);
 
     // Step 11: Generate governance signals
-    let governance_signals =
+    let mut governance_signals =
         generate_governance_signals(&candidate_verbs, &candidate_attributes, req.evidence_mode);
+
+    // Graceful degradation: if subject has no taxonomy memberships, add warning
+    if !memberships.has_memberships() {
+        if let Some(ref entity_type) = subject.entity_type_fqn {
+            governance_signals.push(GovernanceSignal {
+                kind: GovernanceSignalKind::UnclassifiedObject,
+                message: format!(
+                    "Subject entity type '{}' has no taxonomy memberships — \
+                     all candidates included without taxonomy filtering",
+                    entity_type
+                ),
+                severity: GovernanceSignalSeverity::Warning,
+                related_fqn: Some(entity_type.clone()),
+                related_snapshot_id: None,
+            });
+        }
+    }
 
     // Step 12: Compute confidence score
     let confidence = compute_confidence(
@@ -607,6 +684,62 @@ async fn resolve_subject_inner(
     }
 }
 
+// ── Step 2b: Load Taxonomy Memberships ────────────────────────
+
+async fn load_subject_memberships(
+    pool: &PgPool,
+    subject: &ResolvedSubject,
+) -> Result<SubjectMemberships> {
+    // Load all active membership rules from the convenience view
+    let rows = sqlx::query_as::<_, (String, String, String, String, String)>(
+        r#"
+        SELECT
+            taxonomy_fqn,
+            node_fqn,
+            target_type,
+            target_fqn,
+            membership_kind
+        FROM sem_reg.v_active_memberships_by_subject
+        "#,
+    )
+    .fetch_all(pool)
+    .await?;
+
+    let all_memberships: Vec<TaxonomyMembership> = rows
+        .into_iter()
+        .map(
+            |(taxonomy_fqn, node_fqn, target_type, target_fqn, membership_kind)| {
+                TaxonomyMembership {
+                    taxonomy_fqn,
+                    node_fqn,
+                    target_type,
+                    target_fqn,
+                    membership_kind,
+                }
+            },
+        )
+        .collect();
+
+    // Derive the subject's taxonomy memberships from its entity type
+    let mut subject_taxonomy_fqns = HashSet::new();
+
+    if let Some(ref entity_type_fqn) = subject.entity_type_fqn {
+        for m in &all_memberships {
+            if m.target_type == "entity_type_def"
+                && m.target_fqn == *entity_type_fqn
+                && m.membership_kind != "excluded"
+            {
+                subject_taxonomy_fqns.insert(m.taxonomy_fqn.clone());
+            }
+        }
+    }
+
+    Ok(SubjectMemberships {
+        subject_taxonomy_fqns,
+        all_memberships,
+    })
+}
+
 // ── Step 3: Load and Rank Views ───────────────────────────────
 
 async fn load_view_defs(
@@ -626,11 +759,12 @@ async fn load_view_defs(
 fn rank_views_by_overlap(
     views: &[(SnapshotRow, ViewDefBody)],
     subject: &ResolvedSubject,
+    memberships: &SubjectMemberships,
 ) -> Vec<RankedView> {
     views
         .iter()
         .map(|(row, body)| {
-            let overlap = compute_view_overlap(body, subject);
+            let overlap = compute_view_overlap(body, subject, memberships);
             RankedView {
                 view_snapshot_id: row.snapshot_id,
                 view_id: row.object_id,
@@ -644,7 +778,11 @@ fn rank_views_by_overlap(
         .collect()
 }
 
-fn compute_view_overlap(view: &ViewDefBody, subject: &ResolvedSubject) -> f64 {
+fn compute_view_overlap(
+    view: &ViewDefBody,
+    subject: &ResolvedSubject,
+    memberships: &SubjectMemberships,
+) -> f64 {
     // Score based on entity type match between view's base_entity_type
     // and the subject's resolved entity type
     let mut score = 0.0;
@@ -655,6 +793,20 @@ fn compute_view_overlap(view: &ViewDefBody, subject: &ResolvedSubject) -> f64 {
         } else if view.domain == entity_type.split('.').next().unwrap_or("") {
             // Domain-level match (e.g. view for "kyc" domain, entity is "kyc.case")
             score += 0.4;
+        }
+    }
+
+    // Taxonomy membership overlap bonus: if the view's FQN shares taxonomy
+    // memberships with the subject's entity type, boost the score.
+    if memberships.has_memberships() {
+        let view_taxonomies = memberships.taxonomy_fqns_for_target(&view.fqn);
+        let overlap_count = memberships
+            .subject_taxonomy_fqns
+            .intersection(&view_taxonomies)
+            .count();
+        if overlap_count > 0 {
+            // Up to +0.2 bonus for taxonomy overlap (caps at 2+ overlaps)
+            score += (overlap_count as f64 * 0.1).min(0.2);
         }
     }
 
@@ -686,6 +838,7 @@ fn filter_and_rank_verbs(
     mode: EvidenceMode,
     top_view: Option<&ViewDefBody>,
     entity_kind: Option<&str>,
+    memberships: &SubjectMemberships,
 ) -> Result<Vec<VerbCandidate>> {
     let mut candidates = Vec::new();
 
@@ -721,7 +874,7 @@ fn filter_and_rank_verbs(
         }
 
         // Tier/trust filtering based on evidence mode
-        if !tier_allowed(row.governance_tier, row.trust_class, mode) {
+        if !tier_allowed(row.governance_tier, row.trust_class, mode, top_view) {
             continue;
         }
 
@@ -744,6 +897,33 @@ fn filter_and_rank_verbs(
             if subject_kinds.iter().any(|sk| sk == kind) {
                 rank_score += 0.15;
             }
+        }
+
+        // Taxonomy membership filtering: if the subject has taxonomy memberships,
+        // filter out verbs that are in taxonomies that don't overlap with the subject's.
+        // Graceful degradation: if subject has no memberships, include all candidates.
+        if memberships.has_memberships() {
+            let verb_taxonomies = memberships.taxonomy_fqns_for_target(&fqn);
+            if !verb_taxonomies.is_empty() {
+                // Verb has taxonomy memberships — check for overlap with subject
+                let overlap = memberships
+                    .subject_taxonomy_fqns
+                    .intersection(&verb_taxonomies)
+                    .count();
+                if overlap == 0 {
+                    // No taxonomy overlap — filter out this verb
+                    tracing::trace!(
+                        verb_fqn = %fqn,
+                        verb_taxonomies = ?verb_taxonomies,
+                        subject_taxonomies = ?memberships.subject_taxonomy_fqns,
+                        "Verb filtered out: no taxonomy overlap with subject"
+                    );
+                    continue;
+                }
+                // Boost for taxonomy overlap (up to +0.1 for 2+ overlapping taxonomies)
+                rank_score += (overlap as f64 * 0.05).min(0.1);
+            }
+            // Verbs without taxonomy memberships pass through — they are unconstrained
         }
 
         // Determine usable_for_proof based on tier + trust
@@ -791,6 +971,7 @@ fn filter_and_rank_attributes(
     actor: &ActorContext,
     mode: EvidenceMode,
     top_view: Option<&ViewDefBody>,
+    memberships: &SubjectMemberships,
 ) -> Result<Vec<AttributeCandidate>> {
     let mut candidates = Vec::new();
 
@@ -808,7 +989,7 @@ fn filter_and_rank_attributes(
             .to_string();
 
         // Tier/trust filtering
-        if !tier_allowed(row.governance_tier, row.trust_class, mode) {
+        if !tier_allowed(row.governance_tier, row.trust_class, mode, top_view) {
             continue;
         }
 
@@ -820,7 +1001,29 @@ fn filter_and_rank_attributes(
         }
 
         // Rank from view columns
-        let (rank_score, required) = compute_attribute_prominence(&fqn, top_view);
+        let (mut rank_score, required) = compute_attribute_prominence(&fqn, top_view);
+
+        // Taxonomy membership filtering: same pattern as verb filtering
+        if memberships.has_memberships() {
+            let attr_taxonomies = memberships.taxonomy_fqns_for_target(&fqn);
+            if !attr_taxonomies.is_empty() {
+                let overlap = memberships
+                    .subject_taxonomy_fqns
+                    .intersection(&attr_taxonomies)
+                    .count();
+                if overlap == 0 {
+                    tracing::trace!(
+                        attr_fqn = %fqn,
+                        attr_taxonomies = ?attr_taxonomies,
+                        subject_taxonomies = ?memberships.subject_taxonomy_fqns,
+                        "Attribute filtered out: no taxonomy overlap with subject"
+                    );
+                    continue;
+                }
+                // Boost for taxonomy overlap
+                rank_score += (overlap as f64 * 0.05).min(0.1);
+            }
+        }
 
         candidates.push(AttributeCandidate {
             attribute_snapshot_id: row.snapshot_id,
@@ -871,15 +1074,24 @@ fn compute_attribute_prominence(attr_fqn: &str, top_view: Option<&ViewDefBody>) 
 
 // ── Tier/Trust Filtering ──────────────────────────────────────
 
-fn tier_allowed(tier: GovernanceTier, trust: TrustClass, mode: EvidenceMode) -> bool {
+fn tier_allowed(
+    tier: GovernanceTier,
+    trust: TrustClass,
+    mode: EvidenceMode,
+    view: Option<&ViewDefBody>,
+) -> bool {
     match mode {
         EvidenceMode::Strict => {
             tier == GovernanceTier::Governed
                 && matches!(trust, TrustClass::Proof | TrustClass::DecisionSupport)
         }
         EvidenceMode::Normal => {
-            // Governed always allowed; operational allowed but tagged
-            true
+            // Governed always allowed
+            if tier == GovernanceTier::Governed {
+                return true;
+            }
+            // Operational only if the active view opts in via includes_operational
+            view.is_some_and(|v| v.includes_operational)
         }
         EvidenceMode::Exploratory => true,
         EvidenceMode::Governance => true,
@@ -1289,50 +1501,103 @@ mod tests {
         assert_eq!(round.goals, vec!["resolve_ubo"]);
     }
 
+    fn view_with_operational(includes: bool) -> ViewDefBody {
+        ViewDefBody {
+            fqn: "test.view".into(),
+            name: "Test View".into(),
+            description: "Test".into(),
+            domain: "test".into(),
+            base_entity_type: "test".into(),
+            columns: vec![],
+            filters: vec![],
+            sort_order: vec![],
+            includes_operational: includes,
+        }
+    }
+
     #[test]
     fn test_tier_allowed_strict() {
+        // Strict mode ignores view — only Governed + Proof/DecisionSupport
         assert!(tier_allowed(
             GovernanceTier::Governed,
             TrustClass::Proof,
-            EvidenceMode::Strict
+            EvidenceMode::Strict,
+            None,
         ));
         assert!(tier_allowed(
             GovernanceTier::Governed,
             TrustClass::DecisionSupport,
-            EvidenceMode::Strict
+            EvidenceMode::Strict,
+            None,
         ));
         assert!(!tier_allowed(
             GovernanceTier::Governed,
             TrustClass::Convenience,
-            EvidenceMode::Strict
+            EvidenceMode::Strict,
+            None,
         ));
         assert!(!tier_allowed(
             GovernanceTier::Operational,
             TrustClass::DecisionSupport,
-            EvidenceMode::Strict
+            EvidenceMode::Strict,
+            None,
         ));
     }
 
     #[test]
-    fn test_tier_allowed_normal() {
+    fn test_tier_allowed_normal_governed_always_allowed() {
+        // Governed always passes in Normal mode, regardless of view
         assert!(tier_allowed(
             GovernanceTier::Governed,
             TrustClass::Proof,
-            EvidenceMode::Normal
+            EvidenceMode::Normal,
+            None,
         ));
+        assert!(tier_allowed(
+            GovernanceTier::Governed,
+            TrustClass::Convenience,
+            EvidenceMode::Normal,
+            None,
+        ));
+    }
+
+    #[test]
+    fn test_tier_allowed_normal_operational_filtered_by_view() {
+        // Operational in Normal mode: filtered out when view is absent
+        assert!(!tier_allowed(
+            GovernanceTier::Operational,
+            TrustClass::Convenience,
+            EvidenceMode::Normal,
+            None,
+        ));
+
+        // Filtered out when view has includes_operational=false
+        let view_no_op = view_with_operational(false);
+        assert!(!tier_allowed(
+            GovernanceTier::Operational,
+            TrustClass::Convenience,
+            EvidenceMode::Normal,
+            Some(&view_no_op),
+        ));
+
+        // Included when view has includes_operational=true
+        let view_with_op = view_with_operational(true);
         assert!(tier_allowed(
             GovernanceTier::Operational,
             TrustClass::Convenience,
-            EvidenceMode::Normal
+            EvidenceMode::Normal,
+            Some(&view_with_op),
         ));
     }
 
     #[test]
     fn test_tier_allowed_exploratory() {
+        // Exploratory always allows everything
         assert!(tier_allowed(
             GovernanceTier::Operational,
             TrustClass::Convenience,
-            EvidenceMode::Exploratory
+            EvidenceMode::Exploratory,
+            None,
         ));
     }
 
@@ -1353,6 +1618,7 @@ mod tests {
                 columns: vec![],
                 filters: vec![],
                 sort_order: vec![],
+                includes_operational: false,
             },
         }];
 
@@ -1445,6 +1711,7 @@ mod tests {
             columns: vec![],
             filters: vec![],
             sort_order: vec![],
+            includes_operational: false,
         };
 
         let views = vec![
@@ -1482,6 +1749,7 @@ mod tests {
             columns: vec![],
             filters: vec![],
             sort_order: vec![],
+            includes_operational: false,
         };
 
         let subject = ResolvedSubject {
@@ -1490,7 +1758,8 @@ mod tests {
             state: None,
         };
 
-        let score = compute_view_overlap(&view, &subject);
+        let no_memberships = SubjectMemberships::default();
+        let score = compute_view_overlap(&view, &subject, &no_memberships);
         assert!(score >= 0.8);
     }
 
@@ -1505,6 +1774,7 @@ mod tests {
             columns: vec![],
             filters: vec![],
             sort_order: vec![],
+            includes_operational: false,
         };
 
         let subject = ResolvedSubject {
@@ -1513,8 +1783,116 @@ mod tests {
             state: None,
         };
 
-        let score = compute_view_overlap(&view, &subject);
+        let no_memberships = SubjectMemberships::default();
+        let score = compute_view_overlap(&view, &subject, &no_memberships);
         assert!(score >= 0.4);
         assert!(score < 0.8);
+    }
+
+    #[test]
+    fn test_view_overlap_with_taxonomy_memberships() {
+        let view = ViewDefBody {
+            fqn: "kyc.ubo-view".into(),
+            name: "UBO View".into(),
+            description: "UBO discovery view".into(),
+            domain: "kyc".into(),
+            base_entity_type: "entity.proper-person".into(),
+            columns: vec![],
+            filters: vec![],
+            sort_order: vec![],
+            includes_operational: false,
+        };
+
+        let subject = ResolvedSubject {
+            entity_type_fqn: Some("entity.proper-person".into()),
+            jurisdiction: None,
+            state: None,
+        };
+
+        // Create memberships where both subject and view share "domain.kyc" taxonomy
+        let memberships = SubjectMemberships {
+            subject_taxonomy_fqns: HashSet::from(["domain.kyc".into()]),
+            all_memberships: vec![TaxonomyMembership {
+                taxonomy_fqn: "domain.kyc".into(),
+                node_fqn: "domain.kyc.ubo".into(),
+                target_type: "view_def".into(),
+                target_fqn: "kyc.ubo-view".into(),
+                membership_kind: "direct".into(),
+            }],
+        };
+
+        let score_with = compute_view_overlap(&view, &subject, &memberships);
+        let no_memberships = SubjectMemberships::default();
+        let score_without = compute_view_overlap(&view, &subject, &no_memberships);
+
+        // Taxonomy overlap gives a bonus
+        assert!(score_with > score_without);
+    }
+
+    #[test]
+    fn test_subject_memberships_overlap_count() {
+        let memberships = SubjectMemberships {
+            subject_taxonomy_fqns: HashSet::from(["domain.kyc".into(), "risk.high".into()]),
+            all_memberships: vec![
+                TaxonomyMembership {
+                    taxonomy_fqn: "domain.kyc".into(),
+                    node_fqn: "domain.kyc.ubo".into(),
+                    target_type: "verb_contract".into(),
+                    target_fqn: "kyc.open-case".into(),
+                    membership_kind: "direct".into(),
+                },
+                TaxonomyMembership {
+                    taxonomy_fqn: "risk.high".into(),
+                    node_fqn: "risk.high.pep".into(),
+                    target_type: "verb_contract".into(),
+                    target_fqn: "kyc.open-case".into(),
+                    membership_kind: "direct".into(),
+                },
+                TaxonomyMembership {
+                    taxonomy_fqn: "domain.trading".into(),
+                    node_fqn: "domain.trading.equities".into(),
+                    target_type: "verb_contract".into(),
+                    target_fqn: "trading.create-profile".into(),
+                    membership_kind: "direct".into(),
+                },
+            ],
+        };
+
+        // kyc.open-case shares 2 taxonomies with subject
+        assert_eq!(memberships.taxonomy_overlap_count("kyc.open-case"), 2);
+        // trading.create-profile shares 0 taxonomies with subject
+        assert_eq!(
+            memberships.taxonomy_overlap_count("trading.create-profile"),
+            0
+        );
+        // Unknown verb shares 0
+        assert_eq!(memberships.taxonomy_overlap_count("unknown.verb"), 0);
+    }
+
+    #[test]
+    fn test_subject_memberships_excluded_filtered() {
+        let memberships = SubjectMemberships {
+            subject_taxonomy_fqns: HashSet::from(["domain.kyc".into()]),
+            all_memberships: vec![TaxonomyMembership {
+                taxonomy_fqn: "domain.kyc".into(),
+                node_fqn: "domain.kyc.sanctions".into(),
+                target_type: "verb_contract".into(),
+                target_fqn: "kyc.screen".into(),
+                membership_kind: "excluded".into(),
+            }],
+        };
+
+        // Excluded memberships should NOT be counted
+        let target_taxonomies = memberships.taxonomy_fqns_for_target("kyc.screen");
+        assert!(target_taxonomies.is_empty());
+        assert_eq!(memberships.taxonomy_overlap_count("kyc.screen"), 0);
+    }
+
+    #[test]
+    fn test_graceful_degradation_no_memberships() {
+        let memberships = SubjectMemberships::default();
+        assert!(!memberships.has_memberships());
+        // With no memberships, overlap count is always 0 but filtering is skipped
+        assert_eq!(memberships.taxonomy_overlap_count("any.verb"), 0);
     }
 }

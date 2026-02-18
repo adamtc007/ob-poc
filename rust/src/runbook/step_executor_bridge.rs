@@ -102,7 +102,6 @@ mod tests {
     use super::*;
     use crate::runbook::executor::StepExecutor;
     use crate::runbook::types::ExecutionMode;
-    use std::collections::HashMap;
 
     /// Stub DslExecutor that returns success.
     struct SuccessExecutor;
@@ -154,6 +153,7 @@ mod tests {
             depends_on: vec![],
             execution_mode: ExecutionMode::Sync,
             write_set: vec![],
+            verb_contract_snapshot_id: None,
         }
     }
 

@@ -27,6 +27,7 @@ use super::types::{CompiledRunbook, CompiledRunbookId};
 /// MCP) pattern-matches to decide what to show the user.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
+#[allow(clippy::large_enum_variant)]
 pub enum OrchestratorResponse {
     /// Compilation succeeded — a runbook is ready for execution.
     Compiled(CompiledRunbookSummary),
@@ -131,7 +132,7 @@ pub struct ClarificationContext {
     pub is_macro: bool,
 
     /// Arguments that were successfully extracted.
-    pub extracted_args: std::collections::HashMap<String, String>,
+    pub extracted_args: std::collections::BTreeMap<String, String>,
 }
 
 // ---------------------------------------------------------------------------
@@ -223,6 +224,25 @@ mod tests {
         let json = serde_json::to_string(&resp).unwrap();
         let back: OrchestratorResponse = serde_json::from_str(&json).unwrap();
         assert!(back.is_compiled());
+    }
+
+    #[test]
+    fn compilation_error_response_serde_round_trip() {
+        use super::super::errors::{CompilationError, CompilationErrorKind};
+
+        let resp = OrchestratorResponse::CompilationError(CompilationError::new(
+            CompilationErrorKind::PackConstraint {
+                verb: "cbu.delete".into(),
+                explanation: "forbidden by kyc-case pack".into(),
+            },
+            "pack_gate",
+        ));
+        let json = serde_json::to_string(&resp).unwrap();
+        assert!(json.contains("compilation_error"));
+        assert!(json.contains("pack_gate"));
+        let back: OrchestratorResponse = serde_json::from_str(&json).unwrap();
+        assert!(!back.is_compiled());
+        assert!(matches!(back, OrchestratorResponse::CompilationError(_)));
     }
 
     #[test]

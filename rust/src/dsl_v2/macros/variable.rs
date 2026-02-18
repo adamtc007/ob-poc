@@ -11,7 +11,7 @@
 
 use regex::Regex;
 use serde_json::Value;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use thiserror::Error;
 
 use super::schema::MacroArg;
@@ -119,7 +119,7 @@ impl VariableContext {
     /// Build context from macro args and provided values
     pub fn from_macro_args(
         args_spec: &HashMap<String, MacroArg>,
-        provided_args: &HashMap<String, String>,
+        provided_args: &BTreeMap<String, String>,
     ) -> Result<Self, VariableError> {
         let mut ctx = Self::new();
 

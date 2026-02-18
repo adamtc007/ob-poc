@@ -51,7 +51,9 @@ use crate::journey::template::instantiate_template;
 use crate::repl::intent_matcher::IntentMatcher;
 use crate::repl::types::{MatchContext, MatchOutcome};
 use crate::runbook::envelope::ReplayEnvelope;
-use crate::runbook::executor::{execute_runbook_with_pool, StepOutcome};
+#[cfg(feature = "database")]
+use crate::runbook::executor::PostgresRunbookStore;
+use crate::runbook::executor::{execute_runbook_with_pool, RunbookStoreBackend, StepOutcome};
 use crate::runbook::step_executor_bridge::{DslExecutorV2StepExecutor, DslStepExecutor};
 use crate::runbook::types::{
     CompiledRunbook, CompiledStep, ExecutionMode as CompiledExecutionMode,
@@ -3562,9 +3564,18 @@ impl ReplOrchestratorV2 {
                 .collect(),
             depends_on: vec![],
             execution_mode: compiled_mode,
-            write_set: derive_write_set(&entry.verb, &entry.args, None)
-                .into_iter()
-                .collect(),
+            write_set: derive_write_set(
+                &entry.verb,
+                &entry
+                    .args
+                    .iter()
+                    .map(|(k, v)| (k.clone(), v.clone()))
+                    .collect(),
+                None,
+            )
+            .into_iter()
+            .collect(),
+            verb_contract_snapshot_id: None, // TODO: wire SemReg snapshot resolution
         };
         CompiledRunbook::new(session_id, version, vec![step], ReplayEnvelope::empty())
     }
@@ -3588,18 +3599,31 @@ impl ReplOrchestratorV2 {
         runbook_id: Uuid,
         fallback_version: u64,
     ) -> StepOutcome {
-        let store = match self.runbook_store.as_ref() {
-            Some(s) => s,
-            None => {
-                // No store available — cannot enforce gate. This should not happen
-                // in production (store is always wired in main.rs).
-                tracing::error!(
-                    "RunbookStore not available — cannot enforce execution gate (INV-3)"
-                );
-                return StepOutcome::Failed {
-                    error: "Internal error: RunbookStore not configured".into(),
-                };
-            }
+        // Construct the store backend: Postgres when pool available, in-memory fallback.
+        // This ensures lock events, status events, and holder lookups fire in production
+        // (Phase D: RunbookStoreBackend trait wiring).
+        #[cfg(feature = "database")]
+        let pg_store: Option<PostgresRunbookStore> = self
+            .pool
+            .as_ref()
+            .map(|p| PostgresRunbookStore::new(p.clone()));
+
+        // Fallback in-memory store for when no pool (tests, non-database config).
+        let fallback_store: RunbookStore = RunbookStore::new();
+
+        #[cfg(feature = "database")]
+        let store: &dyn RunbookStoreBackend = if let Some(ref pg) = pg_store {
+            pg
+        } else if let Some(ref s) = self.runbook_store {
+            s.as_ref()
+        } else {
+            &fallback_store
+        };
+        #[cfg(not(feature = "database"))]
+        let store: &dyn RunbookStoreBackend = if let Some(ref s) = self.runbook_store {
+            s.as_ref()
+        } else {
+            &fallback_store
         };
 
         // Resolve or create the CompiledRunbookId.
@@ -3614,7 +3638,12 @@ impl ReplOrchestratorV2 {
             );
             let compiled = self.compile_entry_on_the_fly(entry, session_id, fallback_version);
             let id = compiled.id;
-            store.insert(compiled);
+            if let Err(e) = store.insert(&compiled).await {
+                tracing::error!(error = %e, "Failed to insert compiled runbook into store");
+                return StepOutcome::Failed {
+                    error: format!("Failed to store compiled runbook: {}", e),
+                };
+            }
             id
         };
 
@@ -3639,7 +3668,6 @@ impl ReplOrchestratorV2 {
                     None,
                     &bridge,
                     self.pool.as_ref(),
-                    None,
                 )
                 .await
                 {
@@ -3657,7 +3685,6 @@ impl ReplOrchestratorV2 {
                     None,
                     &bridge,
                     self.pool.as_ref(),
-                    None,
                 )
                 .await
                 {
@@ -3669,15 +3696,8 @@ impl ReplOrchestratorV2 {
             }
         } else {
             let bridge = DslStepExecutor::new(Arc::clone(&self.executor));
-            match execute_runbook_with_pool(
-                store,
-                compiled_id,
-                None,
-                &bridge,
-                self.pool.as_ref(),
-                None,
-            )
-            .await
+            match execute_runbook_with_pool(store, compiled_id, None, &bridge, self.pool.as_ref())
+                .await
             {
                 Ok(result) => extract_first_outcome(result),
                 Err(e) => StepOutcome::Failed {
@@ -3956,15 +3976,22 @@ impl ReplOrchestratorV2 {
 
         let classification = classify_verb(&entry.verb, &self.verb_config_index, macro_registry);
         let version = session.allocate_runbook_version();
+        // Convert HashMap → BTreeMap for deterministic iteration (INV-2, Phase C)
+        let args_btree: std::collections::BTreeMap<String, String> = entry
+            .args
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect();
         let response = compile_verb(
             session.id,
             &classification,
-            &entry.args,
+            &args_btree,
             &unified,
             macro_registry,
             version,
             &constraints,
             None, // sem_reg_allowed_verbs — resolved upstream by orchestrator
+            None, // verb_snapshot_pins — TODO: wire SemReg snapshot resolution
         );
 
         match response {
@@ -3973,8 +4000,8 @@ impl ReplOrchestratorV2 {
                 // Store the compiled runbook artifact so execute_runbook() can
                 // retrieve it by ID. INV-3: no execution without a stored artifact.
                 if let Some(ref store) = self.runbook_store {
-                    if let Some(runbook) = summary.compiled_runbook {
-                        store.insert(runbook);
+                    if let Some(ref runbook) = summary.compiled_runbook {
+                        store.insert_sync(runbook);
                     }
                 }
                 None // success — caller continues with entry

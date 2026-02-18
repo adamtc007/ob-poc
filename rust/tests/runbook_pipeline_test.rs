@@ -19,7 +19,7 @@
 
 #![cfg(feature = "vnext-repl")]
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use uuid::Uuid;
 
 use ob_poc::dsl_v2::macros::{
@@ -31,8 +31,8 @@ use ob_poc::repl::verb_config_index::VerbConfigIndex;
 use ob_poc::runbook::verb_classifier::{classify_verb, VerbClassification};
 use ob_poc::runbook::{
     compile_verb, execute_runbook, CompiledRunbook, CompiledRunbookStatus, CompiledStep,
-    ExecutionMode, OrchestratorResponse, ParkReason, ReplayEnvelope, RunbookStore, StepCursor,
-    StepExecutor, StepOutcome,
+    ExecutionMode, OrchestratorResponse, ParkReason, ReplayEnvelope, RunbookStore,
+    RunbookStoreBackend, StepCursor, StepExecutor, StepOutcome,
 };
 use ob_poc::session::unified::{ClientRef, StructureType, UnifiedSession};
 
@@ -297,13 +297,14 @@ fn make_step(verb: &str) -> CompiledStep {
         depends_on: vec![],
         execution_mode: ExecutionMode::Sync,
         write_set: vec![],
+        verb_contract_snapshot_id: None,
     }
 }
 
 /// Helper: compile + execute a macro through the full pipeline.
 async fn compile_and_execute(
     macro_name: &str,
-    args: HashMap<String, String>,
+    args: BTreeMap<String, String>,
     registry: &MacroRegistry,
     constraints: &EffectiveConstraints,
 ) -> (
@@ -323,6 +324,7 @@ async fn compile_and_execute(
         1,
         constraints,
         None, // sem_reg_allowed_verbs
+        None, // verb_snapshot_pins
     );
 
     if let OrchestratorResponse::Compiled(ref summary) = resp {
@@ -331,7 +333,7 @@ async fn compile_and_execute(
         let rb = CompiledRunbook::new(Uuid::new_v4(), 1, steps, ReplayEnvelope::empty());
         let id = rb.id;
         let store = RunbookStore::new();
-        store.insert(rb);
+        store.insert(&rb).await.unwrap();
 
         let result = execute_runbook(&store, id, None, &SuccessExecutor)
             .await
@@ -354,7 +356,7 @@ async fn macro_end_to_end() {
     let registry = macro_registry_with_structure_setup();
     let constraints = EffectiveConstraints::unconstrained();
 
-    let mut args = HashMap::new();
+    let mut args = BTreeMap::new();
     args.insert("name".to_string(), "Acme Fund".to_string());
 
     let (resp, exec_result) =
@@ -407,7 +409,7 @@ async fn pack_scoping() {
         }],
     };
 
-    let mut args = HashMap::new();
+    let mut args = BTreeMap::new();
     args.insert("name".to_string(), "Acme Fund".to_string());
 
     let (resp, exec_result) =
@@ -489,7 +491,7 @@ async fn pack_completion_widening() {
 
     // Now cbu.create should compile successfully
     let registry = macro_registry_with_structure_setup();
-    let mut args = HashMap::new();
+    let mut args = BTreeMap::new();
     args.insert("name".to_string(), "Widened Fund".to_string());
 
     let (resp, exec_result) =
@@ -521,7 +523,7 @@ async fn replay_determinism() {
     let verb_index = VerbConfigIndex::empty();
     let constraints = EffectiveConstraints::unconstrained();
 
-    let mut args = HashMap::new();
+    let mut args = BTreeMap::new();
     args.insert("name".to_string(), "Determinism Test".to_string());
 
     let classification = classify_verb("structure.full-setup", &verb_index, &registry);
@@ -536,6 +538,7 @@ async fn replay_determinism() {
         1,
         &constraints,
         None, // sem_reg_allowed_verbs
+        None, // verb_snapshot_pins
     );
     let resp2 = compile_verb(
         Uuid::new_v4(),
@@ -546,6 +549,7 @@ async fn replay_determinism() {
         1,
         &constraints,
         None, // sem_reg_allowed_verbs
+        None, // verb_snapshot_pins
     );
 
     // Both should compile
@@ -573,13 +577,13 @@ async fn replay_determinism() {
     let steps1: Vec<_> = s1.preview.iter().map(|p| make_step(&p.verb)).collect();
     let rb1 = CompiledRunbook::new(Uuid::new_v4(), 1, steps1, ReplayEnvelope::empty());
     let id1 = rb1.id;
-    store1.insert(rb1);
+    store1.insert(&rb1).await.unwrap();
 
     let store2 = RunbookStore::new();
     let steps2: Vec<_> = s2.preview.iter().map(|p| make_step(&p.verb)).collect();
     let rb2 = CompiledRunbook::new(Uuid::new_v4(), 1, steps2, ReplayEnvelope::empty());
     let id2 = rb2.id;
-    store2.insert(rb2);
+    store2.insert(&rb2).await.unwrap();
 
     let recorder1 = RecordingExecutor::new();
     let recorder2 = RecordingExecutor::new();
@@ -675,7 +679,7 @@ async fn execution_gate_rejects_raw() {
         ReplayEnvelope::empty(),
     );
     let id = rb.id;
-    store.insert(rb);
+    store.insert(&rb).await.unwrap();
 
     let result = execute_runbook(&store, id, None, &SuccessExecutor)
         .await
@@ -706,7 +710,7 @@ async fn execution_gate_rejects_raw() {
         ReplayEnvelope::empty(),
     );
     let id2 = rb2.id;
-    store.insert(rb2);
+    store.insert(&rb2).await.unwrap();
 
     let result = execute_runbook(&store, id2, None, &FailOnVerb("entity.create".into()))
         .await
@@ -760,7 +764,7 @@ async fn constraint_violation_remediation() {
     let verb_index = VerbConfigIndex::empty();
     let classification = classify_verb("structure.setup", &verb_index, &registry);
 
-    let mut args = HashMap::new();
+    let mut args = BTreeMap::new();
     args.insert("name".to_string(), "Blocked Fund".to_string());
 
     let resp = compile_verb(
@@ -772,6 +776,7 @@ async fn constraint_violation_remediation() {
         1,
         &constraints,
         None, // sem_reg_allowed_verbs
+        None, // verb_snapshot_pins
     );
 
     // Must be a ConstraintViolation
@@ -826,10 +831,10 @@ async fn runbook_immutability() {
     let id = rb.id;
     let original_version = rb.version;
     let original_session_id = rb.session_id;
-    store.insert(rb);
+    store.insert(&rb).await.unwrap();
 
     // Snapshot before execution
-    let before = store.get(&id).unwrap();
+    let before = store.get(&id).await.unwrap().unwrap();
     assert_eq!(before.steps.len(), original_step_count);
     assert!(matches!(before.status, CompiledRunbookStatus::Compiled));
 
@@ -843,7 +848,7 @@ async fn runbook_immutability() {
     ));
 
     // Snapshot after execution
-    let after = store.get(&id).unwrap();
+    let after = store.get(&id).await.unwrap().unwrap();
 
     // Steps must be unchanged
     assert_eq!(
@@ -880,7 +885,7 @@ async fn multi_step_macro_pipeline() {
     let registry = macro_registry_with_multi_step();
     let constraints = EffectiveConstraints::unconstrained();
 
-    let mut args = HashMap::new();
+    let mut args = BTreeMap::new();
     args.insert("name".to_string(), "Multi-Step Fund".to_string());
 
     let (resp, exec_result) =
@@ -920,7 +925,7 @@ async fn park_and_resume_pipeline() {
         ReplayEnvelope::empty(),
     );
     let id = rb.id;
-    store.insert(rb);
+    store.insert(&rb).await.unwrap();
 
     // Execute — parks at step 2
     let result = execute_runbook(&store, id, None, &ParkOnVerb("doc.solicit".into()))
@@ -935,6 +940,7 @@ async fn park_and_resume_pipeline() {
     store
         .update_status(
             &id,
+            "Parked",
             CompiledRunbookStatus::Parked {
                 reason: ParkReason::AwaitingCallback {
                     correlation_key: "callback-1".into(),
@@ -945,6 +951,7 @@ async fn park_and_resume_pipeline() {
                 },
             },
         )
+        .await
         .unwrap();
 
     // Resume from step 2
@@ -972,7 +979,7 @@ async fn primitive_verb_compile_and_execute() {
         fqn: "cbu.create".to_string(),
     };
 
-    let mut args = HashMap::new();
+    let mut args = BTreeMap::new();
     args.insert("name".to_string(), "Direct Fund".to_string());
 
     let resp = compile_verb(
@@ -984,6 +991,7 @@ async fn primitive_verb_compile_and_execute() {
         1,
         &constraints,
         None, // sem_reg_allowed_verbs
+        None, // verb_snapshot_pins
     );
 
     assert!(resp.is_compiled());
@@ -999,7 +1007,7 @@ async fn primitive_verb_compile_and_execute() {
     let steps: Vec<_> = summary.preview.iter().map(|p| make_step(&p.verb)).collect();
     let rb = CompiledRunbook::new(Uuid::new_v4(), 1, steps, ReplayEnvelope::empty());
     let id = rb.id;
-    store.insert(rb);
+    store.insert(&rb).await.unwrap();
 
     let result = execute_runbook(&store, id, None, &SuccessExecutor)
         .await
@@ -1025,7 +1033,7 @@ fn compile_invocation_missing_macro_args() {
     let constraints = EffectiveConstraints::unconstrained();
 
     // Call compile_invocation with NO args — "name" is required by the macro
-    let args = HashMap::new();
+    let args = BTreeMap::new();
 
     let resp = ob_poc::runbook::compile_invocation(
         Uuid::new_v4(),
@@ -1037,6 +1045,7 @@ fn compile_invocation_missing_macro_args() {
         &constraints,
         1,
         None, // sem_reg_allowed_verbs
+        None, // verb_snapshot_pins
     );
 
     assert!(
@@ -1077,7 +1086,7 @@ fn compile_invocation_end_to_end() {
     let session = test_session();
     let constraints = EffectiveConstraints::unconstrained();
 
-    let mut args = HashMap::new();
+    let mut args = BTreeMap::new();
     args.insert("name".to_string(), "E2E Fund".to_string());
 
     let resp = ob_poc::runbook::compile_invocation(
@@ -1090,6 +1099,7 @@ fn compile_invocation_end_to_end() {
         &constraints,
         1,
         None, // sem_reg_allowed_verbs
+        None, // verb_snapshot_pins
     );
 
     assert!(
@@ -1132,7 +1142,7 @@ fn compile_invocation_constraint_violation() {
         }],
     };
 
-    let mut args = HashMap::new();
+    let mut args = BTreeMap::new();
     args.insert("name".to_string(), "Blocked Fund".to_string());
 
     let resp = ob_poc::runbook::compile_invocation(
@@ -1145,6 +1155,7 @@ fn compile_invocation_constraint_violation() {
         &constraints,
         1,
         None, // sem_reg_allowed_verbs
+        None, // verb_snapshot_pins
     );
 
     assert!(

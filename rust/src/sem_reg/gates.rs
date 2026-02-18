@@ -149,6 +149,177 @@ pub fn evaluate_publish_gates(
     PublishGateResult { results }
 }
 
+// ── Unified gate evaluator ─────────────────────────────────────
+//
+// `evaluate_extended_gates()` collects `Vec<GateFailure>` from ALL technical
+// + governance gates. `evaluate_all_publish_gates()` merges both the simple
+// 4-gate `PublishGateResult` AND the extended failures.
+
+use super::gates_governance;
+use super::gates_technical;
+
+/// Context for running the full extended gate suite.
+///
+/// Callers populate only the fields relevant to the snapshot being published.
+/// Missing context fields are skipped gracefully (gates that need them produce
+/// no failures rather than panicking).
+#[derive(Default)]
+pub struct ExtendedGateContext {
+    /// Predecessor snapshot for version/integrity checks.
+    pub predecessor: Option<SnapshotRow>,
+    /// Taxonomy memberships for this object.
+    pub memberships: Vec<String>,
+    /// Known verb FQNs in the registry (for macro expansion checks).
+    pub known_verb_fqns: std::collections::HashSet<String>,
+    /// Current timestamp for review cycle checks.
+    pub now: Option<chrono::DateTime<chrono::Utc>>,
+}
+
+/// Run all extended gates (technical + governance) against a snapshot.
+///
+/// Returns a `Vec<GateFailure>` — empty means all gates passed.
+pub fn evaluate_extended_gates(
+    snapshot: &SnapshotRow,
+    ctx: &ExtendedGateContext,
+) -> Vec<GateFailure> {
+    let mut failures = Vec::new();
+    let tier = snapshot.governance_tier;
+
+    // ── Technical gates ──────────────────────────────────────
+
+    // T3: Security label presence
+    failures.extend(gates_technical::check_security_label_presence(snapshot));
+
+    // T5: Snapshot integrity (predecessor checks)
+    failures.extend(gates_technical::check_snapshot_integrity(
+        snapshot,
+        ctx.predecessor.as_ref(),
+    ));
+
+    // ── Governance gates ─────────────────────────────────────
+
+    // G1: Taxonomy membership
+    let fqn = snapshot
+        .definition
+        .get("fqn")
+        .and_then(|v| v.as_str())
+        .unwrap_or("unknown");
+    failures.extend(gates_governance::check_taxonomy_membership(
+        fqn,
+        tier,
+        &ctx.memberships,
+    ));
+
+    // G2: Stewardship
+    failures.extend(gates_governance::check_stewardship(snapshot, tier));
+
+    // G4: Regulatory linkage
+    failures.extend(gates_governance::check_regulatory_linkage(snapshot, tier));
+
+    // G5: Review cycle compliance
+    let now = ctx.now.unwrap_or_else(chrono::Utc::now);
+    failures.extend(gates_governance::check_review_cycle_compliance(
+        snapshot, tier, now,
+    ));
+
+    // G6: Version consistency (strict — requires > not >=)
+    failures.extend(gates_governance::check_version_consistency(
+        snapshot,
+        ctx.predecessor.as_ref(),
+    ));
+
+    // G7: Continuation completeness
+    failures.extend(gates_governance::check_continuation_completeness(snapshot));
+
+    // G8: Macro expansion integrity (verb contracts only)
+    if snapshot.object_type == super::types::ObjectType::VerbContract {
+        let verb_fqn = snapshot
+            .definition
+            .get("fqn")
+            .and_then(|v| v.as_str())
+            .unwrap_or("unknown");
+        failures.extend(gates_governance::check_macro_expansion_integrity(
+            &snapshot.definition,
+            verb_fqn,
+            &ctx.known_verb_fqns,
+        ));
+    }
+
+    failures
+}
+
+/// Evaluate ALL publish gates — both the simple 4-gate pipeline and extended gates.
+///
+/// Returns a unified `UnifiedPublishGateResult` that merges both frameworks.
+/// A publish is blocked if:
+/// - Any simple gate fails, OR
+/// - Any extended gate has `GateSeverity::Error` in `GateMode::Enforce`
+pub fn evaluate_all_publish_gates(
+    meta: &SnapshotMeta,
+    snapshot: &SnapshotRow,
+    ctx: &ExtendedGateContext,
+    mode: GateMode,
+) -> UnifiedPublishGateResult {
+    // Run the simple 4-gate pipeline
+    let simple = evaluate_publish_gates(meta, ctx.predecessor.as_ref());
+
+    // Run the extended gate suite
+    let extended_failures = evaluate_extended_gates(snapshot, ctx);
+
+    let extended = ExtendedPublishGateResult {
+        failures: extended_failures,
+        mode,
+    };
+
+    UnifiedPublishGateResult { simple, extended }
+}
+
+/// Unified result merging both simple and extended gate frameworks.
+#[derive(Debug, Clone)]
+pub struct UnifiedPublishGateResult {
+    pub simple: PublishGateResult,
+    pub extended: ExtendedPublishGateResult,
+}
+
+impl UnifiedPublishGateResult {
+    /// Should this result block a publish?
+    pub fn should_block(&self) -> bool {
+        !self.simple.all_passed() || self.extended.should_block()
+    }
+
+    /// All failure messages from both frameworks.
+    pub fn all_failure_messages(&self) -> Vec<String> {
+        let mut msgs = self.simple.failure_messages();
+        for f in &self.extended.failures {
+            if f.severity == GateSeverity::Error {
+                let fqn = f.object_fqn.as_deref().unwrap_or("unknown");
+                msgs.push(format!("[{}] ({}) {}", f.gate_name, fqn, f.message));
+            }
+        }
+        msgs
+    }
+
+    /// Total error count across both frameworks.
+    pub fn error_count(&self) -> usize {
+        self.simple.failures().len()
+            + self
+                .extended
+                .failures
+                .iter()
+                .filter(|f| f.severity == GateSeverity::Error)
+                .count()
+    }
+
+    /// Total warning count (extended only — simple has no warnings).
+    pub fn warning_count(&self) -> usize {
+        self.extended
+            .failures
+            .iter()
+            .filter(|f| f.severity == GateSeverity::Warning)
+            .count()
+    }
+}
+
 // ── Phase 3: Evidence-specific gates ─────────────────────────────
 
 /// Check that an evidence requirement referencing a Proof-class attribute
@@ -895,5 +1066,137 @@ mod tests {
         let failures = check_derivation_type_compatibility(&spec, &known);
         assert_eq!(failures.len(), 1);
         assert!(failures[0].message.contains("input attribute"));
+    }
+
+    // ── Unified gate evaluator tests ──────────────────────────
+
+    fn mock_snapshot_row(tier: GovernanceTier, created_by: &str) -> SnapshotRow {
+        SnapshotRow {
+            snapshot_id: Uuid::new_v4(),
+            snapshot_set_id: None,
+            object_type: ObjectType::AttributeDef,
+            object_id: Uuid::new_v4(),
+            version_major: 1,
+            version_minor: 0,
+            status: SnapshotStatus::Active,
+            governance_tier: tier,
+            trust_class: TrustClass::Convenience,
+            security_label: serde_json::json!({"classification": "internal"}),
+            effective_from: chrono::Utc::now(),
+            effective_until: None,
+            predecessor_id: None,
+            change_type: ChangeType::Created,
+            change_rationale: None,
+            created_by: created_by.into(),
+            approved_by: None,
+            definition: serde_json::json!({"fqn": "cbu.test_attr"}),
+            created_at: chrono::Utc::now(),
+        }
+    }
+
+    #[test]
+    fn test_evaluate_extended_gates_operational_minimal() {
+        let snapshot = mock_snapshot_row(GovernanceTier::Operational, "scanner");
+        let ctx = ExtendedGateContext::default();
+        let failures = evaluate_extended_gates(&snapshot, &ctx);
+        // Operational: taxonomy is warning, stewardship skips, regulatory skips,
+        // review_cycle skips, version_consistency no pred, continuation non-breaking
+        let errors: Vec<_> = failures
+            .iter()
+            .filter(|f| f.severity == GateSeverity::Error)
+            .collect();
+        assert!(errors.is_empty(), "Unexpected errors: {:?}", errors,);
+    }
+
+    #[test]
+    fn test_evaluate_extended_gates_governed_missing_steward() {
+        let snapshot = mock_snapshot_row(GovernanceTier::Governed, "system");
+        let ctx = ExtendedGateContext::default();
+        let failures = evaluate_extended_gates(&snapshot, &ctx);
+        let stewardship_errors: Vec<_> = failures
+            .iter()
+            .filter(|f| f.gate_name == "stewardship")
+            .collect();
+        assert_eq!(stewardship_errors.len(), 1);
+    }
+
+    #[test]
+    fn test_evaluate_extended_gates_breaking_no_rationale() {
+        let mut snapshot = mock_snapshot_row(GovernanceTier::Operational, "scanner");
+        snapshot.change_type = ChangeType::Breaking;
+        let ctx = ExtendedGateContext::default();
+        let failures = evaluate_extended_gates(&snapshot, &ctx);
+        let continuation_errors: Vec<_> = failures
+            .iter()
+            .filter(|f| f.gate_name == "continuation_completeness")
+            .collect();
+        assert_eq!(continuation_errors.len(), 1);
+    }
+
+    #[test]
+    fn test_evaluate_all_publish_gates_blocks_on_simple_failure() {
+        // Proof + Operational → simple gate fails
+        let meta = SnapshotMeta {
+            object_type: ObjectType::AttributeDef,
+            object_id: Uuid::new_v4(),
+            version_major: 1,
+            version_minor: 0,
+            status: SnapshotStatus::Active,
+            governance_tier: GovernanceTier::Operational,
+            trust_class: TrustClass::Proof, // violates proof rule
+            security_label: SecurityLabel::default(),
+            change_type: ChangeType::Created,
+            change_rationale: None,
+            created_by: "test".into(),
+            approved_by: None,
+            predecessor_id: None,
+        };
+        let snapshot = mock_snapshot_row(GovernanceTier::Operational, "test");
+        let ctx = ExtendedGateContext::default();
+        let result = evaluate_all_publish_gates(&meta, &snapshot, &ctx, GateMode::Enforce);
+        assert!(result.should_block());
+        assert!(result.error_count() >= 1);
+    }
+
+    #[test]
+    fn test_evaluate_all_publish_gates_blocks_on_extended_error() {
+        // Simple gates pass, but breaking change with no rationale → extended error
+        let meta =
+            SnapshotMeta::new_operational(ObjectType::AttributeDef, Uuid::new_v4(), "scanner");
+        let mut snapshot = mock_snapshot_row(GovernanceTier::Operational, "scanner");
+        snapshot.change_type = ChangeType::Breaking;
+        let ctx = ExtendedGateContext::default();
+        let result = evaluate_all_publish_gates(&meta, &snapshot, &ctx, GateMode::Enforce);
+        assert!(result.should_block());
+        let continuation_msgs: Vec<_> = result
+            .all_failure_messages()
+            .into_iter()
+            .filter(|m| m.contains("continuation_completeness"))
+            .collect();
+        assert!(!continuation_msgs.is_empty());
+    }
+
+    #[test]
+    fn test_evaluate_all_publish_gates_report_only_does_not_block() {
+        let meta =
+            SnapshotMeta::new_operational(ObjectType::AttributeDef, Uuid::new_v4(), "scanner");
+        let mut snapshot = mock_snapshot_row(GovernanceTier::Operational, "scanner");
+        snapshot.change_type = ChangeType::Breaking;
+        let ctx = ExtendedGateContext::default();
+        let result = evaluate_all_publish_gates(&meta, &snapshot, &ctx, GateMode::ReportOnly);
+        // Extended errors exist but mode is ReportOnly, simple gates pass
+        assert!(!result.should_block());
+        assert!(result.error_count() >= 1); // still counted
+    }
+
+    #[test]
+    fn test_unified_result_warning_count() {
+        let meta =
+            SnapshotMeta::new_operational(ObjectType::AttributeDef, Uuid::new_v4(), "scanner");
+        let snapshot = mock_snapshot_row(GovernanceTier::Operational, "scanner");
+        let ctx = ExtendedGateContext::default();
+        let result = evaluate_all_publish_gates(&meta, &snapshot, &ctx, GateMode::Enforce);
+        // Operational with no memberships → taxonomy warning
+        assert!(result.warning_count() >= 1);
     }
 }

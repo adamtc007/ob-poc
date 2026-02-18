@@ -18,6 +18,7 @@ use super::{
     membership::MembershipRuleBody,
     observation_def::ObservationDefBody,
     policy_rule::PolicyRuleBody,
+    relationship_type_def::RelationshipTypeDefBody,
     store::SnapshotStore,
     taxonomy_def::{TaxonomyDefBody, TaxonomyNodeBody},
     types::{ObjectType, SnapshotMeta, SnapshotRow},
@@ -100,6 +101,17 @@ impl RegistryService {
         EntityTypeDefBody,
         ObjectType::EntityTypeDef,
         "an entity type definition"
+    );
+
+    // ── Relationship Type Definitions ─────────────────────────
+
+    typed_registry_methods!(
+        publish_relationship_type_def,
+        resolve_relationship_type_def,
+        resolve_relationship_type_def_by_fqn,
+        RelationshipTypeDefBody,
+        ObjectType::RelationshipTypeDef,
+        "a relationship type definition"
     );
 
     // ── Verb Contracts ────────────────────────────────────────

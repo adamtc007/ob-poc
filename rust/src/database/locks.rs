@@ -147,6 +147,11 @@ pub enum LockError {
         entity_id: String,
         /// Locks that were acquired before contention occurred
         acquired_so_far: Vec<LockKey>,
+        /// Best-effort: the compiled runbook ID currently holding the lock (INV-10).
+        /// Populated by querying `compiled_runbook_events` for the most recent
+        /// `lock_acquired` event on the contested entity. `None` if lookup fails
+        /// or no holder is found (advisory locks are anonymous in PostgreSQL).
+        holder_runbook_id: Option<uuid::Uuid>,
     },
 
     /// Database error
@@ -248,6 +253,7 @@ pub async fn acquire_locks(
                         entity_type: lock.entity_type.clone(),
                         entity_id: lock.entity_id.clone(),
                         acquired_so_far: acquired,
+                        holder_runbook_id: None, // Populated by caller via event store lookup
                     });
                 }
                 return Err(LockError::Database(e));
@@ -273,6 +279,7 @@ pub async fn acquire_locks(
                 entity_type: lock.entity_type.clone(),
                 entity_id: lock.entity_id.clone(),
                 acquired_so_far: acquired,
+                holder_runbook_id: None, // Populated by caller via event store lookup
             });
         }
     }

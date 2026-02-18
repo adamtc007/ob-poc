@@ -13,7 +13,7 @@
 //! }
 //! ```
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::sync::OnceLock;
 
 use anyhow::Result;
@@ -76,7 +76,7 @@ pub enum MacroAttemptResult {
 /// allowing normal processing to continue.
 pub fn try_expand_macro(
     verb_fqn: &str,
-    args: &HashMap<String, String>,
+    args: &BTreeMap<String, String>,
     session: &UnifiedSession,
 ) -> MacroAttemptResult {
     let registry = macro_registry();
@@ -107,8 +107,8 @@ pub fn try_expand_macro(
 ///
 /// Extracts string values from IntentArguments for macro expansion.
 /// Enum values use the UI key (macro expansion handles internal mapping).
-pub fn intent_args_to_macro_args(intent: &StructuredIntent) -> HashMap<String, String> {
-    let mut args = HashMap::new();
+pub fn intent_args_to_macro_args(intent: &StructuredIntent) -> BTreeMap<String, String> {
+    let mut args = BTreeMap::new();
 
     for arg in &intent.arguments {
         if let Some(value) = extract_string_value(&arg.value) {
