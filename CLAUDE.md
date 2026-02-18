@@ -5,7 +5,7 @@
 > **Backend:** Rust/Axum (`rust/crates/ob-poc-web/`) - Serves React + REST API
 > **Crates:** 16 active Rust crates (esper_* crates deprecated after React migration; ob-poc-graph + viewport removed)
 > **Verbs:** 1,083 canonical verbs, 14,593 intent patterns (DB-sourced)
-> **Migrations:** 90 schema migrations (001-077 + 072b seed + 078-079, 081-090 sem_reg + 087-089 agent/runbook)
+> **Migrations:** 91 schema migrations (001-077 + 072b seed + 078-079, 081-091 sem_reg + 087-089 agent/runbook)
 > **Schema Overview:** `migrations/OB_POC_SCHEMA_ENTITY_OVERVIEW.md` — living doc, 15 sections, ~195 tables (ob-poc + kyc + sem_reg), 14 mermaid ER diagrams
 > **Embeddings:** Candle local (384-dim, BGE-small-en-v1.5) - 14,593 patterns vectorized
 > **React Migration (077):** ✅ Complete - egui/WASM replaced with React/TypeScript, 3-panel chat layout
@@ -56,7 +56,7 @@
 > **KYC/UBO Skeleton Build Pipeline:** ✅ Complete - 7-step build (import-run → graph validate → UBO compute → coverage → outreach plan → tollgate → complete), real computation in all ops, 12 integration tests with assertions
 > **KYC Skeleton Build Post-Audit (S1):** ✅ Complete - Decimal conversion (F-5), coverage ownership scoping (F-2), transaction boundary (F-1), configurable outreach cap (F-4), shared function extraction (F-3a-e)
 > **KYC Skeleton Build Post-Audit (S2):** ✅ Complete - Import run case linkage on idempotent hit (F-7), as_of date for import runs (F-8a-c), case status state machine with KycCaseUpdateStatusOp plugin (F-6a-e), 4 transition tests
-> **Semantic OS (Phases 0-9, Migrations 078-090):** ✅ Complete + Gap Remediation (S1-S19) - Immutable snapshot registry, 13 object types, ABAC + security labels (enforced at tool boundary), publish gates (unified simple + extended framework), context resolution API (paginated, taxonomy-filtered), agent control plane (plans/decisions/escalations), ~32 MCP tools (integrated into MCP server), deterministic object IDs (UUID v5), scanner drift detection, lineage/embeddings/coverage projections, evidence instance layer (observations, document_instances, provenance_edges, retention_policies), stub gate fixes (verb_surface_disclosure, type_correctness), tier_allowed + includes_operational fix, 5 governance gates (regulatory_linkage, review_cycle, version_consistency, continuation_completeness, macro_expansion_integrity), RelationshipTypeDef (13th type), evidence MCP tool realignment, grounding context + embedding ranking, 10 integration test scenarios + 15 invariant tests, 39 Rust source files (~14,700 LOC), 9 SQL migrations (~1,050 LOC)
+> **Semantic OS (Phases 0-9, Migrations 078-091):** ✅ Complete + Gap Remediation (S1-S19) + Peer Review Remediation (D1-D7/S14) - Immutable snapshot registry, 13 object types, ABAC + security labels (enforced at tool boundary), publish gates (unified simple + extended framework), context resolution API (paginated, taxonomy-filtered, relationship-aware, conditional membership evaluation), agent control plane (plans/decisions/escalations), ~32 MCP tools (integrated into MCP server), deterministic object IDs (UUID v5), scanner drift detection, lineage/embeddings/coverage projections, evidence instance layer (observations, attribute_observations, document_instances, provenance_edges, retention_policies), stub gate fixes (verb_surface_disclosure, type_correctness), tier_allowed + includes_operational fix, 5 governance gates (regulatory_linkage, review_cycle, version_consistency, continuation_completeness, macro_expansion_integrity), RelationshipTypeDef with edge_class + directionality, evidence MCP tool realignment (4-state freshness, entity-centric observations), grounding context + embedding ranking, 4 KYC-canonical taxonomy seeds, sink disclosure severity fix, document_instances lifecycle guard, 10 integration test scenarios + 15 invariant tests, 39 Rust source files (~15,200 LOC), 10 SQL migrations (~1,100 LOC)
 
 This is the root project guide for Claude Code. Domain-specific details are in annexes.
 
@@ -5907,9 +5907,9 @@ role:
 
 ---
 
-## Semantic OS — Immutable Registry & Context Resolution (078-090)
+## Semantic OS — Immutable Registry & Context Resolution (078-091)
 
-> ✅ **IMPLEMENTED (2026-02-16)**: 10 phases (0-9) + S1-S19 gap remediation, 39 Rust source files (~14,700 LOC), 9 SQL migrations (~1,050 LOC), ~32 MCP tools (integrated into MCP server), 12 CLI subcommands, 10 integration test scenarios + 15 invariant tests. Gap remediation: stub gate fixes, tier_allowed fix, evidence instance layer (4 tables + immutability trigger), evidence MCP realignment, unified gate framework (5 new governance gates), RelationshipTypeDef, grounding context + embedding ranking. MCP hardening patch applied (ABAC enforcement, atomic publish, deterministic IDs, drift detection, pagination fix).
+> ✅ **IMPLEMENTED (2026-02-16)**: 10 phases (0-9) + S1-S19 gap remediation + D1-D7/S14 peer review remediation, 39 Rust source files (~15,200 LOC), 10 SQL migrations (~1,100 LOC), ~32 MCP tools (integrated into MCP server), 12 CLI subcommands, 10 integration test scenarios + 15 invariant tests. Gap remediation: stub gate fixes, tier_allowed fix, evidence instance layer (4 tables + immutability trigger), evidence MCP realignment, unified gate framework (5 new governance gates), RelationshipTypeDef, grounding context + embedding ranking. MCP hardening patch applied (ABAC enforcement, atomic publish, deterministic IDs, drift detection, pagination fix). Peer review remediation: entity-centric attribute_observations table (D2), 4-state freshness contract (D4), edge_class + directionality on RelationshipTypeDef (D5), 4 KYC-canonical taxonomy seeds (D7), conditional membership rule evaluation in resolve_context (S14), sink disclosure severity fix (D1), document_instances lifecycle guard (D3).
 
 **Problem Solved:** The system had no formal model for what attributes, verbs, entity types, policies, and evidence requirements exist, how they relate, or who can access them. The Semantic Registry provides an immutable, auditable, governance-aware knowledge base that the agent, runtime, and governance teams can query programmatically.
 
@@ -6031,6 +6031,7 @@ enum AccessDecision { Allow, Deny { reason }, AllowWithConstraints { constraints
 | **8** | 085 | `agent/` (5 files) | Agent plans/steps/decisions/escalations, ~32 MCP tools, snapshot manifest |
 | **9** | 086 | `projections/` (4 files) | Lineage (derivation edges, run records), embeddings (with grounding context + similarity ranking, S18), coverage metrics |
 | **Evidence** | 090 | `evidence_instances` | Observations, document instances, provenance edges, retention policies, immutability trigger on snapshots (S4-S5) |
+| **Peer Review** | 091 | `evidence_instances`, `context_resolution`, `gates_technical`, `relationship_type_def`, `seeds/taxonomy_seeds` | Entity-centric `attribute_observations` table (D2), 4-state freshness contract (D4), edge_class + directionality (D5), 4 KYC taxonomy seeds (D7), conditional membership eval (S14), sink disclosure severity (D1), document_instances lifecycle guard (D3) |
 
 ### Context Resolution API (Phase 7)
 
@@ -6275,7 +6276,7 @@ rust/src/sem_reg/
 ├── verb_contract.rs            # VerbContractBody
 ├── registry.rs                 # RegistryService typed publish/resolve
 ├── scanner.rs                  # Verb YAML → registry bootstrap + drift detection
-├── evidence_instances.rs       # Evidence instance layer (S4): Observation, DocumentInstance, ProvenanceEdge, RetentionPolicy
+├── evidence_instances.rs       # Evidence instance layer (S4): Observation, AttributeObservation (D2), DocumentInstance, ProvenanceEdge, RetentionPolicy
 ├── taxonomy_def.rs             # TaxonomyDefBody, TaxonomyNodeBody
 ├── membership.rs               # MembershipRuleBody
 ├── view_def.rs                 # ViewDefBody (+ includes_operational field, S3)
@@ -6288,8 +6289,8 @@ rust/src/sem_reg/
 ├── security.rs                 # Security label inheritance
 ├── derivation.rs               # DerivationFunctionRegistry, evaluation
 ├── gates_governance.rs         # 8 governance gates (3 original + 5 added in S6)
-├── gates_technical.rs          # Technical gates: type_correctness, verb_surface_disclosure (fixed S2)
-├── context_resolution.rs       # 12-step resolve_context() with taxonomy filtering (S15), tier_allowed fix (S3)
+├── gates_technical.rs          # Technical gates: type_correctness, verb_surface_disclosure (fixed S2), sink disclosure severity (D1)
+├── context_resolution.rs       # 12-step resolve_context() with taxonomy filtering (S15), tier_allowed fix (S3), relationship-aware ranking (D5), conditional membership eval (S14)
 ├── agent/
 │   ├── mod.rs                  # Agent module root
 │   ├── plans.rs                # AgentPlan, PlanStep, PlanStore
@@ -6324,13 +6325,33 @@ rust/src/sem_reg/
 | `rust/xtask/src/sem_reg.rs` | CLI subcommands (stats, validate, ctx-resolve, etc.) |
 | `rust/src/sem_reg/ids.rs` | Deterministic UUID v5 object IDs |
 | `rust/src/sem_reg/enforce.rs` | ABAC enforcement helpers (`enforce_read()`) |
-| `rust/src/sem_reg/evidence_instances.rs` | Evidence instance types + store methods (S4) |
+| `rust/src/sem_reg/evidence_instances.rs` | Evidence instance types + store methods (S4), AttributeObservation entity-centric model (D2) |
+| `rust/src/sem_reg/seeds/taxonomy_seeds.rs` | 9 taxonomy seeds (5 domain + 4 KYC-canonical: subject-category, risk-tier, document-class, jurisdiction-regime) |
 | `rust/tests/sem_reg_integration.rs` | 10 integration test scenarios |
 | `rust/tests/sem_reg_invariants.rs` | 15 invariant tests (INV-1 through INV-6 + extensions) |
 | `migrations/078_sem_reg_phase0.sql` | Core schema, `snapshots` table, enums |
 | `migrations/085_sem_reg_phase8.sql` | Agent tables (plans, steps, decisions) |
 | `migrations/086_sem_reg_phase9.sql` | Projection tables (lineage, embeddings) |
 | `migrations/090_sem_reg_evidence_instances.sql` | Evidence tables + snapshots immutability trigger (S4) |
+| `migrations/091_sem_reg_evidence_fixes.sql` | Entity-centric `attribute_observations` table (D2), `document_instances` lifecycle guard trigger (D3) |
+
+---
+
+### Peer Review Remediation (D1-D7/S14, 2026-02-16)
+
+Fixes validated against external peer review of S1-S19 implementation:
+
+| Fix | Priority | Files | Description |
+|-----|----------|-------|-------------|
+| **D1** | P1 | `gates_technical.rs` | Sink disclosure severity: undisclosed sinks `warning()` → `error()`. Sources remain `warning()`. |
+| **D2** | P0 | migration 091, `evidence_instances.rs`, `mcp_tools.rs` | Entity-centric `attribute_observations` table alongside snapshot-centric `observations`. New `AttributeObservation` struct + 3 store methods. MCP handlers dual-path: `subject_ref` present → attribute_observations, absent → observations. |
+| **D3** | P2 | migration 091 | `document_instances` lifecycle guard trigger (immutable field protection on UPDATE, no DELETE). |
+| **D4** | P0 | `mcp_tools.rs` | 4-state freshness contract replacing binary true/false: `unknown_no_policy`, `unknown_no_observation`, `stale`, `fresh`. `stale_count` only counts actual stale items. |
+| **D5** | P0 | `relationship_type_def.rs`, `context_resolution.rs` | `edge_class: Option<String>` + `directionality: Option<Directionality>` on `RelationshipTypeDefBody`. Step 2c in resolve_context() loads subject relationships. Verb ranking boosted by domain (+0.08) and edge_class (+0.07) overlap. |
+| **D7** | P0 | `seeds/taxonomy_seeds.rs` | 4 KYC-canonical taxonomy seeds: subject-category (6 nodes), risk-tier (5 nodes), document-class (6 nodes), jurisdiction-regime (6 nodes). Added alongside existing 5 domain seeds. |
+| **S14** | P0 | `context_resolution.rs` | Conditional membership rule evaluation in `load_subject_memberships()`. Loads `MembershipRuleBody` conditions, evaluates at resolution time. Runtime-dependent conditions (attribute_equals, entity_has_role) conservatively excluded from overlap scoring. |
+
+**Not fixed (validated as non-defects):** D6 (gates exist + wired + tested), D8 (serde tags correct, seeds use Rust structs not YAML), D9 (always-on audit deferred).
 
 ---
 

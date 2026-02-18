@@ -183,8 +183,10 @@ pub fn check_verb_surface_disclosure(
         declared_surface.insert(consumed.clone());
     }
 
-    // Check sinks: attributes that declare this verb as a consumer
-    // should appear in the verb's declared surface
+    // Check sinks: attributes that declare this verb as a consumer (data the verb writes to)
+    // should appear in the verb's declared surface.
+    // Undisclosed sinks are ERROR severity — the verb is writing to data it doesn't declare,
+    // which is a safety/governance concern. Sources (reads) are Warning.
     for sink_attr_fqn in attribute_sinks_for_verb {
         if !declared_surface.contains(sink_attr_fqn) {
             // Check short name too (without domain prefix)
@@ -194,11 +196,11 @@ pub fn check_verb_surface_disclosure(
                 .unwrap_or(sink_attr_fqn.as_str());
             if !declared_surface.contains(short_name) {
                 failures.push(
-                    GateFailure::warning(
+                    GateFailure::error(
                         "verb_surface_disclosure",
                         "verb_contract",
                         format!(
-                            "Attribute '{}' declares verb '{}' as a consumer, \
+                            "Attribute '{}' declares verb '{}' as a consumer (sink), \
                              but the verb does not include it in its I/O surface \
                              (args, produces, or consumes)",
                             sink_attr_fqn, verb.fqn
@@ -573,16 +575,17 @@ mod tests {
     }
 
     #[test]
-    fn test_verb_surface_disclosure_undeclared_sink_warns() {
+    fn test_verb_surface_disclosure_undeclared_sink_is_error() {
         let verb = sample_verb();
         let known: HashSet<String> = HashSet::new();
-        // Attribute says this verb consumes it, but verb doesn't declare it
+        // Attribute says this verb consumes it (sink), but verb doesn't declare it
         let sinks = vec!["cbu.hidden_field".to_string()];
         let failures = check_verb_surface_disclosure(&verb, &known, &sinks, &[]);
         assert_eq!(failures.len(), 1);
-        assert!(failures[0].message.contains("declares verb"));
-        assert!(failures[0].message.contains("consumer"));
+        assert!(failures[0].message.contains("consumer (sink)"));
         assert_eq!(failures[0].gate_name, "verb_surface_disclosure");
+        // D1: Undisclosed sinks must be Error severity, not Warning
+        assert_eq!(failures[0].severity, GateSeverity::Error);
     }
 
     #[test]

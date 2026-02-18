@@ -33,7 +33,9 @@ use uuid::Uuid;
 
 use super::{
     abac::{evaluate_abac, AccessDecision, AccessPurpose, ActorContext},
+    membership::{MembershipCondition, MembershipKind, MembershipRuleBody},
     policy_rule::PolicyRuleBody,
+    relationship_type_def::RelationshipTypeDefBody,
     store::SnapshotStore,
     types::{GovernanceTier, ObjectType, SnapshotRow, TrustClass},
     view_def::ViewDefBody,
@@ -443,6 +445,43 @@ impl SubjectMemberships {
     }
 }
 
+/// Relationship context for the subject — loaded in Step 2c (D5).
+///
+/// Contains relationship type definitions where the subject's entity type
+/// appears as either source or target. Exposes `edge_class` for verb filtering.
+#[derive(Debug, Clone, Default)]
+struct SubjectRelationships {
+    /// Relationship types where the subject is the source entity type
+    outgoing: Vec<RelationshipTypeDefBody>,
+    /// Relationship types where the subject is the target entity type
+    incoming: Vec<RelationshipTypeDefBody>,
+}
+
+impl SubjectRelationships {
+    /// Returns the set of edge classes that the subject participates in.
+    fn edge_classes(&self) -> HashSet<String> {
+        self.outgoing
+            .iter()
+            .chain(self.incoming.iter())
+            .filter_map(|r| r.edge_class.clone())
+            .collect()
+    }
+
+    /// Returns the set of domains covered by the subject's relationships.
+    fn relationship_domains(&self) -> HashSet<String> {
+        self.outgoing
+            .iter()
+            .chain(self.incoming.iter())
+            .map(|r| r.domain.clone())
+            .collect()
+    }
+
+    /// Returns true if the subject has any relationships loaded.
+    fn has_relationships(&self) -> bool {
+        !self.outgoing.is_empty() || !self.incoming.is_empty()
+    }
+}
+
 // ── Resolution Engine ─────────────────────────────────────────
 
 /// The top-level context resolution function.
@@ -462,7 +501,13 @@ pub async fn resolve_context(
 
     // Step 2b: Load taxonomy memberships for the subject and all registry objects.
     // This enables taxonomy-aware filtering in Steps 3, 5, and 6.
+    // S14: Conditional memberships are evaluated; those whose conditions cannot
+    // be verified are excluded from overlap scoring.
     let memberships = load_subject_memberships(pool, &subject).await?;
+
+    // Step 2c (D5): Load relationship type definitions for the subject's entity type.
+    // Exposes edge_class (ownership, control, service, regulatory) to verb filtering.
+    let relationships = load_subject_relationships(pool, &subject, as_of).await?;
 
     // Step 3: Select applicable ViewDefs by taxonomy overlap
     let all_views = load_view_defs(pool, as_of).await?;
@@ -471,7 +516,7 @@ pub async fn resolve_context(
     // Step 4: Extract verb_surface + attribute_prominence from top view
     let top_view_body = ranked_views.first().map(|rv| &rv.body);
 
-    // Step 5: Filter verbs by taxonomy + ABAC + tier
+    // Step 5: Filter verbs by taxonomy + ABAC + tier + relationship edge_class
     let all_verb_rows = load_typed_snapshots(pool, ObjectType::VerbContract, as_of).await?;
     let mut candidate_verbs = filter_and_rank_verbs(
         &all_verb_rows,
@@ -480,6 +525,7 @@ pub async fn resolve_context(
         top_view_body,
         req.entity_kind.as_deref(),
         &memberships,
+        &relationships,
     )?;
 
     // Step 6: Filter attributes similarly
@@ -720,7 +766,13 @@ async fn load_subject_memberships(
         )
         .collect();
 
-    // Derive the subject's taxonomy memberships from its entity type
+    // S14: Load MembershipRuleBody snapshots to evaluate conditional memberships.
+    // Conditional memberships are only counted if their conditions can be verified.
+    let conditional_rules = load_conditional_membership_rules(pool).await?;
+    let excluded_conditionals = evaluate_conditional_memberships(&conditional_rules);
+
+    // Derive the subject's taxonomy memberships from its entity type.
+    // S14: Filter out conditional memberships that failed evaluation.
     let mut subject_taxonomy_fqns = HashSet::new();
 
     if let Some(ref entity_type_fqn) = subject.entity_type_fqn {
@@ -729,6 +781,18 @@ async fn load_subject_memberships(
                 && m.target_fqn == *entity_type_fqn
                 && m.membership_kind != "excluded"
             {
+                // S14: If this is a conditional membership, check if it was excluded
+                if m.membership_kind == "conditional" {
+                    let key = format!("{}::{}", m.taxonomy_fqn, m.target_fqn);
+                    if excluded_conditionals.contains(&key) {
+                        tracing::trace!(
+                            taxonomy = %m.taxonomy_fqn,
+                            target = %m.target_fqn,
+                            "Conditional membership excluded: conditions not verifiable"
+                        );
+                        continue;
+                    }
+                }
                 subject_taxonomy_fqns.insert(m.taxonomy_fqn.clone());
             }
         }
@@ -738,6 +802,111 @@ async fn load_subject_memberships(
         subject_taxonomy_fqns,
         all_memberships,
     })
+}
+
+/// Load MembershipRuleBody snapshots with `Conditional` membership kind (S14).
+async fn load_conditional_membership_rules(pool: &PgPool) -> Result<Vec<MembershipRuleBody>> {
+    let rows = SnapshotStore::list_active(pool, ObjectType::MembershipRule, 500, 0).await?;
+    let mut conditional_rules = Vec::new();
+    for row in &rows {
+        if let Ok(body) = row.parse_definition::<MembershipRuleBody>() {
+            if body.membership_kind == MembershipKind::Conditional {
+                conditional_rules.push(body);
+            }
+        }
+    }
+    Ok(conditional_rules)
+}
+
+/// Evaluate conditional membership rules (S14).
+///
+/// Returns a set of `"{taxonomy_fqn}::{target_fqn}"` keys for conditional
+/// memberships that should be excluded because their conditions cannot be
+/// verified in the current context.
+///
+/// Conditions that reference entity attributes (e.g. `attribute_equals`)
+/// require runtime entity state that `resolve_context()` does not have.
+/// These memberships are conservatively excluded from overlap scoring.
+///
+/// Conditions with no predicates (empty conditions vec) are treated as
+/// satisfied — they represent unconditional "conditional" memberships
+/// (effectively direct).
+fn evaluate_conditional_memberships(rules: &[MembershipRuleBody]) -> HashSet<String> {
+    let mut excluded = HashSet::new();
+
+    for rule in rules {
+        if rule.conditions.is_empty() {
+            // No conditions → treat as satisfied (effectively a direct membership)
+            continue;
+        }
+
+        // Evaluate each condition. If ANY condition is not verifiable, exclude.
+        let all_verifiable = rule.conditions.iter().all(evaluate_condition);
+        if !all_verifiable {
+            let key = format!("{}::{}", rule.taxonomy_fqn, rule.target_fqn);
+            excluded.insert(key);
+        }
+    }
+
+    excluded
+}
+
+/// Evaluate a single membership condition.
+///
+/// Returns `true` if the condition is verifiable and passes in the current
+/// static context. Returns `false` if the condition requires runtime entity
+/// state that we don't have.
+fn evaluate_condition(condition: &MembershipCondition) -> bool {
+    match condition.kind.as_str() {
+        // Conditions that require entity attribute state — not available
+        "attribute_equals" | "attribute_in" | "attribute_not_in" | "attribute_gt"
+        | "attribute_lt" => false,
+        // Conditions based on entity role — not available in resolution context
+        "entity_has_role" | "entity_in_jurisdiction" => false,
+        // Static conditions that can be evaluated without runtime state
+        "always_true" => true,
+        "always_false" => false,
+        // Unknown condition types — conservatively exclude
+        other => {
+            tracing::debug!(
+                condition_kind = %other,
+                "Unknown membership condition kind — excluding from overlap"
+            );
+            false
+        }
+    }
+}
+
+// ── Step 2c: Load Subject Relationships (D5) ─────────────────
+
+/// Load relationship type definitions where the subject's entity type
+/// appears as source or target. Enables edge_class-aware verb ranking.
+async fn load_subject_relationships(
+    pool: &PgPool,
+    subject: &ResolvedSubject,
+    as_of: DateTime<Utc>,
+) -> Result<SubjectRelationships> {
+    let Some(ref entity_type_fqn) = subject.entity_type_fqn else {
+        return Ok(SubjectRelationships::default());
+    };
+
+    let all_rel_rows = load_typed_snapshots(pool, ObjectType::RelationshipTypeDef, as_of).await?;
+
+    let mut outgoing = Vec::new();
+    let mut incoming = Vec::new();
+
+    for row in &all_rel_rows {
+        let Ok(body) = row.parse_definition::<RelationshipTypeDefBody>() else {
+            continue;
+        };
+        if body.source_entity_type_fqn == *entity_type_fqn {
+            outgoing.push(body);
+        } else if body.target_entity_type_fqn == *entity_type_fqn {
+            incoming.push(body);
+        }
+    }
+
+    Ok(SubjectRelationships { outgoing, incoming })
 }
 
 // ── Step 3: Load and Rank Views ───────────────────────────────
@@ -839,6 +1008,7 @@ fn filter_and_rank_verbs(
     top_view: Option<&ViewDefBody>,
     entity_kind: Option<&str>,
     memberships: &SubjectMemberships,
+    relationships: &SubjectRelationships,
 ) -> Result<Vec<VerbCandidate>> {
     let mut candidates = Vec::new();
 
@@ -924,6 +1094,23 @@ fn filter_and_rank_verbs(
                 rank_score += (overlap as f64 * 0.05).min(0.1);
             }
             // Verbs without taxonomy memberships pass through — they are unconstrained
+        }
+
+        // D5: Relationship-aware ranking — boost verbs whose domain matches
+        // the subject's relationship edge classes or relationship domains.
+        // This allows resolve_context() to surface relationship-relevant verbs
+        // (e.g. "ownership" edge_class boosts verbs in the ownership domain).
+        if relationships.has_relationships() {
+            let verb_domain = fqn.split('.').next().unwrap_or("");
+            let rel_domains = relationships.relationship_domains();
+            if rel_domains.contains(verb_domain) {
+                rank_score += 0.08;
+            }
+            // Additional boost for verbs whose domain appears as an edge_class
+            let edge_classes = relationships.edge_classes();
+            if edge_classes.contains(verb_domain) {
+                rank_score += 0.07;
+            }
         }
 
         // Determine usable_for_proof based on tier + trust
@@ -1894,5 +2081,212 @@ mod tests {
         assert!(!memberships.has_memberships());
         // With no memberships, overlap count is always 0 but filtering is skipped
         assert_eq!(memberships.taxonomy_overlap_count("any.verb"), 0);
+    }
+
+    // ── D5: SubjectRelationships tests ────────────────────────
+
+    #[test]
+    fn test_subject_relationships_edge_classes() {
+        let rels = SubjectRelationships {
+            outgoing: vec![RelationshipTypeDefBody {
+                fqn: "relationship.ownership".into(),
+                name: "Ownership".into(),
+                description: "Ownership".into(),
+                domain: "ownership".into(),
+                source_entity_type_fqn: "entity.fund".into(),
+                target_entity_type_fqn: "entity.legal_entity".into(),
+                cardinality:
+                    crate::sem_reg::relationship_type_def::RelationshipCardinality::OneToMany,
+                edge_class: Some("ownership".into()),
+                directionality: Some(
+                    crate::sem_reg::relationship_type_def::Directionality::Forward,
+                ),
+                inverse_fqn: None,
+                constraints: vec![],
+            }],
+            incoming: vec![RelationshipTypeDefBody {
+                fqn: "relationship.custody_of".into(),
+                name: "Custody Of".into(),
+                description: "Custody".into(),
+                domain: "custody".into(),
+                source_entity_type_fqn: "entity.custodian".into(),
+                target_entity_type_fqn: "entity.fund".into(),
+                cardinality:
+                    crate::sem_reg::relationship_type_def::RelationshipCardinality::OneToMany,
+                edge_class: Some("service".into()),
+                directionality: None,
+                inverse_fqn: None,
+                constraints: vec![],
+            }],
+        };
+
+        let classes = rels.edge_classes();
+        assert!(classes.contains("ownership"));
+        assert!(classes.contains("service"));
+        assert_eq!(classes.len(), 2);
+    }
+
+    #[test]
+    fn test_subject_relationships_domains() {
+        let rels = SubjectRelationships {
+            outgoing: vec![RelationshipTypeDefBody {
+                fqn: "relationship.ownership".into(),
+                name: "Ownership".into(),
+                description: "Ownership".into(),
+                domain: "ownership".into(),
+                source_entity_type_fqn: "entity.fund".into(),
+                target_entity_type_fqn: "entity.legal_entity".into(),
+                cardinality:
+                    crate::sem_reg::relationship_type_def::RelationshipCardinality::OneToMany,
+                edge_class: None,
+                directionality: None,
+                inverse_fqn: None,
+                constraints: vec![],
+            }],
+            incoming: vec![],
+        };
+
+        let domains = rels.relationship_domains();
+        assert!(domains.contains("ownership"));
+        assert!(rels.has_relationships());
+    }
+
+    #[test]
+    fn test_subject_relationships_empty() {
+        let rels = SubjectRelationships::default();
+        assert!(!rels.has_relationships());
+        assert!(rels.edge_classes().is_empty());
+        assert!(rels.relationship_domains().is_empty());
+    }
+
+    // ── S14: Conditional membership evaluation tests ──────────
+
+    #[test]
+    fn test_evaluate_condition_attribute_equals_excluded() {
+        let cond = MembershipCondition {
+            kind: "attribute_equals".into(),
+            field: "pep_status".into(),
+            operator: "eq".into(),
+            value: serde_json::json!("active"),
+        };
+        // attribute_equals requires runtime state → not verifiable
+        assert!(!evaluate_condition(&cond));
+    }
+
+    #[test]
+    fn test_evaluate_condition_always_true() {
+        let cond = MembershipCondition {
+            kind: "always_true".into(),
+            field: "".into(),
+            operator: "eq".into(),
+            value: serde_json::json!(true),
+        };
+        assert!(evaluate_condition(&cond));
+    }
+
+    #[test]
+    fn test_evaluate_condition_always_false() {
+        let cond = MembershipCondition {
+            kind: "always_false".into(),
+            field: "".into(),
+            operator: "eq".into(),
+            value: serde_json::json!(false),
+        };
+        assert!(!evaluate_condition(&cond));
+    }
+
+    #[test]
+    fn test_evaluate_condition_unknown_kind_excluded() {
+        let cond = MembershipCondition {
+            kind: "custom_check".into(),
+            field: "something".into(),
+            operator: "eq".into(),
+            value: serde_json::json!("value"),
+        };
+        // Unknown conditions are conservatively excluded
+        assert!(!evaluate_condition(&cond));
+    }
+
+    #[test]
+    fn test_evaluate_conditional_memberships_empty_conditions_pass() {
+        let rules = vec![MembershipRuleBody {
+            fqn: "rule.test".into(),
+            name: "Test".into(),
+            description: None,
+            taxonomy_fqn: "taxonomy.risk-tier".into(),
+            node_fqn: "taxonomy.risk-tier.high".into(),
+            membership_kind: MembershipKind::Conditional,
+            target_type: "entity_type_def".into(),
+            target_fqn: "entity.person".into(),
+            conditions: vec![], // No conditions → passes
+        }];
+        let excluded = evaluate_conditional_memberships(&rules);
+        assert!(excluded.is_empty());
+    }
+
+    #[test]
+    fn test_evaluate_conditional_memberships_with_attribute_condition_excluded() {
+        let rules = vec![MembershipRuleBody {
+            fqn: "rule.pep-check".into(),
+            name: "PEP Check".into(),
+            description: None,
+            taxonomy_fqn: "taxonomy.risk-tier".into(),
+            node_fqn: "taxonomy.risk-tier.high".into(),
+            membership_kind: MembershipKind::Conditional,
+            target_type: "entity_type_def".into(),
+            target_fqn: "entity.person".into(),
+            conditions: vec![MembershipCondition {
+                kind: "attribute_equals".into(),
+                field: "pep_status".into(),
+                operator: "eq".into(),
+                value: serde_json::json!("active"),
+            }],
+        }];
+        let excluded = evaluate_conditional_memberships(&rules);
+        assert_eq!(excluded.len(), 1);
+        assert!(excluded.contains("taxonomy.risk-tier::entity.person"));
+    }
+
+    #[test]
+    fn test_evaluate_conditional_memberships_mixed_rules() {
+        let rules = vec![
+            MembershipRuleBody {
+                fqn: "rule.always".into(),
+                name: "Always".into(),
+                description: None,
+                taxonomy_fqn: "taxonomy.subject-category".into(),
+                node_fqn: "taxonomy.subject-category.fund".into(),
+                membership_kind: MembershipKind::Conditional,
+                target_type: "entity_type_def".into(),
+                target_fqn: "entity.fund".into(),
+                conditions: vec![MembershipCondition {
+                    kind: "always_true".into(),
+                    field: "".into(),
+                    operator: "eq".into(),
+                    value: serde_json::json!(true),
+                }],
+            },
+            MembershipRuleBody {
+                fqn: "rule.pep".into(),
+                name: "PEP".into(),
+                description: None,
+                taxonomy_fqn: "taxonomy.risk-tier".into(),
+                node_fqn: "taxonomy.risk-tier.high".into(),
+                membership_kind: MembershipKind::Conditional,
+                target_type: "entity_type_def".into(),
+                target_fqn: "entity.person".into(),
+                conditions: vec![MembershipCondition {
+                    kind: "attribute_equals".into(),
+                    field: "pep_status".into(),
+                    operator: "eq".into(),
+                    value: serde_json::json!("active"),
+                }],
+            },
+        ];
+        let excluded = evaluate_conditional_memberships(&rules);
+        // Only the PEP rule is excluded; the always_true rule passes
+        assert_eq!(excluded.len(), 1);
+        assert!(excluded.contains("taxonomy.risk-tier::entity.person"));
+        assert!(!excluded.contains("taxonomy.subject-category::entity.fund"));
     }
 }

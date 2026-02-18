@@ -485,10 +485,13 @@ fn evidence_specs() -> Vec<SemRegToolSpec> {
     vec![
         SemRegToolSpec {
             name: "sem_reg_record_observation".into(),
-            description: "Record an evidence observation for a registry snapshot".into(),
+            description: "Record an evidence observation. Provide subject_ref + attribute_fqn for entity-centric recording (attribute_observations table), or snapshot_id for snapshot-centric recording (observations table).".into(),
             category: "evidence".into(),
             parameters: vec![
-                param("snapshot_id", "Snapshot UUID this observation is evidence for", "uuid", true),
+                param("snapshot_id", "Snapshot UUID (required for snapshot-centric mode, optional for entity-centric)", "uuid", false),
+                param("subject_ref", "Entity UUID this observation is about (entity-centric mode)", "uuid", false),
+                param("attribute_fqn", "Attribute FQN, e.g. 'kyc.pep_status' (entity-centric mode)", "string", false),
+                param("confidence", "Confidence in the observation 0.0-1.0 (entity-centric mode, default: 1.0)", "number", false),
                 param("observer_id", "Who or what made the observation (e.g. 'agent:kyc-bot')", "string", true),
                 param("evidence_grade", "Grade: primary_document, secondary_document, self_declaration, third_party_attestation, system_derived, manual_override", "string", true),
                 param("raw_payload", "Evidence payload (JSON object)", "object", false),
@@ -497,10 +500,12 @@ fn evidence_specs() -> Vec<SemRegToolSpec> {
         },
         SemRegToolSpec {
             name: "sem_reg_check_evidence_freshness".into(),
-            description: "Check evidence freshness for snapshots against observation recency".into(),
+            description: "Check evidence freshness. 4-state contract: fresh, stale, unknown_no_observation, unknown_no_policy. Provide snapshot_ids for snapshot-centric checks, or subject_ref + attribute_fqns for entity-centric checks.".into(),
             category: "evidence".into(),
             parameters: vec![
-                param("snapshot_ids", "Array of snapshot UUIDs to check", "array", true),
+                param("snapshot_ids", "Array of snapshot UUIDs to check (snapshot-centric mode)", "array", false),
+                param("subject_ref", "Entity UUID to check freshness for (entity-centric mode)", "uuid", false),
+                param("attribute_fqns", "Array of attribute FQNs to check (entity-centric mode)", "array", false),
                 param("max_age_days", "Maximum age in days before evidence is considered stale (default: 365)", "integer", false),
             ],
         },
@@ -1864,15 +1869,6 @@ async fn handle_record_observation(
 ) -> SemRegToolResult {
     use crate::sem_reg::evidence_instances::{EvidenceGrade, EvidenceInstanceStore};
 
-    let snapshot_id = match args
-        .get("snapshot_id")
-        .and_then(|v| v.as_str())
-        .and_then(|s| Uuid::parse_str(s).ok())
-    {
-        Some(id) => id,
-        None => return SemRegToolResult::err("Missing or invalid required parameter: snapshot_id"),
-    };
-
     let observer_id = match args.get("observer_id").and_then(|v| v.as_str()) {
         Some(o) => o,
         None => return SemRegToolResult::err("Missing required parameter: observer_id"),
@@ -1891,33 +1887,94 @@ async fn handle_record_observation(
         None => return SemRegToolResult::err("Missing required parameter: evidence_grade"),
     };
 
-    let raw_payload = args
-        .get("raw_payload")
-        .cloned()
-        .unwrap_or(serde_json::json!({}));
-
     let supersedes = args
         .get("supersedes")
         .and_then(|v| v.as_str())
         .and_then(|s| Uuid::parse_str(s).ok());
 
-    match EvidenceInstanceStore::insert_observation(
-        ctx.pool,
-        snapshot_id,
-        observer_id,
-        &evidence_grade,
-        &raw_payload,
-        supersedes,
-    )
-    .await
-    {
-        Ok(observation_id) => SemRegToolResult::ok(serde_json::json!({
-            "observation_id": observation_id,
-            "snapshot_id": snapshot_id,
-            "evidence_grade": evidence_grade.as_str(),
-            "status": "recorded",
-        })),
-        Err(e) => SemRegToolResult::err(format!("Failed to record observation: {e}")),
+    // Entity-centric path: when subject_ref + attribute_fqn are present,
+    // insert into attribute_observations table.
+    let subject_ref = args
+        .get("subject_ref")
+        .and_then(|v| v.as_str())
+        .and_then(|s| Uuid::parse_str(s).ok());
+    let attribute_fqn = args.get("attribute_fqn").and_then(|v| v.as_str());
+
+    if let (Some(subject_ref), Some(attribute_fqn)) = (subject_ref, attribute_fqn) {
+        let confidence = args
+            .get("confidence")
+            .and_then(|v| v.as_f64())
+            .map(|f| f as f32)
+            .unwrap_or(1.0);
+        let snapshot_id = args
+            .get("snapshot_id")
+            .and_then(|v| v.as_str())
+            .and_then(|s| Uuid::parse_str(s).ok());
+        let raw_payload = args.get("raw_payload");
+
+        match EvidenceInstanceStore::insert_attribute_observation(
+            ctx.pool,
+            subject_ref,
+            attribute_fqn,
+            observer_id,
+            &evidence_grade,
+            confidence,
+            snapshot_id,
+            raw_payload,
+            supersedes,
+        )
+        .await
+        {
+            Ok(observation_id) => SemRegToolResult::ok(serde_json::json!({
+                "observation_id": observation_id,
+                "subject_ref": subject_ref,
+                "attribute_fqn": attribute_fqn,
+                "confidence": confidence,
+                "evidence_grade": evidence_grade.as_str(),
+                "store": "attribute_observations",
+                "status": "recorded",
+            })),
+            Err(e) => SemRegToolResult::err(format!("Failed to record attribute observation: {e}")),
+        }
+    } else {
+        // Snapshot-centric path (original behavior): requires snapshot_id
+        let snapshot_id = match args
+            .get("snapshot_id")
+            .and_then(|v| v.as_str())
+            .and_then(|s| Uuid::parse_str(s).ok())
+        {
+            Some(id) => id,
+            None => {
+                return SemRegToolResult::err(
+                    "Missing required parameter: either snapshot_id (snapshot-centric) or subject_ref + attribute_fqn (entity-centric)",
+                )
+            }
+        };
+
+        let raw_payload = args
+            .get("raw_payload")
+            .cloned()
+            .unwrap_or(serde_json::json!({}));
+
+        match EvidenceInstanceStore::insert_observation(
+            ctx.pool,
+            snapshot_id,
+            observer_id,
+            &evidence_grade,
+            &raw_payload,
+            supersedes,
+        )
+        .await
+        {
+            Ok(observation_id) => SemRegToolResult::ok(serde_json::json!({
+                "observation_id": observation_id,
+                "snapshot_id": snapshot_id,
+                "evidence_grade": evidence_grade.as_str(),
+                "store": "observations",
+                "status": "recorded",
+            })),
+            Err(e) => SemRegToolResult::err(format!("Failed to record observation: {e}")),
+        }
     }
 }
 
@@ -1925,6 +1982,99 @@ async fn handle_check_freshness(
     ctx: &SemRegToolContext<'_>,
     args: &serde_json::Value,
 ) -> SemRegToolResult {
+    let max_age_days = args
+        .get("max_age_days")
+        .and_then(|v| v.as_i64())
+        .unwrap_or(365);
+
+    let cutoff = chrono::Utc::now() - chrono::Duration::days(max_age_days);
+
+    // Entity-centric path: check attribute_observations for a subject
+    let subject_ref = args
+        .get("subject_ref")
+        .and_then(|v| v.as_str())
+        .and_then(|s| Uuid::parse_str(s).ok());
+    let attribute_fqns: Vec<String> = args
+        .get("attribute_fqns")
+        .and_then(|v| v.as_array())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|v| v.as_str().map(String::from))
+                .collect()
+        })
+        .unwrap_or_default();
+
+    if let Some(subject_ref) = subject_ref {
+        if attribute_fqns.is_empty() {
+            return SemRegToolResult::err(
+                "attribute_fqns array is required when subject_ref is provided",
+            );
+        }
+
+        let mut items = Vec::new();
+        for fqn in &attribute_fqns {
+            let row: Option<(chrono::DateTime<chrono::Utc>, String, f32)> = sqlx::query_as(
+                r#"SELECT observed_at, evidence_grade, confidence
+                   FROM sem_reg.attribute_observations
+                   WHERE subject_ref = $1 AND attribute_fqn = $2
+                   ORDER BY observed_at DESC
+                   LIMIT 1"#,
+            )
+            .bind(subject_ref)
+            .bind(fqn.as_str())
+            .fetch_optional(ctx.pool)
+            .await
+            .unwrap_or(None);
+
+            match row {
+                Some((observed_at, grade, confidence)) => {
+                    let is_fresh = observed_at >= cutoff;
+                    let age_days = (chrono::Utc::now() - observed_at).num_days();
+                    let days_remaining = max_age_days - age_days;
+                    items.push(serde_json::json!({
+                        "subject_ref": subject_ref,
+                        "attribute_fqn": fqn,
+                        "fresh": is_fresh,
+                        "status": if is_fresh { "fresh" } else { "stale" },
+                        "last_observed_at": observed_at.to_rfc3339(),
+                        "evidence_grade": grade,
+                        "confidence": confidence,
+                        "age_days": age_days,
+                        "days_remaining": days_remaining.max(0),
+                    }));
+                }
+                None => {
+                    items.push(serde_json::json!({
+                        "subject_ref": subject_ref,
+                        "attribute_fqn": fqn,
+                        "fresh": null,
+                        "status": "unknown_no_observation",
+                    }));
+                }
+            }
+        }
+
+        let stale_count = items.iter().filter(|i| i["status"] == "stale").count();
+        let unknown_count = items
+            .iter()
+            .filter(|i| {
+                i["status"] == "unknown_no_observation" || i["status"] == "unknown_no_policy"
+            })
+            .count();
+        let fresh_count = items.iter().filter(|i| i["status"] == "fresh").count();
+
+        return SemRegToolResult::ok(serde_json::json!({
+            "checked_count": attribute_fqns.len(),
+            "fresh_count": fresh_count,
+            "stale_count": stale_count,
+            "unknown_count": unknown_count,
+            "all_fresh": stale_count == 0 && unknown_count == 0,
+            "max_age_days": max_age_days,
+            "items": items,
+        }));
+    }
+
+    // Snapshot-centric path (original, with 4-state contract)
     let snapshot_ids: Vec<Uuid> = args
         .get("snapshot_ids")
         .and_then(|v| v.as_array())
@@ -1936,15 +2086,10 @@ async fn handle_check_freshness(
         .unwrap_or_default();
 
     if snapshot_ids.is_empty() {
-        return SemRegToolResult::err("snapshot_ids array is empty");
+        return SemRegToolResult::err(
+            "Either snapshot_ids or subject_ref + attribute_fqns is required",
+        );
     }
-
-    let max_age_days = args
-        .get("max_age_days")
-        .and_then(|v| v.as_i64())
-        .unwrap_or(365);
-
-    let cutoff = chrono::Utc::now() - chrono::Duration::days(max_age_days);
 
     let mut items = Vec::new();
 
@@ -1970,6 +2115,7 @@ async fn handle_check_freshness(
                 items.push(serde_json::json!({
                     "snapshot_id": sid,
                     "fresh": is_fresh,
+                    "status": if is_fresh { "fresh" } else { "stale" },
                     "last_observed_at": observed_at.to_rfc3339(),
                     "evidence_grade": grade,
                     "age_days": age_days,
@@ -1977,21 +2123,42 @@ async fn handle_check_freshness(
                 }));
             }
             None => {
+                // 4-state contract: check if an evidence requirement exists
+                let has_policy: bool = sqlx::query_scalar(
+                    r#"SELECT EXISTS(
+                        SELECT 1 FROM sem_reg.snapshots
+                        WHERE object_type = 'evidence_requirement'
+                          AND status = 'active'
+                          AND definition->'target_object_type' IS NOT NULL
+                    )"#,
+                )
+                .fetch_one(ctx.pool)
+                .await
+                .unwrap_or(false);
+
                 items.push(serde_json::json!({
                     "snapshot_id": sid,
-                    "fresh": false,
-                    "reason": "no_observations",
+                    "fresh": null,
+                    "status": if has_policy { "unknown_no_observation" } else { "unknown_no_policy" },
                 }));
             }
         }
     }
 
-    let stale_count = items.iter().filter(|i| i["fresh"] == false).count();
+    // Only count truly stale items (not unknown) in stale_count
+    let stale_count = items.iter().filter(|i| i["status"] == "stale").count();
+    let unknown_count = items
+        .iter()
+        .filter(|i| i["status"] == "unknown_no_observation" || i["status"] == "unknown_no_policy")
+        .count();
+    let fresh_count = items.iter().filter(|i| i["status"] == "fresh").count();
 
     SemRegToolResult::ok(serde_json::json!({
         "checked_count": snapshot_ids.len(),
-        "all_fresh": stale_count == 0,
+        "fresh_count": fresh_count,
         "stale_count": stale_count,
+        "unknown_count": unknown_count,
+        "all_fresh": stale_count == 0 && unknown_count == 0,
         "max_age_days": max_age_days,
         "items": items,
     }))
@@ -2058,19 +2225,45 @@ async fn handle_identify_gaps(
                     continue;
                 }
 
-                // Check observation existence and freshness for each required attribute
-                let sid = attr.attribute_snapshot_id;
-                let obs_row: Option<(chrono::DateTime<chrono::Utc>, String)> = sqlx::query_as(
-                    r#"SELECT observed_at, evidence_grade
+                // Check observation existence and freshness for each required attribute.
+                // First try entity-centric attribute_observations (by subject + attribute FQN),
+                // then fall back to snapshot-centric observations table.
+                let attr_obs_row: Option<(chrono::DateTime<chrono::Utc>, String, f32)> =
+                    sqlx::query_as(
+                        r#"SELECT observed_at, evidence_grade, confidence
+                           FROM sem_reg.attribute_observations
+                           WHERE subject_ref = $1 AND attribute_fqn = $2
+                           ORDER BY observed_at DESC
+                           LIMIT 1"#,
+                    )
+                    .bind(subject_id)
+                    .bind(&attr.fqn)
+                    .fetch_optional(ctx.pool)
+                    .await
+                    .unwrap_or(None);
+
+                let obs_row: Option<(chrono::DateTime<chrono::Utc>, String)> =
+                    if attr_obs_row.is_some() {
+                        attr_obs_row
+                            .as_ref()
+                            .map(|(ts, grade, _)| (*ts, grade.clone()))
+                    } else {
+                        // Fall back to snapshot-centric observations
+                        let sid = attr.attribute_snapshot_id;
+                        sqlx::query_as(
+                            r#"SELECT observed_at, evidence_grade
                            FROM sem_reg.observations
                            WHERE snapshot_id = $1
                            ORDER BY observed_at DESC
                            LIMIT 1"#,
-                )
-                .bind(sid)
-                .fetch_optional(ctx.pool)
-                .await
-                .unwrap_or(None);
+                        )
+                        .bind(sid)
+                        .fetch_optional(ctx.pool)
+                        .await
+                        .unwrap_or(None)
+                    };
+
+                let confidence = attr_obs_row.map(|(_, _, c)| c);
 
                 let (has_observation, is_fresh, evidence_grade, remediation) = match obs_row {
                     Some((observed_at, grade)) => {
@@ -2107,6 +2300,7 @@ async fn handle_identify_gaps(
                         "has_observation": has_observation,
                         "observation_fresh": is_fresh,
                         "evidence_grade": evidence_grade,
+                        "confidence": confidence,
                         "remediation": remediation,
                     }));
                 }

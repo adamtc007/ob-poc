@@ -6,6 +6,12 @@
 //! - Instrument classification (asset classes)
 //! - Governance tier (governed vs operational)
 //! - Domain (verb/attribute domains)
+//!
+//! KYC-canonical taxonomies for `resolve_context()` overlap scoring:
+//! - Subject category (natural-person, legal-entity, trust, fund, government-body)
+//! - Risk tier (low, medium, high, prohibited)
+//! - Document class (identity, address-proof, source-of-wealth, corporate-structure, regulatory-filing)
+//! - Jurisdiction regime (EU-AMLD6, US-BSA, UK-MLR, FATF-grey, FATF-black)
 
 use std::collections::BTreeMap;
 
@@ -59,6 +65,14 @@ fn core_taxonomies() -> Vec<(TaxonomyDefBody, Vec<TaxonomyNodeBody>)> {
         governance_tier_taxonomy(),
         // 5. Domain taxonomy
         domain_taxonomy(),
+        // 6. KYC: Subject category taxonomy
+        subject_category_taxonomy(),
+        // 7. KYC: Risk tier taxonomy
+        risk_tier_taxonomy(),
+        // 8. KYC: Document class taxonomy
+        document_class_taxonomy(),
+        // 9. KYC: Jurisdiction regime taxonomy
+        jurisdiction_regime_taxonomy(),
     ]
 }
 
@@ -360,6 +374,246 @@ fn domain_taxonomy() -> (TaxonomyDefBody, Vec<TaxonomyNodeBody>) {
     (tax, nodes)
 }
 
+// ---------------------------------------------------------------------------
+// KYC-canonical taxonomies (D7)
+//
+// These 4 taxonomies are referenced by ViewDefs and MembershipRules that
+// resolve_context() uses for overlap scoring. Without them, taxonomy overlap
+// is near-zero and no views rank meaningfully.
+// ---------------------------------------------------------------------------
+
+fn subject_category_taxonomy() -> (TaxonomyDefBody, Vec<TaxonomyNodeBody>) {
+    let tax = TaxonomyDefBody {
+        fqn: "taxonomy.subject-category".into(),
+        name: "Subject Category".into(),
+        description: "Classifies KYC subjects by their legal nature for due-diligence scoping"
+            .into(),
+        domain: "kyc".into(),
+        root_node_fqn: Some("taxonomy.subject-category.root".into()),
+        max_depth: Some(2),
+        classification_axis: Some("subject_category".into()),
+    };
+
+    let nodes = vec![
+        node(
+            "taxonomy.subject-category.root",
+            "All Subjects",
+            &tax.fqn,
+            None,
+            0,
+        ),
+        node(
+            "taxonomy.subject-category.natural-person",
+            "Natural Person",
+            &tax.fqn,
+            Some("taxonomy.subject-category.root"),
+            1,
+        ),
+        node(
+            "taxonomy.subject-category.legal-entity",
+            "Legal Entity",
+            &tax.fqn,
+            Some("taxonomy.subject-category.root"),
+            2,
+        ),
+        node(
+            "taxonomy.subject-category.trust",
+            "Trust",
+            &tax.fqn,
+            Some("taxonomy.subject-category.root"),
+            3,
+        ),
+        node(
+            "taxonomy.subject-category.fund",
+            "Fund",
+            &tax.fqn,
+            Some("taxonomy.subject-category.root"),
+            4,
+        ),
+        node(
+            "taxonomy.subject-category.government-body",
+            "Government Body",
+            &tax.fqn,
+            Some("taxonomy.subject-category.root"),
+            5,
+        ),
+    ];
+
+    (tax, nodes)
+}
+
+fn risk_tier_taxonomy() -> (TaxonomyDefBody, Vec<TaxonomyNodeBody>) {
+    let tax = TaxonomyDefBody {
+        fqn: "taxonomy.risk-tier".into(),
+        name: "Risk Tier".into(),
+        description: "AML/KYC risk classification determining due-diligence depth and frequency"
+            .into(),
+        domain: "kyc".into(),
+        root_node_fqn: Some("taxonomy.risk-tier.root".into()),
+        max_depth: Some(2),
+        classification_axis: Some("risk_tier".into()),
+    };
+
+    let nodes = vec![
+        node(
+            "taxonomy.risk-tier.root",
+            "All Risk Tiers",
+            &tax.fqn,
+            None,
+            0,
+        ),
+        node(
+            "taxonomy.risk-tier.low",
+            "Low",
+            &tax.fqn,
+            Some("taxonomy.risk-tier.root"),
+            1,
+        ),
+        node(
+            "taxonomy.risk-tier.medium",
+            "Medium",
+            &tax.fqn,
+            Some("taxonomy.risk-tier.root"),
+            2,
+        ),
+        node(
+            "taxonomy.risk-tier.high",
+            "High",
+            &tax.fqn,
+            Some("taxonomy.risk-tier.root"),
+            3,
+        ),
+        node(
+            "taxonomy.risk-tier.prohibited",
+            "Prohibited",
+            &tax.fqn,
+            Some("taxonomy.risk-tier.root"),
+            4,
+        ),
+    ];
+
+    (tax, nodes)
+}
+
+fn document_class_taxonomy() -> (TaxonomyDefBody, Vec<TaxonomyNodeBody>) {
+    let tax = TaxonomyDefBody {
+        fqn: "taxonomy.document-class".into(),
+        name: "Document Class".into(),
+        description: "Classifies KYC/onboarding documents by their evidentiary purpose".into(),
+        domain: "kyc".into(),
+        root_node_fqn: Some("taxonomy.document-class.root".into()),
+        max_depth: Some(2),
+        classification_axis: Some("document_class".into()),
+    };
+
+    let nodes = vec![
+        node(
+            "taxonomy.document-class.root",
+            "All Documents",
+            &tax.fqn,
+            None,
+            0,
+        ),
+        node(
+            "taxonomy.document-class.identity",
+            "Identity",
+            &tax.fqn,
+            Some("taxonomy.document-class.root"),
+            1,
+        ),
+        node(
+            "taxonomy.document-class.address-proof",
+            "Address Proof",
+            &tax.fqn,
+            Some("taxonomy.document-class.root"),
+            2,
+        ),
+        node(
+            "taxonomy.document-class.source-of-wealth",
+            "Source of Wealth",
+            &tax.fqn,
+            Some("taxonomy.document-class.root"),
+            3,
+        ),
+        node(
+            "taxonomy.document-class.corporate-structure",
+            "Corporate Structure",
+            &tax.fqn,
+            Some("taxonomy.document-class.root"),
+            4,
+        ),
+        node(
+            "taxonomy.document-class.regulatory-filing",
+            "Regulatory Filing",
+            &tax.fqn,
+            Some("taxonomy.document-class.root"),
+            5,
+        ),
+    ];
+
+    (tax, nodes)
+}
+
+fn jurisdiction_regime_taxonomy() -> (TaxonomyDefBody, Vec<TaxonomyNodeBody>) {
+    let tax = TaxonomyDefBody {
+        fqn: "taxonomy.jurisdiction-regime".into(),
+        name: "Jurisdiction Regime".into(),
+        description: "Regulatory regime classification for jurisdiction-specific KYC requirements"
+            .into(),
+        domain: "kyc".into(),
+        root_node_fqn: Some("taxonomy.jurisdiction-regime.root".into()),
+        max_depth: Some(2),
+        classification_axis: Some("jurisdiction_regime".into()),
+    };
+
+    let nodes = vec![
+        node(
+            "taxonomy.jurisdiction-regime.root",
+            "All Regimes",
+            &tax.fqn,
+            None,
+            0,
+        ),
+        node(
+            "taxonomy.jurisdiction-regime.eu-amld6",
+            "EU AMLD6",
+            &tax.fqn,
+            Some("taxonomy.jurisdiction-regime.root"),
+            1,
+        ),
+        node(
+            "taxonomy.jurisdiction-regime.us-bsa",
+            "US BSA",
+            &tax.fqn,
+            Some("taxonomy.jurisdiction-regime.root"),
+            2,
+        ),
+        node(
+            "taxonomy.jurisdiction-regime.uk-mlr",
+            "UK MLR",
+            &tax.fqn,
+            Some("taxonomy.jurisdiction-regime.root"),
+            3,
+        ),
+        node(
+            "taxonomy.jurisdiction-regime.fatf-grey",
+            "FATF Grey List",
+            &tax.fqn,
+            Some("taxonomy.jurisdiction-regime.root"),
+            4,
+        ),
+        node(
+            "taxonomy.jurisdiction-regime.fatf-black",
+            "FATF Black List",
+            &tax.fqn,
+            Some("taxonomy.jurisdiction-regime.root"),
+            5,
+        ),
+    ];
+
+    (tax, nodes)
+}
+
 /// Helper to build a taxonomy node.
 fn node(
     fqn: &str,
@@ -501,7 +755,11 @@ mod tests {
     #[test]
     fn test_core_taxonomies_well_formed() {
         let taxonomies = core_taxonomies();
-        assert_eq!(taxonomies.len(), 5, "Expected 5 core taxonomies");
+        assert_eq!(
+            taxonomies.len(),
+            9,
+            "Expected 9 core taxonomies (5 domain + 4 KYC)"
+        );
 
         for (tax, nodes) in &taxonomies {
             // Each taxonomy has a valid FQN
@@ -567,6 +825,85 @@ mod tests {
             otc.parent_fqn.as_deref(),
             Some("taxonomy.instrument-class.derivatives")
         );
+    }
+
+    #[test]
+    fn test_subject_category_nodes() {
+        let (tax, nodes) = subject_category_taxonomy();
+        assert_eq!(tax.fqn, "taxonomy.subject-category");
+        assert_eq!(tax.domain, "kyc");
+        assert_eq!(nodes.len(), 6); // root + 5 categories
+        let fund = nodes.iter().find(|n| n.fqn.ends_with(".fund")).unwrap();
+        assert_eq!(
+            fund.parent_fqn.as_deref(),
+            Some("taxonomy.subject-category.root")
+        );
+    }
+
+    #[test]
+    fn test_risk_tier_nodes() {
+        let (tax, nodes) = risk_tier_taxonomy();
+        assert_eq!(tax.fqn, "taxonomy.risk-tier");
+        assert_eq!(tax.domain, "kyc");
+        assert_eq!(nodes.len(), 5); // root + 4 tiers
+        let prohibited = nodes
+            .iter()
+            .find(|n| n.fqn.ends_with(".prohibited"))
+            .unwrap();
+        assert_eq!(
+            prohibited.parent_fqn.as_deref(),
+            Some("taxonomy.risk-tier.root")
+        );
+    }
+
+    #[test]
+    fn test_document_class_nodes() {
+        let (tax, nodes) = document_class_taxonomy();
+        assert_eq!(tax.fqn, "taxonomy.document-class");
+        assert_eq!(tax.domain, "kyc");
+        assert_eq!(nodes.len(), 6); // root + 5 classes
+        let sow = nodes
+            .iter()
+            .find(|n| n.fqn.ends_with(".source-of-wealth"))
+            .unwrap();
+        assert_eq!(
+            sow.parent_fqn.as_deref(),
+            Some("taxonomy.document-class.root")
+        );
+    }
+
+    #[test]
+    fn test_jurisdiction_regime_nodes() {
+        let (tax, nodes) = jurisdiction_regime_taxonomy();
+        assert_eq!(tax.fqn, "taxonomy.jurisdiction-regime");
+        assert_eq!(tax.domain, "kyc");
+        assert_eq!(nodes.len(), 6); // root + 5 regimes
+        let fatf_grey = nodes
+            .iter()
+            .find(|n| n.fqn.ends_with(".fatf-grey"))
+            .unwrap();
+        assert_eq!(
+            fatf_grey.parent_fqn.as_deref(),
+            Some("taxonomy.jurisdiction-regime.root")
+        );
+    }
+
+    #[test]
+    fn test_kyc_taxonomies_have_unique_fqns() {
+        let all = core_taxonomies();
+        let mut all_fqns: Vec<String> = Vec::new();
+        for (tax, nodes) in &all {
+            assert!(
+                !all_fqns.contains(&tax.fqn),
+                "Duplicate taxonomy FQN: {}",
+                tax.fqn
+            );
+            all_fqns.push(tax.fqn.clone());
+            for n in nodes {
+                assert!(!all_fqns.contains(&n.fqn), "Duplicate node FQN: {}", n.fqn);
+                all_fqns.push(n.fqn.clone());
+            }
+        }
     }
 
     #[test]

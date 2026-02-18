@@ -65,6 +65,40 @@ pub struct Observation {
     pub created_at: DateTime<Utc>,
 }
 
+// ── Attribute Observation (entity-centric) ────────────────────
+
+/// An entity-centric observation recording evidence about a specific
+/// attribute of a specific subject (entity).
+///
+/// Unlike `Observation` (snapshot-centric event log), this table answers:
+/// "What evidence exists for entity X attribute A?"
+///
+/// Forms a linear supersession chain via `supersedes`.
+/// INSERT-only — the DB trigger prevents UPDATE and DELETE.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AttributeObservation {
+    pub observation_id: Uuid,
+    /// The entity this observation is about.
+    pub subject_ref: Uuid,
+    /// Which attribute (e.g., "kyc.pep_status", "entity.jurisdiction_code").
+    pub attribute_fqn: String,
+    /// Optional link to a registry snapshot for provenance.
+    pub snapshot_id: Option<Uuid>,
+    /// Confidence in the observation (0.0–1.0).
+    pub confidence: f32,
+    /// When the observation was made.
+    pub observed_at: DateTime<Utc>,
+    /// Who or what made the observation.
+    pub observer_id: String,
+    /// Reliability grade of this evidence.
+    pub evidence_grade: EvidenceGrade,
+    /// Raw evidence payload.
+    pub raw_payload: Option<serde_json::Value>,
+    /// Previous observation in the chain (None for first observation).
+    pub supersedes: Option<Uuid>,
+    pub created_at: DateTime<Utc>,
+}
+
 // ── Document Instance ─────────────────────────────────────────
 
 /// Status of a document instance.
@@ -239,6 +273,101 @@ impl EvidenceInstanceStore {
         Ok(rows.into_iter().map(|r| r.into()).collect())
     }
 
+    // ── Attribute Observation methods ────────────────────────────
+
+    /// Insert a new attribute observation (entity-centric). Returns the observation_id.
+    #[allow(clippy::too_many_arguments)]
+    pub async fn insert_attribute_observation(
+        pool: &sqlx::PgPool,
+        subject_ref: Uuid,
+        attribute_fqn: &str,
+        observer_id: &str,
+        evidence_grade: &EvidenceGrade,
+        confidence: f32,
+        snapshot_id: Option<Uuid>,
+        raw_payload: Option<&serde_json::Value>,
+        supersedes: Option<Uuid>,
+    ) -> Result<Uuid, sqlx::Error> {
+        let id = Uuid::new_v4();
+        sqlx::query(
+            r#"INSERT INTO sem_reg.attribute_observations
+               (observation_id, subject_ref, attribute_fqn, snapshot_id,
+                confidence, observer_id, evidence_grade, raw_payload, supersedes)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)"#,
+        )
+        .bind(id)
+        .bind(subject_ref)
+        .bind(attribute_fqn)
+        .bind(snapshot_id)
+        .bind(confidence)
+        .bind(observer_id)
+        .bind(evidence_grade.as_str())
+        .bind(raw_payload)
+        .bind(supersedes)
+        .execute(pool)
+        .await?;
+        Ok(id)
+    }
+
+    /// Find the latest (most recent) attribute observation for a subject + attribute.
+    /// Returns `None` if no observation exists.
+    pub async fn find_latest_for_subject(
+        pool: &sqlx::PgPool,
+        subject_ref: Uuid,
+        attribute_fqn: &str,
+    ) -> Result<Option<AttributeObservation>, sqlx::Error> {
+        let row = sqlx::query_as::<_, AttributeObservationRow>(
+            r#"SELECT * FROM sem_reg.attribute_observations
+               WHERE subject_ref = $1 AND attribute_fqn = $2
+               ORDER BY observed_at DESC
+               LIMIT 1"#,
+        )
+        .bind(subject_ref)
+        .bind(attribute_fqn)
+        .fetch_optional(pool)
+        .await?;
+
+        Ok(row.map(|r| r.into()))
+    }
+
+    /// Find all attribute observations for a subject, optionally filtered by attribute FQN.
+    /// Returns newest-first.
+    pub async fn find_by_subject_and_attribute(
+        pool: &sqlx::PgPool,
+        subject_ref: Uuid,
+        attribute_fqn: Option<&str>,
+        limit: i64,
+    ) -> Result<Vec<AttributeObservation>, sqlx::Error> {
+        let rows = if let Some(fqn) = attribute_fqn {
+            sqlx::query_as::<_, AttributeObservationRow>(
+                r#"SELECT * FROM sem_reg.attribute_observations
+                   WHERE subject_ref = $1 AND attribute_fqn = $2
+                   ORDER BY observed_at DESC
+                   LIMIT $3"#,
+            )
+            .bind(subject_ref)
+            .bind(fqn)
+            .bind(limit)
+            .fetch_all(pool)
+            .await?
+        } else {
+            sqlx::query_as::<_, AttributeObservationRow>(
+                r#"SELECT * FROM sem_reg.attribute_observations
+                   WHERE subject_ref = $1
+                   ORDER BY observed_at DESC
+                   LIMIT $2"#,
+            )
+            .bind(subject_ref)
+            .bind(limit)
+            .fetch_all(pool)
+            .await?
+        };
+
+        Ok(rows.into_iter().map(|r| r.into()).collect())
+    }
+
+    // ── Snapshot Observation methods ──────────────────────────────
+
     /// Insert a new document instance. Returns the instance_id.
     pub async fn insert_document_instance(
         pool: &sqlx::PgPool,
@@ -347,6 +476,50 @@ impl From<ObservationRow> for Observation {
             observer_id: row.observer_id,
             evidence_grade: grade,
             raw_payload: row.raw_payload,
+            created_at: row.created_at,
+        }
+    }
+}
+
+#[cfg(feature = "database")]
+#[derive(sqlx::FromRow)]
+struct AttributeObservationRow {
+    observation_id: Uuid,
+    subject_ref: Uuid,
+    attribute_fqn: String,
+    snapshot_id: Option<Uuid>,
+    confidence: f32,
+    observed_at: DateTime<Utc>,
+    observer_id: String,
+    evidence_grade: String,
+    raw_payload: Option<serde_json::Value>,
+    supersedes: Option<Uuid>,
+    created_at: DateTime<Utc>,
+}
+
+#[cfg(feature = "database")]
+impl From<AttributeObservationRow> for AttributeObservation {
+    fn from(row: AttributeObservationRow) -> Self {
+        let grade = match row.evidence_grade.as_str() {
+            "primary_document" => EvidenceGrade::PrimaryDocument,
+            "secondary_document" => EvidenceGrade::SecondaryDocument,
+            "self_declaration" => EvidenceGrade::SelfDeclaration,
+            "third_party_attestation" => EvidenceGrade::ThirdPartyAttestation,
+            "system_derived" => EvidenceGrade::SystemDerived,
+            "manual_override" => EvidenceGrade::ManualOverride,
+            _ => EvidenceGrade::ManualOverride, // fallback
+        };
+        AttributeObservation {
+            observation_id: row.observation_id,
+            subject_ref: row.subject_ref,
+            attribute_fqn: row.attribute_fqn,
+            snapshot_id: row.snapshot_id,
+            confidence: row.confidence,
+            observed_at: row.observed_at,
+            observer_id: row.observer_id,
+            evidence_grade: grade,
+            raw_payload: row.raw_payload,
+            supersedes: row.supersedes,
             created_at: row.created_at,
         }
     }
@@ -491,6 +664,53 @@ mod tests {
         let round: ProvenanceEdge = serde_json::from_value(json).unwrap();
         assert_eq!(round.edge_id, edge.edge_id);
         assert_eq!(round.edge_class, ProvenanceEdgeClass::VerifiedBy);
+    }
+
+    #[test]
+    fn test_attribute_observation_serde() {
+        let obs = AttributeObservation {
+            observation_id: Uuid::new_v4(),
+            subject_ref: Uuid::new_v4(),
+            attribute_fqn: "kyc.pep_status".into(),
+            snapshot_id: Some(Uuid::new_v4()),
+            confidence: 0.85,
+            observed_at: Utc::now(),
+            observer_id: "agent:kyc-bot".into(),
+            evidence_grade: EvidenceGrade::ThirdPartyAttestation,
+            raw_payload: Some(serde_json::json!({"source": "world-check", "result": "clear"})),
+            supersedes: None,
+            created_at: Utc::now(),
+        };
+        let json = serde_json::to_value(&obs).unwrap();
+        let round: AttributeObservation = serde_json::from_value(json).unwrap();
+        assert_eq!(round.observation_id, obs.observation_id);
+        assert_eq!(round.subject_ref, obs.subject_ref);
+        assert_eq!(round.attribute_fqn, "kyc.pep_status");
+        assert!((round.confidence - 0.85).abs() < f32::EPSILON);
+        assert!(round.supersedes.is_none());
+        assert!(round.snapshot_id.is_some());
+    }
+
+    #[test]
+    fn test_attribute_observation_minimal() {
+        let obs = AttributeObservation {
+            observation_id: Uuid::new_v4(),
+            subject_ref: Uuid::new_v4(),
+            attribute_fqn: "entity.jurisdiction_code".into(),
+            snapshot_id: None,
+            confidence: 1.0,
+            observed_at: Utc::now(),
+            observer_id: "system".into(),
+            evidence_grade: EvidenceGrade::SystemDerived,
+            raw_payload: None,
+            supersedes: None,
+            created_at: Utc::now(),
+        };
+        let json = serde_json::to_value(&obs).unwrap();
+        let round: AttributeObservation = serde_json::from_value(json).unwrap();
+        assert_eq!(round.attribute_fqn, "entity.jurisdiction_code");
+        assert!(round.snapshot_id.is_none());
+        assert!(round.raw_payload.is_none());
     }
 
     #[test]
