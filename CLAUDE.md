@@ -59,7 +59,7 @@
 > **KYC Skeleton Build Post-Audit (S2):** ✅ Complete - Import run case linkage on idempotent hit (F-7), as_of date for import runs (F-8a-c), case status state machine with KycCaseUpdateStatusOp plugin (F-6a-e), 4 transition tests
 > **Semantic OS (Phases 0-9, Migrations 078-098):** ✅ Complete + Standalone Service (v1.1) + Stewardship (Phase 0-1) - Immutable snapshot registry, 13 object types, ABAC + security labels, publish gates, context resolution API, agent control plane (~32 MCP tools), 6 standalone crates (sem_os_core/postgres/server/client/harness/obpoc_adapter), port-trait isolation, outbox-driven projections, changeset workflow (Draft→Approved→Published), stewardship layer (23 MCP tools: 17 Phase 0 + 6 Phase 1), 15 guardrail rules (G01-G15), basis records, conflict detection, Show Loop (4 viewports + SSE), REST+JWT API, db_introspect MCP tool, AttributeSource real (schema,table,column) triples
 > **Stewardship Agent (Phase 0-1, Migrations 096-098):** ✅ Complete - Changeset authoring layer, 23 MCP tools, guardrails engine (G01-G15), basis records, conflict detection, idempotency, Show Loop with 4 viewports (Focus/Inspector/Diff/Gates), SSE streaming, REST endpoints, 11 integration tests
-> **Governed Registry Authoring (v0.4, Migrations 099-100):** ✅ Complete - Research→Governed two-plane model, 7 governance verbs (propose/validate/dry-run/plan/publish/rollback/diff), content-addressed idempotency (SHA-256), AgentMode gating (Research vs Governed), validation pipeline (Stage 1 artifact integrity + Stage 2 dry-run), batch publish with topological sort, governance audit log, retention/cleanup, 61 unit tests + 26 integration tests, 8 CLI subcommands, 10 REST routes
+> **Governed Registry Authoring (v0.4, Migrations 099-100):** ✅ Complete - Research→Governed two-plane model, 7 governance verbs (propose/validate/dry-run/plan/publish/rollback/diff), content-addressed idempotency (SHA-256), AgentMode gating (Research vs Governed), validation pipeline (Stage 1 artifact integrity + Stage 2 dry-run), batch publish with topological sort, governance audit log, retention/cleanup, 60 unit tests + 26 integration tests, 8 CLI subcommands, 10 REST routes
 
 This is the root project guide for Claude Code. Domain-specific details are in annexes.
 
@@ -6647,7 +6647,7 @@ rust/src/sem_reg/stewardship/
 
 ## Governed Registry Authoring — Research→Governed Change Boundary (v0.4, Migrations 099-100)
 
-> ✅ **IMPLEMENTED (2026-02-25)**: 7-phase implementation complete. 61 unit tests + 26 integration tests. Clippy clean. 8 CLI subcommands. 10 REST routes.
+> ✅ **IMPLEMENTED (2026-02-25)**: 7-phase implementation complete. 60 unit tests + 26 integration tests. Clippy clean. 8 CLI subcommands. 10 REST routes.
 
 **Problem Solved:** Research output (schema migrations, verb definitions, attributes, taxonomies) was committed ad-hoc without validation, drift detection, or governance gating. The v0.4 spec defines a two-plane model: the **Research plane** produces immutable ChangeSets (bundles of artifacts), and the **Governed plane** publishes validated ChangeSets atomically into the active snapshot set.
 
@@ -6799,7 +6799,7 @@ rust/crates/sem_os_core/src/authoring/
 ├── types.rs                # ChangeSetStatus (9-state), ArtifactType, ChangeSetFull, ValidationReport, DryRunReport, etc.
 ├── errors.rs               # Error code constants (V:*, D:*, PUBLISH:*)
 ├── canonical_hash.rs       # compute_content_hash(), compute_artifact_hash()
-├── ports.rs                # AuthoringStore trait (15 methods), ScratchSchemaRunner trait
+├── ports.rs                # AuthoringStore trait (20 methods), ScratchSchemaRunner trait
 ├── validate_stage1.rs      # Stage 1: artifact integrity, SQL/YAML parse, ref resolution (14 unit tests)
 ├── validate_stage2.rs      # Stage 2: DDL safety checks (CONCURRENTLY, DROP TABLE)
 ├── diff.rs                 # Structural diff + breaking change detection (7 unit tests)
@@ -6818,7 +6818,7 @@ rust/crates/sem_os_core/src/authoring/
 
 | Category | Count | Scope |
 |----------|-------|-------|
-| Unit tests (`sem_os_core`) | 61 | Types, hashing, validation, diff, bundle, agent mode, metrics, cleanup |
+| Unit tests (`sem_os_core`) | 60 | Types, hashing, validation, diff, bundle, agent mode, metrics, cleanup |
 | Integration tests | 26 | E2E (4), Negative (8), Regression (6), Mode (3), Observability (2), Cleanup (1), Additional (2) |
 
 ```bash

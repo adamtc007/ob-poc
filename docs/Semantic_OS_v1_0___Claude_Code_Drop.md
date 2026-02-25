@@ -2,11 +2,11 @@
 
 **Status:** ✅ IMPLEMENTED (2026-02-25) — All stages complete. Harness green in inprocess mode.
 **Date:** Feb 2026
-**Version:** v1.1 (standalone service + stewardship Phase 0-1 + schema visibility)
-**Scope:** Full standalone Semantic OS: workspace crates → kernel extraction → API → outbox → projections → stewardship → schema visibility
+**Version:** v1.2 (standalone service + stewardship Phase 0-1 + schema visibility + governed authoring pipeline)
+**Scope:** Full standalone Semantic OS: workspace crates → kernel extraction → API → outbox → projections → stewardship → schema visibility → governed authoring pipeline
 **Original Spec:** v1.0 (production-ready drop from v3.4 peer review lineage)
 
-> **Implementation Summary:** 6 workspace crates (`sem_os_core`, `sem_os_postgres`, `sem_os_server`, `sem_os_client`, `sem_os_harness`, `sem_os_obpoc_adapter`), 7 migrations (092-098), ~101 MCP tools total (~32 sem_reg + 23 stewardship + rest), 3 test suites (core, projections, permissions), stewardship agent Phase 0-1 (changeset workflow + Show Loop), `db_introspect` MCP tool, `AttributeSource` real (schema, table, column) triples. Adapter wires into ob-poc via `SemOsClient` trait in both inprocess and remote modes.
+> **Implementation Summary:** 6 workspace crates (`sem_os_core`, `sem_os_postgres`, `sem_os_server`, `sem_os_client`, `sem_os_harness`, `sem_os_obpoc_adapter`), 9 migrations (092-100), ~101 MCP tools total (~32 sem_reg + 23 stewardship + rest), 3 test suites (core, projections, permissions), stewardship agent Phase 0-1 (changeset workflow + Show Loop), governed authoring pipeline (7 governance verbs, Research/Governed AgentMode gating, 60 unit + 26 integration tests), `db_introspect` MCP tool, `AttributeSource` real (schema, table, column) triples. Adapter wires into ob-poc via `SemOsClient` trait in both inprocess and remote modes.
 
 ---
 
@@ -1340,6 +1340,60 @@ async fn test_projection_watermark_advances(client: &dyn SemOsClient) {
 
 ---
 
+## 8.5) Governed Registry Authoring — Research→Governed Change Boundary (v0.4)
+
+> ✅ **IMPLEMENTED (2026-02-25)**: 7-phase implementation. 60 unit tests + 26 integration tests. Clippy clean. 8 CLI subcommands. 10 REST routes. Migrations 099-100.
+
+### Problem
+
+Research output (schema migrations, verb definitions, attributes, taxonomies) was committed ad-hoc without validation, drift detection, or governance gating. The v0.4 spec (`docs/semantic_os_research_governed_boundary_v0.4.md`) defines a two-plane model:
+
+- **Research plane**: Produces immutable ChangeSets (bundles of artifacts) via `propose_change_set`, `validate_change_set`, `dry_run_change_set`
+- **Governed plane**: Publishes validated ChangeSets atomically into the active snapshot set via `publish_snapshot_set`
+
+### Key deliverables
+
+| Component | Location | Summary |
+|-----------|----------|---------|
+| **Authoring module** | `sem_os_core/src/authoring/` (13 files) | Types (9-state ChangeSet), canonical hashing (SHA-256), validation (Stage 1 + Stage 2), diff engine, GovernanceVerbService (7 verbs), bundle parser, AgentMode gating, metrics, cleanup |
+| **AuthoringStore trait** | `sem_os_core/src/authoring/ports.rs` | 20 async methods for ChangeSet CRUD, validation reports, governance audit, publish batches, retention |
+| **ScratchSchemaRunner trait** | `sem_os_core/src/authoring/ports.rs` | DDL dry-run in scratch schema with rollback |
+| **PgAuthoringStore** | `sem_os_postgres/src/authoring.rs` | PostgreSQL implementation (20 methods) |
+| **PgScratchSchemaRunner** | `sem_os_postgres/src/authoring.rs` | Scratch schema DDL apply in transaction |
+| **REST routes** | `sem_os_server/src/handlers/authoring.rs` | 10 endpoints: list, propose, get, validate, dry-run, plan, publish, batch-publish, diff, rollback |
+| **CoreService extension** | `sem_os_core/src/service.rs` | 8 new methods delegating to GovernanceVerbService |
+| **CLI subcommands** | `rust/xtask/src/sem_reg.rs` | 8 commands: authoring-list, authoring-propose, authoring-validate, authoring-dry-run, authoring-plan, authoring-publish, authoring-publish-batch, authoring-diff |
+| **Migration 099** | `migrations/099_sem_reg_authoring.sql` | Extended `sem_reg.changesets` + `changeset_entries`, new `sem_reg_authoring` schema with `validation_reports`, `governance_audit_log`, `publish_batches`, `change_set_artifacts` |
+| **Migration 100** | `migrations/100_sem_reg_authoring_archive.sql` | Archive tables for retention policy |
+| **Integration tests** | `rust/tests/sem_reg_authoring_integration.rs` | 26 tests: E2E (4), Negative (8), Regression (6), Mode (3), Observability (2), Cleanup (1), Additional (2) |
+
+### 7 governance verbs
+
+| Verb | Status Transition | Key Logic |
+|------|-------------------|-----------|
+| `propose_change_set` | → `Draft` | Parse bundle, compute content_hash, idempotent by `(hash_version, content_hash)` |
+| `validate_change_set` | `Draft` → `Validated`/`Rejected` | Stage 1: hash, SQL/YAML parse, ref resolution |
+| `dry_run_change_set` | `Validated` → `DryRunPassed`/`DryRunFailed` | Stage 2: scratch schema, DDL safety, compat diff |
+| `plan_publish` | (read-only) | Diff against active, compute downstream impact |
+| `publish_snapshot_set` | `DryRunPassed` → `Published` | Advisory lock → drift detect → apply → publish → audit |
+| `rollback_snapshot_set` | (pointer revert) | Revert active_snapshot_set pointer |
+| `diff_change_sets` | (read-only) | Structural diff between two ChangeSets |
+
+### AgentMode gating
+
+| Mode | Allowed | Blocked |
+|------|---------|---------|
+| `Research` | propose, validate, dry-run, plan, diff, full `db_introspect`, SemReg read | publish, rollback, governed business verbs |
+| `Governed` | publish, rollback, business verbs, limited `db_introspect` | authoring exploration verbs |
+
+Default: `Governed`. Switch via `agent.set-mode` verb.
+
+### Content-addressed idempotency
+
+`content_hash = SHA-256(canonical_json(sorted_artifacts))`. Proposing the same bundle returns the existing ChangeSet. UNIQUE index on `(hash_version, content_hash)` excludes rejected/superseded.
+
+---
+
 ## 9) Migration sequence
 
 | Migration file | Contents | Stage |
@@ -1348,6 +1402,12 @@ async fn test_projection_watermark_advances(client: &dyn SemOsClient) {
 | `092_sem_reg_outbox.sql` | Outbox with `outbox_seq GENERATED ALWAYS AS IDENTITY` | S2.2 |
 | `093_sem_reg_pub.sql` | `sem_reg_pub.*` projection schema + watermark | S2.5 |
 | `094_sem_reg_changesets.sql` | Changesets + `changeset_entries` (no `draft_snapshots`) | S3.1 |
+| `095_sem_reg_changesets.sql` | Changeset reviews + indexes | S3.1+ |
+| `096_sem_reg_views_hotfix.sql` | View hotfixes for stewardship | S3.2 |
+| `097_stewardship_phase0.sql` | Stewardship Phase 0 tables (basis records, conflict detection) | S3.3 |
+| `098_stewardship_phase1.sql` | Stewardship Phase 1 (Show Loop viewports, SSE) | S3.3+ |
+| `099_sem_reg_authoring.sql` | Governed authoring: extended changesets, `sem_reg_authoring` schema (validation_reports, governance_audit_log, publish_batches, change_set_artifacts) | §8.5 |
+| `100_sem_reg_authoring_archive.sql` | Archive tables for authoring retention policy | §8.5 |
 
 > **Before starting Stage 2.1:** cross-check these numbers against all files in `migrations/`. If `091`–`094` conflict with existing files, renumber to the next available block and update every reference in this document.
 
