@@ -186,8 +186,8 @@ pub async fn run_onboarding_scan(
         );
     }
 
-    // 3. Infer attributes (delegates to adapter)
-    let attributes = infer_attributes_from_verbs(&verbs_config);
+    // 3. Infer attributes (delegates to adapter, uses entity types for table resolution)
+    let attributes = infer_attributes_from_verbs(&verbs_config, &entity_types);
     if verbose {
         println!("Inferred {} attributes from verb args", attributes.len());
     }
@@ -541,7 +541,8 @@ mod tests {
             domains,
         };
 
-        let attrs = infer_attributes_from_verbs(&config);
+        let entity_types = infer_entity_types_from_verbs(&config);
+        let attrs = infer_attributes_from_verbs(&config, &entity_types);
         assert!(!attrs.is_empty());
         let name_attr = attrs.iter().find(|a| a.fqn == "cbu.name");
         assert!(name_attr.is_some());

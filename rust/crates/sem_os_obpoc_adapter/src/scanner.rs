@@ -213,7 +213,22 @@ pub fn infer_entity_types_from_verbs(verbs_config: &VerbsConfig) -> Vec<EntityTy
 }
 
 /// Infer attributes from verb argument definitions.
-pub fn infer_attributes_from_verbs(verbs_config: &VerbsConfig) -> Vec<AttributeDefBody> {
+///
+/// Accepts the inferred entity type defs so that attribute sources can resolve
+/// real (schema, table) triples via the resolution chain:
+/// 1. Verb CRUD config (most precise — gives exact table + schema)
+/// 2. Entity type db_table mapping (from lookup configs)
+/// 3. Fallback to None (better than a wrong guess)
+pub fn infer_attributes_from_verbs(
+    verbs_config: &VerbsConfig,
+    entity_type_defs: &[EntityTypeDefBody],
+) -> Vec<AttributeDefBody> {
+    // Build domain → entity type lookup for step 2 of the resolution chain
+    let entity_types_by_domain: BTreeMap<&str, &EntityTypeDefBody> = entity_type_defs
+        .iter()
+        .map(|et| (et.domain.as_str(), et))
+        .collect();
+
     let mut seen: BTreeMap<String, AttributeDefBody> = BTreeMap::new();
 
     for (domain, domain_config) in &verbs_config.domains {
@@ -222,6 +237,18 @@ pub fn infer_attributes_from_verbs(verbs_config: &VerbsConfig) -> Vec<AttributeD
                 let fqn = format!("{}.{}", domain, arg.name);
                 let action = action.clone();
                 let domain = domain.clone();
+
+                // Resolution chain: CRUD config → entity type db_table → None
+                let (schema, table) = if let Some(crud) = &verb_config.crud {
+                    (crud.schema.clone(), crud.table.clone())
+                } else if let Some(et) = entity_types_by_domain.get(domain.as_str()) {
+                    et.db_table
+                        .as_ref()
+                        .map_or((None, None), |dt| (Some(dt.schema.clone()), Some(dt.table.clone())))
+                } else {
+                    (None, None)
+                };
+
                 seen.entry(fqn.clone()).or_insert_with(|| AttributeDefBody {
                     fqn,
                     name: title_case(&arg.name),
@@ -235,7 +262,8 @@ pub fn infer_attributes_from_verbs(verbs_config: &VerbsConfig) -> Vec<AttributeD
                     data_type: arg_type_to_attribute_type(arg),
                     source: Some(AttributeSource {
                         producing_verb: Some(format!("{}.{}", domain, action)),
-                        table: arg.maps_to.as_ref().map(|_| domain.clone()),
+                        schema,
+                        table,
                         column: arg.maps_to.clone(),
                         derived: false,
                     }),
@@ -504,7 +532,8 @@ mod tests {
             domains,
         };
 
-        let attrs = infer_attributes_from_verbs(&config);
+        let entity_types = infer_entity_types_from_verbs(&config);
+        let attrs = infer_attributes_from_verbs(&config, &entity_types);
         assert!(!attrs.is_empty());
         let name_attr = attrs.iter().find(|a| a.fqn == "cbu.name");
         assert!(name_attr.is_some());

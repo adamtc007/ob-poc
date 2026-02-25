@@ -47,9 +47,13 @@ pub struct AttributeSource {
     /// The verb that produces this attribute (e.g. "cbu.create")
     #[serde(default)]
     pub producing_verb: Option<String>,
-    /// The DB table and column where the canonical value lives
+    /// DB schema where the canonical value lives (e.g. "ob-poc", "sem_reg")
+    #[serde(default)]
+    pub schema: Option<String>,
+    /// DB table where the canonical value lives (e.g. "cbus", "entities")
     #[serde(default)]
     pub table: Option<String>,
+    /// DB column name (e.g. "jurisdiction_code")
     #[serde(default)]
     pub column: Option<String>,
     /// Whether this is a derived attribute (requires DerivationSpec)
@@ -97,6 +101,7 @@ mod tests {
             data_type: AttributeDataType::String,
             source: Some(AttributeSource {
                 producing_verb: Some("cbu.create".into()),
+                schema: Some("ob-poc".into()),
                 table: Some("cbus".into()),
                 column: Some("jurisdiction".into()),
                 derived: false,

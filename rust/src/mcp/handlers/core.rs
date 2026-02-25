@@ -97,6 +97,7 @@ tool_name_enum! {
     EntityGet               => "entity_get",
     VerbsList               => "verbs_list",
     SchemaInfo              => "schema_info",
+    DbIntrospect            => "db_introspect",
     DslLookup               => "dsl_lookup",
     DslComplete             => "dsl_complete",
     DslSignature            => "dsl_signature",
@@ -383,6 +384,7 @@ impl ToolHandlers {
             ToolName::EntityGet               => self.entity_get(args).await,
             ToolName::VerbsList               => self.verbs_list(args),
             ToolName::SchemaInfo              => self.schema_info(args).await,
+            ToolName::DbIntrospect            => self.db_introspect(args).await,
             ToolName::DslLookup               => self.dsl_lookup(args).await,
             ToolName::DslComplete             => self.dsl_complete(args),
             ToolName::DslSignature            => self.dsl_signature(args),
@@ -1928,6 +1930,223 @@ impl ToolHandlers {
         }
 
         Ok(result)
+    }
+
+    /// Discover database tables, columns, PKs, and FKs from information_schema.
+    async fn db_introspect(&self, args: Value) -> Result<Value> {
+        let pool = self.require_pool()?;
+        let schema_name = args["schema_name"]
+            .as_str()
+            .ok_or_else(|| anyhow!("schema_name required"))?;
+        let table_filter = args["table_name"].as_str();
+        let include_fks = args["include_fks"].as_bool().unwrap_or(true);
+
+        // 1. Query columns (with optional table filter)
+        #[derive(sqlx::FromRow)]
+        struct ColRow {
+            table_name: String,
+            column_name: String,
+            data_type: String,
+            is_nullable: String,
+            column_default: Option<String>,
+        }
+
+        let columns: Vec<ColRow> = if let Some(tbl) = table_filter {
+            sqlx::query_as(
+                "SELECT table_name, column_name, data_type, is_nullable, column_default \
+                 FROM information_schema.columns \
+                 WHERE table_schema = $1 AND table_name = $2 \
+                 ORDER BY table_name, ordinal_position",
+            )
+            .bind(schema_name)
+            .bind(tbl)
+            .fetch_all(pool)
+            .await?
+        } else {
+            sqlx::query_as(
+                "SELECT table_name, column_name, data_type, is_nullable, column_default \
+                 FROM information_schema.columns \
+                 WHERE table_schema = $1 \
+                 ORDER BY table_name, ordinal_position",
+            )
+            .bind(schema_name)
+            .fetch_all(pool)
+            .await?
+        };
+
+        // 2. Query primary keys
+        #[derive(sqlx::FromRow)]
+        struct PkRow {
+            table_name: String,
+            column_name: String,
+        }
+
+        let pks: Vec<PkRow> = if let Some(tbl) = table_filter {
+            sqlx::query_as(
+                "SELECT tc.table_name, kcu.column_name \
+                 FROM information_schema.table_constraints tc \
+                 JOIN information_schema.key_column_usage kcu \
+                   ON tc.constraint_name = kcu.constraint_name \
+                   AND tc.table_schema = kcu.table_schema \
+                 WHERE tc.constraint_type = 'PRIMARY KEY' \
+                   AND tc.table_schema = $1 \
+                   AND tc.table_name = $2 \
+                 ORDER BY tc.table_name, kcu.ordinal_position",
+            )
+            .bind(schema_name)
+            .bind(tbl)
+            .fetch_all(pool)
+            .await?
+        } else {
+            sqlx::query_as(
+                "SELECT tc.table_name, kcu.column_name \
+                 FROM information_schema.table_constraints tc \
+                 JOIN information_schema.key_column_usage kcu \
+                   ON tc.constraint_name = kcu.constraint_name \
+                   AND tc.table_schema = kcu.table_schema \
+                 WHERE tc.constraint_type = 'PRIMARY KEY' \
+                   AND tc.table_schema = $1 \
+                 ORDER BY tc.table_name, kcu.ordinal_position",
+            )
+            .bind(schema_name)
+            .fetch_all(pool)
+            .await?
+        };
+
+        // Build PK lookup: table_name → set of PK columns
+        let mut pk_map: std::collections::HashMap<&str, std::collections::HashSet<&str>> =
+            std::collections::HashMap::new();
+        for pk in &pks {
+            pk_map
+                .entry(pk.table_name.as_str())
+                .or_default()
+                .insert(pk.column_name.as_str());
+        }
+
+        // 3. Query foreign keys (optional)
+        #[derive(sqlx::FromRow)]
+        struct FkRow {
+            table_name: String,
+            column_name: String,
+            foreign_table_schema: String,
+            foreign_table_name: String,
+            foreign_column_name: String,
+        }
+
+        let fks: Vec<FkRow> = if include_fks {
+            if let Some(tbl) = table_filter {
+                sqlx::query_as(
+                    "SELECT kcu.table_name, kcu.column_name, \
+                            ccu.table_schema AS foreign_table_schema, \
+                            ccu.table_name AS foreign_table_name, \
+                            ccu.column_name AS foreign_column_name \
+                     FROM information_schema.table_constraints tc \
+                     JOIN information_schema.key_column_usage kcu \
+                       ON tc.constraint_name = kcu.constraint_name \
+                       AND tc.table_schema = kcu.table_schema \
+                     JOIN information_schema.constraint_column_usage ccu \
+                       ON tc.constraint_name = ccu.constraint_name \
+                       AND tc.table_schema = ccu.table_schema \
+                     WHERE tc.constraint_type = 'FOREIGN KEY' \
+                       AND tc.table_schema = $1 \
+                       AND tc.table_name = $2 \
+                     ORDER BY kcu.table_name, kcu.column_name",
+                )
+                .bind(schema_name)
+                .bind(tbl)
+                .fetch_all(pool)
+                .await?
+            } else {
+                sqlx::query_as(
+                    "SELECT kcu.table_name, kcu.column_name, \
+                            ccu.table_schema AS foreign_table_schema, \
+                            ccu.table_name AS foreign_table_name, \
+                            ccu.column_name AS foreign_column_name \
+                     FROM information_schema.table_constraints tc \
+                     JOIN information_schema.key_column_usage kcu \
+                       ON tc.constraint_name = kcu.constraint_name \
+                       AND tc.table_schema = kcu.table_schema \
+                     JOIN information_schema.constraint_column_usage ccu \
+                       ON tc.constraint_name = ccu.constraint_name \
+                       AND tc.table_schema = ccu.table_schema \
+                     WHERE tc.constraint_type = 'FOREIGN KEY' \
+                       AND tc.table_schema = $1 \
+                     ORDER BY kcu.table_name, kcu.column_name",
+                )
+                .bind(schema_name)
+                .fetch_all(pool)
+                .await?
+            }
+        } else {
+            vec![]
+        };
+
+        // Build FK lookup: table_name → Vec<FK info>
+        let mut fk_map: std::collections::HashMap<&str, Vec<&FkRow>> =
+            std::collections::HashMap::new();
+        for fk in &fks {
+            fk_map
+                .entry(fk.table_name.as_str())
+                .or_default()
+                .push(fk);
+        }
+
+        // 4. Assemble result grouped by table
+        let mut tables_map: std::collections::BTreeMap<&str, Vec<&ColRow>> =
+            std::collections::BTreeMap::new();
+        for col in &columns {
+            tables_map
+                .entry(col.table_name.as_str())
+                .or_default()
+                .push(col);
+        }
+
+        let tables: Vec<Value> = tables_map
+            .iter()
+            .map(|(table_name, cols)| {
+                let pk_set = pk_map.get(table_name).cloned().unwrap_or_default();
+                let columns: Vec<Value> = cols
+                    .iter()
+                    .map(|c| {
+                        json!({
+                            "name": c.column_name,
+                            "type": c.data_type,
+                            "nullable": c.is_nullable == "YES",
+                            "default": c.column_default,
+                            "is_pk": pk_set.contains(c.column_name.as_str()),
+                        })
+                    })
+                    .collect();
+
+                let foreign_keys: Vec<Value> = fk_map
+                    .get(table_name)
+                    .map(|fks| {
+                        fks.iter()
+                            .map(|fk| {
+                                json!({
+                                    "column": fk.column_name,
+                                    "references_schema": fk.foreign_table_schema,
+                                    "references_table": fk.foreign_table_name,
+                                    "references_column": fk.foreign_column_name,
+                                })
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default();
+
+                json!({
+                    "name": table_name,
+                    "columns": columns,
+                    "foreign_keys": foreign_keys,
+                })
+            })
+            .collect();
+
+        Ok(json!({
+            "schema": schema_name,
+            "table_count": tables.len(),
+            "tables": tables,
+        }))
     }
 
     /// Look up database IDs via EntityGateway - the key tool to prevent UUID hallucination

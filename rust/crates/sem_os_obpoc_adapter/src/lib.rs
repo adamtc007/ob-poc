@@ -26,8 +26,8 @@ use sem_os_core::seeds::{
 pub fn build_seed_bundle(verbs_config: &VerbsConfig) -> SeedBundle {
     // 1. Scan verb configs → typed bodies
     let verb_contract_bodies = scanner::scan_verb_contracts(verbs_config);
-    let attribute_bodies = scanner::infer_attributes_from_verbs(verbs_config);
     let entity_type_bodies = scanner::infer_entity_types_from_verbs(verbs_config);
+    let attribute_bodies = scanner::infer_attributes_from_verbs(verbs_config, &entity_type_bodies);
 
     // 2. Collect seed data from pure builders
     let taxonomy_pairs = seeds::core_taxonomies();

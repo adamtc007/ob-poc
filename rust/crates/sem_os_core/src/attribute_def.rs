@@ -38,8 +38,13 @@ pub enum AttributeDataType {
 pub struct AttributeSource {
     #[serde(default)]
     pub producing_verb: Option<String>,
+    /// DB schema where the canonical value lives (e.g. "ob-poc", "sem_reg")
+    #[serde(default)]
+    pub schema: Option<String>,
+    /// DB table where the canonical value lives (e.g. "cbus", "entities")
     #[serde(default)]
     pub table: Option<String>,
+    /// DB column name (e.g. "jurisdiction_code")
     #[serde(default)]
     pub column: Option<String>,
     #[serde(default)]

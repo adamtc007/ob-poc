@@ -184,6 +184,7 @@ async fn seed_attribute_def(pool: &PgPool, candidate: &AttributeCandidate) -> Re
         data_type: sql_type_to_attribute_data_type(&candidate.sql_type),
         source: Some(AttributeSource {
             producing_verb,
+            schema: Some(candidate.schema.clone()),
             table: Some(candidate.table.clone()),
             column: Some(candidate.column.clone()),
             derived: false,

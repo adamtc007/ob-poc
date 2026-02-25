@@ -139,6 +139,30 @@ pub fn get_tools() -> Vec<Tool> {
             }),
         },
         Tool {
+            name: "db_introspect".into(),
+            description: "Discover database tables, columns, primary keys, and foreign keys from PostgreSQL information_schema. Use this to understand the raw relational schema before proposing new tables or verbs.".into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "schema_name": {
+                        "type": "string",
+                        "description": "Schema to inspect (e.g. 'ob-poc', 'sem_reg', 'agent')",
+                        "default": "ob-poc"
+                    },
+                    "table_name": {
+                        "type": "string",
+                        "description": "Optional: specific table to inspect. If omitted, returns all tables in the schema."
+                    },
+                    "include_fks": {
+                        "type": "boolean",
+                        "description": "Include foreign key relationships (default true)",
+                        "default": true
+                    }
+                },
+                "required": ["schema_name"]
+            }),
+        },
+        Tool {
             name: "dsl_lookup".into(),
             description: "Look up real database IDs. ALWAYS use this instead of guessing UUIDs. Returns matching records with their IDs.".into(),
             input_schema: json!({
