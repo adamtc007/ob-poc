@@ -1171,10 +1171,14 @@ async fn get_investor_list(
     };
 
     // Query for total count (with filters)
-    let count_query = build_investor_count_query(&filters);
-    let total_items: i64 = sqlx::query_scalar(&count_query)
+    let (count_query, count_params) = build_investor_count_query(&filters);
+    let mut count_q = sqlx::query_scalar(&count_query)
         .bind(issuer_id)
-        .bind(as_of)
+        .bind(as_of);
+    for p in &count_params {
+        count_q = count_q.bind(p.as_str());
+    }
+    let total_items: i64 = count_q
         .fetch_one(&pool)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
@@ -1182,12 +1186,16 @@ async fn get_investor_list(
     let total_pages = ((total_items as f64) / (page_size as f64)).ceil() as i32;
 
     // Query for page items
-    let items_query = build_investor_list_query(&filters, &order_clause, page_size, offset);
-    let rows = sqlx::query(&items_query)
+    let (items_query, list_params) = build_investor_list_query(&filters, &order_clause, page_size, offset);
+    let mut items_q = sqlx::query(&items_query)
         .bind(issuer_id)
         .bind(as_of)
         .bind(page_size as i64)
-        .bind(offset as i64)
+        .bind(offset as i64);
+    for p in &list_params {
+        items_q = items_q.bind(p.as_str());
+    }
+    let rows = items_q
         .fetch_all(&pool)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
@@ -1661,8 +1669,11 @@ async fn check_has_dilution_data(
     Ok(count > 0)
 }
 
-/// Build count query with filters
-fn build_investor_count_query(filters: &InvestorFilters) -> String {
+/// Build count query with parameterized filters.
+///
+/// Returns `(sql, filter_values)` where filter_values should be bound
+/// after the base parameters ($1=issuer_id, $2=as_of).
+fn build_investor_count_query(filters: &InvestorFilters) -> (String, Vec<String>) {
     let mut query = String::from(
         r#"
         SELECT COUNT(DISTINCT h.investor_entity_id)
@@ -1675,38 +1686,44 @@ fn build_investor_count_query(filters: &InvestorFilters) -> String {
         "#,
     );
 
-    if filters.investor_type.is_some() {
-        query.push_str(" AND i.investor_type = '");
-        query.push_str(filters.investor_type.as_ref().unwrap());
-        query.push('\'');
+    let mut params: Vec<String> = Vec::new();
+    // $1=issuer_id, $2=as_of are bound at the call site
+    let mut idx = 3u32;
+
+    if let Some(ref v) = filters.investor_type {
+        query.push_str(&format!(" AND i.investor_type = ${idx}"));
+        params.push(v.clone());
+        idx += 1;
     }
-    if filters.kyc_status.is_some() {
-        query.push_str(" AND i.kyc_status = '");
-        query.push_str(filters.kyc_status.as_ref().unwrap());
-        query.push('\'');
+    if let Some(ref v) = filters.kyc_status {
+        query.push_str(&format!(" AND i.kyc_status = ${idx}"));
+        params.push(v.clone());
+        idx += 1;
     }
-    if filters.jurisdiction.is_some() {
-        query.push_str(" AND i.tax_jurisdiction = '");
-        query.push_str(filters.jurisdiction.as_ref().unwrap());
-        query.push('\'');
+    if let Some(ref v) = filters.jurisdiction {
+        query.push_str(&format!(" AND i.tax_jurisdiction = ${idx}"));
+        params.push(v.clone());
+        idx += 1;
     }
-    if let Some(ref search) = filters.search {
-        query.push_str(&format!(
-            " AND e.name ILIKE '%{}%'",
-            search.replace('\'', "''")
-        ));
+    if let Some(ref v) = filters.search {
+        query.push_str(&format!(" AND e.name ILIKE ${idx}"));
+        params.push(format!("%{v}%"));
+        let _ = idx; // suppress unused warning
     }
 
-    query
+    (query, params)
 }
 
-/// Build list query with filters, ordering, and pagination
+/// Build list query with parameterized filters, ordering, and pagination.
+///
+/// Returns `(sql, filter_values)` where filter_values should be bound
+/// after the base parameters ($1=issuer_id, $2=as_of, $3=limit, $4=offset).
 fn build_investor_list_query(
     filters: &InvestorFilters,
     order_clause: &str,
     _page_size: i32,
     _offset: i32,
-) -> String {
+) -> (String, Vec<String>) {
     let mut query = String::from(
         r#"
         SELECT
@@ -1730,33 +1747,36 @@ fn build_investor_list_query(
         "#,
     );
 
-    if filters.investor_type.is_some() {
-        query.push_str(" AND i.investor_type = '");
-        query.push_str(filters.investor_type.as_ref().unwrap());
-        query.push('\'');
+    let mut params: Vec<String> = Vec::new();
+    // $1=issuer_id, $2=as_of, $3=limit, $4=offset are bound at call site
+    let mut idx = 5u32;
+
+    if let Some(ref v) = filters.investor_type {
+        query.push_str(&format!(" AND i.investor_type = ${idx}"));
+        params.push(v.clone());
+        idx += 1;
     }
-    if filters.kyc_status.is_some() {
-        query.push_str(" AND i.kyc_status = '");
-        query.push_str(filters.kyc_status.as_ref().unwrap());
-        query.push('\'');
+    if let Some(ref v) = filters.kyc_status {
+        query.push_str(&format!(" AND i.kyc_status = ${idx}"));
+        params.push(v.clone());
+        idx += 1;
     }
-    if filters.jurisdiction.is_some() {
-        query.push_str(" AND i.tax_jurisdiction = '");
-        query.push_str(filters.jurisdiction.as_ref().unwrap());
-        query.push('\'');
+    if let Some(ref v) = filters.jurisdiction {
+        query.push_str(&format!(" AND i.tax_jurisdiction = ${idx}"));
+        params.push(v.clone());
+        idx += 1;
     }
-    if let Some(ref search) = filters.search {
-        query.push_str(&format!(
-            " AND e.name ILIKE '%{}%'",
-            search.replace('\'', "''")
-        ));
+    if let Some(ref v) = filters.search {
+        query.push_str(&format!(" AND e.name ILIKE ${idx}"));
+        params.push(format!("%{v}%"));
+        let _ = idx;
     }
 
     query.push_str(" GROUP BY e.entity_id, e.name, et.type_code, i.investor_type, i.kyc_status, i.tax_jurisdiction");
     query.push_str(&format!(" ORDER BY {}", order_clause));
     query.push_str(" LIMIT $3 OFFSET $4");
 
-    query
+    (query, params)
 }
 
 // =============================================================================

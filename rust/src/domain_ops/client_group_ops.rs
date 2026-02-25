@@ -426,8 +426,8 @@ impl CustomOperation for ClientGroupEntityListOp {
         Ok(ExecutionResult::RecordSet(
             items
                 .iter()
-                .map(|i| serde_json::to_value(i).unwrap())
-                .collect(),
+                .map(serde_json::to_value)
+                .collect::<Result<Vec<_>, _>>()?,
         ))
     }
 
@@ -662,8 +662,8 @@ impl CustomOperation for ClientGroupTagListOp {
         Ok(ExecutionResult::RecordSet(
             items
                 .iter()
-                .map(|i| serde_json::to_value(i).unwrap())
-                .collect(),
+                .map(serde_json::to_value)
+                .collect::<Result<Vec<_>, _>>()?,
         ))
     }
 
@@ -748,8 +748,8 @@ impl CustomOperation for ClientGroupSearchOp {
         Ok(ExecutionResult::RecordSet(
             items
                 .iter()
-                .map(|i| serde_json::to_value(i).unwrap())
-                .collect(),
+                .map(serde_json::to_value)
+                .collect::<Result<Vec<_>, _>>()?,
         ))
     }
 
@@ -881,8 +881,8 @@ impl CustomOperation for ClientGroupDiscoverEntitiesOp {
         Ok(ExecutionResult::RecordSet(
             items
                 .iter()
-                .map(|i| serde_json::to_value(i).unwrap())
-                .collect(),
+                .map(serde_json::to_value)
+                .collect::<Result<Vec<_>, _>>()?,
         ))
     }
 
@@ -1392,8 +1392,8 @@ impl CustomOperation for ClientGroupListRolesOp {
         Ok(ExecutionResult::RecordSet(
             items
                 .iter()
-                .map(|i| serde_json::to_value(i).unwrap())
-                .collect(),
+                .map(serde_json::to_value)
+                .collect::<Result<Vec<_>, _>>()?,
         ))
     }
 
@@ -1491,8 +1491,8 @@ impl CustomOperation for ClientGroupPartiesOp {
         Ok(ExecutionResult::RecordSet(
             items
                 .iter()
-                .map(|i| serde_json::to_value(i).unwrap())
-                .collect(),
+                .map(serde_json::to_value)
+                .collect::<Result<Vec<_>, _>>()?,
         ))
     }
 
@@ -1665,8 +1665,8 @@ impl CustomOperation for ClientGroupListRelationshipsOp {
         Ok(ExecutionResult::RecordSet(
             items
                 .iter()
-                .map(|i| serde_json::to_value(i).unwrap())
-                .collect(),
+                .map(serde_json::to_value)
+                .collect::<Result<Vec<_>, _>>()?,
         ))
     }
 
@@ -1996,8 +1996,8 @@ impl CustomOperation for ClientGroupListUnverifiedOp {
         Ok(ExecutionResult::RecordSet(
             items
                 .iter()
-                .map(|i| serde_json::to_value(i).unwrap())
-                .collect(),
+                .map(serde_json::to_value)
+                .collect::<Result<Vec<_>, _>>()?,
         ))
     }
 
@@ -2092,8 +2092,8 @@ impl CustomOperation for ClientGroupListDiscrepanciesOp {
         Ok(ExecutionResult::RecordSet(
             items
                 .iter()
-                .map(|i| serde_json::to_value(i).unwrap())
-                .collect(),
+                .map(serde_json::to_value)
+                .collect::<Result<Vec<_>, _>>()?,
         ))
     }
 

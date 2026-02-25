@@ -220,7 +220,7 @@ mod tests {
     mod contract_tests {
         use super::*;
         use crate::repl::verb_config_index::{ArgSummary, VerbConfigIndex, VerbIndexEntry};
-        use crate::runbook::ConfirmPolicy;
+        use crate::repl::runbook::ConfirmPolicy;
 
         fn test_index() -> VerbConfigIndex {
             let mut index = VerbConfigIndex::empty();

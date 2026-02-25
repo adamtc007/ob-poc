@@ -819,6 +819,7 @@ fn cmd_verbs(domain: Option<String>, verbose: bool, format: OutputFormat) -> Res
                         VerbBehavior::CustomOp => "[CUSTOM]".yellow(),
                         VerbBehavior::Composite => "[COMPOSITE]".blue(),
                         VerbBehavior::GraphQuery => "[GRAPH]".cyan(),
+                        VerbBehavior::Durable => "[DURABLE]".magenta(),
                     };
 
                     println!(
@@ -1149,6 +1150,7 @@ async fn cmd_execute(
                     VerbBehavior::CustomOp => "[CUSTOM]".yellow(),
                     VerbBehavior::Composite => "[COMPOSITE]".blue(),
                     VerbBehavior::GraphQuery => "[GRAPH]".cyan(),
+                    VerbBehavior::Durable => "[DURABLE]".magenta(),
                 };
                 println!(
                     "  [{}] {}.{}{} {}",

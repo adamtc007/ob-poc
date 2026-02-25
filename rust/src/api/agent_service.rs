@@ -285,6 +285,8 @@ pub struct AgentService {
     entity_linker: Option<Arc<dyn crate::entity_linking::EntityLinkingService>>,
     /// Server-side policy enforcement for single-pipeline invariants
     policy_gate: Arc<crate::policy::PolicyGate>,
+    /// Semantic OS client — when set, routes sem_reg calls through DI boundary
+    sem_os_client: Option<Arc<dyn sem_os_client::SemOsClient>>,
 }
 
 impl AgentService {
@@ -315,6 +317,7 @@ impl AgentService {
             lexicon,
             entity_linker: None,
             policy_gate: Arc::new(crate::policy::PolicyGate::from_env()),
+            sem_os_client: None,
         }
     }
 
@@ -324,6 +327,12 @@ impl AgentService {
         entity_linker: Arc<dyn crate::entity_linking::EntityLinkingService>,
     ) -> Self {
         self.entity_linker = Some(entity_linker);
+        self
+    }
+
+    /// Set Semantic OS client for routing sem_reg calls through DI boundary
+    pub fn with_sem_os_client(mut self, client: Arc<dyn sem_os_client::SemOsClient>) -> Self {
+        self.sem_os_client = Some(client);
         self
     }
 
@@ -481,6 +490,7 @@ impl AgentService {
             lookup_service: self.get_lookup_service(),
             policy_gate: self.policy_gate.clone(),
             source,
+            sem_os_client: self.sem_os_client.clone(),
         }
     }
 
@@ -596,7 +606,7 @@ impl AgentService {
         }
 
         // 3. Check for pending decision (client group or deal selection)
-        if let Some(ref pending) = session.pending_decision.clone() {
+        if let Some(pending) = session.pending_decision.take() {
             // Check if input is a number (1, 2, 3, etc.) or special keyword
             let input_upper = input.trim().to_uppercase();
             if input_upper == "NEW"
@@ -615,27 +625,20 @@ impl AgentService {
                 // Find the matching choice
                 if let Some(choice) = pending.choices.iter().find(|c| c.id == choice_id) {
                     let choice = choice.clone();
-                    let packet = pending.clone();
-                    session.pending_decision = None;
-
-                    // Handle the selection based on decision kind
                     return self
-                        .handle_decision_selection(session, &packet, &choice)
+                        .handle_decision_selection(session, &pending, &choice)
                         .await;
                 } else if let Ok(idx) = input.trim().parse::<usize>() {
                     // Try index-based selection
                     if idx >= 1 && idx <= pending.choices.len() {
                         let choice = pending.choices[idx - 1].clone();
-                        let packet = pending.clone();
-                        session.pending_decision = None;
-
                         return self
-                            .handle_decision_selection(session, &packet, &choice)
+                            .handle_decision_selection(session, &pending, &choice)
                             .await;
                     }
                 }
 
-                // Invalid selection
+                // Invalid selection — restore pending so user can retry
                 let msg = format!(
                     "Please select a valid option (1-{}) or type NEW/SKIP.",
                     pending.choices.len()
@@ -655,24 +658,21 @@ impl AgentService {
                     dsl_hash: None,
                     verb_disambiguation: None,
                     intent_tier: None,
-                    decision: Some(pending.clone()),
+                    decision: Some(pending),
                 });
             }
             // Not a number/keyword - try fuzzy match against choice labels
             // This handles cases like typing "aviva" when the choices list
             // contains "Aviva Investors"
             let input_lower = input.trim().to_lowercase();
-            if let Some(matched) = pending
+            if let Some(matched_idx) = pending
                 .choices
                 .iter()
-                .find(|c| c.label.to_lowercase().contains(&input_lower))
+                .position(|c| c.label.to_lowercase().contains(&input_lower))
             {
-                let choice = matched.clone();
-                let packet = pending.clone();
-                session.pending_decision = None;
-
+                let choice = pending.choices[matched_idx].clone();
                 return self
-                    .handle_decision_selection(session, &packet, &choice)
+                    .handle_decision_selection(session, &pending, &choice)
                     .await;
             }
 
@@ -692,17 +692,15 @@ impl AgentService {
                         description: String::new(),
                         is_escape: true,
                     });
-                let packet = pending.clone();
-                session.pending_decision = None;
 
                 // Auto-skip deal selection, then process the original input
                 let _ = self
-                    .handle_decision_selection(session, &packet, &skip_choice)
+                    .handle_decision_selection(session, &pending, &skip_choice)
                     .await;
                 // Fall through to process original input via intent pipeline
-            } else {
-                session.pending_decision = None;
             }
+            // For non-deal decisions, pending is already taken (cleared).
+            // Fall through to process input via intent pipeline.
         }
 
         // 4. Check for pending intent tier selection
