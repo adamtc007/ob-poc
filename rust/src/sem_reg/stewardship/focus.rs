@@ -48,7 +48,7 @@ impl FocusStore {
         let taxonomy_focus_json = focus
             .taxonomy_focus
             .as_ref()
-            .map(|t| serde_json::to_value(t))
+            .map(serde_json::to_value)
             .transpose()?;
 
         let (overlay_mode_str, overlay_changeset_id) = match &focus.overlay_mode {
@@ -94,7 +94,7 @@ impl FocusStore {
             changeset_id: changeset_id.or(focus.changeset_id).unwrap_or(Uuid::nil()),
             event_type: StewardshipEventType::FocusChanged {
                 from: serde_json::json!({}),
-                to: serde_json::to_value(&focus).unwrap_or_default(),
+                to: serde_json::to_value(focus).unwrap_or_default(),
                 source: source.clone(),
             },
             actor_id: source.as_str().to_string(),

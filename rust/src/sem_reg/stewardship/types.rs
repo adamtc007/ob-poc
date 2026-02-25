@@ -35,7 +35,7 @@ impl ChangesetAction {
         }
     }
 
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn parse(s: &str) -> Option<Self> {
         match s {
             "add" => Some(Self::Add),
             "modify" => Some(Self::Modify),
@@ -72,7 +72,7 @@ impl ChangesetStatus {
         }
     }
 
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn parse(s: &str) -> Option<Self> {
         match s {
             "draft" => Some(Self::Draft),
             "under_review" => Some(Self::UnderReview),
@@ -140,7 +140,7 @@ impl BasisKind {
         }
     }
 
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn parse(s: &str) -> Option<Self> {
         match s {
             "regulatory_fact" => Some(Self::RegulatoryFact),
             "market_practice" => Some(Self::MarketPractice),
@@ -197,7 +197,7 @@ impl ConflictStrategy {
         }
     }
 
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn parse(s: &str) -> Option<Self> {
         match s {
             "merge" => Some(Self::Merge),
             "rebase" => Some(Self::Rebase),
@@ -375,7 +375,7 @@ impl TemplateStatus {
         }
     }
 
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn parse(s: &str) -> Option<Self> {
         match s {
             "draft" => Some(Self::Draft),
             "active" => Some(Self::Active),
@@ -407,7 +407,7 @@ impl BindingKind {
         }
     }
 
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn parse(s: &str) -> Option<Self> {
         match s {
             "rust_handler" => Some(Self::RustHandler),
             "bpmn_process" => Some(Self::BpmnProcess),
@@ -436,7 +436,7 @@ impl BindingStatus {
         }
     }
 
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn parse(s: &str) -> Option<Self> {
         match s {
             "draft" => Some(Self::Draft),
             "active" => Some(Self::Active),
@@ -718,7 +718,7 @@ pub enum WorkbenchPacketKind {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum WorkbenchPayload {
-    ShowPayload { show_packet: ShowPacket },
+    ShowPayload { show_packet: Box<ShowPacket> },
     DeltaPayload { deltas: Vec<ViewportDelta> },
     StatusPayload { viewport_id: String, status: ViewportStatus },
 }
@@ -760,13 +760,13 @@ mod tests {
     #[test]
     fn test_changeset_action_roundtrip() {
         let action = ChangesetAction::Promote;
-        assert_eq!(ChangesetAction::from_str(action.as_str()), Some(action));
+        assert_eq!(ChangesetAction::parse(action.as_str()), Some(action));
     }
 
     #[test]
     fn test_changeset_status_roundtrip() {
         let status = ChangesetStatus::UnderReview;
-        assert_eq!(ChangesetStatus::from_str(status.as_str()), Some(status));
+        assert_eq!(ChangesetStatus::parse(status.as_str()), Some(status));
     }
 
     #[test]
@@ -842,24 +842,24 @@ mod tests {
     #[test]
     fn test_basis_kind_roundtrip() {
         let kind = BasisKind::PlatformConvention;
-        assert_eq!(BasisKind::from_str(kind.as_str()), Some(kind));
+        assert_eq!(BasisKind::parse(kind.as_str()), Some(kind));
     }
 
     #[test]
     fn test_conflict_strategy_roundtrip() {
         let s = ConflictStrategy::Rebase;
-        assert_eq!(ConflictStrategy::from_str(s.as_str()), Some(s));
+        assert_eq!(ConflictStrategy::parse(s.as_str()), Some(s));
     }
 
     #[test]
     fn test_template_status_roundtrip() {
         let s = TemplateStatus::Active;
-        assert_eq!(TemplateStatus::from_str(s.as_str()), Some(s));
+        assert_eq!(TemplateStatus::parse(s.as_str()), Some(s));
     }
 
     #[test]
     fn test_binding_kind_roundtrip() {
         let k = BindingKind::BpmnProcess;
-        assert_eq!(BindingKind::from_str(k.as_str()), Some(k));
+        assert_eq!(BindingKind::parse(k.as_str()), Some(k));
     }
 }

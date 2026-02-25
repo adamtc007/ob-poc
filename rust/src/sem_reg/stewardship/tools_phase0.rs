@@ -13,16 +13,15 @@ use serde_json::json;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::sem_reg::abac::ActorContext;
 use crate::sem_reg::agent::mcp_tools::{SemRegToolContext, SemRegToolResult, SemRegToolSpec, ToolParameter};
 use crate::sem_reg::store::SnapshotStore;
 use crate::sem_reg::types::{ObjectType, SnapshotStatus};
 
 use super::guardrails::evaluate_all_guardrails;
-use super::idempotency::{with_idempotency, IdempotencyCheck, check_idempotency, record_idempotency};
+use super::idempotency::{IdempotencyCheck, check_idempotency, record_idempotency};
 use super::impact::compute_changeset_impact;
 use super::store::StewardshipStore;
-use super::templates::{instantiate_template, validate_template};
+use super::templates::instantiate_template;
 use super::types::*;
 
 // ═══════════════════════════════════════════════════════════════
@@ -534,7 +533,7 @@ async fn handle_add_item(
         }
     }
 
-    let action = match ChangesetAction::from_str(action_str) {
+    let action = match ChangesetAction::parse(action_str) {
         Some(a) => a,
         None => return SemRegToolResult::err(format!("Invalid action: {}", action_str)),
     };
@@ -774,7 +773,7 @@ async fn handle_attach_basis(
     let client_request_id = get_client_request_id(args);
     let actor = actor_id(ctx);
 
-    let kind = match BasisKind::from_str(kind_str) {
+    let kind = match BasisKind::parse(kind_str) {
         Some(k) => k,
         None => return SemRegToolResult::err(format!("Invalid basis kind: {}", kind_str)),
     };
@@ -1360,7 +1359,7 @@ async fn handle_resolve_conflict(
     let client_request_id = get_client_request_id(args);
     let actor = actor_id(ctx);
 
-    let strategy = match ConflictStrategy::from_str(strategy_str) {
+    let strategy = match ConflictStrategy::parse(strategy_str) {
         Some(s) => s,
         None => return SemRegToolResult::err(format!("Invalid strategy: {}", strategy_str)),
     };
@@ -1557,7 +1556,7 @@ async fn handle_coverage_report(
     ctx: &SemRegToolContext<'_>,
     args: &serde_json::Value,
 ) -> SemRegToolResult {
-    let scope = get_str(args, "scope");
+    let _scope = get_str(args, "scope");
     let include_drift = get_bool(args, "include_drift", false);
 
     // Count active snapshots by type
@@ -1739,7 +1738,7 @@ impl From<ChangesetEntryDbRow> for ChangesetEntryRow {
             action: r
                 .action
                 .as_deref()
-                .and_then(ChangesetAction::from_str)
+                .and_then(ChangesetAction::parse)
                 .unwrap_or(ChangesetAction::Add),
             predecessor_id: r.predecessor_id,
             revision: r.revision.unwrap_or(1),
@@ -1763,7 +1762,7 @@ impl From<ChangesetDbRow> for ChangesetRow {
     fn from(r: ChangesetDbRow) -> Self {
         Self {
             changeset_id: r.changeset_id,
-            status: ChangesetStatus::from_str(&r.status).unwrap_or(ChangesetStatus::Draft),
+            status: ChangesetStatus::parse(&r.status).unwrap_or(ChangesetStatus::Draft),
             owner_actor_id: r.owner_actor_id,
             scope: r.scope,
             created_at: r.created_at,
@@ -1773,6 +1772,7 @@ impl From<ChangesetDbRow> for ChangesetRow {
 }
 
 #[derive(sqlx::FromRow)]
+#[allow(dead_code)]
 struct ConflictCandidate {
     changeset_id: Uuid,
     object_fqn: String,

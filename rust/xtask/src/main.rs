@@ -976,6 +976,87 @@ enum SemRegAction {
         #[arg(long)]
         manifest_path: Option<String>,
     },
+
+    // ── Authoring Pipeline (Governed Change Boundary) ───────
+
+    /// List authoring pipeline ChangeSets
+    AuthoringList {
+        /// Filter by status (draft, validated, dry_run_passed, etc.)
+        #[arg(long)]
+        status: Option<String>,
+        /// Maximum number of results
+        #[arg(long, short = 'n', default_value = "50")]
+        limit: i64,
+    },
+
+    /// Show details for a single ChangeSet
+    AuthoringGet {
+        /// ChangeSet UUID
+        id: String,
+    },
+
+    /// Propose a new ChangeSet from a bundle directory
+    AuthoringPropose {
+        /// Path to bundle directory containing changeset.yaml + artifacts
+        bundle_path: String,
+    },
+
+    /// Run Stage 1 validation on a ChangeSet (Draft → Validated/Rejected)
+    AuthoringValidate {
+        /// ChangeSet UUID
+        id: String,
+    },
+
+    /// Run Stage 2 dry-run on a ChangeSet (Validated → DryRunPassed/DryRunFailed)
+    AuthoringDryRun {
+        /// ChangeSet UUID
+        id: String,
+    },
+
+    /// Generate a publish plan (diff) for a ChangeSet (read-only)
+    AuthoringPlan {
+        /// ChangeSet UUID
+        id: String,
+    },
+
+    /// Publish a ChangeSet (DryRunPassed → Published)
+    AuthoringPublish {
+        /// ChangeSet UUID
+        id: String,
+        /// Publisher identifier
+        #[arg(long, default_value = "cli")]
+        publisher: String,
+    },
+
+    /// Publish multiple ChangeSets atomically in topological order
+    AuthoringPublishBatch {
+        /// ChangeSet UUIDs (comma-separated or multiple args)
+        ids: Vec<String>,
+        /// Publisher identifier
+        #[arg(long, default_value = "cli")]
+        publisher: String,
+    },
+
+    /// Compute structural diff between two ChangeSets
+    AuthoringDiff {
+        /// Base ChangeSet UUID
+        base_id: String,
+        /// Target ChangeSet UUID
+        target_id: String,
+    },
+
+    /// Show authoring pipeline health (pending changesets, stale dry-runs)
+    AuthoringHealth,
+
+    /// Archive old terminal/orphan ChangeSets (report-only for now)
+    AuthoringCleanup {
+        /// Days to retain terminal ChangeSets (Rejected/DryRunFailed)
+        #[arg(long, default_value = "90")]
+        terminal_days: Option<u32>,
+        /// Days to retain orphan ChangeSets (Draft/Validated)
+        #[arg(long, default_value = "30")]
+        orphan_days: Option<u32>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -1284,6 +1365,40 @@ fn main() -> Result<()> {
                 }
                 SemRegAction::OnboardApply { manifest_path } => {
                     rt.block_on(sem_reg::onboard_apply(manifest_path.as_deref()))
+                }
+                // ── Authoring Pipeline ──
+                SemRegAction::AuthoringList { status, limit } => {
+                    rt.block_on(sem_reg::authoring_list(status.as_deref(), limit))
+                }
+                SemRegAction::AuthoringGet { id } => {
+                    rt.block_on(sem_reg::authoring_get(&id))
+                }
+                SemRegAction::AuthoringPropose { bundle_path } => {
+                    rt.block_on(sem_reg::authoring_propose(&bundle_path))
+                }
+                SemRegAction::AuthoringValidate { id } => {
+                    rt.block_on(sem_reg::authoring_validate(&id))
+                }
+                SemRegAction::AuthoringDryRun { id } => {
+                    rt.block_on(sem_reg::authoring_dry_run(&id))
+                }
+                SemRegAction::AuthoringPlan { id } => {
+                    rt.block_on(sem_reg::authoring_plan(&id))
+                }
+                SemRegAction::AuthoringPublish { id, publisher } => {
+                    rt.block_on(sem_reg::authoring_publish(&id, &publisher))
+                }
+                SemRegAction::AuthoringPublishBatch { ids, publisher } => {
+                    rt.block_on(sem_reg::authoring_publish_batch(&ids, &publisher))
+                }
+                SemRegAction::AuthoringDiff { base_id, target_id } => {
+                    rt.block_on(sem_reg::authoring_diff(&base_id, &target_id))
+                }
+                SemRegAction::AuthoringHealth => {
+                    rt.block_on(sem_reg::authoring_health())
+                }
+                SemRegAction::AuthoringCleanup { terminal_days, orphan_days } => {
+                    rt.block_on(sem_reg::authoring_cleanup(terminal_days, orphan_days))
                 }
             }
         }

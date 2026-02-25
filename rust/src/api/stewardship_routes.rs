@@ -12,11 +12,8 @@
 use axum::{
     extract::{Path, State},
     http::StatusCode,
-    response::{
-        sse::{Event, KeepAlive, Sse},
-        IntoResponse,
-    },
-    routing::{delete, get, post, put},
+    response::sse::{Event, KeepAlive, Sse},
+    routing::{get, post},
     Json, Router,
 };
 use chrono::Utc;
@@ -222,7 +219,7 @@ async fn set_focus(
             timestamp: Utc::now(),
             frame_type: "workbench".to_string(),
             kind: WorkbenchPacketKind::Show,
-            payload: WorkbenchPayload::ShowPayload { show_packet: packet },
+            payload: WorkbenchPayload::ShowPayload { show_packet: Box::new(packet) },
         };
         let tx = state.get_channel(session_id).await;
         // Best-effort send — if no SSE clients connected, this is a no-op

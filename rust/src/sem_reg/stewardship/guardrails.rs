@@ -107,6 +107,7 @@ pub fn has_warning_guardrails(results: &[GuardrailResult]) -> bool {
 //  Individual guardrail check functions
 // ═══════════════════════════════════════════════════════════════════
 
+#[cfg(test)]
 fn make_result(id: GuardrailId, message: &str, remediation: &str) -> GuardrailResult {
     let severity = id.default_severity();
     GuardrailResult {
@@ -377,7 +378,7 @@ fn check_silent_meaning_change(
                 if has_type_change && entry.reasoning.is_none() {
                     // Verify it's actually a change by comparing against active snapshot.
                     // SnapshotMeta has object_id (UUID), not fqn; compare against predecessor_id.
-                    let has_active = entry.predecessor_id.map_or(false, |pid| {
+                    let has_active = entry.predecessor_id.is_some_and(|pid| {
                         active_snapshots.iter().any(|s| s.object_id == pid)
                     });
                     if has_active {

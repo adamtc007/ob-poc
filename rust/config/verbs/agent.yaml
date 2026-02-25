@@ -336,6 +336,44 @@ domains:
         returns:
           type: affected
 
+      set-authoring-mode:
+        description: Switch between Research and Governed authoring modes
+        metadata:
+          tier: intent
+          source_of_truth: session
+          scope: global
+          noun: authoring_mode
+          category: agent_control
+          context: interactive_only
+          side_effects: runtime_state
+        behavior: plugin
+        handler: AgentSetAuthoringModeOp
+        invocation_phrases:
+          - "switch to research mode"
+          - "enter research mode"
+          - "switch to governed mode"
+          - "enter governed mode"
+          - "set authoring mode"
+        args:
+          - name: mode
+            type: string
+            required: true
+            description: |
+              Authoring mode: research (exploration, ChangeSet authoring,
+              full schema introspection) or governed (business operations,
+              publish, limited introspection). Default is governed.
+            valid_values:
+              - research
+              - governed
+          - name: confirm
+            type: boolean
+            required: false
+            description: |
+              Explicit confirmation required for mode switch. Must be true
+              to proceed.
+        returns:
+          type: affected
+
       # ============================================
       # Teaching Operations (Direct Pattern Learning)
       # ============================================

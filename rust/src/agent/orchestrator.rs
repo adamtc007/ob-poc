@@ -25,6 +25,7 @@ use crate::policy::{gate::PolicySnapshot, PolicyGate};
 use crate::sem_reg::abac::ActorContext;
 
 use sem_os_client::SemOsClient;
+use sem_os_core::authoring::agent_mode::AgentMode;
 
 /// Context needed to run the unified orchestrator.
 pub struct OrchestratorContext {
@@ -46,6 +47,11 @@ pub struct OrchestratorContext {
     /// When set, `resolve_sem_reg_verbs()` calls through this client instead of
     /// direct `sem_reg::context_resolution::resolve_context()`.
     pub sem_os_client: Option<Arc<dyn SemOsClient>>,
+    /// Authoring pipeline mode (Research vs Governed).
+    /// Controls which verbs are available: Research allows authoring exploration
+    /// verbs but blocks publish; Governed blocks authoring exploration but allows
+    /// publish and business verbs. Default: Governed.
+    pub agent_mode: AgentMode,
 }
 
 /// Where the utterance originated.
@@ -133,6 +139,10 @@ pub struct IntentTrace {
     pub entity_kind_filtered: bool,
     /// Whether telemetry was persisted to agent.intent_events
     pub telemetry_persisted: bool,
+    /// Active authoring mode (Research or Governed)
+    pub agent_mode: String,
+    /// Verbs blocked by AgentMode gating (if any)
+    pub agent_mode_blocked_verbs: Vec<String>,
 }
 
 /// Returns true for pipeline outcomes that are "early exits" -- scope resolution,
@@ -236,6 +246,7 @@ pub async fn handle_utterance(
             None,
             false,
             false,
+            &[],
         );
         let mut outcome = OrchestratorOutcome {
             pipeline_result: discovery_result,
@@ -268,6 +279,7 @@ pub async fn handle_utterance(
             Some("direct_dsl".to_string()),
             false,
             false,
+            &[],
         );
         let mut outcome = OrchestratorOutcome {
             pipeline_result: discovery_result,
@@ -332,6 +344,23 @@ pub async fn handle_utterance(
             }
         }
     }
+
+    // -- Stage A.3: Apply AgentMode filter --
+    // Research mode blocks publish/publish-batch; Governed blocks authoring exploration verbs.
+    let mut agent_mode_blocked = Vec::new();
+    filtered_candidates.retain(|v| {
+        if ctx.agent_mode.is_verb_allowed(&v.verb) {
+            true
+        } else {
+            tracing::debug!(
+                verb = %v.verb,
+                mode = %ctx.agent_mode,
+                "AgentMode blocked verb"
+            );
+            agent_mode_blocked.push(v.verb.clone());
+            false
+        }
+    });
 
     let post_filter: Vec<(String, f32)> = filtered_candidates
         .iter()
@@ -415,6 +444,7 @@ pub async fn handle_utterance(
         None,
         sem_reg_denied_all,
         semreg_unavailable,
+        &agent_mode_blocked,
     );
     if semreg_forced_regen {
         trace.selection_source = "semreg".to_string();
@@ -465,6 +495,7 @@ fn build_trace(
     bypass_used: Option<String>,
     sem_reg_denied_all: bool,
     semreg_unavailable: bool,
+    agent_mode_blocked: &[String],
 ) -> IntentTrace {
     let policy = &ctx.policy_gate;
     let final_verb = result
@@ -537,6 +568,8 @@ fn build_trace(
         dominant_entity_kind: dominant_entity_kind.clone(),
         entity_kind_filtered: dominant_entity_kind.is_some(),
         telemetry_persisted: false,
+        agent_mode: ctx.agent_mode.to_string(),
+        agent_mode_blocked_verbs: agent_mode_blocked.to_vec(),
     }
 }
 
@@ -679,6 +712,8 @@ pub async fn handle_utterance_with_forced_verb(
         dominant_entity_kind,
         entity_kind_filtered: false,
         telemetry_persisted: false,
+        agent_mode: ctx.agent_mode.to_string(),
+        agent_mode_blocked_verbs: vec![],
     };
 
     tracing::info!(
@@ -882,6 +917,8 @@ mod tests {
             dominant_entity_kind: None,
             entity_kind_filtered: false,
             telemetry_persisted: false,
+            agent_mode: "governed".into(),
+            agent_mode_blocked_verbs: vec![],
         }
     }
 

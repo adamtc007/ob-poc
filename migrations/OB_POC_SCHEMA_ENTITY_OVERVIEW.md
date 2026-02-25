@@ -1,7 +1,7 @@
 # OB-POC — Schema Entity Overview
 
-> **Last reconciled:** 2026-02-18 — against 90 migrations, 58 DSL verb domains, CLAUDE.md
-> **Scope:** `"ob-poc"` schema (206 tables) + `"kyc"` schema (37 tables + 10 views) + `"sem_reg"` schema (16 tables + 14 views) + `"sem_reg_pub"` schema (4 tables) + `"ob_ref"` tollgate definitions. External schemas (`custody`, `agent`, `teams`) referenced but not detailed.
+> **Last reconciled:** 2026-02-25 — against 98 migrations, 58 DSL verb domains, CLAUDE.md
+> **Scope:** `"ob-poc"` schema (206 tables) + `"kyc"` schema (37 tables + 10 views) + `"sem_reg"` schema (16 tables + 14 views) + `"sem_reg_pub"` schema (4 tables) + `"stewardship"` schema (9 tables) + `"ob_ref"` tollgate definitions. External schemas (`custody`, `agent`, `teams`) referenced but not detailed.
 > **Method:** SQL DDL cross-referenced with DSL verb YAML (`rust/config/verbs/*.yaml`) to validate domain groupings.
 > **Mermaid ER diagrams** render in GitHub, VS Code, and any CommonMark renderer with mermaid support.
 
@@ -1352,8 +1352,13 @@ erDiagram
         TEXT object_fqn
         TEXT object_type
         TEXT change_kind
+        VARCHAR action "add|modify|remove (default add)"
         JSONB draft_payload
         UUID base_snapshot_id
+        UUID predecessor_id FK "→ snapshots"
+        INT revision "default 1"
+        TEXT reasoning
+        JSONB guardrail_log "default []"
         TIMESTAMPTZ created_at
     }
 
@@ -1565,12 +1570,12 @@ erDiagram
 | `sem_reg.outbox_events` | Transactional outbox for reliable event dispatch. Snapshot publishes atomically enqueue events; outbox poller claims and dispatches to projections/subscribers. Sequential BIGINT PK for ordered processing. | INSERT + claim/process UPDATE |
 | `sem_reg.bootstrap_audit` | Tracks in-progress and completed bootstrap seed runs. PK on `bundle_hash` for idempotency. Status: in_progress/published/failed. | INSERT + status/completed_at UPDATE |
 
-### Changeset Tables (v1.1 — Draft Workflow)
+### Changeset Tables (v1.1 — Draft Workflow, extended by v0.4 Authoring)
 
 | Table | Purpose | Mutability |
 |-------|---------|------------|
-| `sem_reg.changesets` | Draft workspace for proposed registry changes. Status: draft/in_review/approved/published/rejected. Scoped by `owner_actor_id`. | INSERT + status/updated_at UPDATE |
-| `sem_reg.changeset_entries` | Individual proposed changes within a changeset. Each entry targets one object FQN with `change_kind` (add/modify/remove) and `draft_payload` JSONB. `base_snapshot_id` for modify/remove tracks what is being changed. | INSERT-only per changeset |
+| `sem_reg.changesets` | Draft workspace for proposed registry changes. Status: draft/under_review/approved/published/rejected/validated/dry_run_passed/dry_run_failed/superseded (widened by M099). `content_hash` + `hash_version` enable content-addressed idempotency (UNIQUE partial index on non-rejected/superseded). `title`/`rationale` for human context. `supersedes_change_set_id`/`superseded_by`/`superseded_at` for supersession chain. `depends_on UUID[]` for dependency ordering. `evaluated_against_snapshot_set_id` for drift detection. Scoped by `owner_actor_id`. | INSERT + status/updated_at UPDATE |
+| `sem_reg.changeset_entries` | Individual proposed changes within a changeset. Each entry targets one object FQN with `action` (add/modify/remove), `change_kind`, and `draft_payload` JSONB. `base_snapshot_id` and `predecessor_id` track lineage. `revision` counter (default 1), `reasoning` text, and `guardrail_log` JSONB for stewardship audit. Extended by M099: `content_hash` (artifact hash), `path` (file path in bundle), `artifact_type` (sql/yaml/json), `ordinal` (ordering), `entry_metadata` JSONB. | INSERT-only per changeset |
 | `sem_reg.changeset_reviews` | Review verdicts on changesets. Verdict: approved/rejected/requested_changes. | INSERT-only (append) |
 
 ### SQL Functions
@@ -1635,6 +1640,344 @@ sem_reg.snapshots (source of truth)
 
 ---
 
+## 17) Stewardship Agent Schema (`stewardship`)
+
+The `stewardship` schema supports the **Stewardship Agent** — a governance-aware agent that manages registry changesets, provides basis-of-record tracing, resolves conflicts between competing changes, and tracks viewport focus for agent sessions. The stewardship agent operates on top of `sem_reg` changesets, adding evidentiary basis, conflict resolution, and session management.
+
+**Migrations:** 097 (Phase 0), 098 (Phase 1)
+
+### Tables (9)
+
+| Table | Purpose | Key Columns |
+|-------|---------|-------------|
+| `basis_records` | Evidentiary basis for changeset entries — why a change was proposed | `basis_id` (PK), `changeset_id` (FK→sem_reg.changesets), `entry_id` (FK→sem_reg.changeset_entries), `kind`, `title`, `narrative` |
+| `basis_claims` | Individual claims within a basis record — specific assertions with confidence | `claim_id` (PK), `basis_id` (FK→basis_records), `claim_text`, `reference_uri`, `excerpt`, `confidence` (float8), `flagged_as_open_question` |
+| `conflict_records` | Detected conflicts between competing changesets on the same FQN | `conflict_id` (PK), `changeset_id` (FK), `competing_changeset_id` (FK), `fqn`, `resolution_strategy`, `resolution_rationale`, `resolved_by`, `resolved_at` |
+| `events` | Stewardship event log — all agent actions and state transitions | `event_id` (PK), `changeset_id` (FK), `event_type`, `actor_id`, `payload` (JSONB), `viewport_manifest_id` (FK→viewport_manifests) |
+| `focus_states` | Per-session agent focus — which objects/taxonomies are in view | `session_id` (PK), `changeset_id` (FK), `overlay_mode` (default 'active_only'), `object_refs` (JSONB), `taxonomy_focus` (JSONB), `resolution_context` (JSONB) |
+| `viewport_manifests` | Immutable viewport snapshots — captures focus state at a point in time | `manifest_id` (PK), `session_id`, `changeset_id`, `focus_state` (JSONB), `overlay_mode`, `assumed_principal`, `viewport_refs` (JSONB) |
+| `templates` | Stewardship changeset templates — reusable patterns for common changes | `template_id` (PK), `fqn`, `display_name`, `version_major/minor/patch`, `domain`, `scope` (JSONB), `items` (JSONB), `steward`, `basis_ref` (FK), `status` (default 'draft') |
+| `verb_implementation_bindings` | Binding records linking verb FQNs to their implementations | `binding_id` (PK), `verb_fqn`, `binding_kind`, `binding_ref`, `exec_modes` (JSONB), `status` (default 'draft'), `last_verified_at` |
+| `idempotency_keys` | Request deduplication — prevents duplicate tool invocations | `client_request_id` (PK), `tool_name`, `result` (JSONB) |
+
+### ER Diagram
+
+```mermaid
+erDiagram
+    SEM_REG_CHANGESETS ||--o{ BASIS_RECORDS : "has basis"
+    SEM_REG_CHANGESET_ENTRIES ||--o{ BASIS_RECORDS : "evidences"
+    BASIS_RECORDS ||--o{ BASIS_CLAIMS : "contains"
+    SEM_REG_CHANGESETS ||--o{ CONFLICT_RECORDS : "has conflicts"
+    SEM_REG_CHANGESETS ||--o{ CONFLICT_RECORDS : "competing"
+    SEM_REG_CHANGESETS ||--o{ EVENTS : "logs"
+    SEM_REG_CHANGESETS ||--o{ FOCUS_STATES : "session focus"
+    VIEWPORT_MANIFESTS ||--o{ EVENTS : "captured in"
+
+    BASIS_RECORDS {
+        UUID basis_id PK
+        UUID changeset_id FK
+        UUID entry_id FK
+        VARCHAR kind
+        TEXT title
+        TEXT narrative
+        TEXT created_by
+        TIMESTAMPTZ created_at
+    }
+
+    BASIS_CLAIMS {
+        UUID claim_id PK
+        UUID basis_id FK
+        TEXT claim_text
+        TEXT reference_uri
+        TEXT excerpt
+        FLOAT8 confidence
+        BOOLEAN flagged_as_open_question
+        TIMESTAMPTZ created_at
+    }
+
+    CONFLICT_RECORDS {
+        UUID conflict_id PK
+        UUID changeset_id FK
+        UUID competing_changeset_id FK
+        TEXT fqn
+        TIMESTAMPTZ detected_at
+        TEXT resolution_strategy
+        TEXT resolution_rationale
+        TEXT resolved_by
+        TIMESTAMPTZ resolved_at
+    }
+
+    EVENTS {
+        UUID event_id PK
+        UUID changeset_id FK
+        VARCHAR event_type
+        VARCHAR actor_id
+        JSONB payload
+        UUID viewport_manifest_id FK
+        TIMESTAMPTZ created_at
+    }
+
+    FOCUS_STATES {
+        UUID session_id PK
+        UUID changeset_id FK
+        VARCHAR overlay_mode
+        UUID overlay_changeset_id
+        JSONB object_refs
+        JSONB taxonomy_focus
+        JSONB resolution_context
+        TIMESTAMPTZ updated_at
+        VARCHAR updated_by
+    }
+
+    VIEWPORT_MANIFESTS {
+        UUID manifest_id PK
+        UUID session_id
+        UUID changeset_id
+        JSONB focus_state
+        VARCHAR overlay_mode
+        VARCHAR assumed_principal
+        JSONB viewport_refs
+        TIMESTAMPTZ created_at
+    }
+
+    TEMPLATES {
+        UUID template_id PK
+        TEXT fqn
+        TEXT display_name
+        INT version_major
+        INT version_minor
+        INT version_patch
+        TEXT domain
+        JSONB scope
+        JSONB items
+        TEXT steward
+        UUID basis_ref FK
+        VARCHAR status
+        TEXT created_by
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ updated_at
+    }
+
+    VERB_IMPLEMENTATION_BINDINGS {
+        UUID binding_id PK
+        TEXT verb_fqn
+        VARCHAR binding_kind
+        TEXT binding_ref
+        JSONB exec_modes
+        VARCHAR status
+        TIMESTAMPTZ last_verified_at
+        TEXT notes
+        TIMESTAMPTZ created_at
+    }
+
+    IDEMPOTENCY_KEYS {
+        UUID client_request_id PK
+        TEXT tool_name
+        JSONB result
+        TIMESTAMPTZ created_at
+    }
+```
+
+### Cross-Schema Foreign Keys
+
+| Source Table | Column | Target |
+|-------------|--------|--------|
+| `stewardship.basis_records` | `changeset_id` | `sem_reg.changesets` |
+| `stewardship.basis_records` | `entry_id` | `sem_reg.changeset_entries` |
+| `stewardship.conflict_records` | `changeset_id` | `sem_reg.changesets` |
+| `stewardship.conflict_records` | `competing_changeset_id` | `sem_reg.changesets` |
+| `stewardship.events` | `changeset_id` | `sem_reg.changesets` |
+| `stewardship.focus_states` | `changeset_id` | `sem_reg.changesets` |
+
+### Data Flow
+
+```
+sem_reg.changesets (changeset lifecycle)
+    │
+    ├─► stewardship.basis_records (why this change was proposed)
+    │       └─► stewardship.basis_claims (specific assertions with evidence)
+    │
+    ├─► stewardship.conflict_records (competing changes on same FQN)
+    │
+    ├─► stewardship.events (audit log of all agent actions)
+    │       └─► stewardship.viewport_manifests (point-in-time focus snapshots)
+    │
+    └─► stewardship.focus_states (live session focus per agent session)
+
+stewardship.templates (reusable changeset patterns)
+stewardship.verb_implementation_bindings (verb → executor binding registry)
+stewardship.idempotency_keys (tool invocation dedup)
+```
+
+---
+
+## 18) Registry Authoring Schema (`sem_reg_authoring`)
+
+The `sem_reg_authoring` schema supports the **Governed Registry Authoring Pipeline** — a two-plane model where research produces immutable ChangeSets and the governed plane validates and publishes them atomically into the active snapshot set. This schema provides validation report storage, governance audit logging, batch publish tracking, artifact storage, and retention/archival.
+
+**Migrations:** 099 (core authoring tables + `sem_reg.changesets` extensions), 100 (archive tables)
+
+### Extended Tables (in `sem_reg` schema, by M099)
+
+Migration 099 extends the existing `sem_reg.changesets` and `sem_reg.changeset_entries` tables:
+
+**`sem_reg.changesets` — new columns:**
+
+| Column | Type | Purpose |
+|--------|------|---------|
+| `content_hash` | TEXT | SHA-256 of canonical changeset content for idempotent propose |
+| `hash_version` | TEXT (default 'v1') | Hash algorithm version |
+| `title` | TEXT | Human-readable changeset title |
+| `rationale` | TEXT | Why this changeset was proposed |
+| `supersedes_change_set_id` | UUID (FK → changesets) | Supersession chain: what this replaces |
+| `superseded_by` | UUID (FK → changesets) | Supersession chain: what replaced this |
+| `superseded_at` | TIMESTAMPTZ | When supersession occurred |
+| `depends_on` | UUID[] | Dependency ordering for batch publish |
+| `evaluated_against_snapshot_set_id` | UUID | Snapshot set at dry-run time (drift detection) |
+
+**New status values:** `validated`, `dry_run_passed`, `dry_run_failed`, `superseded` (added to CHECK constraint alongside existing draft/under_review/approved/published/rejected).
+
+**New index:** `uq_changeset_content_hash` — UNIQUE on `(hash_version, content_hash)` WHERE `content_hash IS NOT NULL AND status NOT IN ('rejected', 'superseded')`. Enables content-addressed idempotent propose.
+
+**`sem_reg.changeset_entries` — new columns:**
+
+| Column | Type | Purpose |
+|--------|------|---------|
+| `content_hash` | TEXT | SHA-256 of individual artifact content |
+| `path` | TEXT | File path within the changeset bundle |
+| `artifact_type` | TEXT | Artifact classification (sql, yaml, json, etc.) |
+| `ordinal` | INT (default 0) | Ordering within the changeset |
+| `entry_metadata` | JSONB | Additional artifact metadata |
+
+### Tables (6)
+
+| Table | Purpose | Mutability |
+|-------|---------|------------|
+| `sem_reg_authoring.validation_reports` | Append-only log of validation results. Stage: `validate` (Stage 1: artifact integrity, ref resolution, semantic consistency) or `dry_run` (Stage 2: schema safety, compatibility). `ok` boolean + `report` JSONB with structured error codes. Indexed by `(change_set_id, stage, ran_at DESC)`. | INSERT-only (append) |
+| `sem_reg_authoring.governance_audit_log` | Permanent append-only audit trail for all 7 governance verbs (propose/validate/dry_run/plan_publish/publish/rollback/diff). Records `verb`, `agent_session_id`, `agent_mode` (Research/Governed), `change_set_id`, `snapshot_set_id`, `active_snapshot_set_id`, `result` JSONB, `duration_ms`, `metadata` JSONB. Indexed by `ts DESC` and `change_set_id`. | INSERT-only (append) |
+| `sem_reg_authoring.publish_batches` | Tracks atomic batch publishes. `change_set_ids UUID[]` lists all changesets published together (topologically sorted). `snapshot_set_id` is the target set. `publisher` identifies the actor. | INSERT-only (append) |
+| `sem_reg_authoring.change_set_artifacts` | Stored artifacts (SQL migrations, YAML defs, JSON schemas) associated with changesets. `artifact_type`, `ordinal` for ordering, `content` (full text), `content_hash` (SHA-256), `path` (file path in bundle), `metadata` JSONB. FK to `sem_reg.changesets`. Indexed by `(change_set_id, ordinal)`. | INSERT-only per changeset |
+| `sem_reg_authoring.change_sets_archive` | Archive destination for expired/orphan changesets (rejected > 90 days, orphan drafts > 30 days). Mirrors `sem_reg.changesets` structure including all v0.4 extended columns. `archived_at` timestamp added. Indexed by `status` and `archived_at DESC`. | INSERT-only (retention job) |
+| `sem_reg_authoring.change_set_artifacts_archive` | Archive destination for artifacts belonging to archived changesets. Mirrors `change_set_artifacts` structure. `archived_at` timestamp added. Indexed by `change_set_id`. | INSERT-only (retention job) |
+
+### ER Diagram
+
+```mermaid
+erDiagram
+    SEM_REG_CHANGESETS ||--o{ VALIDATION_REPORTS : "validated by"
+    SEM_REG_CHANGESETS ||--o{ CHANGE_SET_ARTIFACTS : "bundles"
+    SEM_REG_CHANGESETS ||--o{ GOVERNANCE_AUDIT_LOG : "audited by"
+    SEM_REG_CHANGESETS }o--o| SEM_REG_CHANGESETS : "supersedes"
+    PUBLISH_BATCHES }o--|| SEM_REG_SNAPSHOT_SETS : "publishes into"
+    CHANGE_SETS_ARCHIVE ||--o{ CHANGE_SET_ARTIFACTS_ARCHIVE : "archived artifacts"
+
+    SEM_REG_CHANGESETS {
+        uuid changeset_id PK
+        text status
+        text content_hash
+        text hash_version
+        text title
+        text rationale
+        uuid supersedes_change_set_id FK
+        uuid superseded_by FK
+        uuid evaluated_against_snapshot_set_id
+        uuid_array depends_on
+    }
+
+    VALIDATION_REPORTS {
+        uuid report_id PK
+        uuid change_set_id FK
+        text stage
+        boolean ok
+        jsonb report
+        timestamptz ran_at
+    }
+
+    GOVERNANCE_AUDIT_LOG {
+        uuid entry_id PK
+        timestamptz ts
+        text verb
+        uuid agent_session_id
+        text agent_mode
+        uuid change_set_id
+        uuid active_snapshot_set_id
+        jsonb result
+        bigint duration_ms
+    }
+
+    PUBLISH_BATCHES {
+        uuid batch_id PK
+        uuid_array change_set_ids
+        uuid snapshot_set_id
+        timestamptz published_at
+        text publisher
+    }
+
+    CHANGE_SET_ARTIFACTS {
+        uuid artifact_id PK
+        uuid change_set_id FK
+        text artifact_type
+        integer ordinal
+        text path
+        text content
+        text content_hash
+        jsonb metadata
+    }
+
+    CHANGE_SETS_ARCHIVE {
+        uuid changeset_id PK
+        text status
+        text content_hash
+        timestamptz archived_at
+    }
+
+    CHANGE_SET_ARTIFACTS_ARCHIVE {
+        uuid artifact_id PK
+        uuid change_set_id FK
+        text artifact_type
+        timestamptz archived_at
+    }
+```
+
+### Data Flow
+
+```
+Research Agent (AgentMode::Research)
+    │
+    ├─► propose_change_set → sem_reg.changesets (Draft, content_hash computed)
+    │                         + sem_reg_authoring.change_set_artifacts (bundle)
+    │                         + sem_reg_authoring.governance_audit_log
+    │
+    ├─► validate_change_set → sem_reg_authoring.validation_reports (Stage 1)
+    │                         sem_reg.changesets status → Validated/Rejected
+    │
+    ├─► dry_run_change_set  → sem_reg_authoring.validation_reports (Stage 2)
+    │                         sem_reg.changesets status → DryRunPassed/DryRunFailed
+    │                         evaluated_against_snapshot_set_id set
+    │
+    └─► plan_publish / diff → read-only operations, no state changes
+
+Governed Agent (AgentMode::Governed)
+    │
+    ├─► publish_snapshot_set → advisory lock → drift check → apply DDL
+    │                          → publish_batch_into_set() (atomic)
+    │                          → sem_reg_authoring.publish_batches
+    │                          → sem_reg.changesets status → Published
+    │                          → supersession chain update
+    │                          → sem_reg_authoring.governance_audit_log
+    │
+    └─► rollback_snapshot_set → advisory lock → revert active pointer
+                                → sem_reg_authoring.governance_audit_log
+
+Retention Job (background)
+    │
+    └─► sem_reg.changesets (Rejected > 90d, orphan Draft > 30d)
+            → sem_reg_authoring.change_sets_archive
+            → sem_reg_authoring.change_set_artifacts_archive
+```
+
+---
+
 ## Schema Statistics
 
 | Metric | Count |
@@ -1643,13 +1986,15 @@ sem_reg.snapshots (source of truth)
 | Total `kyc` tables | 37 (+ 10 views) |
 | Total `sem_reg` tables | 16 (+ 14 views, 2 functions) |
 | Total `sem_reg_pub` tables | 4 |
+| Total `sem_reg_authoring` tables | 6 |
+| Total `stewardship` tables | 9 |
 | Tables with DSL verb domains | ~120 |
-| Tables in this document | ~200 (essential to data model) |
+| Tables in this document | ~220 (essential to data model) |
 | Tables omitted (DSL engine, REPL, semantic search, layout cache) | ~70 |
 | DSL verb domains | 58 |
 | Total verb count | ~1,083 |
-| Migrations | 90 SQL files (001–077 + 072b + 078–079, 081–086, 090–095) |
-| Sections in this document | 16 |
+| Migrations | 100 SQL files (001–077 + 072b + 078–079, 081–086, 090–100) |
+| Sections in this document | 18 |
 
 **Omitted infrastructure tables** (no verb domains, not essential to data model):
 - DSL engine: `dsl_verbs`, `dsl_sessions`, `dsl_instances`, `dsl_snapshots`, `dsl_*` (14 tables)

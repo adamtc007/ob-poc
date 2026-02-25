@@ -121,6 +121,8 @@ smallvec = { version = "1.11", features = ["serde"] }
 [dev-dependencies]
 bpmn-lite-core = { path = "../bpmn-lite/bpmn-lite-core" }
 bpmn-lite-server = { path = "../bpmn-lite/bpmn-lite-server" }
+sem_os_core = { path = "crates/sem_os_core" }
+sem_os_postgres = { path = "crates/sem_os_postgres" }
 tokio-stream = "0.1"
 proptest = "1.4"
 

@@ -1100,6 +1100,442 @@ pub async fn onboard_apply(manifest_path: Option<&str>) -> Result<()> {
     Ok(())
 }
 
+// ── Authoring Pipeline CLI ────────────────────────────────────
+
+/// List authoring pipeline ChangeSets with optional status filter.
+pub async fn authoring_list(status: Option<&str>, limit: i64) -> Result<()> {
+    let pool = connect().await?;
+    let store = sem_os_postgres::PgAuthoringStore::new(pool);
+
+    let status_filter = match status {
+        Some(s) => {
+            let parsed = sem_os_core::authoring::types::ChangeSetStatus::parse(s)
+                .ok_or_else(|| anyhow::anyhow!(
+                    "Invalid status '{}'. Valid: draft, validated, rejected, \
+                     dry_run_passed, dry_run_failed, published, superseded",
+                    s
+                ))?;
+            Some(parsed)
+        }
+        None => None,
+    };
+
+    use sem_os_core::authoring::ports::AuthoringStore;
+    let changesets = store.list_change_sets(status_filter, limit).await
+        .map_err(|e| anyhow::anyhow!("{e}"))?;
+
+    if changesets.is_empty() {
+        println!("No ChangeSets found.");
+        return Ok(());
+    }
+
+    println!("Authoring Pipeline ChangeSets");
+    println!("=============================");
+    println!(
+        "  {:<38} {:<16} {:<30} {}",
+        "ID", "STATUS", "TITLE", "CREATED"
+    );
+    println!("  {}", "-".repeat(100));
+    for cs in &changesets {
+        println!(
+            "  {:<38} {:<16} {:<30} {}",
+            cs.change_set_id,
+            cs.status.as_str(),
+            truncate_str(&cs.title, 28),
+            cs.created_at.format("%Y-%m-%d %H:%M"),
+        );
+    }
+    println!("\n  Total: {}", changesets.len());
+    Ok(())
+}
+
+/// Get details for a single ChangeSet.
+pub async fn authoring_get(id: &str) -> Result<()> {
+    let pool = connect().await?;
+    let store = sem_os_postgres::PgAuthoringStore::new(pool);
+    let cs_id = uuid::Uuid::parse_str(id).context("Invalid UUID")?;
+
+    use sem_os_core::authoring::ports::AuthoringStore;
+    let cs = store.get_change_set(cs_id).await
+        .map_err(|e| anyhow::anyhow!("{e}"))?;
+
+    println!("ChangeSet: {}", cs.change_set_id);
+    println!("  Status:        {}", cs.status.as_str());
+    println!("  Title:         {}", cs.title);
+    if let Some(ref r) = cs.rationale {
+        println!("  Rationale:     {}", r);
+    }
+    println!("  Content Hash:  {}", cs.content_hash);
+    println!("  Hash Version:  {}", cs.hash_version);
+    println!("  Created By:    {}", cs.created_by);
+    println!("  Created At:    {}", cs.created_at);
+    if !cs.depends_on.is_empty() {
+        println!("  Depends On:    {:?}", cs.depends_on);
+    }
+    if let Some(sup) = cs.supersedes_change_set_id {
+        println!("  Supersedes:    {}", sup);
+    }
+    if let Some(by) = cs.superseded_by {
+        println!("  Superseded By: {}", by);
+    }
+    if let Some(eval) = cs.evaluated_against_snapshot_set_id {
+        println!("  Evaluated Against: {}", eval);
+    }
+
+    // Show artifacts
+    let artifacts = store.get_artifacts(cs_id).await
+        .map_err(|e| anyhow::anyhow!("{e}"))?;
+    if !artifacts.is_empty() {
+        println!("\n  Artifacts ({}):", artifacts.len());
+        for a in &artifacts {
+            println!(
+                "    [{}] {} ({})",
+                a.ordinal,
+                a.path.as_deref().unwrap_or("(inline)"),
+                a.artifact_type,
+            );
+        }
+    }
+
+    // Show validation reports
+    let reports = store.get_validation_reports(cs_id).await
+        .map_err(|e| anyhow::anyhow!("{e}"))?;
+    if !reports.is_empty() {
+        println!("\n  Validation Reports ({}):", reports.len());
+        for (report_id, stage, ok, _report_json) in &reports {
+            let status = if *ok { "PASS" } else { "FAIL" };
+            println!("    {} {:?} → {}", report_id, stage, status);
+        }
+    }
+
+    Ok(())
+}
+
+/// Validate a ChangeSet (Stage 1 — Draft → Validated/Rejected).
+pub async fn authoring_validate(id: &str) -> Result<()> {
+    let pool = connect().await?;
+    let store = sem_os_postgres::PgAuthoringStore::new(pool.clone());
+    let scratch = sem_os_postgres::PgScratchSchemaRunner::new(pool);
+    let cs_id = uuid::Uuid::parse_str(id).context("Invalid UUID")?;
+
+    let service = sem_os_core::authoring::governance_verbs::GovernanceVerbService::new(
+        &store, &scratch,
+    );
+    let report = service.validate(cs_id).await
+        .map_err(|e| anyhow::anyhow!("{e}"))?;
+
+    println!("Validation Report for {}", cs_id);
+    println!("  Result: {}", if report.ok { "PASS" } else { "FAIL" });
+    if !report.errors.is_empty() {
+        println!("  Errors ({}):", report.errors.len());
+        for e in &report.errors {
+            println!("    [{:?}] {}: {}", e.severity, e.code, e.message);
+        }
+    }
+    if !report.warnings.is_empty() {
+        println!("  Warnings ({}):", report.warnings.len());
+        for w in &report.warnings {
+            println!("    [{:?}] {}: {}", w.severity, w.code, w.message);
+        }
+    }
+    Ok(())
+}
+
+/// Dry-run a ChangeSet (Stage 2 — Validated → DryRunPassed/DryRunFailed).
+pub async fn authoring_dry_run(id: &str) -> Result<()> {
+    let pool = connect().await?;
+    let store = sem_os_postgres::PgAuthoringStore::new(pool.clone());
+    let scratch = sem_os_postgres::PgScratchSchemaRunner::new(pool);
+    let cs_id = uuid::Uuid::parse_str(id).context("Invalid UUID")?;
+
+    let service = sem_os_core::authoring::governance_verbs::GovernanceVerbService::new(
+        &store, &scratch,
+    );
+    let report = service.dry_run(cs_id).await
+        .map_err(|e| anyhow::anyhow!("{e}"))?;
+
+    println!("Dry-Run Report for {}", cs_id);
+    println!("  Result: {}", if report.ok { "PASS" } else { "FAIL" });
+    if let Some(ms) = report.scratch_schema_apply_ms {
+        println!("  Scratch apply: {}ms", ms);
+    }
+    if !report.errors.is_empty() {
+        println!("  Errors ({}):", report.errors.len());
+        for e in &report.errors {
+            println!("    [{:?}] {}: {}", e.severity, e.code, e.message);
+        }
+    }
+    if !report.warnings.is_empty() {
+        println!("  Warnings ({}):", report.warnings.len());
+        for w in &report.warnings {
+            println!("    [{:?}] {}: {}", w.severity, w.code, w.message);
+        }
+    }
+    if let Some(ref diff) = report.diff_summary {
+        print_diff_summary(diff);
+    }
+    Ok(())
+}
+
+/// Generate a publish plan (diff) for a ChangeSet. Read-only.
+pub async fn authoring_plan(id: &str) -> Result<()> {
+    let pool = connect().await?;
+    let store = sem_os_postgres::PgAuthoringStore::new(pool.clone());
+    let scratch = sem_os_postgres::PgScratchSchemaRunner::new(pool);
+    let cs_id = uuid::Uuid::parse_str(id).context("Invalid UUID")?;
+
+    let service = sem_os_core::authoring::governance_verbs::GovernanceVerbService::new(
+        &store, &scratch,
+    );
+    let diff = service.plan_publish(cs_id).await
+        .map_err(|e| anyhow::anyhow!("{e}"))?;
+
+    println!("Publish Plan for {}", cs_id);
+    print_diff_summary(&diff);
+    Ok(())
+}
+
+/// Publish a ChangeSet (DryRunPassed → Published).
+pub async fn authoring_publish(id: &str, publisher: &str) -> Result<()> {
+    let pool = connect().await?;
+    let store = sem_os_postgres::PgAuthoringStore::new(pool.clone());
+    let scratch = sem_os_postgres::PgScratchSchemaRunner::new(pool);
+    let cs_id = uuid::Uuid::parse_str(id).context("Invalid UUID")?;
+
+    let service = sem_os_core::authoring::governance_verbs::GovernanceVerbService::new(
+        &store, &scratch,
+    );
+    let batch = service.publish(cs_id, publisher).await
+        .map_err(|e| anyhow::anyhow!("{e}"))?;
+
+    println!("Published ChangeSet {}", cs_id);
+    println!("  Batch ID:       {}", batch.batch_id);
+    println!("  Snapshot Set:   {}", batch.snapshot_set_id);
+    println!("  Published At:   {}", batch.published_at);
+    println!("  Publisher:      {}", batch.publisher);
+    Ok(())
+}
+
+/// Publish multiple ChangeSets atomically in topological order.
+pub async fn authoring_publish_batch(ids: &[String], publisher: &str) -> Result<()> {
+    let pool = connect().await?;
+    let store = sem_os_postgres::PgAuthoringStore::new(pool.clone());
+    let scratch = sem_os_postgres::PgScratchSchemaRunner::new(pool);
+
+    let cs_ids: Vec<uuid::Uuid> = ids
+        .iter()
+        .map(|s| uuid::Uuid::parse_str(s).context("Invalid UUID"))
+        .collect::<Result<Vec<_>>>()?;
+
+    let service = sem_os_core::authoring::governance_verbs::GovernanceVerbService::new(
+        &store, &scratch,
+    );
+    let batch = service.publish_batch(&cs_ids, publisher).await
+        .map_err(|e| anyhow::anyhow!("{e}"))?;
+
+    println!("Published {} ChangeSets in batch {}", cs_ids.len(), batch.batch_id);
+    println!("  Snapshot Set:   {}", batch.snapshot_set_id);
+    println!("  Published At:   {}", batch.published_at);
+    println!("  Publisher:      {}", batch.publisher);
+    for cs_id in &batch.change_set_ids {
+        println!("  - {}", cs_id);
+    }
+    Ok(())
+}
+
+/// Compute structural diff between two ChangeSets.
+pub async fn authoring_diff(base_id: &str, target_id: &str) -> Result<()> {
+    let pool = connect().await?;
+    let store = sem_os_postgres::PgAuthoringStore::new(pool.clone());
+    let scratch = sem_os_postgres::PgScratchSchemaRunner::new(pool);
+
+    let base = uuid::Uuid::parse_str(base_id).context("Invalid base UUID")?;
+    let target = uuid::Uuid::parse_str(target_id).context("Invalid target UUID")?;
+
+    let service = sem_os_core::authoring::governance_verbs::GovernanceVerbService::new(
+        &store, &scratch,
+    );
+    let diff = service.diff(base, target).await
+        .map_err(|e| anyhow::anyhow!("{e}"))?;
+
+    println!("Diff: {} → {}", base_id, target_id);
+    print_diff_summary(&diff);
+    Ok(())
+}
+
+/// Show authoring pipeline health (pending changesets, stale dry-runs).
+pub async fn authoring_health() -> Result<()> {
+    let pool = connect().await?;
+    let store = sem_os_postgres::PgAuthoringStore::new(pool);
+
+    use sem_os_core::authoring::ports::AuthoringStore;
+
+    // Pending changeset counts by status
+    let status_counts = store.count_by_status().await
+        .map_err(|e| anyhow::anyhow!("{e}"))?;
+    let mut total_pending: i64 = 0;
+
+    println!("Authoring Pipeline Health");
+    println!("=========================");
+    println!("\n  Pending ChangeSets by Status:");
+    if status_counts.is_empty() {
+        println!("    (none)");
+    } else {
+        for (status, count) in &status_counts {
+            println!("    {:<20} {:>6}", status.as_str(), count);
+            if !status.is_terminal() {
+                total_pending += count;
+            }
+        }
+        println!("    {:<20} {:>6}", "TOTAL (non-terminal)", total_pending);
+    }
+
+    // Stale dry-runs
+    let stale = store.find_stale_dry_runs().await
+        .map_err(|e| anyhow::anyhow!("{e}"))?;
+    println!("\n  Stale Dry-Runs: {}", stale.len());
+    for cs in &stale {
+        println!(
+            "    {} (status: {}, title: {})",
+            cs.change_set_id,
+            cs.status.as_str(),
+            truncate_str(&cs.title, 40),
+        );
+    }
+
+    Ok(())
+}
+
+/// Propose a ChangeSet from a bundle directory or inline YAML.
+pub async fn authoring_propose(bundle_path: &str) -> Result<()> {
+    use sem_os_core::authoring::bundle::{build_bundle, parse_manifest};
+    use sem_os_core::principal::Principal;
+
+    let pool = connect().await?;
+    let store = sem_os_postgres::PgAuthoringStore::new(pool.clone());
+    let scratch = sem_os_postgres::PgScratchSchemaRunner::new(pool);
+
+    // Read manifest from bundle directory
+    let bundle_dir = std::path::Path::new(bundle_path);
+    let manifest_path = bundle_dir.join("changeset.yaml");
+    let manifest_yaml = std::fs::read_to_string(&manifest_path)
+        .with_context(|| format!("Failed to read {}", manifest_path.display()))?;
+    let raw = parse_manifest(&manifest_yaml)
+        .map_err(|e| anyhow::anyhow!("{e}"))?;
+
+    let bundle = build_bundle(&raw, |_type_str, path| {
+        let full_path = bundle_dir.join(path);
+        std::fs::read_to_string(&full_path)
+            .map_err(|e| format!("Failed to read {}: {e}", full_path.display()))
+    }).map_err(|e| anyhow::anyhow!("{e}"))?;
+
+    let principal = Principal {
+        actor_id: "cli".to_string(),
+        roles: vec!["operator".to_string()],
+        claims: std::collections::HashMap::new(),
+        tenancy: None,
+    };
+
+    let service = sem_os_core::authoring::governance_verbs::GovernanceVerbService::new(
+        &store, &scratch,
+    );
+    let cs = service.propose(&bundle, &principal).await
+        .map_err(|e| anyhow::anyhow!("{e}"))?;
+
+    println!("Proposed ChangeSet: {}", cs.change_set_id);
+    println!("  Status:       {}", cs.status.as_str());
+    println!("  Title:        {}", cs.title);
+    println!("  Content Hash: {}", cs.content_hash);
+    println!("  Artifacts:    {}", bundle.artifacts.len());
+    Ok(())
+}
+
+/// Run cleanup to archive old terminal/orphan ChangeSets.
+pub async fn authoring_cleanup(
+    terminal_days: Option<u32>,
+    orphan_days: Option<u32>,
+) -> Result<()> {
+    let pool = connect().await?;
+
+    // The cleanup function requires a CleanupStore, which PgAuthoringStore
+    // doesn't implement directly. For now, report what would be cleaned.
+    use sem_os_core::authoring::ports::AuthoringStore;
+    let store = sem_os_postgres::PgAuthoringStore::new(pool);
+
+    let policy = sem_os_core::authoring::cleanup::CleanupPolicy {
+        terminal_retention_days: terminal_days.unwrap_or(90),
+        orphan_retention_days: orphan_days.unwrap_or(30),
+    };
+
+    println!("Cleanup Policy:");
+    println!("  Terminal retention: {} days", policy.terminal_retention_days);
+    println!("  Orphan retention:   {} days", policy.orphan_retention_days);
+
+    // Show counts of what would be affected
+    let status_counts = store.count_by_status().await
+        .map_err(|e| anyhow::anyhow!("{e}"))?;
+
+    let mut terminal_count = 0i64;
+    let mut orphan_count = 0i64;
+    for (status, count) in &status_counts {
+        match status {
+            sem_os_core::authoring::types::ChangeSetStatus::Rejected
+            | sem_os_core::authoring::types::ChangeSetStatus::DryRunFailed => {
+                terminal_count += count;
+            }
+            sem_os_core::authoring::types::ChangeSetStatus::Draft
+            | sem_os_core::authoring::types::ChangeSetStatus::Validated => {
+                orphan_count += count;
+            }
+            _ => {}
+        }
+    }
+
+    println!("\n  Terminal candidates (Rejected/DryRunFailed): {}", terminal_count);
+    println!("  Orphan candidates (Draft/Validated):         {}", orphan_count);
+    println!("\n  Note: Actual archival depends on age threshold — not all may qualify.");
+    Ok(())
+}
+
+fn print_diff_summary(diff: &sem_os_core::authoring::types::DiffSummary) {
+    if diff.added.is_empty() && diff.modified.is_empty() && diff.removed.is_empty() && diff.breaking_changes.is_empty() {
+        println!("  (no changes)");
+        return;
+    }
+    if !diff.added.is_empty() {
+        println!("  Added ({}):", diff.added.len());
+        for e in &diff.added {
+            println!("    + {} [{}]", e.fqn, e.object_type);
+        }
+    }
+    if !diff.modified.is_empty() {
+        println!("  Modified ({}):", diff.modified.len());
+        for e in &diff.modified {
+            println!("    ~ {} [{}]", e.fqn, e.object_type);
+        }
+    }
+    if !diff.removed.is_empty() {
+        println!("  Removed ({}):", diff.removed.len());
+        for e in &diff.removed {
+            println!("    - {} [{}]", e.fqn, e.object_type);
+        }
+    }
+    if !diff.breaking_changes.is_empty() {
+        println!("  Breaking Changes ({}):", diff.breaking_changes.len());
+        for e in &diff.breaking_changes {
+            println!("    ! {} [{}] — {}", e.fqn, e.object_type, e.detail.as_deref().unwrap_or(""));
+        }
+    }
+}
+
+fn truncate_str(s: &str, max: usize) -> String {
+    if s.len() <= max {
+        s.to_string()
+    } else {
+        format!("{}…", &s[..max.saturating_sub(1)])
+    }
+}
+
 // ── Helpers ───────────────────────────────────────────────────
 
 async fn connect() -> Result<PgPool> {

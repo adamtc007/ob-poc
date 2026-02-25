@@ -1,4 +1,5 @@
 pub mod abac;
+pub mod authoring;
 pub mod context_resolution;
 pub mod enforce;
 pub mod error;

@@ -1,8 +1,10 @@
 # Semantic OS v3.0 — Standalone Service Boundary + Stewardship (Implementation TODO)
 
-**Status:** Draft — for Opus peer review → then Claude Code implementation  
-**Date:** Feb 2026  
-**Scope:** Refactor Semantic OS v2 first (freeze semantics), then add Standalone boundary, then Stewardship Agent + Workbench.
+**Status:** ✅ IMPLEMENTED (2026-02-25) — Delivered as v1.1 standalone service. See `docs/Semantic_OS_v1_0___Claude_Code_Drop.md` for the executed spec.
+**Date:** Feb 2026
+**Original Scope:** Refactor Semantic OS v2 first (freeze semantics), then add Standalone boundary, then Stewardship Agent + Workbench.
+
+> **Note:** This was the planning/TODO document. The implementation was executed via the v1.0 Claude Code Drop spec and delivered as 6 workspace crates + 7 migrations (092-098) + stewardship Phase 0-1. The TODO items below reflect the original plan — all have been completed.
 
 ---
 

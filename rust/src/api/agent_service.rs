@@ -111,8 +111,10 @@ use crate::dsl_v2::macros::{load_macro_registry_from_dir, MacroRegistry};
 use crate::dsl_v2::ref_resolver::ResolveResult;
 use crate::dsl_v2::validation::RefType;
 use crate::dsl_v2::{enrich_program, parse_program, runtime_registry, Statement};
-use crate::graph::GraphScope;
 use crate::mcp::verb_search_factory::VerbSearcherFactory;
+#[cfg(not(feature = "runbook-gate-vnext"))]
+use crate::graph::GraphScope;
+#[cfg(not(feature = "runbook-gate-vnext"))]
 use crate::session::SessionScope;
 use crate::session::{SessionState, UnifiedSession, UnresolvedRefInfo};
 use serde::{Deserialize, Serialize};
@@ -491,6 +493,7 @@ impl AgentService {
             policy_gate: self.policy_gate.clone(),
             source,
             sem_os_client: self.sem_os_client.clone(),
+            agent_mode: sem_os_core::authoring::agent_mode::AgentMode::default(),
         }
     }
 
@@ -1747,7 +1750,7 @@ impl AgentService {
             execute_runbook,
             types::{CompiledStep, ExecutionMode},
             write_set::derive_write_set_heuristic,
-            CompiledRunbook, RunbookStore,
+            CompiledRunbook,
         };
 
         // Phase D: use Postgres store when pool available for event emission.

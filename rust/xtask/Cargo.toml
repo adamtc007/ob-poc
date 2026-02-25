@@ -18,6 +18,8 @@ chrono = { version = "0.4", features = ["serde"] }
 reqwest = { version = "0.12", features = ["json"] }
 urlencoding = "2.1"
 ob-poc = { path = "..", features = ["database", "vnext-repl"] }
+sem_os_core = { path = "../crates/sem_os_core" }
+sem_os_postgres = { path = "../crates/sem_os_postgres" }
 dsl-core = { path = "../crates/dsl-core" }
 playbook-core = { path = "../crates/playbook-core" }
 playbook-lower = { path = "../crates/playbook-lower" }

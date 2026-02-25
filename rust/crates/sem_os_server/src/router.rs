@@ -36,6 +36,31 @@ pub fn build_router(service: Arc<dyn CoreService>, pool: PgPool, jwt_config: Jwt
         )
         .route("/tools/call", post(handlers::tools::call_tool))
         .route("/tools/list", get(handlers::tools::list_tools))
+        // Authoring pipeline (governance verbs)
+        .route("/authoring", get(handlers::authoring::list))
+        .route("/authoring/propose", post(handlers::authoring::propose))
+        .route(
+            "/authoring/publish-batch",
+            post(handlers::authoring::publish_batch),
+        )
+        .route("/authoring/diff", post(handlers::authoring::diff))
+        .route("/authoring/{id}", get(handlers::authoring::get))
+        .route(
+            "/authoring/{id}/validate",
+            post(handlers::authoring::validate),
+        )
+        .route(
+            "/authoring/{id}/dry-run",
+            post(handlers::authoring::dry_run),
+        )
+        .route(
+            "/authoring/{id}/plan",
+            get(handlers::authoring::plan_publish),
+        )
+        .route(
+            "/authoring/{id}/publish",
+            post(handlers::authoring::publish),
+        )
         // Changeset / Workbench
         .route("/changesets", get(handlers::changesets::list_changesets))
         .route(
@@ -58,7 +83,16 @@ pub fn build_router(service: Arc<dyn CoreService>, pool: PgPool, jwt_config: Jwt
         .layer(Extension(jwt_config));
 
     // Public routes (no auth)
-    let public = Router::new().route("/health", get(handlers::health::health));
+    let public = Router::new()
+        .route("/health", get(handlers::health::health))
+        .route(
+            "/health/semreg/pending-changesets",
+            get(handlers::health::semreg_pending_changesets),
+        )
+        .route(
+            "/health/semreg/stale-dryruns",
+            get(handlers::health::semreg_stale_dryruns),
+        );
 
     // Combine and add shared state
     public

@@ -206,6 +206,8 @@ pub struct ToolHandlers {
     pub(super) lexicon: Option<crate::mcp::verb_search::SharedLexicon>,
     /// Semantic OS client — routes sem_reg_* tool calls through the DI boundary
     pub(super) sem_os_client: Option<Arc<dyn SemOsClient>>,
+    /// Authoring pipeline mode (Research vs Governed) — controls db_introspect surface.
+    pub(super) agent_mode: sem_os_core::authoring::agent_mode::AgentMode,
 }
 
 impl ToolHandlers {
@@ -227,7 +229,14 @@ impl ToolHandlers {
             macro_registry: None,
             lexicon: None,
             sem_os_client: None,
+            agent_mode: sem_os_core::authoring::agent_mode::AgentMode::default(),
         }
+    }
+
+    /// Set the authoring pipeline mode (Research vs Governed).
+    pub fn with_agent_mode(mut self, mode: sem_os_core::authoring::agent_mode::AgentMode) -> Self {
+        self.agent_mode = mode;
+        self
     }
 
     /// Set the lexicon service for fast in-memory lexical verb search
@@ -1472,6 +1481,7 @@ impl ToolHandlers {
             policy_gate,
             source: crate::agent::orchestrator::UtteranceSource::Mcp,
             sem_os_client: self.sem_os_client.clone(),
+            agent_mode: self.agent_mode,
         };
         let outcome = crate::agent::orchestrator::handle_utterance(&orch_ctx, instruction).await?;
         let result = outcome.pipeline_result;
@@ -1933,6 +1943,9 @@ impl ToolHandlers {
     }
 
     /// Discover database tables, columns, PKs, and FKs from information_schema.
+    ///
+    /// Mode-gated: In Governed mode, `table_name` is required (describe a single table).
+    /// Full schema enumeration (listing all tables) is only available in Research mode.
     async fn db_introspect(&self, args: Value) -> Result<Value> {
         let pool = self.require_pool()?;
         let schema_name = args["schema_name"]
@@ -1940,6 +1953,15 @@ impl ToolHandlers {
             .ok_or_else(|| anyhow!("schema_name required"))?;
         let table_filter = args["table_name"].as_str();
         let include_fks = args["include_fks"].as_bool().unwrap_or(true);
+
+        // Governed mode restricts to single-table introspection only
+        if !self.agent_mode.allows_full_introspect() && table_filter.is_none() {
+            return Err(anyhow!(
+                "db_introspect: full schema enumeration is not available in {} mode. \
+                 Provide table_name to describe a specific table.",
+                self.agent_mode
+            ));
+        }
 
         // 1. Query columns (with optional table filter)
         #[derive(sqlx::FromRow)]

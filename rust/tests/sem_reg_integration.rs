@@ -35,8 +35,8 @@ mod integration {
         evaluate_abac, AccessDecision, AccessPurpose, ActorContext, AgentPlan, AgentPlanStatus,
         AttributeDefBody, ChangeType, Classification, DecisionRecord, DecisionStore, EvidenceMode,
         GovernanceTier, LineageStore, MetricsStore, ObjectType, PlanStep, PlanStepStatus,
-        PlanStore, RegistryService, SecurityLabel, SnapshotMeta, SnapshotStore, SubjectRef,
-        TrustClass, VerbContractBody,
+        PlanStore, RegistryService, SecurityLabel, SnapshotMeta, SnapshotRow, SnapshotStatus,
+        SnapshotStore, SubjectRef, TrustClass, VerbContractBody,
     };
 
     // Import types not re-exported at module boundary
@@ -1164,8 +1164,10 @@ mod integration {
                 fqn: fqn.clone(),
                 name: name.into(),
                 description: format!("Test taxonomy: {name}"),
+                domain: "test".into(),
                 root_node_fqn: None,
                 max_depth: Some(3),
+                classification_axis: None,
             };
             RegistryService::publish_taxonomy_def(&db.pool, &meta, &body, None).await?;
         }
@@ -1199,8 +1201,9 @@ mod integration {
         let mem_et_body = MembershipRuleBody {
             fqn: db.fqn("membership.fund_in_am"),
             name: "Fund in Asset Management".into(),
-            description: "Test fund belongs to AM taxonomy".into(),
+            description: Some("Test fund belongs to AM taxonomy".into()),
             taxonomy_fqn: tax_am_fqn.clone(),
+            node_fqn: tax_am_fqn.clone(),
             target_type: "entity_type_def".into(),
             target_fqn: et_fqn.clone(),
             membership_kind: MembershipKind::Direct,
@@ -1248,8 +1251,9 @@ mod integration {
         let mem_va_body = MembershipRuleBody {
             fqn: db.fqn("membership.fund_action_in_am"),
             name: "fund_action in AM".into(),
-            description: "Verb A in asset management".into(),
+            description: Some("Verb A in asset management".into()),
             taxonomy_fqn: tax_am_fqn.clone(),
+            node_fqn: tax_am_fqn.clone(),
             target_type: "verb_contract".into(),
             target_fqn: verb_a_fqn.clone(),
             membership_kind: MembershipKind::Direct,
@@ -1279,8 +1283,9 @@ mod integration {
         let mem_vb_body = MembershipRuleBody {
             fqn: db.fqn("membership.compliance_action_in_co"),
             name: "compliance_action in CO".into(),
-            description: "Verb B in compliance only".into(),
+            description: Some("Verb B in compliance only".into()),
             taxonomy_fqn: tax_co_fqn.clone(),
+            node_fqn: tax_co_fqn.clone(),
             target_type: "verb_contract".into(),
             target_fqn: verb_b_fqn.clone(),
             membership_kind: MembershipKind::Direct,
@@ -1312,6 +1317,7 @@ mod integration {
             constraints: Default::default(),
             evidence_mode: EvidenceMode::Exploratory,
             point_in_time: None,
+            entity_kind: None,
         };
 
         let response = resolve_context(&db.pool, &request).await?;

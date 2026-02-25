@@ -54,6 +54,7 @@ pub fn build_stub_context(
         policy_gate: Arc::new(policy),
         source: UtteranceSource::Chat,
         sem_os_client: None,
+        agent_mode: sem_os_core::authoring::agent_mode::AgentMode::default(),
     }
 }
 

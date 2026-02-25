@@ -178,6 +178,7 @@ async fn test_acquire_locks_contention_returns_partial() {
             entity_type,
             entity_id,
             acquired_so_far,
+            holder_runbook_id: _,
         }) => {
             assert_eq!(entity_type, "entity");
             assert_eq!(entity_id, entity_id_2);

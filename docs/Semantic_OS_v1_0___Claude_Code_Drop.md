@@ -1,9 +1,12 @@
 # Semantic OS v1.0 — Claude Code Implementation Drop
 
-**Status:** READY FOR IMPLEMENTATION — Claude Code execution document  
-**Date:** Feb 2026  
-**Version:** v1.0 (production-ready drop from v3.4 peer review lineage)  
-**Scope:** Full standalone Semantic OS: workspace crates → kernel extraction → API → outbox → projections → stewardship
+**Status:** ✅ IMPLEMENTED (2026-02-25) — All stages complete. Harness green in inprocess mode.
+**Date:** Feb 2026
+**Version:** v1.1 (standalone service + stewardship Phase 0-1 + schema visibility)
+**Scope:** Full standalone Semantic OS: workspace crates → kernel extraction → API → outbox → projections → stewardship → schema visibility
+**Original Spec:** v1.0 (production-ready drop from v3.4 peer review lineage)
+
+> **Implementation Summary:** 6 workspace crates (`sem_os_core`, `sem_os_postgres`, `sem_os_server`, `sem_os_client`, `sem_os_harness`, `sem_os_obpoc_adapter`), 7 migrations (092-098), ~101 MCP tools total (~32 sem_reg + 23 stewardship + rest), 3 test suites (core, projections, permissions), stewardship agent Phase 0-1 (changeset workflow + Show Loop), `db_introspect` MCP tool, `AttributeSource` real (schema, table, column) triples. Adapter wires into ob-poc via `SemOsClient` trait in both inprocess and remote modes.
 
 ---
 

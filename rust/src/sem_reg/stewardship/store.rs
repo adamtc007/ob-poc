@@ -495,6 +495,7 @@ impl StewardshipStore {
 // ═══════════════════════════════════════════════════════════════════
 
 #[derive(sqlx::FromRow)]
+#[allow(dead_code)]
 struct EventRow {
     event_id: Uuid,
     changeset_id: Uuid,
@@ -538,7 +539,7 @@ impl BasisRow {
             basis_id: self.basis_id,
             changeset_id: self.changeset_id,
             entry_id: self.entry_id,
-            kind: BasisKind::from_str(&self.kind).unwrap_or(BasisKind::Precedent),
+            kind: BasisKind::parse(&self.kind).unwrap_or(BasisKind::Precedent),
             title: self.title,
             narrative: self.narrative,
             created_by: self.created_by,
@@ -581,7 +582,7 @@ impl ConflictRow {
             detected_at: self.detected_at,
             resolution_strategy: self
                 .resolution_strategy
-                .and_then(|s| ConflictStrategy::from_str(&s)),
+                .and_then(|s| ConflictStrategy::parse(&s)),
             resolution_rationale: self.resolution_rationale,
             resolved_by: self.resolved_by,
             resolved_at: self.resolved_at,
@@ -626,7 +627,7 @@ impl TemplateRow {
             items,
             steward: self.steward,
             basis_ref: self.basis_ref,
-            status: TemplateStatus::from_str(&self.status).unwrap_or(TemplateStatus::Draft),
+            status: TemplateStatus::parse(&self.status).unwrap_or(TemplateStatus::Draft),
             created_by: self.created_by,
             created_at: self.created_at,
         })
@@ -652,11 +653,11 @@ impl BindingRow {
         Ok(VerbImplementationBinding {
             binding_id: self.binding_id,
             verb_fqn: self.verb_fqn,
-            binding_kind: BindingKind::from_str(&self.binding_kind)
+            binding_kind: BindingKind::parse(&self.binding_kind)
                 .unwrap_or(BindingKind::RustHandler),
             binding_ref: self.binding_ref,
             exec_modes,
-            status: BindingStatus::from_str(&self.status).unwrap_or(BindingStatus::Draft),
+            status: BindingStatus::parse(&self.status).unwrap_or(BindingStatus::Draft),
             last_verified_at: self.last_verified_at,
             notes: self.notes,
         })

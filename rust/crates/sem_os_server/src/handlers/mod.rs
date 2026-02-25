@@ -1,3 +1,4 @@
+pub mod authoring;
 pub mod bootstrap;
 pub mod changesets;
 pub mod export;

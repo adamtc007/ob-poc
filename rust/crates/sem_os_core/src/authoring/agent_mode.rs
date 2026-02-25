@@ -1,0 +1,230 @@
+//! Agent mode gating for the Research → Governed boundary.
+//!
+//! | Mode       | Allowed                                   | Blocked                        |
+//! |------------|-------------------------------------------|--------------------------------|
+//! | Research   | Authoring verbs, full db_introspect,      | Governed business verbs        |
+//! |            | SemReg read tools, diff tools             | (cbu.*, entity.*, etc.)        |
+//! | Governed   | Business verbs (per SemReg), publish,     | Authoring verbs (propose,      |
+//! |            | limited db_introspect (verify/describe)   | validate, dry_run, plan)       |
+
+use serde::{Deserialize, Serialize};
+
+/// Agent operating mode for the Research → Governed boundary.
+///
+/// Default is `Governed`. Mode switch requires explicit `agent.set-mode` verb
+/// with confirmation.
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
+pub enum AgentMode {
+    /// Research plane: exploration, schema introspection, ChangeSet authoring.
+    ///
+    /// Allowed: propose, validate, dry_run, plan, diff, full db_introspect,
+    /// SemReg read/search tools.
+    /// Blocked: governed business verbs (cbu.*, entity.*, trading-profile.*, etc.)
+    Research,
+
+    /// Governed plane: validated business operations per SemReg policy.
+    ///
+    /// Allowed: business verbs (per SemReg), publish, rollback,
+    /// limited db_introspect (verify_table_exists, describe_table).
+    /// Blocked: authoring verbs (propose, validate, dry_run, plan).
+    #[default]
+    Governed,
+}
+
+impl AgentMode {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Research => "research",
+            Self::Governed => "governed",
+        }
+    }
+
+    /// Whether this mode allows authoring verbs (propose, validate, dry_run, plan).
+    pub fn allows_authoring(&self) -> bool {
+        matches!(self, AgentMode::Research)
+    }
+
+    /// Whether this mode allows full db_introspect surface.
+    /// Governed mode restricts to verify_table_exists and describe_table only.
+    pub fn allows_full_introspect(&self) -> bool {
+        matches!(self, AgentMode::Research)
+    }
+
+    /// Whether this mode allows governed business verbs.
+    pub fn allows_business_verbs(&self) -> bool {
+        matches!(self, AgentMode::Governed)
+    }
+
+    /// Parse from string (case-insensitive).
+    pub fn parse(s: &str) -> Option<Self> {
+        match s.to_lowercase().as_str() {
+            "research" => Some(AgentMode::Research),
+            "governed" => Some(AgentMode::Governed),
+            _ => None,
+        }
+    }
+
+    /// db_introspect subcommands allowed in this mode.
+    pub fn allowed_introspect_subcommands(&self) -> &[&str] {
+        match self {
+            AgentMode::Research => &[
+                "list_tables",
+                "describe_table",
+                "verify_table_exists",
+                "list_foreign_keys",
+                "list_indexes",
+            ],
+            AgentMode::Governed => &["verify_table_exists", "describe_table"],
+        }
+    }
+
+    /// Authoring verb prefixes that are gated by mode.
+    const AUTHORING_VERB_PREFIXES: &[&str] = &[
+        "authoring.propose",
+        "authoring.validate",
+        "authoring.dry-run",
+        "authoring.plan",
+        "authoring.diff",
+    ];
+
+    /// Check if a verb FQN is allowed in this mode.
+    ///
+    /// Returns `true` if the verb is allowed, `false` if it should be blocked.
+    /// Verbs not explicitly gated are always allowed.
+    pub fn is_verb_allowed(&self, verb_fqn: &str) -> bool {
+        let is_authoring = Self::AUTHORING_VERB_PREFIXES
+            .iter()
+            .any(|prefix| verb_fqn.starts_with(prefix));
+
+        match self {
+            AgentMode::Research => {
+                // Research mode allows authoring verbs but blocks publish/rollback
+                if verb_fqn == "authoring.publish" || verb_fqn == "authoring.publish-batch" {
+                    return false;
+                }
+                // Allow authoring verbs, allow everything else
+                true
+            }
+            AgentMode::Governed => {
+                // Governed mode blocks authoring exploration verbs
+                if is_authoring {
+                    return false;
+                }
+                // Allow publish/rollback and all business verbs
+                true
+            }
+        }
+    }
+}
+
+impl std::fmt::Display for AgentMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AgentMode::Research => write!(f, "research"),
+            AgentMode::Governed => write!(f, "governed"),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_default_is_governed() {
+        assert_eq!(AgentMode::default(), AgentMode::Governed);
+    }
+
+    #[test]
+    fn test_research_allows_authoring() {
+        let mode = AgentMode::Research;
+        assert!(mode.allows_authoring());
+        assert!(mode.allows_full_introspect());
+        assert!(!mode.allows_business_verbs());
+    }
+
+    #[test]
+    fn test_governed_blocks_authoring() {
+        let mode = AgentMode::Governed;
+        assert!(!mode.allows_authoring());
+        assert!(!mode.allows_full_introspect());
+        assert!(mode.allows_business_verbs());
+    }
+
+    #[test]
+    fn test_verb_gating_research() {
+        let mode = AgentMode::Research;
+        assert!(mode.is_verb_allowed("authoring.propose"));
+        assert!(mode.is_verb_allowed("authoring.validate"));
+        assert!(mode.is_verb_allowed("authoring.dry-run"));
+        assert!(mode.is_verb_allowed("authoring.diff"));
+        // Research blocks publish (that's governed-only)
+        assert!(!mode.is_verb_allowed("authoring.publish"));
+        assert!(!mode.is_verb_allowed("authoring.publish-batch"));
+        // Business verbs allowed (no hard block in research)
+        assert!(mode.is_verb_allowed("cbu.create"));
+        assert!(mode.is_verb_allowed("entity.create"));
+    }
+
+    #[test]
+    fn test_verb_gating_governed() {
+        let mode = AgentMode::Governed;
+        // Governed blocks authoring exploration verbs
+        assert!(!mode.is_verb_allowed("authoring.propose"));
+        assert!(!mode.is_verb_allowed("authoring.validate"));
+        assert!(!mode.is_verb_allowed("authoring.dry-run"));
+        assert!(!mode.is_verb_allowed("authoring.diff"));
+        // Governed allows publish
+        assert!(mode.is_verb_allowed("authoring.publish"));
+        assert!(mode.is_verb_allowed("authoring.publish-batch"));
+        // Business verbs allowed
+        assert!(mode.is_verb_allowed("cbu.create"));
+        assert!(mode.is_verb_allowed("kyc.open-case"));
+    }
+
+    #[test]
+    fn test_introspect_subcommands() {
+        let research = AgentMode::Research;
+        assert_eq!(research.allowed_introspect_subcommands().len(), 5);
+
+        let governed = AgentMode::Governed;
+        assert_eq!(governed.allowed_introspect_subcommands().len(), 2);
+        assert!(governed
+            .allowed_introspect_subcommands()
+            .contains(&"verify_table_exists"));
+        assert!(governed
+            .allowed_introspect_subcommands()
+            .contains(&"describe_table"));
+    }
+
+    #[test]
+    fn test_parse() {
+        assert_eq!(AgentMode::parse("research"), Some(AgentMode::Research));
+        assert_eq!(AgentMode::parse("governed"), Some(AgentMode::Governed));
+        assert_eq!(AgentMode::parse("Research"), Some(AgentMode::Research));
+        assert_eq!(AgentMode::parse("GOVERNED"), Some(AgentMode::Governed));
+        assert_eq!(AgentMode::parse("invalid"), None);
+    }
+
+    #[test]
+    fn test_display() {
+        assert_eq!(AgentMode::Research.to_string(), "research");
+        assert_eq!(AgentMode::Governed.to_string(), "governed");
+    }
+
+    #[test]
+    fn test_serde_roundtrip() {
+        let research = AgentMode::Research;
+        let json = serde_json::to_string(&research).unwrap();
+        assert_eq!(json, "\"research\"");
+        let back: AgentMode = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, AgentMode::Research);
+
+        let governed = AgentMode::Governed;
+        let json = serde_json::to_string(&governed).unwrap();
+        assert_eq!(json, "\"governed\"");
+        let back: AgentMode = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, AgentMode::Governed);
+    }
+}

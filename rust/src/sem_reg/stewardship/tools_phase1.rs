@@ -184,7 +184,7 @@ async fn handle_get_focus(ctx: &SemRegToolContext<'_>, args: &serde_json::Value)
         Err(e) => return SemRegToolResult::err(e),
     };
 
-    match FocusStore::get(&ctx.pool, session_id).await {
+    match FocusStore::get(ctx.pool, session_id).await {
         Ok(Some(focus)) => match serde_json::to_value(&focus) {
             Ok(v) => SemRegToolResult::ok(v),
             Err(e) => SemRegToolResult::err(format!("Serialization error: {e}")),
@@ -251,7 +251,7 @@ async fn handle_set_focus(ctx: &SemRegToolContext<'_>, args: &serde_json::Value)
         updated_by: source.clone(),
     };
 
-    match FocusStore::set(&ctx.pool, &focus, source, changeset_id).await {
+    match FocusStore::set(ctx.pool, &focus, source, changeset_id).await {
         Ok(()) => SemRegToolResult::ok(json!({
             "status": "focus_set",
             "session_id": session_id.to_string(),
@@ -272,7 +272,7 @@ async fn handle_show(ctx: &SemRegToolContext<'_>, args: &serde_json::Value) -> S
         .map(String::from);
 
     // Load current focus
-    let focus = match FocusStore::get(&ctx.pool, session_id).await {
+    let focus = match FocusStore::get(ctx.pool, session_id).await {
         Ok(Some(f)) => f,
         Ok(None) => {
             return SemRegToolResult::err(format!(
@@ -284,7 +284,7 @@ async fn handle_show(ctx: &SemRegToolContext<'_>, args: &serde_json::Value) -> S
 
     // Compute ShowPacket
     match ShowLoop::compute_show_packet(
-        &ctx.pool,
+        ctx.pool,
         &focus,
         &ctx.actor.actor_id,
         assume_principal.as_deref(),
@@ -314,7 +314,7 @@ async fn handle_get_viewport(
     };
 
     // Load current focus
-    let focus = match FocusStore::get(&ctx.pool, session_id).await {
+    let focus = match FocusStore::get(ctx.pool, session_id).await {
         Ok(Some(f)) => f,
         Ok(None) => {
             return SemRegToolResult::err(format!(
@@ -326,7 +326,7 @@ async fn handle_get_viewport(
 
     // Compute the requested viewport
     let result = match viewport_kind {
-        "focus" => ShowLoop::compute_show_packet(&ctx.pool, &focus, &ctx.actor.actor_id, None)
+        "focus" => ShowLoop::compute_show_packet(ctx.pool, &focus, &ctx.actor.actor_id, None)
             .await
             .map(|p| {
                 p.viewports
@@ -335,7 +335,7 @@ async fn handle_get_viewport(
                     .map(|_| json!({"viewport": "focus", "status": "ready"}))
                     .unwrap_or(json!({"error": "Focus viewport not available"}))
             }),
-        "object" => ShowLoop::compute_show_packet(&ctx.pool, &focus, &ctx.actor.actor_id, None)
+        "object" => ShowLoop::compute_show_packet(ctx.pool, &focus, &ctx.actor.actor_id, None)
             .await
             .map(|p| {
                 p.viewports
@@ -344,7 +344,7 @@ async fn handle_get_viewport(
                     .map(|_| json!({"viewport": "object", "status": "ready"}))
                     .unwrap_or(json!({"error": "Object viewport not available — no objects in focus"}))
             }),
-        "diff" => ShowLoop::compute_show_packet(&ctx.pool, &focus, &ctx.actor.actor_id, None)
+        "diff" => ShowLoop::compute_show_packet(ctx.pool, &focus, &ctx.actor.actor_id, None)
             .await
             .map(|p| {
                 p.viewports
@@ -353,7 +353,7 @@ async fn handle_get_viewport(
                     .map(|_| json!({"viewport": "diff", "status": "ready"}))
                     .unwrap_or(json!({"error": "Diff viewport not available — no draft overlay active"}))
             }),
-        "gates" => ShowLoop::compute_show_packet(&ctx.pool, &focus, &ctx.actor.actor_id, None)
+        "gates" => ShowLoop::compute_show_packet(ctx.pool, &focus, &ctx.actor.actor_id, None)
             .await
             .map(|p| {
                 p.viewports
@@ -382,7 +382,7 @@ async fn handle_get_diff(ctx: &SemRegToolContext<'_>, args: &serde_json::Value) 
     };
 
     // Load current focus
-    let focus = match FocusStore::get(&ctx.pool, session_id).await {
+    let focus = match FocusStore::get(ctx.pool, session_id).await {
         Ok(Some(f)) => f,
         Ok(None) => {
             return SemRegToolResult::err(format!(
@@ -400,7 +400,7 @@ async fn handle_get_diff(ctx: &SemRegToolContext<'_>, args: &serde_json::Value) 
     }
 
     // Compute full ShowPacket and extract diff viewport data
-    match ShowLoop::compute_show_packet(&ctx.pool, &focus, &ctx.actor.actor_id, None).await {
+    match ShowLoop::compute_show_packet(ctx.pool, &focus, &ctx.actor.actor_id, None).await {
         Ok(packet) => {
             let diff_data = packet
                 .viewports
@@ -429,7 +429,7 @@ async fn handle_capture_manifest(
         .map(String::from);
 
     // Load current focus
-    let focus = match FocusStore::get(&ctx.pool, session_id).await {
+    let focus = match FocusStore::get(ctx.pool, session_id).await {
         Ok(Some(f)) => f,
         Ok(None) => {
             return SemRegToolResult::err(format!(
@@ -441,7 +441,7 @@ async fn handle_capture_manifest(
 
     // Compute ShowPacket to get viewport models
     let packet = match ShowLoop::compute_show_packet(
-        &ctx.pool,
+        ctx.pool,
         &focus,
         &ctx.actor.actor_id,
         assume_principal.as_deref(),
@@ -474,7 +474,7 @@ async fn handle_capture_manifest(
         ShowLoop::compute_manifest(&focus, &viewport_models, assume_principal.as_deref());
 
     // Persist to database
-    if let Err(e) = ShowLoop::persist_manifest(&ctx.pool, &manifest).await {
+    if let Err(e) = ShowLoop::persist_manifest(ctx.pool, &manifest).await {
         return SemRegToolResult::err(format!("Failed to persist manifest: {e}"));
     }
 

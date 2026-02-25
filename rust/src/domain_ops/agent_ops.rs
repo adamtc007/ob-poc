@@ -886,6 +886,89 @@ impl CustomOperation for AgentSetModeOp {
     }
 }
 
+/// Switch between Research and Governed authoring modes.
+///
+/// Research mode enables exploration, ChangeSet authoring, and full schema
+/// introspection. Governed mode enables business operations and publish.
+#[register_custom_op]
+pub struct AgentSetAuthoringModeOp;
+
+#[async_trait]
+impl CustomOperation for AgentSetAuthoringModeOp {
+    fn domain(&self) -> &'static str {
+        "agent"
+    }
+
+    fn verb(&self) -> &'static str {
+        "set-authoring-mode"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Controls Research vs Governed authoring mode boundary"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        _pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let mode_str = get_required_string(verb_call, "mode")?;
+        let confirm = verb_call
+            .get_value("confirm")
+            .and_then(|v| v.as_boolean())
+            .unwrap_or(false);
+
+        let mode = sem_os_core::authoring::agent_mode::AgentMode::parse(&mode_str)
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "Invalid authoring mode '{}'. Valid: research, governed",
+                    mode_str
+                )
+            })?;
+
+        if !confirm {
+            return Ok(ExecutionResult::Record(json!({
+                "requires_confirmation": true,
+                "mode": mode_str,
+                "message": format!(
+                    "Switch to {} mode? This changes which verbs are available. \
+                     Re-run with :confirm true to proceed.",
+                    mode
+                )
+            })));
+        }
+
+        // Signal authoring mode change via agent control channel
+        ctx.bind_json(
+            "_agent_control",
+            json!({
+                "action": "set_authoring_mode",
+                "mode": mode.to_string()
+            }),
+        );
+
+        Ok(ExecutionResult::Record(json!({
+            "mode": mode.to_string(),
+            "allows_authoring": mode.allows_authoring(),
+            "allows_full_introspect": mode.allows_full_introspect(),
+            "message": format!("Authoring mode set to {}", mode)
+        })))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow::anyhow!(
+            "Database feature required for agent operations"
+        ))
+    }
+}
+
 // ============================================================================
 // Teaching Operations (Direct Pattern Learning)
 // ============================================================================
