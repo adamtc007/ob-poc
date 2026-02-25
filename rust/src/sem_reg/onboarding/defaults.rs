@@ -231,6 +231,7 @@ fn crud_contract(
             subject_kinds: vec![],
             phase_tags: vec![],
         }),
+        crud_mapping: None,
     }
 }
 

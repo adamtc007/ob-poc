@@ -28,8 +28,8 @@ use ob_poc::api::{
     create_cbu_session_router_with_pool, create_client_router, create_deal_router,
     create_dsl_viewer_router, create_entity_router, create_graph_router, create_resolution_router,
     create_scoped_entity_router, create_session_graph_router, create_session_store,
-    create_taxonomy_router, create_trading_matrix_router, create_universe_router,
-    create_verb_discovery_router, service_resource_router,
+    create_stewardship_router, create_taxonomy_router, create_trading_matrix_router,
+    create_universe_router, create_verb_discovery_router, service_resource_router,
 };
 
 // Import gateway resolver for resolution routes
@@ -190,6 +190,51 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // =========================================================================
+    // Semantic Registry bootstrap scan
+    //
+    // When OBPOC_STRICT_SEMREG is enabled (default: true), the SemReg registry
+    // MUST be populated or the orchestrator will DenyAll verbs. We run the
+    // scanner automatically on startup so the registry is never empty.
+    // =========================================================================
+    {
+        use ob_poc::sem_reg::scanner::run_onboarding_scan;
+        use ob_poc::sem_reg::store::SnapshotStore;
+
+        let strict_semreg = std::env::var("OBPOC_STRICT_SEMREG")
+            .map(|v| v != "false" && v != "0")
+            .unwrap_or(true);
+
+        if strict_semreg {
+            // Check if registry already has active snapshots
+            let counts = SnapshotStore::count_active(&pool, None).await.unwrap_or_default();
+            let total: i64 = counts.iter().map(|(_, c)| c).sum();
+
+            if total == 0 {
+                tracing::info!("SemReg registry is empty — running bootstrap scan...");
+                match run_onboarding_scan(&pool, false, false).await {
+                    Ok(report) => {
+                        tracing::info!("SemReg bootstrap complete: {}", report);
+                    }
+                    Err(e) => {
+                        tracing::error!("SemReg bootstrap scan failed: {}", e);
+                        tracing::error!(
+                            "Server will start but verb governance will reject all verbs (DenyAll). \
+                             Run `cargo x sem-reg scan` manually to populate the registry."
+                        );
+                    }
+                }
+            } else {
+                tracing::info!(
+                    "SemReg registry has {} active snapshots — skipping bootstrap scan",
+                    total
+                );
+            }
+        } else {
+            tracing::debug!("SemReg bootstrap scan skipped (OBPOC_STRICT_SEMREG=false)");
+        }
+    }
+
+    // =========================================================================
     // Start embedded EntityGateway gRPC service
     // =========================================================================
     tracing::info!("Starting embedded EntityGateway...");
@@ -310,6 +355,58 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         tracing::info!("EntityGateway started successfully");
     }
 
+    // =========================================================================
+    // Semantic OS Client — DI boundary for all sem_reg operations.
+    //
+    // SEM_OS_MODE controls the wiring:
+    //   "inprocess" (default) — InProcessClient wrapping CoreServiceImpl
+    //   "http"                — HttpClient targeting standalone sem_os_server
+    //   unset / other         — None (direct sem_reg calls, legacy path)
+    // =========================================================================
+    let sem_os_client: Option<Arc<dyn sem_os_client::SemOsClient>> = {
+        let mode = std::env::var("SEM_OS_MODE").unwrap_or_default();
+        match mode.as_str() {
+            "inprocess" => {
+                use sem_os_core::service::CoreServiceImpl;
+                use sem_os_postgres::PgStores;
+
+                let stores = PgStores::new(pool.clone());
+                let core_service = CoreServiceImpl::new(
+                    Arc::new(stores.snapshots),
+                    Arc::new(stores.objects),
+                    Arc::new(stores.audit),
+                    Arc::new(stores.outbox),
+                    Arc::new(stores.evidence),
+                    Arc::new(stores.projections),
+                );
+                let principal = sem_os_core::principal::Principal::in_process(
+                    "ob-poc-web",
+                    vec!["operator".to_string()],
+                );
+                let client = sem_os_client::inprocess::InProcessClient::new(
+                    Arc::new(core_service),
+                    principal,
+                );
+                tracing::info!("SemOsClient: InProcess mode (direct CoreService)");
+                Some(Arc::new(client) as Arc<dyn sem_os_client::SemOsClient>)
+            }
+            "http" => {
+                let url = std::env::var("SEM_OS_URL")
+                    .unwrap_or_else(|_| "http://localhost:3001".to_string());
+                let token = std::env::var("SEM_OS_JWT").unwrap_or_default();
+                let client = sem_os_client::http::HttpClient::new(&url, &token);
+                tracing::info!("SemOsClient: HTTP mode (target: {})", url);
+                Some(Arc::new(client) as Arc<dyn sem_os_client::SemOsClient>)
+            }
+            _ => {
+                tracing::info!(
+                    "SemOsClient: disabled (SEM_OS_MODE not set, using direct sem_reg calls)"
+                );
+                None
+            }
+        }
+    };
+
     // Create single shared session store for agent routers
     let sessions = create_session_store();
 
@@ -340,7 +437,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Build stateless API router (from main ob-poc crate) with SHARED session store
     // Use async semantic-enabled router for Candle-based verb search
-    let agent_router = create_agent_router_with_semantic(pool.clone(), sessions.clone()).await;
+    let agent_router =
+        create_agent_router_with_semantic(pool.clone(), sessions.clone(), sem_os_client.clone())
+            .await;
 
     let api_router: Router<()> = Router::new()
         .merge(agent_router)
@@ -374,7 +473,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .nest(
             "/api/cbu-session",
             create_cbu_session_router_with_pool(pool.clone()),
-        );
+        )
+        // Stewardship routes (focus, show loop, SSE, manifests)
+        .merge(create_stewardship_router(pool.clone()));
 
     // Build voice matching router (semantic + phonetic)
     let voice_router = routes::voice::create_voice_router(pool.clone());

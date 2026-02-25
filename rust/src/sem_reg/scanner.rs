@@ -4,27 +4,73 @@
 //! and AttributeDef snapshots into the semantic registry.
 //!
 //! The scanner is **idempotent**: it checks if an FQN already exists before publishing.
-
-use std::collections::BTreeMap;
+//!
+//! Pure conversion functions (verb_config_to_contract, infer_entity_types_from_verbs,
+//! infer_attributes_from_verbs, suggest_security_label) are delegated to
+//! `sem_os_obpoc_adapter::scanner`. This module owns the DB-dependent orchestrator.
 
 use anyhow::Result;
 use sqlx::PgPool;
 use uuid::Uuid;
 
 use dsl_core::config::loader::ConfigLoader;
-use dsl_core::config::types::{ArgConfig, VerbConfig, VerbsConfig};
 
 use super::{
-    attribute_def::{AttributeDataType, AttributeDefBody, AttributeSource},
-    entity_type_def::{DbTableMapping, EntityTypeDefBody},
     ids::{definition_hash, object_id_for},
     store::SnapshotStore,
     types::{ChangeType, ObjectType, SnapshotMeta},
-    verb_contract::{
-        VerbArgDef, VerbArgLookup, VerbContractBody, VerbContractMetadata, VerbPrecondition,
-        VerbProducesSpec, VerbReturnSpec,
-    },
 };
+
+// Re-export pure conversion functions from the adapter so existing call sites work.
+// Note: suggest_security_label is NOT re-exported because it returns sem_os_core types
+// which differ from ob-poc's sqlx-annotated types. A local wrapper is provided below.
+pub use sem_os_obpoc_adapter::scanner::{
+    arg_type_to_attribute_type, infer_attributes_from_verbs, infer_entity_types_from_verbs,
+    scan_verb_contracts, title_case, to_wire_str, verb_config_to_contract,
+};
+
+/// Suggest a security label for a snapshot based on FQN/domain/tag heuristics.
+///
+/// Delegates to the adapter's pure implementation, then converts to ob-poc types.
+pub fn suggest_security_label(
+    fqn: &str,
+    domain: &str,
+    tags: &[String],
+) -> super::types::SecurityLabel {
+    let adapter_label = sem_os_obpoc_adapter::scanner::suggest_security_label(fqn, domain, tags);
+
+    // Convert sem_os_core types → ob-poc types (structurally identical, different crate paths)
+    use super::types::{Classification, HandlingControl, SecurityLabel};
+
+    let classification = match adapter_label.classification {
+        sem_os_core::types::Classification::Public => Classification::Public,
+        sem_os_core::types::Classification::Internal => Classification::Internal,
+        sem_os_core::types::Classification::Confidential => Classification::Confidential,
+        sem_os_core::types::Classification::Restricted => Classification::Restricted,
+    };
+
+    let handling_controls = adapter_label
+        .handling_controls
+        .into_iter()
+        .map(|hc| match hc {
+            sem_os_core::types::HandlingControl::MaskByDefault => HandlingControl::MaskByDefault,
+            sem_os_core::types::HandlingControl::NoExport => HandlingControl::NoExport,
+            sem_os_core::types::HandlingControl::NoLlmExternal => HandlingControl::NoLlmExternal,
+            sem_os_core::types::HandlingControl::DualControl => HandlingControl::DualControl,
+            sem_os_core::types::HandlingControl::SecureViewerOnly => {
+                HandlingControl::SecureViewerOnly
+            }
+        })
+        .collect();
+
+    SecurityLabel {
+        classification,
+        pii: adapter_label.pii,
+        jurisdictions: adapter_label.jurisdictions,
+        purpose_limitation: adapter_label.purpose_limitation,
+        handling_controls,
+    }
+}
 
 /// Summary report from a scan run.
 #[derive(Debug, Default)]
@@ -112,240 +158,6 @@ impl std::fmt::Display for ScanReport {
     }
 }
 
-/// Convert a `VerbConfig` to a `VerbContractBody`.
-pub fn verb_config_to_contract(
-    domain: &str,
-    action: &str,
-    config: &VerbConfig,
-) -> VerbContractBody {
-    let fqn = format!("{}.{}", domain, action);
-
-    let args: Vec<VerbArgDef> = config
-        .args
-        .iter()
-        .map(|a| VerbArgDef {
-            name: a.name.clone(),
-            arg_type: to_wire_str(&a.arg_type),
-            required: a.required,
-            description: a.description.clone(),
-            lookup: a.lookup.as_ref().map(|l| {
-                let search_key_str = match &l.search_key {
-                    dsl_core::config::types::SearchKeyConfig::Simple(s) => Some(s.clone()),
-                    dsl_core::config::types::SearchKeyConfig::Composite(c) => {
-                        Some(c.primary.clone())
-                    }
-                };
-                VerbArgLookup {
-                    table: l.table.clone(),
-                    entity_type: l.entity_type.clone().unwrap_or_else(|| l.table.clone()),
-                    schema: l.schema.clone(),
-                    search_key: search_key_str,
-                    primary_key: Some(l.primary_key.clone()),
-                }
-            }),
-            valid_values: a.valid_values.clone(),
-            default: a
-                .default
-                .as_ref()
-                .and_then(|v| serde_json::to_value(v).ok()),
-        })
-        .collect();
-
-    let returns = config.returns.as_ref().map(|r| VerbReturnSpec {
-        return_type: to_wire_str(&r.return_type),
-        schema: None,
-    });
-
-    let produces = config.produces.as_ref().map(|p| VerbProducesSpec {
-        entity_type: p.produced_type.clone(),
-        resolved: p.resolved,
-    });
-
-    let consumes: Vec<String> = config
-        .consumes
-        .iter()
-        .map(|c| c.consumed_type.clone())
-        .collect();
-
-    // Extract preconditions from lifecycle
-    let preconditions = config
-        .lifecycle
-        .as_ref()
-        .map(|lc| {
-            let mut pres = Vec::new();
-            for req in &lc.requires_states {
-                pres.push(VerbPrecondition {
-                    kind: "requires_state".into(),
-                    value: req.clone(),
-                    description: None,
-                });
-            }
-            for check in &lc.precondition_checks {
-                pres.push(VerbPrecondition {
-                    kind: "precondition_check".into(),
-                    value: check.clone(),
-                    description: None,
-                });
-            }
-            pres
-        })
-        .unwrap_or_default();
-
-    let metadata = config.metadata.as_ref().map(|m| VerbContractMetadata {
-        tier: m.tier.as_ref().map(to_wire_str),
-        source_of_truth: m.source_of_truth.as_ref().map(to_wire_str),
-        scope: m.scope.as_ref().map(to_wire_str),
-        noun: m.noun.clone(),
-        tags: m.tags.clone(),
-        subject_kinds: m.subject_kinds.clone(),
-        phase_tags: m.phase_tags.clone(),
-    });
-
-    // Derive subject_kinds: explicit from metadata, else heuristic from produces
-    let subject_kinds = config
-        .metadata
-        .as_ref()
-        .map(|m| m.subject_kinds.clone())
-        .filter(|sk| !sk.is_empty())
-        .unwrap_or_else(|| {
-            // Heuristic: derive from produces.entity_type when not explicitly declared
-            config
-                .produces
-                .as_ref()
-                .map(|p| vec![p.produced_type.clone()])
-                .unwrap_or_default()
-        });
-
-    let phase_tags = config
-        .metadata
-        .as_ref()
-        .map(|m| m.phase_tags.clone())
-        .unwrap_or_default();
-
-    let requires_subject = config
-        .metadata
-        .as_ref()
-        .map(|m| m.requires_subject)
-        .unwrap_or(true);
-
-    let produces_focus = config
-        .metadata
-        .as_ref()
-        .map(|m| m.produces_focus)
-        .unwrap_or(false);
-
-    VerbContractBody {
-        fqn,
-        domain: domain.to_string(),
-        action: action.to_string(),
-        description: config.description.clone(),
-        behavior: to_wire_str(&config.behavior),
-        args,
-        returns,
-        preconditions,
-        postconditions: vec![],
-        produces,
-        consumes,
-        invocation_phrases: config.invocation_phrases.clone(),
-        subject_kinds,
-        phase_tags,
-        requires_subject,
-        produces_focus,
-        metadata,
-    }
-}
-
-/// Infer entity types from verb argument lookup configurations.
-pub fn infer_entity_types_from_verbs(verbs_config: &VerbsConfig) -> Vec<EntityTypeDefBody> {
-    let mut seen: BTreeMap<String, EntityTypeDefBody> = BTreeMap::new();
-
-    for (domain, domain_config) in &verbs_config.domains {
-        for verb_config in domain_config.verbs.values() {
-            for arg in &verb_config.args {
-                if let Some(lookup) = &arg.lookup {
-                    let entity_type_str = lookup.entity_type.as_deref().unwrap_or(&lookup.table);
-                    let key = format!("{}.{}", domain, entity_type_str);
-                    seen.entry(key.clone()).or_insert_with(|| {
-                        let search_key_str = match &lookup.search_key {
-                            dsl_core::config::types::SearchKeyConfig::Simple(s) => s.clone(),
-                            dsl_core::config::types::SearchKeyConfig::Composite(c) => {
-                                c.primary.clone()
-                            }
-                        };
-                        EntityTypeDefBody {
-                            fqn: key,
-                            name: title_case(entity_type_str),
-                            description: format!(
-                                "Entity type inferred from {}.{} lookup",
-                                domain, entity_type_str
-                            ),
-                            domain: domain.clone(),
-                            db_table: Some(DbTableMapping {
-                                schema: lookup.schema.clone().unwrap_or_else(|| "ob-poc".into()),
-                                table: lookup.table.clone(),
-                                primary_key: lookup.primary_key.clone(),
-                                name_column: Some(search_key_str),
-                            }),
-                            lifecycle_states: vec![],
-                            required_attributes: vec![],
-                            optional_attributes: vec![],
-                            parent_type: None,
-                        }
-                    });
-                }
-            }
-        }
-    }
-
-    seen.into_values().collect()
-}
-
-/// Infer attributes from verb argument definitions.
-pub fn infer_attributes_from_verbs(verbs_config: &VerbsConfig) -> Vec<AttributeDefBody> {
-    let mut seen: BTreeMap<String, AttributeDefBody> = BTreeMap::new();
-
-    for (domain, domain_config) in &verbs_config.domains {
-        for (action, verb_config) in &domain_config.verbs {
-            for arg in &verb_config.args {
-                let fqn = format!("{}.{}", domain, arg.name);
-                let action = action.clone();
-                let domain = domain.clone();
-                seen.entry(fqn.clone()).or_insert_with(|| AttributeDefBody {
-                    fqn,
-                    name: title_case(&arg.name),
-                    description: arg.description.clone().unwrap_or_else(|| {
-                        format!(
-                            "Attribute inferred from {}.{} arg '{}'",
-                            domain, action, arg.name
-                        )
-                    }),
-                    domain: domain.clone(),
-                    data_type: arg_type_to_attribute_type(arg),
-                    source: Some(AttributeSource {
-                        producing_verb: Some(format!("{}.{}", domain, action)),
-                        table: arg.maps_to.as_ref().map(|_| domain.clone()),
-                        column: arg.maps_to.clone(),
-                        derived: false,
-                    }),
-                    constraints: None,
-                    sinks: vec![],
-                });
-            }
-        }
-    }
-
-    seen.into_values().collect()
-}
-
-/// Convert a serde-serializable enum to its stable snake_case wire name.
-///
-/// Replaces the anti-pattern `format!("{:?}", x).to_lowercase()` which
-/// depends on Debug formatting. This uses serde rename attributes instead.
-fn to_wire_str<T: serde::Serialize>(value: &T) -> String {
-    let json = serde_json::to_string(value).unwrap_or_default();
-    json.trim_matches('"').to_string()
-}
-
 /// Run the full onboarding scan.
 ///
 /// If `dry_run` is true, reports counts without writing to the database.
@@ -358,20 +170,14 @@ pub async fn run_onboarding_scan(
     let verbs_config = loader.load_verbs()?;
     let mut report = ScanReport::default();
 
-    // 1. Convert verb configs to contracts
-    let mut contracts = Vec::new();
-    for (domain, domain_config) in &verbs_config.domains {
-        for (action, verb_config) in &domain_config.verbs {
-            contracts.push(verb_config_to_contract(domain, action, verb_config));
-        }
-    }
-    contracts.sort_by(|a, b| a.fqn.cmp(&b.fqn));
+    // 1. Convert verb configs to contracts (delegates to adapter)
+    let contracts = scan_verb_contracts(&verbs_config);
 
     if verbose {
         println!("Found {} verb definitions in YAML", contracts.len());
     }
 
-    // 2. Infer entity types
+    // 2. Infer entity types (delegates to adapter)
     let entity_types = infer_entity_types_from_verbs(&verbs_config);
     if verbose {
         println!(
@@ -380,7 +186,7 @@ pub async fn run_onboarding_scan(
         );
     }
 
-    // 3. Infer attributes
+    // 3. Infer attributes (delegates to adapter)
     let attributes = infer_attributes_from_verbs(&verbs_config);
     if verbose {
         println!("Inferred {} attributes from verb args", attributes.len());
@@ -595,123 +401,6 @@ pub async fn run_onboarding_scan(
     report.derivation_specs_updated = derivation_report.derivations_updated;
 
     Ok(report)
-}
-
-// ── Security label heuristic ──────────────────────────────────
-
-/// Suggest a security label for an existing snapshot based on heuristics.
-///
-/// Uses FQN patterns, domain, and tags to assign a reasonable default:
-/// - PII patterns (name, address, dob, ssn, passport) → Confidential + PII
-/// - Sanctions domain → Restricted + NoLlmExternal
-/// - Financial domain (deal, billing, rate) → Confidential
-/// - Default → Internal, no special handling
-pub fn suggest_security_label(
-    fqn: &str,
-    domain: &str,
-    tags: &[String],
-) -> super::types::SecurityLabel {
-    use super::types::{Classification, HandlingControl, SecurityLabel};
-
-    let fqn_lower = fqn.to_lowercase();
-    let domain_lower = domain.to_lowercase();
-    let tags_lower: Vec<String> = tags.iter().map(|t| t.to_lowercase()).collect();
-
-    // PII patterns in FQN or tags
-    let pii_patterns = [
-        "name",
-        "address",
-        "dob",
-        "date_of_birth",
-        "birth_date",
-        "ssn",
-        "social_security",
-        "passport",
-        "national_id",
-        "tax_id",
-        "phone",
-        "email",
-        "bank_account",
-        "iban",
-    ];
-    let has_pii = pii_patterns.iter().any(|p| fqn_lower.contains(p))
-        || tags_lower
-            .iter()
-            .any(|t| t == "pii" || t == "personal_data");
-
-    // Sanctions domain
-    let is_sanctions = domain_lower == "sanctions"
-        || domain_lower == "screening"
-        || tags_lower.iter().any(|t| t == "sanctions");
-
-    // Financial domain
-    let is_financial = matches!(
-        domain_lower.as_str(),
-        "deal" | "billing" | "rate" | "fee" | "invoice" | "contract"
-    ) || tags_lower.iter().any(|t| t == "financial");
-
-    if is_sanctions {
-        SecurityLabel {
-            classification: Classification::Restricted,
-            pii: has_pii,
-            jurisdictions: vec![],
-            purpose_limitation: vec!["operations".into()],
-            handling_controls: vec![HandlingControl::NoExport, HandlingControl::NoLlmExternal],
-        }
-    } else if has_pii {
-        SecurityLabel {
-            classification: Classification::Confidential,
-            pii: true,
-            jurisdictions: vec![],
-            purpose_limitation: vec!["operations".into(), "audit".into()],
-            handling_controls: vec![HandlingControl::MaskByDefault],
-        }
-    } else if is_financial {
-        SecurityLabel {
-            classification: Classification::Confidential,
-            pii: false,
-            jurisdictions: vec![],
-            purpose_limitation: vec![],
-            handling_controls: vec![HandlingControl::NoLlmExternal],
-        }
-    } else {
-        SecurityLabel::default()
-    }
-}
-
-// ── Helpers ───────────────────────────────────────────────────
-
-fn title_case(s: &str) -> String {
-    s.replace(['-', '_'], " ")
-        .split_whitespace()
-        .map(|word| {
-            let mut chars = word.chars();
-            match chars.next() {
-                None => String::new(),
-                Some(c) => c.to_uppercase().to_string() + &chars.as_str().to_lowercase(),
-            }
-        })
-        .collect::<Vec<_>>()
-        .join(" ")
-}
-
-fn arg_type_to_attribute_type(arg: &ArgConfig) -> AttributeDataType {
-    match to_wire_str(&arg.arg_type).as_str() {
-        "string" => AttributeDataType::String,
-        "integer" | "int" => AttributeDataType::Integer,
-        "decimal" | "number" | "float" => AttributeDataType::Decimal,
-        "boolean" | "bool" => AttributeDataType::Boolean,
-        "uuid" => AttributeDataType::Uuid,
-        "date" => AttributeDataType::Date,
-        "timestamp" => AttributeDataType::Timestamp,
-        _ => {
-            if let Some(ref valid_values) = arg.valid_values {
-                AttributeDataType::Enum(valid_values.clone())
-            } else {
-                AttributeDataType::String
-            }
-        }
-    }
 }
 
 #[cfg(test)]

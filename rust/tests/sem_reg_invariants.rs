@@ -103,6 +103,7 @@ mod invariants {
                 requires_subject: true,
                 produces_focus: false,
                 metadata: None,
+                crud_mapping: None,
             };
             let sid =
                 RegistryService::publish_verb_contract(&self.pool, &meta, &body, None).await?;

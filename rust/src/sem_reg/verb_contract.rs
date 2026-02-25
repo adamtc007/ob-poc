@@ -60,6 +60,21 @@ pub struct VerbContractBody {
     /// Verb metadata
     #[serde(default)]
     pub metadata: Option<VerbContractMetadata>,
+    /// CRUD table/schema/operation mapping (when behavior = "crud").
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub crud_mapping: Option<VerbCrudMapping>,
+}
+
+/// CRUD table/operation mapping captured from verb YAML.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VerbCrudMapping {
+    pub operation: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub table: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub schema: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub key_column: Option<String>,
 }
 
 /// A single argument in a verb contract.
@@ -227,6 +242,7 @@ mod tests {
                 subject_kinds: vec!["cbu".into()],
                 phase_tags: vec!["onboarding".into()],
             }),
+            crud_mapping: None,
         };
 
         let json = serde_json::to_value(&body).unwrap();
@@ -264,6 +280,7 @@ mod tests {
             requires_subject: true,
             produces_focus: false,
             metadata: None,
+            crud_mapping: None,
         };
 
         let json = serde_json::to_value(&body).unwrap();

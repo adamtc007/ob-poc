@@ -21,6 +21,9 @@ dsl_types = { path = "../dsl_types" }
 entity-gateway = { path = "crates/entity-gateway", optional = true }
 ob-poc-types = { path = "crates/ob-poc-types" }
 ob-poc-macros = { path = "crates/ob-poc-macros" }
+sem_os_core = { path = "crates/sem_os_core" }
+sem_os_client = { path = "crates/sem_os_client" }
+sem_os_obpoc_adapter = { path = "crates/sem_os_obpoc_adapter" }
 
 # Auto-registration for custom operations
 inventory = "0.3"
@@ -91,6 +94,7 @@ clap = { version = "4.5", features = ["derive", "env"], optional = true }
 colored = { version = "2.1", optional = true }
 atty = { version = "0.2", optional = true }
 futures = "0.3"
+tokio-stream = { version = "0.1", features = ["sync"] }
 dotenvy = "0.15"
 rustyline = { version = "12.0", optional = true }
 
@@ -228,4 +232,12 @@ members = [
 
     "xtask", "crates/playbook-core", "crates/playbook-lower",
     "crates/inspector-projection",
+
+    # Semantic OS crates (Stage 1.1)
+    "crates/sem_os_core",
+    "crates/sem_os_postgres",
+    "crates/sem_os_server",
+    "crates/sem_os_client",
+    "crates/sem_os_obpoc_adapter",
+    "crates/sem_os_harness",
 ]

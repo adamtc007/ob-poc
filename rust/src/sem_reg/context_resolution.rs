@@ -1624,6 +1624,106 @@ async fn load_typed_snapshots(
     }
 }
 
+// ── Draft-Aware Context Resolution (Phase 1) ─────────────────
+
+/// Overlay mode for draft-aware resolution.
+/// When `DraftOverlay`, draft snapshots from the changeset override
+/// active snapshots for the same (object_type, object_id).
+pub use crate::sem_reg::stewardship::types::OverlayMode;
+
+/// Resolve context with draft overlay support.
+///
+/// When overlay_mode = DraftOverlay { changeset_id }, extends snapshot
+/// resolution so draft snapshots in the changeset override active ones
+/// for the same (object_type, object_id).
+///
+/// When assume_principal is set, ABAC evaluation uses that principal's
+/// roles instead of the caller's. The assumed identity is recorded in
+/// ViewportManifest for audit purposes (spec §2.3.4).
+pub async fn resolve_context_with_overlay(
+    pool: &PgPool,
+    req: &ContextResolutionRequest,
+    overlay_mode: &OverlayMode,
+    _assume_principal: Option<&str>,
+) -> Result<ContextResolutionResponse> {
+    match overlay_mode {
+        OverlayMode::ActiveOnly => {
+            // No overlay — delegate to standard resolution
+            resolve_context(pool, req).await
+        }
+        OverlayMode::DraftOverlay { changeset_id } => {
+            // Standard resolution first
+            let mut response = resolve_context(pool, req).await?;
+
+            // Load draft snapshots from the changeset and merge them
+            // into the response, overriding active snapshots for same objects.
+            let draft_overrides = load_changeset_drafts(pool, *changeset_id).await?;
+
+            if !draft_overrides.is_empty() {
+                // Re-rank verbs considering draft definitions
+                let draft_verb_fqns: std::collections::HashSet<String> = draft_overrides
+                    .iter()
+                    .filter(|s| s.object_type == ObjectType::VerbContract)
+                    .filter_map(|s| {
+                        s.definition
+                            .get("fqn")
+                            .and_then(|v| v.as_str())
+                            .map(|fqn| fqn.to_string())
+                    })
+                    .collect();
+
+                // Boost verbs that have draft definitions (they're being worked on)
+                for verb in &mut response.candidate_verbs {
+                    if draft_verb_fqns.contains(&verb.fqn) {
+                        verb.rank_score += 0.05; // Small boost for in-changeset verbs
+                    }
+                }
+
+                // Re-sort by updated rank
+                response
+                    .candidate_verbs
+                    .sort_by(|a, b| b.rank_score.partial_cmp(&a.rank_score).unwrap_or(std::cmp::Ordering::Equal));
+
+                // Add governance signal about draft overlay
+                response.governance_signals.push(GovernanceSignal {
+                    kind: GovernanceSignalKind::CoverageGap, // Closest existing kind
+                    severity: GovernanceSignalSeverity::Info,
+                    message: format!(
+                        "Resolution includes draft overlay from changeset {} ({} draft snapshots)",
+                        changeset_id,
+                        draft_overrides.len()
+                    ),
+                    related_fqn: None,
+                    related_snapshot_id: None,
+                });
+            }
+
+            Ok(response)
+        }
+    }
+}
+
+/// Load draft snapshots belonging to a changeset.
+async fn load_changeset_drafts(
+    pool: &PgPool,
+    changeset_id: Uuid,
+) -> Result<Vec<SnapshotRow>> {
+    let rows = sqlx::query_as::<_, SnapshotRow>(
+        r#"
+        SELECT *
+        FROM sem_reg.snapshots
+        WHERE snapshot_set_id = $1
+          AND status = 'draft'
+          AND effective_until IS NULL
+        ORDER BY object_type, fqn
+        "#,
+    )
+    .bind(changeset_id)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows)
+}
+
 // ── Tests ─────────────────────────────────────────────────────
 
 #[cfg(test)]

@@ -846,6 +846,260 @@ pub async fn coverage(tier_str: &str, json_output: bool) -> Result<()> {
     Ok(())
 }
 
+// ── Onboarding Pipeline ──────────────────────────────────────
+
+const DEFAULT_MANIFEST_PATH: &str = "data/onboarding-manifest.json";
+
+/// Run the 5-step extraction pipeline and write an onboarding manifest.
+pub async fn onboard_scan(verbose: bool) -> Result<()> {
+    use ob_poc::sem_reg::onboarding::{
+        entity_infer, manifest, schema_extract, verb_extract, xref,
+    };
+
+    println!("Registry Onboarding Scan");
+    println!("========================\n");
+
+    // Step 1: Extract verb signatures from DSL YAML
+    println!("Step 1/5: Extracting verb signatures from YAML...");
+    let loader = dsl_core::config::loader::ConfigLoader::from_env();
+    let verbs_config = loader
+        .load_verbs()
+        .context("Failed to load verb configuration from YAML")?;
+    let verb_extracts = verb_extract::extract_verbs(&verbs_config);
+    println!("  → {} verbs extracted", verb_extracts.len());
+
+    if verbose {
+        for v in &verb_extracts {
+            println!(
+                "    {} ({:?}, {} inputs, {} side-effects)",
+                v.fqn,
+                v.behavior,
+                v.inputs.len(),
+                v.side_effects.len()
+            );
+        }
+    }
+
+    // Step 2: Introspect PostgreSQL schema
+    println!("\nStep 2/5: Introspecting PostgreSQL schema...");
+    let pool = connect().await?;
+    let tables = schema_extract::extract_schema(
+        &pool,
+        schema_extract::DEFAULT_SCHEMAS,
+    )
+    .await
+    .context("Failed to extract schema from database")?;
+
+    let total_columns: usize = tables.iter().map(|t| t.columns.len()).sum();
+    println!("  → {} tables, {} columns", tables.len(), total_columns);
+
+    if verbose {
+        for t in &tables {
+            println!(
+                "    {}.{} ({} cols, {} PKs, {} FKs)",
+                t.schema,
+                t.table_name,
+                t.columns.len(),
+                t.primary_keys.len(),
+                t.foreign_keys.len()
+            );
+        }
+    }
+
+    // Step 3: Cross-reference verbs ↔ schema
+    println!("\nStep 3/5: Cross-referencing verbs ↔ schema columns...");
+    let xref_result = xref::cross_reference(&verb_extracts, &tables);
+    println!(
+        "  → {} candidates: {} verb-connected, {} framework, {} orphans, {} dead",
+        xref_result.candidates.len(),
+        xref_result.verb_connected,
+        xref_result.framework,
+        xref_result.operational_orphans,
+        xref_result.dead_schema,
+    );
+
+    // Step 4: Infer entity types and relationships
+    println!("\nStep 4/5: Inferring entity types and relationships...");
+    let entity_types = entity_infer::infer_entity_types(&xref_result.candidates, &tables);
+    let relationships = entity_infer::infer_relationships(&tables);
+    println!(
+        "  → {} entity types, {} relationships",
+        entity_types.len(),
+        relationships.len()
+    );
+
+    if verbose {
+        for et in &entity_types {
+            println!(
+                "    {} ({} attrs, {} verb-connected, {} orphans)",
+                et.fqn,
+                et.attribute_fqns.len(),
+                et.verb_connected_count,
+                et.orphan_count
+            );
+        }
+    }
+
+    // Step 5: Assemble manifest
+    println!("\nStep 5/5: Assembling onboarding manifest...");
+    let onboarding_manifest = manifest::assemble_manifest(
+        &std::env::var("DATABASE_URL")
+            .unwrap_or_else(|_| "postgresql:///data_designer".into()),
+        tables.len(),
+        total_columns,
+        verb_extracts,
+        xref_result,
+        entity_types,
+        relationships,
+    );
+
+    // Write manifest
+    let manifest_path = std::path::Path::new(DEFAULT_MANIFEST_PATH);
+    manifest::write_manifest(&onboarding_manifest, manifest_path)
+        .context("Failed to write manifest")?;
+    println!("  → Manifest written to {}", DEFAULT_MANIFEST_PATH);
+
+    // Print summary
+    println!("\n── Summary ────────────────────────────────────────");
+    println!("  Tables scanned:       {}", onboarding_manifest.tables_scanned);
+    println!("  Columns scanned:      {}", onboarding_manifest.columns_scanned);
+    println!("  Verbs extracted:      {}", onboarding_manifest.verbs_extracted);
+    println!("  Verb-connected attrs: {}", onboarding_manifest.verb_connected_attrs);
+    println!("  Framework columns:    {}", onboarding_manifest.framework_columns);
+    println!("  Operational orphans:  {}", onboarding_manifest.operational_orphans);
+    println!("  Dead schema:          {}", onboarding_manifest.dead_schema);
+    println!("  Entity types:         {}", onboarding_manifest.entity_type_candidates.len());
+    println!("  Relationships:        {}", onboarding_manifest.relationship_candidates.len());
+    println!(
+        "  Wiring completeness:  {:.1}% ({} fully / {} partial / {} unwired)",
+        onboarding_manifest.wiring_pct,
+        onboarding_manifest.verbs_fully_wired,
+        onboarding_manifest.verbs_partially_wired,
+        onboarding_manifest.verbs_unwired,
+    );
+
+    if onboarding_manifest.wiring_pct < 80.0 {
+        println!("\n  ⚠ Wiring below 80% target — review orphan columns and unmapped verbs");
+    }
+
+    Ok(())
+}
+
+/// Display a summary report from an onboarding manifest file.
+pub async fn onboard_report(manifest_path: Option<&str>) -> Result<()> {
+    use ob_poc::sem_reg::onboarding::manifest;
+
+    let path_str = manifest_path.unwrap_or(DEFAULT_MANIFEST_PATH);
+    let path = std::path::Path::new(path_str);
+
+    let m = manifest::read_manifest(path)
+        .context(format!("Failed to read manifest from {}", path_str))?;
+
+    println!("Onboarding Manifest Report");
+    println!("==========================\n");
+    println!("  Source DB:            {}", m.source_db);
+    println!("  Extracted at:         {}", m.extracted_at);
+    println!("  Tables scanned:       {}", m.tables_scanned);
+    println!("  Columns scanned:      {}", m.columns_scanned);
+    println!("  Verbs extracted:      {}", m.verbs_extracted);
+
+    println!("\n── Column Classification ───────────────────────────");
+    println!("  Verb-connected:       {} (seeded as AttributeDef)", m.verb_connected_attrs);
+    println!("  Framework:            {} (NOT seeded)", m.framework_columns);
+    println!("  Operational orphans:  {} (seeded with verb_orphan=true)", m.operational_orphans);
+    println!("  Dead schema:          {} (NOT seeded)", m.dead_schema);
+
+    println!("\n── Wiring Completeness ─────────────────────────────");
+    println!("  Fully wired:          {}", m.verbs_fully_wired);
+    println!("  Partially wired:      {}", m.verbs_partially_wired);
+    println!("  Unwired:              {}", m.verbs_unwired);
+    println!("  Wiring percentage:    {:.1}%", m.wiring_pct);
+
+    println!("\n── Entity Types ({}) ──────────────────────────────", m.entity_type_candidates.len());
+    for et in &m.entity_type_candidates {
+        println!(
+            "  {:<40} {} attrs ({} verb, {} orphan)",
+            et.fqn,
+            et.attribute_fqns.len(),
+            et.verb_connected_count,
+            et.orphan_count,
+        );
+    }
+
+    println!("\n── Relationships ({}) ─────────────────────────────", m.relationship_candidates.len());
+    for rel in &m.relationship_candidates {
+        println!(
+            "  {:<50} {:?} ({:?})",
+            rel.fqn, rel.edge_class, rel.cardinality,
+        );
+    }
+
+    println!("\n── Bootstrap Seed Summary ──────────────────────────");
+    let seedable_attrs = m
+        .attribute_candidates
+        .iter()
+        .filter(|c| {
+            matches!(
+                c.classification,
+                ob_poc::sem_reg::onboarding::xref::ColumnClassification::VerbConnected
+                    | ob_poc::sem_reg::onboarding::xref::ColumnClassification::OperationalOrphan
+            )
+        })
+        .count();
+    println!("  AttributeDefs to seed:          {}", seedable_attrs);
+    println!("  VerbContracts to seed:          {}", m.verb_extracts.len());
+    println!("  EntityTypeDefs to seed:         {}", m.entity_type_candidates.len());
+    println!("  RelationshipTypeDefs to seed:   {}", m.relationship_candidates.len());
+
+    println!("\n  NOT seeded (Phase B2+):");
+    println!("    PolicyRules, EvidenceRequirements, TaxonomyMemberships,");
+    println!("    SecurityLabels, Templates, VerbBindings");
+
+    Ok(())
+}
+
+/// Apply bootstrap seed from manifest to sem_reg.snapshots.
+pub async fn onboard_apply(manifest_path: Option<&str>) -> Result<()> {
+    use ob_poc::sem_reg::onboarding::{manifest, seed};
+
+    let path_str = manifest_path.unwrap_or(DEFAULT_MANIFEST_PATH);
+    let path = std::path::Path::new(path_str);
+
+    let m = manifest::read_manifest(path)
+        .context(format!("Failed to read manifest from {}", path_str))?;
+
+    println!("Registry Bootstrap Seed");
+    println!("=======================\n");
+    println!("  Manifest: {}", path_str);
+    println!("  Source DB: {}", m.source_db);
+    println!("  Extracted at: {}", m.extracted_at);
+
+    let pool = connect().await?;
+    let report = seed::apply_bootstrap(&pool, &m)
+        .await
+        .context("Bootstrap seed failed")?;
+
+    println!("\n── Bootstrap Report ────────────────────────────────");
+    println!("  AttributeDefs written:          {}", report.attribute_defs_written);
+    println!("  AttributeDefs skipped:          {}", report.attribute_defs_skipped);
+    println!("  VerbContracts written:          {}", report.verb_contracts_written);
+    println!("  VerbContracts skipped:          {}", report.verb_contracts_skipped);
+    println!("  EntityTypeDefs written:         {}", report.entity_type_defs_written);
+    println!("  EntityTypeDefs skipped:         {}", report.entity_type_defs_skipped);
+    println!("  RelationshipTypeDefs written:   {}", report.relationship_type_defs_written);
+    println!("  RelationshipTypeDefs skipped:   {}", report.relationship_type_defs_skipped);
+    println!(
+        "  Total snapshots:                {}",
+        report.total_written()
+    );
+
+    if report.total_written() == 0 {
+        println!("\n  ℹ No new snapshots written — bootstrap may have already been applied.");
+    }
+
+    Ok(())
+}
+
 // ── Helpers ───────────────────────────────────────────────────
 
 async fn connect() -> Result<PgPool> {

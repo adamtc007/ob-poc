@@ -48,7 +48,11 @@ impl AgentState {
     ///
     /// This is the primary constructor. Initializes Candle embedder synchronously
     /// so semantic search is available immediately when server starts accepting requests.
-    pub async fn with_semantic(pool: PgPool, sessions: SessionStore) -> Self {
+    pub async fn with_semantic(
+        pool: PgPool,
+        sessions: SessionStore,
+        sem_os_client: Option<Arc<dyn sem_os_client::SemOsClient>>,
+    ) -> Self {
         use crate::agent::learning::embedder::CandleEmbedder;
 
         let dsl_v2_executor = Arc::new(DslExecutor::new(pool.clone()));
@@ -210,13 +214,20 @@ impl AgentState {
         );
 
         // Build agent service with embedder, learned data, lexicon, and entity linker
-        let agent_service = crate::api::agent_service::AgentService::new(
+        let mut agent_service = crate::api::agent_service::AgentService::new(
             pool.clone(),
             embedder,
             learned_data,
             lexicon,
         )
         .with_entity_linker(entity_linker.clone());
+
+        // Wire SemOsClient if provided (env-driven in main.rs)
+        if let Some(ref client) = sem_os_client {
+            agent_service = agent_service.with_sem_os_client(client.clone());
+            tracing::info!("AgentService wired with SemOsClient");
+        }
+
         let expansion_audit =
             Arc::new(crate::database::ExpansionAuditRepository::new(pool.clone()));
 
@@ -245,7 +256,11 @@ impl AgentState {
 /// This is the ONLY constructor. Initializes Candle embedder synchronously
 /// so semantic search is available immediately when server starts accepting requests.
 /// There is no non-semantic path - all chat goes through the IntentPipeline.
-pub async fn create_agent_router_with_semantic(pool: PgPool, sessions: SessionStore) -> Router {
-    let state = AgentState::with_semantic(pool, sessions).await;
+pub async fn create_agent_router_with_semantic(
+    pool: PgPool,
+    sessions: SessionStore,
+    sem_os_client: Option<Arc<dyn sem_os_client::SemOsClient>>,
+) -> Router {
+    let state = AgentState::with_semantic(pool, sessions, sem_os_client).await;
     crate::api::agent_routes::create_agent_router_with_state(state)
 }

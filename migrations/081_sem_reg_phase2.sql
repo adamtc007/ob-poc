@@ -16,7 +16,7 @@ CREATE OR REPLACE VIEW sem_reg.v_active_taxonomy_defs AS
 SELECT
     s.snapshot_id,
     s.object_id,
-    s.version,
+    s.version_major,
     s.governance_tier,
     s.trust_class,
     s.created_by,
@@ -27,7 +27,7 @@ SELECT
     s.definition->>'domain'      AS domain,
     s.definition->>'root_node_fqn' AS root_node_fqn,
     (s.definition->>'max_depth')::int AS max_depth,
-    s.definition->'classification_axis' AS classification_axis
+    s.definition->>'classification_axis' AS classification_axis
 FROM sem_reg.snapshots s
 WHERE s.object_type = 'taxonomy_def'
   AND s.status = 'active'
@@ -40,7 +40,7 @@ CREATE OR REPLACE VIEW sem_reg.v_active_taxonomy_nodes AS
 SELECT
     s.snapshot_id,
     s.object_id,
-    s.version,
+    s.version_major,
     s.governance_tier,
     s.trust_class,
     s.created_by,
@@ -64,7 +64,7 @@ CREATE OR REPLACE VIEW sem_reg.v_active_membership_rules AS
 SELECT
     s.snapshot_id,
     s.object_id,
-    s.version,
+    s.version_major,
     s.governance_tier,
     s.trust_class,
     s.created_by,
@@ -90,7 +90,7 @@ CREATE OR REPLACE VIEW sem_reg.v_active_view_defs AS
 SELECT
     s.snapshot_id,
     s.object_id,
-    s.version,
+    s.version_major,
     s.governance_tier,
     s.trust_class,
     s.created_by,

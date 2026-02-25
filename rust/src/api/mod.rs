@@ -95,6 +95,9 @@ pub mod deal_types;
 #[cfg(feature = "server")]
 pub mod deal_routes;
 
+#[cfg(feature = "server")]
+pub mod stewardship_routes;
+
 #[cfg(feature = "vnext-repl")]
 pub mod repl_routes_v2;
 
@@ -174,6 +177,9 @@ pub use deal_types::{
 
 #[cfg(feature = "server")]
 pub use deal_routes::{create_deal_router, create_deal_router_simple, DealState};
+
+#[cfg(feature = "server")]
+pub use stewardship_routes::create_stewardship_router;
 
 #[cfg(feature = "vnext-repl")]
 pub use repl_routes_v2::{router as create_repl_v2_router, ReplV2RouteState};

@@ -292,18 +292,40 @@ yarn-error.log*
 config/local.yaml
 config/dev.yaml
 
-# Generated SQL dumps
+# Generated SQL dumps and schema snapshots
 *.sql.dump
 *.sql.gz
 *.dump
+init_docker.sql
+data_export.sql
+schema_docker.sql
+seed_data.sql
+docs/master-schema.sql
+migrations/master-schema.sql
 
 # Go compiled binaries (specific paths)
 go/web-server
 
 # WASM build artifacts
+static/pkg/
 rust/static/pkg/
 rust/crates/dsl-lsp/zed-extension/extension.wasm
 rust/crates/dsl-lsp/zed-extension/grammars/
+rust/crates/dsl-lsp/tree-sitter-dsl/tree-sitter-dsl.wasm
+
+# Generated binary snapshots (rebuild with cargo x lexicon/entity compile)
+rust/assets/*.bin
+
+# Generated docs, reports, and PDFs
+docs/generated/
+rust/docs/generated/
+migrations/*.pdf
+
+# Patch files (applied work — use git history)
+*.patch
+
+# Data directory (seed data, external JSON, derived DSL — not source code)
+data/
 
 # Performance and profiling
 perf.data

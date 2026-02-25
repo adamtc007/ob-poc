@@ -2,6 +2,9 @@
 //!
 //! Bridges the internal `SemRegToolSpec` definitions to MCP `protocol::Tool` format,
 //! making all sem_reg tools available through the MCP `tools/list` surface.
+//!
+//! When a `SemOsClient` is available, `sem_reg_tools_via_client()` fetches tool
+//! specs through the DI boundary instead of calling `all_tool_specs()` directly.
 
 use serde_json::json;
 
@@ -53,6 +56,42 @@ fn spec_to_mcp_tool(spec: &SemRegToolSpec) -> Tool {
 /// Returns all Semantic Registry tools as MCP `Tool` definitions.
 pub fn sem_reg_tools() -> Vec<Tool> {
     all_tool_specs().iter().map(spec_to_mcp_tool).collect()
+}
+
+/// Convert a proto `ToolSpec` (from `SemOsClient::list_tool_specs()`) to an MCP `Tool`.
+fn proto_spec_to_mcp_tool(spec: &sem_os_core::proto::ToolSpec) -> Tool {
+    let mut properties = serde_json::Map::new();
+    let mut required = Vec::new();
+
+    for param in &spec.parameters {
+        let schema = map_param_schema(&param.param_type, &param.description);
+        properties.insert(param.name.clone(), schema);
+        if param.required {
+            required.push(json!(param.name));
+        }
+    }
+
+    Tool {
+        name: spec.name.clone(),
+        description: spec.description.clone(),
+        input_schema: json!({
+            "type": "object",
+            "properties": properties,
+            "required": required,
+        }),
+    }
+}
+
+/// Fetch tool specs via `SemOsClient` and convert to MCP `Tool` definitions.
+/// Falls back to direct `all_tool_specs()` if the client call fails.
+pub async fn sem_reg_tools_via_client(client: &dyn sem_os_client::SemOsClient) -> Vec<Tool> {
+    match client.list_tool_specs().await {
+        Ok(resp) => resp.tools.iter().map(proto_spec_to_mcp_tool).collect(),
+        Err(e) => {
+            tracing::warn!(error = %e, "SemOsClient list_tool_specs failed, falling back to direct");
+            sem_reg_tools()
+        }
+    }
 }
 
 #[cfg(test)]

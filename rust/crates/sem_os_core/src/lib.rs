@@ -1,0 +1,29 @@
+pub mod abac;
+pub mod context_resolution;
+pub mod enforce;
+pub mod error;
+pub mod gates;
+pub mod ids;
+pub mod ports;
+pub mod principal;
+pub mod proto;
+pub mod security;
+pub mod seeds;
+pub mod service;
+pub mod stewardship;
+pub mod types;
+
+// ── Body type modules (13 object types) ───────────────────────
+pub mod attribute_def;
+pub mod derivation;
+pub mod derivation_spec;
+pub mod document_type_def;
+pub mod entity_type_def;
+pub mod evidence;
+pub mod membership;
+pub mod observation_def;
+pub mod policy_rule;
+pub mod relationship_type_def;
+pub mod taxonomy_def;
+pub mod verb_contract;
+pub mod view_def;

@@ -121,6 +121,7 @@ mod integration {
                 requires_subject: true,
                 produces_focus: false,
                 metadata: None,
+                crud_mapping: None,
             };
             let sid =
                 RegistryService::publish_verb_contract(&self.pool, &meta, &body, None).await?;
@@ -1233,6 +1234,7 @@ mod integration {
             requires_subject: true,
             produces_focus: false,
             metadata: None,
+            crud_mapping: None,
         };
         RegistryService::publish_verb_contract(&db.pool, &verb_a_meta, &verb_a_body, None).await?;
 

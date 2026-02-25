@@ -12,7 +12,7 @@ CREATE OR REPLACE VIEW sem_reg.v_active_derivation_specs AS
 SELECT
     s.snapshot_id,
     s.object_id,
-    s.version,
+    s.version_major,
     s.governance_tier,
     s.trust_class,
     s.created_by,

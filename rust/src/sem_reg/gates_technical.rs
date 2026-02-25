@@ -380,6 +380,7 @@ mod tests {
             requires_subject: true,
             produces_focus: false,
             metadata: None,
+            crud_mapping: None,
         }
     }
 

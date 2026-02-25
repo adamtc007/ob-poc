@@ -53,6 +53,7 @@ pub fn build_stub_context(
         lookup_service: None,
         policy_gate: Arc::new(policy),
         source: UtteranceSource::Chat,
+        sem_os_client: None,
     }
 }
 

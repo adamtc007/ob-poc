@@ -46,5 +46,10 @@ tonic = "0.12"
 # Semantic voice command matching
 ob-semantic-matcher = { path = "../ob-semantic-matcher" }
 
+# Semantic OS client + core + postgres stores
+sem_os_core = { path = "../sem_os_core" }
+sem_os_client = { path = "../sem_os_client" }
+sem_os_postgres = { path = "../sem_os_postgres" }
+
 [features]
 default = []

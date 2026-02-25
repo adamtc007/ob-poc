@@ -3,6 +3,9 @@
 //! Implements 9 `sem_reg://` resource URIs for the MCP `resources/list` and
 //! `resources/read` surface. Each handler reads from `RegistryService`,
 //! applies ABAC via `enforce_read()`, and returns JSON content.
+//!
+//! When a `SemOsClient` is available, `read_resource_via_client()` routes
+//! resource reads through the DI boundary instead of direct DB calls.
 
 use serde_json::json;
 use sqlx::PgPool;
@@ -114,6 +117,68 @@ pub async fn read_resource(uri: &str, pool: &PgPool, actor: &ActorContext) -> Re
         Some(("context", subject_id)) => read_context(uri, pool, actor, subject_id).await,
         Some(("coverage", _)) => read_coverage(uri, pool).await,
         _ => ResourceReadResult::not_found(uri),
+    }
+}
+
+/// Route a `sem_reg://` URI through `SemOsClient` instead of direct DB calls.
+///
+/// Maps resource URIs to the corresponding `dispatch_tool()` calls:
+/// - `sem_reg://attributes/{fqn}` → `sem_reg_describe_attribute`
+/// - `sem_reg://verbs/{fqn}` → `sem_reg_describe_verb`
+/// - `sem_reg://entity-types/{fqn}` → `sem_reg_describe_entity_type`
+/// - `sem_reg://context/{id}` → `sem_reg_resolve_context`
+/// - `sem_reg://coverage` → `sem_reg_coverage`
+/// - Others → `sem_reg_describe_attribute` (generic describe)
+///
+/// Falls back to direct `read_resource()` on client errors.
+pub async fn read_resource_via_client(
+    uri: &str,
+    client: &dyn sem_os_client::SemOsClient,
+    pool: &PgPool,
+    actor: &ActorContext,
+) -> ResourceReadResult {
+    let (segment, value) = match parse_uri(uri) {
+        Some(sv) => sv,
+        None => return ResourceReadResult::not_found(uri),
+    };
+
+    let (tool_name, arguments) = match segment {
+        "attributes" => ("sem_reg_describe_attribute", json!({"fqn": value})),
+        "entity-types" => ("sem_reg_describe_entity_type", json!({"fqn": value})),
+        "verbs" => ("sem_reg_describe_verb", json!({"fqn": value})),
+        "taxonomies" => ("sem_reg_taxonomy_tree", json!({"fqn": value})),
+        "views" => ("sem_reg_describe_view", json!({"fqn": value})),
+        "policies" => ("sem_reg_describe_policy", json!({"fqn": value})),
+        "evidence" => ("sem_reg_check_evidence_freshness", json!({"fqn": value})),
+        "context" => (
+            "sem_reg_resolve_context",
+            json!({"subject_id": value, "subject_type": "entity"}),
+        ),
+        "coverage" => ("sem_reg_coverage", json!({})),
+        _ => return ResourceReadResult::not_found(uri),
+    };
+
+    // Build a principal from the actor context for ABAC.
+    let principal =
+        sem_os_core::principal::Principal::in_process(&actor.actor_id, actor.roles.clone());
+
+    let req = sem_os_core::proto::ToolCallRequest {
+        tool_name: tool_name.to_string(),
+        arguments,
+    };
+
+    match client.dispatch_tool(&principal, req).await {
+        Ok(resp) if resp.success => ResourceReadResult::json_content(uri, &resp.data),
+        Ok(resp) => {
+            let msg = resp.error.unwrap_or_else(|| "tool returned failure".into());
+            tracing::warn!(uri, tool_name, error = %msg, "SemOsClient resource dispatch failed");
+            // Fallback to direct
+            read_resource(uri, pool, actor).await
+        }
+        Err(e) => {
+            tracing::warn!(uri, tool_name, error = %e, "SemOsClient resource dispatch error, falling back to direct");
+            read_resource(uri, pool, actor).await
+        }
     }
 }
 

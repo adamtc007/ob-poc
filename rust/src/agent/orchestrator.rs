@@ -24,6 +24,8 @@ use crate::mcp::verb_search::HybridVerbSearcher;
 use crate::policy::{gate::PolicySnapshot, PolicyGate};
 use crate::sem_reg::abac::ActorContext;
 
+use sem_os_client::SemOsClient;
+
 /// Context needed to run the unified orchestrator.
 pub struct OrchestratorContext {
     pub actor: ActorContext,
@@ -40,6 +42,10 @@ pub struct OrchestratorContext {
     pub policy_gate: Arc<PolicyGate>,
     /// Source of this utterance (for trace/audit).
     pub source: UtteranceSource,
+    /// Semantic OS client — routes context resolution through the DI boundary.
+    /// When set, `resolve_sem_reg_verbs()` calls through this client instead of
+    /// direct `sem_reg::context_resolution::resolve_context()`.
+    pub sem_os_client: Option<Arc<dyn SemOsClient>>,
 }
 
 /// Where the utterance originated.
@@ -702,6 +708,83 @@ async fn resolve_sem_reg_verbs(
     ctx: &OrchestratorContext,
     entity_kind: Option<&str>,
 ) -> (SemRegVerbPolicy, Option<Vec<String>>) {
+    // Route through SemOsClient when available (DI boundary), fallback to direct call.
+    // The two paths return structurally-identical but type-distinct response types,
+    // so we extract the allowed verb FQN set within each branch.
+    if let Some(ref client) = ctx.sem_os_client {
+        resolve_via_client(client.as_ref(), ctx, entity_kind).await
+    } else {
+        #[cfg(feature = "database")]
+        {
+            resolve_via_direct(ctx, entity_kind).await
+        }
+        #[cfg(not(feature = "database"))]
+        {
+            tracing::warn!("sem_reg context resolution requires database feature or SemOsClient");
+            (SemRegVerbPolicy::Unavailable, None)
+        }
+    }
+}
+
+/// Resolve verbs via SemOsClient DI boundary (in-process or HTTP).
+async fn resolve_via_client(
+    client: &dyn SemOsClient,
+    ctx: &OrchestratorContext,
+    entity_kind: Option<&str>,
+) -> (SemRegVerbPolicy, Option<Vec<String>>) {
+    use sem_os_core::abac::AccessDecision;
+    use sem_os_core::context_resolution::{EvidenceMode, SubjectRef};
+
+    let subject = if let Some(entity_id) = ctx.dominant_entity_id {
+        SubjectRef::EntityId(entity_id)
+    } else {
+        SubjectRef::CaseId(
+            ctx.case_id
+                .unwrap_or_else(|| ctx.session_id.unwrap_or_else(Uuid::new_v4)),
+        )
+    };
+    // Convert ob-poc ActorContext → sem_os_core ActorContext via serde round-trip
+    // (structurally identical types in separate crates)
+    let core_actor: sem_os_core::abac::ActorContext = {
+        let json = serde_json::to_value(&ctx.actor).expect("ActorContext serializes");
+        serde_json::from_value(json).expect("ActorContext round-trips")
+    };
+    let request = sem_os_core::context_resolution::ContextResolutionRequest {
+        subject,
+        intent: None,
+        actor: core_actor,
+        goals: vec![],
+        constraints: Default::default(),
+        evidence_mode: EvidenceMode::default(),
+        point_in_time: None,
+        entity_kind: entity_kind.map(|s| s.to_string()),
+    };
+    let principal =
+        sem_os_core::principal::Principal::in_process(&ctx.actor.actor_id, ctx.actor.roles.clone());
+
+    match client.resolve_context(&principal, request).await {
+        Ok(response) => {
+            let allowed: HashSet<String> = response
+                .candidate_verbs
+                .iter()
+                .filter(|v| matches!(v.access_decision, AccessDecision::Allow))
+                .map(|v| v.fqn.clone())
+                .collect();
+            emit_and_build_policy(allowed, response.candidate_verbs.len())
+        }
+        Err(e) => {
+            tracing::warn!(error = %e, source = "sem_reg", "SemReg context resolution failed (client)");
+            (SemRegVerbPolicy::Unavailable, None)
+        }
+    }
+}
+
+/// Resolve verbs via direct sem_reg call (legacy path, before full cutover).
+#[cfg(feature = "database")]
+async fn resolve_via_direct(
+    ctx: &OrchestratorContext,
+    entity_kind: Option<&str>,
+) -> (SemRegVerbPolicy, Option<Vec<String>>) {
     use crate::sem_reg::abac::AccessDecision;
     use crate::sem_reg::context_resolution::{
         resolve_context, ContextResolutionRequest, EvidenceMode, SubjectRef,
@@ -734,27 +817,29 @@ async fn resolve_sem_reg_verbs(
                 .filter(|v| matches!(v.access_decision, AccessDecision::Allow))
                 .map(|v| v.fqn.clone())
                 .collect();
-            let names: Vec<String> = allowed.iter().cloned().collect();
-            tracing::debug!(
-                allowed_count = allowed.len(),
-                total_candidates = response.candidate_verbs.len(),
-                "SemReg verb filter resolved"
-            );
-            if allowed.is_empty() {
-                // Explicit deny-all -- NOT the same as "unavailable"
-                (SemRegVerbPolicy::DenyAll, Some(vec![]))
-            } else {
-                (SemRegVerbPolicy::AllowedSet(allowed), Some(names))
-            }
+            emit_and_build_policy(allowed, response.candidate_verbs.len())
         }
         Err(e) => {
-            tracing::warn!(
-                error = %e,
-                source = "sem_reg",
-                "SemReg context resolution failed"
-            );
+            tracing::warn!(error = %e, source = "sem_reg", "SemReg context resolution failed (direct)");
             (SemRegVerbPolicy::Unavailable, None)
         }
+    }
+}
+
+fn emit_and_build_policy(
+    allowed: HashSet<String>,
+    total_candidates: usize,
+) -> (SemRegVerbPolicy, Option<Vec<String>>) {
+    let names: Vec<String> = allowed.iter().cloned().collect();
+    tracing::debug!(
+        allowed_count = allowed.len(),
+        total_candidates,
+        "SemReg verb filter resolved"
+    );
+    if allowed.is_empty() {
+        (SemRegVerbPolicy::DenyAll, Some(vec![]))
+    } else {
+        (SemRegVerbPolicy::AllowedSet(allowed), Some(names))
     }
 }
 

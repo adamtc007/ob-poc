@@ -16,7 +16,7 @@ CREATE OR REPLACE VIEW sem_reg.v_active_policy_rules AS
 SELECT
     s.snapshot_id,
     s.object_id,
-    s.version,
+    s.version_major,
     s.governance_tier,
     s.trust_class,
     s.created_by,
@@ -42,7 +42,7 @@ CREATE OR REPLACE VIEW sem_reg.v_active_evidence_requirements AS
 SELECT
     s.snapshot_id,
     s.object_id,
-    s.version,
+    s.version_major,
     s.governance_tier,
     s.trust_class,
     s.created_by,
@@ -67,7 +67,7 @@ CREATE OR REPLACE VIEW sem_reg.v_active_document_type_defs AS
 SELECT
     s.snapshot_id,
     s.object_id,
-    s.version,
+    s.version_major,
     s.governance_tier,
     s.trust_class,
     s.created_by,
@@ -91,7 +91,7 @@ CREATE OR REPLACE VIEW sem_reg.v_active_observation_defs AS
 SELECT
     s.snapshot_id,
     s.object_id,
-    s.version,
+    s.version_major,
     s.governance_tier,
     s.trust_class,
     s.created_by,

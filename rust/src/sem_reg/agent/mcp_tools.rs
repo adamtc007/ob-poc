@@ -150,6 +150,12 @@ pub fn all_tool_specs() -> Vec<SemRegToolSpec> {
     // Category 6: Evidence
     specs.extend(evidence_specs());
 
+    // Category 7: Stewardship (Phase 0 changeset tools)
+    specs.extend(super::super::stewardship::phase0_tool_specs());
+
+    // Category 8: Stewardship (Phase 1 visualisation tools)
+    specs.extend(super::super::stewardship::phase1_tool_specs());
+
     specs
 }
 
@@ -597,6 +603,17 @@ pub async fn dispatch_tool(
         "sem_reg_check_evidence_freshness" => handle_check_freshness(ctx, args).await,
         "sem_reg_identify_evidence_gaps" => handle_identify_gaps(ctx, args).await,
         "sem_reg_coverage_report" => handle_coverage_report(ctx, args).await,
+
+        // Category 7: Stewardship (Phase 0 changeset tools + Phase 1 visualisation tools)
+        name if name.starts_with("stew_") => {
+            if let Some(result) = super::super::stewardship::dispatch_phase0_tool(ctx, name, args).await {
+                result
+            } else if let Some(result) = super::super::stewardship::dispatch_phase1_tool(ctx, name, args).await {
+                result
+            } else {
+                SemRegToolResult::err(format!("Unknown stewardship tool: {}", name))
+            }
+        }
 
         _ => SemRegToolResult::err(format!("Unknown tool: {}", tool_name)),
     }

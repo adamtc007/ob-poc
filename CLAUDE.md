@@ -6373,6 +6373,112 @@ Correctness and safety improvements applied across the Semantic OS:
 **New files:** `sem_reg/ids.rs`, `sem_reg/enforce.rs`, `mcp/tools_sem_reg.rs`
 **New tests:** 16 unit tests (6 ids + 6 enforce + 4 tools_sem_reg bridge)
 
+---
+
+## Semantic OS v1.1 — Standalone Service Architecture
+
+> **Status:** ✅ Complete (2026-02-18) — Stages 1-4 implemented. Harness green in inprocess mode.
+
+**Problem Solved:** The original Semantic OS (v1.0, `rust/src/sem_reg/`) was deeply embedded in the ob-poc monolith. v1.1 extracts it into a standalone service with its own crate workspace, REST API, outbox-driven projections, changeset workflow, and client SDK.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  ob-poc (main application)                                                   │
+│       │                                                                       │
+│       └─► SemOsClient trait (rust/crates/sem_os_client/)                     │
+│               │                                                               │
+│               ├─► InProcessClient (default: SEM_OS_MODE=inprocess)           │
+│               │       └─► CoreService (sem_os_core) ─► PgSnapshotStore       │
+│               │                                                               │
+│               └─► HttpClient (SEM_OS_MODE=remote)                            │
+│                       └─► REST API (sem_os_server) + JWT bearer              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Crate Structure
+
+| Crate | Purpose |
+|-------|---------|
+| `sem_os_core` | Core domain: types, ports (traits), service logic, gates, stewardship guardrails |
+| `sem_os_postgres` | PostgreSQL store implementations (SnapshotStore, ChangesetStore, OutboxStore, etc.) |
+| `sem_os_server` | Axum REST server with JWT auth, CORS, outbox dispatcher |
+| `sem_os_client` | `SemOsClient` trait + `InProcessClient` + `HttpClient` |
+| `sem_os_harness` | Integration test harness (isolated DB per run, 3 suites) |
+| `sem_os_obpoc_adapter` | Adapter wiring SemOsClient into ob-poc's existing code paths |
+
+### Key Design Decisions
+
+- **Protobuf-first types**: All API types defined in `api/proto/sem_os/v1/service.proto`, shared by server and client.
+- **Immutable snapshots**: Every change produces a new snapshot row. No in-place updates.
+- **Atomic publish + outbox**: Snapshot insert + outbox enqueue in a single transaction. Outbox dispatcher processes events asynchronously.
+- **Projection watermark**: `sem_reg_pub.projection_watermark` tracks the last processed outbox sequence. Projections are eventually consistent.
+- **Changeset workflow**: Draft → Submitted → Approved → Promoted. Gate preview before publish. Stewardship guardrails enforce role constraints, proof chain compatibility, and stale draft detection.
+
+### Database Schemas
+
+| Schema | Owner | Purpose |
+|--------|-------|---------|
+| `sem_reg` | sem_os | Core registry: snapshots, snapshot_sets, outbox_events, agent plans/decisions, changesets |
+| `sem_reg_pub` | sem_os | Read-optimized projections: active_snapshot_set, projection_watermark |
+
+### Environment Variables
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `SEM_OS_MODE` | `inprocess` | `inprocess` = direct CoreService, `remote` = REST client |
+| `SEM_OS_URL` | — | Base URL for remote mode (e.g., `http://localhost:4100`) |
+| `SEM_OS_JWT_SECRET` | — | Shared secret for JWT signing/verification |
+
+### Running the Server
+
+```bash
+# Start Semantic OS server (standalone)
+SEM_OS_JWT_SECRET=dev-secret DATABASE_URL="postgresql:///data_designer" \
+  cargo run -p sem_os_server
+
+# Run harness tests (isolated DB per test)
+DATABASE_URL="postgresql:///data_designer" \
+  cargo test -p sem_os_harness -- --ignored --nocapture
+```
+
+### Migrations (092-095)
+
+| Migration | Purpose |
+|-----------|---------|
+| 092 | `sem_reg.outbox_events` table |
+| 093 | `sem_reg.bootstrap_audit` table |
+| 094 | `sem_reg_pub` schema: `active_snapshot_set`, `projection_watermark`, seed row |
+| 095 | `sem_reg.changesets`, `changeset_entries`, `changeset_reviews` + indexes |
+
+### Post-Cutover Housekeeping (TODO)
+
+- [ ] Delete `rust/src/sem_reg/*.rs` (old monolithic code) once stable — forces discovery of remaining direct calls
+- [ ] Drop in-process ABAC fallback code once remote mode is validated
+- [ ] Monitor outbox lag: `SELECT MAX(attempt_count) FROM sem_reg.outbox_events WHERE processed_at IS NULL`
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `rust/crates/sem_os_core/src/service.rs` | CoreServiceImpl: bootstrap, resolve, publish, changeset promote |
+| `rust/crates/sem_os_core/src/ports.rs` | Storage port traits (SnapshotStore, ChangesetStore, OutboxStore, etc.) |
+| `rust/crates/sem_os_core/src/stewardship.rs` | Role constraints, proof chain checks, stale draft detection |
+| `rust/crates/sem_os_core/src/gates/mod.rs` | Publish gate evaluation (proof rule, security, approval, version) |
+| `rust/crates/sem_os_postgres/src/store.rs` | PgSnapshotStore: resolve, publish_snapshot, publish_into_set |
+| `rust/crates/sem_os_postgres/src/changesets.rs` | PgChangesetStore: CRUD + review workflow |
+| `rust/crates/sem_os_postgres/src/outbox.rs` | PgOutboxStore: claim, mark_processed, mark_failed |
+| `rust/crates/sem_os_server/src/router.rs` | Axum router: snapshot + changeset + projection routes |
+| `rust/crates/sem_os_server/src/dispatcher.rs` | Outbox dispatcher: poll → claim → write projection → advance watermark |
+| `rust/crates/sem_os_client/src/lib.rs` | SemOsClient trait: the sole API boundary |
+| `rust/crates/sem_os_client/src/inprocess.rs` | InProcessClient: delegates to Arc\<dyn CoreService\> |
+| `rust/crates/sem_os_client/src/http.rs` | HttpClient: REST + JWT bearer |
+| `rust/crates/sem_os_harness/src/lib.rs` | 3 test suites: core, projections, permissions |
+| `rust/crates/sem_os_obpoc_adapter/src/lib.rs` | Adapter: builds SemOsClient from env vars, wires into ob-poc |
+
+---
+
 ## Deprecated / Removed
 
 | Removed | Replaced By |

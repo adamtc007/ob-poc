@@ -1,7 +1,7 @@
 # OB-POC — Schema Entity Overview
 
-> **Last reconciled:** 2026-02-12 — against 77 migrations, 58 DSL verb domains, CLAUDE.md
-> **Scope:** `"ob-poc"` schema (226 tables) + `"kyc"` schema (37 tables + 9 views) + `"ob_ref"` tollgate definitions. External schemas (`custody`, `agent`, `teams`) referenced but not detailed.
+> **Last reconciled:** 2026-02-18 — against 90 migrations, 58 DSL verb domains, CLAUDE.md
+> **Scope:** `"ob-poc"` schema (206 tables) + `"kyc"` schema (37 tables + 10 views) + `"sem_reg"` schema (16 tables + 14 views) + `"sem_reg_pub"` schema (4 tables) + `"ob_ref"` tollgate definitions. External schemas (`custody`, `agent`, `teams`) referenced but not detailed.
 > **Method:** SQL DDL cross-referenced with DSL verb YAML (`rust/config/verbs/*.yaml`) to validate domain groupings.
 > **Mermaid ER diagrams** render in GitHub, VS Code, and any CommonMark renderer with mermaid support.
 
@@ -1234,7 +1234,11 @@ The skeleton build pipeline (`skeleton.build` verb) orchestrates the discovery p
 
 The Semantic Registry provides an immutable snapshot-based registry for the Semantic OS. All registry objects (13 types) share a single `sem_reg.snapshots` table with a JSONB `definition` column. Typed Rust structs provide compile-time safety over the JSONB bodies.
 
-**Migrations:** 078 (Phase 0), 079 (Phase 1), 081 (Phase 2), 082 (Phase 3), 083 (Phases 4-5), 084 (Phase 7), 085 (Phase 8), 086 (Phase 9)
+The registry is split across **two PostgreSQL schemas**:
+- **`sem_reg`** — Source of truth: immutable snapshots, agent plans, projections, outbox, changesets (16 tables, 14 views, 2 functions)
+- **`sem_reg_pub`** — Read-only projections: flattened active snapshots for ob-poc consumption (4 tables)
+
+**Migrations:** 078 (Phase 0), 079 (Phase 1), 081 (Phase 2), 082 (Phase 3), 083 (Phases 4-5), 084 (Phase 7), 085 (Phase 8), 086 (Phase 9), 090 (Evidence instances), 091 (Evidence fixes), 092 (Outbox), 093 (Bootstrap audit), 094 (sem_reg_pub projections), 095 (Changesets)
 
 ### Enums
 
@@ -1261,6 +1265,12 @@ erDiagram
     snapshots ||--o{ derivation_edges : "output"
     snapshots ||--o| embedding_records : "embedded"
     run_records ||--o{ derivation_edges : "produces"
+    snapshots ||--o{ outbox_events : "publishes"
+    changesets ||--o{ changeset_entries : "contains"
+    changesets ||--o{ changeset_reviews : "reviewed_by"
+    outbox_events ||--o{ active_verb_contracts : "projects"
+    outbox_events ||--o{ active_entity_types : "projects"
+    outbox_events ||--o{ active_taxonomies : "projects"
 
     snapshot_sets {
         UUID snapshot_set_id PK
@@ -1296,6 +1306,64 @@ erDiagram
         TEXT name UK
         INT ordinal UK
         TEXT description
+    }
+
+    outbox_events {
+        BIGINT outbox_seq PK
+        UUID event_id UK
+        TEXT event_type
+        BIGINT aggregate_version
+        UUID snapshot_set_id
+        UUID correlation_id
+        JSONB payload
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ claimed_at
+        TEXT claimer_id
+        TIMESTAMPTZ claim_timeout_at
+        TIMESTAMPTZ processed_at
+        TIMESTAMPTZ failed_at
+        INT attempt_count
+        TEXT last_error
+    }
+
+    bootstrap_audit {
+        TEXT bundle_hash PK
+        TEXT origin_actor_id
+        JSONB bundle_counts
+        UUID snapshot_set_id
+        TEXT status
+        TIMESTAMPTZ started_at
+        TIMESTAMPTZ completed_at
+        TEXT error
+    }
+
+    changesets {
+        UUID changeset_id PK
+        TEXT status
+        TEXT owner_actor_id
+        TEXT scope
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ updated_at
+    }
+
+    changeset_entries {
+        UUID entry_id PK
+        UUID changeset_id FK
+        TEXT object_fqn
+        TEXT object_type
+        TEXT change_kind
+        JSONB draft_payload
+        UUID base_snapshot_id
+        TIMESTAMPTZ created_at
+    }
+
+    changeset_reviews {
+        UUID review_id PK
+        UUID changeset_id FK
+        TEXT actor_id
+        TEXT verdict
+        TEXT comment
+        TIMESTAMPTZ reviewed_at
     }
 
     agent_plans {
@@ -1413,9 +1481,40 @@ erDiagram
         TIMESTAMPTZ created_at
         TIMESTAMPTZ updated_at
     }
+
+    active_verb_contracts {
+        UUID snapshot_set_id PK
+        UUID snapshot_id
+        TEXT fqn PK
+        TEXT verb_name
+        JSONB payload
+        TIMESTAMPTZ published_at
+    }
+
+    active_entity_types {
+        UUID snapshot_set_id PK
+        UUID snapshot_id
+        TEXT fqn PK
+        JSONB payload
+        TIMESTAMPTZ published_at
+    }
+
+    active_taxonomies {
+        UUID snapshot_set_id PK
+        UUID snapshot_id
+        TEXT fqn PK
+        JSONB payload
+        TIMESTAMPTZ published_at
+    }
+
+    projection_watermark {
+        TEXT projection_name PK
+        BIGINT last_outbox_seq
+        TIMESTAMPTZ updated_at
+    }
 ```
 
-### Core Tables
+### Core Tables (`sem_reg`)
 
 | Table | Purpose | Mutability |
 |-------|---------|------------|
@@ -1432,6 +1531,14 @@ erDiagram
 | `ix_snapshots_temporal` | B-tree (object_type, object_id, effective_from, effective_until) | Point-in-time resolution |
 | `ix_snapshots_set` | B-tree partial (WHERE snapshot_set_id IS NOT NULL) | Set membership lookup |
 | `ix_snapshots_type_status` | B-tree (object_type, status) | Type + status listing |
+| `idx_snapshots_*_fqn` | B-tree on `definition->>'fqn'` per object_type (13 indexes) | Fast FQN lookup per object type |
+| `idx_snapshots_security_classification` | B-tree on `security_label->>'classification'` | Security classification filter |
+| `idx_snapshots_verb_domain` | B-tree on `definition->>'domain'` for verb_contract | Verb domain listing |
+| `idx_snapshots_taxonomy_node_parent` | B-tree on (taxonomy_fqn, parent_fqn) for taxonomy_node | Taxonomy tree traversal |
+| `idx_snapshots_membership_target` | B-tree on `definition->>'target_fqn'` for membership_rule | Membership target lookup |
+| `idx_snapshots_evidence_req_target` | B-tree on `definition->>'target_entity_type'` for evidence_requirement | Evidence target filter |
+| `idx_snapshots_policy_rule_domain` | B-tree on (domain, scope) for policy_rule | Policy domain + scope filter |
+| `idx_snapshots_derivation_inputs` | GIN on `definition->'inputs'` for derivation_spec | Derivation input lookup |
 
 ### Agent Tables (Phase 8)
 
@@ -1451,6 +1558,21 @@ erDiagram
 | `sem_reg.run_records` | Immutable execution records per plan step. Timing (started_at, completed_at, duration_ms), I/O counts, metadata JSONB. | INSERT-only |
 | `sem_reg.embedding_records` | One embedding per snapshot (UNIQUE on snapshot_id). Version hash for staleness detection. Embedding stored as JSONB float array. | INSERT + UPDATE on re-embed |
 
+### Infrastructure Tables (v1.1)
+
+| Table | Purpose | Mutability |
+|-------|---------|------------|
+| `sem_reg.outbox_events` | Transactional outbox for reliable event dispatch. Snapshot publishes atomically enqueue events; outbox poller claims and dispatches to projections/subscribers. Sequential BIGINT PK for ordered processing. | INSERT + claim/process UPDATE |
+| `sem_reg.bootstrap_audit` | Tracks in-progress and completed bootstrap seed runs. PK on `bundle_hash` for idempotency. Status: in_progress/published/failed. | INSERT + status/completed_at UPDATE |
+
+### Changeset Tables (v1.1 — Draft Workflow)
+
+| Table | Purpose | Mutability |
+|-------|---------|------------|
+| `sem_reg.changesets` | Draft workspace for proposed registry changes. Status: draft/in_review/approved/published/rejected. Scoped by `owner_actor_id`. | INSERT + status/updated_at UPDATE |
+| `sem_reg.changeset_entries` | Individual proposed changes within a changeset. Each entry targets one object FQN with `change_kind` (add/modify/remove) and `draft_payload` JSONB. `base_snapshot_id` for modify/remove tracks what is being changed. | INSERT-only per changeset |
+| `sem_reg.changeset_reviews` | Review verdicts on changesets. Verdict: approved/rejected/requested_changes. | INSERT-only (append) |
+
 ### SQL Functions
 
 | Function | Purpose |
@@ -1458,7 +1580,7 @@ erDiagram
 | `sem_reg.resolve_active(object_type, object_id, as_of)` | Returns the active snapshot at a point in time |
 | `sem_reg.count_active(object_type)` | Returns active snapshot count by object type |
 
-### Key Views (across Phases 1-9)
+### Key Views (14 views across Phases 1-9)
 
 | View | Phase | Purpose |
 |------|-------|---------|
@@ -1470,11 +1592,6 @@ erDiagram
 | `v_active_taxonomy_nodes` | 2 | Active taxonomy nodes |
 | `v_active_membership_rules` | 2 | Active membership rules |
 | `v_active_view_defs` | 2 | Active view definitions |
-| `v_active_policy_rules` | 3 | Active policy rules |
-| `v_active_evidence_reqs` | 3 | Active evidence requirements |
-| `v_active_document_type_defs` | 3 | Active document type definitions |
-| `v_active_observation_defs` | 3 | Active observation definitions |
-| `v_active_derivation_specs` | 5 | Active derivation specs |
 | `v_active_memberships_by_subject` | 7 | Fast taxonomy overlap lookup for context resolution |
 | `v_verb_precondition_status` | 7 | Precondition evaluability check |
 | `v_view_attribute_columns` | 7 | View attribute columns |
@@ -1484,20 +1601,55 @@ erDiagram
 
 ---
 
+## 16) Published Projections Schema (`sem_reg_pub`)
+
+The `sem_reg_pub` schema provides **read-only, flattened projections** of active registry snapshots for consumption by the ob-poc runtime. These tables are populated by the outbox dispatcher from `sem_reg.outbox_events` — ob-poc never writes to this schema directly.
+
+**Migration:** 094
+
+### Tables (4)
+
+| Table | Purpose | Mutability |
+|-------|---------|------------|
+| `sem_reg_pub.active_verb_contracts` | Flattened active verb contracts with FQN, verb_name, JSONB payload. PK on (snapshot_set_id, fqn). | Replaced atomically by outbox dispatcher |
+| `sem_reg_pub.active_entity_types` | Flattened active entity type definitions with FQN, JSONB payload. PK on (snapshot_set_id, fqn). | Replaced atomically by outbox dispatcher |
+| `sem_reg_pub.active_taxonomies` | Flattened active taxonomy definitions with FQN, JSONB payload. PK on (snapshot_set_id, fqn). | Replaced atomically by outbox dispatcher |
+| `sem_reg_pub.projection_watermark` | Tracks how far the outbox dispatcher has processed. Single row per projection name. `last_outbox_seq` = latest processed event sequence. | UPDATE on each dispatch cycle |
+
+### Data Flow
+
+```
+sem_reg.snapshots (source of truth)
+    │
+    ├─► sem_reg.outbox_events (transactional outbox — atomically enqueued on publish)
+    │       │
+    │       └─► Outbox Dispatcher (claims + processes events)
+    │               │
+    │               ├─► sem_reg_pub.active_verb_contracts (flattened projection)
+    │               ├─► sem_reg_pub.active_entity_types (flattened projection)
+    │               ├─► sem_reg_pub.active_taxonomies (flattened projection)
+    │               └─► sem_reg_pub.projection_watermark (advance seq pointer)
+    │
+    └─► ob-poc runtime reads from sem_reg_pub (read-only, never writes)
+```
+
+---
+
 ## Schema Statistics
 
 | Metric | Count |
 |--------|-------|
-| Total `ob-poc` tables | 226 |
-| Total `kyc` tables | 37 (+ 9 views) |
-| Total `sem_reg` tables | 10 (+ 19 views, 2 functions) |
+| Total `ob-poc` tables | 206 |
+| Total `kyc` tables | 37 (+ 10 views) |
+| Total `sem_reg` tables | 16 (+ 14 views, 2 functions) |
+| Total `sem_reg_pub` tables | 4 |
 | Tables with DSL verb domains | ~120 |
-| Tables in this document | ~195 (essential to data model) |
-| Tables omitted (DSL engine, REPL, semantic search, layout cache) | ~76 |
+| Tables in this document | ~200 (essential to data model) |
+| Tables omitted (DSL engine, REPL, semantic search, layout cache) | ~70 |
 | DSL verb domains | 58 |
 | Total verb count | ~1,083 |
-| Migrations | 85 (001–077 + 072b + 078–079, 081–086) |
-| Sections in this document | 15 |
+| Migrations | 90 SQL files (001–077 + 072b + 078–079, 081–086, 090–095) |
+| Sections in this document | 16 |
 
 **Omitted infrastructure tables** (no verb domains, not essential to data model):
 - DSL engine: `dsl_verbs`, `dsl_sessions`, `dsl_instances`, `dsl_snapshots`, `dsl_*` (14 tables)

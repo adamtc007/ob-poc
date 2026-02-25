@@ -947,6 +947,35 @@ enum SemRegAction {
         #[arg(long)]
         json: bool,
     },
+
+    /// Scan schema + verbs and produce onboarding manifest (read-only)
+    ///
+    /// Runs the 5-step extraction pipeline (verb extract, schema introspect,
+    /// cross-reference, entity inference, manifest assembly) and writes
+    /// the result to data/onboarding-manifest.json.
+    OnboardScan {
+        /// Show per-step detail
+        #[arg(long, short = 'v')]
+        verbose: bool,
+    },
+
+    /// Display onboarding manifest summary report
+    OnboardReport {
+        /// Path to manifest JSON (default: data/onboarding-manifest.json)
+        #[arg(long)]
+        manifest_path: Option<String>,
+    },
+
+    /// Apply bootstrap seed from manifest (one-time write to sem_reg.snapshots)
+    ///
+    /// Reads an onboarding manifest and writes AttributeDefs, VerbContracts,
+    /// EntityTypeDefs, and RelationshipTypeDefs to the semantic registry.
+    /// Protected by BOOTSTRAP_SET_ID — refuses to run if already bootstrapped.
+    OnboardApply {
+        /// Path to manifest JSON (default: data/onboarding-manifest.json)
+        #[arg(long)]
+        manifest_path: Option<String>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -1246,6 +1275,15 @@ fn main() -> Result<()> {
                 )),
                 SemRegAction::Coverage { tier, json } => {
                     rt.block_on(sem_reg::coverage(&tier, json))
+                }
+                SemRegAction::OnboardScan { verbose } => {
+                    rt.block_on(sem_reg::onboard_scan(verbose))
+                }
+                SemRegAction::OnboardReport { manifest_path } => {
+                    rt.block_on(sem_reg::onboard_report(manifest_path.as_deref()))
+                }
+                SemRegAction::OnboardApply { manifest_path } => {
+                    rt.block_on(sem_reg::onboard_apply(manifest_path.as_deref()))
                 }
             }
         }

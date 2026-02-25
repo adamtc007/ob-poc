@@ -1,0 +1,88 @@
+syntax = "proto3";
+package sem_os.v1;
+
+// ── Core value types ─────────────────────────────────────────────────────────
+
+message SnapshotSetId  { string value = 1; }
+message SnapshotId     { string value = 1; }
+message Fqn            { string value = 1; }
+
+// ── Resolve context ───────────────────────────────────────────────────────────
+
+message ResolveContextRequest {
+    string  verb        = 1;
+    string  entity_type = 2;
+    string  context_key = 3;
+    string  tenant_id   = 4;
+    string  snapshot_set_id = 5;  // pin to specific set; empty = use latest active
+}
+
+message ResolveContextResponse {
+    repeated Candidate candidates = 1;
+    repeated GateViolation violations = 2;
+    string resolved_snapshot_set_id = 3;
+}
+
+message Candidate {
+    string fqn          = 1;
+    double score        = 2;
+    string verb_name    = 3;
+    bytes  payload_json = 4;  // JSON-encoded verb contract payload
+}
+
+message GateViolation {
+    string gate_id     = 1;
+    string severity    = 2;  // "error" | "warning"
+    string message     = 3;
+    string remediation = 4;
+}
+
+// ── Manifest ──────────────────────────────────────────────────────────────────
+
+message GetManifestRequest  { string snapshot_set_id = 1; }
+message GetManifestResponse {
+    string snapshot_set_id = 1;
+    string published_at    = 2;  // RFC3339
+    repeated ManifestEntry entries = 3;
+}
+
+message ManifestEntry {
+    string snapshot_id  = 1;
+    string object_type  = 2;
+    string fqn          = 3;
+    string content_hash = 4;
+}
+
+// ── Publish ───────────────────────────────────────────────────────────────────
+
+message PublishRequest  { bytes payload_json = 1; }  // opaque publish payload
+message PublishResponse { string snapshot_set_id = 1; }
+
+// ── Snapshot export ───────────────────────────────────────────────────────────
+
+message ExportSnapshotSetRequest  { string snapshot_set_id = 1; }
+message ExportSnapshotSetResponse {
+    string snapshot_set_id = 1;
+    repeated ExportEntry entries = 2;
+}
+message ExportEntry {
+    string snapshot_id  = 1;
+    string fqn          = 2;
+    string object_type  = 3;
+    bytes  payload_json = 4;
+}
+
+// ── Bootstrap ─────────────────────────────────────────────────────────────────
+
+message BootstrapSeedBundleRequest  { bytes bundle_json = 1; }
+message BootstrapSeedBundleResponse { string snapshot_set_id = 1; }
+
+// ── Service definition (for future tonic gRPC) ───────────────────────────────
+
+service SemOs {
+    rpc ResolveContext       (ResolveContextRequest)       returns (ResolveContextResponse);
+    rpc GetManifest          (GetManifestRequest)          returns (GetManifestResponse);
+    rpc Publish              (PublishRequest)               returns (PublishResponse);
+    rpc ExportSnapshotSet    (ExportSnapshotSetRequest)     returns (ExportSnapshotSetResponse);
+    rpc BootstrapSeedBundle  (BootstrapSeedBundleRequest)  returns (BootstrapSeedBundleResponse);
+}
