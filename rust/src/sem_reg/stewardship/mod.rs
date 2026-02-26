@@ -39,9 +39,8 @@ pub use tools_phase1::{dispatch_phase1_tool, phase1_tool_specs};
 pub use types::{
     BasisClaim, BasisKind, BasisRecord, ChangesetAction, ChangesetEntryRow, ChangesetRow,
     ChangesetStatus, ConflictRecord, ConflictStrategy, GuardrailId, GuardrailResult,
-    GuardrailSeverity, ReviewDisposition, SemanticVersion, StewardshipEventType,
-    StewardshipRecord, StewardshipTemplate, TemplateItem, TemplateStatus,
-    VerbImplementationBinding,
+    GuardrailSeverity, ReviewDisposition, SemanticVersion, StewardshipEventType, StewardshipRecord,
+    StewardshipTemplate, TemplateItem, TemplateStatus, VerbImplementationBinding,
 };
 
 // Phase 1 types (re-exported for convenience)

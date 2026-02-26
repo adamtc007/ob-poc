@@ -204,9 +204,7 @@ pub async fn get(
 
 fn parse_uuid(s: &str) -> Result<Uuid, AppError> {
     Uuid::parse_str(s)
-        .map_err(|_| {
-            sem_os_core::error::SemOsError::InvalidInput(format!("invalid UUID: {s}"))
-        })
+        .map_err(|_| sem_os_core::error::SemOsError::InvalidInput(format!("invalid UUID: {s}")))
         .map_err(AppError::from)
 }
 
@@ -214,7 +212,10 @@ fn parse_uuid(s: &str) -> Result<Uuid, AppError> {
 /// Research mode agents cannot publish. Non-admin users cannot publish.
 fn require_publish_permission(principal: &Principal) -> Result<(), AppError> {
     let mode = principal.agent_mode();
-    if !matches!(mode, sem_os_core::authoring::agent_mode::AgentMode::Governed) {
+    if !matches!(
+        mode,
+        sem_os_core::authoring::agent_mode::AgentMode::Governed
+    ) {
         return Err(AppError::from(
             sem_os_core::error::SemOsError::Unauthorized(format!(
                 "blocked by AgentMode: {} cannot publish",

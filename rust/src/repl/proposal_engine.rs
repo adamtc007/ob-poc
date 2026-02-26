@@ -154,7 +154,7 @@ impl ProposalEngine {
         let trimmed = input.trim();
 
         // 1. Direct DSL detection — log but route through normal proposal flow.
-        // Direct DSL bypass is gated at the IntentPipeline level (allow_direct_dsl flag).
+        // No DSL bypass path exists; all utterances go through SemReg filtering.
         if trimmed.starts_with('(') {
             tracing::debug!(
                 input = trimmed,

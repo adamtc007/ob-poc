@@ -370,111 +370,110 @@ impl ToolHandlers {
             return self.dispatch_sem_reg(name, args).await;
         }
 
-        let tool = ToolName::parse_name(name)
-            .ok_or_else(|| anyhow!("Unknown tool: {}", name))?;
+        let tool = ToolName::parse_name(name).ok_or_else(|| anyhow!("Unknown tool: {}", name))?;
 
         match tool {
-            ToolName::DslValidate             => self.dsl_validate(args).await,
-            ToolName::DslExecute              => self.dsl_execute(args).await,
-            ToolName::DslExecuteSubmission    => self.dsl_execute_submission(args).await,
-            ToolName::DslBind                 => self.dsl_bind(args).await,
-            ToolName::DslPlan                 => self.dsl_plan(args).await,
-            ToolName::VerbSearch              => self.verb_search(args).await,
-            ToolName::IntentFeedback          => self.intent_feedback(args).await,
-            ToolName::DslGenerate             => self.dsl_generate(args).await,
-            ToolName::IntentBlock             => self.intent_block(args).await,
-            ToolName::LearningImport          => self.learning_import(args).await,
-            ToolName::LearningList            => self.learning_list(args).await,
-            ToolName::LearningApprove         => self.learning_approve(args).await,
-            ToolName::LearningReject          => self.learning_reject(args).await,
-            ToolName::LearningStats           => self.learning_stats(args).await,
-            ToolName::CbuGet                  => self.cbu_get(args).await,
-            ToolName::CbuList                 => self.cbu_list(args).await,
-            ToolName::EntityGet               => self.entity_get(args).await,
-            ToolName::VerbsList               => self.verbs_list(args),
-            ToolName::SchemaInfo              => self.schema_info(args).await,
-            ToolName::DbIntrospect            => self.db_introspect(args).await,
-            ToolName::DslLookup               => self.dsl_lookup(args).await,
-            ToolName::DslComplete             => self.dsl_complete(args),
-            ToolName::DslSignature            => self.dsl_signature(args),
-            ToolName::SessionLoadCbu          => self.session_load_cbu(args).await,
+            ToolName::DslValidate => self.dsl_validate(args).await,
+            ToolName::DslExecute => self.dsl_execute(args).await,
+            ToolName::DslExecuteSubmission => self.dsl_execute_submission(args).await,
+            ToolName::DslBind => self.dsl_bind(args).await,
+            ToolName::DslPlan => self.dsl_plan(args).await,
+            ToolName::VerbSearch => self.verb_search(args).await,
+            ToolName::IntentFeedback => self.intent_feedback(args).await,
+            ToolName::DslGenerate => self.dsl_generate(args).await,
+            ToolName::IntentBlock => self.intent_block(args).await,
+            ToolName::LearningImport => self.learning_import(args).await,
+            ToolName::LearningList => self.learning_list(args).await,
+            ToolName::LearningApprove => self.learning_approve(args).await,
+            ToolName::LearningReject => self.learning_reject(args).await,
+            ToolName::LearningStats => self.learning_stats(args).await,
+            ToolName::CbuGet => self.cbu_get(args).await,
+            ToolName::CbuList => self.cbu_list(args).await,
+            ToolName::EntityGet => self.entity_get(args).await,
+            ToolName::VerbsList => self.verbs_list(args),
+            ToolName::SchemaInfo => self.schema_info(args).await,
+            ToolName::DbIntrospect => self.db_introspect(args).await,
+            ToolName::DslLookup => self.dsl_lookup(args).await,
+            ToolName::DslComplete => self.dsl_complete(args),
+            ToolName::DslSignature => self.dsl_signature(args),
+            ToolName::SessionLoadCbu => self.session_load_cbu(args).await,
             ToolName::SessionLoadJurisdiction => self.session_load_jurisdiction(args).await,
-            ToolName::SessionLoadGalaxy       => self.session_load_galaxy(args).await,
-            ToolName::SessionUnloadCbu        => self.session_unload_cbu(args).await,
-            ToolName::SessionClear            => self.session_clear(args).await,
-            ToolName::SessionUndo             => self.session_undo(args).await,
-            ToolName::SessionRedo             => self.session_redo(args).await,
-            ToolName::SessionInfo             => self.session_info(args).await,
-            ToolName::SessionList             => self.session_list(args).await,
-            ToolName::EntitySearch            => self.entity_search(args).await,
-            ToolName::ResolutionStart         => self.resolution_start(args).await,
-            ToolName::ResolutionSearch        => self.resolution_search(args).await,
-            ToolName::ResolutionSelect        => self.resolution_select(args).await,
-            ToolName::ResolutionComplete      => self.resolution_complete(args).await,
-            ToolName::WorkflowStatus          => self.workflow_status(args).await,
-            ToolName::WorkflowAdvance         => self.workflow_advance(args).await,
-            ToolName::WorkflowTransition      => self.workflow_transition(args).await,
-            ToolName::WorkflowStart           => self.workflow_start(args).await,
-            ToolName::ResolveBlocker          => self.resolve_blocker(args),
-            ToolName::TemplateList            => self.template_list(args),
-            ToolName::TemplateGet             => self.template_get(args),
-            ToolName::TemplateExpand          => self.template_expand(args),
-            ToolName::BatchStart              => self.batch_start(args).await,
-            ToolName::BatchAddEntities        => self.batch_add_entities(args).await,
-            ToolName::BatchConfirmKeyset      => self.batch_confirm_keyset(args).await,
-            ToolName::BatchSetScalar          => self.batch_set_scalar(args).await,
-            ToolName::BatchGetState           => self.batch_get_state(args).await,
-            ToolName::BatchExpandCurrent      => self.batch_expand_current(args).await,
-            ToolName::BatchRecordResult       => self.batch_record_result(args).await,
-            ToolName::BatchSkipCurrent        => self.batch_skip_current(args).await,
-            ToolName::BatchCancel             => self.batch_cancel(args).await,
-            ToolName::ResearchList            => self.research_list(args).await,
-            ToolName::ResearchGet             => self.research_get(args).await,
-            ToolName::ResearchExecute         => self.research_execute(args).await,
-            ToolName::ResearchApprove         => self.research_approve(args).await,
-            ToolName::ResearchReject          => self.research_reject(args).await,
-            ToolName::ResearchStatus          => self.research_status(args).await,
-            ToolName::TaxonomyGet             => self.taxonomy_get(args).await,
-            ToolName::TaxonomyDrillIn         => self.taxonomy_drill_in(args).await,
-            ToolName::TaxonomyZoomOut         => self.taxonomy_zoom_out(args).await,
-            ToolName::TaxonomyReset           => self.taxonomy_reset(args).await,
-            ToolName::TaxonomyPosition        => self.taxonomy_position(args).await,
-            ToolName::TaxonomyEntities        => self.taxonomy_entities(args).await,
-            ToolName::TradingMatrixGet        => self.trading_matrix_get(args).await,
-            ToolName::FeedbackAnalyze         => self.feedback_analyze(args).await,
-            ToolName::FeedbackList            => self.feedback_list(args).await,
-            ToolName::FeedbackGet             => self.feedback_get(args).await,
-            ToolName::FeedbackRepro           => self.feedback_repro(args).await,
-            ToolName::FeedbackTodo            => self.feedback_todo(args).await,
-            ToolName::FeedbackAudit           => self.feedback_audit(args).await,
-            ToolName::IntentAnalyze           => self.intent_analyze(args).await,
-            ToolName::IntentList              => self.intent_list(args).await,
-            ToolName::IntentApprove           => self.intent_approve(args).await,
-            ToolName::IntentReject            => self.intent_reject(args).await,
-            ToolName::IntentReload            => self.intent_reload(args).await,
-            ToolName::ServiceIntentCreate     => self.service_intent_create(args).await,
-            ToolName::ServiceIntentList       => self.service_intent_list(args).await,
-            ToolName::ServiceDiscoveryRun     => self.service_discovery_run(args).await,
-            ToolName::ServiceAttributesGaps   => self.service_attributes_gaps(args).await,
-            ToolName::ServiceAttributesSet    => self.service_attributes_set(args).await,
-            ToolName::ServiceReadinessGet     => self.service_readiness_get(args).await,
+            ToolName::SessionLoadGalaxy => self.session_load_galaxy(args).await,
+            ToolName::SessionUnloadCbu => self.session_unload_cbu(args).await,
+            ToolName::SessionClear => self.session_clear(args).await,
+            ToolName::SessionUndo => self.session_undo(args).await,
+            ToolName::SessionRedo => self.session_redo(args).await,
+            ToolName::SessionInfo => self.session_info(args).await,
+            ToolName::SessionList => self.session_list(args).await,
+            ToolName::EntitySearch => self.entity_search(args).await,
+            ToolName::ResolutionStart => self.resolution_start(args).await,
+            ToolName::ResolutionSearch => self.resolution_search(args).await,
+            ToolName::ResolutionSelect => self.resolution_select(args).await,
+            ToolName::ResolutionComplete => self.resolution_complete(args).await,
+            ToolName::WorkflowStatus => self.workflow_status(args).await,
+            ToolName::WorkflowAdvance => self.workflow_advance(args).await,
+            ToolName::WorkflowTransition => self.workflow_transition(args).await,
+            ToolName::WorkflowStart => self.workflow_start(args).await,
+            ToolName::ResolveBlocker => self.resolve_blocker(args),
+            ToolName::TemplateList => self.template_list(args),
+            ToolName::TemplateGet => self.template_get(args),
+            ToolName::TemplateExpand => self.template_expand(args),
+            ToolName::BatchStart => self.batch_start(args).await,
+            ToolName::BatchAddEntities => self.batch_add_entities(args).await,
+            ToolName::BatchConfirmKeyset => self.batch_confirm_keyset(args).await,
+            ToolName::BatchSetScalar => self.batch_set_scalar(args).await,
+            ToolName::BatchGetState => self.batch_get_state(args).await,
+            ToolName::BatchExpandCurrent => self.batch_expand_current(args).await,
+            ToolName::BatchRecordResult => self.batch_record_result(args).await,
+            ToolName::BatchSkipCurrent => self.batch_skip_current(args).await,
+            ToolName::BatchCancel => self.batch_cancel(args).await,
+            ToolName::ResearchList => self.research_list(args).await,
+            ToolName::ResearchGet => self.research_get(args).await,
+            ToolName::ResearchExecute => self.research_execute(args).await,
+            ToolName::ResearchApprove => self.research_approve(args).await,
+            ToolName::ResearchReject => self.research_reject(args).await,
+            ToolName::ResearchStatus => self.research_status(args).await,
+            ToolName::TaxonomyGet => self.taxonomy_get(args).await,
+            ToolName::TaxonomyDrillIn => self.taxonomy_drill_in(args).await,
+            ToolName::TaxonomyZoomOut => self.taxonomy_zoom_out(args).await,
+            ToolName::TaxonomyReset => self.taxonomy_reset(args).await,
+            ToolName::TaxonomyPosition => self.taxonomy_position(args).await,
+            ToolName::TaxonomyEntities => self.taxonomy_entities(args).await,
+            ToolName::TradingMatrixGet => self.trading_matrix_get(args).await,
+            ToolName::FeedbackAnalyze => self.feedback_analyze(args).await,
+            ToolName::FeedbackList => self.feedback_list(args).await,
+            ToolName::FeedbackGet => self.feedback_get(args).await,
+            ToolName::FeedbackRepro => self.feedback_repro(args).await,
+            ToolName::FeedbackTodo => self.feedback_todo(args).await,
+            ToolName::FeedbackAudit => self.feedback_audit(args).await,
+            ToolName::IntentAnalyze => self.intent_analyze(args).await,
+            ToolName::IntentList => self.intent_list(args).await,
+            ToolName::IntentApprove => self.intent_approve(args).await,
+            ToolName::IntentReject => self.intent_reject(args).await,
+            ToolName::IntentReload => self.intent_reload(args).await,
+            ToolName::ServiceIntentCreate => self.service_intent_create(args).await,
+            ToolName::ServiceIntentList => self.service_intent_list(args).await,
+            ToolName::ServiceDiscoveryRun => self.service_discovery_run(args).await,
+            ToolName::ServiceAttributesGaps => self.service_attributes_gaps(args).await,
+            ToolName::ServiceAttributesSet => self.service_attributes_set(args).await,
+            ToolName::ServiceReadinessGet => self.service_readiness_get(args).await,
             ToolName::ServiceReadinessRecompute => self.service_readiness_recompute(args).await,
-            ToolName::ServicePipelineRun      => self.service_pipeline_run(args).await,
-            ToolName::SrdefList               => self.srdef_list(args).await,
-            ToolName::SrdefGet                => self.srdef_get(args).await,
-            ToolName::LearningAnalyze         => self.learning_analyze(args).await,
-            ToolName::LearningApply           => self.learning_apply(args).await,
-            ToolName::EmbeddingsStatus        => self.embeddings_status(args).await,
-            ToolName::PromotionRunCycle       => self.promotion_run_cycle(args).await,
-            ToolName::PromotionCandidates     => self.promotion_candidates(args).await,
-            ToolName::PromotionReviewQueue    => self.promotion_review_queue(args).await,
-            ToolName::PromotionApprove        => self.promotion_approve(args).await,
-            ToolName::PromotionReject         => self.promotion_reject(args).await,
-            ToolName::PromotionHealth         => self.promotion_health(args).await,
+            ToolName::ServicePipelineRun => self.service_pipeline_run(args).await,
+            ToolName::SrdefList => self.srdef_list(args).await,
+            ToolName::SrdefGet => self.srdef_get(args).await,
+            ToolName::LearningAnalyze => self.learning_analyze(args).await,
+            ToolName::LearningApply => self.learning_apply(args).await,
+            ToolName::EmbeddingsStatus => self.embeddings_status(args).await,
+            ToolName::PromotionRunCycle => self.promotion_run_cycle(args).await,
+            ToolName::PromotionCandidates => self.promotion_candidates(args).await,
+            ToolName::PromotionReviewQueue => self.promotion_review_queue(args).await,
+            ToolName::PromotionApprove => self.promotion_approve(args).await,
+            ToolName::PromotionReject => self.promotion_reject(args).await,
+            ToolName::PromotionHealth => self.promotion_health(args).await,
             ToolName::PromotionPipelineStatus => self.promotion_pipeline_status(args).await,
-            ToolName::TeachPhrase             => self.teach_phrase(args).await,
-            ToolName::UnteachPhrase           => self.unteach_phrase(args).await,
-            ToolName::TeachingStatus          => self.teaching_status(args).await,
+            ToolName::TeachPhrase => self.teach_phrase(args).await,
+            ToolName::UnteachPhrase => self.unteach_phrase(args).await,
+            ToolName::TeachingStatus => self.teaching_status(args).await,
         }
     }
 
@@ -696,6 +695,54 @@ impl ToolHandlers {
                 return Err(anyhow!("Parse error: {:?}", e));
             }
         };
+
+        // SemReg verb validation: extract verb FQNs from AST, check all are allowed
+        if let Some(ref client) = self.sem_os_client {
+            use dsl_core::Statement;
+            let actor = crate::policy::ActorResolver::from_env();
+            let envelope = crate::agent::orchestrator::resolve_allowed_verbs(
+                client.as_ref(),
+                &actor,
+                session_id,
+            )
+            .await;
+            if envelope.is_unavailable() {
+                // Graceful degradation: if strict mode, fail; otherwise warn and continue
+                let policy_gate = crate::policy::PolicyGate::from_env();
+                if policy_gate.semreg_fail_closed() {
+                    tracing::warn!("dsl_execute: SemReg unavailable in strict mode — blocking");
+                    return Err(anyhow!(
+                        "SemReg unavailable — execution blocked in strict mode"
+                    ));
+                }
+                tracing::warn!(
+                    "dsl_execute: SemReg unavailable — proceeding with governance warning"
+                );
+            } else if envelope.is_deny_all() {
+                tracing::warn!("dsl_execute: SemReg DenyAll — blocking execution");
+                return Err(anyhow!("SemReg denied execution: no verbs are allowed"));
+            } else {
+                let mut denied_verbs = Vec::new();
+                for stmt in &ast.statements {
+                    if let Statement::VerbCall(vc) = stmt {
+                        let fqn = format!("{}.{}", vc.domain, vc.verb);
+                        if !envelope.is_allowed(&fqn) {
+                            denied_verbs.push(fqn);
+                        }
+                    }
+                }
+                if !denied_verbs.is_empty() {
+                    tracing::warn!(
+                        denied = ?denied_verbs,
+                        "dsl_execute: SemReg denied verbs in DSL"
+                    );
+                    return Err(anyhow!(
+                        "SemReg denied execution: verbs not in allowed set: {}",
+                        denied_verbs.join(", ")
+                    ));
+                }
+            }
+        }
 
         // CSG validation (includes dataflow)
         {
@@ -1420,7 +1467,9 @@ impl ToolHandlers {
 
     /// Search for verbs matching natural language intent
     ///
-    /// Uses hybrid search: learned phrases → YAML phrases → semantic embeddings
+    /// Uses hybrid search: learned phrases → YAML phrases → semantic embeddings.
+    /// Results are pre-constrained through SemReg if available — only governance-approved
+    /// verbs are searched/returned (Phase 3 CCIR).
     async fn verb_search(&self, args: Value) -> Result<Value> {
         let query = args["query"]
             .as_str()
@@ -1431,12 +1480,45 @@ impl ToolHandlers {
         // Get or create verb searcher
         let searcher = self.get_verb_searcher().await?;
 
-        // Perform hybrid search (no user_id in this context)
-        let results = searcher.search(query, None, domain, limit).await?;
+        // Resolve SemReg allowed verbs BEFORE search (Phase 3: pre-constrained)
+        let mut sem_reg_filtered = false;
+        let envelope = if let Some(ref client) = self.sem_os_client {
+            let actor = crate::policy::ActorResolver::from_env();
+            let env =
+                crate::agent::orchestrator::resolve_allowed_verbs(client.as_ref(), &actor, None)
+                    .await;
+            Some(env)
+        } else {
+            None
+        };
+
+        // Determine the allowed_verbs constraint for the search
+        let allowed_verbs_ref = match &envelope {
+            Some(env) if env.is_deny_all() => {
+                tracing::warn!("verb_search: SemReg DenyAll — search will return empty");
+                sem_reg_filtered = true;
+                // Pass an empty set — nothing will match
+                Some(&env.allowed_verbs)
+            }
+            Some(env) if !env.is_unavailable() => {
+                sem_reg_filtered = true;
+                Some(&env.allowed_verbs)
+            }
+            _ => {
+                // No SemOS client or SemReg unavailable: graceful degradation
+                None
+            }
+        };
+
+        // Perform hybrid search with SemReg pre-constraint (Phase 3 CCIR)
+        let results = searcher
+            .search(query, None, domain, limit, allowed_verbs_ref)
+            .await?;
 
         Ok(json!({
             "query": query,
             "domain_filter": domain,
+            "sem_reg_filtered": sem_reg_filtered,
             "results": results.iter().map(|r| json!({
                 "verb": r.verb,
                 "score": r.score,
@@ -2107,10 +2189,7 @@ impl ToolHandlers {
         let mut fk_map: std::collections::HashMap<&str, Vec<&FkRow>> =
             std::collections::HashMap::new();
         for fk in &fks {
-            fk_map
-                .entry(fk.table_name.as_str())
-                .or_default()
-                .push(fk);
+            fk_map.entry(fk.table_name.as_str()).or_default().push(fk);
         }
 
         // 4. Assemble result grouped by table

@@ -86,9 +86,7 @@ pub fn format_seed_preview(manifest: &OnboardingManifest) -> String {
 
     lines.push(String::new());
     lines.push("  NOT seeded (Phase B2+):".into());
-    lines.push(
-        "    PolicyRules, EvidenceRequirements, TaxonomyMemberships,".into(),
-    );
+    lines.push("    PolicyRules, EvidenceRequirements, TaxonomyMemberships,".into());
     lines.push("    SecurityLabels, Templates, VerbBindings".into());
 
     lines.join("\n")

@@ -126,7 +126,11 @@ mod tests {
             PUBLISH_BATCH_CYCLE_DETECTED,
         ];
 
-        assert_eq!(all_codes.len(), 32, "authoring pipeline defines 32 error codes");
+        assert_eq!(
+            all_codes.len(),
+            32,
+            "authoring pipeline defines 32 error codes"
+        );
 
         for code in &all_codes {
             let parts: Vec<&str> = code.split(':').collect();

@@ -804,10 +804,6 @@ pub struct ExecuteDslRequest {
     /// DSL source to execute. If None/missing, uses session's assembled_dsl.
     #[serde(default)]
     pub dsl: Option<String>,
-    /// Must be true to allow raw DSL execution via `dsl` field.
-    /// Prevents accidental bypass of the intent pipeline.
-    #[serde(default)]
-    pub allow_raw_dsl: bool,
 }
 
 // NOTE: Direct /execute endpoint removed - use /api/session/:id/execute instead

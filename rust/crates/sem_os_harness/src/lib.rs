@@ -473,15 +473,8 @@ mod tests {
         let projections = Arc::new(PgProjectionWriter::new(pool));
 
         let service = Arc::new(
-            CoreServiceImpl::new(
-                snapshots,
-                objects,
-                audit,
-                outbox,
-                evidence,
-                projections,
-            )
-            .with_changesets(changesets),
+            CoreServiceImpl::new(snapshots, objects, audit, outbox, evidence, projections)
+                .with_changesets(changesets),
         );
 
         let principal = Principal::in_process("harness-system", vec!["admin".into()]);

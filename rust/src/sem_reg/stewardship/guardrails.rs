@@ -95,12 +95,16 @@ pub fn evaluate_all_guardrails(
 
 /// Returns true if any guardrail result has Block severity.
 pub fn has_blocking_guardrails(results: &[GuardrailResult]) -> bool {
-    results.iter().any(|r| r.severity == GuardrailSeverity::Block)
+    results
+        .iter()
+        .any(|r| r.severity == GuardrailSeverity::Block)
 }
 
 /// Returns true if any guardrail result has Warning severity (needs acknowledgement).
 pub fn has_warning_guardrails(results: &[GuardrailResult]) -> bool {
-    results.iter().any(|r| r.severity == GuardrailSeverity::Warning)
+    results
+        .iter()
+        .any(|r| r.severity == GuardrailSeverity::Warning)
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -143,7 +147,10 @@ fn check_role_permissions(
     let mut results = Vec::new();
     for entry in entries {
         // Promote and deprecate actions require elevated roles
-        if matches!(entry.action, ChangesetAction::Promote | ChangesetAction::Deprecate) {
+        if matches!(
+            entry.action,
+            ChangesetAction::Promote | ChangesetAction::Deprecate
+        ) {
             // In a full implementation, we'd check the actor's ABAC roles here.
             // For now, we check if reasoning is provided (a proxy for intentional action).
             if entry.reasoning.is_none() {
@@ -214,7 +221,10 @@ fn check_type_constraints(
     let mut results = Vec::new();
     for entry in entries {
         // Check if draft_payload contains a governance_tier + trust_class pair
-        if let Some(tier_str) = entry.draft_payload.get("governance_tier").and_then(|v| v.as_str())
+        if let Some(tier_str) = entry
+            .draft_payload
+            .get("governance_tier")
+            .and_then(|v| v.as_str())
         {
             if let Some(trust_str) = entry
                 .draft_payload
@@ -333,7 +343,15 @@ fn check_classification_required(entries: &[ChangesetEntryRow]) -> Vec<Guardrail
 /// G06: SecurityLabelRequired — PII/tax semantics must have explicit security label.
 fn check_security_label_required(entries: &[ChangesetEntryRow]) -> Vec<GuardrailResult> {
     let mut results = Vec::new();
-    let sensitive_keywords = ["pii", "tax", "ssn", "passport", "dob", "salary", "nationality"];
+    let sensitive_keywords = [
+        "pii",
+        "tax",
+        "ssn",
+        "passport",
+        "dob",
+        "salary",
+        "nationality",
+    ];
 
     for entry in entries {
         let fqn_lower = entry.object_fqn.to_lowercase();
@@ -378,9 +396,9 @@ fn check_silent_meaning_change(
                 if has_type_change && entry.reasoning.is_none() {
                     // Verify it's actually a change by comparing against active snapshot.
                     // SnapshotMeta has object_id (UUID), not fqn; compare against predecessor_id.
-                    let has_active = entry.predecessor_id.is_some_and(|pid| {
-                        active_snapshots.iter().any(|s| s.object_id == pid)
-                    });
+                    let has_active = entry
+                        .predecessor_id
+                        .is_some_and(|pid| active_snapshots.iter().any(|s| s.object_id == pid));
                     if has_active {
                         results.push(make_result_with_ctx(
                             GuardrailId::G07SilentMeaningChange,
@@ -831,16 +849,8 @@ mod tests {
     #[test]
     fn test_has_blocking_guardrails() {
         let results = vec![
-            make_result(
-                GuardrailId::G02NamingConvention,
-                "warning",
-                "fix naming",
-            ),
-            make_result(
-                GuardrailId::G03TypeConstraint,
-                "block",
-                "fix type",
-            ),
+            make_result(GuardrailId::G02NamingConvention, "warning", "fix naming"),
+            make_result(GuardrailId::G03TypeConstraint, "block", "fix type"),
         ];
         assert!(has_blocking_guardrails(&results));
     }

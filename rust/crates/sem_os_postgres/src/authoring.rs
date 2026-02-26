@@ -4,7 +4,9 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use sem_os_core::authoring::ports::{AuthoringStore, Result, ScratchRunResult, ScratchSchemaRunner};
+use sem_os_core::authoring::ports::{
+    AuthoringStore, Result, ScratchRunResult, ScratchSchemaRunner,
+};
 use sem_os_core::authoring::types::*;
 use sem_os_core::error::SemOsError;
 use sem_os_core::principal::Principal;
@@ -147,11 +149,7 @@ impl AuthoringStore for PgAuthoringStore {
         Ok(())
     }
 
-    async fn mark_superseded(
-        &self,
-        change_set_id: Uuid,
-        superseded_by: Uuid,
-    ) -> Result<()> {
+    async fn mark_superseded(&self, change_set_id: Uuid, superseded_by: Uuid) -> Result<()> {
         sqlx::query(
             r#"
             UPDATE sem_reg.changesets
@@ -320,8 +318,8 @@ impl AuthoringStore for PgAuthoringStore {
     // ── Governance audit log ───────────────────────────────────
 
     async fn insert_audit_entry(&self, entry: &GovernanceAuditEntry) -> Result<()> {
-        let result_json = serde_json::to_value(&entry.result)
-            .map_err(|e| SemOsError::Internal(e.into()))?;
+        let result_json =
+            serde_json::to_value(&entry.result).map_err(|e| SemOsError::Internal(e.into()))?;
 
         sqlx::query(
             r#"
@@ -392,31 +390,30 @@ impl AuthoringStore for PgAuthoringStore {
         // Key: hash of "sem_reg_authoring_publish" → deterministic i64.
         const PUBLISH_LOCK_KEY: i64 = 0x5345_4D52_4547_5055; // "SEMREGPU" as hex
 
-        let row: (bool,) = sqlx::query_as(
-            "SELECT pg_try_advisory_lock($1)",
-        )
-        .bind(PUBLISH_LOCK_KEY)
-        .fetch_one(&self.pool)
-        .await
-        .map_err(|e| SemOsError::Internal(e.into()))?;
+        let row: (bool,) = sqlx::query_as("SELECT pg_try_advisory_lock($1)")
+            .bind(PUBLISH_LOCK_KEY)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|e| SemOsError::Internal(e.into()))?;
 
         Ok(row.0)
     }
 
     async fn apply_migrations(&self, migrations: &[(String, String)]) -> Result<()> {
-        let mut tx = self.pool.begin().await
+        let mut tx = self
+            .pool
+            .begin()
+            .await
             .map_err(|e| SemOsError::Internal(e.into()))?;
 
         for (path, sql) in migrations {
-            sqlx::query(sql)
-                .execute(&mut *tx)
-                .await
-                .map_err(|e| SemOsError::Internal(
-                    anyhow::anyhow!("Migration {path} failed: {e}"),
-                ))?;
+            sqlx::query(sql).execute(&mut *tx).await.map_err(|e| {
+                SemOsError::Internal(anyhow::anyhow!("Migration {path} failed: {e}"))
+            })?;
         }
 
-        tx.commit().await
+        tx.commit()
+            .await
             .map_err(|e| SemOsError::Internal(e.into()))?;
 
         Ok(())
@@ -427,7 +424,10 @@ impl AuthoringStore for PgAuthoringStore {
         change_set_ids: &[Uuid],
         publisher: &str,
     ) -> Result<Uuid> {
-        let mut tx = self.pool.begin().await
+        let mut tx = self
+            .pool
+            .begin()
+            .await
             .map_err(|e| SemOsError::Internal(e.into()))?;
 
         // Create the snapshot set
@@ -438,7 +438,10 @@ impl AuthoringStore for PgAuthoringStore {
             RETURNING snapshot_set_id
             "#,
         )
-        .bind(format!("Authoring publish: {} changeset(s)", change_set_ids.len()))
+        .bind(format!(
+            "Authoring publish: {} changeset(s)",
+            change_set_ids.len()
+        ))
         .bind(publisher)
         .fetch_one(&mut *tx)
         .await
@@ -459,7 +462,8 @@ impl AuthoringStore for PgAuthoringStore {
         .await
         .map_err(|e| SemOsError::Internal(e.into()))?;
 
-        tx.commit().await
+        tx.commit()
+            .await
             .map_err(|e| SemOsError::Internal(e.into()))?;
 
         Ok(ss_id)
@@ -482,9 +486,7 @@ impl AuthoringStore for PgAuthoringStore {
 
         Ok(rows
             .into_iter()
-            .filter_map(|(s, c)| {
-                ChangeSetStatus::parse(&s).map(|status| (status, c))
-            })
+            .filter_map(|(s, c)| ChangeSetStatus::parse(&s).map(|status| (status, c)))
             .collect())
     }
 
@@ -540,7 +542,10 @@ impl ScratchSchemaRunner for PgScratchSchemaRunner {
         let mut down_errors = Vec::new();
 
         // Use a single connection + transaction so everything rolls back
-        let mut conn = self.pool.acquire().await
+        let mut conn = self
+            .pool
+            .acquire()
+            .await
             .map_err(|e| SemOsError::Internal(e.into()))?;
 
         // Create scratch schema
@@ -579,9 +584,7 @@ impl ScratchSchemaRunner for PgScratchSchemaRunner {
             .await;
 
         // Reset search_path
-        let _ = sqlx::query("RESET search_path")
-            .execute(&mut *conn)
-            .await;
+        let _ = sqlx::query("RESET search_path").execute(&mut *conn).await;
 
         Ok(ScratchRunResult {
             apply_ms,

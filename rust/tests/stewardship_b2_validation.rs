@@ -18,12 +18,12 @@ mod b2_validation {
 
     use ob_poc::sem_reg::abac::ActorContext;
     use ob_poc::sem_reg::agent::mcp_tools::{SemRegToolContext, SemRegToolResult};
+    use ob_poc::sem_reg::onboarding::seed::BOOTSTRAP_SET_ID;
+    use ob_poc::sem_reg::stewardship::focus::FocusStore;
+    use ob_poc::sem_reg::stewardship::show_loop::ShowLoop;
     use ob_poc::sem_reg::stewardship::tools_phase0::dispatch_phase0_tool;
     use ob_poc::sem_reg::stewardship::tools_phase1::dispatch_phase1_tool;
-    use ob_poc::sem_reg::stewardship::show_loop::ShowLoop;
-    use ob_poc::sem_reg::stewardship::focus::FocusStore;
     use ob_poc::sem_reg::stewardship::types::*;
-    use ob_poc::sem_reg::onboarding::seed::BOOTSTRAP_SET_ID;
 
     // ── Test Infrastructure ──────────────────────────────────────────
 
@@ -38,8 +38,7 @@ mod b2_validation {
     }
 
     async fn get_pool() -> Result<PgPool> {
-        let url = std::env::var("DATABASE_URL")
-            .unwrap_or_else(|_| "postgresql:///ob_poc".into());
+        let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| "postgresql:///ob_poc".into());
         let pool = PgPool::connect(&url).await?;
         Ok(pool)
     }
@@ -87,11 +86,13 @@ mod b2_validation {
             .await
             .ok();
 
-        sqlx::query("DELETE FROM sem_reg.snapshots WHERE snapshot_set_id = $1 AND status = 'draft'")
-            .bind(changeset_id)
-            .execute(pool)
-            .await
-            .ok();
+        sqlx::query(
+            "DELETE FROM sem_reg.snapshots WHERE snapshot_set_id = $1 AND status = 'draft'",
+        )
+        .bind(changeset_id)
+        .execute(pool)
+        .await
+        .ok();
 
         sqlx::query("DELETE FROM sem_reg.changesets WHERE changeset_id = $1")
             .bind(changeset_id)
@@ -117,7 +118,8 @@ mod b2_validation {
 
     /// Helper: unwrap a dispatch_phase0_tool result.
     fn unwrap_tool_result(result: Option<SemRegToolResult>, tool_name: &str) -> SemRegToolResult {
-        let result = result.unwrap_or_else(|| panic!("{}: dispatch returned None (tool not found)", tool_name));
+        let result = result
+            .unwrap_or_else(|| panic!("{}: dispatch returned None (tool not found)", tool_name));
         if !result.success {
             panic!(
                 "{}: tool failed: {}",
@@ -184,7 +186,10 @@ mod b2_validation {
 
         // Assert the result contains data_type from the definition
         let data = &result.data;
-        println!("  Data keys: {:?}", data.as_object().map(|o| o.keys().collect::<Vec<_>>()));
+        println!(
+            "  Data keys: {:?}",
+            data.as_object().map(|o| o.keys().collect::<Vec<_>>())
+        );
         // The describe tool returns object_type, fqn, snapshot_id, definition, etc.
         // Check that the definition includes data_type
         if let Some(def) = data.get("definition") {
@@ -295,11 +300,17 @@ mod b2_validation {
         .await;
         let show_result = unwrap_tool_result(show_result, "stew_show");
         let show_data = &show_result.data;
-        println!("  ShowPacket keys: {:?}", show_data.as_object().map(|o| o.keys().collect::<Vec<_>>()));
+        println!(
+            "  ShowPacket keys: {:?}",
+            show_data.as_object().map(|o| o.keys().collect::<Vec<_>>())
+        );
 
         // Assert: focus data is present
         if let Some(focus) = show_data.get("focus") {
-            println!("  Focus changeset_id in ShowPacket: {:?}", focus.get("changeset_id"));
+            println!(
+                "  Focus changeset_id in ShowPacket: {:?}",
+                focus.get("changeset_id")
+            );
         }
 
         // Assert: viewports array exists and contains Focus viewport
@@ -392,15 +403,9 @@ mod b2_validation {
         println!("  Gate precheck result: {:?}", gate_result.data);
 
         // Assert: guardrail results exist
-        let blocking = gate_result.data["blocking_count"]
-            .as_i64()
-            .unwrap_or(0);
-        let warnings = gate_result.data["warning_count"]
-            .as_i64()
-            .unwrap_or(0);
-        let advisories = gate_result.data["advisory_count"]
-            .as_i64()
-            .unwrap_or(0);
+        let blocking = gate_result.data["blocking_count"].as_i64().unwrap_or(0);
+        let warnings = gate_result.data["warning_count"].as_i64().unwrap_or(0);
+        let advisories = gate_result.data["advisory_count"].as_i64().unwrap_or(0);
         let total = blocking + warnings + advisories;
         println!(
             "  Guardrail results: {} blocking, {} warnings, {} advisories (total: {})",
@@ -460,7 +465,13 @@ mod b2_validation {
         )
         .await;
         let result = unwrap_tool_result(result, "stew_describe_object (with consumers)");
-        println!("  Describe result keys: {:?}", result.data.as_object().map(|o| o.keys().collect::<Vec<_>>()));
+        println!(
+            "  Describe result keys: {:?}",
+            result
+                .data
+                .as_object()
+                .map(|o| o.keys().collect::<Vec<_>>())
+        );
 
         // Check for consumers field
         if let Some(consumers) = result.data.get("consumers") {
@@ -489,12 +500,13 @@ mod b2_validation {
         )
         .await;
         let xref_result = unwrap_tool_result(xref_result, "stew_cross_reference");
-        println!("  Cross-reference (empty changeset): {:?}", xref_result.data);
+        println!(
+            "  Cross-reference (empty changeset): {:?}",
+            xref_result.data
+        );
 
         // A clean changeset should have no conflicts
-        let conflict_count = xref_result.data["conflict_count"]
-            .as_i64()
-            .unwrap_or(0);
+        let conflict_count = xref_result.data["conflict_count"].as_i64().unwrap_or(0);
         assert_eq!(
             conflict_count, 0,
             "Empty changeset should have zero cross-reference conflicts"
@@ -569,7 +581,10 @@ mod b2_validation {
         )
         .await;
         let add_result = unwrap_tool_result(add_result, "stew_add_item (modify)");
-        println!("  Added modify entry: {:?}", add_result.data.get("entry_id"));
+        println!(
+            "  Added modify entry: {:?}",
+            add_result.data.get("entry_id")
+        );
 
         // 5d. Set focus with draft overlay + object_ref
         let session_id = Uuid::new_v4();
@@ -694,7 +709,10 @@ mod b2_validation {
         println!("  Created changeset: {}", changeset_id);
 
         // 6b. Add a new AttributeDef with novel FQN (not in bootstrap)
-        let novel_attr_fqn = format!("b2_test.intra_changeset.test_field_{}", &Uuid::new_v4().to_string()[..8]);
+        let novel_attr_fqn = format!(
+            "b2_test.intra_changeset.test_field_{}",
+            &Uuid::new_v4().to_string()[..8]
+        );
         let attr_payload = json!({
             "fqn": novel_attr_fqn,
             "name": "B2 Intra-Changeset Test Field",
@@ -716,7 +734,11 @@ mod b2_validation {
         )
         .await;
         let add_attr = unwrap_tool_result(add_attr, "stew_add_item (new attribute)");
-        println!("  Added new AttributeDef: {} -> {:?}", novel_attr_fqn, add_attr.data.get("entry_id"));
+        println!(
+            "  Added new AttributeDef: {} -> {:?}",
+            novel_attr_fqn,
+            add_attr.data.get("entry_id")
+        );
 
         // 6c. Add a VerbContract that references the new AttributeDef
         let novel_verb_fqn = format!("b2_test.intra_verb_{}", &Uuid::new_v4().to_string()[..8]);
@@ -747,7 +769,11 @@ mod b2_validation {
         )
         .await;
         let add_verb = unwrap_tool_result(add_verb, "stew_add_item (new verb)");
-        println!("  Added new VerbContract: {} -> {:?}", novel_verb_fqn, add_verb.data.get("entry_id"));
+        println!(
+            "  Added new VerbContract: {} -> {:?}",
+            novel_verb_fqn,
+            add_verb.data.get("entry_id")
+        );
 
         // 6d. Run gate precheck
         let gate_result = dispatch_phase0_tool(
@@ -759,15 +785,9 @@ mod b2_validation {
         let gate_result = unwrap_tool_result(gate_result, "stew_gate_precheck");
         println!("  Gate precheck result: {:?}", gate_result.data);
 
-        let blocking = gate_result.data["blocking_count"]
-            .as_i64()
-            .unwrap_or(0);
-        let warnings = gate_result.data["warning_count"]
-            .as_i64()
-            .unwrap_or(0);
-        let advisories = gate_result.data["advisory_count"]
-            .as_i64()
-            .unwrap_or(0);
+        let blocking = gate_result.data["blocking_count"].as_i64().unwrap_or(0);
+        let warnings = gate_result.data["warning_count"].as_i64().unwrap_or(0);
+        let advisories = gate_result.data["advisory_count"].as_i64().unwrap_or(0);
         println!(
             "  Results: {} blocking, {} warnings, {} advisories",
             blocking, warnings, advisories
@@ -775,9 +795,16 @@ mod b2_validation {
 
         // Assert: NO blocking error for "missing reference" to the intra-changeset attribute
         // Warnings for naming convention (G02) or classification (G05) are acceptable.
-        if let Some(results) = gate_result.data.get("guardrail_results").and_then(|v| v.as_array()) {
+        if let Some(results) = gate_result
+            .data
+            .get("guardrail_results")
+            .and_then(|v| v.as_array())
+        {
             for r in results {
-                let guardrail_id = r.get("guardrail_id").and_then(|g| g.as_str()).unwrap_or("?");
+                let guardrail_id = r
+                    .get("guardrail_id")
+                    .and_then(|g| g.as_str())
+                    .unwrap_or("?");
                 let severity = r.get("severity").and_then(|s| s.as_str()).unwrap_or("?");
                 let message = r.get("message").and_then(|m| m.as_str()).unwrap_or("?");
                 println!("    {} [{}]: {}", guardrail_id, severity, message);

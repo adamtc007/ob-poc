@@ -13,7 +13,8 @@ pub mod seeds;
 
 use dsl_core::config::types::VerbsConfig;
 use sem_os_core::seeds::{
-    AttributeSeed, EntityTypeSeed, PolicySeed, SeedBundle, TaxonomySeed, VerbContractSeed, ViewSeed,
+    AttributeSeed, DerivationSpecSeed, EntityTypeSeed, PolicySeed, SeedBundle, TaxonomySeed,
+    VerbContractSeed, ViewSeed,
 };
 
 /// Build a complete `SeedBundle` from ob-poc verb configuration.
@@ -33,10 +34,7 @@ pub fn build_seed_bundle(verbs_config: &VerbsConfig) -> SeedBundle {
     let taxonomy_pairs = seeds::core_taxonomies();
     let policy_bodies = seeds::core_policies();
     let view_bodies = seeds::core_views();
-    // Note: derivation specs are included as policies (they have their own object type
-    // in the registry but are not a separate SeedBundle field). They will be handled
-    // by the bootstrap endpoint on the server side. For now we skip them in the bundle
-    // since SeedBundle doesn't have a derivations field.
+    let derivation_spec_bodies = seeds::core_derivation_specs();
 
     // 3. Serialize into seed DTOs
     let verb_contracts: Vec<VerbContractSeed> = verb_contract_bodies
@@ -87,6 +85,14 @@ pub fn build_seed_bundle(verbs_config: &VerbsConfig) -> SeedBundle {
         })
         .collect();
 
+    let derivation_specs: Vec<DerivationSpecSeed> = derivation_spec_bodies
+        .iter()
+        .map(|body| DerivationSpecSeed {
+            fqn: body.fqn.clone(),
+            payload: serde_json::to_value(body).expect("DerivationSpecBody must serialize"),
+        })
+        .collect();
+
     // 4. Compute deterministic bundle hash
     let bundle_hash = SeedBundle::compute_hash(
         &verb_contracts,
@@ -95,6 +101,7 @@ pub fn build_seed_bundle(verbs_config: &VerbsConfig) -> SeedBundle {
         &taxonomies,
         &policies,
         &views,
+        &derivation_specs,
     )
     .expect("SeedBundle canonical JSON serialization should never fail");
 
@@ -106,6 +113,7 @@ pub fn build_seed_bundle(verbs_config: &VerbsConfig) -> SeedBundle {
         taxonomies,
         policies,
         views,
+        derivation_specs,
     }
 }
 
@@ -188,6 +196,7 @@ mod tests {
         assert!(!bundle.taxonomies.is_empty());
         assert!(!bundle.policies.is_empty());
         assert!(!bundle.views.is_empty());
+        assert!(!bundle.derivation_specs.is_empty());
     }
 
     #[test]
@@ -243,5 +252,22 @@ mod tests {
 
         // Should have 4 views from core_views()
         assert_eq!(bundle.views.len(), 4);
+    }
+
+    #[test]
+    fn test_derivation_spec_seeds_are_present() {
+        let config = minimal_verbs_config();
+        let bundle = build_seed_bundle(&config);
+
+        // Should have 5 derivation specs from core_derivation_specs()
+        assert_eq!(bundle.derivation_specs.len(), 5);
+        let fqns: Vec<&str> = bundle
+            .derivation_specs
+            .iter()
+            .map(|d| d.fqn.as_str())
+            .collect();
+        assert!(fqns.contains(&"ubo.total_ownership_pct"));
+        assert!(fqns.contains(&"risk.composite_score"));
+        assert!(fqns.contains(&"trading.aggregate_aum"));
     }
 }

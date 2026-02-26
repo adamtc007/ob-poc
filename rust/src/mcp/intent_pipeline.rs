@@ -2,13 +2,14 @@
 //!
 //! ALL user input flows through this pipeline. No exceptions.
 //!
-//! ## Deprecation Note (Phase 2)
+//! ## Active Callers
 //!
-//! For the v2 REPL, use `IntentService::match_verb()` instead of
-//! `IntentPipeline::process_with_scope()`. The IntentService provides a unified
-//! 5-phase pipeline with clarification checking via `sentences.clarify`
-//! templates. This module remains the entry point for the v1 agent
-//! pipeline (`/api/session/:id/chat`).
+//! This module is **actively used** by two distinct code paths:
+//! - **Chat API** (`/api/session/:id/chat`) — via `orchestrator::handle_utterance()`
+//! - **MCP `dsl_generate`** — via `orchestrator::handle_utterance()`
+//!
+//! For the V2 REPL, use `IntentService::match_verb()` instead, which provides
+//! a unified 5-phase pipeline with pack-scoped scoring and clarification.
 //!
 //! ## Pipeline Flow
 //!
@@ -142,8 +143,6 @@ pub enum PipelineOutcome {
     },
     /// Scope candidates need user selection
     ScopeCandidates,
-    /// Direct DSL was attempted but policy denied it
-    DirectDslNotAllowed,
     /// SemReg denied all verb candidates (strict mode)
     NoAllowedVerbs,
 }
@@ -192,11 +191,11 @@ pub struct IntentPipeline {
     verb_searcher: HybridVerbSearcher,
     llm_client: Option<Arc<dyn LlmClient>>,
     scope_resolver: ScopeResolver,
-    /// Whether direct DSL bypass (input starting with '(') is allowed.
-    /// Default: false. Set to true only for operator-role actors.
-    allow_direct_dsl: bool,
     #[cfg(feature = "database")]
     pool: Option<PgPool>,
+    /// SemReg-allowed verb FQNs (Phase 3 CCIR pre-constraint).
+    /// When set, verb search only considers verbs in this set.
+    allowed_verbs: Option<std::collections::HashSet<String>>,
 }
 
 impl IntentPipeline {
@@ -206,9 +205,9 @@ impl IntentPipeline {
             verb_searcher,
             llm_client: None,
             scope_resolver: ScopeResolver::new(),
-            allow_direct_dsl: false,
             #[cfg(feature = "database")]
             pool: None,
+            allowed_verbs: None,
         }
     }
 
@@ -219,15 +218,15 @@ impl IntentPipeline {
             verb_searcher,
             llm_client: None,
             scope_resolver: ScopeResolver::new(),
-            allow_direct_dsl: false,
             pool: Some(pool),
+            allowed_verbs: None,
         }
     }
 
-    /// Enable or disable direct DSL bypass (input starting with '(').
-    /// Should only be enabled for operator-role actors.
-    pub fn set_allow_direct_dsl(mut self, allow: bool) -> Self {
-        self.allow_direct_dsl = allow;
+    /// Set SemReg-allowed verb constraint (Phase 3 CCIR).
+    /// When set, verb search only considers verbs in this set.
+    pub fn with_allowed_verbs(mut self, allowed: std::collections::HashSet<String>) -> Self {
+        self.allowed_verbs = Some(allowed);
         self
     }
 
@@ -389,38 +388,6 @@ impl IntentPipeline {
     ) -> Result<PipelineResult> {
         let trimmed = instruction.trim();
 
-        // Fast path: Direct DSL input — requires explicit "dsl:" prefix + server allow flag.
-        // The old starts_with('(') path is removed to close the bypass trap door.
-        if let Some(raw_dsl) = trimmed.strip_prefix("dsl:").map(|s| s.trim()) {
-            if self.allow_direct_dsl {
-                tracing::info!(
-                    bypass = "direct_dsl",
-                    "Direct DSL bypass used (operator-gated, dsl: prefix)"
-                );
-                return self.process_direct_dsl(raw_dsl, existing_scope).await;
-            } else {
-                tracing::warn!(
-                    bypass = "direct_dsl_denied",
-                    "Direct DSL bypass attempted but not allowed by PolicyGate"
-                );
-                return Ok(PipelineResult {
-                    intent: StructuredIntent::empty(),
-                    verb_candidates: vec![],
-                    dsl: String::new(),
-                    dsl_hash: None,
-                    valid: false,
-                    validation_error: Some(
-                        "Direct DSL input is not allowed. Use natural language instead.".into(),
-                    ),
-                    unresolved_refs: vec![],
-                    missing_required: vec![],
-                    outcome: PipelineOutcome::DirectDslNotAllowed,
-                    scope_resolution: None,
-                    scope_context: None,
-                });
-            }
-        }
-
         // Infer domain from input phrase if no hint provided
         // This narrows verb search to relevant domain, improving accuracy
         let inferred_domain = domain_hint
@@ -531,9 +498,16 @@ impl IntentPipeline {
     ) -> Result<PipelineResult> {
         // Step 1: Find verb candidates via semantic search
         // Domain filter narrows results to relevant verbs (e.g., "session" domain for "set session...")
+        // When allowed_verbs is set (Phase 3 CCIR), search is pre-constrained to SemReg-approved verbs.
         let candidates = self
             .verb_searcher
-            .search(instruction, None, domain_filter, 5)
+            .search(
+                instruction,
+                None,
+                domain_filter,
+                5,
+                self.allowed_verbs.as_ref(),
+            )
             .await?;
 
         if candidates.is_empty() {
@@ -962,106 +936,6 @@ Respond with ONLY valid JSON:
             arguments,
             confidence: verb_confidence,
             notes,
-        })
-    }
-
-    /// Process direct DSL input (bypass semantic search and LLM)
-    ///
-    /// When user types DSL directly like `(view.book :client <Allianz>)`,
-    /// we parse and validate it without involving the LLM.
-    async fn process_direct_dsl(
-        &self,
-        dsl: &str,
-        scope: Option<ScopeContext>,
-    ) -> Result<PipelineResult> {
-        use crate::mcp::verb_search::VerbSearchSource;
-        use dsl_core::Statement;
-
-        let scope_ctx = scope.unwrap_or_default();
-
-        tracing::info!("Processing direct DSL input: {}", dsl);
-
-        // Parse the DSL - on failure, re-route through natural language pipeline
-        // This lets the LLM interpret malformed DSL as user intent
-        let ast = match parse_program(dsl) {
-            Ok(ast) => ast,
-            Err(parse_error) => {
-                tracing::info!(
-                    "DSL parse failed, re-routing to NL pipeline: {}",
-                    parse_error
-                );
-                // Recursively call process() but skip the DSL detection
-                // by treating the malformed DSL as natural language
-                return self.process_as_natural_language(dsl, None, scope_ctx).await;
-            }
-        };
-
-        // Extract verb from first statement
-        let verb = if let Some(stmt) = ast.statements.first() {
-            match stmt {
-                Statement::VerbCall(vc) => format!("{}.{}", vc.domain, vc.verb),
-                Statement::Comment(_) => return Err(anyhow!("First statement is a comment")),
-            }
-        } else {
-            return Err(anyhow!("Empty DSL program"));
-        };
-
-        // Validate via compile
-        let (valid, validation_error) = self.validate_dsl(dsl);
-
-        // Enrich AST and extract entity refs using canonical walker (FIX C)
-        let registry = runtime_registry_arc();
-        let enriched = enrich_program(ast, &registry);
-        let locations = find_unresolved_ref_locations(&enriched.program);
-
-        let unresolved: Vec<UnresolvedRef> = locations
-            .into_iter()
-            .map(|loc| UnresolvedRef {
-                param_name: loc.arg_key,
-                search_value: loc.search_text,
-                entity_type: Some(loc.entity_type),
-                search_column: loc.search_column,
-                ref_id: loc.ref_id,
-            })
-            .collect();
-
-        // Compute dsl_hash for version tracking
-        let dsl_hash = Some(compute_dsl_hash(dsl));
-
-        // Build a minimal StructuredIntent for consistency
-        let intent = StructuredIntent {
-            verb: verb.clone(),
-            arguments: vec![], // Args are in the DSL itself
-            confidence: 1.0,   // Direct DSL = full confidence
-            notes: vec!["Direct DSL input".to_string()],
-        };
-
-        Ok(PipelineResult {
-            intent,
-            verb_candidates: vec![VerbSearchResult {
-                verb,
-                score: 1.0,
-                source: VerbSearchSource::DirectDsl,
-                matched_phrase: dsl.to_string(),
-                description: Some("Direct DSL input".to_string()),
-            }],
-            dsl: dsl.to_string(),
-            dsl_hash,
-            valid,
-            validation_error,
-            unresolved_refs: unresolved,
-            missing_required: vec![],
-            outcome: if valid {
-                PipelineOutcome::Ready
-            } else {
-                PipelineOutcome::NeedsUserInput
-            },
-            scope_resolution: None,
-            scope_context: if scope_ctx.has_scope() {
-                Some(scope_ctx)
-            } else {
-                None
-            },
         })
     }
 
@@ -1858,26 +1732,6 @@ mod tests {
     }
 
     #[test]
-    fn test_allow_direct_dsl_defaults_to_false() {
-        let searcher = HybridVerbSearcher::minimal();
-        let pipeline = IntentPipeline::new(searcher);
-        assert!(
-            !pipeline.allow_direct_dsl,
-            "allow_direct_dsl should default to false"
-        );
-    }
-
-    #[test]
-    fn test_set_allow_direct_dsl() {
-        let searcher = HybridVerbSearcher::minimal();
-        let pipeline = IntentPipeline::new(searcher).set_allow_direct_dsl(true);
-        assert!(
-            pipeline.allow_direct_dsl,
-            "allow_direct_dsl should be true after set"
-        );
-    }
-
-    #[test]
     fn test_infer_domain_from_phrase() {
         // Session domain
         assert_eq!(
@@ -2024,26 +1878,6 @@ mod tests {
 mod policy_gate_tests {
     use super::*;
 
-    #[test]
-    fn test_allow_direct_dsl_defaults_to_false() {
-        let searcher = HybridVerbSearcher::minimal();
-        let pipeline = IntentPipeline::new(searcher);
-        assert!(
-            !pipeline.allow_direct_dsl,
-            "Direct DSL should be disabled by default"
-        );
-    }
-
-    #[test]
-    fn test_set_allow_direct_dsl() {
-        let searcher = HybridVerbSearcher::minimal();
-        let pipeline = IntentPipeline::new(searcher).set_allow_direct_dsl(true);
-        assert!(
-            pipeline.allow_direct_dsl,
-            "Direct DSL should be enabled after set_allow_direct_dsl(true)"
-        );
-    }
-
     /// Static guard: IntentPipeline must ONLY be constructed in orchestrator.rs.
     #[test]
     fn test_no_duplicate_pipeline_outside_orchestrator() {
@@ -2106,10 +1940,11 @@ mod correctness_tests {
     use super::*;
 
     #[test]
-    fn test_denied_dsl_returns_explicit_error() {
-        // With direct DSL disabled, dsl: prefix must return DirectDslNotAllowed
+    fn test_dsl_prefix_treated_as_natural_language() {
+        // After side-door removal, "dsl:" prefix is no longer special —
+        // it should go through normal NL pipeline (no bypass)
         let searcher = HybridVerbSearcher::minimal();
-        let pipeline = IntentPipeline::new(searcher); // allow_direct_dsl defaults to false
+        let pipeline = IntentPipeline::new(searcher);
 
         let rt = tokio::runtime::Builder::new_current_thread()
             .enable_all()
@@ -2120,36 +1955,12 @@ mod correctness_tests {
             .block_on(pipeline.process_with_scope("dsl:(cbu.list)", None, None))
             .unwrap();
 
-        assert_eq!(result.outcome, PipelineOutcome::DirectDslNotAllowed);
-        assert!(
-            result.dsl.is_empty(),
-            "No DSL should be generated when dsl: is denied"
-        );
-        assert!(!result.valid);
-        assert!(result.validation_error.unwrap().contains("not allowed"));
-    }
-
-    #[test]
-    fn test_direct_dsl_without_prefix_is_not_bypass() {
-        // Input starting with '(' should NOT trigger direct DSL bypass
-        let searcher = HybridVerbSearcher::minimal();
-        let pipeline = IntentPipeline::new(searcher).set_allow_direct_dsl(true);
-
-        let rt = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .unwrap();
-
-        // Parenthesized input without dsl: prefix should go through NL pipeline
-        let result = rt
-            .block_on(pipeline.process_with_scope("(cbu.list)", None, None))
-            .unwrap();
-
-        // Should NOT produce DSL from direct bypass (no dsl: prefix)
+        // Should NOT be Ready via bypass — goes through NL pipeline
+        // (minimal searcher won't find a match, so NoMatch is expected)
         assert_ne!(
             result.outcome,
             PipelineOutcome::Ready,
-            "Parenthesized input without dsl: prefix should not bypass"
+            "dsl: prefix should not bypass NL pipeline"
         );
     }
 
@@ -2159,12 +1970,5 @@ mod correctness_tests {
         let outcome = PipelineOutcome::NoAllowedVerbs;
         let json = serde_json::to_string(&outcome).unwrap();
         assert!(json.contains("NoAllowedVerbs"));
-    }
-
-    #[test]
-    fn test_pipeline_outcome_direct_dsl_not_allowed_variant() {
-        let outcome = PipelineOutcome::DirectDslNotAllowed;
-        let json = serde_json::to_string(&outcome).unwrap();
-        assert!(json.contains("DirectDslNotAllowed"));
     }
 }

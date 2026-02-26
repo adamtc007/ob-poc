@@ -52,19 +52,15 @@ pub struct RawArtifactEntry {
 
 /// Parse a `changeset.yaml` manifest string.
 pub fn parse_manifest(yaml: &str) -> Result<RawManifest> {
-    serde_yaml::from_str(yaml).map_err(|e| {
-        SemOsError::InvalidInput(format!("Failed to parse changeset.yaml: {e}"))
-    })
+    serde_yaml::from_str(yaml)
+        .map_err(|e| SemOsError::InvalidInput(format!("Failed to parse changeset.yaml: {e}")))
 }
 
 /// Build a `BundleContents` from a raw manifest and a content resolver.
 ///
 /// `resolve_content` maps `(artifact_type, path)` → file content.
 /// This abstraction allows both filesystem and inline/base64 bundles.
-pub fn build_bundle<F>(
-    raw: &RawManifest,
-    resolve_content: F,
-) -> Result<BundleContents>
+pub fn build_bundle<F>(raw: &RawManifest, resolve_content: F) -> Result<BundleContents>
 where
     F: Fn(&str, &str) -> std::result::Result<String, String>,
 {
@@ -81,10 +77,7 @@ where
         })?;
 
         let content = resolve_content(&entry.artifact_type, &entry.path).map_err(|e| {
-            SemOsError::InvalidInput(format!(
-                "Failed to resolve artifact '{}': {e}",
-                entry.path
-            ))
+            SemOsError::InvalidInput(format!("Failed to resolve artifact '{}': {e}", entry.path))
         })?;
 
         let content_hash = compute_artifact_hash_typed(&content, artifact_type);
@@ -201,7 +194,10 @@ artifacts:
         let bundle = build_bundle_from_map(&raw, &content_map).unwrap();
         assert_eq!(bundle.manifest.title, "Add KYC attributes");
         assert_eq!(bundle.artifacts.len(), 3);
-        assert_eq!(bundle.artifacts[0].artifact_type, ArtifactType::MigrationSql);
+        assert_eq!(
+            bundle.artifacts[0].artifact_type,
+            ArtifactType::MigrationSql
+        );
         assert_eq!(bundle.artifacts[0].content, "CREATE TABLE kyc();");
         assert!(!bundle.artifacts[0].content_hash.is_empty());
     }
@@ -227,7 +223,10 @@ artifacts:
         content_map.insert("foo.txt".into(), "content".into());
         let result = build_bundle_from_map(&raw, &content_map);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Unknown artifact type"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Unknown artifact type"));
     }
 
     #[test]
@@ -244,7 +243,10 @@ artifacts:
         content_map.insert("001.sql".into(), "CREATE TABLE t();".into());
         let result = build_bundle_from_map(&raw, &content_map);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Content hash mismatch"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Content hash mismatch"));
     }
 
     #[test]
@@ -257,7 +259,11 @@ artifacts:
 
         let bundle = build_bundle_from_map(&raw, &content_map).unwrap();
         for artifact in &bundle.artifacts {
-            assert_eq!(artifact.content_hash.len(), 64, "SHA-256 hex should be 64 chars");
+            assert_eq!(
+                artifact.content_hash.len(),
+                64,
+                "SHA-256 hex should be 64 chars"
+            );
         }
     }
 

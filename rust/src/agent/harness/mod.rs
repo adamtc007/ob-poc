@@ -99,8 +99,6 @@ pub struct ModeExpectations {
     #[serde(default = "default_true")]
     pub strict_single_pipeline: bool,
     #[serde(default)]
-    pub allow_direct_dsl: bool,
-    #[serde(default)]
     pub allow_raw_execute: bool,
 }
 
@@ -109,7 +107,6 @@ impl Default for ModeExpectations {
         Self {
             strict_semreg: true,
             strict_single_pipeline: true,
-            allow_direct_dsl: false,
             allow_raw_execute: false,
         }
     }
@@ -221,31 +218,26 @@ name: "Full Suite"
 suite_id: "full"
 mode_expectations:
   strict_semreg: false
-  allow_direct_dsl: true
 session_seed:
   scope: "Allianz GI"
   actor:
     actor_id: "admin.user"
     roles: ["operator"]
 scenarios:
-  - name: "direct dsl"
-    tags: ["bypass", "dsl"]
+  - name: "natural language"
+    tags: ["intent"]
     steps:
-      - user: "dsl:(cbu.create :name \"Acme\")"
+      - user: "create a new fund"
         expect:
-          outcome: "Ready"
-          bypass_used: "direct_dsl"
-          dsl_non_empty: true
+          outcome: "NoMatch"
         on_outcome:
           ClarifyVerb:
             choose_index: 1
 "#;
         let suite: ScenarioSuite = serde_yaml::from_str(yaml).unwrap();
         assert!(!suite.mode_expectations.strict_semreg);
-        assert!(suite.mode_expectations.allow_direct_dsl);
         assert_eq!(suite.session_seed.actor.roles, vec!["operator"]);
         let step = &suite.scenarios[0].steps[0];
-        assert_eq!(step.expect.bypass_used.as_deref(), Some("direct_dsl"));
         assert!(step.on_outcome.is_some());
     }
 
@@ -259,7 +251,6 @@ scenarios: []
         let suite: ScenarioSuite = serde_yaml::from_str(yaml).unwrap();
         assert!(suite.mode_expectations.strict_semreg);
         assert!(suite.mode_expectations.strict_single_pipeline);
-        assert!(!suite.mode_expectations.allow_direct_dsl);
         assert!(!suite.mode_expectations.allow_raw_execute);
     }
 

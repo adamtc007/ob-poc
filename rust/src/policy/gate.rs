@@ -11,7 +11,6 @@ use serde::Serialize;
 pub struct PolicyGate {
     pub strict_single_pipeline: bool,
     pub allow_raw_execute: bool,
-    pub allow_direct_dsl: bool,
     pub strict_semreg: bool,
     pub allow_legacy_generate: bool,
 }
@@ -21,7 +20,6 @@ impl PolicyGate {
         Self {
             strict_single_pipeline: env_bool("OBPOC_STRICT_SINGLE_PIPELINE", true),
             allow_raw_execute: env_bool("OBPOC_ALLOW_RAW_EXECUTE", false),
-            allow_direct_dsl: env_bool("OBPOC_ALLOW_DIRECT_DSL", false),
             strict_semreg: env_bool("OBPOC_STRICT_SEMREG", true),
             allow_legacy_generate: env_bool("OBPOC_ALLOW_LEGACY_GENERATE", false),
         }
@@ -31,7 +29,6 @@ impl PolicyGate {
         Self {
             strict_single_pipeline: false,
             allow_raw_execute: true,
-            allow_direct_dsl: true,
             strict_semreg: false,
             allow_legacy_generate: true,
         }
@@ -41,14 +38,9 @@ impl PolicyGate {
         Self {
             strict_single_pipeline: true,
             allow_raw_execute: false,
-            allow_direct_dsl: false,
             strict_semreg: true,
             allow_legacy_generate: false,
         }
-    }
-
-    pub fn can_use_direct_dsl(&self, actor: &ActorContext) -> bool {
-        self.allow_direct_dsl && actor.roles.iter().any(|r| r == "operator" || r == "admin")
     }
 
     pub fn can_execute_raw_dsl(&self, actor: &ActorContext) -> bool {
@@ -72,7 +64,6 @@ impl PolicyGate {
         PolicySnapshot {
             strict_single_pipeline: self.strict_single_pipeline,
             allow_raw_execute: self.allow_raw_execute,
-            allow_direct_dsl: self.allow_direct_dsl,
             strict_semreg: self.strict_semreg,
             allow_legacy_generate: self.allow_legacy_generate,
         }
@@ -83,7 +74,6 @@ impl PolicyGate {
 pub struct PolicySnapshot {
     pub strict_single_pipeline: bool,
     pub allow_raw_execute: bool,
-    pub allow_direct_dsl: bool,
     pub strict_semreg: bool,
     pub allow_legacy_generate: bool,
 }
@@ -217,7 +207,6 @@ mod tests {
     #[test]
     fn test_strict_denies_all() {
         let g = PolicyGate::strict();
-        assert!(!g.can_use_direct_dsl(&operator()));
         assert!(!g.can_execute_raw_dsl(&operator()));
         assert!(!g.can_use_legacy_generate(&operator()));
         assert!(g.semreg_fail_closed());
@@ -225,14 +214,12 @@ mod tests {
     #[test]
     fn test_permissive_allows_operator() {
         let g = PolicyGate::permissive();
-        assert!(!g.can_use_direct_dsl(&viewer()));
-        assert!(g.can_use_direct_dsl(&operator()));
+        assert!(!g.can_execute_raw_dsl(&viewer()));
         assert!(g.can_execute_raw_dsl(&operator()));
     }
     #[test]
     fn test_admin_same_as_operator() {
         let g = PolicyGate::permissive();
-        assert!(g.can_use_direct_dsl(&admin()));
         assert!(g.can_execute_raw_dsl(&admin()));
     }
     #[test]

@@ -1172,9 +1172,7 @@ async fn get_investor_list(
 
     // Query for total count (with filters)
     let (count_query, count_params) = build_investor_count_query(&filters);
-    let mut count_q = sqlx::query_scalar(&count_query)
-        .bind(issuer_id)
-        .bind(as_of);
+    let mut count_q = sqlx::query_scalar(&count_query).bind(issuer_id).bind(as_of);
     for p in &count_params {
         count_q = count_q.bind(p.as_str());
     }
@@ -1186,7 +1184,8 @@ async fn get_investor_list(
     let total_pages = ((total_items as f64) / (page_size as f64)).ceil() as i32;
 
     // Query for page items
-    let (items_query, list_params) = build_investor_list_query(&filters, &order_clause, page_size, offset);
+    let (items_query, list_params) =
+        build_investor_list_query(&filters, &order_clause, page_size, offset);
     let mut items_q = sqlx::query(&items_query)
         .bind(issuer_id)
         .bind(as_of)

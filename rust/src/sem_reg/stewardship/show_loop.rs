@@ -100,10 +100,7 @@ impl ShowLoop {
 
     /// Viewport C: Object Inspector — shows details of focused objects.
     /// Uses existing sem_reg snapshot data.
-    async fn render_object_inspector(
-        pool: &PgPool,
-        focus: &FocusState,
-    ) -> Result<ViewportModel> {
+    async fn render_object_inspector(pool: &PgPool, focus: &FocusState) -> Result<ViewportModel> {
         let mut objects = Vec::new();
 
         for obj_ref in &focus.object_refs {
@@ -140,10 +137,7 @@ impl ShowLoop {
 
     /// Viewport D: Diff — predecessor Active vs Draft successor.
     /// Server-side field-level typed diff.
-    async fn render_diff_viewport(
-        pool: &PgPool,
-        focus: &FocusState,
-    ) -> Result<ViewportModel> {
+    async fn render_diff_viewport(pool: &PgPool, focus: &FocusState) -> Result<ViewportModel> {
         let changeset_id = match &focus.overlay_mode {
             OverlayMode::DraftOverlay { changeset_id } => *changeset_id,
             _ => {
@@ -211,10 +205,7 @@ impl ShowLoop {
 
     /// Viewport G: Gates — runs guardrails on changeset entries.
     /// Returns Loading status if gates are still being computed.
-    async fn render_gates_viewport(
-        pool: &PgPool,
-        focus: &FocusState,
-    ) -> Result<ViewportModel> {
+    async fn render_gates_viewport(pool: &PgPool, focus: &FocusState) -> Result<ViewportModel> {
         let changeset_id = match focus.changeset_id {
             Some(id) => id,
             None => {
@@ -292,8 +283,7 @@ impl ShowLoop {
         let viewport_refs: Vec<ViewportRef> = viewports
             .iter()
             .map(|vp| {
-                let data_json =
-                    serde_json::to_string(&vp.data).unwrap_or_default();
+                let data_json = serde_json::to_string(&vp.data).unwrap_or_default();
                 let mut hasher = Sha256::new();
                 hasher.update(data_json.as_bytes());
                 let hash = format!("{:x}", hasher.finalize());
@@ -321,10 +311,7 @@ impl ShowLoop {
     }
 
     /// Persist a ViewportManifest to the audit table.
-    pub async fn persist_manifest(
-        pool: &PgPool,
-        manifest: &ViewportManifest,
-    ) -> Result<()> {
+    pub async fn persist_manifest(pool: &PgPool, manifest: &ViewportManifest) -> Result<()> {
         let focus_json = serde_json::to_value(&manifest.focus_state)?;
         let viewport_refs_json = serde_json::to_value(&manifest.rendered_viewports)?;
 
@@ -865,6 +852,8 @@ mod tests {
         let actions = ShowLoop::compute_suggested_actions(&focus);
         // Toggle overlay + Run gates + Submit for review
         assert_eq!(actions.len(), 3);
-        assert!(actions.iter().any(|a| a.action_type == ActionType::RunGates));
+        assert!(actions
+            .iter()
+            .any(|a| a.action_type == ActionType::RunGates));
     }
 }

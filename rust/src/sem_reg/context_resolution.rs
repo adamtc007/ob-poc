@@ -1680,9 +1680,11 @@ pub async fn resolve_context_with_overlay(
                 }
 
                 // Re-sort by updated rank
-                response
-                    .candidate_verbs
-                    .sort_by(|a, b| b.rank_score.partial_cmp(&a.rank_score).unwrap_or(std::cmp::Ordering::Equal));
+                response.candidate_verbs.sort_by(|a, b| {
+                    b.rank_score
+                        .partial_cmp(&a.rank_score)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                });
 
                 // Add governance signal about draft overlay
                 response.governance_signals.push(GovernanceSignal {
@@ -1704,10 +1706,7 @@ pub async fn resolve_context_with_overlay(
 }
 
 /// Load draft snapshots belonging to a changeset.
-async fn load_changeset_drafts(
-    pool: &PgPool,
-    changeset_id: Uuid,
-) -> Result<Vec<SnapshotRow>> {
+async fn load_changeset_drafts(pool: &PgPool, changeset_id: Uuid) -> Result<Vec<SnapshotRow>> {
     let rows = sqlx::query_as::<_, SnapshotRow>(
         r#"
         SELECT *

@@ -49,6 +49,13 @@ pub struct IntentEventRow {
     pub dominant_entity_id: Option<Uuid>,
     pub dominant_entity_kind: Option<String>,
     pub entity_kind_filtered: bool,
+
+    pub allowed_verbs_fingerprint: Option<String>,
+    pub pruned_verbs_count: i32,
+
+    pub toctou_recheck_performed: bool,
+    pub toctou_result: Option<String>,
+    pub toctou_new_fingerprint: Option<String>,
 }
 
 /// Map a PipelineOutcome to its telemetry string label.
@@ -62,7 +69,6 @@ pub fn outcome_label(outcome: &crate::mcp::intent_pipeline::PipelineOutcome) -> 
         PipelineOutcome::SemanticNotReady => "semantic_not_ready",
         PipelineOutcome::ScopeResolved { .. } => "scope_resolved",
         PipelineOutcome::ScopeCandidates => "scope_candidates",
-        PipelineOutcome::DirectDslNotAllowed => "direct_dsl_denied",
         PipelineOutcome::NoAllowedVerbs => "no_allowed_verbs",
     }
 }

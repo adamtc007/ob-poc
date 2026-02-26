@@ -178,7 +178,10 @@ pub async fn dispatch_phase1_tool(
 
 // ─── Tool handlers ──────────────────────────────────────────────
 
-async fn handle_get_focus(ctx: &SemRegToolContext<'_>, args: &serde_json::Value) -> SemRegToolResult {
+async fn handle_get_focus(
+    ctx: &SemRegToolContext<'_>,
+    args: &serde_json::Value,
+) -> SemRegToolResult {
     let session_id = match parse_uuid_arg(args, "session_id") {
         Ok(id) => id,
         Err(e) => return SemRegToolResult::err(e),
@@ -197,7 +200,10 @@ async fn handle_get_focus(ctx: &SemRegToolContext<'_>, args: &serde_json::Value)
     }
 }
 
-async fn handle_set_focus(ctx: &SemRegToolContext<'_>, args: &serde_json::Value) -> SemRegToolResult {
+async fn handle_set_focus(
+    ctx: &SemRegToolContext<'_>,
+    args: &serde_json::Value,
+) -> SemRegToolResult {
     let session_id = match parse_uuid_arg(args, "session_id") {
         Ok(id) => id,
         Err(e) => return SemRegToolResult::err(e),
@@ -342,7 +348,9 @@ async fn handle_get_viewport(
                     .iter()
                     .find(|v| v.kind == ViewportKind::Object)
                     .map(|_| json!({"viewport": "object", "status": "ready"}))
-                    .unwrap_or(json!({"error": "Object viewport not available — no objects in focus"}))
+                    .unwrap_or(
+                        json!({"error": "Object viewport not available — no objects in focus"}),
+                    )
             }),
         "diff" => ShowLoop::compute_show_packet(ctx.pool, &focus, &ctx.actor.actor_id, None)
             .await
@@ -351,7 +359,9 @@ async fn handle_get_viewport(
                     .iter()
                     .find(|v| v.kind == ViewportKind::Diff)
                     .map(|_| json!({"viewport": "diff", "status": "ready"}))
-                    .unwrap_or(json!({"error": "Diff viewport not available — no draft overlay active"}))
+                    .unwrap_or(
+                        json!({"error": "Diff viewport not available — no draft overlay active"}),
+                    )
             }),
         "gates" => ShowLoop::compute_show_packet(ctx.pool, &focus, &ctx.actor.actor_id, None)
             .await
@@ -360,7 +370,9 @@ async fn handle_get_viewport(
                     .iter()
                     .find(|v| v.kind == ViewportKind::Gates)
                     .map(|_| json!({"viewport": "gates", "status": "ready"}))
-                    .unwrap_or(json!({"error": "Gates viewport not available — no changeset selected"}))
+                    .unwrap_or(
+                        json!({"error": "Gates viewport not available — no changeset selected"}),
+                    )
             }),
         other => {
             return SemRegToolResult::err(format!(
@@ -375,7 +387,10 @@ async fn handle_get_viewport(
     }
 }
 
-async fn handle_get_diff(ctx: &SemRegToolContext<'_>, args: &serde_json::Value) -> SemRegToolResult {
+async fn handle_get_diff(
+    ctx: &SemRegToolContext<'_>,
+    args: &serde_json::Value,
+) -> SemRegToolResult {
     let session_id = match parse_uuid_arg(args, "session_id") {
         Ok(id) => id,
         Err(e) => return SemRegToolResult::err(e),

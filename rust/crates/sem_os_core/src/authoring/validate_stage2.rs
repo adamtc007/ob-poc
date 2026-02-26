@@ -90,7 +90,9 @@ async fn validate_schema_safety(
         .iter()
         .map(|a| {
             (
-                a.path.clone().unwrap_or_else(|| format!("ordinal_{}", a.ordinal)),
+                a.path
+                    .clone()
+                    .unwrap_or_else(|| format!("ordinal_{}", a.ordinal)),
                 a.content.clone(),
             )
         })
@@ -102,7 +104,9 @@ async fn validate_schema_safety(
         .iter()
         .map(|a| {
             (
-                a.path.clone().unwrap_or_else(|| format!("down_ordinal_{}", a.ordinal)),
+                a.path
+                    .clone()
+                    .unwrap_or_else(|| format!("down_ordinal_{}", a.ordinal)),
                 a.content.clone(),
             )
         })
@@ -127,7 +131,10 @@ async fn validate_schema_safety(
     }
 
     // If we have non-transactional DDL errors, skip scratch apply
-    if errors.iter().any(|e| e.code == D_SCHEMA_NON_TRANSACTIONAL_DDL) {
+    if errors
+        .iter()
+        .any(|e| e.code == D_SCHEMA_NON_TRANSACTIONAL_DDL)
+    {
         return;
     }
 
@@ -343,8 +350,7 @@ mod tests {
 
     #[test]
     fn test_concurrently_case_insensitive() {
-        let line =
-            find_concurrently_line("create index concurrently idx on t(c);");
+        let line = find_concurrently_line("create index concurrently idx on t(c);");
         assert_eq!(line, Some(1));
     }
 }

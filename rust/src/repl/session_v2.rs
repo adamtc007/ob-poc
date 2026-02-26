@@ -1,8 +1,8 @@
 //! Session V2 — Owns a Runbook instead of a ledger
 //!
 //! `ReplSessionV2` is the single container for a user's in-progress work.
-//! It holds the state machine, client context, journey context, runbook,
-//! and conversation history.
+//! It holds the state machine, runbook, staged pack, and conversation history.
+//! Session state is derived from the runbook via `ContextStack::from_runbook()`.
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -32,18 +32,14 @@ use crate::journey::pack::PackManifest;
 pub struct ReplSessionV2 {
     pub id: Uuid,
     pub state: ReplStateV2,
-    /// Deprecated — use `ContextStack::derived_scope` from runbook fold (P-3).
-    /// Retained for serialization compatibility during migration.
-    /// No V2 code should READ from this field — it is written only for
-    /// persistence backward compatibility.
-    #[deprecated(note = "Use ContextStack::derived_scope from runbook fold (P-3)")]
-    pub client_context: Option<ClientContext>,
-    /// Deprecated — use `staged_pack` + `ContextStack` from runbook fold (P-3).
-    /// Retained for serialization compatibility during migration.
-    /// No V2 code should READ from this field — it is written only for
-    /// persistence backward compatibility.
-    #[deprecated(note = "Use staged_pack + ContextStack from runbook fold (P-3)")]
-    pub journey_context: Option<JourneyContext>,
+    /// Deprecated — retained as opaque JSON for deserialization of legacy sessions.
+    /// No code should read or write this field.
+    #[serde(default)]
+    pub client_context: Option<serde_json::Value>,
+    /// Deprecated — retained as opaque JSON for deserialization of legacy sessions.
+    /// No code should read or write this field.
+    #[serde(default)]
+    pub journey_context: Option<serde_json::Value>,
     /// The active pack manifest (not serialized — reloaded from pack files).
     /// This is the staged pack that ContextStack reads. It replaces the
     /// `journey_context.pack` field for all read-side access.
@@ -80,7 +76,6 @@ pub struct ReplSessionV2 {
 
 impl ReplSessionV2 {
     /// Create a new session starting in `ScopeGate`.
-    #[allow(deprecated)] // Initialises deprecated fields to None for serde compat
     pub fn new() -> Self {
         let id = Uuid::new_v4();
         let now = Utc::now();
@@ -139,68 +134,47 @@ impl ReplSessionV2 {
         self.last_active_at = Utc::now();
     }
 
-    /// Set the client context (scope).
+    /// Set the client scope (client group id).
     ///
-    /// Writes to both `runbook.client_group_id` (canonical) and the
-    /// deprecated `client_context` field (serialization compat only).
-    #[allow(deprecated)] // Bridge: writes deprecated field for persistence compat
-    pub fn set_client_context(&mut self, ctx: ClientContext) {
-        self.runbook.client_group_id = Some(ctx.client_group_id);
-        self.client_context = Some(ctx);
+    /// Writes to `runbook.client_group_id` — the canonical source of truth.
+    pub fn set_client_scope(&mut self, client_group_id: Uuid) {
+        self.runbook.client_group_id = Some(client_group_id);
         self.last_active_at = Utc::now();
     }
 
     /// Activate a journey pack.
     ///
-    /// Sets both the new `staged_pack` field (for ContextStack reads)
-    /// and the legacy `journey_context` (for migration compatibility).
-    #[allow(deprecated)] // Bridge: writes deprecated journey_context for persistence compat
+    /// Sets `staged_pack` (for ContextStack reads) and runbook pack fields.
     pub fn activate_pack(
         &mut self,
         pack: Arc<PackManifest>,
         manifest_hash: String,
-        handoff: Option<PackHandoff>,
+        _handoff: Option<PackHandoff>,
     ) {
         self.runbook.pack_id = Some(pack.id.clone());
         self.runbook.pack_version = Some(pack.version.clone());
         self.runbook.pack_manifest_hash = Some(manifest_hash.clone());
 
-        // New: set staged_pack for ContextStack reads.
-        self.staged_pack = Some(pack.clone());
-        self.staged_pack_hash = Some(manifest_hash.clone());
-
-        // Legacy: kept for serialization compatibility.
-        self.journey_context = Some(JourneyContext {
-            pack,
-            pack_manifest_hash: manifest_hash,
-            answers: HashMap::new(),
-            template_id: None,
-            progress: PackProgress::default(),
-            handoff_source: handoff,
-        });
-
+        self.staged_pack = Some(pack);
+        self.staged_pack_hash = Some(manifest_hash);
         self.last_active_at = Utc::now();
     }
 
     /// Record an answer to a pack question.
     ///
-    /// Writes to deprecated `journey_context.answers` for persistence compat.
     /// The canonical source is `ContextStack::accumulated_answers` derived
-    /// from the runbook fold via `derive_answers()`.
-    #[allow(deprecated)] // Bridge: writes deprecated field for persistence compat
-    pub fn record_answer(&mut self, field: String, value: serde_json::Value) {
-        if let Some(ref mut ctx) = self.journey_context {
-            ctx.answers.insert(field, value);
-        }
+    /// from the runbook fold via `derive_answers()`. Answers are stored as
+    /// runbook entries, not on the session struct.
+    pub fn record_answer(&mut self, _field: String, _value: serde_json::Value) {
+        // Answers are recorded via runbook entries — this is now a no-op.
+        // Callers should add answer entries to the runbook directly.
         self.last_active_at = Utc::now();
     }
 
     /// Clear the staged pack (e.g., when switching journeys).
-    #[allow(deprecated)] // Bridge: clears deprecated journey_context for persistence compat
     pub fn clear_staged_pack(&mut self) {
         self.staged_pack = None;
         self.staged_pack_hash = None;
-        self.journey_context = None;
         self.last_active_at = Utc::now();
     }
 
@@ -227,29 +201,26 @@ impl ReplSessionV2 {
         self.staged_pack.is_some() || self.journey_context.is_some()
     }
 
-    /// Get the active pack ID (from staged_pack or journey_context).
-    #[allow(deprecated)] // Fallback reads deprecated journey_context for migration compat
+    /// Get the active pack ID (from staged_pack).
     pub fn active_pack_id(&self) -> Option<String> {
-        self.staged_pack
-            .as_ref()
-            .map(|p| p.id.clone())
-            .or_else(|| self.journey_context.as_ref().map(|c| c.pack.id.clone()))
+        self.staged_pack.as_ref().map(|p| p.id.clone())
     }
 
     /// Rehydrate transient fields after loading from database.
     ///
     /// - Restores the Arc<PackManifest> from the pack router using the stored hash.
-    /// - Restores staged_pack from the journey_context (migration bridge).
     /// - Rebuilds the invocation index on the runbook.
-    #[allow(deprecated)] // Reads deprecated journey_context for migration rehydration
     pub fn rehydrate(&mut self, pack_router: &crate::journey::router::PackRouter) {
         // Restore the pack Arc from the router using stored manifest hash.
-        if let Some(ref mut jctx) = self.journey_context {
-            if let Some((manifest, _)) = pack_router.get_pack_by_hash(&jctx.pack_manifest_hash) {
-                jctx.pack = manifest.clone();
-                // Also restore staged_pack for ContextStack reads.
+        // Prefer staged_pack_hash (transient), fall back to runbook.pack_manifest_hash (persisted).
+        let hash = self
+            .staged_pack_hash
+            .as_deref()
+            .or(self.runbook.pack_manifest_hash.as_deref());
+        if let Some(hash) = hash {
+            if let Some((manifest, _)) = pack_router.get_pack_by_hash(hash) {
                 self.staged_pack = Some(manifest.clone());
-                self.staged_pack_hash = Some(jctx.pack_manifest_hash.clone());
+                self.staged_pack_hash = Some(hash.to_string());
             }
         }
         // Rebuild invocation index (lost during serialization due to #[serde(skip)]).
@@ -261,86 +232,6 @@ impl Default for ReplSessionV2 {
     fn default() -> Self {
         Self::new()
     }
-}
-
-// ---------------------------------------------------------------------------
-// ClientContext
-// ---------------------------------------------------------------------------
-
-/// The scope the user is operating in — which client group and defaults.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ClientContext {
-    pub client_group_id: Uuid,
-    pub client_group_name: String,
-    pub default_cbu: Option<Uuid>,
-    pub default_book: Option<Uuid>,
-}
-
-// ---------------------------------------------------------------------------
-// JourneyContext
-// ---------------------------------------------------------------------------
-
-/// Context for an active journey pack.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct JourneyContext {
-    /// The active pack manifest (not serialized — reloaded from pack files).
-    #[serde(skip, default = "default_pack")]
-    pub pack: Arc<PackManifest>,
-
-    /// Canonical hash of the pack manifest file.
-    pub pack_manifest_hash: String,
-
-    /// Answers to pack questions collected so far.
-    pub answers: HashMap<String, serde_json::Value>,
-
-    /// Selected template (if any).
-    pub template_id: Option<String>,
-
-    /// Progress tracking.
-    pub progress: PackProgress,
-
-    /// If this session was started via handoff from another pack.
-    pub handoff_source: Option<PackHandoff>,
-}
-
-/// Default pack for deserialization — placeholder until reloaded from files.
-fn default_pack() -> Arc<PackManifest> {
-    Arc::new(PackManifest {
-        id: String::new(),
-        name: String::new(),
-        version: String::new(),
-        description: String::new(),
-        invocation_phrases: Vec::new(),
-        required_context: Vec::new(),
-        optional_context: Vec::new(),
-        allowed_verbs: Vec::new(),
-        forbidden_verbs: Vec::new(),
-        risk_policy: Default::default(),
-        required_questions: Vec::new(),
-        optional_questions: Vec::new(),
-        stop_rules: Vec::new(),
-        templates: Vec::new(),
-        pack_summary_template: None,
-        section_layout: Vec::new(),
-        definition_of_done: Vec::new(),
-        progress_signals: Vec::new(),
-        handoff_target: None,
-    })
-}
-
-// ---------------------------------------------------------------------------
-// PackProgress
-// ---------------------------------------------------------------------------
-
-/// Progress within an active pack.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct PackProgress {
-    pub questions_answered: usize,
-    pub questions_remaining: usize,
-    pub steps_proposed: usize,
-    pub steps_confirmed: usize,
-    pub steps_executed: usize,
-    pub signals_emitted: Vec<String>,
 }
 
 // ---------------------------------------------------------------------------
@@ -412,18 +303,12 @@ required_context:
     }
 
     #[test]
-    fn test_set_client_context() {
+    fn test_set_client_scope() {
         let mut session = ReplSessionV2::new();
         let group_id = Uuid::new_v4();
 
-        session.set_client_context(ClientContext {
-            client_group_id: group_id,
-            client_group_name: "Allianz".to_string(),
-            default_cbu: None,
-            default_book: None,
-        });
+        session.set_client_scope(group_id);
 
-        assert!(session.client_context.is_some());
         assert_eq!(session.runbook.client_group_id, Some(group_id));
     }
 
@@ -435,11 +320,13 @@ required_context:
 
         session.activate_pack(pack.clone(), hash.clone(), None);
 
-        assert!(session.journey_context.is_some());
-        let ctx = session.journey_context.as_ref().unwrap();
-        assert_eq!(ctx.pack_manifest_hash, hash);
-        assert_eq!(ctx.pack.id, "onboarding-request");
-        assert!(ctx.answers.is_empty());
+        // staged_pack and runbook fields are the canonical locations
+        assert!(session.staged_pack.is_some());
+        assert_eq!(
+            session.staged_pack.as_ref().unwrap().id,
+            "onboarding-request"
+        );
+        assert_eq!(session.staged_pack_hash.as_deref(), Some("abc123def456"));
 
         assert_eq!(
             session.runbook.pack_id,
@@ -454,12 +341,12 @@ required_context:
         let pack = sample_pack();
         session.activate_pack(pack, "hash".to_string(), None);
 
+        // record_answer is now a no-op (answers stored via runbook entries).
+        // Verify it doesn't panic and updates last_active_at.
+        let before = session.last_active_at;
         session.record_answer("products".to_string(), serde_json::json!(["IRS", "EQUITY"]));
         session.record_answer("jurisdiction".to_string(), serde_json::json!("LU"));
-
-        let ctx = session.journey_context.as_ref().unwrap();
-        assert_eq!(ctx.answers.len(), 2);
-        assert_eq!(ctx.answers["jurisdiction"], serde_json::json!("LU"));
+        assert!(session.last_active_at >= before);
     }
 
     #[test]
@@ -508,13 +395,18 @@ required_context:
             forwarded_outcomes: vec![Uuid::new_v4()],
         };
 
+        // handoff is now ignored by activate_pack (context is derived from runbook)
+        // but we verify it doesn't panic and pack is properly activated
         session.activate_pack(pack, "hash".to_string(), Some(handoff));
 
-        let ctx = session.journey_context.as_ref().unwrap();
-        assert!(ctx.handoff_source.is_some());
+        assert!(session.staged_pack.is_some());
         assert_eq!(
-            ctx.handoff_source.as_ref().unwrap().target_pack_id,
+            session.staged_pack.as_ref().unwrap().id,
             "onboarding-request"
+        );
+        assert_eq!(
+            session.runbook.pack_id,
+            Some("onboarding-request".to_string())
         );
     }
 
@@ -582,13 +474,13 @@ required_context:
         let json = serde_json::to_string(&session).unwrap();
         let mut loaded: ReplSessionV2 = serde_json::from_str(&json).unwrap();
 
-        // Before rehydration, pack is the default placeholder.
-        assert!(loaded.journey_context.as_ref().unwrap().pack.id.is_empty());
+        // Before rehydration, staged_pack is lost (not serialized).
+        assert!(loaded.staged_pack.is_none());
 
-        // After rehydration, pack is restored.
+        // After rehydration, staged_pack is restored from router.
         loaded.rehydrate(&router);
         assert_eq!(
-            loaded.journey_context.as_ref().unwrap().pack.id,
+            loaded.staged_pack.as_ref().unwrap().id,
             "onboarding-request"
         );
     }

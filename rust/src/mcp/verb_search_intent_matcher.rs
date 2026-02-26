@@ -54,7 +54,7 @@ impl IntentMatcher for VerbSearchIntentMatcher {
         let user_id: Option<Uuid> = context.user_id;
         let domain_filter: Option<String> = context.domain_hint.clone();
 
-        // Run the 10-tier verb search
+        // Run the 10-tier verb search, constrained by SemReg allowed verbs if present
         let results = self
             .searcher
             .search(
@@ -62,6 +62,7 @@ impl IntentMatcher for VerbSearchIntentMatcher {
                 user_id,
                 domain_filter.as_deref(),
                 10, // top-k candidates
+                context.allowed_verbs.as_ref(),
             )
             .await?;
 

@@ -155,11 +155,7 @@ fn compute_wiring_metrics(
         }
 
         // Has maps_to args — check how many resolve to known columns
-        let verb_tables: Vec<&str> = verb
-            .side_effects
-            .iter()
-            .map(|e| e.table.as_str())
-            .collect();
+        let verb_tables: Vec<&str> = verb.side_effects.iter().map(|e| e.table.as_str()).collect();
 
         let mapped_count = mapped_args
             .iter()

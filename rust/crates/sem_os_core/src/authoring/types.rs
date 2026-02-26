@@ -72,11 +72,7 @@ impl ChangeSetStatus {
     pub fn is_intermediate(&self) -> bool {
         matches!(
             self,
-            Self::Draft
-                | Self::UnderReview
-                | Self::Approved
-                | Self::Validated
-                | Self::DryRunPassed
+            Self::Draft | Self::UnderReview | Self::Approved | Self::Validated | Self::DryRunPassed
         )
     }
 }
@@ -409,7 +405,11 @@ mod tests {
             ChangeSetStatus::Superseded,
         ] {
             let s = status.as_str();
-            assert_eq!(ChangeSetStatus::parse(s), Some(status), "round-trip failed for {s}");
+            assert_eq!(
+                ChangeSetStatus::parse(s),
+                Some(status),
+                "round-trip failed for {s}"
+            );
         }
     }
 
@@ -424,7 +424,11 @@ mod tests {
             ArtifactType::DocJson,
         ] {
             let s = at.as_str();
-            assert_eq!(ArtifactType::parse(s), Some(at), "round-trip failed for {s}");
+            assert_eq!(
+                ArtifactType::parse(s),
+                Some(at),
+                "round-trip failed for {s}"
+            );
         }
     }
 

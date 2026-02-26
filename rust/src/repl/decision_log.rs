@@ -195,6 +195,16 @@ pub struct VerbDecision {
     /// Precondition filter stats (if filter was applied).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub precondition_filter: Option<PreconditionFilterLog>,
+
+    /// SemReg ContextEnvelope fingerprint (SHA-256 of sorted allowed verb FQNs).
+    /// Populated when SemOS client is available and ContextEnvelope is resolved.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub context_envelope_fingerprint: Option<String>,
+
+    /// Number of verbs pruned by SemReg context resolution.
+    /// Zero when SemOS unavailable or when no pruning occurred.
+    #[serde(default)]
+    pub pruned_verbs_count: usize,
 }
 
 /// Log entry for precondition filtering.
@@ -237,6 +247,8 @@ impl Default for VerbDecision {
             used_template_path: false,
             template_id: None,
             precondition_filter: None,
+            context_envelope_fingerprint: None,
+            pruned_verbs_count: 0,
         }
     }
 }
@@ -799,6 +811,8 @@ mod tests {
                 used_template_path: false,
                 template_id: None,
                 precondition_filter: None,
+                context_envelope_fingerprint: Some("abc123".to_string()),
+                pruned_verbs_count: 42,
             })
             .with_proposed_dsl("(kyc.add-entity :entity-name \"Irish Fund\")".to_string());
 

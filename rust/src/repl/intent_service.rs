@@ -458,6 +458,41 @@ mod tests {
             },
         );
 
+        // Session verbs needed by ambiguous/matched tests
+        let mut session_verbs = HashMap::new();
+        for action in &["load-galaxy", "load-system", "load-cbu"] {
+            session_verbs.insert(
+                action.to_string(),
+                VerbConfig {
+                    description: format!("Load {action}"),
+                    behavior: VerbBehavior::Plugin,
+                    args: vec![],
+                    sentences: None,
+                    crud: None,
+                    handler: None,
+                    graph_query: None,
+                    durable: None,
+                    returns: None,
+                    produces: None,
+                    consumes: vec![],
+                    lifecycle: None,
+                    metadata: None,
+                    invocation_phrases: vec![],
+                    policy: None,
+                    confirm_policy: None,
+                },
+            );
+        }
+        domains.insert(
+            "session".to_string(),
+            DomainConfig {
+                description: "Session ops".to_string(),
+                verbs: session_verbs,
+                dynamic_verbs: vec![],
+                invocation_hints: vec![],
+            },
+        );
+
         let config = VerbsConfig {
             version: "1.0".to_string(),
             domains,
@@ -475,6 +510,7 @@ mod tests {
             user_id: None,
             domain_hint: None,
             bindings: vec![],
+            allowed_verbs: None,
         }
     }
 
@@ -508,7 +544,7 @@ mod tests {
     #[tokio::test]
     async fn test_match_verb_ambiguous() {
         let matcher = StubIntentMatcher::ambiguous(
-            vec![("session.load-galaxy", 0.82), ("session.load-system", 0.79)],
+            vec![("session.load-galaxy", 0.65), ("session.load-system", 0.62)],
             0.03,
         );
         let index = make_test_index_with_sentences();

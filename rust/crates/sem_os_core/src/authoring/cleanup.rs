@@ -47,17 +47,12 @@ pub struct CleanupReport {
 pub trait CleanupStore: Send + Sync {
     /// Archive terminal ChangeSets (Rejected/DryRunFailed) older than the cutoff.
     /// Returns the count of archived rows.
-    async fn archive_terminal_changesets(
-        &self,
-        cutoff: DateTime<Utc>,
-    ) -> super::ports::Result<u32>;
+    async fn archive_terminal_changesets(&self, cutoff: DateTime<Utc>)
+        -> super::ports::Result<u32>;
 
     /// Archive orphan ChangeSets (Draft/Validated with no updates) older than the cutoff.
     /// Returns the count of archived rows.
-    async fn archive_orphan_changesets(
-        &self,
-        cutoff: DateTime<Utc>,
-    ) -> super::ports::Result<u32>;
+    async fn archive_orphan_changesets(&self, cutoff: DateTime<Utc>) -> super::ports::Result<u32>;
 }
 
 /// Run the cleanup process according to the given policy.
@@ -67,10 +62,8 @@ pub async fn run_cleanup(
 ) -> super::ports::Result<CleanupReport> {
     let now = Utc::now();
 
-    let terminal_cutoff = now
-        - chrono::Duration::days(i64::from(policy.terminal_retention_days));
-    let orphan_cutoff = now
-        - chrono::Duration::days(i64::from(policy.orphan_retention_days));
+    let terminal_cutoff = now - chrono::Duration::days(i64::from(policy.terminal_retention_days));
+    let orphan_cutoff = now - chrono::Duration::days(i64::from(policy.orphan_retention_days));
 
     let terminal_archived = store.archive_terminal_changesets(terminal_cutoff).await?;
     let orphan_archived = store.archive_orphan_changesets(orphan_cutoff).await?;

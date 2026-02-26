@@ -53,18 +53,11 @@ pub trait AuthoringStore: Send + Sync {
     ) -> Result<()>;
 
     /// Record the snapshot set ID that was active when dry-run was evaluated.
-    async fn set_evaluated_against(
-        &self,
-        change_set_id: Uuid,
-        snapshot_set_id: Uuid,
-    ) -> Result<()>;
+    async fn set_evaluated_against(&self, change_set_id: Uuid, snapshot_set_id: Uuid)
+        -> Result<()>;
 
     /// Mark a ChangeSet as superseded by another.
-    async fn mark_superseded(
-        &self,
-        change_set_id: Uuid,
-        superseded_by: Uuid,
-    ) -> Result<()>;
+    async fn mark_superseded(&self, change_set_id: Uuid, superseded_by: Uuid) -> Result<()>;
 
     /// List ChangeSets with optional filters.
     async fn list_change_sets(

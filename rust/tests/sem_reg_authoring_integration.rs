@@ -86,7 +86,10 @@ artifacts:
         );
         let raw = parse_manifest(&yaml).expect("manifest parse");
         let mut content_map = HashMap::new();
-        content_map.insert("001.sql".to_string(), format!("-- supersede migration {id}"));
+        content_map.insert(
+            "001.sql".to_string(),
+            format!("-- supersede migration {id}"),
+        );
         build_bundle_from_map(&raw, &content_map).expect("bundle build")
     }
 
@@ -127,7 +130,11 @@ artifacts:
 
         // 4. Plan publish (read-only, no state change)
         let plan = svc.plan_publish(cs.change_set_id).await.expect("plan");
-        println!("  Plan: {} added, {} modified", plan.added.len(), plan.modified.len());
+        println!(
+            "  Plan: {} added, {} modified",
+            plan.added.len(),
+            plan.modified.len()
+        );
 
         // 5. Publish
         let batch = svc
@@ -178,7 +185,10 @@ artifacts:
         let r2 = store.get_change_set(cs2.change_set_id).await.unwrap();
         assert_eq!(r1.status, ChangeSetStatus::Published);
         assert_eq!(r2.status, ChangeSetStatus::Published);
-        println!("  Batch published {} ChangeSets", batch.change_set_ids.len());
+        println!(
+            "  Batch published {} ChangeSets",
+            batch.change_set_ids.len()
+        );
     }
 
     /// E2E-3: Supersession chain — publish A, then publish B that supersedes A.
@@ -267,7 +277,10 @@ artifacts:
         let err = svc.validate(cs.change_set_id).await;
         assert!(err.is_err(), "validate on non-Draft should fail");
         let msg = err.unwrap_err().to_string();
-        assert!(msg.contains("must be Draft"), "error should mention Draft: {msg}");
+        assert!(
+            msg.contains("must be Draft"),
+            "error should mention Draft: {msg}"
+        );
     }
 
     /// NEG-2: Dry-run a non-Validated ChangeSet → error.
@@ -415,10 +428,7 @@ artifacts:
         let content_map = HashMap::new(); // Empty — missing.sql not provided
         let result = build_bundle_from_map(&raw, &content_map);
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("Missing content"));
+        assert!(result.unwrap_err().to_string().contains("Missing content"));
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -692,10 +702,7 @@ artifacts:
         let cs = svc.propose(&bundle, &principal).await.unwrap();
         svc.validate(cs.change_set_id).await.unwrap();
         svc.dry_run(cs.change_set_id).await.unwrap();
-        let batch = svc
-            .publish(cs.change_set_id, "obs-test")
-            .await
-            .unwrap();
+        let batch = svc.publish(cs.change_set_id, "obs-test").await.unwrap();
 
         // Check publish_batches table
         let row: Option<(Uuid, String)> = sqlx::query_as(
@@ -726,8 +733,10 @@ artifacts:
         let policy = CleanupPolicy::default();
         assert_eq!(policy.terminal_retention_days, 90);
         assert_eq!(policy.orphan_retention_days, 30);
-        println!("  Cleanup policy: terminal={}d, orphan={}d",
-            policy.terminal_retention_days, policy.orphan_retention_days);
+        println!(
+            "  Cleanup policy: terminal={}d, orphan={}d",
+            policy.terminal_retention_days, policy.orphan_retention_days
+        );
     }
 
     // ═══════════════════════════════════════════════════════════════════

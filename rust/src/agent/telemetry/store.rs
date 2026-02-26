@@ -22,7 +22,9 @@ pub async fn insert_intent_event(pool: &PgPool, row: &IntentEventRow) -> bool {
             outcome, dsl_hash, run_sheet_entry_id,
             macro_semreg_checked, macro_denied_verbs,
             prompt_version, error_code,
-            dominant_entity_id, dominant_entity_kind, entity_kind_filtered
+            dominant_entity_id, dominant_entity_kind, entity_kind_filtered,
+            allowed_verbs_fingerprint, pruned_verbs_count,
+            toctou_recheck_performed, toctou_result, toctou_new_fingerprint
         ) VALUES (
             $1, $2, $3, $4,
             $5, $6, $7,
@@ -33,7 +35,9 @@ pub async fn insert_intent_event(pool: &PgPool, row: &IntentEventRow) -> bool {
             $17, $18, $19,
             $20, $21,
             $22, $23,
-            $24, $25, $26
+            $24, $25, $26,
+            $27, $28,
+            $29, $30, $31
         )
         "#,
     )
@@ -63,6 +67,11 @@ pub async fn insert_intent_event(pool: &PgPool, row: &IntentEventRow) -> bool {
     .bind(row.dominant_entity_id)
     .bind(&row.dominant_entity_kind)
     .bind(row.entity_kind_filtered)
+    .bind(&row.allowed_verbs_fingerprint)
+    .bind(row.pruned_verbs_count)
+    .bind(row.toctou_recheck_performed)
+    .bind(&row.toctou_result)
+    .bind(&row.toctou_new_fingerprint)
     .execute(pool)
     .await;
 

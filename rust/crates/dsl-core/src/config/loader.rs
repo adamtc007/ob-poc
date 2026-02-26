@@ -190,9 +190,22 @@ impl ConfigLoader {
             let partial: VerbsConfig = serde_yaml::from_str(&content)
                 .with_context(|| format!("Failed to parse {}", path.display()))?;
 
-            // Merge domains
+            // Merge domains — combine verbs, dynamic_verbs, invocation_hints
+            // when the same domain name appears in multiple YAML files
             for (domain_name, domain_config) in partial.domains {
-                merged_config.domains.insert(domain_name, domain_config);
+                merged_config
+                    .domains
+                    .entry(domain_name)
+                    .and_modify(|existing| {
+                        existing.verbs.extend(domain_config.verbs.clone());
+                        existing
+                            .dynamic_verbs
+                            .extend(domain_config.dynamic_verbs.clone());
+                        existing
+                            .invocation_hints
+                            .extend(domain_config.invocation_hints.clone());
+                    })
+                    .or_insert(domain_config);
             }
         }
 
@@ -386,6 +399,56 @@ mod tests {
             verbs_path.exists(),
             "ConfigLoader should find workspace config/verbs directory. Got config_dir: {}",
             loader.config_dir
+        );
+    }
+
+    #[test]
+    fn test_domain_merge_no_overwrite() {
+        std::env::remove_var("DSL_CONFIG_DIR");
+        let loader = ConfigLoader::from_env();
+        let config = loader.load_verbs().expect("Failed to load verbs");
+
+        let total_verbs: usize = config.domains.values().map(|d| d.verbs.len()).sum();
+        println!("Total domains: {}", config.domains.len());
+        println!("Total verbs: {}", total_verbs);
+
+        // Previously colliding domains must have merged verbs from all YAML files.
+        // capital: 21 verbs (capital.yaml) + 12 verbs (kyc/capital.yaml) = ~30 (some overlap)
+        if let Some(dc) = config.domains.get("capital") {
+            println!("capital: {} verbs", dc.verbs.len());
+            assert!(
+                dc.verbs.len() >= 25,
+                "capital domain should have merged verbs from capital.yaml and kyc/capital.yaml, got {}",
+                dc.verbs.len()
+            );
+        }
+
+        // ownership: 16 verbs (ownership.yaml) + 6 verbs from manco-group.yaml = 22
+        if let Some(dc) = config.domains.get("ownership") {
+            println!("ownership: {} verbs", dc.verbs.len());
+            assert!(
+                dc.verbs.len() >= 20,
+                "ownership domain should have merged verbs from ownership.yaml and manco-group.yaml, got {}",
+                dc.verbs.len()
+            );
+        }
+
+        // share-class: 4 verbs (fund-vehicle.yaml) + 6 verbs (share-class.yaml) = 10
+        if let Some(dc) = config.domains.get("share-class") {
+            println!("share-class: {} verbs", dc.verbs.len());
+            assert!(
+                dc.verbs.len() >= 10,
+                "share-class domain should have merged verbs from fund-vehicle.yaml and share-class.yaml, got {}",
+                dc.verbs.len()
+            );
+        }
+
+        // Total verbs loaded from split config directory.
+        // 938 unique FQNs defined across YAML + dynamic/template entries.
+        assert!(
+            total_verbs >= 1000,
+            "Total verbs should be >= 1000 after merge fix, got {}",
+            total_verbs
         );
     }
 }

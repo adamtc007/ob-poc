@@ -29,7 +29,7 @@ use ob_poc::api::{
     create_dsl_viewer_router, create_entity_router, create_graph_router, create_resolution_router,
     create_scoped_entity_router, create_session_graph_router, create_session_store,
     create_stewardship_router, create_taxonomy_router, create_trading_matrix_router,
-    create_universe_router, create_verb_discovery_router, service_resource_router,
+    create_universe_router, service_resource_router,
 };
 
 // Import gateway resolver for resolution routes
@@ -206,7 +206,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         if strict_semreg {
             // Check if registry already has active snapshots
-            let counts = SnapshotStore::count_active(&pool, None).await.unwrap_or_default();
+            let counts = SnapshotStore::count_active(&pool, None)
+                .await
+                .unwrap_or_default();
             let total: i64 = counts.iter().map(|(_, c)| c).sum();
 
             if total == 0 {
@@ -453,8 +455,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .merge(create_resolution_router(sessions.clone(), gateway_resolver))
         // Client portal router (separate auth, scoped access)
         .merge(create_client_router(pool.clone(), sessions.clone()))
-        // Verb discovery router (RAG-style verb suggestions)
-        .merge(create_verb_discovery_router(pool.clone()))
         // Trading matrix router (custody taxonomy browser)
         .merge(create_trading_matrix_router(pool.clone()))
         // Taxonomy navigation router (fractal drill-down)
@@ -813,6 +813,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     orchestrator = orchestrator.with_verb_config_index(verb_config_index);
                 }
             }
+        }
+
+        // Wire SemOS client for context-constrained verb search (Phase 4D CCIR)
+        if let Some(ref client) = sem_os_client {
+            orchestrator = orchestrator.with_sem_os_client(client.clone());
+            tracing::info!("REPL V2: SemOS client wired for context-constrained verb search");
         }
 
         let v2_state = ReplV2RouteState {

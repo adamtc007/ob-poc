@@ -123,11 +123,8 @@ pub trait CoreService: Send + Sync {
     async fn authoring_plan_publish(&self, change_set_id: Uuid) -> Result<PublishPlan>;
 
     /// Publish a ChangeSet. Transitions DryRunPassed → Published.
-    async fn authoring_publish(
-        &self,
-        change_set_id: Uuid,
-        publisher: &str,
-    ) -> Result<PublishBatch>;
+    async fn authoring_publish(&self, change_set_id: Uuid, publisher: &str)
+        -> Result<PublishBatch>;
 
     /// Publish multiple ChangeSets atomically in topological order.
     async fn authoring_publish_batch(
@@ -137,11 +134,7 @@ pub trait CoreService: Send + Sync {
     ) -> Result<PublishBatch>;
 
     /// Compute structural diff between two ChangeSets.
-    async fn authoring_diff(
-        &self,
-        base_id: Uuid,
-        target_id: Uuid,
-    ) -> Result<DiffSummary>;
+    async fn authoring_diff(&self, base_id: Uuid, target_id: Uuid) -> Result<DiffSummary>;
 
     /// List ChangeSets with optional status filter.
     async fn authoring_list(
@@ -238,7 +231,10 @@ impl CoreServiceImpl {
     }
 
     /// Set the cleanup store (builder pattern).
-    pub fn with_cleanup(mut self, cleanup: Arc<dyn crate::authoring::cleanup::CleanupStore>) -> Self {
+    pub fn with_cleanup(
+        mut self,
+        cleanup: Arc<dyn crate::authoring::cleanup::CleanupStore>,
+    ) -> Self {
         self.cleanup = Some(cleanup);
         self
     }
@@ -246,12 +242,14 @@ impl CoreServiceImpl {
     /// Build a `GovernanceVerbService` from the authoring + scratch_runner stores.
     /// Returns an error if either is not configured.
     fn governance_verb_service(&self) -> Result<(&dyn AuthoringStore, &dyn ScratchSchemaRunner)> {
-        let authoring = self.authoring.as_deref().ok_or_else(|| {
-            SemOsError::MigrationPending("authoring store not configured".into())
-        })?;
-        let scratch = self.scratch_runner.as_deref().ok_or_else(|| {
-            SemOsError::MigrationPending("scratch runner not configured".into())
-        })?;
+        let authoring = self
+            .authoring
+            .as_deref()
+            .ok_or_else(|| SemOsError::MigrationPending("authoring store not configured".into()))?;
+        let scratch = self
+            .scratch_runner
+            .as_deref()
+            .ok_or_else(|| SemOsError::MigrationPending("scratch runner not configured".into()))?;
         Ok((authoring, scratch))
     }
 }
@@ -432,6 +430,12 @@ impl CoreService for CoreServiceImpl {
                     .views
                     .iter()
                     .map(|s| (ObjectType::ViewDef, s.fqn.as_str(), &s.payload)),
+            )
+            .chain(
+                bundle
+                    .derivation_specs
+                    .iter()
+                    .map(|s| (ObjectType::DerivationSpec, s.fqn.as_str(), &s.payload)),
             )
             .collect();
 
@@ -958,11 +962,7 @@ impl CoreService for CoreServiceImpl {
         svc.publish_batch(change_set_ids, publisher).await
     }
 
-    async fn authoring_diff(
-        &self,
-        base_id: Uuid,
-        target_id: Uuid,
-    ) -> Result<DiffSummary> {
+    async fn authoring_diff(&self, base_id: Uuid, target_id: Uuid) -> Result<DiffSummary> {
         let (authoring, scratch) = self.governance_verb_service()?;
         let svc = GovernanceVerbService::new(authoring, scratch);
         svc.diff(base_id, target_id).await
@@ -973,25 +973,28 @@ impl CoreService for CoreServiceImpl {
         status: Option<AuthoringChangeSetStatus>,
         limit: i64,
     ) -> Result<Vec<ChangeSetFull>> {
-        let authoring = self.authoring.as_deref().ok_or_else(|| {
-            SemOsError::MigrationPending("authoring store not configured".into())
-        })?;
+        let authoring = self
+            .authoring
+            .as_deref()
+            .ok_or_else(|| SemOsError::MigrationPending("authoring store not configured".into()))?;
         authoring.list_change_sets(status, limit).await
     }
 
     async fn authoring_get(&self, change_set_id: Uuid) -> Result<ChangeSetFull> {
-        let authoring = self.authoring.as_deref().ok_or_else(|| {
-            SemOsError::MigrationPending("authoring store not configured".into())
-        })?;
+        let authoring = self
+            .authoring
+            .as_deref()
+            .ok_or_else(|| SemOsError::MigrationPending("authoring store not configured".into()))?;
         authoring.get_change_set(change_set_id).await
     }
 
     async fn authoring_health_pending(
         &self,
     ) -> Result<crate::authoring::types::PendingChangeSetsHealth> {
-        let authoring = self.authoring.as_deref().ok_or_else(|| {
-            SemOsError::MigrationPending("authoring store not configured".into())
-        })?;
+        let authoring = self
+            .authoring
+            .as_deref()
+            .ok_or_else(|| SemOsError::MigrationPending("authoring store not configured".into()))?;
         let status_counts = authoring.count_by_status().await?;
         let mut counts = Vec::new();
         let mut total_pending: i64 = 0;
@@ -1013,9 +1016,10 @@ impl CoreService for CoreServiceImpl {
     async fn authoring_health_stale_dryruns(
         &self,
     ) -> Result<crate::authoring::types::StaleDryRunsHealth> {
-        let authoring = self.authoring.as_deref().ok_or_else(|| {
-            SemOsError::MigrationPending("authoring store not configured".into())
-        })?;
+        let authoring = self
+            .authoring
+            .as_deref()
+            .ok_or_else(|| SemOsError::MigrationPending("authoring store not configured".into()))?;
         let stale = authoring.find_stale_dry_runs().await?;
         let stale_change_set_ids: Vec<Uuid> = stale.iter().map(|cs| cs.change_set_id).collect();
         Ok(crate::authoring::types::StaleDryRunsHealth {
@@ -1028,9 +1032,10 @@ impl CoreService for CoreServiceImpl {
         &self,
         policy: &crate::authoring::cleanup::CleanupPolicy,
     ) -> Result<crate::authoring::cleanup::CleanupReport> {
-        let cleanup = self.cleanup.as_ref().ok_or_else(|| {
-            SemOsError::MigrationPending("cleanup store not configured".into())
-        })?;
+        let cleanup = self
+            .cleanup
+            .as_ref()
+            .ok_or_else(|| SemOsError::MigrationPending("cleanup store not configured".into()))?;
         crate::authoring::cleanup::run_cleanup(cleanup.as_ref(), policy)
             .await
             .map_err(|e| SemOsError::Internal(anyhow::anyhow!("{e}")))

@@ -28,11 +28,7 @@ use tokio_stream::wrappers::BroadcastStream;
 use tokio_stream::StreamExt;
 use uuid::Uuid;
 
-use crate::sem_reg::stewardship::{
-    focus::FocusStore,
-    show_loop::ShowLoop,
-    types::*,
-};
+use crate::sem_reg::stewardship::{focus::FocusStore, show_loop::ShowLoop, types::*};
 
 // ── State ────────────────────────────────────────────────────
 
@@ -133,10 +129,7 @@ pub fn create_stewardship_router(pool: PgPool) -> Router<()> {
             "/api/stewardship/session/{id}/focus",
             get(get_focus).put(set_focus).delete(delete_focus),
         )
-        .route(
-            "/api/stewardship/session/{id}/show",
-            get(get_show),
-        )
+        .route("/api/stewardship/session/{id}/show", get(get_show))
         .route(
             "/api/stewardship/session/{id}/workbench-events",
             get(workbench_sse),
@@ -219,7 +212,9 @@ async fn set_focus(
             timestamp: Utc::now(),
             frame_type: "workbench".to_string(),
             kind: WorkbenchPacketKind::Show,
-            payload: WorkbenchPayload::ShowPayload { show_packet: Box::new(packet) },
+            payload: WorkbenchPayload::ShowPayload {
+                show_packet: Box::new(packet),
+            },
         };
         let tx = state.get_channel(session_id).await;
         // Best-effort send — if no SSE clients connected, this is a no-op

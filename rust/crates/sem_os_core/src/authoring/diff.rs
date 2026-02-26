@@ -7,10 +7,7 @@ use std::collections::HashMap;
 use super::types::*;
 
 /// Compute a structural diff between two sets of artifacts.
-pub fn diff_changesets(
-    base: &[ChangeSetArtifact],
-    target: &[ChangeSetArtifact],
-) -> DiffSummary {
+pub fn diff_changesets(base: &[ChangeSetArtifact], target: &[ChangeSetArtifact]) -> DiffSummary {
     let base_map = build_artifact_index(base);
     let target_map = build_artifact_index(target);
 
@@ -39,7 +36,8 @@ pub fn diff_changesets(
                         detail: Some(format!(
                             "Hash changed: {} → {}",
                             &base_artifact.content_hash[..8.min(base_artifact.content_hash.len())],
-                            &target_artifact.content_hash[..8.min(target_artifact.content_hash.len())]
+                            &target_artifact.content_hash
+                                [..8.min(target_artifact.content_hash.len())]
                         )),
                     };
                     if is_breaking {
@@ -97,10 +95,7 @@ fn artifact_key(artifact: &ChangeSetArtifact) -> String {
 /// - SQL migrations that contain DROP TABLE / DROP COLUMN
 /// - Removed artifacts (always breaking)
 /// - Attribute type changes
-fn detect_breaking_change(
-    _base: &ChangeSetArtifact,
-    target: &ChangeSetArtifact,
-) -> bool {
+fn detect_breaking_change(_base: &ChangeSetArtifact, target: &ChangeSetArtifact) -> bool {
     match target.artifact_type {
         ArtifactType::MigrationSql => {
             let upper = target.content.to_uppercase();
@@ -169,11 +164,7 @@ mod tests {
 
     use super::*;
 
-    fn make_artifact(
-        artifact_type: ArtifactType,
-        path: &str,
-        content: &str,
-    ) -> ChangeSetArtifact {
+    fn make_artifact(artifact_type: ArtifactType, path: &str, content: &str) -> ChangeSetArtifact {
         ChangeSetArtifact {
             artifact_id: Uuid::new_v4(),
             change_set_id: Uuid::new_v4(),
@@ -211,7 +202,11 @@ mod tests {
         let a = make_artifact(ArtifactType::MigrationSql, "001.sql", "SELECT 1;");
         let summary = diff_changesets(&[a], &[]);
         assert_eq!(summary.removed.len(), 1);
-        assert_eq!(summary.breaking_changes.len(), 1, "Removal is always breaking");
+        assert_eq!(
+            summary.breaking_changes.len(),
+            1,
+            "Removal is always breaking"
+        );
     }
 
     #[test]
@@ -231,11 +226,7 @@ mod tests {
             "001.sql",
             "CREATE TABLE t (id INT);",
         );
-        let mut b = make_artifact(
-            ArtifactType::MigrationSql,
-            "001.sql",
-            "DROP TABLE t;",
-        );
+        let mut b = make_artifact(ArtifactType::MigrationSql, "001.sql", "DROP TABLE t;");
         b.content_hash = "changed".to_string();
         let summary = diff_changesets(&[a], &[b]);
         assert_eq!(summary.breaking_changes.len(), 1);
@@ -244,7 +235,11 @@ mod tests {
     #[test]
     fn test_summarize_changeset() {
         let artifacts = vec![
-            make_artifact(ArtifactType::MigrationSql, "001.sql", "CREATE TABLE t (id INT);"),
+            make_artifact(
+                ArtifactType::MigrationSql,
+                "001.sql",
+                "CREATE TABLE t (id INT);",
+            ),
             make_artifact(ArtifactType::VerbYaml, "verb.yaml", "fqn: test.create"),
             make_artifact(ArtifactType::MigrationSql, "002.sql", "DROP TABLE old;"),
         ];

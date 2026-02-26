@@ -847,15 +847,17 @@ mod tests {
         assert!(registry.has("research.sec-edgar", "fetch-filings"));
         assert!(registry.has("research.sec-edgar", "import-company"));
         // ManCo / Governance Controller operations
-        assert!(registry.has("manco", "bridge.manco-roles"));
-        assert!(registry.has("manco", "bridge.gleif-fund-managers"));
-        assert!(registry.has("manco", "bridge.bods-ownership"));
         assert!(registry.has("manco", "group.derive"));
         assert!(registry.has("manco", "group.cbus"));
         assert!(registry.has("manco", "group.for-cbu"));
         assert!(registry.has("manco", "primary-controller"));
         assert!(registry.has("manco", "control-chain"));
+        // Ownership domain operations (bridges + control links + refresh)
+        assert!(registry.has("ownership", "bridge.manco-roles"));
+        assert!(registry.has("ownership", "bridge.gleif-fund-managers"));
+        assert!(registry.has("ownership", "bridge.bods-ownership"));
         assert!(registry.has("ownership", "control-links.compute"));
+        assert!(registry.has("ownership", "refresh"));
     }
 
     #[test]

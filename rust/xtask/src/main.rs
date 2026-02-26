@@ -978,7 +978,6 @@ enum SemRegAction {
     },
 
     // ── Authoring Pipeline (Governed Change Boundary) ───────
-
     /// List authoring pipeline ChangeSets
     AuthoringList {
         /// Filter by status (draft, validated, dry_run_passed, etc.)
@@ -1370,9 +1369,7 @@ fn main() -> Result<()> {
                 SemRegAction::AuthoringList { status, limit } => {
                     rt.block_on(sem_reg::authoring_list(status.as_deref(), limit))
                 }
-                SemRegAction::AuthoringGet { id } => {
-                    rt.block_on(sem_reg::authoring_get(&id))
-                }
+                SemRegAction::AuthoringGet { id } => rt.block_on(sem_reg::authoring_get(&id)),
                 SemRegAction::AuthoringPropose { bundle_path } => {
                     rt.block_on(sem_reg::authoring_propose(&bundle_path))
                 }
@@ -1382,9 +1379,7 @@ fn main() -> Result<()> {
                 SemRegAction::AuthoringDryRun { id } => {
                     rt.block_on(sem_reg::authoring_dry_run(&id))
                 }
-                SemRegAction::AuthoringPlan { id } => {
-                    rt.block_on(sem_reg::authoring_plan(&id))
-                }
+                SemRegAction::AuthoringPlan { id } => rt.block_on(sem_reg::authoring_plan(&id)),
                 SemRegAction::AuthoringPublish { id, publisher } => {
                     rt.block_on(sem_reg::authoring_publish(&id, &publisher))
                 }
@@ -1394,12 +1389,11 @@ fn main() -> Result<()> {
                 SemRegAction::AuthoringDiff { base_id, target_id } => {
                     rt.block_on(sem_reg::authoring_diff(&base_id, &target_id))
                 }
-                SemRegAction::AuthoringHealth => {
-                    rt.block_on(sem_reg::authoring_health())
-                }
-                SemRegAction::AuthoringCleanup { terminal_days, orphan_days } => {
-                    rt.block_on(sem_reg::authoring_cleanup(terminal_days, orphan_days))
-                }
+                SemRegAction::AuthoringHealth => rt.block_on(sem_reg::authoring_health()),
+                SemRegAction::AuthoringCleanup {
+                    terminal_days,
+                    orphan_days,
+                } => rt.block_on(sem_reg::authoring_cleanup(terminal_days, orphan_days)),
             }
         }
         Command::Entity { action } => {

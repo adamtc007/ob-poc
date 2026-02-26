@@ -60,7 +60,10 @@ fn validate_artifact_integrity(
             errors.push(ValidationError {
                 code: V_HASH_MISSING_ARTIFACT.to_string(),
                 severity: ErrorSeverity::Error,
-                message: format!("Artifact declared in manifest not found in bundle: {}", entry.path),
+                message: format!(
+                    "Artifact declared in manifest not found in bundle: {}",
+                    entry.path
+                ),
                 artifact_path: Some(entry.path.clone()),
                 line: None,
                 context: None,
@@ -101,14 +104,17 @@ fn validate_artifact_integrity(
     }
 
     // Warn about orphan artifacts (present in bundle but not in manifest)
-    let manifest_paths: HashSet<&str> = manifest.artifacts.iter().map(|a| a.path.as_str()).collect();
+    let manifest_paths: HashSet<&str> =
+        manifest.artifacts.iter().map(|a| a.path.as_str()).collect();
     for artifact in artifacts {
         if let Some(path) = &artifact.path {
             if !manifest_paths.contains(path.as_str()) {
                 warnings.push(ValidationError {
                     code: "V:WARN:ORPHAN_ARTIFACT".to_string(),
                     severity: ErrorSeverity::Warning,
-                    message: format!("Artifact present in bundle but not declared in manifest: {path}"),
+                    message: format!(
+                        "Artifact present in bundle but not declared in manifest: {path}"
+                    ),
                     artifact_path: Some(path.clone()),
                     line: None,
                     context: None,
@@ -118,11 +124,7 @@ fn validate_artifact_integrity(
     }
 }
 
-fn validate_sql_syntax(
-    content: &str,
-    path: &str,
-    errors: &mut Vec<ValidationError>,
-) {
+fn validate_sql_syntax(content: &str, path: &str, errors: &mut Vec<ValidationError>) {
     use sqlparser::dialect::PostgreSqlDialect;
     use sqlparser::parser::Parser;
 
@@ -155,11 +157,7 @@ fn extract_line_from_sql_error(e: &sqlparser::parser::ParserError) -> Option<u32
     }
 }
 
-fn validate_yaml_syntax(
-    content: &str,
-    path: &str,
-    errors: &mut Vec<ValidationError>,
-) {
+fn validate_yaml_syntax(content: &str, path: &str, errors: &mut Vec<ValidationError>) {
     if let Err(e) = serde_yaml::from_str::<serde_yaml::Value>(content) {
         errors.push(ValidationError {
             code: V_PARSE_YAML_SYNTAX.to_string(),
@@ -176,11 +174,7 @@ fn extract_line_from_yaml_error(e: &serde_yaml::Error) -> Option<u32> {
     e.location().map(|loc| loc.line() as u32)
 }
 
-fn validate_json_syntax(
-    content: &str,
-    path: &str,
-    errors: &mut Vec<ValidationError>,
-) {
+fn validate_json_syntax(content: &str, path: &str, errors: &mut Vec<ValidationError>) {
     if let Err(e) = serde_json::from_str::<serde_json::Value>(content) {
         errors.push(ValidationError {
             code: V_PARSE_JSON_SYNTAX.to_string(),
@@ -212,10 +206,7 @@ fn validate_references(
 
 /// Detect self-referencing or trivially circular dependencies.
 /// Full cycle detection across the dependency graph requires DB access (Stage 2).
-fn detect_dependency_cycles(
-    depends_on: &[Uuid],
-    errors: &mut Vec<ValidationError>,
-) {
+fn detect_dependency_cycles(depends_on: &[Uuid], errors: &mut Vec<ValidationError>) {
     // Check for duplicate dependencies
     let mut seen = HashSet::new();
     for dep in depends_on {
@@ -282,10 +273,14 @@ fn validate_internal_references(
             }
 
             // Check attribute references in verb required_attributes
-            if let Some(attrs) = value.get("required_attributes").and_then(|v| v.as_sequence()) {
+            if let Some(attrs) = value
+                .get("required_attributes")
+                .and_then(|v| v.as_sequence())
+            {
                 for attr in attrs {
                     if let Some(attr_fqn) = attr.as_str() {
-                        if !declared_attributes.contains(attr_fqn) && !declared_attributes.is_empty()
+                        if !declared_attributes.contains(attr_fqn)
+                            && !declared_attributes.is_empty()
                         {
                             // Soft reference — Stage 2 verifies against registry
                         }
@@ -334,11 +329,7 @@ fn validate_semantics(
 }
 
 /// Check for DDL patterns that are warnings in Stage 1 (errors in Stage 2 dry-run).
-fn check_forbidden_ddl(
-    sql_content: &str,
-    path: Option<&str>,
-    warnings: &mut Vec<ValidationError>,
-) {
+fn check_forbidden_ddl(sql_content: &str, path: Option<&str>, warnings: &mut Vec<ValidationError>) {
     let upper = sql_content.to_uppercase();
 
     // CONCURRENTLY requires non-transactional execution
@@ -358,7 +349,8 @@ fn check_forbidden_ddl(
         warnings.push(ValidationError {
             code: D_SCHEMA_FORBIDDEN_DDL.to_string(),
             severity: ErrorSeverity::Warning,
-            message: "Migration contains DROP TABLE — must declare breaking_change=true".to_string(),
+            message: "Migration contains DROP TABLE — must declare breaking_change=true"
+                .to_string(),
             artifact_path: path.map(String::from),
             line: find_line_containing(sql_content, "DROP TABLE"),
             context: None,
@@ -469,11 +461,7 @@ fn validate_attribute_type_consistency(
 mod tests {
     use super::*;
 
-    fn make_artifact(
-        artifact_type: ArtifactType,
-        path: &str,
-        content: &str,
-    ) -> ChangeSetArtifact {
+    fn make_artifact(artifact_type: ArtifactType, path: &str, content: &str) -> ChangeSetArtifact {
         ChangeSetArtifact {
             artifact_id: Uuid::new_v4(),
             change_set_id: Uuid::new_v4(),
@@ -580,21 +568,15 @@ mod tests {
         };
         let report = validate_stage1(&manifest, &[]);
         assert!(!report.ok);
-        assert!(
-            report
-                .errors
-                .iter()
-                .any(|e| e.code == V_HASH_MISSING_ARTIFACT)
-        );
+        assert!(report
+            .errors
+            .iter()
+            .any(|e| e.code == V_HASH_MISSING_ARTIFACT));
     }
 
     #[test]
     fn test_invalid_json_syntax() {
-        let artifact = make_artifact(
-            ArtifactType::AttributeJson,
-            "attrs/bad.json",
-            "{ bad json",
-        );
+        let artifact = make_artifact(ArtifactType::AttributeJson, "attrs/bad.json", "{ bad json");
         let manifest = make_manifest(&[&artifact]);
         let report = validate_stage1(&manifest, &[artifact]);
         assert!(!report.ok);
@@ -625,12 +607,10 @@ mod tests {
         let report = validate_stage1(&manifest, &[artifact]);
         // CONCURRENTLY is a warning in Stage 1, not an error
         assert!(report.ok, "CONCURRENTLY should be warning, not error");
-        assert!(
-            report
-                .warnings
-                .iter()
-                .any(|w| w.code == D_SCHEMA_NON_TRANSACTIONAL_DDL)
-        );
+        assert!(report
+            .warnings
+            .iter()
+            .any(|w| w.code == D_SCHEMA_NON_TRANSACTIONAL_DDL));
     }
 
     #[test]
@@ -643,12 +623,10 @@ mod tests {
         let manifest = make_manifest(&[&artifact]);
         let report = validate_stage1(&manifest, &[artifact]);
         assert!(report.ok, "DROP TABLE should be warning, not error");
-        assert!(
-            report
-                .warnings
-                .iter()
-                .any(|w| w.code == D_SCHEMA_FORBIDDEN_DDL)
-        );
+        assert!(report
+            .warnings
+            .iter()
+            .any(|w| w.code == D_SCHEMA_FORBIDDEN_DDL));
     }
 
     #[test]
@@ -661,12 +639,10 @@ mod tests {
         let manifest = make_manifest(&[&artifact]);
         let report = validate_stage1(&manifest, &[artifact]);
         assert!(!report.ok);
-        assert!(
-            report
-                .errors
-                .iter()
-                .any(|e| e.code == V_TYPE_CONTRACT_INCOMPLETE)
-        );
+        assert!(report
+            .errors
+            .iter()
+            .any(|e| e.code == V_TYPE_CONTRACT_INCOMPLETE));
     }
 
     #[test]
@@ -679,12 +655,10 @@ mod tests {
         let manifest = make_manifest(&[&artifact]);
         let report = validate_stage1(&manifest, &[artifact]);
         assert!(!report.ok);
-        assert!(
-            report
-                .errors
-                .iter()
-                .any(|e| e.code == V_TYPE_ATTRIBUTE_MISMATCH)
-        );
+        assert!(report
+            .errors
+            .iter()
+            .any(|e| e.code == V_TYPE_ATTRIBUTE_MISMATCH));
     }
 
     #[test]
@@ -699,12 +673,10 @@ mod tests {
         };
         let report = validate_stage1(&manifest, &[]);
         assert!(!report.ok);
-        assert!(
-            report
-                .errors
-                .iter()
-                .any(|e| e.code == V_REF_CIRCULAR_DEPENDENCY)
-        );
+        assert!(report
+            .errors
+            .iter()
+            .any(|e| e.code == V_REF_CIRCULAR_DEPENDENCY));
     }
 
     #[test]

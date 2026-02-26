@@ -113,18 +113,42 @@ pub fn verb_config_to_contract(
         .map(|m| m.subject_kinds.clone())
         .filter(|sk| !sk.is_empty())
         .unwrap_or_else(|| {
-            config
-                .produces
-                .as_ref()
-                .map(|p| vec![p.produced_type.clone()])
-                .unwrap_or_default()
+            // Fallback 1: derive from produces.entity_type
+            if let Some(p) = config.produces.as_ref() {
+                return vec![p.produced_type.clone()];
+            }
+            // Fallback 2: derive from verb domain + required UUID args with entity_type lookups
+            let mut kinds: Vec<String> = config
+                .args
+                .iter()
+                .filter(|a| a.required)
+                .filter_map(|a| a.lookup.as_ref().and_then(|l| l.entity_type.clone()))
+                .collect();
+            kinds.dedup();
+            if !kinds.is_empty() {
+                return kinds;
+            }
+            // Fallback 3: derive from domain name (domain-level heuristic)
+            vec![domain_to_subject_kind(domain)]
         });
 
-    let phase_tags = config
-        .metadata
-        .as_ref()
-        .map(|m| m.phase_tags.clone())
-        .unwrap_or_default();
+    let phase_tags = {
+        let explicit = config
+            .metadata
+            .as_ref()
+            .map(|m| m.phase_tags.clone())
+            .unwrap_or_default();
+        if explicit.is_empty() {
+            // Fallback: derive from metadata.tags when phase_tags is empty
+            config
+                .metadata
+                .as_ref()
+                .map(|m| m.tags.clone())
+                .unwrap_or_default()
+        } else {
+            explicit
+        }
+    };
 
     let requires_subject = config
         .metadata
@@ -242,9 +266,9 @@ pub fn infer_attributes_from_verbs(
                 let (schema, table) = if let Some(crud) = &verb_config.crud {
                     (crud.schema.clone(), crud.table.clone())
                 } else if let Some(et) = entity_types_by_domain.get(domain.as_str()) {
-                    et.db_table
-                        .as_ref()
-                        .map_or((None, None), |dt| (Some(dt.schema.clone()), Some(dt.table.clone())))
+                    et.db_table.as_ref().map_or((None, None), |dt| {
+                        (Some(dt.schema.clone()), Some(dt.table.clone()))
+                    })
                 } else {
                     (None, None)
                 };
@@ -374,6 +398,29 @@ pub fn title_case(s: &str) -> String {
         })
         .collect::<Vec<_>>()
         .join(" ")
+}
+
+/// Map a verb domain name to its primary subject kind.
+///
+/// This is the lowest-priority heuristic for `subject_kinds` derivation.
+/// Only used when `metadata.subject_kinds`, `produces.entity_type`, and
+/// arg lookup `entity_type` all yield nothing.
+fn domain_to_subject_kind(domain: &str) -> String {
+    match domain {
+        "cbu" | "cbu-role" => "cbu".into(),
+        "entity" | "entity-role" => "entity".into(),
+        "kyc" | "kyc-case" | "screening" => "kyc-case".into(),
+        "deal" => "deal".into(),
+        "contract" | "contract-pack" => "contract".into(),
+        "billing" => "billing-profile".into(),
+        "trading-profile" | "custody" | "ssi" => "trading-profile".into(),
+        "investor" | "holding" => "investor-register".into(),
+        "document" | "requirement" => "document".into(),
+        "session" | "view" => "session".into(),
+        "gleif" | "research" => "entity".into(),
+        "workflow" | "bpmn" => "workflow".into(),
+        _ => domain.into(),
+    }
 }
 
 pub fn arg_type_to_attribute_type(arg: &ArgConfig) -> AttributeDataType {
@@ -578,5 +625,100 @@ mod tests {
         assert_eq!(label.classification, Classification::Internal);
         assert!(!label.pii);
         assert!(label.handling_controls.is_empty());
+    }
+
+    #[test]
+    fn test_domain_to_subject_kind_common() {
+        assert_eq!(super::domain_to_subject_kind("cbu"), "cbu");
+        assert_eq!(super::domain_to_subject_kind("kyc"), "kyc-case");
+        assert_eq!(super::domain_to_subject_kind("deal"), "deal");
+        assert_eq!(super::domain_to_subject_kind("session"), "session");
+        assert_eq!(super::domain_to_subject_kind("gleif"), "entity");
+        assert_eq!(
+            super::domain_to_subject_kind("trading-profile"),
+            "trading-profile"
+        );
+    }
+
+    #[test]
+    fn test_domain_to_subject_kind_fallback() {
+        // Unknown domains just return the domain name
+        assert_eq!(
+            super::domain_to_subject_kind("unknown-domain"),
+            "unknown-domain"
+        );
+    }
+
+    #[test]
+    fn test_subject_kinds_from_produces() {
+        let config = sample_verb_config(); // has produces: cbu
+        let contract = verb_config_to_contract("cbu", "create", &config);
+        assert_eq!(contract.subject_kinds, vec!["cbu".to_string()]);
+    }
+
+    #[test]
+    fn test_subject_kinds_from_lookup_args() {
+        // Verb with no produces, no metadata.subject_kinds, but has lookup args
+        let mut config = sample_verb_config();
+        config.produces = None;
+        config.metadata = None;
+        // arg[1] has lookup.entity_type = Some("jurisdiction")
+        let contract = verb_config_to_contract("cbu", "lookup-verb", &config);
+        // Falls through produces (None) → required args with entity_type lookups
+        assert!(contract.subject_kinds.contains(&"jurisdiction".to_string()));
+    }
+
+    #[test]
+    fn test_subject_kinds_domain_fallback() {
+        // Verb with no produces, no metadata, no lookup args
+        let mut config = sample_verb_config();
+        config.produces = None;
+        config.metadata = None;
+        config.args = vec![ArgConfig {
+            name: "value".into(),
+            arg_type: ArgType::String,
+            required: true,
+            maps_to: None,
+            lookup: None,
+            valid_values: None,
+            default: None,
+            description: None,
+            validation: None,
+            fuzzy_check: None,
+            slot_type: None,
+            preferred_roles: vec![],
+        }];
+        let contract = verb_config_to_contract("deal", "custom-action", &config);
+        // Falls through all the way to domain_to_subject_kind("deal")
+        assert_eq!(contract.subject_kinds, vec!["deal".to_string()]);
+    }
+
+    #[test]
+    fn test_phase_tags_from_metadata_tags() {
+        // Verb with metadata.tags but empty phase_tags
+        let mut config = sample_verb_config();
+        config.metadata = Some(VerbMetadata {
+            tags: vec!["kyc".into(), "onboarding".into()],
+            phase_tags: vec![], // empty — should fallback to tags
+            ..Default::default()
+        });
+        let contract = verb_config_to_contract("kyc", "check", &config);
+        assert_eq!(
+            contract.phase_tags,
+            vec!["kyc".to_string(), "onboarding".to_string()]
+        );
+    }
+
+    #[test]
+    fn test_phase_tags_explicit_takes_precedence() {
+        // Verb with both metadata.tags and explicit phase_tags
+        let mut config = sample_verb_config();
+        config.metadata = Some(VerbMetadata {
+            tags: vec!["general".into()],
+            phase_tags: vec!["specific-phase".into()], // explicit — takes precedence
+            ..Default::default()
+        });
+        let contract = verb_config_to_contract("cbu", "special", &config);
+        assert_eq!(contract.phase_tags, vec!["specific-phase".to_string()]);
     }
 }

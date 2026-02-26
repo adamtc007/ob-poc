@@ -111,9 +111,9 @@ use crate::dsl_v2::macros::{load_macro_registry_from_dir, MacroRegistry};
 use crate::dsl_v2::ref_resolver::ResolveResult;
 use crate::dsl_v2::validation::RefType;
 use crate::dsl_v2::{enrich_program, parse_program, runtime_registry, Statement};
-use crate::mcp::verb_search_factory::VerbSearcherFactory;
 #[cfg(not(feature = "runbook-gate-vnext"))]
 use crate::graph::GraphScope;
+use crate::mcp::verb_search_factory::VerbSearcherFactory;
 #[cfg(not(feature = "runbook-gate-vnext"))]
 use crate::session::SessionScope;
 use crate::session::{SessionState, UnifiedSession, UnresolvedRefInfo};

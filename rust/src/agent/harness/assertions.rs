@@ -37,7 +37,6 @@ fn outcome_label(outcome: &PipelineOutcome) -> &'static str {
         PipelineOutcome::SemanticNotReady => "SemanticNotReady",
         PipelineOutcome::ScopeResolved { .. } => "ScopeResolved",
         PipelineOutcome::ScopeCandidates => "ScopeCandidates",
-        PipelineOutcome::DirectDslNotAllowed => "DirectDslNotAllowed",
         PipelineOutcome::NoAllowedVerbs => "NoAllowedVerbs",
     }
 }
@@ -312,10 +311,6 @@ mod tests {
         assert_eq!(
             outcome_label(&PipelineOutcome::NeedsClarification),
             "NeedsClarification"
-        );
-        assert_eq!(
-            outcome_label(&PipelineOutcome::DirectDslNotAllowed),
-            "DirectDslNotAllowed"
         );
         assert_eq!(
             outcome_label(&PipelineOutcome::NoAllowedVerbs),

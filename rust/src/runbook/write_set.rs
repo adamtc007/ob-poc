@@ -219,8 +219,8 @@ mod tests {
     #[cfg(feature = "write-set-contract")]
     mod contract_tests {
         use super::*;
-        use crate::repl::verb_config_index::{ArgSummary, VerbConfigIndex, VerbIndexEntry};
         use crate::repl::runbook::ConfirmPolicy;
+        use crate::repl::verb_config_index::{ArgSummary, VerbConfigIndex, VerbIndexEntry};
 
         fn test_index() -> VerbConfigIndex {
             let mut index = VerbConfigIndex::empty();

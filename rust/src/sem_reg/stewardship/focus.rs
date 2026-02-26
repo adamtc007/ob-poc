@@ -53,9 +53,7 @@ impl FocusStore {
 
         let (overlay_mode_str, overlay_changeset_id) = match &focus.overlay_mode {
             OverlayMode::ActiveOnly => ("active_only", None),
-            OverlayMode::DraftOverlay { changeset_id } => {
-                ("draft_overlay", Some(*changeset_id))
-            }
+            OverlayMode::DraftOverlay { changeset_id } => ("draft_overlay", Some(*changeset_id)),
         };
 
         sqlx::query(
@@ -138,9 +136,9 @@ impl FocusRow {
     fn into_focus_state(self) -> Result<FocusState> {
         let overlay_mode = match self.overlay_mode.as_str() {
             "draft_overlay" => {
-                let cs_id = self
-                    .overlay_changeset_id
-                    .ok_or_else(|| anyhow::anyhow!("draft_overlay requires overlay_changeset_id"))?;
+                let cs_id = self.overlay_changeset_id.ok_or_else(|| {
+                    anyhow::anyhow!("draft_overlay requires overlay_changeset_id")
+                })?;
                 OverlayMode::DraftOverlay {
                     changeset_id: cs_id,
                 }

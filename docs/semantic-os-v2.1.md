@@ -45,10 +45,10 @@ AI can only be reliably deployed across regulated operations if three conditions
 
 ### 2.1 Agents require deterministic boundaries
 An LLM can assist with research and drafting, but **execution must be constrained** by machine-checkable contracts:
-- allowed operation surface (“verbs”)
+- allowed operation surface ("verbs") — enforced via `ContextEnvelope` (pre-constrained verb search + dsl_execute gate)
 - input types and constraints
 - preconditions, policy gates, and postconditions
-- audit trails and evidence requirements
+- audit trails and evidence requirements — including deterministic `AllowedVerbSetFingerprint` and TOCTOU recheck
 
 Without this, AI either:
 - cannot act (too risky), or

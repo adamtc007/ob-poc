@@ -606,9 +606,13 @@ pub async fn dispatch_tool(
 
         // Category 7: Stewardship (Phase 0 changeset tools + Phase 1 visualisation tools)
         name if name.starts_with("stew_") => {
-            if let Some(result) = super::super::stewardship::dispatch_phase0_tool(ctx, name, args).await {
+            if let Some(result) =
+                super::super::stewardship::dispatch_phase0_tool(ctx, name, args).await
+            {
                 result
-            } else if let Some(result) = super::super::stewardship::dispatch_phase1_tool(ctx, name, args).await {
+            } else if let Some(result) =
+                super::super::stewardship::dispatch_phase1_tool(ctx, name, args).await
+            {
                 result
             } else {
                 SemRegToolResult::err(format!("Unknown stewardship tool: {}", name))

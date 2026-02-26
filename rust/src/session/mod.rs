@@ -16,19 +16,16 @@
 //! └── bookmarks: HashMap<String, Bookmark>
 //! ```
 
-pub mod agent_context;
 pub mod agent_mode;
 pub mod canonical_hash;
 pub mod constraint_cascade;
 pub mod dsl_sheet;
-pub mod enhanced_context;
 pub mod research_context;
 pub mod scope;
 pub mod scope_path;
 pub mod struct_mass;
 pub mod unified;
 pub mod verb_contract;
-pub mod verb_discovery;
 pub mod verb_hash_lookup;
 pub mod verb_sync;
 pub mod verb_tiering_linter;
@@ -44,7 +41,6 @@ use crate::graph::{EntityGraph, GraphFilters, ViewportContext};
 use crate::navigation::{NavCommand, NavExecutor, NavResult};
 
 pub use crate::research::ApprovedResearch;
-pub use agent_context::AgentGraphContext;
 pub use agent_mode::{
     ActionRef, AgentState, AgentStatus, AgentTask, Candidate, Checkpoint, CheckpointContext,
     CheckpointType, DecisionRef, SessionMode,
@@ -82,10 +78,6 @@ pub use dsl_sheet::{
     CyclicDependency, DslSheet, EntityCandidate, ErrorCode, ExecutionPhase, SessionDslStatement,
     SheetExecutionResult, SheetStatus, SourceSpan, StatementError, StatementResult,
     StatementStatus, UnresolvedReference, ValidationError, ValidationResult, ValidationWarning,
-};
-pub use enhanced_context::{
-    get_verb_suggestions, EnhancedAgentContext, EnhancedContextBuilder, SerializableAgentContext,
-    SerializableBinding,
 };
 pub use research_context::{ResearchContext, ResearchState};
 pub use scope::{ExpandableNode, LoadStatus, ScopeSummary, SessionScope};
@@ -160,10 +152,6 @@ pub use unified::{
     ZoomLevel,
 };
 pub use verb_contract::{codes as diagnostic_codes, VerbDiagnostic, VerbDiagnostics};
-pub use verb_discovery::{
-    AgentVerbContext, CategoryInfo, DiscoveryQuery, SuggestionReason, VerbDiscoveryError,
-    VerbDiscoveryService, VerbSuggestion, WorkflowPhaseInfo,
-};
 pub use verb_sync::{SyncResult, VerbSyncError, VerbSyncService};
 pub use verb_tiering_linter::{
     lint_all_verbs, lint_all_verbs_with_config, lint_verb_tiering, lint_verb_with_config,
@@ -192,8 +180,6 @@ pub use view_state::{
 /// - Incremental consolidation preferred over big-bang refactor
 ///
 /// **Consumers:**
-/// - `EnhancedContextBuilder::from_session_context()` - verb suggestions
-/// - `AgentGraphContext::from_session()` - agent prompts
 /// - `AgentController` - research loop orchestration
 ///
 /// For new DSL/REPL features, prefer `UnifiedSession`.
@@ -398,11 +384,6 @@ impl UnifiedSessionContext {
     /// Get command history (most recent first)
     pub fn recent_commands(&self, limit: usize) -> Vec<&ExecutedCommand> {
         self.command_history.iter().rev().take(limit).collect()
-    }
-
-    /// Build agent context from current state
-    pub fn build_agent_context(&self) -> AgentGraphContext {
-        AgentGraphContext::from_session(self)
     }
 
     /// Check if session has a graph loaded

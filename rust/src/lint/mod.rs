@@ -25,10 +25,8 @@
 //! }
 //! ```
 
-pub mod agent_context_lint;
 mod diagnostic;
 mod macro_lint;
 
-pub use agent_context_lint::{lint_bpmn_task_type, lint_template_body};
 pub use diagnostic::{Diagnostic, Severity};
 pub use macro_lint::{lint_macro_file, PrimitiveRegistry};

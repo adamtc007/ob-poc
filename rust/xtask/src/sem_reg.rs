@@ -852,9 +852,7 @@ const DEFAULT_MANIFEST_PATH: &str = "data/onboarding-manifest.json";
 
 /// Run the 5-step extraction pipeline and write an onboarding manifest.
 pub async fn onboard_scan(verbose: bool) -> Result<()> {
-    use ob_poc::sem_reg::onboarding::{
-        entity_infer, manifest, schema_extract, verb_extract, xref,
-    };
+    use ob_poc::sem_reg::onboarding::{entity_infer, manifest, schema_extract, verb_extract, xref};
 
     println!("Registry Onboarding Scan");
     println!("========================\n");
@@ -883,12 +881,9 @@ pub async fn onboard_scan(verbose: bool) -> Result<()> {
     // Step 2: Introspect PostgreSQL schema
     println!("\nStep 2/5: Introspecting PostgreSQL schema...");
     let pool = connect().await?;
-    let tables = schema_extract::extract_schema(
-        &pool,
-        schema_extract::DEFAULT_SCHEMAS,
-    )
-    .await
-    .context("Failed to extract schema from database")?;
+    let tables = schema_extract::extract_schema(&pool, schema_extract::DEFAULT_SCHEMAS)
+        .await
+        .context("Failed to extract schema from database")?;
 
     let total_columns: usize = tables.iter().map(|t| t.columns.len()).sum();
     println!("  → {} tables, {} columns", tables.len(), total_columns);
@@ -943,8 +938,7 @@ pub async fn onboard_scan(verbose: bool) -> Result<()> {
     // Step 5: Assemble manifest
     println!("\nStep 5/5: Assembling onboarding manifest...");
     let onboarding_manifest = manifest::assemble_manifest(
-        &std::env::var("DATABASE_URL")
-            .unwrap_or_else(|_| "postgresql:///data_designer".into()),
+        &std::env::var("DATABASE_URL").unwrap_or_else(|_| "postgresql:///data_designer".into()),
         tables.len(),
         total_columns,
         verb_extracts,
@@ -961,15 +955,42 @@ pub async fn onboard_scan(verbose: bool) -> Result<()> {
 
     // Print summary
     println!("\n── Summary ────────────────────────────────────────");
-    println!("  Tables scanned:       {}", onboarding_manifest.tables_scanned);
-    println!("  Columns scanned:      {}", onboarding_manifest.columns_scanned);
-    println!("  Verbs extracted:      {}", onboarding_manifest.verbs_extracted);
-    println!("  Verb-connected attrs: {}", onboarding_manifest.verb_connected_attrs);
-    println!("  Framework columns:    {}", onboarding_manifest.framework_columns);
-    println!("  Operational orphans:  {}", onboarding_manifest.operational_orphans);
-    println!("  Dead schema:          {}", onboarding_manifest.dead_schema);
-    println!("  Entity types:         {}", onboarding_manifest.entity_type_candidates.len());
-    println!("  Relationships:        {}", onboarding_manifest.relationship_candidates.len());
+    println!(
+        "  Tables scanned:       {}",
+        onboarding_manifest.tables_scanned
+    );
+    println!(
+        "  Columns scanned:      {}",
+        onboarding_manifest.columns_scanned
+    );
+    println!(
+        "  Verbs extracted:      {}",
+        onboarding_manifest.verbs_extracted
+    );
+    println!(
+        "  Verb-connected attrs: {}",
+        onboarding_manifest.verb_connected_attrs
+    );
+    println!(
+        "  Framework columns:    {}",
+        onboarding_manifest.framework_columns
+    );
+    println!(
+        "  Operational orphans:  {}",
+        onboarding_manifest.operational_orphans
+    );
+    println!(
+        "  Dead schema:          {}",
+        onboarding_manifest.dead_schema
+    );
+    println!(
+        "  Entity types:         {}",
+        onboarding_manifest.entity_type_candidates.len()
+    );
+    println!(
+        "  Relationships:        {}",
+        onboarding_manifest.relationship_candidates.len()
+    );
     println!(
         "  Wiring completeness:  {:.1}% ({} fully / {} partial / {} unwired)",
         onboarding_manifest.wiring_pct,
@@ -1004,9 +1025,18 @@ pub async fn onboard_report(manifest_path: Option<&str>) -> Result<()> {
     println!("  Verbs extracted:      {}", m.verbs_extracted);
 
     println!("\n── Column Classification ───────────────────────────");
-    println!("  Verb-connected:       {} (seeded as AttributeDef)", m.verb_connected_attrs);
-    println!("  Framework:            {} (NOT seeded)", m.framework_columns);
-    println!("  Operational orphans:  {} (seeded with verb_orphan=true)", m.operational_orphans);
+    println!(
+        "  Verb-connected:       {} (seeded as AttributeDef)",
+        m.verb_connected_attrs
+    );
+    println!(
+        "  Framework:            {} (NOT seeded)",
+        m.framework_columns
+    );
+    println!(
+        "  Operational orphans:  {} (seeded with verb_orphan=true)",
+        m.operational_orphans
+    );
     println!("  Dead schema:          {} (NOT seeded)", m.dead_schema);
 
     println!("\n── Wiring Completeness ─────────────────────────────");
@@ -1015,7 +1045,10 @@ pub async fn onboard_report(manifest_path: Option<&str>) -> Result<()> {
     println!("  Unwired:              {}", m.verbs_unwired);
     println!("  Wiring percentage:    {:.1}%", m.wiring_pct);
 
-    println!("\n── Entity Types ({}) ──────────────────────────────", m.entity_type_candidates.len());
+    println!(
+        "\n── Entity Types ({}) ──────────────────────────────",
+        m.entity_type_candidates.len()
+    );
     for et in &m.entity_type_candidates {
         println!(
             "  {:<40} {} attrs ({} verb, {} orphan)",
@@ -1026,7 +1059,10 @@ pub async fn onboard_report(manifest_path: Option<&str>) -> Result<()> {
         );
     }
 
-    println!("\n── Relationships ({}) ─────────────────────────────", m.relationship_candidates.len());
+    println!(
+        "\n── Relationships ({}) ─────────────────────────────",
+        m.relationship_candidates.len()
+    );
     for rel in &m.relationship_candidates {
         println!(
             "  {:<50} {:?} ({:?})",
@@ -1047,9 +1083,18 @@ pub async fn onboard_report(manifest_path: Option<&str>) -> Result<()> {
         })
         .count();
     println!("  AttributeDefs to seed:          {}", seedable_attrs);
-    println!("  VerbContracts to seed:          {}", m.verb_extracts.len());
-    println!("  EntityTypeDefs to seed:         {}", m.entity_type_candidates.len());
-    println!("  RelationshipTypeDefs to seed:   {}", m.relationship_candidates.len());
+    println!(
+        "  VerbContracts to seed:          {}",
+        m.verb_extracts.len()
+    );
+    println!(
+        "  EntityTypeDefs to seed:         {}",
+        m.entity_type_candidates.len()
+    );
+    println!(
+        "  RelationshipTypeDefs to seed:   {}",
+        m.relationship_candidates.len()
+    );
 
     println!("\n  NOT seeded (Phase B2+):");
     println!("    PolicyRules, EvidenceRequirements, TaxonomyMemberships,");
@@ -1080,14 +1125,38 @@ pub async fn onboard_apply(manifest_path: Option<&str>) -> Result<()> {
         .context("Bootstrap seed failed")?;
 
     println!("\n── Bootstrap Report ────────────────────────────────");
-    println!("  AttributeDefs written:          {}", report.attribute_defs_written);
-    println!("  AttributeDefs skipped:          {}", report.attribute_defs_skipped);
-    println!("  VerbContracts written:          {}", report.verb_contracts_written);
-    println!("  VerbContracts skipped:          {}", report.verb_contracts_skipped);
-    println!("  EntityTypeDefs written:         {}", report.entity_type_defs_written);
-    println!("  EntityTypeDefs skipped:         {}", report.entity_type_defs_skipped);
-    println!("  RelationshipTypeDefs written:   {}", report.relationship_type_defs_written);
-    println!("  RelationshipTypeDefs skipped:   {}", report.relationship_type_defs_skipped);
+    println!(
+        "  AttributeDefs written:          {}",
+        report.attribute_defs_written
+    );
+    println!(
+        "  AttributeDefs skipped:          {}",
+        report.attribute_defs_skipped
+    );
+    println!(
+        "  VerbContracts written:          {}",
+        report.verb_contracts_written
+    );
+    println!(
+        "  VerbContracts skipped:          {}",
+        report.verb_contracts_skipped
+    );
+    println!(
+        "  EntityTypeDefs written:         {}",
+        report.entity_type_defs_written
+    );
+    println!(
+        "  EntityTypeDefs skipped:         {}",
+        report.entity_type_defs_skipped
+    );
+    println!(
+        "  RelationshipTypeDefs written:   {}",
+        report.relationship_type_defs_written
+    );
+    println!(
+        "  RelationshipTypeDefs skipped:   {}",
+        report.relationship_type_defs_skipped
+    );
     println!(
         "  Total snapshots:                {}",
         report.total_written()
@@ -1109,19 +1178,23 @@ pub async fn authoring_list(status: Option<&str>, limit: i64) -> Result<()> {
 
     let status_filter = match status {
         Some(s) => {
-            let parsed = sem_os_core::authoring::types::ChangeSetStatus::parse(s)
-                .ok_or_else(|| anyhow::anyhow!(
-                    "Invalid status '{}'. Valid: draft, validated, rejected, \
+            let parsed =
+                sem_os_core::authoring::types::ChangeSetStatus::parse(s).ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "Invalid status '{}'. Valid: draft, validated, rejected, \
                      dry_run_passed, dry_run_failed, published, superseded",
-                    s
-                ))?;
+                        s
+                    )
+                })?;
             Some(parsed)
         }
         None => None,
     };
 
     use sem_os_core::authoring::ports::AuthoringStore;
-    let changesets = store.list_change_sets(status_filter, limit).await
+    let changesets = store
+        .list_change_sets(status_filter, limit)
+        .await
         .map_err(|e| anyhow::anyhow!("{e}"))?;
 
     if changesets.is_empty() {
@@ -1156,7 +1229,9 @@ pub async fn authoring_get(id: &str) -> Result<()> {
     let cs_id = uuid::Uuid::parse_str(id).context("Invalid UUID")?;
 
     use sem_os_core::authoring::ports::AuthoringStore;
-    let cs = store.get_change_set(cs_id).await
+    let cs = store
+        .get_change_set(cs_id)
+        .await
         .map_err(|e| anyhow::anyhow!("{e}"))?;
 
     println!("ChangeSet: {}", cs.change_set_id);
@@ -1183,7 +1258,9 @@ pub async fn authoring_get(id: &str) -> Result<()> {
     }
 
     // Show artifacts
-    let artifacts = store.get_artifacts(cs_id).await
+    let artifacts = store
+        .get_artifacts(cs_id)
+        .await
         .map_err(|e| anyhow::anyhow!("{e}"))?;
     if !artifacts.is_empty() {
         println!("\n  Artifacts ({}):", artifacts.len());
@@ -1198,7 +1275,9 @@ pub async fn authoring_get(id: &str) -> Result<()> {
     }
 
     // Show validation reports
-    let reports = store.get_validation_reports(cs_id).await
+    let reports = store
+        .get_validation_reports(cs_id)
+        .await
         .map_err(|e| anyhow::anyhow!("{e}"))?;
     if !reports.is_empty() {
         println!("\n  Validation Reports ({}):", reports.len());
@@ -1218,10 +1297,11 @@ pub async fn authoring_validate(id: &str) -> Result<()> {
     let scratch = sem_os_postgres::PgScratchSchemaRunner::new(pool);
     let cs_id = uuid::Uuid::parse_str(id).context("Invalid UUID")?;
 
-    let service = sem_os_core::authoring::governance_verbs::GovernanceVerbService::new(
-        &store, &scratch,
-    );
-    let report = service.validate(cs_id).await
+    let service =
+        sem_os_core::authoring::governance_verbs::GovernanceVerbService::new(&store, &scratch);
+    let report = service
+        .validate(cs_id)
+        .await
         .map_err(|e| anyhow::anyhow!("{e}"))?;
 
     println!("Validation Report for {}", cs_id);
@@ -1248,10 +1328,11 @@ pub async fn authoring_dry_run(id: &str) -> Result<()> {
     let scratch = sem_os_postgres::PgScratchSchemaRunner::new(pool);
     let cs_id = uuid::Uuid::parse_str(id).context("Invalid UUID")?;
 
-    let service = sem_os_core::authoring::governance_verbs::GovernanceVerbService::new(
-        &store, &scratch,
-    );
-    let report = service.dry_run(cs_id).await
+    let service =
+        sem_os_core::authoring::governance_verbs::GovernanceVerbService::new(&store, &scratch);
+    let report = service
+        .dry_run(cs_id)
+        .await
         .map_err(|e| anyhow::anyhow!("{e}"))?;
 
     println!("Dry-Run Report for {}", cs_id);
@@ -1284,10 +1365,11 @@ pub async fn authoring_plan(id: &str) -> Result<()> {
     let scratch = sem_os_postgres::PgScratchSchemaRunner::new(pool);
     let cs_id = uuid::Uuid::parse_str(id).context("Invalid UUID")?;
 
-    let service = sem_os_core::authoring::governance_verbs::GovernanceVerbService::new(
-        &store, &scratch,
-    );
-    let diff = service.plan_publish(cs_id).await
+    let service =
+        sem_os_core::authoring::governance_verbs::GovernanceVerbService::new(&store, &scratch);
+    let diff = service
+        .plan_publish(cs_id)
+        .await
         .map_err(|e| anyhow::anyhow!("{e}"))?;
 
     println!("Publish Plan for {}", cs_id);
@@ -1305,10 +1387,11 @@ pub async fn authoring_publish(id: &str, publisher: &str) -> Result<()> {
     let scratch = sem_os_postgres::PgScratchSchemaRunner::new(pool);
     let cs_id = uuid::Uuid::parse_str(id).context("Invalid UUID")?;
 
-    let service = sem_os_core::authoring::governance_verbs::GovernanceVerbService::new(
-        &store, &scratch,
-    );
-    let batch = service.publish(cs_id, publisher).await
+    let service =
+        sem_os_core::authoring::governance_verbs::GovernanceVerbService::new(&store, &scratch);
+    let batch = service
+        .publish(cs_id, publisher)
+        .await
         .map_err(|e| anyhow::anyhow!("{e}"))?;
 
     println!("Published ChangeSet {}", cs_id);
@@ -1330,13 +1413,18 @@ pub async fn authoring_publish_batch(ids: &[String], publisher: &str) -> Result<
         .map(|s| uuid::Uuid::parse_str(s).context("Invalid UUID"))
         .collect::<Result<Vec<_>>>()?;
 
-    let service = sem_os_core::authoring::governance_verbs::GovernanceVerbService::new(
-        &store, &scratch,
-    );
-    let batch = service.publish_batch(&cs_ids, publisher).await
+    let service =
+        sem_os_core::authoring::governance_verbs::GovernanceVerbService::new(&store, &scratch);
+    let batch = service
+        .publish_batch(&cs_ids, publisher)
+        .await
         .map_err(|e| anyhow::anyhow!("{e}"))?;
 
-    println!("Published {} ChangeSets in batch {}", cs_ids.len(), batch.batch_id);
+    println!(
+        "Published {} ChangeSets in batch {}",
+        cs_ids.len(),
+        batch.batch_id
+    );
     println!("  Snapshot Set:   {}", batch.snapshot_set_id);
     println!("  Published At:   {}", batch.published_at);
     println!("  Publisher:      {}", batch.publisher);
@@ -1355,10 +1443,11 @@ pub async fn authoring_diff(base_id: &str, target_id: &str) -> Result<()> {
     let base = uuid::Uuid::parse_str(base_id).context("Invalid base UUID")?;
     let target = uuid::Uuid::parse_str(target_id).context("Invalid target UUID")?;
 
-    let service = sem_os_core::authoring::governance_verbs::GovernanceVerbService::new(
-        &store, &scratch,
-    );
-    let diff = service.diff(base, target).await
+    let service =
+        sem_os_core::authoring::governance_verbs::GovernanceVerbService::new(&store, &scratch);
+    let diff = service
+        .diff(base, target)
+        .await
         .map_err(|e| anyhow::anyhow!("{e}"))?;
 
     println!("Diff: {} → {}", base_id, target_id);
@@ -1374,7 +1463,9 @@ pub async fn authoring_health() -> Result<()> {
     use sem_os_core::authoring::ports::AuthoringStore;
 
     // Pending changeset counts by status
-    let status_counts = store.count_by_status().await
+    let status_counts = store
+        .count_by_status()
+        .await
         .map_err(|e| anyhow::anyhow!("{e}"))?;
     let mut total_pending: i64 = 0;
 
@@ -1394,7 +1485,9 @@ pub async fn authoring_health() -> Result<()> {
     }
 
     // Stale dry-runs
-    let stale = store.find_stale_dry_runs().await
+    let stale = store
+        .find_stale_dry_runs()
+        .await
         .map_err(|e| anyhow::anyhow!("{e}"))?;
     println!("\n  Stale Dry-Runs: {}", stale.len());
     for cs in &stale {
@@ -1423,14 +1516,14 @@ pub async fn authoring_propose(bundle_path: &str) -> Result<()> {
     let manifest_path = bundle_dir.join("changeset.yaml");
     let manifest_yaml = std::fs::read_to_string(&manifest_path)
         .with_context(|| format!("Failed to read {}", manifest_path.display()))?;
-    let raw = parse_manifest(&manifest_yaml)
-        .map_err(|e| anyhow::anyhow!("{e}"))?;
+    let raw = parse_manifest(&manifest_yaml).map_err(|e| anyhow::anyhow!("{e}"))?;
 
     let bundle = build_bundle(&raw, |_type_str, path| {
         let full_path = bundle_dir.join(path);
         std::fs::read_to_string(&full_path)
             .map_err(|e| format!("Failed to read {}: {e}", full_path.display()))
-    }).map_err(|e| anyhow::anyhow!("{e}"))?;
+    })
+    .map_err(|e| anyhow::anyhow!("{e}"))?;
 
     let principal = Principal {
         actor_id: "cli".to_string(),
@@ -1439,10 +1532,11 @@ pub async fn authoring_propose(bundle_path: &str) -> Result<()> {
         tenancy: None,
     };
 
-    let service = sem_os_core::authoring::governance_verbs::GovernanceVerbService::new(
-        &store, &scratch,
-    );
-    let cs = service.propose(&bundle, &principal).await
+    let service =
+        sem_os_core::authoring::governance_verbs::GovernanceVerbService::new(&store, &scratch);
+    let cs = service
+        .propose(&bundle, &principal)
+        .await
         .map_err(|e| anyhow::anyhow!("{e}"))?;
 
     println!("Proposed ChangeSet: {}", cs.change_set_id);
@@ -1454,10 +1548,7 @@ pub async fn authoring_propose(bundle_path: &str) -> Result<()> {
 }
 
 /// Run cleanup to archive old terminal/orphan ChangeSets.
-pub async fn authoring_cleanup(
-    terminal_days: Option<u32>,
-    orphan_days: Option<u32>,
-) -> Result<()> {
+pub async fn authoring_cleanup(terminal_days: Option<u32>, orphan_days: Option<u32>) -> Result<()> {
     let pool = connect().await?;
 
     let policy = sem_os_core::authoring::cleanup::CleanupPolicy {
@@ -1466,8 +1557,14 @@ pub async fn authoring_cleanup(
     };
 
     println!("Cleanup Policy:");
-    println!("  Terminal retention: {} days", policy.terminal_retention_days);
-    println!("  Orphan retention:   {} days", policy.orphan_retention_days);
+    println!(
+        "  Terminal retention: {} days",
+        policy.terminal_retention_days
+    );
+    println!(
+        "  Orphan retention:   {} days",
+        policy.orphan_retention_days
+    );
 
     let cleanup_store = sem_os_postgres::PgCleanupStore::new(pool);
     let report = sem_os_core::authoring::cleanup::run_cleanup(&cleanup_store, &policy)
@@ -1481,7 +1578,11 @@ pub async fn authoring_cleanup(
 }
 
 fn print_diff_summary(diff: &sem_os_core::authoring::types::DiffSummary) {
-    if diff.added.is_empty() && diff.modified.is_empty() && diff.removed.is_empty() && diff.breaking_changes.is_empty() {
+    if diff.added.is_empty()
+        && diff.modified.is_empty()
+        && diff.removed.is_empty()
+        && diff.breaking_changes.is_empty()
+    {
         println!("  (no changes)");
         return;
     }
@@ -1506,7 +1607,12 @@ fn print_diff_summary(diff: &sem_os_core::authoring::types::DiffSummary) {
     if !diff.breaking_changes.is_empty() {
         println!("  Breaking Changes ({}):", diff.breaking_changes.len());
         for e in &diff.breaking_changes {
-            println!("    ! {} [{}] — {}", e.fqn, e.object_type, e.detail.as_deref().unwrap_or(""));
+            println!(
+                "    ! {} [{}] — {}",
+                e.fqn,
+                e.object_type,
+                e.detail.as_deref().unwrap_or("")
+            );
         }
     }
 }

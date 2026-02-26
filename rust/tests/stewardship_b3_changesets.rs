@@ -21,9 +21,9 @@ mod b3_changesets {
 
     use ob_poc::sem_reg::abac::ActorContext;
     use ob_poc::sem_reg::agent::mcp_tools::{SemRegToolContext, SemRegToolResult};
-    use ob_poc::sem_reg::stewardship::tools_phase0::dispatch_phase0_tool;
     #[allow(unused_imports)]
     use ob_poc::sem_reg::onboarding::seed::BOOTSTRAP_SET_ID;
+    use ob_poc::sem_reg::stewardship::tools_phase0::dispatch_phase0_tool;
 
     // ── Test Infrastructure ──────────────────────────────────────────
 
@@ -38,8 +38,8 @@ mod b3_changesets {
     }
 
     async fn get_pool() -> Result<PgPool> {
-        let url = std::env::var("DATABASE_URL")
-            .unwrap_or_else(|_| "postgresql:///data_designer".into());
+        let url =
+            std::env::var("DATABASE_URL").unwrap_or_else(|_| "postgresql:///data_designer".into());
         let pool = PgPool::connect(&url).await?;
         Ok(pool)
     }
@@ -100,16 +100,9 @@ mod b3_changesets {
     }
 
     /// Helper: unwrap a dispatch_phase0_tool result.
-    fn unwrap_tool_result(
-        result: Option<SemRegToolResult>,
-        tool_name: &str,
-    ) -> SemRegToolResult {
-        let result = result.unwrap_or_else(|| {
-            panic!(
-                "{}: dispatch returned None (tool not found)",
-                tool_name
-            )
-        });
+    fn unwrap_tool_result(result: Option<SemRegToolResult>, tool_name: &str) -> SemRegToolResult {
+        let result = result
+            .unwrap_or_else(|| panic!("{}: dispatch returned None (tool not found)", tool_name));
         if !result.success {
             panic!(
                 "{}: tool failed: {}",
@@ -136,11 +129,25 @@ mod b3_changesets {
         )
         .await;
         let result = unwrap_tool_result(result, &format!("{label}: stew_submit_for_review"));
-        println!("  [{label}] Submit result: status={}", result.data.get("status").and_then(|v| v.as_str()).unwrap_or("?"));
+        println!(
+            "  [{label}] Submit result: status={}",
+            result
+                .data
+                .get("status")
+                .and_then(|v| v.as_str())
+                .unwrap_or("?")
+        );
 
         // Verify status is under_review
-        let status = result.data.get("status").and_then(|v| v.as_str()).unwrap_or("");
-        assert_eq!(status, "under_review", "[{label}] Expected under_review after submit");
+        let status = result
+            .data
+            .get("status")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        assert_eq!(
+            status, "under_review",
+            "[{label}] Expected under_review after submit"
+        );
 
         // Record review decision: approve
         println!("  [{label}] Recording review decision: approve...");
@@ -155,9 +162,16 @@ mod b3_changesets {
         )
         .await;
         let result = unwrap_tool_result(result, &format!("{label}: stew_record_review_decision"));
-        let new_status = result.data.get("new_status").and_then(|v| v.as_str()).unwrap_or("");
+        let new_status = result
+            .data
+            .get("new_status")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
         println!("  [{label}] Review result: new_status={}", new_status);
-        assert_eq!(new_status, "approved", "[{label}] Expected approved after review");
+        assert_eq!(
+            new_status, "approved",
+            "[{label}] Expected approved after review"
+        );
 
         // Publish
         println!("  [{label}] Publishing...");
@@ -168,10 +182,24 @@ mod b3_changesets {
         )
         .await;
         let result = unwrap_tool_result(result, &format!("{label}: stew_publish"));
-        let pub_status = result.data.get("status").and_then(|v| v.as_str()).unwrap_or("");
-        let promoted = result.data.get("snapshots_promoted").and_then(|v| v.as_u64()).unwrap_or(0);
-        println!("  [{label}] Publish result: status={}, promoted={}", pub_status, promoted);
-        assert_eq!(pub_status, "published", "[{label}] Expected published status");
+        let pub_status = result
+            .data
+            .get("status")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        let promoted = result
+            .data
+            .get("snapshots_promoted")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0);
+        println!(
+            "  [{label}] Publish result: status={}, promoted={}",
+            pub_status, promoted
+        );
+        assert_eq!(
+            pub_status, "published",
+            "[{label}] Expected published status"
+        );
 
         Ok(result.data)
     }
@@ -215,19 +243,42 @@ mod b3_changesets {
         sqlx::query("DELETE FROM stewardship.basis_claims WHERE basis_id IN (SELECT basis_id FROM stewardship.basis_records WHERE changeset_id = $1)")
             .bind(changeset_id).execute(pool).await.ok();
         sqlx::query("DELETE FROM stewardship.basis_records WHERE changeset_id = $1")
-            .bind(changeset_id).execute(pool).await.ok();
+            .bind(changeset_id)
+            .execute(pool)
+            .await
+            .ok();
         sqlx::query("DELETE FROM stewardship.events WHERE changeset_id = $1")
-            .bind(changeset_id).execute(pool).await.ok();
+            .bind(changeset_id)
+            .execute(pool)
+            .await
+            .ok();
         sqlx::query("DELETE FROM sem_reg.changeset_reviews WHERE changeset_id = $1")
-            .bind(changeset_id).execute(pool).await.ok();
+            .bind(changeset_id)
+            .execute(pool)
+            .await
+            .ok();
         sqlx::query("DELETE FROM sem_reg.changeset_entries WHERE changeset_id = $1")
-            .bind(changeset_id).execute(pool).await.ok();
-        sqlx::query("DELETE FROM sem_reg.snapshots WHERE snapshot_set_id = $1 AND status = 'draft'")
-            .bind(changeset_id).execute(pool).await.ok();
+            .bind(changeset_id)
+            .execute(pool)
+            .await
+            .ok();
+        sqlx::query(
+            "DELETE FROM sem_reg.snapshots WHERE snapshot_set_id = $1 AND status = 'draft'",
+        )
+        .bind(changeset_id)
+        .execute(pool)
+        .await
+        .ok();
         sqlx::query("DELETE FROM sem_reg.changesets WHERE changeset_id = $1")
-            .bind(changeset_id).execute(pool).await.ok();
+            .bind(changeset_id)
+            .execute(pool)
+            .await
+            .ok();
         sqlx::query("DELETE FROM sem_reg.snapshot_sets WHERE snapshot_set_id = $1")
-            .bind(changeset_id).execute(pool).await.ok();
+            .bind(changeset_id)
+            .execute(pool)
+            .await
+            .ok();
         Ok(())
     }
 
@@ -273,7 +324,10 @@ mod b3_changesets {
         .await?;
         println!("  Found {} KYC-related AttributeDefs", kyc_attrs.len());
         let kyc_attr_count = kyc_attrs.len();
-        assert!(kyc_attr_count > 0, "Must find at least 1 KYC-related AttributeDef");
+        assert!(
+            kyc_attr_count > 0,
+            "Must find at least 1 KYC-related AttributeDef"
+        );
 
         // Find KYC-related VerbContracts
         let kyc_verbs = discover_fqns(
@@ -311,8 +365,17 @@ mod b3_changesets {
                 }),
             )
             .await;
-            let add_result = unwrap_tool_result(add_result, &format!("CS1: stew_add_item (attr {})", fqn));
-            println!("    Added membership for attr {}: entry_id={}", fqn, add_result.data.get("entry_id").and_then(|v| v.as_str()).unwrap_or("?"));
+            let add_result =
+                unwrap_tool_result(add_result, &format!("CS1: stew_add_item (attr {})", fqn));
+            println!(
+                "    Added membership for attr {}: entry_id={}",
+                fqn,
+                add_result
+                    .data
+                    .get("entry_id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("?")
+            );
             items_added += 1;
         }
 
@@ -339,8 +402,17 @@ mod b3_changesets {
                 }),
             )
             .await;
-            let add_result = unwrap_tool_result(add_result, &format!("CS1: stew_add_item (verb {})", fqn));
-            println!("    Added membership for verb {}: entry_id={}", fqn, add_result.data.get("entry_id").and_then(|v| v.as_str()).unwrap_or("?"));
+            let add_result =
+                unwrap_tool_result(add_result, &format!("CS1: stew_add_item (verb {})", fqn));
+            println!(
+                "    Added membership for verb {}: entry_id={}",
+                fqn,
+                add_result
+                    .data
+                    .get("entry_id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("?")
+            );
             items_added += 1;
         }
         println!("  Total items added: {}", items_added);
@@ -363,7 +435,14 @@ mod b3_changesets {
         )
         .await;
         let basis_result = unwrap_tool_result(basis_result, "CS1: stew_attach_basis");
-        println!("  Basis attached: basis_id={}", basis_result.data.get("basis_id").and_then(|v| v.as_str()).unwrap_or("?"));
+        println!(
+            "  Basis attached: basis_id={}",
+            basis_result
+                .data
+                .get("basis_id")
+                .and_then(|v| v.as_str())
+                .unwrap_or("?")
+        );
 
         // 5. Gate precheck
         let gate_result = dispatch_phase0_tool(
@@ -376,14 +455,23 @@ mod b3_changesets {
         let blocking = gate_result.data["blocking_count"].as_i64().unwrap_or(0);
         let warnings = gate_result.data["warning_count"].as_i64().unwrap_or(0);
         let advisories = gate_result.data["advisory_count"].as_i64().unwrap_or(0);
-        println!("  Gate precheck: {} blocking, {} warnings, {} advisories", blocking, warnings, advisories);
+        println!(
+            "  Gate precheck: {} blocking, {} warnings, {} advisories",
+            blocking, warnings, advisories
+        );
 
         // G02 naming warnings and G09 advisory are acceptable; blocking should be 0
-        assert_eq!(blocking, 0, "CS1: No blocking guardrails expected for taxonomy classification");
+        assert_eq!(
+            blocking, 0,
+            "CS1: No blocking guardrails expected for taxonomy classification"
+        );
 
         // 6-8. Submit → Approve → Publish
         let publish_data = run_lifecycle(&ctx, changeset_id, "CS1").await?;
-        let promoted = publish_data.get("snapshots_promoted").and_then(|v| v.as_u64()).unwrap_or(0);
+        let promoted = publish_data
+            .get("snapshots_promoted")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0);
         assert!(promoted > 0, "CS1: Must promote at least 1 snapshot");
         println!("  CS1 promoted {} snapshots", promoted);
 
@@ -405,13 +493,15 @@ mod b3_changesets {
         .await?;
 
         // Verify changeset status in DB
-        let cs_status: (String,) = sqlx::query_as(
-            "SELECT status FROM sem_reg.changesets WHERE changeset_id = $1",
-        )
-        .bind(changeset_id)
-        .fetch_one(&pool)
-        .await?;
-        assert_eq!(cs_status.0, "published", "CS1: Changeset should be published");
+        let cs_status: (String,) =
+            sqlx::query_as("SELECT status FROM sem_reg.changesets WHERE changeset_id = $1")
+                .bind(changeset_id)
+                .fetch_one(&pool)
+                .await?;
+        assert_eq!(
+            cs_status.0, "published",
+            "CS1: Changeset should be published"
+        );
 
         println!("\n  ✓ CS1 PASSED: Taxonomy classification changeset published.\n");
         Ok(())
@@ -457,8 +547,14 @@ mod b3_changesets {
             2,
         )
         .await?;
-        println!("  Found {} ownership-related AttributeDefs", ownership_attrs.len());
-        assert!(!ownership_attrs.is_empty(), "Must find at least 1 ownership-related AttributeDef");
+        println!(
+            "  Found {} ownership-related AttributeDefs",
+            ownership_attrs.len()
+        );
+        assert!(
+            !ownership_attrs.is_empty(),
+            "Must find at least 1 ownership-related AttributeDef"
+        );
 
         // 3. Modify each to Governed/Proof (promotion)
         let mut promoted_fqns = Vec::new();
@@ -483,8 +579,17 @@ mod b3_changesets {
                 }),
             )
             .await;
-            let add_result = unwrap_tool_result(add_result, &format!("CS2: stew_add_item (promote {})", fqn));
-            println!("    Promoted {}: entry_id={}", fqn, add_result.data.get("entry_id").and_then(|v| v.as_str()).unwrap_or("?"));
+            let add_result =
+                unwrap_tool_result(add_result, &format!("CS2: stew_add_item (promote {})", fqn));
+            println!(
+                "    Promoted {}: entry_id={}",
+                fqn,
+                add_result
+                    .data
+                    .get("entry_id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("?")
+            );
             promoted_fqns.push(fqn.clone());
         }
 
@@ -512,7 +617,14 @@ mod b3_changesets {
         )
         .await;
         let add_result = unwrap_tool_result(add_result, "CS2: stew_add_item (PolicyRule)");
-        println!("  Added PolicyRule: entry_id={}", add_result.data.get("entry_id").and_then(|v| v.as_str()).unwrap_or("?"));
+        println!(
+            "  Added PolicyRule: entry_id={}",
+            add_result
+                .data
+                .get("entry_id")
+                .and_then(|v| v.as_str())
+                .unwrap_or("?")
+        );
 
         // 5. Add EvidenceRequirement
         let evidence_fqn = "evidence.kyc.beneficial_ownership_proof";
@@ -537,7 +649,14 @@ mod b3_changesets {
         )
         .await;
         let add_result = unwrap_tool_result(add_result, "CS2: stew_add_item (EvidenceRequirement)");
-        println!("  Added EvidenceRequirement: entry_id={}", add_result.data.get("entry_id").and_then(|v| v.as_str()).unwrap_or("?"));
+        println!(
+            "  Added EvidenceRequirement: entry_id={}",
+            add_result
+                .data
+                .get("entry_id")
+                .and_then(|v| v.as_str())
+                .unwrap_or("?")
+        );
 
         // 6. Attach basis
         let basis_result = dispatch_phase0_tool(
@@ -568,18 +687,34 @@ mod b3_changesets {
         let gate_result = unwrap_tool_result(gate_result, "CS2: stew_gate_precheck");
         let blocking = gate_result.data["blocking_count"].as_i64().unwrap_or(0);
         let warnings = gate_result.data["warning_count"].as_i64().unwrap_or(0);
-        println!("  Gate precheck: {} blocking, {} warnings", blocking, warnings);
+        println!(
+            "  Gate precheck: {} blocking, {} warnings",
+            blocking, warnings
+        );
 
         // G04 (ProofChainCompatibility) should NOT block since we're promoting TO Proof
         // G13 (ResolutionMetadataMissing) warning acceptable for new PolicyRule
-        assert_eq!(blocking, 0, "CS2: No blocking guardrails expected for promotion + policy");
+        assert_eq!(
+            blocking, 0,
+            "CS2: No blocking guardrails expected for promotion + policy"
+        );
 
         // 8. Submit → Approve → Publish
         let publish_data = run_lifecycle(&ctx, changeset_id, "CS2").await?;
-        let promoted = publish_data.get("snapshots_promoted").and_then(|v| v.as_u64()).unwrap_or(0);
+        let promoted = publish_data
+            .get("snapshots_promoted")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0);
         let expected_count = promoted_fqns.len() as u64 + 2; // promotions + PolicyRule + EvidenceRequirement
-        println!("  CS2 promoted {} snapshots (expected {})", promoted, expected_count);
-        assert_eq!(promoted, expected_count, "CS2: Expected {} promoted snapshots", expected_count);
+        println!(
+            "  CS2 promoted {} snapshots (expected {})",
+            promoted, expected_count
+        );
+        assert_eq!(
+            promoted, expected_count,
+            "CS2: Expected {} promoted snapshots",
+            expected_count
+        );
 
         // 9. Verify promoted attributes are now Active with superseded predecessors
         for fqn in &promoted_fqns {
@@ -600,7 +735,10 @@ mod b3_changesets {
             .fetch_one(&pool)
             .await
             .context(format!("CS2: New Active snapshot not found for {}", fqn))?;
-            println!("    {} new Active: snap_id={}, tier={}", fqn, new_active.0, new_active.1);
+            println!(
+                "    {} new Active: snap_id={}, tier={}",
+                fqn, new_active.0, new_active.1
+            );
         }
 
         // Verify old predecessors are superseded (effective_until IS NOT NULL)
@@ -720,7 +858,14 @@ mod b3_changesets {
         )
         .await;
         let add_result = unwrap_tool_result(add_result, "CS3: stew_add_item (modify verb)");
-        println!("  Modified VerbContract: entry_id={}", add_result.data.get("entry_id").and_then(|v| v.as_str()).unwrap_or("?"));
+        println!(
+            "  Modified VerbContract: entry_id={}",
+            add_result
+                .data
+                .get("entry_id")
+                .and_then(|v| v.as_str())
+                .unwrap_or("?")
+        );
 
         // 4. Attach basis
         let basis_result = dispatch_phase0_tool(
@@ -747,12 +892,21 @@ mod b3_changesets {
         let gate_result = unwrap_tool_result(gate_result, "CS3: stew_gate_precheck");
         let blocking = gate_result.data["blocking_count"].as_i64().unwrap_or(0);
         println!("  Gate precheck: {} blocking", blocking);
-        assert_eq!(blocking, 0, "CS3: No blocking guardrails expected for verb enrichment");
+        assert_eq!(
+            blocking, 0,
+            "CS3: No blocking guardrails expected for verb enrichment"
+        );
 
         // 6. Submit → Approve → Publish
         let publish_data = run_lifecycle(&ctx, changeset_id, "CS3").await?;
-        let promoted = publish_data.get("snapshots_promoted").and_then(|v| v.as_u64()).unwrap_or(0);
-        assert_eq!(promoted, 1, "CS3: Expected 1 promoted snapshot (enriched verb)");
+        let promoted = publish_data
+            .get("snapshots_promoted")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0);
+        assert_eq!(
+            promoted, 1,
+            "CS3: Expected 1 promoted snapshot (enriched verb)"
+        );
 
         // 7. Verify enriched VerbContract is now Active
         let enriched: (serde_json::Value,) = sqlx::query_as(
@@ -783,12 +937,11 @@ mod b3_changesets {
         println!("  Enriched VerbContract verified: has usage_examples + parameter_guidance");
 
         // Verify predecessor is superseded
-        let superseded: (Option<chrono::DateTime<chrono::Utc>>,) = sqlx::query_as(
-            "SELECT effective_until FROM sem_reg.snapshots WHERE snapshot_id = $1",
-        )
-        .bind(verb_snap_id)
-        .fetch_one(&pool)
-        .await?;
+        let superseded: (Option<chrono::DateTime<chrono::Utc>>,) =
+            sqlx::query_as("SELECT effective_until FROM sem_reg.snapshots WHERE snapshot_id = $1")
+                .bind(verb_snap_id)
+                .fetch_one(&pool)
+                .await?;
         assert!(
             superseded.0.is_some(),
             "CS3: Predecessor verb snapshot should be superseded"
@@ -812,7 +965,10 @@ mod b3_changesets {
         .execute(&pool)
         .await
         .context("CS3: Failed to insert verb implementation binding")?;
-        println!("  Created VerbImplementationBinding: {} -> {}", verb_fqn, binding_ref);
+        println!(
+            "  Created VerbImplementationBinding: {} -> {}",
+            verb_fqn, binding_ref
+        );
 
         // 9. Verify binding
         let binding: (String, String, String) = sqlx::query_as(
@@ -829,7 +985,10 @@ mod b3_changesets {
         assert_eq!(binding.0, verb_fqn);
         assert_eq!(binding.1, "rust_handler");
         assert_eq!(binding.2, "active");
-        println!("  Binding verified: {} [{}] status={}", binding.0, binding.1, binding.2);
+        println!(
+            "  Binding verified: {} [{}] status={}",
+            binding.0, binding.1, binding.2
+        );
 
         // Verify audit events
         verify_audit_events(
@@ -890,7 +1049,10 @@ mod b3_changesets {
         )
         .await?;
         println!("  Found {} PII-candidate AttributeDefs", pii_attrs.len());
-        assert!(!pii_attrs.is_empty(), "Must find at least 1 PII-candidate AttributeDef");
+        assert!(
+            !pii_attrs.is_empty(),
+            "Must find at least 1 PII-candidate AttributeDef"
+        );
 
         // 3. Modify each with security_label
         let mut labelled_fqns = Vec::new();
@@ -921,8 +1083,17 @@ mod b3_changesets {
                 }),
             )
             .await;
-            let add_result = unwrap_tool_result(add_result, &format!("CS4: stew_add_item (label {})", fqn));
-            println!("    Labelled {}: entry_id={}", fqn, add_result.data.get("entry_id").and_then(|v| v.as_str()).unwrap_or("?"));
+            let add_result =
+                unwrap_tool_result(add_result, &format!("CS4: stew_add_item (label {})", fqn));
+            println!(
+                "    Labelled {}: entry_id={}",
+                fqn,
+                add_result
+                    .data
+                    .get("entry_id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("?")
+            );
             labelled_fqns.push(fqn.clone());
         }
 
@@ -955,12 +1126,21 @@ mod b3_changesets {
         let gate_result = unwrap_tool_result(gate_result, "CS4: stew_gate_precheck");
         let blocking = gate_result.data["blocking_count"].as_i64().unwrap_or(0);
         let warnings = gate_result.data["warning_count"].as_i64().unwrap_or(0);
-        println!("  Gate precheck: {} blocking, {} warnings", blocking, warnings);
-        assert_eq!(blocking, 0, "CS4: No blocking guardrails expected for security labelling");
+        println!(
+            "  Gate precheck: {} blocking, {} warnings",
+            blocking, warnings
+        );
+        assert_eq!(
+            blocking, 0,
+            "CS4: No blocking guardrails expected for security labelling"
+        );
 
         // 6. Submit → Approve → Publish
         let publish_data = run_lifecycle(&ctx, changeset_id, "CS4").await?;
-        let promoted = publish_data.get("snapshots_promoted").and_then(|v| v.as_u64()).unwrap_or(0);
+        let promoted = publish_data
+            .get("snapshots_promoted")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0);
         assert_eq!(
             promoted,
             labelled_fqns.len() as u64,
@@ -993,7 +1173,9 @@ mod b3_changesets {
                 "CS4: {} must have security_label in definition",
                 fqn
             );
-            let pii = labelled.0["security_label"]["pii"].as_bool().unwrap_or(false);
+            let pii = labelled.0["security_label"]["pii"]
+                .as_bool()
+                .unwrap_or(false);
             assert!(pii, "CS4: {} security_label.pii must be true", fqn);
             println!("    {} verified: has security_label with pii=true", fqn);
         }
@@ -1081,7 +1263,10 @@ mod b3_changesets {
         )
         .fetch_one(&pool)
         .await?;
-        println!("  Orphaned drafts from published changesets: {}", orphaned_drafts.0);
+        println!(
+            "  Orphaned drafts from published changesets: {}",
+            orphaned_drafts.0
+        );
         assert_eq!(
             orphaned_drafts.0, 0,
             "No drafts should remain in published changesets"
@@ -1115,12 +1300,11 @@ mod b3_changesets {
 
         // 5. Each changeset has audit events
         for (cs_id, _, scope) in &b3_changesets {
-            let event_count: (i64,) = sqlx::query_as(
-                "SELECT COUNT(*) FROM stewardship.events WHERE changeset_id = $1",
-            )
-            .bind(cs_id)
-            .fetch_one(&pool)
-            .await?;
+            let event_count: (i64,) =
+                sqlx::query_as("SELECT COUNT(*) FROM stewardship.events WHERE changeset_id = $1")
+                    .bind(cs_id)
+                    .fetch_one(&pool)
+                    .await?;
             println!("    {} ({}) audit events: {}", cs_id, scope, event_count.0);
             assert!(
                 event_count.0 >= 4,
@@ -1146,9 +1330,15 @@ mod b3_changesets {
         .fetch_optional(&pool)
         .await?;
         if let Some((def,)) = promoted_attr {
-            let tier = def.get("governance_tier").and_then(|v| v.as_str()).unwrap_or("?");
+            let tier = def
+                .get("governance_tier")
+                .and_then(|v| v.as_str())
+                .unwrap_or("?");
             println!("  Promoted attribute tier: {}", tier);
-            assert_eq!(tier, "governed", "Promoted attribute should have governance_tier=governed");
+            assert_eq!(
+                tier, "governed",
+                "Promoted attribute should have governance_tier=governed"
+            );
         } else {
             println!("  ⚠ No promoted attribute found from CS2 (may have been cleaned up)");
         }
@@ -1167,7 +1357,12 @@ mod b3_changesets {
         .fetch_optional(&pool)
         .await?;
         if let Some((def,)) = policy {
-            println!("  PolicyRule found: {}", def.get("description").and_then(|v| v.as_str()).unwrap_or("?"));
+            println!(
+                "  PolicyRule found: {}",
+                def.get("description")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("?")
+            );
             assert!(
                 def.get("predicate_refs").is_some(),
                 "PolicyRule must have predicate_refs"

@@ -37,7 +37,6 @@ pub fn build_stub_context(
     let policy = PolicyGate {
         strict_single_pipeline: mode.strict_single_pipeline,
         allow_raw_execute: mode.allow_raw_execute,
-        allow_direct_dsl: mode.allow_direct_dsl,
         strict_semreg: mode.strict_semreg,
         allow_legacy_generate: false,
     };
@@ -67,7 +66,7 @@ mod tests {
         let mode = ModeExpectations::default();
         assert!(mode.strict_semreg);
         assert!(mode.strict_single_pipeline);
-        assert!(!mode.allow_direct_dsl);
+        assert!(!mode.allow_raw_execute);
     }
 
     #[test]

@@ -548,12 +548,18 @@ Multiple agents (or the same agent in multiple sessions) may author ChangeSets a
 - **Plan** publish and understand blast radius + downstream verb availability changes before committing
 
 ### 3.2 Governed / Execution capabilities
-- Run only **SemReg-allowed verbs** for the current context
+- Run only **SemReg-allowed verbs** for the current context, constrained via `ContextEnvelope`
+- **Pre-constrained verb search**: allowed verb set threaded into `HybridVerbSearcher` (not just post-filtered)
+- **dsl_execute SemReg gate**: every verb FQN in parsed AST checked against envelope before execution
 - "Fail closed" when SemReg is strict and no allowed verbs exist
 - **Post-publish health check** via limited `db_introspect` surface (verify migrations landed correctly)
+- **TOCTOU recheck**: deterministic fingerprint comparison between resolution and execution time
 - Strong audit: every decision and execution recorded with:
   - active snapshot set id
   - evidence / policy gates invoked
+  - `AllowedVerbSetFingerprint` (SHA-256 of sorted allowed verb FQNs)
+  - pruned verb count + structured `PruneReason`
+  - TOCTOU recheck result (if performed)
   - input params (redacted where required)
 
 ### 3.3 Governance capabilities
@@ -1120,5 +1126,44 @@ The `sem_os_server` crate is a fully standalone Axum REST server (port 4100) wit
 | `sem_reg_authoring` schema for change_sets | `sem_reg.changesets` table (existing) | Reused existing stewardship table with extended columns |
 | `/tools/*` REST routes | Removed (TODO) | Tool schemas not yet finalized |
 | `SnapshotStore` as direct trait | Port-trait isolation via `CoreServiceImpl` | All stores injected as `Arc<dyn Port>` for testability |
+
+### CCIR — Context-Constrained Intent Resolution (2026-02-26)
+
+**Migration 103:** Adds 5 CCIR telemetry columns to `agent.intent_events`.
+
+**Problem:** The `SemRegVerbPolicy` enum (`AllowedSet`/`DenyAll`/`Unavailable`) was a flat discriminator that lost all resolution detail — why a verb was denied, what evidence was missing, whether the allowed set drifted between intent resolution and execution.
+
+**Solution:** `ContextEnvelope` replaces `SemRegVerbPolicy` as the structured output of SemReg context resolution in the intent orchestrator:
+
+| Field | Type | Purpose |
+|-------|------|---------|
+| `allowed_verbs` | `HashSet<String>` | Verbs passing ABAC + tier + preconditions |
+| `pruned_verbs` | `Vec<PrunedVerb>` | Verbs rejected with structured `PruneReason` |
+| `fingerprint` | `AllowedVerbSetFingerprint` | SHA-256 of sorted FQNs (`v1:<hex>`) — deterministic |
+| `evidence_gaps` | `Vec<String>` | Missing evidence identified during resolution |
+| `governance_signals` | `Vec<GovernanceSignalSummary>` | Staleness, unowned objects, etc. |
+| `snapshot_set_id` | `Option<String>` | Which snapshot set was resolved against |
+
+**PruneReason (7 variants):** `AbacDenied`, `EntityKindMismatch`, `TierExcluded`, `TaxonomyNoOverlap`, `PreconditionFailed`, `AgentModeBlocked`, `PolicyDenied`
+
+**Key changes:**
+
+1. **Pre-constrained verb search (Phase 3):** Allowed verbs threaded into `IntentPipeline.with_allowed_verbs()` → `HybridVerbSearcher.search()`. Disallowed verbs are filtered at the search tier, not just post-filtered. Post-filter retained as safety net.
+
+2. **dsl_execute SemReg gate:** MCP `dsl_execute` now parses the AST, extracts verb FQNs from each `VerbCall`, and checks against the `ContextEnvelope`. Denied verbs block execution.
+
+3. **TOCTOU recheck:** `ContextEnvelope::toctou_recheck()` compares an original resolution against a fresh one, yielding `StillAllowed` / `AllowedButDrifted` / `Denied`.
+
+4. **Direct DSL bypass removed:** The `dsl:` prefix path and `allow_direct_dsl` flag are deleted. All DSL flows through the SemReg-filtered pipeline.
+
+5. **Legacy V1 cleanup:** 4 modules deleted (~2,700 LOC): `session/agent_context.rs`, `session/enhanced_context.rs`, `session/verb_discovery.rs`, `api/verb_discovery_routes.rs`, `lint/agent_context_lint.rs`.
+
+**Key files:**
+- `rust/src/agent/context_envelope.rs` — `ContextEnvelope`, `PruneReason`, `AllowedVerbSetFingerprint`, `TocTouResult` (16 unit tests)
+- `rust/src/agent/orchestrator.rs` — Uses `ContextEnvelope` instead of `SemRegVerbPolicy`
+- `rust/src/mcp/intent_pipeline.rs` — `with_allowed_verbs()` builder
+- `rust/src/mcp/verb_search.rs` — `search()` accepts `allowed_verbs` parameter
+- `rust/src/mcp/handlers/core.rs` — `dsl_execute` verb validation + `verb_search` pre-constrained
+- `migrations/103_ccir_intent_fingerprint.sql` — Telemetry columns
 
 ---

@@ -88,7 +88,7 @@ impl LookupService {
         // Step 1: Verb search (verb-first ordering)
         let verbs = if let Some(searcher) = &self.verb_searcher {
             searcher
-                .search(utterance, None, None, limit)
+                .search(utterance, None, None, limit, None)
                 .await
                 .unwrap_or_default()
         } else {

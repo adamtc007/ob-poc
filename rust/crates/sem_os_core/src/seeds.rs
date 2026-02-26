@@ -18,6 +18,8 @@ pub struct SeedBundle {
     pub taxonomies: Vec<TaxonomySeed>,
     pub policies: Vec<PolicySeed>,
     pub views: Vec<ViewSeed>,
+    #[serde(default)]
+    pub derivation_specs: Vec<DerivationSpecSeed>,
 }
 
 impl SeedBundle {
@@ -34,6 +36,7 @@ impl SeedBundle {
         taxonomies: &[TaxonomySeed],
         policies: &[PolicySeed],
         views: &[ViewSeed],
+        derivation_specs: &[DerivationSpecSeed],
     ) -> std::result::Result<String, serde_json::Error> {
         #[derive(Serialize)]
         struct Canonical<'a> {
@@ -43,6 +46,7 @@ impl SeedBundle {
             taxonomies: Vec<&'a TaxonomySeed>,
             policies: Vec<&'a PolicySeed>,
             views: Vec<&'a ViewSeed>,
+            derivation_specs: Vec<&'a DerivationSpecSeed>,
         }
 
         let mut vc: Vec<&VerbContractSeed> = verb_contracts.iter().collect();
@@ -63,6 +67,9 @@ impl SeedBundle {
         let mut vi: Vec<&ViewSeed> = views.iter().collect();
         vi.sort_by_key(|s| &s.fqn);
 
+        let mut ds: Vec<&DerivationSpecSeed> = derivation_specs.iter().collect();
+        ds.sort_by_key(|s| &s.fqn);
+
         let canonical = Canonical {
             verb_contracts: vc,
             attributes: at,
@@ -70,6 +77,7 @@ impl SeedBundle {
             taxonomies: tx,
             policies: po,
             views: vi,
+            derivation_specs: ds,
         };
         let json = serde_json::to_string(&canonical)?;
         let hash = Sha256::digest(json.as_bytes());
@@ -111,6 +119,12 @@ pub struct PolicySeed {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ViewSeed {
+    pub fqn: String,
+    pub payload: serde_json::Value,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DerivationSpecSeed {
     pub fqn: String,
     pub payload: serde_json::Value,
 }

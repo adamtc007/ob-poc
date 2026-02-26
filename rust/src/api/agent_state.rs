@@ -209,7 +209,6 @@ impl AgentState {
         tracing::info!(
             strict = policy_gate.strict_single_pipeline,
             allow_raw_execute = policy_gate.allow_raw_execute,
-            allow_direct_dsl = policy_gate.allow_direct_dsl,
             "PolicyGate loaded from environment"
         );
 

@@ -1842,14 +1842,10 @@ async fn chat_session(
     // TRACK PROPOSED DSL FOR DIFF (learning from user edits)
     // =========================================================================
     if let Some(ref dsl_source) = response.dsl_source {
-        // Only set proposed_dsl if agent generated it (not DirectDsl)
-        let is_direct_dsl = req.message.trim().starts_with("dsl:");
-        if !is_direct_dsl {
-            state
-                .session_manager
-                .set_proposed_dsl(session_id, dsl_source)
-                .await;
-        }
+        state
+            .session_manager
+            .set_proposed_dsl(session_id, dsl_source)
+            .await;
     }
 
     // Persist session changes back
@@ -3359,20 +3355,5 @@ mod tests {
         assert!(!domains.is_empty());
         assert!(domains.iter().any(|d| d == "cbu"));
         assert!(domains.iter().any(|d| d == "entity"));
-    }
-
-    #[test]
-    fn test_execute_dsl_request_allow_raw_dsl_default() {
-        // Verify allow_raw_dsl defaults to false via serde
-        let json_str = r#"{"dsl": "(open-case)"}"#;
-        let req: super::ExecuteDslRequest = serde_json::from_str(json_str).unwrap();
-        assert!(!req.allow_raw_dsl, "allow_raw_dsl should default to false");
-    }
-
-    #[test]
-    fn test_execute_dsl_request_allow_raw_dsl_explicit() {
-        let json_str = r#"{"dsl": "(open-case)", "allow_raw_dsl": true}"#;
-        let req: super::ExecuteDslRequest = serde_json::from_str(json_str).unwrap();
-        assert!(req.allow_raw_dsl, "allow_raw_dsl should be true when set");
     }
 }

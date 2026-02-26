@@ -15,7 +15,7 @@
 use chrono::Utc;
 use uuid::Uuid;
 
-use crate::error::{SemOsError};
+use crate::error::SemOsError;
 
 use super::ports::Result;
 use crate::principal::Principal;
@@ -170,8 +170,9 @@ impl<'a> GovernanceVerbService<'a> {
         }
 
         // Save report
-        let report_json = serde_json::to_value(&report)
-            .map_err(|e| SemOsError::InvalidInput(format!("Failed to serialize dry-run report: {e}")))?;
+        let report_json = serde_json::to_value(&report).map_err(|e| {
+            SemOsError::InvalidInput(format!("Failed to serialize dry-run report: {e}"))
+        })?;
         self.authoring_store
             .insert_validation_report(
                 change_set_id,
@@ -193,7 +194,11 @@ impl<'a> GovernanceVerbService<'a> {
             .await?;
 
         super::metrics::emit_dry_run(change_set_id, &report);
-        super::metrics::emit_status_transition(change_set_id, ChangeSetStatus::Validated, new_status);
+        super::metrics::emit_status_transition(
+            change_set_id,
+            ChangeSetStatus::Validated,
+            new_status,
+        );
         Ok(report)
     }
 
@@ -236,7 +241,7 @@ impl<'a> GovernanceVerbService<'a> {
         let current_active = self.authoring_store.get_active_snapshot_set_id().await?;
         let stale_dry_run = match (cs.evaluated_against_snapshot_set_id, current_active) {
             (Some(evaluated), Some(active)) => evaluated != active,
-            (None, _) => true, // No evaluation recorded = stale
+            (None, _) => true,       // No evaluation recorded = stale
             (Some(_), None) => true, // Active gone = stale
         };
 
@@ -271,11 +276,7 @@ impl<'a> GovernanceVerbService<'a> {
     ///   5. Transition → Published
     ///   6. Handle supersession chain
     ///   7. Create snapshot set + write audit entry
-    pub async fn publish(
-        &self,
-        change_set_id: Uuid,
-        publisher: &str,
-    ) -> Result<PublishBatch> {
+    pub async fn publish(&self, change_set_id: Uuid, publisher: &str) -> Result<PublishBatch> {
         let start = std::time::Instant::now();
         let cs = self.authoring_store.get_change_set(change_set_id).await?;
 
@@ -382,9 +383,7 @@ impl<'a> GovernanceVerbService<'a> {
             publisher: publisher.to_string(),
         };
 
-        self.authoring_store
-            .insert_publish_batch(&batch)
-            .await?;
+        self.authoring_store.insert_publish_batch(&batch).await?;
 
         self.authoring_store
             .insert_audit_entry(&GovernanceAuditEntry {
@@ -502,9 +501,7 @@ impl<'a> GovernanceVerbService<'a> {
             publisher: publisher.to_string(),
         };
 
-        self.authoring_store
-            .insert_publish_batch(&batch)
-            .await?;
+        self.authoring_store.insert_publish_batch(&batch).await?;
 
         self.authoring_store
             .insert_audit_entry(&GovernanceAuditEntry {
@@ -531,11 +528,7 @@ impl<'a> GovernanceVerbService<'a> {
     // ── 7. diff_change_sets (read-only) ───────────────────────────
 
     /// Compute structural diff between two ChangeSets.
-    pub async fn diff(
-        &self,
-        base_id: Uuid,
-        target_id: Uuid,
-    ) -> Result<DiffSummary> {
+    pub async fn diff(&self, base_id: Uuid, target_id: Uuid) -> Result<DiffSummary> {
         let base_artifacts = self.authoring_store.get_artifacts(base_id).await?;
         let target_artifacts = self.authoring_store.get_artifacts(target_id).await?;
         let diff = diff_changesets(&base_artifacts, &target_artifacts);
@@ -598,10 +591,7 @@ fn cs_to_manifest(cs: &ChangeSetFull) -> ChangeSetManifest {
 
 /// Simple topological sort for batch publish.
 /// Returns an ordering where dependencies come before dependents.
-async fn topological_sort(
-    ids: &[Uuid],
-    store: &dyn AuthoringStore,
-) -> Result<Vec<Uuid>> {
+async fn topological_sort(ids: &[Uuid], store: &dyn AuthoringStore) -> Result<Vec<Uuid>> {
     use std::collections::{HashMap, HashSet, VecDeque};
 
     let id_set: HashSet<Uuid> = ids.iter().copied().collect();

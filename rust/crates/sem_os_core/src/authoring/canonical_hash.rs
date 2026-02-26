@@ -19,14 +19,22 @@ pub const HASH_VERSION: &str = "v1";
 ///
 /// Returns the hex-encoded SHA-256 hash, without the version prefix.
 /// The caller stores `HASH_VERSION` separately.
-pub fn compute_content_hash(manifest: &ChangeSetManifest, artifacts: &[ChangeSetArtifact]) -> String {
+pub fn compute_content_hash(
+    manifest: &ChangeSetManifest,
+    artifacts: &[ChangeSetArtifact],
+) -> String {
     let mut sorted: Vec<&ChangeSetArtifact> = artifacts.iter().collect();
     sorted.sort_by(|a, b| {
         a.artifact_type
             .as_str()
             .cmp(b.artifact_type.as_str())
             .then_with(|| a.ordinal.cmp(&b.ordinal))
-            .then_with(|| a.path.as_deref().unwrap_or("").cmp(b.path.as_deref().unwrap_or("")))
+            .then_with(|| {
+                a.path
+                    .as_deref()
+                    .unwrap_or("")
+                    .cmp(b.path.as_deref().unwrap_or(""))
+            })
     });
 
     let mut hasher = Sha256::new();
@@ -99,9 +107,7 @@ pub fn compute_artifact_hash_typed(content: &str, artifact_type: ArtifactType) -
             try_canonicalize_json(content)
         }
         ArtifactType::VerbYaml => try_canonicalize_yaml(content),
-        ArtifactType::MigrationSql | ArtifactType::MigrationDownSql => {
-            normalize_content(content)
-        }
+        ArtifactType::MigrationSql | ArtifactType::MigrationDownSql => normalize_content(content),
     };
     compute_artifact_hash(&canonical)
 }

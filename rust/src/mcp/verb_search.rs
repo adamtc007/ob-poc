@@ -73,8 +73,6 @@ pub enum VerbSearchSource {
     UserLearnedSemantic,
     /// Global learned exact match
     LearnedExact,
-    /// Direct DSL input (user typed DSL directly)
-    DirectDsl,
     /// Global learned via invocation_phrases (Issue I distinction)
     GlobalLearned,
     /// Cold start pattern embeddings (Issue I distinction)
@@ -375,6 +373,7 @@ impl HybridVerbSearcher {
         user_id: Option<Uuid>,
         domain_filter: Option<&str>,
         limit: usize,
+        allowed_verbs: Option<&HashSet<String>>,
     ) -> Result<Vec<VerbSearchResult>> {
         let mut results = Vec::new();
         let mut seen_verbs: HashSet<String> = HashSet::new();
@@ -660,6 +659,22 @@ impl HybridVerbSearcher {
 
         // Dedupe by verb, sort by score descending, truncate (Issue J/D fix)
         let mut results = normalize_candidates(results, limit);
+
+        // Pre-constrained filter: remove verbs not in the SemReg allowed set (Phase 3 CCIR)
+        // This runs after normalize_candidates to avoid interfering with per-tier logic.
+        // When allowed_verbs is Some, only verbs in the set survive.
+        if let Some(allowed) = allowed_verbs {
+            let before_count = results.len();
+            results.retain(|r| allowed.contains(&r.verb));
+            let pruned = before_count - results.len();
+            if pruned > 0 {
+                tracing::debug!(
+                    pruned_count = pruned,
+                    remaining = results.len(),
+                    "VerbSearch: SemReg allowed_verbs filter removed candidates"
+                );
+            }
+        }
 
         // Final blocklist filter across entire candidate list (ChatGPT review feedback)
         // Earlier checks only filtered per-tier; this ensures no blocked verbs slip through
@@ -1025,7 +1040,10 @@ mod tests {
     #[tokio::test]
     async fn test_minimal_searcher() {
         let searcher = HybridVerbSearcher::minimal();
-        let results = searcher.search("create cbu", None, None, 5).await.unwrap();
+        let results = searcher
+            .search("create cbu", None, None, 5, None)
+            .await
+            .unwrap();
 
         // Minimal searcher has no DB, so no results
         assert!(results.is_empty());

@@ -101,7 +101,12 @@ pub fn infer_entity_types(
     // Build PK lookup from tables
     let pk_map: BTreeMap<(String, String), Vec<String>> = tables
         .iter()
-        .map(|t| ((t.schema.clone(), t.table_name.clone()), t.primary_keys.clone()))
+        .map(|t| {
+            (
+                (t.schema.clone(), t.table_name.clone()),
+                t.primary_keys.clone(),
+            )
+        })
         .collect();
 
     // Build lifecycle states from table column patterns
@@ -159,10 +164,7 @@ pub fn infer_entity_types(
 /// Infer relationships from foreign keys on extracted tables.
 pub fn infer_relationships(tables: &[TableExtract]) -> Vec<RelationshipCandidate> {
     // Build a set of all table names for lookup table detection
-    let all_tables: HashSet<String> = tables
-        .iter()
-        .map(|t| t.table_name.clone())
-        .collect();
+    let all_tables: HashSet<String> = tables.iter().map(|t| t.table_name.clone()).collect();
 
     // Build column name sets per table for temporal detection
     let table_columns: BTreeMap<(String, String), HashSet<String>> = tables
@@ -188,10 +190,7 @@ pub fn infer_relationships(tables: &[TableExtract]) -> Vec<RelationshipCandidate
 
             let cardinality = infer_cardinality(fk, table);
 
-            let fqn = format!(
-                "relationship.{}_to_{}",
-                table.table_name, fk.target_table
-            );
+            let fqn = format!("relationship.{}_to_{}", table.table_name, fk.target_table);
             let name = format!(
                 "{} → {}",
                 table_to_display_name(&table.table_name),
@@ -294,9 +293,7 @@ fn infer_cardinality(fk: &ForeignKeyExtract, table: &TableExtract) -> InferredCa
 }
 
 /// Detect lifecycle states from table columns that look like status/state enums.
-fn detect_lifecycle_states(
-    tables: &[TableExtract],
-) -> BTreeMap<(String, String), Vec<String>> {
+fn detect_lifecycle_states(tables: &[TableExtract]) -> BTreeMap<(String, String), Vec<String>> {
     let mut result = BTreeMap::new();
 
     for table in tables {
@@ -313,14 +310,8 @@ fn detect_lifecycle_states(
         if !status_cols.is_empty() {
             // We note that lifecycle states exist but can't extract CHECK constraint values
             // from information_schema alone. We record the column names as a hint.
-            let hints: Vec<String> = status_cols
-                .iter()
-                .map(|c| format!("has_{}", c))
-                .collect();
-            result.insert(
-                (table.schema.clone(), table.table_name.clone()),
-                hints,
-            );
+            let hints: Vec<String> = status_cols.iter().map(|c| format!("has_{}", c)).collect();
+            result.insert((table.schema.clone(), table.table_name.clone()), hints);
         }
     }
 
@@ -385,10 +376,7 @@ mod tests {
         cols.insert("entity_id".to_string());
 
         let mut table_columns = BTreeMap::new();
-        table_columns.insert(
-            ("ob-poc".to_string(), "entity_roles".to_string()),
-            cols,
-        );
+        table_columns.insert(("ob-poc".to_string(), "entity_roles".to_string()), cols);
 
         let result = classify_edge(
             "ob-poc",

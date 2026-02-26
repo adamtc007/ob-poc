@@ -8,7 +8,7 @@
 
 use uuid::Uuid;
 
-use super::types::{ChangeSetStatus, DiffSummary, ValidationReport, DryRunReport};
+use super::types::{ChangeSetStatus, DiffSummary, DryRunReport, ValidationReport};
 
 /// Emit a structured tracing event for `propose_change_set`.
 pub fn emit_propose(change_set_id: Uuid, title: &str, idempotent_hit: bool) {
@@ -107,11 +107,7 @@ pub fn emit_diff(base_id: Uuid, target_id: Uuid, diff: &DiffSummary) {
 }
 
 /// Emit a structured tracing event for status transitions.
-pub fn emit_status_transition(
-    change_set_id: Uuid,
-    from: ChangeSetStatus,
-    to: ChangeSetStatus,
-) {
+pub fn emit_status_transition(change_set_id: Uuid, from: ChangeSetStatus, to: ChangeSetStatus) {
     tracing::info!(
         target: "authoring.status_transition",
         %change_set_id,

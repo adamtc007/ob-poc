@@ -718,9 +718,16 @@ pub enum WorkbenchPacketKind {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum WorkbenchPayload {
-    ShowPayload { show_packet: Box<ShowPacket> },
-    DeltaPayload { deltas: Vec<ViewportDelta> },
-    StatusPayload { viewport_id: String, status: ViewportStatus },
+    ShowPayload {
+        show_packet: Box<ShowPacket>,
+    },
+    DeltaPayload {
+        deltas: Vec<ViewportDelta>,
+    },
+    StatusPayload {
+        viewport_id: String,
+        status: ViewportStatus,
+    },
 }
 
 // ─── ViewportManifest (§9.4) ──────────────────────────────────

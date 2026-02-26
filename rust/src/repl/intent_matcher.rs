@@ -57,9 +57,8 @@ pub trait IntentMatcher: Send + Sync {
         stack: &ContextStack,
     ) -> Result<IntentMatchResult> {
         // Direct DSL detection — log but do NOT bypass intent matching.
-        // The IntentPipeline.allow_direct_dsl flag controls whether DSL bypass
-        // is permitted (operator-only). At the trait level we always go through
-        // semantic search so SemReg filtering and IntentTrace are applied.
+        // All utterances go through semantic search so SemReg filtering
+        // and IntentTrace are applied. No DSL bypass path exists.
         if self.is_direct_dsl(utterance) {
             tracing::debug!(
                 input = utterance,

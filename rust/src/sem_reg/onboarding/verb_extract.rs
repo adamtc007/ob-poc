@@ -245,7 +245,10 @@ fn extract_side_effects(verb_config: &dsl_core::config::types::VerbConfig) -> Ve
             // Format: "schema.table" or just "table"
             let (schema, table) = parse_schema_table(write_table);
             // Dedupe: skip if already present
-            if !effects.iter().any(|e| e.table == table && e.schema == schema) {
+            if !effects
+                .iter()
+                .any(|e| e.table == table && e.schema == schema)
+            {
                 effects.push(SideEffect {
                     schema,
                     table,
@@ -255,7 +258,10 @@ fn extract_side_effects(verb_config: &dsl_core::config::types::VerbConfig) -> Ve
         }
         for read_table in &lifecycle.reads_tables {
             let (schema, table) = parse_schema_table(read_table);
-            if !effects.iter().any(|e| e.table == table && e.schema == schema) {
+            if !effects
+                .iter()
+                .any(|e| e.table == table && e.schema == schema)
+            {
                 effects.push(SideEffect {
                     schema,
                     table,

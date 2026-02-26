@@ -17,7 +17,7 @@ use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
 pub use ob_poc_types::manco_group::{
     BridgeBodsResult, BridgeGleifResult, BridgeRolesResult, CbuMancoNotFound, CbuMancoResult,
     ComputeControlLinksResult, ControlChainNode, ControlType, ControllerBasis, DeriveGroupsResult,
-    GroupCbuEntry, PrimaryGovernanceController,
+    GovernanceRefreshResult, GroupCbuEntry, PrimaryGovernanceController,
 };
 
 #[cfg(feature = "database")]
@@ -40,7 +40,7 @@ pub struct MancoBridgeRolesOp;
 #[async_trait]
 impl CustomOperation for MancoBridgeRolesOp {
     fn domain(&self) -> &'static str {
-        "manco"
+        "ownership"
     }
     fn verb(&self) -> &'static str {
         "bridge.manco-roles"
@@ -92,7 +92,7 @@ pub struct MancoBridgeGleifFundManagersOp;
 #[async_trait]
 impl CustomOperation for MancoBridgeGleifFundManagersOp {
     fn domain(&self) -> &'static str {
-        "manco"
+        "ownership"
     }
     fn verb(&self) -> &'static str {
         "bridge.gleif-fund-managers"
@@ -144,7 +144,7 @@ pub struct MancoBridgeBodsOwnershipOp;
 #[async_trait]
 impl CustomOperation for MancoBridgeBodsOwnershipOp {
     fn domain(&self) -> &'static str {
-        "manco"
+        "ownership"
     }
     fn verb(&self) -> &'static str {
         "bridge.bods-ownership"
@@ -838,6 +838,125 @@ impl CustomOperation for OwnershipComputeControlLinksOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         let result = ComputeControlLinksResult { links_created: 0 };
+        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+    }
+}
+
+/// Full governance refresh pipeline: runs all bridges then derives groups.
+#[register_custom_op]
+pub struct OwnershipRefreshOp;
+
+#[async_trait]
+impl CustomOperation for OwnershipRefreshOp {
+    fn domain(&self) -> &'static str {
+        "ownership"
+    }
+    fn verb(&self) -> &'static str {
+        "refresh"
+    }
+    fn rationale(&self) -> &'static str {
+        "Pipeline macro: bridges all data sources then derives governance groups"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let as_of = extract_date_opt(verb_call, "as-of");
+
+        // 1. Bridge ManCo roles → board rights
+        let manco_row: (i32, i32) =
+            sqlx::query_as("SELECT * FROM kyc.fn_bridge_manco_role_to_board_rights($1)")
+                .bind(as_of)
+                .fetch_one(pool)
+                .await?;
+        let manco_bridge = BridgeRolesResult {
+            rights_created: manco_row.0,
+            rights_updated: manco_row.1,
+        };
+
+        // 2. Bridge GLEIF fund managers → board rights
+        let gleif_row: (i32, i32) =
+            sqlx::query_as("SELECT * FROM kyc.fn_bridge_gleif_fund_manager_to_board_rights($1)")
+                .bind(as_of)
+                .fetch_one(pool)
+                .await?;
+        let gleif_bridge = BridgeGleifResult {
+            rights_created: gleif_row.0,
+            rights_updated: gleif_row.1,
+        };
+
+        // 3. Bridge BODS ownership → holdings
+        let bods_row: (i32, i32, i32) =
+            sqlx::query_as("SELECT * FROM kyc.fn_bridge_bods_to_holdings($1)")
+                .bind(as_of)
+                .fetch_one(pool)
+                .await?;
+        let bods_bridge = BridgeBodsResult {
+            holdings_created: bods_row.0,
+            holdings_updated: bods_row.1,
+            entities_linked: bods_row.2,
+        };
+
+        // 4. Compute control links
+        let links_count: i32 = sqlx::query_scalar("SELECT kyc.fn_compute_control_links(NULL, $1)")
+            .bind(as_of)
+            .fetch_one(pool)
+            .await?;
+        let control_links = ComputeControlLinksResult {
+            links_created: links_count,
+        };
+
+        // 5. Derive CBU groups
+        let groups_row: (i32, i32) =
+            sqlx::query_as(r#"SELECT * FROM "ob-poc".fn_derive_cbu_groups($1)"#)
+                .bind(as_of)
+                .fetch_one(pool)
+                .await?;
+        let groups = DeriveGroupsResult {
+            groups_created: groups_row.0,
+            memberships_created: groups_row.1,
+        };
+
+        let result = GovernanceRefreshResult {
+            manco_bridge,
+            gleif_bridge,
+            bods_bridge,
+            control_links,
+            groups,
+        };
+        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        let result = GovernanceRefreshResult {
+            manco_bridge: BridgeRolesResult {
+                rights_created: 0,
+                rights_updated: 0,
+            },
+            gleif_bridge: BridgeGleifResult {
+                rights_created: 0,
+                rights_updated: 0,
+            },
+            bods_bridge: BridgeBodsResult {
+                holdings_created: 0,
+                holdings_updated: 0,
+                entities_linked: 0,
+            },
+            control_links: ComputeControlLinksResult { links_created: 0 },
+            groups: DeriveGroupsResult {
+                groups_created: 0,
+                memberships_created: 0,
+            },
+        };
         Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
 }

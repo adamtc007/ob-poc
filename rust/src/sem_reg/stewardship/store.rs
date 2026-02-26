@@ -180,10 +180,7 @@ impl StewardshipStore {
     }
 
     /// List conflicts for a changeset.
-    pub async fn list_conflicts(
-        pool: &PgPool,
-        changeset_id: Uuid,
-    ) -> Result<Vec<ConflictRecord>> {
+    pub async fn list_conflicts(pool: &PgPool, changeset_id: Uuid) -> Result<Vec<ConflictRecord>> {
         let rows = sqlx::query_as::<_, ConflictRow>(
             r#"
             SELECT conflict_id, changeset_id, competing_changeset_id,

@@ -50,18 +50,12 @@ pub fn build_router(service: Arc<dyn CoreService>, pool: PgPool, jwt_config: Jwt
             "/authoring/:id/validate",
             post(handlers::authoring::validate),
         )
-        .route(
-            "/authoring/:id/dry-run",
-            post(handlers::authoring::dry_run),
-        )
+        .route("/authoring/:id/dry-run", post(handlers::authoring::dry_run))
         .route(
             "/authoring/:id/plan",
             get(handlers::authoring::plan_publish),
         )
-        .route(
-            "/authoring/:id/publish",
-            post(handlers::authoring::publish),
-        )
+        .route("/authoring/:id/publish", post(handlers::authoring::publish))
         // Changeset / Workbench
         .route("/changesets", get(handlers::changesets::list_changesets))
         .route(

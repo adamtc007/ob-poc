@@ -920,8 +920,8 @@ impl CustomOperation for AgentSetAuthoringModeOp {
             .and_then(|v| v.as_boolean())
             .unwrap_or(false);
 
-        let mode = sem_os_core::authoring::agent_mode::AgentMode::parse(&mode_str)
-            .ok_or_else(|| {
+        let mode =
+            sem_os_core::authoring::agent_mode::AgentMode::parse(&mode_str).ok_or_else(|| {
                 anyhow::anyhow!(
                     "Invalid authoring mode '{}'. Valid: research, governed",
                     mode_str

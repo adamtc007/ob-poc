@@ -110,9 +110,7 @@ pub async fn extract_schema(
 
     // Sort columns by ordinal position
     for table in tables.values_mut() {
-        table
-            .columns
-            .sort_by_key(|c| c.ordinal_position);
+        table.columns.sort_by_key(|c| c.ordinal_position);
     }
 
     // Attach primary keys
@@ -204,10 +202,7 @@ struct CommentRow {
 // ── Query functions ──────────────────────────────────────────
 
 #[cfg(feature = "database")]
-async fn load_columns(
-    pool: &PgPool,
-    schemas: &[String],
-) -> Result<Vec<ColumnRow>, anyhow::Error> {
+async fn load_columns(pool: &PgPool, schemas: &[String]) -> Result<Vec<ColumnRow>, anyhow::Error> {
     let rows = sqlx::query_as::<_, (String, String, String, String, String, Option<String>, i32)>(
         r#"
         SELECT
@@ -244,10 +239,7 @@ async fn load_columns(
 }
 
 #[cfg(feature = "database")]
-async fn load_primary_keys(
-    pool: &PgPool,
-    schemas: &[String],
-) -> Result<Vec<PkRow>, anyhow::Error> {
+async fn load_primary_keys(pool: &PgPool, schemas: &[String]) -> Result<Vec<PkRow>, anyhow::Error> {
     let rows = sqlx::query_as::<_, (String, String, String)>(
         r#"
         SELECT
@@ -278,10 +270,7 @@ async fn load_primary_keys(
 }
 
 #[cfg(feature = "database")]
-async fn load_foreign_keys(
-    pool: &PgPool,
-    schemas: &[String],
-) -> Result<Vec<FkRow>, anyhow::Error> {
+async fn load_foreign_keys(pool: &PgPool, schemas: &[String]) -> Result<Vec<FkRow>, anyhow::Error> {
     let rows = sqlx::query_as::<_, (String, String, String, String, String, String, String)>(
         r#"
         SELECT
@@ -352,10 +341,7 @@ async fn load_unique_constraints(
     let mut grouped: std::collections::BTreeMap<(String, String, String), Vec<String>> =
         std::collections::BTreeMap::new();
     for r in rows {
-        grouped
-            .entry((r.0, r.1, r.2))
-            .or_default()
-            .push(r.3);
+        grouped.entry((r.0, r.1, r.2)).or_default().push(r.3);
     }
 
     Ok(grouped

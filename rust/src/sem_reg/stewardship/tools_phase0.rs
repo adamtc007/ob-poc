@@ -13,12 +13,14 @@ use serde_json::json;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::sem_reg::agent::mcp_tools::{SemRegToolContext, SemRegToolResult, SemRegToolSpec, ToolParameter};
+use crate::sem_reg::agent::mcp_tools::{
+    SemRegToolContext, SemRegToolResult, SemRegToolSpec, ToolParameter,
+};
 use crate::sem_reg::store::SnapshotStore;
 use crate::sem_reg::types::{ObjectType, SnapshotStatus};
 
 use super::guardrails::evaluate_all_guardrails;
-use super::idempotency::{IdempotencyCheck, check_idempotency, record_idempotency};
+use super::idempotency::{check_idempotency, record_idempotency, IdempotencyCheck};
 use super::impact::compute_changeset_impact;
 use super::store::StewardshipStore;
 use super::templates::instantiate_template;
@@ -201,24 +203,26 @@ fn stewardship_query_specs() -> Vec<SemRegToolSpec> {
             parameters: vec![
                 param("object_fqn", "Object FQN", "string", true),
                 param("object_type", "Object type", "string", false),
-                param("include_consumers", "Include consuming objects (default true)", "boolean", false),
+                param(
+                    "include_consumers",
+                    "Include consuming objects (default true)",
+                    "boolean",
+                    false,
+                ),
             ],
         },
         SemRegToolSpec {
             name: "stew_cross_reference".into(),
-            description: "Find conflicts, duplicates, and promotable candidates for a changeset".into(),
+            description: "Find conflicts, duplicates, and promotable candidates for a changeset"
+                .into(),
             category: "stewardship_query".into(),
-            parameters: vec![
-                param("changeset_id", "Changeset UUID", "uuid", true),
-            ],
+            parameters: vec![param("changeset_id", "Changeset UUID", "uuid", true)],
         },
         SemRegToolSpec {
             name: "stew_impact_analysis".into(),
             description: "Compute blast radius for changeset items".into(),
             category: "stewardship_query".into(),
-            parameters: vec![
-                param("changeset_id", "Changeset UUID", "uuid", true),
-            ],
+            parameters: vec![param("changeset_id", "Changeset UUID", "uuid", true)],
         },
         SemRegToolSpec {
             name: "stew_coverage_report".into(),
@@ -226,7 +230,12 @@ fn stewardship_query_specs() -> Vec<SemRegToolSpec> {
             category: "stewardship_query".into(),
             parameters: vec![
                 param("scope", "Domain scope to report on", "string", false),
-                param("include_drift", "Include drift detection (default false)", "boolean", false),
+                param(
+                    "include_drift",
+                    "Include drift detection (default false)",
+                    "boolean",
+                    false,
+                ),
             ],
         },
     ]
@@ -373,7 +382,10 @@ async fn handle_compose_changeset(
     // Create the changeset (snapshot_set) in sem_reg
     match SnapshotStore::create_snapshot_set(
         ctx.pool,
-        Some(&format!("changeset:{} scope:{} intent:{}", changeset_id, scope, intent)),
+        Some(&format!(
+            "changeset:{} scope:{} intent:{}",
+            changeset_id, scope, intent
+        )),
         &actor,
     )
     .await
@@ -410,8 +422,7 @@ async fn handle_compose_changeset(
             let mut template_items = Vec::new();
             if let Some(fqn) = template_fqn {
                 let overrides = get_json(args, "overrides");
-                match instantiate_template(ctx.pool, snapshot_set_id, fqn, &actor, &overrides)
-                    .await
+                match instantiate_template(ctx.pool, snapshot_set_id, fqn, &actor, &overrides).await
                 {
                     Ok(entries) => template_items = entries,
                     Err(e) => {
@@ -448,10 +459,7 @@ async fn handle_compose_changeset(
     }
 }
 
-async fn handle_suggest(
-    ctx: &SemRegToolContext<'_>,
-    args: &serde_json::Value,
-) -> SemRegToolResult {
+async fn handle_suggest(ctx: &SemRegToolContext<'_>, args: &serde_json::Value) -> SemRegToolResult {
     let changeset_id = match get_uuid(args, "changeset_id") {
         Some(id) => id,
         None => return SemRegToolResult::err("Missing required parameter: changeset_id"),
@@ -539,8 +547,7 @@ async fn handle_add_item(
     };
 
     let entry_id = Uuid::new_v4();
-    let object_type_parsed = parse_object_type(object_type_str)
-        .unwrap_or(ObjectType::AttributeDef);
+    let object_type_parsed = parse_object_type(object_type_str).unwrap_or(ObjectType::AttributeDef);
     let object_id = crate::sem_reg::ids::object_id_for(object_type_parsed, object_fqn);
 
     // Insert the changeset entry
@@ -585,13 +592,9 @@ async fn handle_add_item(
                 approved_by: None,
             };
 
-            if let Err(e) = SnapshotStore::insert_snapshot(
-                ctx.pool,
-                &meta,
-                &draft_payload,
-                Some(changeset_id),
-            )
-            .await
+            if let Err(e) =
+                SnapshotStore::insert_snapshot(ctx.pool, &meta, &draft_payload, Some(changeset_id))
+                    .await
             {
                 tracing::warn!(error = %e, "Failed to create Draft snapshot for changeset entry");
             }
@@ -814,15 +817,16 @@ async fn handle_attach_basis(
                     .get("excerpt")
                     .and_then(|v| v.as_str())
                     .map(|s| s.to_string()),
-                confidence: claim_json
-                    .get("confidence")
-                    .and_then(|v| v.as_f64()),
+                confidence: claim_json.get("confidence").and_then(|v| v.as_f64()),
                 flagged_as_open_question: claim_json
                     .get("flagged_as_open_question")
                     .and_then(|v| v.as_bool())
                     .unwrap_or(false),
             };
-            if StewardshipStore::insert_claim(ctx.pool, &claim).await.is_ok() {
+            if StewardshipStore::insert_claim(ctx.pool, &claim)
+                .await
+                .is_ok()
+            {
                 claims_created += 1;
             }
         }
@@ -870,9 +874,7 @@ async fn handle_gate_precheck(
     // Load changeset row
     let changeset = match load_changeset_row(ctx.pool, changeset_id).await {
         Ok(Some(c)) => c,
-        Ok(None) => {
-            return SemRegToolResult::err(format!("Changeset {} not found", changeset_id))
-        }
+        Ok(None) => return SemRegToolResult::err(format!("Changeset {} not found", changeset_id)),
         Err(e) => return SemRegToolResult::err(format!("Failed to load changeset: {}", e)),
     };
 
@@ -1101,10 +1103,7 @@ async fn handle_record_review_decision(
     SemRegToolResult::ok(result)
 }
 
-async fn handle_publish(
-    ctx: &SemRegToolContext<'_>,
-    args: &serde_json::Value,
-) -> SemRegToolResult {
+async fn handle_publish(ctx: &SemRegToolContext<'_>, args: &serde_json::Value) -> SemRegToolResult {
     let changeset_id = match get_uuid(args, "changeset_id") {
         Some(id) => id,
         None => return SemRegToolResult::err("Missing required parameter: changeset_id"),
@@ -1130,9 +1129,7 @@ async fn handle_publish(
                 changeset_id, cs.status
             ))
         }
-        Ok(None) => {
-            return SemRegToolResult::err(format!("Changeset {} not found", changeset_id))
-        }
+        Ok(None) => return SemRegToolResult::err(format!("Changeset {} not found", changeset_id)),
         Err(e) => return SemRegToolResult::err(format!("Failed to load changeset: {}", e)),
     }
 
@@ -1234,9 +1231,7 @@ async fn handle_publish(
         "snapshots_promoted": promoted_count,
     });
 
-    if let Err(e) =
-        record_idempotency(ctx.pool, client_request_id, "stew_publish", &result).await
-    {
+    if let Err(e) = record_idempotency(ctx.pool, client_request_id, "stew_publish", &result).await {
         tracing::warn!(error = %e, "Failed to record idempotency");
     }
 
@@ -1315,21 +1310,12 @@ async fn handle_validate_edit(
 
     let changeset = match load_changeset_row(ctx.pool, changeset_id).await {
         Ok(Some(c)) => c,
-        Ok(None) => {
-            return SemRegToolResult::err(format!("Changeset {} not found", changeset_id))
-        }
+        Ok(None) => return SemRegToolResult::err(format!("Changeset {} not found", changeset_id)),
         Err(e) => return SemRegToolResult::err(format!("Failed to load changeset: {}", e)),
     };
 
     // Run guardrails on the single entry
-    let guardrail_results = evaluate_all_guardrails(
-        &changeset,
-        &target_entry,
-        &[],
-        &[],
-        &[],
-        &[],
-    );
+    let guardrail_results = evaluate_all_guardrails(&changeset, &target_entry, &[], &[], &[], &[]);
 
     SemRegToolResult::ok(json!({
         "entry_id": entry_id,
@@ -1369,14 +1355,8 @@ async fn handle_resolve_conflict(
         .map(|s| s.to_string())
         .unwrap_or_else(|| resolution_payload.to_string());
 
-    match StewardshipStore::resolve_conflict(
-        ctx.pool,
-        conflict_id,
-        strategy,
-        &rationale,
-        &actor,
-    )
-    .await
+    match StewardshipStore::resolve_conflict(ctx.pool, conflict_id, strategy, &rationale, &actor)
+        .await
     {
         Ok(()) => {
             let result = json!({
@@ -1466,7 +1446,9 @@ async fn handle_describe_object(
 
             // Add consumer information if requested
             if include_consumers {
-                let consumers = find_consumers(ctx.pool, object_fqn).await.unwrap_or_default();
+                let consumers = find_consumers(ctx.pool, object_fqn)
+                    .await
+                    .unwrap_or_default();
                 result
                     .as_object_mut()
                     .unwrap()
@@ -1808,11 +1790,7 @@ mod tests {
         let mut names: Vec<&str> = specs.iter().map(|s| s.name.as_str()).collect();
         names.sort();
         names.dedup();
-        assert_eq!(
-            names.len(),
-            specs.len(),
-            "Duplicate tool names found"
-        );
+        assert_eq!(names.len(), specs.len(), "Duplicate tool names found");
     }
 
     #[test]
@@ -1839,11 +1817,7 @@ mod tests {
                 .parameters
                 .iter()
                 .any(|p| p.name == "client_request_id");
-            assert!(
-                has_cri,
-                "Tool {} missing client_request_id parameter",
-                name
-            );
+            assert!(has_cri, "Tool {} missing client_request_id parameter", name);
         }
     }
 

@@ -14,14 +14,14 @@ use crate::sem_reg::attribute_def::{
 };
 use crate::sem_reg::entity_type_def::{DbTableMapping, EntityTypeDefBody, LifecycleStateDef};
 use crate::sem_reg::ids::{definition_hash, object_id_for};
-use crate::sem_reg::relationship_type_def::{
-    RelationshipCardinality, RelationshipTypeDefBody,
-};
+use crate::sem_reg::relationship_type_def::{RelationshipCardinality, RelationshipTypeDefBody};
 use crate::sem_reg::store::SnapshotStore;
 use crate::sem_reg::types::{ObjectType, SnapshotMeta};
 use crate::sem_reg::verb_contract::VerbContractBody;
 
-use super::entity_infer::{EdgeClass, EntityTypeCandidate, InferredCardinality, RelationshipCandidate};
+use super::entity_infer::{
+    EdgeClass, EntityTypeCandidate, InferredCardinality, RelationshipCandidate,
+};
 use super::manifest::OnboardingManifest;
 use super::verb_extract::VerbExtract;
 use super::xref::{AttributeCandidate, ColumnClassification};
@@ -29,8 +29,7 @@ use super::xref::{AttributeCandidate, ColumnClassification};
 /// Well-known snapshot_set_id for bootstrap seed.
 /// If this ID exists in `sem_reg.snapshot_sets`, the bootstrap has already run.
 pub const BOOTSTRAP_SET_ID: Uuid = Uuid::from_bytes([
-    0xB0, 0x07, 0x57, 0x4A, 0x50, 0x00, 0x4B, 0x01,
-    0x80, 0x00, 0x5E, 0xED, 0xDA, 0x7A, 0xBA, 0x5E,
+    0xB0, 0x07, 0x57, 0x4A, 0x50, 0x00, 0x4B, 0x01, 0x80, 0x00, 0x5E, 0xED, 0xDA, 0x7A, 0xBA, 0x5E,
 ]);
 
 const BOOTSTRAP_CREATED_BY: &str = "bootstrap";
@@ -159,7 +158,12 @@ pub async fn apply_bootstrap(
 /// Returns `true` if a new snapshot was written, `false` if skipped (already exists with same hash).
 #[cfg(feature = "database")]
 async fn seed_attribute_def(pool: &PgPool, candidate: &AttributeCandidate) -> Result<bool> {
-    let fqn = format!("{}.{}.{}", infer_domain(&candidate.schema), candidate.table, candidate.column);
+    let fqn = format!(
+        "{}.{}.{}",
+        infer_domain(&candidate.schema),
+        candidate.table,
+        candidate.column
+    );
 
     let is_orphan = candidate.classification == ColumnClassification::OperationalOrphan;
 
@@ -228,12 +232,13 @@ async fn seed_verb_contract(pool: &PgPool, verb: &VerbExtract) -> Result<bool> {
         returns: None,
         preconditions: vec![],
         postconditions: vec![],
-        produces: verb.output.as_ref().map(|o| {
-            crate::sem_reg::verb_contract::VerbProducesSpec {
+        produces: verb
+            .output
+            .as_ref()
+            .map(|o| crate::sem_reg::verb_contract::VerbProducesSpec {
                 entity_type: o.produced_type.clone(),
                 resolved: false,
-            }
-        }),
+            }),
         consumes: vec![],
         invocation_phrases: vec![],
         subject_kinds: vec![],
@@ -294,10 +299,7 @@ async fn seed_entity_type_def(pool: &PgPool, entity: &EntityTypeCandidate) -> Re
 
 /// Seed a single RelationshipTypeDef from a RelationshipCandidate.
 #[cfg(feature = "database")]
-async fn seed_relationship_type_def(
-    pool: &PgPool,
-    rel: &RelationshipCandidate,
-) -> Result<bool> {
+async fn seed_relationship_type_def(pool: &PgPool, rel: &RelationshipCandidate) -> Result<bool> {
     let fqn = &rel.fqn;
 
     let cardinality = match rel.cardinality {
@@ -334,9 +336,7 @@ async fn seed_relationship_type_def(
         target_entity_type_fqn: format!("{}.{}", target_domain, rel.target_table),
         cardinality,
         edge_class: Some(edge_class_str.to_string()),
-        directionality: Some(
-            crate::sem_reg::relationship_type_def::Directionality::Forward,
-        ),
+        directionality: Some(crate::sem_reg::relationship_type_def::Directionality::Forward),
         inverse_fqn: None,
         constraints: vec![],
     };
@@ -387,8 +387,7 @@ async fn publish_idempotent<T: Serialize>(
         }
         None => {
             // No existing snapshot — create new
-            let meta =
-                SnapshotMeta::new_operational(object_type, object_id, BOOTSTRAP_CREATED_BY);
+            let meta = SnapshotMeta::new_operational(object_type, object_id, BOOTSTRAP_CREATED_BY);
             SnapshotStore::insert_snapshot(pool, &meta, &definition, Some(BOOTSTRAP_SET_ID))
                 .await?;
             Ok(true)
@@ -405,8 +404,11 @@ fn sql_type_to_attribute_data_type(sql_type: &str) -> AttributeDataType {
         AttributeDataType::Uuid
     } else if lower.contains("int") || lower == "serial" || lower == "bigserial" {
         AttributeDataType::Integer
-    } else if lower.contains("numeric") || lower.contains("decimal") || lower.contains("real")
-        || lower.contains("double") || lower.contains("float")
+    } else if lower.contains("numeric")
+        || lower.contains("decimal")
+        || lower.contains("real")
+        || lower.contains("double")
+        || lower.contains("float")
     {
         AttributeDataType::Decimal
     } else if lower.contains("bool") {
@@ -511,7 +513,10 @@ mod tests {
 
     #[test]
     fn test_column_to_display_name() {
-        assert_eq!(column_to_display_name("jurisdiction_code"), "Jurisdiction Code");
+        assert_eq!(
+            column_to_display_name("jurisdiction_code"),
+            "Jurisdiction Code"
+        );
         assert_eq!(column_to_display_name("entity_id"), "Entity Id");
         assert_eq!(column_to_display_name("name"), "Name");
     }

@@ -75,7 +75,7 @@ impl SemRegFilterResult {
 ///
 /// This is a pure function that doesn't call SemReg directly — the caller
 /// is responsible for obtaining the allowed set (via `resolve_context()`
-/// or `SemRegVerbPolicy`).
+/// or `ContextEnvelope`).
 ///
 /// # Arguments
 ///

@@ -85,10 +85,7 @@ pub struct XrefResult {
 /// Cross-reference verb extracts against schema extracts.
 ///
 /// Produces classified `AttributeCandidate` for every column in every table.
-pub fn cross_reference(
-    verbs: &[VerbExtract],
-    tables: &[TableExtract],
-) -> XrefResult {
+pub fn cross_reference(verbs: &[VerbExtract], tables: &[TableExtract]) -> XrefResult {
     // Build verb→table reference index
     let verb_table_refs = build_verb_table_refs(verbs);
 
@@ -173,11 +170,7 @@ pub fn cross_reference(
             let foreign_key = fk_map.get(col.name.as_str()).copied().cloned();
 
             // Classify
-            let classification = classify_column(
-                &col.name,
-                is_pk,
-                !verb_fqns.is_empty(),
-            );
+            let classification = classify_column(&col.name, is_pk, !verb_fqns.is_empty());
 
             candidates.push(AttributeCandidate {
                 schema: table.schema.clone(),
@@ -284,9 +277,7 @@ fn is_framework_column(name: &str, is_pk: bool) -> bool {
 /// Build an index of verb→table references from verb side effects.
 ///
 /// Returns a map of `table_key → Vec<(verb_fqn, ref_kind)>`.
-fn build_verb_table_refs(
-    verbs: &[VerbExtract],
-) -> HashMap<&str, Vec<(&str, VerbRefKind)>> {
+fn build_verb_table_refs(verbs: &[VerbExtract]) -> HashMap<&str, Vec<(&str, VerbRefKind)>> {
     let mut refs: HashMap<&str, Vec<(&str, VerbRefKind)>> = HashMap::new();
 
     for verb in verbs {
@@ -297,9 +288,7 @@ fn build_verb_table_refs(
                 SideEffectOp::Read => VerbRefKind::LifecycleTable,
                 _ => VerbRefKind::CrudTable,
             };
-            refs.entry(table_key)
-                .or_default()
-                .push((&verb.fqn, kind));
+            refs.entry(table_key).or_default().push((&verb.fqn, kind));
 
             // Also index with schema prefix if available
             if let Some(ref schema) = effect.schema {
@@ -326,9 +315,7 @@ fn build_verb_table_refs(
 /// Build an index of verb→column references from verb arg `maps_to`.
 ///
 /// Returns a map of `"schema.table.column" → Vec<(verb_fqn, ref_kind)>`.
-fn build_verb_column_refs(
-    verbs: &[VerbExtract],
-) -> HashMap<String, Vec<(&str, VerbRefKind)>> {
+fn build_verb_column_refs(verbs: &[VerbExtract]) -> HashMap<String, Vec<(&str, VerbRefKind)>> {
     let mut refs: HashMap<String, Vec<(&str, VerbRefKind)>> = HashMap::new();
 
     for verb in verbs {

@@ -57,9 +57,6 @@ pub mod client_routes;
 pub mod client_auth;
 
 #[cfg(feature = "server")]
-pub mod verb_discovery_routes;
-
-#[cfg(feature = "server")]
 pub mod trading_matrix_routes;
 
 #[cfg(feature = "server")]
@@ -130,9 +127,6 @@ pub use resolution_routes::create_resolution_router;
 
 #[cfg(feature = "server")]
 pub use client_routes::{create_client_router, AuthenticatedClient, ClientState};
-
-#[cfg(feature = "server")]
-pub use verb_discovery_routes::create_verb_discovery_router;
 
 #[cfg(feature = "server")]
 pub use trading_matrix_routes::create_trading_matrix_router;

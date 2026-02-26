@@ -198,7 +198,7 @@ impl VerbSearchTestHarness {
         query: &str,
         decision_threshold: f32,
     ) -> Result<(VerbSearchOutcome, Vec<VerbSearchResult>)> {
-        let results = self.searcher.search(query, None, None, 5).await?;
+        let results = self.searcher.search(query, None, None, 5, None).await?;
         let outcome = check_ambiguity_with_margin(&results, decision_threshold, AMBIGUITY_MARGIN);
         Ok((outcome, results))
     }
@@ -231,7 +231,7 @@ impl VerbSearchTestHarness {
         margin: f32,
     ) -> Result<(VerbSearchOutcome, Vec<VerbSearchResult>)> {
         let searcher = self.create_searcher_with_thresholds(semantic_threshold, fallback_threshold);
-        let results = searcher.search(query, None, None, 5).await?;
+        let results = searcher.search(query, None, None, 5, None).await?;
         // Belt & braces: normalize candidates explicitly so sweep logic stays correct
         // even if searcher internals change
         let candidates = normalize_candidates(results, 5);
@@ -242,7 +242,7 @@ impl VerbSearchTestHarness {
     /// Search and return outcome with default threshold
     #[allow(dead_code)]
     async fn search_with_outcome(&self, query: &str) -> Result<VerbSearchOutcome> {
-        let results = self.searcher.search(query, None, None, 5).await?;
+        let results = self.searcher.search(query, None, None, 5, None).await?;
         let threshold = self.searcher.semantic_threshold();
         Ok(check_ambiguity_with_margin(
             &results,
@@ -253,7 +253,7 @@ impl VerbSearchTestHarness {
 
     /// Search and return raw results (for inspection)
     async fn search_raw(&self, query: &str, limit: usize) -> Result<Vec<VerbSearchResult>> {
-        self.searcher.search(query, None, None, limit).await
+        self.searcher.search(query, None, None, limit, None).await
     }
 }
 

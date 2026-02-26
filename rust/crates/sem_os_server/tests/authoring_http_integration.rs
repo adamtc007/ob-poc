@@ -44,8 +44,12 @@ fn make_jwt(actor_id: &str, roles: &[&str], agent_mode: Option<&str>) -> String 
         tenancy: None,
         agent_mode: agent_mode.map(|s| s.to_string()),
     };
-    encode(&Header::default(), &claims, &EncodingKey::from_secret(TEST_JWT_SECRET))
-        .expect("failed to encode test JWT")
+    encode(
+        &Header::default(),
+        &claims,
+        &EncodingKey::from_secret(TEST_JWT_SECRET),
+    )
+    .expect("failed to encode test JWT")
 }
 
 fn admin_governed_jwt() -> String {
@@ -121,9 +125,9 @@ artifacts:
 
 async fn body_json(resp: axum::response::Response) -> serde_json::Value {
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();
-    serde_json::from_slice(&bytes).unwrap_or_else(|_| {
-        serde_json::json!({ "raw": String::from_utf8_lossy(&bytes).to_string() })
-    })
+    serde_json::from_slice(&bytes).unwrap_or_else(
+        |_| serde_json::json!({ "raw": String::from_utf8_lossy(&bytes).to_string() }),
+    )
 }
 
 // ── Tests ───────────────────────────────────────────────────────
@@ -210,7 +214,10 @@ async fn test_publish_requires_admin() {
     assert_eq!(resp.status(), StatusCode::FORBIDDEN);
     let body = body_json(resp).await;
     assert!(
-        body["error"].as_str().unwrap_or("").contains("not an admin"),
+        body["error"]
+            .as_str()
+            .unwrap_or("")
+            .contains("not an admin"),
         "Expected admin rejection, got: {body}"
     );
 }

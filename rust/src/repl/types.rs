@@ -6,6 +6,8 @@
 //! V1-only types (ReplState, LedgerEntry, UserInput, ReplCommand, etc.)
 //! were removed in Phase 6 when the V1 REPL was decommissioned.
 
+use std::collections::HashSet;
+
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -52,6 +54,11 @@ pub struct MatchContext {
     /// Current bindings (symbol -> entity)
     #[serde(default)]
     pub bindings: Vec<(String, Uuid)>,
+
+    /// SemReg-allowed verb FQNs (from ContextEnvelope).
+    /// When set, verb search only returns verbs in this set.
+    #[serde(skip)]
+    pub allowed_verbs: Option<HashSet<String>>,
 }
 
 /// Scope context for matching
