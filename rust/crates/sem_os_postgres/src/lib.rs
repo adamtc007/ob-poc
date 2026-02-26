@@ -9,10 +9,12 @@
 //! - PgProjectionWriter (stub until S2.2)
 
 pub mod authoring;
+pub mod cleanup;
 pub mod sqlx_types;
 pub mod store;
 
 pub use authoring::{PgAuthoringStore, PgScratchSchemaRunner};
+pub use cleanup::PgCleanupStore;
 pub use store::{
     PgAuditStore, PgChangesetStore, PgEvidenceStore, PgObjectStore, PgOutboxStore,
     PgProjectionWriter, PgSnapshotStore,
@@ -31,6 +33,7 @@ pub struct PgStores {
     pub projections: PgProjectionWriter,
     pub authoring: PgAuthoringStore,
     pub scratch_runner: PgScratchSchemaRunner,
+    pub cleanup: PgCleanupStore,
 }
 
 impl PgStores {
@@ -44,7 +47,8 @@ impl PgStores {
             evidence: PgEvidenceStore::new(pool.clone()),
             projections: PgProjectionWriter::new(pool.clone()),
             authoring: PgAuthoringStore::new(pool.clone()),
-            scratch_runner: PgScratchSchemaRunner::new(pool),
+            scratch_runner: PgScratchSchemaRunner::new(pool.clone()),
+            cleanup: PgCleanupStore::new(pool),
         }
     }
 }

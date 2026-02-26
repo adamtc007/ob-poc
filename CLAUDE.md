@@ -1,12 +1,12 @@
 # CLAUDE.md
 
-> **Last reviewed:** 2026-02-25
+> **Last reviewed:** 2026-02-26
 > **Frontend:** React/TypeScript (`ob-poc-ui-react/`) - Chat UI with scope panel, Inspector
 > **Backend:** Rust/Axum (`rust/crates/ob-poc-web/`) - Serves React + REST API
 > **Crates:** 22 active Rust crates (16 ob-poc + 6 sem_os_*; esper_* deprecated; ob-poc-graph + viewport removed)
 > **Verbs:** 1,083 canonical verbs, 14,593 intent patterns (DB-sourced)
 > **MCP Tools:** ~101 tools (DSL, verbs, learning, session, batch, research, taxonomy, sem_reg, stewardship, db_introspect)
-> **Migrations:** 100 schema migrations (001-077 + 072b seed + 078-091 sem_reg + 087-089 agent/runbook + 092-098 sem_os standalone + stewardship + 099-100 authoring)
+> **Migrations:** 102 schema migrations (001-077 + 072b seed + 078-091 sem_reg + 087-089 agent/runbook + 092-098 sem_os standalone + stewardship + 099-100 authoring + 101-102 standalone remediation)
 > **Schema Overview:** `migrations/OB_POC_SCHEMA_ENTITY_OVERVIEW.md` — living doc, 18 sections, ~220 tables (ob-poc + kyc + sem_reg + sem_reg_authoring), 15 mermaid ER diagrams
 > **Embeddings:** Candle local (384-dim, BGE-small-en-v1.5) - 14,593 patterns vectorized
 > **React Migration (077):** ✅ Complete - egui/WASM replaced with React/TypeScript, 3-panel chat layout
@@ -57,9 +57,9 @@
 > **KYC/UBO Skeleton Build Pipeline:** ✅ Complete - 7-step build (import-run → graph validate → UBO compute → coverage → outreach plan → tollgate → complete), real computation in all ops, 12 integration tests with assertions
 > **KYC Skeleton Build Post-Audit (S1):** ✅ Complete - Decimal conversion (F-5), coverage ownership scoping (F-2), transaction boundary (F-1), configurable outreach cap (F-4), shared function extraction (F-3a-e)
 > **KYC Skeleton Build Post-Audit (S2):** ✅ Complete - Import run case linkage on idempotent hit (F-7), as_of date for import runs (F-8a-c), case status state machine with KycCaseUpdateStatusOp plugin (F-6a-e), 4 transition tests
-> **Semantic OS (Phases 0-9, Migrations 078-098):** ✅ Complete + Standalone Service (v1.1) + Stewardship (Phase 0-1) - Immutable snapshot registry, 13 object types, ABAC + security labels, publish gates, context resolution API, agent control plane (~32 MCP tools), 6 standalone crates (sem_os_core/postgres/server/client/harness/obpoc_adapter), port-trait isolation, outbox-driven projections, changeset workflow (Draft→Approved→Published), stewardship layer (23 MCP tools: 17 Phase 0 + 6 Phase 1), 15 guardrail rules (G01-G15), basis records, conflict detection, Show Loop (4 viewports + SSE), REST+JWT API, db_introspect MCP tool, AttributeSource real (schema,table,column) triples
+> **Semantic OS (Phases 0-9, Migrations 078-098):** ✅ Complete + Standalone Service (v1.1) + Stewardship (Phase 0-1) - Immutable snapshot registry, 13 object types, ABAC + security labels, publish gates, context resolution API, agent control plane (~32 MCP tools), 6 standalone crates (sem_os_core/postgres/server/client/harness/obpoc_adapter), port-trait isolation, outbox-driven projections, changeset workflow (Draft→Approved→Published), stewardship layer (23 MCP tools: 17 Phase 0 + 6 Phase 1), 15 guardrail rules (G01-G15), basis records, conflict detection, Show Loop (4 viewports + SSE), REST+JWT API, db_introspect MCP tool, AttributeSource real (schema,table,column) triples, standalone server verified (10 HTTP integration tests)
 > **Stewardship Agent (Phase 0-1, Migrations 096-098):** ✅ Complete - Changeset authoring layer, 23 MCP tools, guardrails engine (G01-G15), basis records, conflict detection, idempotency, Show Loop with 4 viewports (Focus/Inspector/Diff/Gates), SSE streaming, REST endpoints, 11 integration tests
-> **Governed Registry Authoring (v0.4, Migrations 099-100):** ✅ Complete - Research→Governed two-plane model, 7 governance verbs (propose/validate/dry-run/plan/publish/rollback/diff), content-addressed idempotency (SHA-256), AgentMode gating (Research vs Governed), validation pipeline (Stage 1 artifact integrity + Stage 2 dry-run), batch publish with topological sort, governance audit log, retention/cleanup, 60 unit tests + 26 integration tests, 8 CLI subcommands, 10 REST routes
+> **Governed Registry Authoring (v0.4, Migrations 099-102):** ✅ Complete + Standalone Verified - Research→Governed two-plane model, 7 governance verbs (propose/validate/dry-run/plan/publish/rollback/diff), content-addressed idempotency (SHA-256), AgentMode gating (Research vs Governed), validation pipeline (Stage 1 artifact integrity + Stage 2 dry-run), batch publish with topological sort, governance audit log, retention/cleanup, 9-state ChangeSetStatus (incl. UnderReview/Approved from stewardship), 60 unit tests + 26 integration tests + 10 HTTP integration tests, 8 CLI subcommands, 10 REST routes, standalone sem_os_server deployment verified
 
 This is the root project guide for Claude Code. Domain-specific details are in annexes.
 
@@ -6456,6 +6456,8 @@ pub trait CoreService: Send + Sync {
 
 ### REST API (sem_os_server)
 
+**Protected routes (JWT required):**
+
 | Method | Route | Purpose |
 |--------|-------|---------|
 | POST | `/resolve_context` | 12-step context resolution pipeline |
@@ -6463,14 +6465,30 @@ pub trait CoreService: Send + Sync {
 | POST | `/publish` | Admin publish (gates enforcement) |
 | GET | `/exports/snapshot_set/{id}` | Export snapshot set |
 | POST | `/bootstrap/seed_bundle` | Idempotent seed bootstrap |
-| POST | `/tools/call` | MCP tool dispatch |
-| GET | `/tools/list` | List tool specs |
+| GET | `/authoring` | List ChangeSets (with status filter) |
+| POST | `/authoring/propose` | Propose new ChangeSet from bundle |
+| POST | `/authoring/publish-batch` | Batch publish (topological sort) |
+| POST | `/authoring/diff` | Diff two ChangeSets |
+| GET | `/authoring/{id}` | Get ChangeSet detail |
+| POST | `/authoring/{id}/validate` | Run Stage 1 validation |
+| POST | `/authoring/{id}/dry-run` | Run Stage 2 dry-run |
+| GET | `/authoring/{id}/plan` | Plan publish (diff preview) |
+| POST | `/authoring/{id}/publish` | Publish to active snapshot set (requires Governed + admin) |
 | GET | `/changesets` | List changesets |
 | GET | `/changesets/{id}/diff` | Changeset diff |
 | GET | `/changesets/{id}/impact` | Impact analysis |
 | POST | `/changesets/{id}/gate_preview` | Gate pre-check |
 | POST | `/changesets/{id}/publish` | Promote changeset |
-| GET | `/health` | Health check (no auth) |
+
+**Public routes (no auth):**
+
+| Method | Route | Purpose |
+|--------|-------|---------|
+| GET | `/health` | Health check |
+| GET | `/health/semreg/pending-changesets` | Pending ChangeSet counts by status |
+| GET | `/health/semreg/stale-dryruns` | Stale dry-run detection |
+
+> **Deferred:** `/tools/call` and `/tools/list` routes removed pending finalized tool schemas.
 
 ### Stewardship Agent (Phase 0-1)
 
@@ -6545,18 +6563,27 @@ pub trait CoreService: Send + Sync {
 |----------|---------|---------|
 | `SEM_OS_MODE` | `inprocess` | `inprocess` = direct CoreService, `remote` = REST client |
 | `SEM_OS_URL` | — | Base URL for remote mode (e.g., `http://localhost:4100`) |
-| `SEM_OS_JWT_SECRET` | — | Shared secret for JWT signing/verification |
+| `SEM_OS_DATABASE_URL` | — | Postgres connection string (required for standalone server) |
+| `SEM_OS_JWT_SECRET` | — | Shared secret for JWT signing/verification (required) |
+| `SEM_OS_BIND_ADDR` | `0.0.0.0:4100` | Listen address for standalone server |
+| `SEM_OS_DISPATCHER_INTERVAL_MS` | `500` | Outbox dispatcher poll interval |
+| `SEM_OS_DISPATCHER_MAX_FAILS` | `5` | Max consecutive outbox dispatch failures before pause |
 
 ### Running
 
 ```bash
-# Start Semantic OS server (standalone)
-SEM_OS_JWT_SECRET=dev-secret DATABASE_URL="postgresql:///data_designer" \
+# Start Semantic OS server (standalone, port 4100)
+SEM_OS_DATABASE_URL="postgresql:///data_designer" \
+  SEM_OS_JWT_SECRET=dev-secret \
   cargo run -p sem_os_server
 
 # Run harness tests (isolated DB per test)
 DATABASE_URL="postgresql:///data_designer" \
   cargo test -p sem_os_harness -- --ignored --nocapture
+
+# HTTP integration tests (standalone server)
+DATABASE_URL="postgresql:///data_designer" \
+  cargo test -p sem_os_server --test authoring_http_integration -- --ignored --nocapture
 
 # Stewardship integration tests
 DATABASE_URL="postgresql:///data_designer" \
@@ -6645,9 +6672,9 @@ rust/src/sem_reg/stewardship/
 
 ---
 
-## Governed Registry Authoring — Research→Governed Change Boundary (v0.4, Migrations 099-100)
+## Governed Registry Authoring — Research→Governed Change Boundary (v0.4, Migrations 099-102)
 
-> ✅ **IMPLEMENTED (2026-02-25)**: 7-phase implementation complete. 60 unit tests + 26 integration tests. Clippy clean. 8 CLI subcommands. 10 REST routes.
+> ✅ **IMPLEMENTED (2026-02-25)**: 7-phase implementation complete. Standalone server verified (2026-02-26). 60 unit tests + 26 integration tests + 10 HTTP integration tests. Clippy clean. 8 CLI subcommands. 10 REST routes.
 
 **Problem Solved:** Research output (schema migrations, verb definitions, attributes, taxonomies) was committed ad-hoc without validation, drift detection, or governance gating. The v0.4 spec defines a two-plane model: the **Research plane** produces immutable ChangeSets (bundles of artifacts), and the **Governed plane** publishes validated ChangeSets atomically into the active snapshot set.
 
@@ -6686,14 +6713,15 @@ rust/src/sem_reg/stewardship/
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### ChangeSet Status State Machine
+### ChangeSet Status State Machine (9-state)
 
 ```
-Draft → Validated → DryRunPassed → Published
-  │         │            │
-  └→ Rejected  └→ Rejected  └→ Superseded
-                     └→ DryRunFailed
+Draft → UnderReview → Approved → Validated → DryRunPassed → Published
+  │                                  │            │              │
+  └→ Rejected                        └→ Rejected  └→ DryRunFailed └→ Superseded
 ```
+
+> **Note:** `UnderReview` and `Approved` states added from stewardship changeset workflow. Migration 101 fixes the CHECK constraint to include all 9 states.
 
 ### 7 Governance Verbs
 
@@ -6791,6 +6819,13 @@ cargo x sem-reg authoring-health
 | `change_sets_archive` | Archived ChangeSets (rejected/failed > 90 days, orphan drafts > 30 days) |
 | `change_set_artifacts_archive` | Archived artifacts (cascade from changeset archive) |
 
+**Standalone remediation (migrations 101-102):**
+
+| Migration | Purpose |
+|-----------|---------|
+| 101 | Fix `sem_reg.changesets` CHECK constraint to include all 9 ChangeSetStatus values (added `under_review`, `approved` from stewardship) |
+| 102 | Fix `change_sets_archive` and `change_set_artifacts_archive` ownership to `sem_reg_authoring` schema |
+
 ### Module Structure
 
 ```
@@ -6820,6 +6855,7 @@ rust/crates/sem_os_core/src/authoring/
 |----------|-------|-------|
 | Unit tests (`sem_os_core`) | 60 | Types, hashing, validation, diff, bundle, agent mode, metrics, cleanup |
 | Integration tests | 26 | E2E (4), Negative (8), Regression (6), Mode (3), Observability (2), Cleanup (1), Additional (2) |
+| HTTP integration tests (`sem_os_server`) | 10 | Health, auth required, valid JWT, admin enforcement, AgentMode gating, both-modes read, tools 404, parametric routing, batch publish |
 
 ```bash
 # Unit tests
@@ -6828,6 +6864,10 @@ cargo test -p sem_os_core -- authoring
 # Integration tests (requires database)
 DATABASE_URL="postgresql:///data_designer" \
   cargo test --features database --test sem_reg_authoring_integration -- --ignored --nocapture
+
+# HTTP integration tests (requires database)
+DATABASE_URL="postgresql:///data_designer" \
+  cargo test -p sem_os_server --test authoring_http_integration -- --ignored --nocapture
 ```
 
 ### Key Files
@@ -6844,8 +6884,12 @@ DATABASE_URL="postgresql:///data_designer" \
 | `rust/xtask/src/sem_reg.rs` | 8 CLI subcommands |
 | `rust/xtask/src/main.rs` | CLI wiring |
 | `rust/tests/sem_reg_authoring_integration.rs` | 26 integration tests |
+| `rust/crates/sem_os_server/tests/authoring_http_integration.rs` | 10 HTTP integration tests |
+| `rust/crates/sem_os_postgres/src/cleanup.rs` | `PgCleanupStore` — retention/archival Postgres implementation |
 | `migrations/099_sem_reg_authoring.sql` | Schema extensions + new tables |
 | `migrations/100_sem_reg_authoring_archive.sql` | Archive tables for retention |
+| `migrations/101_changesets_status_check_fix.sql` | Fix CHECK constraint to include all 9 ChangeSetStatus values |
+| `migrations/102_authoring_archive_owner_fix.sql` | Fix archive table schema ownership |
 
 ---
 

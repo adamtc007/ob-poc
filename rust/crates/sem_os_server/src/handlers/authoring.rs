@@ -128,25 +128,33 @@ pub async fn plan_publish(
 }
 
 /// Publish a ChangeSet. Transitions DryRunPassed → Published.
+/// Requires Governed mode + admin role. Publisher is always the authenticated principal.
 pub async fn publish(
+    Extension(principal): Extension<Principal>,
     Extension(service): Extension<Arc<dyn CoreService>>,
     Path(id): Path<String>,
-    Json(body): Json<PublishRequest>,
+    Json(_body): Json<PublishRequest>,
 ) -> Result<Json<serde_json::Value>, AppError> {
+    require_publish_permission(&principal)?;
     let cs_id = parse_uuid(&id)?;
-    let batch = service.authoring_publish(cs_id, &body.publisher).await?;
+    let batch = service
+        .authoring_publish(cs_id, &principal.actor_id)
+        .await?;
     let json = serde_json::to_value(&batch)
         .map_err(|e| sem_os_core::error::SemOsError::Internal(e.into()))?;
     Ok(Json(json))
 }
 
 /// Publish multiple ChangeSets atomically in topological order.
+/// Requires Governed mode + admin role. Publisher is always the authenticated principal.
 pub async fn publish_batch(
+    Extension(principal): Extension<Principal>,
     Extension(service): Extension<Arc<dyn CoreService>>,
     Json(body): Json<PublishBatchRequest>,
 ) -> Result<Json<serde_json::Value>, AppError> {
+    require_publish_permission(&principal)?;
     let batch = service
-        .authoring_publish_batch(&body.change_set_ids, &body.publisher)
+        .authoring_publish_batch(&body.change_set_ids, &principal.actor_id)
         .await?;
     let json = serde_json::to_value(&batch)
         .map_err(|e| sem_os_core::error::SemOsError::Internal(e.into()))?;
@@ -200,4 +208,19 @@ fn parse_uuid(s: &str) -> Result<Uuid, AppError> {
             sem_os_core::error::SemOsError::InvalidInput(format!("invalid UUID: {s}"))
         })
         .map_err(AppError::from)
+}
+
+/// Require Governed mode + admin role for publish operations.
+/// Research mode agents cannot publish. Non-admin users cannot publish.
+fn require_publish_permission(principal: &Principal) -> Result<(), AppError> {
+    let mode = principal.agent_mode();
+    if !matches!(mode, sem_os_core::authoring::agent_mode::AgentMode::Governed) {
+        return Err(AppError::from(
+            sem_os_core::error::SemOsError::Unauthorized(format!(
+                "blocked by AgentMode: {} cannot publish",
+                mode.as_str()
+            )),
+        ));
+    }
+    principal.require_admin().map_err(AppError::from)
 }

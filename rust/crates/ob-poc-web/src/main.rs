@@ -378,7 +378,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     Arc::new(stores.outbox),
                     Arc::new(stores.evidence),
                     Arc::new(stores.projections),
-                );
+                )
+                .with_changesets(Arc::new(stores.changesets))
+                .with_authoring(Arc::new(stores.authoring))
+                .with_scratch_runner(Arc::new(stores.scratch_runner))
+                .with_cleanup(Arc::new(stores.cleanup));
                 let principal = sem_os_core::principal::Principal::in_process(
                     "ob-poc-web",
                     vec!["operator".to_string()],

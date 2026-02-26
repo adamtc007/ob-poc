@@ -2,7 +2,9 @@
 **Version:** 0.4  
 **Date:** Feb 2026  
 **Scope:** OB-POC Semantic OS / SemReg, agentic sessions, DSL verbs, schema + attribute dictionary governance  
-**Status:** Working draft
+**Status:** Implemented (2026-02-25) — standalone server verified (2026-02-26)
+**Implementation:** `rust/crates/sem_os_core/src/authoring/`, `rust/crates/sem_os_server/`, migrations 099-102
+**Tests:** 60 unit + 26 integration + 10 HTTP integration tests
 
 ---
 
@@ -700,7 +702,7 @@ Create a new authoring area (same DB, separate schema: `sem_reg_authoring`):
 
 - [ ] Migration: `sem_reg_authoring.change_sets`
   - `change_set_id uuid PK`
-  - `status enum { Draft, Validated, Rejected, DryRunPassed, DryRunFailed, Published, Superseded }`
+  - `status enum { Draft, UnderReview, Approved, Validated, Rejected, DryRunPassed, DryRunFailed, Published, Superseded }` (9-state; UnderReview/Approved added for stewardship workflow)
   - `content_hash text NOT NULL`
   - `hash_version text NOT NULL DEFAULT 'v1'`
   - `UNIQUE(hash_version, content_hash)`
@@ -958,13 +960,16 @@ Create a new authoring area (same DB, separate schema: `sem_reg_authoring`):
 
 ---
 
-## Appendix A: ChangeSet status enum
+## Appendix A: ChangeSet status enum (9-state)
 
 ```rust
-#[derive(Debug, Clone, Copy, PartialEq, Eq, sqlx::Type)]
-#[sqlx(type_name = "change_set_status", rename_all = "snake_case")]
+/// Implemented in: rust/crates/sem_os_core/src/authoring/types.rs
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ChangeSetStatus {
     Draft,
+    UnderReview,     // Added for stewardship workflow
+    Approved,        // Added for stewardship workflow
     Validated,
     Rejected,
     DryRunPassed,
@@ -973,6 +978,8 @@ pub enum ChangeSetStatus {
     Superseded,
 }
 ```
+
+> **Note:** `UnderReview` and `Approved` states were added to support the stewardship changeset workflow (migrations 097, 101). Migration 101 fixes the CHECK constraint to include all 9 values.
 
 ---
 
@@ -1079,5 +1086,39 @@ semreg.session.mode_switches_total
 semreg.session.verb_denied_total
 semreg.session.fail_closed_total
 ```
+
+---
+
+## Appendix F: Implementation notes (2026-02-26)
+
+### Standalone server deployment
+
+The `sem_os_server` crate is a fully standalone Axum REST server (port 4100) with JWT authentication. It is deployable independently of the `ob-poc-web` monolith.
+
+**Verified capabilities:**
+- All 10 authoring REST routes operational
+- 3 health/observability routes (no auth required)
+- JWT authentication enforced on all protected routes
+- AgentMode gating: `publish` requires Governed mode + admin role
+- Outbox dispatcher runs as background task
+- Cleanup store wired for retention/archival
+
+**Deferred:** `/tools/call` and `/tools/list` routes removed pending finalized tool schemas.
+
+### Migrations 101-102 (standalone remediation)
+
+| Migration | Purpose |
+|-----------|---------|
+| 101 | Fix `sem_reg.changesets.status` CHECK constraint to include all 9 ChangeSetStatus values (`under_review`, `approved` added from stewardship workflow) |
+| 102 | Fix `change_sets_archive` and `change_set_artifacts_archive` to use `sem_reg_authoring` schema |
+
+### Implementation deviations from spec
+
+| Spec | Implementation | Rationale |
+|------|----------------|-----------|
+| 7-state ChangeSetStatus | 9-state (added UnderReview, Approved) | Stewardship workflow needs intermediate review states |
+| `sem_reg_authoring` schema for change_sets | `sem_reg.changesets` table (existing) | Reused existing stewardship table with extended columns |
+| `/tools/*` REST routes | Removed (TODO) | Tool schemas not yet finalized |
+| `SnapshotStore` as direct trait | Port-trait isolation via `CoreServiceImpl` | All stores injected as `Arc<dyn Port>` for testability |
 
 ---

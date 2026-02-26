@@ -4,6 +4,36 @@
 //!   SEM_OS_DATABASE_URL — Postgres connection string (required)
 //!   SEM_OS_JWT_SECRET   — JWT HMAC secret (required)
 //!   SEM_OS_BIND_ADDR    — listen address (default: 0.0.0.0:4100)
+//!
+//! ## Standalone Readiness (v1.2)
+//!
+//! Guaranteed endpoints (standalone-deployable):
+//!   POST /resolve_context      — context resolution pipeline
+//!   GET  /snapshot_sets/{id}/manifest
+//!   POST /publish              — admin publish (gates enforcement)
+//!   GET  /exports/snapshot_set/{id}
+//!   POST /bootstrap/seed_bundle — idempotent seed bootstrap
+//!   GET  /authoring            — list ChangeSets
+//!   POST /authoring/propose    — propose ChangeSet from bundle
+//!   POST /authoring/{id}/validate
+//!   POST /authoring/{id}/dry-run
+//!   GET  /authoring/{id}/plan
+//!   POST /authoring/{id}/publish — requires Governed mode + admin
+//!   POST /authoring/publish-batch
+//!   POST /authoring/diff
+//!   GET  /changesets            — list changesets
+//!   GET  /changesets/{id}/diff
+//!   GET  /changesets/{id}/impact
+//!   POST /changesets/{id}/gate_preview
+//!   POST /changesets/{id}/publish
+//!   GET  /health               — health check (no auth)
+//!
+//! Deferred to future release:
+//!   /tools/call, /tools/list   — awaiting finalized tool schemas
+//!
+//! ob-poc-only (NOT available standalone):
+//!   Stewardship REST+SSE       — /api/stewardship/*
+//!   db_introspect MCP tool     — wired through ob-poc MCP server
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -57,7 +87,10 @@ async fn main() {
             Arc::new(stores.evidence),
             Arc::clone(&projections),
         )
-        .with_changesets(Arc::new(stores.changesets)),
+        .with_changesets(Arc::new(stores.changesets))
+        .with_authoring(Arc::new(stores.authoring))
+        .with_scratch_runner(Arc::new(stores.scratch_runner))
+        .with_cleanup(Arc::new(stores.cleanup)),
     );
 
     // Start outbox dispatcher as background task

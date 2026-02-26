@@ -191,6 +191,7 @@ pub struct CoreServiceImpl {
     pub projections: Arc<dyn ProjectionWriter>,
     pub authoring: Option<Arc<dyn AuthoringStore>>,
     pub scratch_runner: Option<Arc<dyn ScratchSchemaRunner>>,
+    pub cleanup: Option<Arc<dyn crate::authoring::cleanup::CleanupStore>>,
 }
 
 impl CoreServiceImpl {
@@ -214,6 +215,7 @@ impl CoreServiceImpl {
             projections,
             authoring: None,
             scratch_runner: None,
+            cleanup: None,
         }
     }
 
@@ -232,6 +234,12 @@ impl CoreServiceImpl {
     /// Set the scratch schema runner (builder pattern).
     pub fn with_scratch_runner(mut self, runner: Arc<dyn ScratchSchemaRunner>) -> Self {
         self.scratch_runner = Some(runner);
+        self
+    }
+
+    /// Set the cleanup store (builder pattern).
+    pub fn with_cleanup(mut self, cleanup: Arc<dyn crate::authoring::cleanup::CleanupStore>) -> Self {
+        self.cleanup = Some(cleanup);
         self
     }
 
@@ -1020,15 +1028,12 @@ impl CoreService for CoreServiceImpl {
         &self,
         policy: &crate::authoring::cleanup::CleanupPolicy,
     ) -> Result<crate::authoring::cleanup::CleanupReport> {
-        // Cleanup requires a CleanupStore impl. For now, return a no-op report
-        // since CleanupStore is a separate trait that needs to be wired in.
-        // The actual wiring happens when PgCleanupStore is built in sem_os_postgres.
-        let _ = policy;
-        Ok(crate::authoring::cleanup::CleanupReport {
-            terminal_archived: 0,
-            orphan_archived: 0,
-            cleaned_at: chrono::Utc::now(),
-        })
+        let cleanup = self.cleanup.as_ref().ok_or_else(|| {
+            SemOsError::MigrationPending("cleanup store not configured".into())
+        })?;
+        crate::authoring::cleanup::run_cleanup(cleanup.as_ref(), policy)
+            .await
+            .map_err(|e| SemOsError::Internal(anyhow::anyhow!("{e}")))
     }
 
     async fn drain_outbox_for_test(&self) -> Result<()> {

@@ -20,6 +20,8 @@ use uuid::Uuid;
 #[serde(rename_all = "snake_case")]
 pub enum ChangeSetStatus {
     Draft,
+    UnderReview,
+    Approved,
     Validated,
     Rejected,
     DryRunPassed,
@@ -32,6 +34,8 @@ impl ChangeSetStatus {
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Draft => "draft",
+            Self::UnderReview => "under_review",
+            Self::Approved => "approved",
             Self::Validated => "validated",
             Self::Rejected => "rejected",
             Self::DryRunPassed => "dry_run_passed",
@@ -44,6 +48,8 @@ impl ChangeSetStatus {
     pub fn parse(s: &str) -> Option<Self> {
         match s {
             "draft" => Some(Self::Draft),
+            "under_review" => Some(Self::UnderReview),
+            "approved" => Some(Self::Approved),
             "validated" => Some(Self::Validated),
             "rejected" => Some(Self::Rejected),
             "dry_run_passed" => Some(Self::DryRunPassed),
@@ -59,6 +65,18 @@ impl ChangeSetStatus {
         matches!(
             self,
             Self::Published | Self::Rejected | Self::DryRunFailed | Self::Superseded
+        )
+    }
+
+    /// Whether this status is a non-terminal intermediate state.
+    pub fn is_intermediate(&self) -> bool {
+        matches!(
+            self,
+            Self::Draft
+                | Self::UnderReview
+                | Self::Approved
+                | Self::Validated
+                | Self::DryRunPassed
         )
     }
 }
@@ -381,6 +399,8 @@ mod tests {
     fn test_change_set_status_round_trip() {
         for status in [
             ChangeSetStatus::Draft,
+            ChangeSetStatus::UnderReview,
+            ChangeSetStatus::Approved,
             ChangeSetStatus::Validated,
             ChangeSetStatus::Rejected,
             ChangeSetStatus::DryRunPassed,
@@ -415,6 +435,8 @@ mod tests {
         assert!(ChangeSetStatus::Superseded.is_terminal());
         assert!(ChangeSetStatus::DryRunFailed.is_terminal());
         assert!(!ChangeSetStatus::Draft.is_terminal());
+        assert!(!ChangeSetStatus::UnderReview.is_terminal());
+        assert!(!ChangeSetStatus::Approved.is_terminal());
         assert!(!ChangeSetStatus::Validated.is_terminal());
         assert!(!ChangeSetStatus::DryRunPassed.is_terminal());
     }

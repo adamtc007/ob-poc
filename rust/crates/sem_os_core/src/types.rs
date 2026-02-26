@@ -395,7 +395,8 @@ fn default_evidence_grade() -> String {
 #[serde(rename_all = "snake_case")]
 pub enum ChangesetStatus {
     Draft,
-    InReview,
+    #[serde(rename = "under_review", alias = "in_review")]
+    UnderReview,
     Approved,
     Published,
     Rejected,
@@ -405,7 +406,7 @@ impl ChangesetStatus {
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Draft => "draft",
-            Self::InReview => "in_review",
+            Self::UnderReview => "under_review",
             Self::Approved => "approved",
             Self::Published => "published",
             Self::Rejected => "rejected",
@@ -415,7 +416,7 @@ impl ChangesetStatus {
     pub fn from_str(s: &str) -> Option<Self> {
         match s {
             "draft" => Some(Self::Draft),
-            "in_review" => Some(Self::InReview),
+            "under_review" | "in_review" => Some(Self::UnderReview),
             "approved" => Some(Self::Approved),
             "published" => Some(Self::Published),
             "rejected" => Some(Self::Rejected),

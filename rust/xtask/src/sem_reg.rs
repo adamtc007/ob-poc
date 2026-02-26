@@ -1291,7 +1291,10 @@ pub async fn authoring_plan(id: &str) -> Result<()> {
         .map_err(|e| anyhow::anyhow!("{e}"))?;
 
     println!("Publish Plan for {}", cs_id);
-    print_diff_summary(&diff);
+    println!("  Status:            {}", diff.status);
+    println!("  Breaking changes:  {}", diff.breaking_change_count);
+    println!("  Migration count:   {}", diff.migration_count);
+    print_diff_summary(&diff.diff);
     Ok(())
 }
 
@@ -1457,11 +1460,6 @@ pub async fn authoring_cleanup(
 ) -> Result<()> {
     let pool = connect().await?;
 
-    // The cleanup function requires a CleanupStore, which PgAuthoringStore
-    // doesn't implement directly. For now, report what would be cleaned.
-    use sem_os_core::authoring::ports::AuthoringStore;
-    let store = sem_os_postgres::PgAuthoringStore::new(pool);
-
     let policy = sem_os_core::authoring::cleanup::CleanupPolicy {
         terminal_retention_days: terminal_days.unwrap_or(90),
         orphan_retention_days: orphan_days.unwrap_or(30),
@@ -1471,29 +1469,14 @@ pub async fn authoring_cleanup(
     println!("  Terminal retention: {} days", policy.terminal_retention_days);
     println!("  Orphan retention:   {} days", policy.orphan_retention_days);
 
-    // Show counts of what would be affected
-    let status_counts = store.count_by_status().await
+    let cleanup_store = sem_os_postgres::PgCleanupStore::new(pool);
+    let report = sem_os_core::authoring::cleanup::run_cleanup(&cleanup_store, &policy)
+        .await
         .map_err(|e| anyhow::anyhow!("{e}"))?;
 
-    let mut terminal_count = 0i64;
-    let mut orphan_count = 0i64;
-    for (status, count) in &status_counts {
-        match status {
-            sem_os_core::authoring::types::ChangeSetStatus::Rejected
-            | sem_os_core::authoring::types::ChangeSetStatus::DryRunFailed => {
-                terminal_count += count;
-            }
-            sem_os_core::authoring::types::ChangeSetStatus::Draft
-            | sem_os_core::authoring::types::ChangeSetStatus::Validated => {
-                orphan_count += count;
-            }
-            _ => {}
-        }
-    }
-
-    println!("\n  Terminal candidates (Rejected/DryRunFailed): {}", terminal_count);
-    println!("  Orphan candidates (Draft/Validated):         {}", orphan_count);
-    println!("\n  Note: Actual archival depends on age threshold — not all may qualify.");
+    println!("\nCleanup Results:");
+    println!("  Terminal archived: {}", report.terminal_archived);
+    println!("  Orphan archived:   {}", report.orphan_archived);
     Ok(())
 }
 

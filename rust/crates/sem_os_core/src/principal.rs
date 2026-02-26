@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use crate::authoring::agent_mode::AgentMode;
 use crate::error::SemOsError;
 
 #[derive(Debug, Clone)]
@@ -55,6 +56,16 @@ impl Principal {
                 self.actor_id
             )))
         }
+    }
+
+    /// Read agent mode from JWT claims.
+    /// Accepts "research" or "governed" (case-insensitive).
+    /// Defaults to `AgentMode::Governed` if claim is missing or unrecognised.
+    pub fn agent_mode(&self) -> AgentMode {
+        self.claims
+            .get("agent_mode")
+            .and_then(|v| AgentMode::parse(v))
+            .unwrap_or(AgentMode::Governed)
     }
 }
 
