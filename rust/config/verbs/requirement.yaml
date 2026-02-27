@@ -19,7 +19,7 @@ domains:
           - require document
           - set up document requirement
         metadata:
-          tier: diagnostics
+          tier: intent
           source_of_truth: operational
           scope: cbu
           noun: document_requirement
@@ -187,7 +187,7 @@ domains:
         description: Mark a requirement as expired (document validity lapsed)
         behavior: crud
         metadata:
-          tier: diagnostics
+          tier: intent
           source_of_truth: operational
           scope: cbu
           noun: requirement_expiry
@@ -219,7 +219,7 @@ domains:
           - restart document collection
           - re-request document
         metadata:
-          tier: diagnostics
+          tier: intent
           source_of_truth: operational
           scope: cbu
           noun: requirement_reset

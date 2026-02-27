@@ -1166,4 +1166,21 @@ The `sem_os_server` crate is a fully standalone Axum REST server (port 4100) wit
 - `rust/src/mcp/handlers/core.rs` — `dsl_execute` verb validation + `verb_search` pre-constrained
 - `migrations/103_ccir_intent_fingerprint.sql` — Telemetry columns
 
+### DSL Verb Domains for SemReg (2026-02-27)
+
+The SemReg/Stewardship MCP tools are now discoverable as first-class DSL verbs across 7 new domains (69 verbs total) plus 4 new agent introspection verbs. Verb YAML lives in `rust/config/verbs/sem-reg/` with corresponding `CustomOperation` handlers in `rust/src/domain_ops/sem_reg_*_ops.rs`.
+
+| Domain | Verbs | YAML File | Purpose |
+|--------|-------|-----------|---------|
+| `registry` | 20 | `sem-reg/registry.yaml` | Object CRUD: snapshots, attributes, entity types, verb contracts, taxonomies, views, policies |
+| `changeset` | 14 | `sem-reg/changeset.yaml` | Changeset authoring: propose, validate, dry-run, publish, diff, review workflow |
+| `governance` | 9 | `sem-reg/governance.yaml` | Governance verbs: publish gates, impact analysis, rollback, audit log |
+| `audit` | 8 | `sem-reg/audit.yaml` | Governance audit trail: decision records, intent events, bootstrap audit |
+| `maintenance` | 7 | `sem-reg/maintenance.yaml` | Registry maintenance: cleanup, retention, archival, health checks |
+| `focus` | 6 | `sem-reg/focus.yaml` | Stewardship focus/show loop: viewport management, manifest capture |
+| `schema` | 5 | `sem-reg/schema.yaml` | Schema introspection and attribute source mapping |
+| `agent` (ext) | 4 | `agent.yaml` | Mode/policy introspection, tool listing, telemetry summary |
+
+All 73 new verbs pass tiering lint (`cargo x verbs lint` — 0 errors) and have been embedded via `populate_embeddings` (15,465 total patterns, 1,158 verbs, 100% coverage).
+
 ---

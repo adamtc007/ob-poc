@@ -1,0 +1,196 @@
+# Schema Domain Verbs
+#
+# Schema introspection and extraction verbs for building registry definitions
+# from relational schema. These verbs bridge the gap between raw PostgreSQL
+# schema (tables, columns, foreign keys) and typed Semantic Registry objects
+# (attribute definitions, entity type definitions, verb contracts).
+#
+# Backend: plugin handlers (SchemaIntrospectOp, SchemaExtract*Op, SchemaCrossReferenceOp)
+# AgentMode: Allowed in BOTH Research and Governed modes
+
+domains:
+  schema:
+    description: |
+      Schema introspection and extraction for building registry definitions
+      from relational schema. Discovers tables, columns, and foreign keys
+      from PostgreSQL information_schema, then extracts typed attribute
+      definitions, entity type definitions, and verb contracts suitable
+      for publishing into the Semantic Registry.
+    invocation_hints:
+      - "introspect schema"
+      - "extract attributes from schema"
+      - "extract verbs"
+      - "extract entities"
+      - "cross reference schema"
+    verbs:
+      # ============================================
+      # Schema Introspection
+      # ============================================
+      introspect:
+        description: Introspect database schema (tables, columns, foreign keys)
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: schema_introspection
+          category: schema_analysis
+          context: scripted_ok
+          side_effects: facts_only
+        behavior: plugin
+        handler: SchemaIntrospectOp
+        invocation_phrases:
+          - "introspect database schema"
+          - "show schema tables and columns"
+          - "describe database structure"
+          - "list tables in schema"
+          - "inspect schema foreign keys"
+        args:
+          - name: schema-name
+            type: string
+            required: true
+            description: PostgreSQL schema name to introspect (e.g., ob-poc, sem_reg)
+          - name: table-name
+            type: string
+            required: false
+            description: Optional table name to narrow introspection to a single table
+          - name: include-fks
+            type: boolean
+            required: false
+            default: true
+            description: Whether to include foreign key relationships in the output
+        returns:
+          type: record
+          capture: false
+
+      # ============================================
+      # Attribute Extraction
+      # ============================================
+      extract-attributes:
+        description: Extract attribute definitions from schema columns
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: attribute_extraction
+          category: schema_analysis
+          context: scripted_ok
+          side_effects: facts_only
+        behavior: plugin
+        handler: SchemaExtractAttributesOp
+        invocation_phrases:
+          - "extract attributes from schema"
+          - "derive attribute definitions from columns"
+          - "build attributes from table columns"
+          - "generate attribute defs from schema"
+        args:
+          - name: schema-name
+            type: string
+            required: true
+            description: PostgreSQL schema name to extract attributes from
+          - name: table-name
+            type: string
+            required: false
+            description: Optional table name to extract attributes from a single table
+        returns:
+          type: record
+          capture: false
+
+      # ============================================
+      # Verb Extraction
+      # ============================================
+      extract-verbs:
+        description: Extract verb contracts from YAML config
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: verb_extraction
+          category: schema_analysis
+          context: scripted_ok
+          side_effects: facts_only
+        behavior: plugin
+        handler: SchemaExtractVerbsOp
+        invocation_phrases:
+          - "extract verb contracts from config"
+          - "derive verb definitions from YAML"
+          - "build verb contracts from verb config"
+          - "generate verb contracts"
+          - "extract verbs from YAML"
+        args:
+          - name: domain
+            type: string
+            required: false
+            description: Optional domain filter (e.g., cbu, entity, kyc) to extract verbs for a single domain
+          - name: include-generated
+            type: boolean
+            required: false
+            default: false
+            description: Whether to include auto-generated phrase verbs in the output
+        returns:
+          type: record
+          capture: false
+
+      # ============================================
+      # Entity Type Extraction
+      # ============================================
+      extract-entities:
+        description: Extract entity type definitions from schema tables
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: entity_extraction
+          category: schema_analysis
+          context: scripted_ok
+          side_effects: facts_only
+        behavior: plugin
+        handler: SchemaExtractEntitiesOp
+        invocation_phrases:
+          - "extract entity types from schema"
+          - "derive entity definitions from tables"
+          - "build entity type defs from schema"
+          - "generate entity types from database"
+        args:
+          - name: schema-name
+            type: string
+            required: true
+            description: PostgreSQL schema name to extract entity type definitions from
+        returns:
+          type: record
+          capture: false
+
+      # ============================================
+      # Cross-Reference / Drift Detection
+      # ============================================
+      cross-reference:
+        description: Cross-reference schema against registry snapshots for drift detection
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: schema_cross_reference
+          category: schema_analysis
+          context: scripted_ok
+          side_effects: facts_only
+        behavior: plugin
+        handler: SchemaCrossReferenceOp
+        invocation_phrases:
+          - "cross reference schema against registry"
+          - "detect schema drift"
+          - "compare schema to registry snapshots"
+          - "check schema registry alignment"
+          - "find schema drift"
+        args:
+          - name: schema-name
+            type: string
+            required: false
+            description: PostgreSQL schema name to cross-reference (all schemas if omitted)
+          - name: object-type
+            type: string
+            required: false
+            description: |
+              Object type to cross-reference: attribute_def, entity_type_def,
+              verb_contract. All types if omitted.
+        returns:
+          type: record
+          capture: false

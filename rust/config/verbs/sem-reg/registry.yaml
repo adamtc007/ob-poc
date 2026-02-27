@@ -1,0 +1,630 @@
+# Registry Domain Verbs (Spec §C.1)
+#
+# Read-only registry query verbs. These expose the Semantic Registry's
+# immutable snapshot store through the DSL pipeline and CCIR.
+#
+# Backend: sem_reg MCP tools via dispatch_tool()
+# AgentMode: Allowed in BOTH Research and Governed modes
+
+domains:
+  registry:
+    description: |
+      Semantic Registry read-only query operations.
+      Describe, search, list, and navigate registered objects
+      (attributes, verbs, entity types, policies, taxonomies, views).
+    invocation_hints:
+      - "describe attribute"
+      - "search registry"
+      - "list verbs"
+      - "resolve context"
+      - "show lineage"
+      - "coverage report"
+    verbs:
+      # ============================================
+      # Object Description
+      # ============================================
+      describe-object:
+        description: Describe a registered object by FQN (attribute, verb, entity type, policy, view)
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: registry_object
+          category: registry_query
+          context: scripted_ok
+          side_effects: facts_only
+        behavior: plugin
+        handler: RegistryDescribeObjectOp
+        invocation_phrases:
+          - "describe registry object"
+          - "show object definition"
+          - "what is this attribute"
+          - "describe this verb"
+          - "show entity type definition"
+        args:
+          - name: fqn
+            type: string
+            required: true
+            description: Fully qualified name of the object
+          - name: object-type
+            type: string
+            required: false
+            description: |
+              Object type hint: attribute_def, verb_contract, entity_type_def,
+              policy_rule, view_def. Auto-detected if omitted.
+        returns:
+          type: record
+          capture: false
+
+      # ============================================
+      # Search & List
+      # ============================================
+      search:
+        description: Search registry objects by keyword or pattern
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: registry_search
+          category: registry_query
+          context: scripted_ok
+          side_effects: facts_only
+        behavior: plugin
+        handler: RegistrySearchOp
+        invocation_phrases:
+          - "search the registry"
+          - "find in registry"
+          - "search for attributes"
+          - "look up in semantic registry"
+        args:
+          - name: query
+            type: string
+            required: true
+            description: Search query text
+          - name: object-type
+            type: string
+            required: false
+            description: Filter by object type
+          - name: limit
+            type: integer
+            required: false
+            default: 20
+            description: Maximum results to return
+        returns:
+          type: record_set
+          capture: false
+
+      list-objects:
+        description: List registered objects by type with optional filters
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: registry_object
+          category: registry_query
+          context: scripted_ok
+          side_effects: facts_only
+        behavior: plugin
+        handler: RegistryListObjectsOp
+        invocation_phrases:
+          - "list registry objects"
+          - "list all verbs"
+          - "list all attributes"
+          - "show registered entity types"
+        args:
+          - name: object-type
+            type: string
+            required: true
+            description: "Object type: attribute_def, verb_contract, entity_type_def, etc."
+          - name: limit
+            type: integer
+            required: false
+            default: 100
+            description: Maximum results to return
+        returns:
+          type: record_set
+          capture: false
+
+      # ============================================
+      # Context Resolution
+      # ============================================
+      resolve-context:
+        description: Resolve full context for a subject (verbs, attributes, policies, governance signals)
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: context_resolution
+          category: registry_query
+          context: scripted_ok
+          side_effects: facts_only
+        behavior: plugin
+        handler: RegistryResolveContextOp
+        invocation_phrases:
+          - "resolve context"
+          - "what can I do with this"
+          - "show available operations"
+          - "resolve context for entity"
+        args:
+          - name: subject-id
+            type: uuid
+            required: true
+            description: Subject entity or case ID
+          - name: subject-type
+            type: string
+            required: false
+            description: "Subject type hint: entity, case, document, task, view"
+          - name: mode
+            type: string
+            required: false
+            default: normal
+            description: "Evidence mode: strict, normal, exploratory, governance"
+        returns:
+          type: record
+          capture: false
+
+      # ============================================
+      # Verb Surface & Producers
+      # ============================================
+      verb-surface:
+        description: Get the verb surface for a view or entity type
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: verb_surface
+          category: registry_query
+          context: scripted_ok
+          side_effects: facts_only
+        behavior: plugin
+        handler: RegistryVerbSurfaceOp
+        invocation_phrases:
+          - "show verb surface"
+          - "what verbs apply here"
+          - "available verbs for this view"
+        args:
+          - name: view-fqn
+            type: string
+            required: false
+            description: View FQN to get verb surface for
+          - name: entity-type-fqn
+            type: string
+            required: false
+            description: Entity type FQN to get verb surface for
+        returns:
+          type: record
+          capture: false
+
+      attribute-producers:
+        description: Find which verbs produce a given attribute
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: attribute_producer
+          category: registry_query
+          context: scripted_ok
+          side_effects: facts_only
+        behavior: plugin
+        handler: RegistryAttributeProducersOp
+        invocation_phrases:
+          - "what produces this attribute"
+          - "attribute producers"
+          - "which verb creates this"
+        args:
+          - name: attribute-fqn
+            type: string
+            required: true
+            description: Attribute FQN to find producers for
+        returns:
+          type: record
+          capture: false
+
+      # ============================================
+      # Lineage & Tracing
+      # ============================================
+      lineage:
+        description: Trace lineage for an object (forward impact or reverse provenance)
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: lineage
+          category: registry_query
+          context: scripted_ok
+          side_effects: facts_only
+        behavior: plugin
+        handler: RegistryLineageOp
+        invocation_phrases:
+          - "show lineage"
+          - "trace provenance"
+          - "what depends on this"
+          - "where does this come from"
+        args:
+          - name: object-fqn
+            type: string
+            required: true
+            description: Object FQN to trace lineage for
+          - name: direction
+            type: string
+            required: false
+            default: both
+            description: "Direction: forward (impact), reverse (provenance), both"
+        returns:
+          type: record
+          capture: false
+
+      regulation-trace:
+        description: Trace regulatory requirements for an object
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: regulation_trace
+          category: registry_query
+          context: scripted_ok
+          side_effects: facts_only
+        behavior: plugin
+        handler: RegistryRegulationTraceOp
+        invocation_phrases:
+          - "trace regulation"
+          - "what regulations apply"
+          - "regulatory requirements"
+        args:
+          - name: object-fqn
+            type: string
+            required: true
+            description: Object FQN to trace regulations for
+        returns:
+          type: record
+          capture: false
+
+      # ============================================
+      # Taxonomy Navigation
+      # ============================================
+      taxonomy-tree:
+        description: Get taxonomy tree structure
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: taxonomy
+          category: registry_query
+          context: scripted_ok
+          side_effects: facts_only
+        behavior: plugin
+        handler: RegistryTaxonomyTreeOp
+        invocation_phrases:
+          - "show taxonomy tree"
+          - "taxonomy structure"
+          - "display classification hierarchy"
+        args:
+          - name: taxonomy-fqn
+            type: string
+            required: true
+            description: Taxonomy FQN to display
+          - name: max-depth
+            type: integer
+            required: false
+            default: 5
+            description: Maximum depth to display
+        returns:
+          type: record
+          capture: false
+
+      taxonomy-members:
+        description: List members of a taxonomy node
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: taxonomy_member
+          category: registry_query
+          context: scripted_ok
+          side_effects: facts_only
+        behavior: plugin
+        handler: RegistryTaxonomyMembersOp
+        invocation_phrases:
+          - "taxonomy members"
+          - "what belongs to this taxonomy"
+          - "list taxonomy node members"
+        args:
+          - name: taxonomy-fqn
+            type: string
+            required: true
+            description: Taxonomy FQN
+          - name: node-fqn
+            type: string
+            required: false
+            description: Specific node to list members for
+        returns:
+          type: record_set
+          capture: false
+
+      classify:
+        description: Classify an object against a taxonomy
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: classification
+          category: registry_query
+          context: scripted_ok
+          side_effects: facts_only
+        behavior: plugin
+        handler: RegistryClassifyOp
+        invocation_phrases:
+          - "classify this"
+          - "what taxonomy does this belong to"
+          - "classification of object"
+        args:
+          - name: object-fqn
+            type: string
+            required: true
+            description: Object FQN to classify
+          - name: taxonomy-fqn
+            type: string
+            required: false
+            description: Taxonomy to classify against (all if omitted)
+        returns:
+          type: record
+          capture: false
+
+      # ============================================
+      # View Operations
+      # ============================================
+      describe-view:
+        description: Describe a view definition (verb surface + attribute prominence)
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: view_def
+          category: registry_query
+          context: scripted_ok
+          side_effects: facts_only
+        behavior: plugin
+        handler: RegistryDescribeViewOp
+        invocation_phrases:
+          - "describe view"
+          - "show view definition"
+          - "what does this view show"
+        args:
+          - name: fqn
+            type: string
+            required: true
+            description: View FQN to describe
+        returns:
+          type: record
+          capture: false
+
+      apply-view:
+        description: Apply a view to filter and rank verbs/attributes for a subject
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: view_application
+          category: registry_query
+          context: scripted_ok
+          side_effects: facts_only
+        behavior: plugin
+        handler: RegistryApplyViewOp
+        invocation_phrases:
+          - "apply view"
+          - "switch to view"
+          - "use this view"
+        args:
+          - name: view-fqn
+            type: string
+            required: true
+            description: View FQN to apply
+          - name: subject-id
+            type: uuid
+            required: false
+            description: Subject to apply view to
+        returns:
+          type: record
+          capture: false
+
+      # ============================================
+      # Policy Description
+      # ============================================
+      describe-policy:
+        description: Describe a policy rule definition
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: policy_rule
+          category: registry_query
+          context: scripted_ok
+          side_effects: facts_only
+        behavior: plugin
+        handler: RegistryDescribePolicyOp
+        invocation_phrases:
+          - "describe policy"
+          - "show policy rule"
+          - "what does this policy do"
+        args:
+          - name: fqn
+            type: string
+            required: true
+            description: Policy rule FQN
+        returns:
+          type: record
+          capture: false
+
+      # ============================================
+      # Coverage & Evidence
+      # ============================================
+      coverage-report:
+        description: Generate coverage report for registry (tier distribution, completeness)
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: coverage_report
+          category: registry_query
+          context: scripted_ok
+          side_effects: facts_only
+        behavior: plugin
+        handler: RegistryCoverageReportOp
+        invocation_phrases:
+          - "coverage report"
+          - "registry coverage"
+          - "show tier distribution"
+          - "completeness report"
+        args:
+          - name: tier
+            type: string
+            required: false
+            description: "Filter by tier: governed, operational, all"
+        returns:
+          type: record
+          capture: false
+
+      evidence-freshness:
+        description: Check evidence freshness for registered objects
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: evidence_freshness
+          category: registry_query
+          context: scripted_ok
+          side_effects: facts_only
+        behavior: plugin
+        handler: RegistryEvidenceFreshnessOp
+        invocation_phrases:
+          - "check evidence freshness"
+          - "stale evidence"
+          - "evidence status"
+        args:
+          - name: object-fqn
+            type: string
+            required: false
+            description: Object FQN to check (all if omitted)
+          - name: max-age-days
+            type: integer
+            required: false
+            default: 90
+            description: Maximum age in days before considered stale
+        returns:
+          type: record
+          capture: false
+
+      evidence-gaps:
+        description: Identify evidence gaps in the registry
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: evidence_gap
+          category: registry_query
+          context: scripted_ok
+          side_effects: facts_only
+        behavior: plugin
+        handler: RegistryEvidenceGapsOp
+        invocation_phrases:
+          - "find evidence gaps"
+          - "what evidence is missing"
+          - "evidence gap analysis"
+        args:
+          - name: scope
+            type: string
+            required: false
+            description: Scope to check (domain name or 'all')
+        returns:
+          type: record
+          capture: false
+
+      # ============================================
+      # History & Diff
+      # ============================================
+      snapshot-history:
+        description: Get snapshot history for an object (all versions over time)
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: snapshot_history
+          category: registry_query
+          context: scripted_ok
+          side_effects: facts_only
+        behavior: plugin
+        handler: RegistrySnapshotHistoryOp
+        invocation_phrases:
+          - "show snapshot history"
+          - "version history"
+          - "object history"
+        args:
+          - name: object-fqn
+            type: string
+            required: true
+            description: Object FQN
+          - name: object-type
+            type: string
+            required: false
+            description: Object type hint
+          - name: limit
+            type: integer
+            required: false
+            default: 20
+            description: Maximum versions to return
+        returns:
+          type: record_set
+          capture: false
+
+      snapshot-diff:
+        description: Diff two snapshots of the same object
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: snapshot_diff
+          category: registry_query
+          context: scripted_ok
+          side_effects: facts_only
+        behavior: plugin
+        handler: RegistrySnapshotDiffOp
+        invocation_phrases:
+          - "diff snapshots"
+          - "compare versions"
+          - "what changed between versions"
+        args:
+          - name: base-snapshot-id
+            type: uuid
+            required: true
+            description: Base snapshot UUID
+          - name: target-snapshot-id
+            type: uuid
+            required: true
+            description: Target snapshot UUID
+        returns:
+          type: record
+          capture: false
+
+      # ============================================
+      # Active Manifest
+      # ============================================
+      active-manifest:
+        description: Get the active snapshot set manifest
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: manifest
+          category: registry_query
+          context: scripted_ok
+          side_effects: facts_only
+        behavior: plugin
+        handler: RegistryActiveManifestOp
+        invocation_phrases:
+          - "show active manifest"
+          - "current snapshot set"
+          - "what is published"
+        args: []
+        returns:
+          type: record
+          capture: false

@@ -242,7 +242,7 @@ domains:
           - add document record
           - register document
         metadata:
-          tier: diagnostics
+          tier: intent
           source_of_truth: operational
           scope: cbu
           noun: document
@@ -432,7 +432,7 @@ domains:
           - begin verification
           - queue for QA
         metadata:
-          tier: diagnostics
+          tier: intent
           source_of_truth: operational
           scope: cbu
           noun: document_qa

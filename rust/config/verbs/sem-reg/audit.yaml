@@ -1,0 +1,281 @@
+# Audit Domain Verbs (Spec §C.8)
+#
+# Plan management and decision/observation recording verbs.
+# All verbs delegate to sem_reg MCP tools via dispatch_tool().
+#
+# Backend: sem_reg MCP tools (sem_reg_create_plan, sem_reg_add_plan_step, etc.)
+# AgentMode: Allowed in BOTH Research and Governed modes
+
+domains:
+  audit:
+    description: |
+      Audit trail operations: plan management, decision recording,
+      escalation recording, disambiguation recording, and observation recording.
+      All verbs produce immutable audit records pinned to snapshot manifests.
+    invocation_hints:
+      - "create plan"
+      - "record decision"
+      - "record escalation"
+      - "record observation"
+    verbs:
+      # ============================================
+      # Plan Management
+      # ============================================
+      create-plan:
+        description: Create a new agent plan with goal and assumptions
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: agent_plan
+          category: audit_planning
+          context: scripted_ok
+          side_effects: state_write
+        behavior: plugin
+        handler: AuditCreatePlanOp
+        invocation_phrases:
+          - "create agent plan"
+          - "start a new plan"
+          - "make a plan for this goal"
+          - "begin planning"
+        args:
+          - name: goal
+            type: string
+            required: true
+            description: The goal or objective for this plan
+          - name: assumptions
+            type: json
+            required: false
+            description: JSON array of assumptions underpinning the plan
+        returns:
+          type: record
+          capture: false
+
+      add-plan-step:
+        description: Add a step to an existing agent plan
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: plan_step
+          category: audit_planning
+          context: scripted_ok
+          side_effects: state_write
+        behavior: plugin
+        handler: AuditAddPlanStepOp
+        invocation_phrases:
+          - "add step to plan"
+          - "add plan step"
+          - "append step to agent plan"
+        args:
+          - name: plan-id
+            type: uuid
+            required: true
+            description: The plan to add a step to
+          - name: verb-fqn
+            type: string
+            required: true
+            description: The verb FQN for this step
+          - name: params
+            type: json
+            required: false
+            description: JSON parameters for this step
+        returns:
+          type: record
+          capture: false
+
+      validate-plan:
+        description: Validate an agent plan (check all steps have valid verbs and snapshots)
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: plan_validation
+          category: audit_planning
+          context: scripted_ok
+          side_effects: facts_only
+        behavior: plugin
+        handler: AuditValidatePlanOp
+        invocation_phrases:
+          - "validate plan"
+          - "check plan validity"
+          - "verify agent plan"
+        args:
+          - name: plan-id
+            type: uuid
+            required: true
+            description: The plan to validate
+        returns:
+          type: record
+          capture: false
+
+      execute-plan-step:
+        description: Execute a specific step in an agent plan
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: plan_step_execution
+          category: audit_planning
+          context: scripted_ok
+          side_effects: state_write
+        behavior: plugin
+        handler: AuditExecutePlanStepOp
+        invocation_phrases:
+          - "execute plan step"
+          - "run plan step"
+          - "advance plan"
+        args:
+          - name: plan-id
+            type: uuid
+            required: true
+            description: The plan containing the step
+          - name: step-id
+            type: uuid
+            required: true
+            description: The step to execute
+        returns:
+          type: record
+          capture: false
+
+      # ============================================
+      # Decision & Observation Recording
+      # ============================================
+      record-decision:
+        description: Record an agent decision with snapshot manifest provenance
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: decision_record
+          category: audit_recording
+          context: scripted_ok
+          side_effects: state_write
+        behavior: plugin
+        handler: AuditRecordDecisionOp
+        invocation_phrases:
+          - "record decision"
+          - "log agent decision"
+          - "record a decision with provenance"
+          - "capture decision"
+        args:
+          - name: plan-id
+            type: uuid
+            required: true
+            description: The plan this decision relates to
+          - name: decision
+            type: string
+            required: true
+            description: The decision text
+          - name: rationale
+            type: string
+            required: false
+            description: Rationale for the decision
+        returns:
+          type: record
+          capture: false
+
+      record-escalation:
+        description: Record an escalation to a human reviewer
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: escalation_record
+          category: audit_recording
+          context: scripted_ok
+          side_effects: state_write
+        behavior: plugin
+        handler: AuditRecordEscalationOp
+        invocation_phrases:
+          - "record escalation"
+          - "escalate to human"
+          - "flag for human review"
+          - "log escalation"
+        args:
+          - name: plan-id
+            type: uuid
+            required: true
+            description: The plan requiring escalation
+          - name: reason
+            type: string
+            required: true
+            description: Reason for escalation
+          - name: required-action
+            type: string
+            required: false
+            description: What the human reviewer needs to do
+        returns:
+          type: record
+          capture: false
+
+      record-disambiguation:
+        description: Record a disambiguation prompt and selected choice
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: disambiguation_record
+          category: audit_recording
+          context: scripted_ok
+          side_effects: state_write
+        behavior: plugin
+        handler: AuditRecordDisambiguationOp
+        invocation_phrases:
+          - "record disambiguation"
+          - "log disambiguation choice"
+          - "capture disambiguation result"
+        args:
+          - name: plan-id
+            type: uuid
+            required: true
+            description: The plan this disambiguation relates to
+          - name: prompt
+            type: string
+            required: true
+            description: The disambiguation prompt
+          - name: options
+            type: json
+            required: false
+            description: JSON array of options presented
+          - name: selected
+            type: string
+            required: false
+            description: The selected option
+        returns:
+          type: record
+          capture: false
+
+      record-observation:
+        description: Record an observation on a subject entity
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: observation_record
+          category: audit_recording
+          context: scripted_ok
+          side_effects: state_write
+        behavior: plugin
+        handler: AuditRecordObservationOp
+        invocation_phrases:
+          - "record observation"
+          - "log observation on entity"
+          - "capture evidence observation"
+          - "note observation"
+        args:
+          - name: subject-ref
+            type: string
+            required: true
+            description: Subject entity or attribute reference
+          - name: observation-type
+            type: string
+            required: true
+            description: Type of observation being recorded
+          - name: value
+            type: json
+            required: false
+            description: The observation value as JSON
+        returns:
+          type: record
+          capture: false

@@ -385,12 +385,12 @@ domains:
       evaluate-gate:
         description: "Evaluate a named tollgate against case state and coverage data"
         invocation_phrases:
-          - "evaluate tollgate"
-          - "check tollgate"
+          - "evaluate tollgate gate"
+          - "check tollgate gate"
           - "evaluate skeleton ready"
-          - "check gate"
+          - "check named gate"
           - "run gate evaluation"
-          - "tollgate check"
+          - "tollgate gate check"
         metadata:
           tier: intent
           source_of_truth: operational

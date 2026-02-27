@@ -1,0 +1,184 @@
+# Focus Domain Verbs (Spec §C.5)
+#
+# Stewardship Show Loop verbs for focus state, viewports, diff, and manifest capture.
+# All verbs delegate to Stewardship Phase 1 tools via delegate_to_stew_tool().
+#
+# Backend: Stewardship Phase 1 tools (stew_get_focus, stew_set_focus, etc.)
+# AgentMode: Allowed in BOTH Research and Governed modes (visualization)
+
+domains:
+  focus:
+    description: |
+      Focus and visualization operations for the stewardship Show Loop.
+      Get/set focus state, render viewports, compute diffs, and capture manifests.
+      These verbs power the agent's awareness of the current working context
+      within the Semantic Registry.
+    invocation_hints:
+      - "get focus"
+      - "set focus"
+      - "show current state"
+      - "show diff"
+      - "capture manifest"
+    verbs:
+      # ============================================
+      # Focus State
+      # ============================================
+      get:
+        description: Get the current focus state (what object the agent is working on)
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: focus_state
+          category: focus_management
+          context: scripted_ok
+          side_effects: facts_only
+        behavior: plugin
+        handler: FocusGetOp
+        invocation_phrases:
+          - "get current focus"
+          - "what am I focused on"
+          - "show focus state"
+          - "what is the current focus"
+        args: []
+        returns:
+          type: record
+          capture: false
+
+      set:
+        description: Set the focus state to a specific registry object
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: focus_state
+          category: focus_management
+          context: scripted_ok
+          side_effects: state_write
+        behavior: plugin
+        handler: FocusSetOp
+        invocation_phrases:
+          - "set focus to"
+          - "focus on this object"
+          - "switch focus to"
+          - "change focus"
+        args:
+          - name: fqn
+            type: string
+            required: true
+            description: FQN of the object to focus on
+          - name: object-type
+            type: string
+            required: false
+            description: Object type hint (attribute_def, verb_contract, etc.)
+        returns:
+          type: record
+          capture: false
+
+      # ============================================
+      # Focus Display
+      # ============================================
+      render:
+        description: Render the current focus context (computes ShowPacket with all viewports)
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: show_packet
+          category: focus_display
+          context: scripted_ok
+          side_effects: facts_only
+        behavior: plugin
+        handler: FocusRenderOp
+        invocation_phrases:
+          - "render focus viewports"
+          - "display focus context"
+          - "render current focus state"
+          - "compute show packet"
+        args: []
+        returns:
+          type: record
+          capture: false
+
+      viewport:
+        description: Compute a single viewport by kind (Focus Summary, Inspector, Diff, Gates)
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: viewport
+          category: focus_display
+          context: scripted_ok
+          side_effects: facts_only
+        behavior: plugin
+        handler: FocusViewportOp
+        invocation_phrases:
+          - "show viewport"
+          - "render viewport"
+          - "get viewport data"
+          - "show focus summary viewport"
+          - "show inspector viewport"
+          - "show diff viewport"
+          - "show gates viewport"
+        args:
+          - name: viewport-kind
+            type: string
+            required: true
+            description: "Viewport kind: focus_summary, inspector, diff, gates"
+        returns:
+          type: record
+          capture: false
+
+      # ============================================
+      # Focus Diff
+      # ============================================
+      diff:
+        description: Compute a structured diff between predecessor and current draft
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: focus_diff
+          category: focus_display
+          context: scripted_ok
+          side_effects: facts_only
+        behavior: plugin
+        handler: FocusDiffOp
+        invocation_phrases:
+          - "show diff"
+          - "compare changes"
+          - "what changed"
+          - "diff current focus"
+        args:
+          - name: changeset-id
+            type: uuid
+            required: false
+            description: Optional changeset ID to diff (uses focused changeset if omitted)
+        returns:
+          type: record
+          capture: false
+
+      # ============================================
+      # Manifest Capture
+      # ============================================
+      capture-manifest:
+        description: Capture and persist a ViewportManifest snapshot of the current focus
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: viewport_manifest
+          category: focus_management
+          context: scripted_ok
+          side_effects: state_write
+        behavior: plugin
+        handler: FocusCaptureManifestOp
+        invocation_phrases:
+          - "capture manifest"
+          - "save viewport manifest"
+          - "persist focus snapshot"
+          - "capture current viewport state"
+        args: []
+        returns:
+          type: record
+          capture: false

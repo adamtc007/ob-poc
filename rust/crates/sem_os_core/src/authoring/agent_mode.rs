@@ -1,11 +1,13 @@
 //! Agent mode gating for the Research → Governed boundary.
 //!
-//! | Mode       | Allowed                                   | Blocked                        |
-//! |------------|-------------------------------------------|--------------------------------|
-//! | Research   | Authoring verbs, full db_introspect,      | Governed business verbs        |
-//! |            | SemReg read tools, diff tools             | (cbu.*, entity.*, etc.)        |
-//! | Governed   | Business verbs (per SemReg), publish,     | Authoring verbs (propose,      |
-//! |            | limited db_introspect (verify/describe)   | validate, dry_run, plan)       |
+//! | Mode       | Allowed                                   | Blocked                            |
+//! |------------|-------------------------------------------|------------------------------------|
+//! | Research   | Authoring verbs, full db_introspect,      | governance.*, maintenance.*,       |
+//! |            | changeset.*, registry.*, schema.*,         | authoring.publish                  |
+//! |            | focus.*, audit.*, agent.*                  |                                    |
+//! | Governed   | Business verbs, publish, governance.*,    | authoring exploration verbs,       |
+//! |            | maintenance.*, registry.*, schema.*,       | changeset.*                        |
+//! |            | focus.*, audit.*, agent.*                  |                                    |
 
 use serde::{Deserialize, Serialize};
 
@@ -88,10 +90,22 @@ impl AgentMode {
         "authoring.diff",
     ];
 
+    /// Domain prefixes blocked in Research mode (governed-plane only).
+    const GOVERNED_ONLY_PREFIXES: &[&str] = &["governance.", "maintenance."];
+
+    /// Domain prefixes blocked in Governed mode (research-plane only).
+    const RESEARCH_ONLY_PREFIXES: &[&str] = &["changeset."];
+
     /// Check if a verb FQN is allowed in this mode.
     ///
     /// Returns `true` if the verb is allowed, `false` if it should be blocked.
     /// Verbs not explicitly gated are always allowed.
+    ///
+    /// Domain gating rules:
+    /// - `registry.*`, `schema.*`, `focus.*`, `audit.*`, `agent.*` — both modes (read-only / self-mgmt)
+    /// - `changeset.*` — Research only (authoring), blocked in Governed
+    /// - `governance.*`, `maintenance.*` — Governed only (pipeline/ops), blocked in Research
+    /// - `authoring.*` — Research allows propose/validate/dry-run/plan/diff; Governed allows publish
     pub fn is_verb_allowed(&self, verb_fqn: &str) -> bool {
         let is_authoring = Self::AUTHORING_VERB_PREFIXES
             .iter()
@@ -99,11 +113,17 @@ impl AgentMode {
 
         match self {
             AgentMode::Research => {
-                // Research mode allows authoring verbs but blocks publish/rollback
+                // Research mode blocks publish/rollback
                 if verb_fqn == "authoring.publish" || verb_fqn == "authoring.publish-batch" {
                     return false;
                 }
-                // Allow authoring verbs, allow everything else
+                // Research mode blocks governed-only domain prefixes
+                if Self::GOVERNED_ONLY_PREFIXES
+                    .iter()
+                    .any(|prefix| verb_fqn.starts_with(prefix))
+                {
+                    return false;
+                }
                 true
             }
             AgentMode::Governed => {
@@ -111,7 +131,13 @@ impl AgentMode {
                 if is_authoring {
                     return false;
                 }
-                // Allow publish/rollback and all business verbs
+                // Governed mode blocks research-only domain prefixes
+                if Self::RESEARCH_ONLY_PREFIXES
+                    .iter()
+                    .any(|prefix| verb_fqn.starts_with(prefix))
+                {
+                    return false;
+                }
                 true
             }
         }
@@ -181,6 +207,108 @@ mod tests {
         // Business verbs allowed
         assert!(mode.is_verb_allowed("cbu.create"));
         assert!(mode.is_verb_allowed("kyc.open-case"));
+    }
+
+    #[test]
+    fn test_domain_gating_both_modes_allowed() {
+        // registry, schema, focus, audit, agent — allowed in both modes
+        let research = AgentMode::Research;
+        let governed = AgentMode::Governed;
+
+        for verb in &[
+            "registry.describe-object",
+            "registry.search",
+            "schema.introspect",
+            "schema.extract-attributes",
+            "focus.get",
+            "focus.set",
+            "audit.create-plan",
+            "audit.record-decision",
+            "agent.get-mode",
+            "agent.set-authoring-mode",
+        ] {
+            assert!(
+                research.is_verb_allowed(verb),
+                "Research should allow {verb}"
+            );
+            assert!(
+                governed.is_verb_allowed(verb),
+                "Governed should allow {verb}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_domain_gating_changeset_research_only() {
+        let research = AgentMode::Research;
+        let governed = AgentMode::Governed;
+
+        for verb in &[
+            "changeset.compose",
+            "changeset.add-item",
+            "changeset.remove-item",
+            "changeset.refine-item",
+            "changeset.list",
+            "changeset.get",
+            "changeset.diff",
+        ] {
+            assert!(
+                research.is_verb_allowed(verb),
+                "Research should allow {verb}"
+            );
+            assert!(
+                !governed.is_verb_allowed(verb),
+                "Governed should block {verb}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_domain_gating_governance_governed_only() {
+        let research = AgentMode::Research;
+        let governed = AgentMode::Governed;
+
+        for verb in &[
+            "governance.gate-precheck",
+            "governance.submit-for-review",
+            "governance.validate",
+            "governance.dry-run",
+            "governance.publish",
+            "governance.publish-batch",
+            "governance.rollback",
+        ] {
+            assert!(
+                !research.is_verb_allowed(verb),
+                "Research should block {verb}"
+            );
+            assert!(
+                governed.is_verb_allowed(verb),
+                "Governed should allow {verb}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_domain_gating_maintenance_governed_only() {
+        let research = AgentMode::Research;
+        let governed = AgentMode::Governed;
+
+        for verb in &[
+            "maintenance.health-pending",
+            "maintenance.cleanup",
+            "maintenance.bootstrap-seeds",
+            "maintenance.reindex-embeddings",
+            "maintenance.validate-schema-sync",
+        ] {
+            assert!(
+                !research.is_verb_allowed(verb),
+                "Research should block {verb}"
+            );
+            assert!(
+                governed.is_verb_allowed(verb),
+                "Governed should allow {verb}"
+            );
+        }
     }
 
     #[test]

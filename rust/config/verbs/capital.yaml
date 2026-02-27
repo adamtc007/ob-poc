@@ -15,6 +15,11 @@ domains:
 
       share-class.create:
         description: Create a new share class for an issuer
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
+          noun: capital
         behavior: plugin
         plugin:
           handler: CapitalShareClassCreateOp
@@ -86,6 +91,11 @@ domains:
 
       share-class.add-identifier:
         description: Add an identifier (ISIN, SEDOL, etc.) to a share class
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
+          noun: capital
         behavior: crud
         crud:
           operation: insert
@@ -137,6 +147,11 @@ domains:
 
       share-class.list:
         description: List share classes for an issuer
+        metadata:
+          tier: reference
+          source_of_truth: register
+          scope: cbu
+          noun: capital
         behavior: crud
         crud:
           operation: list_by_fk
@@ -159,6 +174,11 @@ domains:
 
       share-class.get-supply:
         description: Get current supply state for a share class
+        metadata:
+          tier: reference
+          source_of_truth: register
+          scope: cbu
+          noun: capital
         behavior: plugin
         plugin:
           handler: CapitalShareClassGetSupplyOp
@@ -184,6 +204,11 @@ domains:
 
       issue.initial:
         description: Initial issuance of shares (incorporation/fund launch)
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
+          noun: capital
         behavior: plugin
         plugin:
           handler: CapitalIssueInitialOp
@@ -218,6 +243,11 @@ domains:
 
       issue.new:
         description: Subsequent issuance (capital raise)
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
+          noun: capital
         behavior: plugin
         plugin:
           handler: CapitalIssueNewOp
@@ -365,6 +395,11 @@ domains:
 
       dilution.grant-options:
         description: Grant stock options to a holder
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
+          noun: capital
         behavior: plugin
         plugin:
           handler: CapitalDilutionGrantOptionsOp
@@ -433,6 +468,11 @@ domains:
 
       dilution.issue-warrant:
         description: Issue warrants to an investor
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
+          noun: capital
         behavior: plugin
         plugin:
           handler: CapitalDilutionIssueWarrantOp
@@ -484,6 +524,11 @@ domains:
 
       dilution.create-safe:
         description: Create a SAFE (Simple Agreement for Future Equity)
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
+          noun: capital
         behavior: plugin
         plugin:
           handler: CapitalDilutionCreateSafeOp
@@ -534,6 +579,11 @@ domains:
 
       dilution.create-convertible-note:
         description: Create a convertible note
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
+          noun: capital
         behavior: plugin
         plugin:
           handler: CapitalDilutionCreateConvertibleNoteOp
@@ -585,6 +635,11 @@ domains:
 
       dilution.exercise:
         description: Exercise options/warrants and convert to shares
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
+          noun: capital
         behavior: plugin
         plugin:
           handler: CapitalDilutionExerciseOp
@@ -618,6 +673,11 @@ domains:
 
       dilution.forfeit:
         description: Forfeit/cancel unvested or unexercised instruments
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
+          noun: capital
         behavior: plugin
         plugin:
           handler: CapitalDilutionForfeitOp
@@ -641,6 +701,11 @@ domains:
 
       dilution.list:
         description: List dilution instruments for an issuer
+        metadata:
+          tier: reference
+          source_of_truth: register
+          scope: cbu
+          noun: capital
         behavior: plugin
         plugin:
           handler: CapitalDilutionListOp
@@ -682,6 +747,11 @@ domains:
 
       dilution.get-summary:
         description: Get dilution summary for an issuer
+        metadata:
+          tier: reference
+          source_of_truth: register
+          scope: cbu
+          noun: capital
         behavior: plugin
         plugin:
           handler: CapitalDilutionGetSummaryOp
@@ -704,6 +774,11 @@ domains:
 
       control-config.set:
         description: Set control thresholds for an issuer
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
+          noun: capital
         behavior: crud
         crud:
           operation: upsert
@@ -782,6 +857,11 @@ domains:
 
       control-config.get:
         description: Get control configuration for an issuer
+        metadata:
+          tier: reference
+          source_of_truth: register
+          scope: cbu
+          noun: capital
         behavior: crud
         crud:
           operation: select

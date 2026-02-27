@@ -1220,6 +1220,362 @@ impl CustomOperation for AgentTeachingStatusOp {
 }
 
 // ============================================================================
+// AgentGetModeOp - Read current agent operating mode
+// ============================================================================
+
+#[register_custom_op]
+pub struct AgentGetModeOp;
+
+#[async_trait]
+impl CustomOperation for AgentGetModeOp {
+    fn domain(&self) -> &'static str {
+        "agent"
+    }
+
+    fn verb(&self) -> &'static str {
+        "get-mode"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Reads the current AgentMode (Research or Governed) from session context"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        _pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        // Read mode from json_bindings (set by AgentSetAuthoringModeOp)
+        let mode = ctx
+            .json_bindings
+            .get("_agent_mode")
+            .and_then(|v| v.as_str().map(String::from))
+            .unwrap_or_else(|| "governed".to_string());
+
+        let parsed =
+            sem_os_core::authoring::agent_mode::AgentMode::parse(&mode).unwrap_or_default();
+
+        Ok(ExecutionResult::Record(json!({
+            "mode": parsed.to_string(),
+            "allows_authoring": parsed.allows_authoring(),
+            "allows_full_introspect": parsed.allows_full_introspect(),
+            "allows_business_verbs": parsed.allows_business_verbs(),
+            "message": format!("Current agent mode: {}", parsed)
+        })))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow::anyhow!(
+            "Database feature required for agent operations"
+        ))
+    }
+}
+
+// ============================================================================
+// AgentGetPolicyOp - Read current PolicyGate snapshot
+// ============================================================================
+
+#[register_custom_op]
+pub struct AgentGetPolicyOp;
+
+#[async_trait]
+impl CustomOperation for AgentGetPolicyOp {
+    fn domain(&self) -> &'static str {
+        "agent"
+    }
+
+    fn verb(&self) -> &'static str {
+        "get-policy"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Reads the current PolicyGate configuration from environment"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+        _pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        // Read policy flags from environment (same as PolicyGate reads them)
+        let strict_pipeline =
+            std::env::var("OBPOC_STRICT_SINGLE_PIPELINE").unwrap_or_else(|_| "true".to_string());
+        let allow_raw_execute =
+            std::env::var("OBPOC_ALLOW_RAW_EXECUTE").unwrap_or_else(|_| "false".to_string());
+        let strict_semreg =
+            std::env::var("OBPOC_STRICT_SEMREG").unwrap_or_else(|_| "true".to_string());
+        let allow_legacy_generate =
+            std::env::var("OBPOC_ALLOW_LEGACY_GENERATE").unwrap_or_else(|_| "false".to_string());
+
+        Ok(ExecutionResult::Record(json!({
+            "strict_single_pipeline": strict_pipeline == "true",
+            "allow_raw_execute": allow_raw_execute == "true",
+            "strict_semreg": strict_semreg == "true",
+            "allow_legacy_generate": allow_legacy_generate == "true",
+            "message": "Current PolicyGate configuration"
+        })))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow::anyhow!(
+            "Database feature required for agent operations"
+        ))
+    }
+}
+
+// ============================================================================
+// AgentListToolsOp - List available MCP tool specifications
+// ============================================================================
+
+#[register_custom_op]
+pub struct AgentListToolsOp;
+
+#[async_trait]
+impl CustomOperation for AgentListToolsOp {
+    fn domain(&self) -> &'static str {
+        "agent"
+    }
+
+    fn verb(&self) -> &'static str {
+        "list-tools"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Lists available MCP tool specifications from the sem_reg agent module"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+        _pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let category_filter = get_optional_string(verb_call, "category");
+
+        // Get tool specs from sem_reg agent module
+        let all_specs = crate::sem_reg::agent::mcp_tools::all_tool_specs();
+
+        let tools: Vec<serde_json::Value> = all_specs
+            .into_iter()
+            .filter(|spec| {
+                if let Some(ref cat) = category_filter {
+                    spec.name.contains(cat.as_str())
+                } else {
+                    true
+                }
+            })
+            .map(|spec| {
+                json!({
+                    "name": spec.name,
+                    "description": spec.description,
+                })
+            })
+            .collect();
+
+        Ok(ExecutionResult::RecordSet(
+            tools
+                .into_iter()
+                .map(|v| serde_json::to_value(v).unwrap_or_default())
+                .collect(),
+        ))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow::anyhow!(
+            "Database feature required for agent operations"
+        ))
+    }
+}
+
+// ============================================================================
+// AgentTelemetrySummaryOp - Query intent telemetry for pipeline health
+// ============================================================================
+
+#[register_custom_op]
+pub struct AgentTelemetrySummaryOp;
+
+#[async_trait]
+impl CustomOperation for AgentTelemetrySummaryOp {
+    fn domain(&self) -> &'static str {
+        "agent"
+    }
+
+    fn verb(&self) -> &'static str {
+        "telemetry-summary"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Queries intent_events telemetry views for pipeline health analysis"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let days_back = get_optional_integer(verb_call, "days-back").unwrap_or(7);
+        let min_count = get_optional_integer(verb_call, "min-count").unwrap_or(2);
+        let include_ccir = verb_call
+            .get_value("include-ccir")
+            .and_then(|v| v.as_boolean())
+            .unwrap_or(false);
+
+        // Query clarify hotspots
+        let clarify_rows: Vec<(String, i64)> = sqlx::query_as(
+            r#"
+            SELECT chosen_verb_fqn, count(*) AS clarify_count
+            FROM agent.intent_events
+            WHERE outcome = 'needs_clarification'
+              AND chosen_verb_fqn IS NOT NULL
+              AND ts > now() - make_interval(days => $1)
+            GROUP BY chosen_verb_fqn
+            HAVING count(*) >= $2
+            ORDER BY clarify_count DESC
+            LIMIT 20
+            "#,
+        )
+        .bind(days_back as i32)
+        .bind(min_count as i64)
+        .fetch_all(pool)
+        .await
+        .unwrap_or_default();
+
+        // Query failure modes
+        let failure_rows: Vec<(String, Option<String>, i64)> = sqlx::query_as(
+            r#"
+            SELECT outcome, error_code, count(*) AS event_count
+            FROM agent.intent_events
+            WHERE outcome NOT IN ('ready', 'scope_resolved', 'macro_expanded')
+              AND ts > now() - make_interval(days => $1)
+            GROUP BY outcome, error_code
+            HAVING count(*) >= $2
+            ORDER BY event_count DESC
+            LIMIT 20
+            "#,
+        )
+        .bind(days_back as i32)
+        .bind(min_count as i64)
+        .fetch_all(pool)
+        .await
+        .unwrap_or_default();
+
+        // Query SemReg denies
+        let deny_rows: Vec<(String, i64)> = sqlx::query_as(
+            r#"
+            SELECT denied_verb, count(*) AS deny_count
+            FROM (
+                SELECT jsonb_array_elements_text(semreg_denied_verbs) AS denied_verb
+                FROM agent.intent_events
+                WHERE semreg_denied_verbs IS NOT NULL
+                  AND jsonb_array_length(semreg_denied_verbs) > 0
+                  AND ts > now() - make_interval(days => $1)
+            ) sub
+            GROUP BY denied_verb
+            HAVING count(*) >= $2
+            ORDER BY deny_count DESC
+            LIMIT 20
+            "#,
+        )
+        .bind(days_back as i32)
+        .bind(min_count as i64)
+        .fetch_all(pool)
+        .await
+        .unwrap_or_default();
+
+        // Total event count for the period
+        let total: (i64,) = sqlx::query_as(
+            r#"
+            SELECT count(*) FROM agent.intent_events
+            WHERE ts > now() - make_interval(days => $1)
+            "#,
+        )
+        .bind(days_back as i32)
+        .fetch_one(pool)
+        .await
+        .unwrap_or((0,));
+
+        let mut result = json!({
+            "period_days": days_back,
+            "min_count_threshold": min_count,
+            "total_events": total.0,
+            "clarify_hotspots": clarify_rows.iter().map(|(verb, count)| {
+                json!({"verb": verb, "count": count})
+            }).collect::<Vec<_>>(),
+            "failure_modes": failure_rows.iter().map(|(outcome, code, count)| {
+                json!({"outcome": outcome, "error_code": code, "count": count})
+            }).collect::<Vec<_>>(),
+            "semreg_denies": deny_rows.iter().map(|(verb, count)| {
+                json!({"verb": verb, "deny_count": count})
+            }).collect::<Vec<_>>(),
+        });
+
+        // Optionally include CCIR statistics
+        if include_ccir {
+            let ccir_row: (i64, i64, i64) = sqlx::query_as(
+                r#"
+                SELECT
+                    count(*) FILTER (WHERE allowed_verbs_fingerprint IS NOT NULL) AS fingerprinted,
+                    coalesce(avg(pruned_verbs_count) FILTER (WHERE pruned_verbs_count IS NOT NULL), 0)::bigint AS avg_pruned,
+                    count(*) FILTER (WHERE toctou_recheck_performed = true) AS toctou_rechecks
+                FROM agent.intent_events
+                WHERE ts > now() - make_interval(days => $1)
+                "#,
+            )
+            .bind(days_back as i32)
+            .fetch_one(pool)
+            .await
+            .unwrap_or((0, 0, 0));
+
+            if let serde_json::Value::Object(ref mut map) = result {
+                map.insert(
+                    "ccir".to_string(),
+                    json!({
+                        "events_with_fingerprint": ccir_row.0,
+                        "avg_pruned_verbs": ccir_row.1,
+                        "toctou_rechecks": ccir_row.2,
+                    }),
+                );
+            }
+        }
+
+        Ok(ExecutionResult::Record(result))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow::anyhow!(
+            "Database feature required for agent operations"
+        ))
+    }
+}
+
+// ============================================================================
 // AgentLearnOp - Activate taught patterns by running populate_embeddings
 // ============================================================================
 

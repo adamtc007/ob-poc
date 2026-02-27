@@ -33,7 +33,6 @@ domains:
         metadata:
           tier: intent
           source_of_truth: operational
-          writes_operational: true
           internal: false
           noun: client_group_entity
           tags: [membership, crud]
@@ -77,7 +76,6 @@ domains:
         metadata:
           tier: intent
           source_of_truth: operational
-          writes_operational: true
           internal: false
           noun: client_group_entity
           tags: [membership, crud]
@@ -169,7 +167,6 @@ domains:
         metadata:
           tier: intent
           source_of_truth: operational
-          writes_operational: true
           internal: false
           noun: entity_tag
           tags: [tag, crud, learning]
@@ -213,7 +210,6 @@ domains:
         metadata:
           tier: intent
           source_of_truth: operational
-          writes_operational: true
           internal: false
           noun: entity_tag
           tags: [tag, crud]
@@ -333,7 +329,6 @@ domains:
         metadata:
           tier: intent
           source_of_truth: operational
-          writes_operational: true
           internal: false
           noun: discovery
           tags: [onboarding, discovery, bulk]
@@ -379,7 +374,6 @@ domains:
         metadata:
           tier: intent
           source_of_truth: operational
-          writes_operational: true
           internal: false
           noun: membership
           tags: [onboarding, confirmation]
@@ -417,7 +411,6 @@ domains:
         metadata:
           tier: intent
           source_of_truth: operational
-          writes_operational: true
           internal: false
           noun: membership
           tags: [onboarding, rejection]
@@ -464,7 +457,6 @@ domains:
         metadata:
           tier: intent
           source_of_truth: operational
-          writes_operational: true
           internal: false
           noun: client_group_entity_role
           tags: [role, crud]
@@ -534,7 +526,6 @@ domains:
         metadata:
           tier: intent
           source_of_truth: operational
-          writes_operational: true
           internal: false
           noun: client_group_entity_role
           tags: [role, crud]
@@ -661,7 +652,6 @@ domains:
         metadata:
           tier: intent
           source_of_truth: operational
-          writes_operational: true
           internal: false
           noun: client_group_relationship
           tags: [ownership, crud]
@@ -775,7 +765,6 @@ domains:
         metadata:
           tier: intent
           source_of_truth: operational
-          writes_operational: true
           internal: false
           noun: client_group_relationship_source
           tags: [ownership, source, crud]
@@ -841,7 +830,6 @@ domains:
         metadata:
           tier: intent
           source_of_truth: operational
-          writes_operational: true
           internal: false
           noun: client_group_relationship_source
           tags: [ownership, verification]
@@ -871,7 +859,6 @@ domains:
         metadata:
           tier: intent
           source_of_truth: operational
-          writes_operational: true
           internal: false
           noun: client_group_relationship_source
           tags: [ownership, canonical]
@@ -991,7 +978,6 @@ domains:
         metadata:
           tier: intent
           source_of_truth: operational
-          writes_operational: true
           internal: false
           noun: client_group
           tags: [discovery, workflow]
@@ -1030,7 +1016,6 @@ domains:
         metadata:
           tier: intent
           source_of_truth: operational
-          writes_operational: true
           internal: false
           noun: client_group
           tags: [discovery, workflow]

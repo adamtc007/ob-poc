@@ -1,0 +1,197 @@
+# Maintenance Domain Verbs (Spec §C.6)
+#
+# Operational maintenance verbs: health queries, cleanup, bootstrap,
+# outbox drain, embedding reindex, and schema sync validation.
+# Mixed backends: direct SQL, subprocess, and CLI stubs.
+#
+# Backend: Mixed — direct SQL, subprocess (populate_embeddings), CoreService
+# AgentMode: Allowed in Governed mode only (operational). Blocked in Research mode.
+
+domains:
+  maintenance:
+    description: |
+      Registry operational maintenance: health checks, cleanup,
+      bootstrap seeds, outbox drain, embedding reindex, and schema sync validation.
+      These verbs are available in Governed mode only.
+    invocation_hints:
+      - "check registry health"
+      - "cleanup old changesets"
+      - "reindex embeddings"
+      - "validate schema sync"
+    verbs:
+      # ============================================
+      # Health Queries
+      # ============================================
+      health-pending:
+        description: Check pending changeset health (counts by status)
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: pending_health
+          category: maintenance_health
+          context: scripted_ok
+          side_effects: facts_only
+        behavior: plugin
+        handler: MaintenanceHealthPendingOp
+        invocation_phrases:
+          - "check pending changesets"
+          - "how many changesets are pending"
+          - "changeset health check"
+          - "pending changeset counts"
+        args: []
+        returns:
+          type: record
+          capture: false
+
+      health-stale-dryruns:
+        description: Check for stale dry-run results older than threshold
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: stale_dryruns
+          category: maintenance_health
+          context: scripted_ok
+          side_effects: facts_only
+        behavior: plugin
+        handler: MaintenanceHealthStaleDryrunsOp
+        invocation_phrases:
+          - "check stale dry runs"
+          - "find old dry-run results"
+          - "stale dry-run health"
+          - "are there stale dry runs"
+        args: []
+        returns:
+          type: record
+          capture: false
+
+      # ============================================
+      # Cleanup
+      # ============================================
+      cleanup:
+        description: Run retention cleanup on old rejected/failed changesets
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: cleanup_result
+          category: maintenance_ops
+          context: scripted_ok
+          side_effects: state_write
+        behavior: plugin
+        handler: MaintenanceCleanupOp
+        invocation_phrases:
+          - "run cleanup"
+          - "archive old changesets"
+          - "cleanup rejected changesets"
+          - "run retention policy"
+        args: []
+        returns:
+          type: record
+          capture: false
+
+      # ============================================
+      # Bootstrap Seeds
+      # ============================================
+      bootstrap-seeds:
+        description: Bootstrap seed bundles into the registry
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: bootstrap_result
+          category: maintenance_ops
+          context: scripted_ok
+          side_effects: state_write
+        behavior: plugin
+        handler: MaintenanceBootstrapSeedsOp
+        invocation_phrases:
+          - "bootstrap seeds"
+          - "seed the registry"
+          - "initialize registry seeds"
+          - "run seed bootstrap"
+        args: []
+        returns:
+          type: record
+          capture: false
+
+      # ============================================
+      # Outbox Drain
+      # ============================================
+      drain-outbox:
+        description: Check outbox event queue status and trigger flush
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: outbox_status
+          category: maintenance_ops
+          context: scripted_ok
+          side_effects: facts_only
+        behavior: plugin
+        handler: MaintenanceDrainOutboxOp
+        invocation_phrases:
+          - "drain outbox"
+          - "check outbox status"
+          - "flush outbox events"
+          - "how many outbox events are pending"
+        args: []
+        returns:
+          type: record
+          capture: false
+
+      # ============================================
+      # Reindex Embeddings
+      # ============================================
+      reindex-embeddings:
+        description: Trigger embedding reindex by spawning populate_embeddings binary
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: reindex_result
+          category: maintenance_ops
+          context: scripted_ok
+          side_effects: state_write
+        behavior: plugin
+        handler: MaintenanceReindexEmbeddingsOp
+        invocation_phrases:
+          - "reindex embeddings"
+          - "rebuild embeddings"
+          - "run populate embeddings"
+          - "refresh semantic embeddings"
+        args:
+          - name: force
+            type: boolean
+            required: false
+            default: false
+            description: Force re-embedding all patterns (not just delta)
+        returns:
+          type: record
+          capture: false
+
+      # ============================================
+      # Schema Sync Validation
+      # ============================================
+      validate-schema-sync:
+        description: Validate that schema and registry are in sync (drift detection)
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: schema_sync_status
+          category: maintenance_ops
+          context: scripted_ok
+          side_effects: facts_only
+        behavior: plugin
+        handler: MaintenanceValidateSchemaSyncOp
+        invocation_phrases:
+          - "validate schema sync"
+          - "check for schema drift"
+          - "are schema and registry in sync"
+          - "detect registry drift"
+        args: []
+        returns:
+          type: record
+          capture: false

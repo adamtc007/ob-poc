@@ -1,0 +1,270 @@
+# Governance Domain Verbs (Spec §C.4)
+#
+# Governance pipeline verbs for the Research → Governed change boundary.
+# Mixed delegation: stewardship tools for review/gate, MCP tools for
+# validation, and direct SQL for rollback.
+#
+# Backend: Stewardship Phase 0 tools + sem_reg MCP tools + direct SQL
+# AgentMode: Allowed in Governed mode only (pipeline). Blocked in Research mode.
+
+domains:
+  governance:
+    description: |
+      Governance pipeline operations for the Research → Governed change boundary.
+      Gate precheck, submit for review, record review decisions, validate,
+      dry-run, plan publish, publish, batch publish, and rollback.
+      These verbs are available in Governed mode only.
+    invocation_hints:
+      - "gate precheck"
+      - "submit for review"
+      - "validate changeset"
+      - "publish changeset"
+      - "rollback snapshot"
+    verbs:
+      # ============================================
+      # Stewardship-Delegated Ops
+      # ============================================
+      gate-precheck:
+        description: Gate precheck before submitting a changeset for review
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: gate_precheck
+          category: governance_review
+          context: scripted_ok
+          side_effects: facts_only
+        behavior: plugin
+        handler: GovernanceGatePrecheckOp
+        invocation_phrases:
+          - "gate precheck"
+          - "check gates before review"
+          - "pre-check changeset"
+          - "run gate precheck"
+        args:
+          - name: changeset-id
+            type: uuid
+            required: true
+            description: The changeset to pre-check
+        returns:
+          type: record
+          capture: false
+
+      submit-for-review:
+        description: Submit a changeset for human review
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: review_submission
+          category: governance_review
+          context: scripted_ok
+          side_effects: state_write
+        behavior: plugin
+        handler: GovernanceSubmitForReviewOp
+        invocation_phrases:
+          - "submit for review"
+          - "send changeset for review"
+          - "request review"
+          - "submit changeset"
+        args:
+          - name: changeset-id
+            type: uuid
+            required: true
+            description: The changeset to submit for review
+        returns:
+          type: record
+          capture: false
+
+      record-review:
+        description: Record a review decision (approve/reject) on a changeset
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: review_decision
+          category: governance_review
+          context: scripted_ok
+          side_effects: state_write
+        behavior: plugin
+        handler: GovernanceRecordReviewOp
+        invocation_phrases:
+          - "record review decision"
+          - "approve changeset"
+          - "reject changeset"
+          - "record review"
+        args:
+          - name: changeset-id
+            type: uuid
+            required: true
+            description: The changeset being reviewed
+          - name: decision
+            type: string
+            required: true
+            description: "Review decision: approved, rejected"
+          - name: comment
+            type: string
+            required: false
+            description: Reviewer comment
+        returns:
+          type: record
+          capture: false
+
+      # ============================================
+      # CoreService-Delegated Ops
+      # ============================================
+      validate:
+        description: Validate a changeset (Stage 1 artifact integrity)
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: validation_report
+          category: governance_pipeline
+          context: scripted_ok
+          side_effects: state_write
+        behavior: plugin
+        handler: GovernanceValidateOp
+        invocation_phrases:
+          - "validate changeset"
+          - "run stage 1 validation"
+          - "check changeset integrity"
+          - "validate artifacts"
+        args:
+          - name: changeset-id
+            type: uuid
+            required: true
+            description: The changeset to validate
+        returns:
+          type: record
+          capture: false
+
+      dry-run:
+        description: Dry-run a changeset (Stage 2 scratch schema validation)
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: dry_run_report
+          category: governance_pipeline
+          context: scripted_ok
+          side_effects: state_write
+        behavior: plugin
+        handler: GovernanceDryRunOp
+        invocation_phrases:
+          - "dry run changeset"
+          - "run stage 2 dry-run"
+          - "test changeset in scratch schema"
+          - "preview changeset application"
+        args:
+          - name: changeset-id
+            type: uuid
+            required: true
+            description: The changeset to dry-run
+        returns:
+          type: record
+          capture: false
+
+      plan-publish:
+        description: Plan a publish operation (diff preview against active snapshot set)
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: publish_plan
+          category: governance_pipeline
+          context: scripted_ok
+          side_effects: facts_only
+        behavior: plugin
+        handler: GovernancePlanPublishOp
+        invocation_phrases:
+          - "plan publish"
+          - "preview publish impact"
+          - "what will publishing change"
+          - "diff against active snapshots"
+        args:
+          - name: changeset-id
+            type: uuid
+            required: true
+            description: The changeset to plan publishing for
+        returns:
+          type: record
+          capture: false
+
+      publish:
+        description: Publish a validated changeset to the active snapshot set
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: publish_result
+          category: governance_pipeline
+          context: scripted_ok
+          side_effects: state_write
+        behavior: plugin
+        handler: GovernancePublishOp
+        invocation_phrases:
+          - "publish changeset"
+          - "publish to active snapshot set"
+          - "apply changeset"
+          - "commit changeset to registry"
+        args:
+          - name: changeset-id
+            type: uuid
+            required: true
+            description: The changeset to publish
+        returns:
+          type: record
+          capture: false
+
+      publish-batch:
+        description: Batch publish multiple changesets in topological order
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: batch_publish_result
+          category: governance_pipeline
+          context: scripted_ok
+          side_effects: state_write
+        behavior: plugin
+        handler: GovernancePublishBatchOp
+        invocation_phrases:
+          - "batch publish changesets"
+          - "publish multiple changesets"
+          - "bulk publish"
+          - "publish all pending changesets"
+        args:
+          - name: changeset-ids
+            type: json
+            required: true
+            description: JSON array of changeset IDs to publish in order
+        returns:
+          type: record
+          capture: false
+
+      rollback:
+        description: Rollback the active snapshot set to a previous version
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: rollback_result
+          category: governance_pipeline
+          context: scripted_ok
+          side_effects: state_write
+        behavior: plugin
+        handler: GovernanceRollbackOp
+        invocation_phrases:
+          - "rollback snapshot set"
+          - "revert to previous snapshot"
+          - "undo last publish"
+          - "rollback registry"
+        args:
+          - name: target-snapshot-set-id
+            type: string
+            required: true
+            description: The snapshot set ID to rollback to
+        returns:
+          type: record
+          capture: false

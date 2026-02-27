@@ -1,0 +1,461 @@
+# Changeset Domain Verbs (Spec §C.3)
+#
+# Changeset composition, editing, validation, and query verbs.
+# All verbs delegate to Stewardship Phase 0 tools via delegate_to_stew_tool().
+#
+# Backend: Stewardship Phase 0 tools (stew_compose_changeset, stew_add_item, etc.)
+# AgentMode: Allowed in Research mode only (authoring). Blocked in Governed mode.
+
+domains:
+  changeset:
+    description: |
+      Changeset authoring operations for the governed registry pipeline.
+      Compose changesets, add/remove/refine items, attach evidence basis,
+      validate edits, analyze impact, and resolve conflicts.
+      These verbs are available in Research mode only.
+    invocation_hints:
+      - "compose changeset"
+      - "add item to changeset"
+      - "validate changeset"
+      - "list changesets"
+      - "show changeset diff"
+    verbs:
+      # ============================================
+      # Composition
+      # ============================================
+      compose:
+        description: Create a new changeset for authoring registry changes
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: changeset
+          category: changeset_authoring
+          context: scripted_ok
+          side_effects: state_write
+        behavior: plugin
+        handler: ChangesetComposeOp
+        invocation_phrases:
+          - "compose changeset"
+          - "create new changeset"
+          - "start a changeset"
+          - "begin authoring changes"
+        args:
+          - name: title
+            type: string
+            required: true
+            description: Title for the new changeset
+          - name: rationale
+            type: string
+            required: false
+            description: Rationale explaining why these changes are needed
+        returns:
+          type: record
+          capture: false
+
+      add-item:
+        description: Add an item (snapshot) to an existing changeset
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: changeset_item
+          category: changeset_authoring
+          context: scripted_ok
+          side_effects: state_write
+        behavior: plugin
+        handler: ChangesetAddItemOp
+        invocation_phrases:
+          - "add item to changeset"
+          - "add snapshot to changeset"
+          - "include in changeset"
+          - "add to changeset"
+        args:
+          - name: changeset-id
+            type: uuid
+            required: true
+            description: The changeset to add the item to
+          - name: object-type
+            type: string
+            required: true
+            description: Type of object being added (attribute_def, verb_contract, etc.)
+          - name: fqn
+            type: string
+            required: true
+            description: FQN of the object to add
+          - name: definition
+            type: json
+            required: true
+            description: Object definition body as JSON
+        returns:
+          type: record
+          capture: false
+
+      remove-item:
+        description: Remove an item from a changeset
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: changeset_item
+          category: changeset_authoring
+          context: scripted_ok
+          side_effects: state_write
+        behavior: plugin
+        handler: ChangesetRemoveItemOp
+        invocation_phrases:
+          - "remove item from changeset"
+          - "delete changeset item"
+          - "take out of changeset"
+        args:
+          - name: changeset-id
+            type: uuid
+            required: true
+            description: The changeset to remove the item from
+          - name: entry-id
+            type: uuid
+            required: true
+            description: The changeset entry to remove
+        returns:
+          type: record
+          capture: false
+
+      refine-item:
+        description: Refine an existing changeset item (update its definition)
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: changeset_item
+          category: changeset_authoring
+          context: scripted_ok
+          side_effects: state_write
+        behavior: plugin
+        handler: ChangesetRefineItemOp
+        invocation_phrases:
+          - "refine changeset item"
+          - "update changeset entry"
+          - "edit item in changeset"
+          - "revise changeset item"
+        args:
+          - name: changeset-id
+            type: uuid
+            required: true
+            description: The changeset containing the item
+          - name: entry-id
+            type: uuid
+            required: true
+            description: The changeset entry to refine
+          - name: definition
+            type: json
+            required: true
+            description: Updated object definition body as JSON
+          - name: reasoning
+            type: string
+            required: false
+            description: Reason for the refinement
+        returns:
+          type: record
+          capture: false
+
+      # ============================================
+      # Suggestions & Templates
+      # ============================================
+      suggest:
+        description: Get AI suggestions for a changeset (fill gaps, improve completeness)
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: changeset_suggestion
+          category: changeset_authoring
+          context: scripted_ok
+          side_effects: facts_only
+        behavior: plugin
+        handler: ChangesetSuggestOp
+        invocation_phrases:
+          - "suggest changeset improvements"
+          - "what should I add to this changeset"
+          - "suggest missing items"
+          - "improve changeset"
+        args:
+          - name: changeset-id
+            type: uuid
+            required: true
+            description: The changeset to get suggestions for
+        returns:
+          type: record
+          capture: false
+
+      apply-template:
+        description: Apply a changeset template to pre-populate items
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: changeset_template
+          category: changeset_authoring
+          context: scripted_ok
+          side_effects: state_write
+        behavior: plugin
+        handler: ChangesetApplyTemplateOp
+        invocation_phrases:
+          - "apply template to changeset"
+          - "use changeset template"
+          - "populate changeset from template"
+        args:
+          - name: changeset-id
+            type: uuid
+            required: true
+            description: The changeset to apply the template to
+          - name: template-id
+            type: string
+            required: true
+            description: Template identifier to apply
+        returns:
+          type: record
+          capture: false
+
+      # ============================================
+      # Evidence & Validation
+      # ============================================
+      attach-basis:
+        description: Attach evidence basis to a changeset item
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: evidence_basis
+          category: changeset_evidence
+          context: scripted_ok
+          side_effects: state_write
+        behavior: plugin
+        handler: ChangesetAttachBasisOp
+        invocation_phrases:
+          - "attach basis to changeset"
+          - "add evidence to changeset item"
+          - "attach proof"
+          - "add basis record"
+        args:
+          - name: changeset-id
+            type: uuid
+            required: true
+            description: The changeset containing the item
+          - name: entry-id
+            type: uuid
+            required: true
+            description: The changeset entry to attach basis to
+          - name: basis
+            type: json
+            required: true
+            description: Basis record as JSON (source, evidence type, confidence)
+        returns:
+          type: record
+          capture: false
+
+      validate-edit:
+        description: Validate a single changeset edit against guardrails
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: edit_validation
+          category: changeset_evidence
+          context: scripted_ok
+          side_effects: facts_only
+        behavior: plugin
+        handler: ChangesetValidateEditOp
+        invocation_phrases:
+          - "validate changeset edit"
+          - "check edit against guardrails"
+          - "verify changeset item"
+          - "run guardrails on edit"
+        args:
+          - name: changeset-id
+            type: uuid
+            required: true
+            description: The changeset to validate
+          - name: entry-id
+            type: uuid
+            required: false
+            description: Optional specific entry to validate (all entries if omitted)
+        returns:
+          type: record
+          capture: false
+
+      # ============================================
+      # Cross-Referencing & Impact
+      # ============================================
+      cross-reference:
+        description: Cross-reference changeset items against existing registry
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: cross_reference
+          category: changeset_analysis
+          context: scripted_ok
+          side_effects: facts_only
+        behavior: plugin
+        handler: ChangesetCrossReferenceOp
+        invocation_phrases:
+          - "cross reference changeset"
+          - "check changeset references"
+          - "verify changeset links"
+          - "cross-ref changeset against registry"
+        args:
+          - name: changeset-id
+            type: uuid
+            required: true
+            description: The changeset to cross-reference
+        returns:
+          type: record
+          capture: false
+
+      impact-analysis:
+        description: Analyze the impact of publishing a changeset
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: impact_analysis
+          category: changeset_analysis
+          context: scripted_ok
+          side_effects: facts_only
+        behavior: plugin
+        handler: ChangesetImpactAnalysisOp
+        invocation_phrases:
+          - "analyze changeset impact"
+          - "what will this changeset affect"
+          - "impact analysis for changeset"
+          - "show changeset impact"
+        args:
+          - name: changeset-id
+            type: uuid
+            required: true
+            description: The changeset to analyze
+        returns:
+          type: record
+          capture: false
+
+      # ============================================
+      # Conflict Resolution
+      # ============================================
+      resolve-conflict:
+        description: Resolve a detected conflict in a changeset
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: conflict_resolution
+          category: changeset_authoring
+          context: scripted_ok
+          side_effects: state_write
+        behavior: plugin
+        handler: ChangesetResolveConflictOp
+        invocation_phrases:
+          - "resolve changeset conflict"
+          - "fix changeset conflict"
+          - "merge conflicting changes"
+          - "resolve conflict"
+        args:
+          - name: changeset-id
+            type: uuid
+            required: true
+            description: The changeset with the conflict
+          - name: conflict-id
+            type: uuid
+            required: true
+            description: The conflict to resolve
+          - name: resolution
+            type: string
+            required: true
+            description: "Resolution strategy: keep_mine, keep_theirs, merge"
+        returns:
+          type: record
+          capture: false
+
+      # ============================================
+      # Query
+      # ============================================
+      list:
+        description: List changesets with optional status filter
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: changeset_list
+          category: changeset_query
+          context: scripted_ok
+          side_effects: facts_only
+        behavior: plugin
+        handler: ChangesetListOp
+        invocation_phrases:
+          - "list changesets"
+          - "show all changesets"
+          - "get changesets by status"
+          - "what changesets are pending"
+        args:
+          - name: status
+            type: string
+            required: false
+            description: "Optional status filter: draft, validated, dry_run_passed, published, rejected"
+        returns:
+          type: record_set
+          capture: false
+
+      get:
+        description: Get detailed changeset information
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: changeset_detail
+          category: changeset_query
+          context: scripted_ok
+          side_effects: facts_only
+        behavior: plugin
+        handler: ChangesetGetOp
+        invocation_phrases:
+          - "get changeset details"
+          - "show changeset"
+          - "describe changeset"
+          - "changeset info"
+        args:
+          - name: changeset-id
+            type: uuid
+            required: true
+            description: The changeset to get details for
+        returns:
+          type: record
+          capture: false
+
+      diff:
+        description: Diff two changesets or a changeset against the active snapshot set
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: changeset_diff
+          category: changeset_query
+          context: scripted_ok
+          side_effects: facts_only
+        behavior: plugin
+        handler: ChangesetDiffOp
+        invocation_phrases:
+          - "diff changesets"
+          - "compare changesets"
+          - "show changeset differences"
+          - "diff against active snapshots"
+        args:
+          - name: changeset-id
+            type: uuid
+            required: true
+            description: The changeset to diff
+          - name: base-changeset-id
+            type: uuid
+            required: false
+            description: Optional base changeset for comparison (active snapshot set if omitted)
+        returns:
+          type: record
+          capture: false

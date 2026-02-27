@@ -4,11 +4,11 @@
 > **Frontend:** React/TypeScript (`ob-poc-ui-react/`) - Chat UI with scope panel, Inspector
 > **Backend:** Rust/Axum (`rust/crates/ob-poc-web/`) - Serves React + REST API
 > **Crates:** 22 active Rust crates (16 ob-poc + 6 sem_os_*; esper_* deprecated; ob-poc-graph + viewport removed)
-> **Verbs:** 1,083 canonical verbs, 14,593 intent patterns (DB-sourced)
+> **Verbs:** 1,158 canonical verbs, 15,465 intent patterns (DB-sourced)
 > **MCP Tools:** ~101 tools (DSL, verbs, learning, session, batch, research, taxonomy, sem_reg, stewardship, db_introspect)
 > **Migrations:** 103 schema migrations (001-077 + 072b seed + 078-091 sem_reg + 087-089 agent/runbook + 092-098 sem_os standalone + stewardship + 099-100 authoring + 101-102 standalone remediation + 103 CCIR telemetry)
 > **Schema Overview:** `migrations/OB_POC_SCHEMA_ENTITY_OVERVIEW.md` — living doc, 18 sections, ~220 tables (ob-poc + kyc + sem_reg + sem_reg_authoring), 15 mermaid ER diagrams
-> **Embeddings:** Candle local (384-dim, BGE-small-en-v1.5) - 14,593 patterns vectorized
+> **Embeddings:** Candle local (384-dim, BGE-small-en-v1.5) - 15,465 patterns vectorized
 > **React Migration (077):** ✅ Complete - egui/WASM replaced with React/TypeScript, 3-panel chat layout
 > **Verb Phrase Generation:** ✅ Complete - V1 YAML auto-generates phrases on load (no V2 registry)
 > **Navigation:** ✅ Unified - All prompts go through intent matching (view.*/session.* verbs)
@@ -6994,7 +6994,15 @@ DATABASE_URL="postgresql:///data_designer" \
 | `rule-field` | 2 | Closed-world field dictionary for rule validation |
 | `contract-pack` | 3 | Contract template packs |
 | `ownership` | 4 | Ownership graph pipeline (bridge ManCo roles, GLEIF fund managers, BODS, control links, CBU groups) |
-| `sem_reg.*` | ~32 MCP | Semantic Registry: immutable snapshots, context resolution, agent plans/decisions, lineage, coverage |
+| `registry` | 20 | SemReg object CRUD: snapshots, attributes, entity types, verb contracts, taxonomies, views, policies |
+| `changeset` | 14 | Changeset authoring: propose, validate, dry-run, publish, diff, review workflow |
+| `governance` | 9 | Governance verbs: publish gates, impact analysis, rollback, audit log |
+| `audit` | 8 | Governance audit trail: decision records, intent events, bootstrap audit |
+| `maintenance` | 7 | Registry maintenance: cleanup, retention, archival, health checks |
+| `focus` | 6 | Stewardship focus/show loop: viewport management, manifest capture |
+| `schema` | 5 | Schema introspection and attribute source mapping |
+| `agent` | 4+ | Agent mode/policy introspection, tool listing, telemetry summary |
+| `sem_reg.*` | ~32 MCP | Semantic Registry MCP tools: context resolution, agent plans/decisions, lineage, coverage |
 
 ### Agent Intent Pipeline Hardening
 

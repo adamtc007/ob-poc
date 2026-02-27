@@ -479,6 +479,121 @@ domains:
           type: record
           capture: false
 
+      # ============================================
+      # Mode & Policy Introspection
+      # ============================================
+      get-mode:
+        description: Get the current agent operating mode (Research or Governed)
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: agent_mode
+          category: agent_status
+          context: scripted_ok
+          side_effects: facts_only
+        behavior: plugin
+        handler: AgentGetModeOp
+        invocation_phrases:
+          - "get agent mode"
+          - "what mode am I in"
+          - "current agent mode"
+          - "show agent mode"
+          - "am I in research mode"
+          - "am I in governed mode"
+        args: []
+        returns:
+          type: record
+          capture: false
+
+      get-policy:
+        description: Get the current PolicyGate configuration and active policy snapshot
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: policy_snapshot
+          category: agent_status
+          context: scripted_ok
+          side_effects: facts_only
+        behavior: plugin
+        handler: AgentGetPolicyOp
+        invocation_phrases:
+          - "get policy"
+          - "show policy gate"
+          - "current policy"
+          - "policy configuration"
+          - "what policies are active"
+        args: []
+        returns:
+          type: record
+          capture: false
+
+      list-tools:
+        description: List available MCP tool specifications from the registry
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: tool_list
+          category: agent_status
+          context: scripted_ok
+          side_effects: facts_only
+        behavior: plugin
+        handler: AgentListToolsOp
+        invocation_phrases:
+          - "list tools"
+          - "what tools are available"
+          - "show available tools"
+          - "list MCP tools"
+          - "tool inventory"
+        args:
+          - name: category
+            type: string
+            required: false
+            description: "Optional category filter (e.g., registry, taxonomy, planning)"
+        returns:
+          type: record_set
+          capture: false
+
+      telemetry-summary:
+        description: Query intent event telemetry for hit-rate analysis and pipeline health
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: telemetry_report
+          category: agent_status
+          context: scripted_ok
+          side_effects: facts_only
+        behavior: plugin
+        handler: AgentTelemetrySummaryOp
+        invocation_phrases:
+          - "telemetry summary"
+          - "intent telemetry"
+          - "show pipeline health"
+          - "intent hit rate"
+          - "how is the pipeline performing"
+        args:
+          - name: days-back
+            type: integer
+            required: false
+            default: 7
+            description: Number of days to look back
+          - name: min-count
+            type: integer
+            required: false
+            default: 2
+            description: Minimum event count threshold for inclusion
+          - name: include-ccir
+            type: boolean
+            required: false
+            default: false
+            description: Include CCIR fingerprint and prune statistics
+        returns:
+          type: record
+          capture: false
+
       learn:
         description: Activate taught patterns by generating embeddings for semantic search
         metadata:
