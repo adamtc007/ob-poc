@@ -48,7 +48,7 @@ impl ChangeSetStatus {
     pub fn parse(s: &str) -> Option<Self> {
         match s {
             "draft" => Some(Self::Draft),
-            "under_review" => Some(Self::UnderReview),
+            "under_review" | "in_review" => Some(Self::UnderReview),
             "approved" => Some(Self::Approved),
             "validated" => Some(Self::Validated),
             "rejected" => Some(Self::Rejected),

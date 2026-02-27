@@ -1,201 +1,48 @@
 //! Core types for the Semantic Registry.
 //!
-//! Enums map 1:1 to PostgreSQL `sem_reg.*` types.
-//! All structs are snapshot-aware — every registry object is immutable once published.
+//! Canonical types live in `sem_os_core::types` (no sqlx dependency).
+//! This module re-exports them and provides `PgSnapshotRow` — an sqlx-aware
+//! adapter that decodes PostgreSQL enum columns as text and converts to the
+//! canonical enum types.
 
+use anyhow::anyhow;
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-// ── Enums (mirror sem_reg.* PG enums) ─────────────────────────
+// ── Re-exports from sem_os_core (canonical, no sqlx) ──────────
+pub use sem_os_core::types::{
+    ChangeType, Classification, GovernanceTier, HandlingControl, ObjectType, SecurityLabel,
+    SnapshotMeta, SnapshotRow, SnapshotStatus, TrustClass,
+};
 
-/// Governance tier — determines workflow rigour, NOT security posture.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, sqlx::Type)]
-#[sqlx(type_name = "sem_reg.governance_tier", rename_all = "snake_case")]
-#[serde(rename_all = "snake_case")]
-pub enum GovernanceTier {
-    Governed,
-    Operational,
-}
+// ── PgSnapshotRow — sqlx adapter ──────────────────────────────
 
-/// Trust class — graduated trust levels for registry objects.
-/// Invariant: `Proof` is only valid when `governance_tier = Governed`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, sqlx::Type)]
-#[sqlx(type_name = "sem_reg.trust_class", rename_all = "snake_case")]
-#[serde(rename_all = "snake_case")]
-pub enum TrustClass {
-    Proof,
-    DecisionSupport,
-    Convenience,
-}
-
-/// Snapshot lifecycle status.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, sqlx::Type)]
-#[sqlx(type_name = "sem_reg.snapshot_status", rename_all = "snake_case")]
-#[serde(rename_all = "snake_case")]
-pub enum SnapshotStatus {
-    Draft,
-    Active,
-    Deprecated,
-    Retired,
-}
-
-/// Change type for snapshot transitions.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, sqlx::Type)]
-#[sqlx(type_name = "sem_reg.change_type", rename_all = "snake_case")]
-#[serde(rename_all = "snake_case")]
-pub enum ChangeType {
-    Created,
-    NonBreaking,
-    Breaking,
-    Promotion,
-    Deprecation,
-    Retirement,
-}
-
-/// Registry object type — discriminator for the shared snapshots table.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, sqlx::Type)]
-#[sqlx(type_name = "sem_reg.object_type", rename_all = "snake_case")]
-#[serde(rename_all = "snake_case")]
-pub enum ObjectType {
-    AttributeDef,
-    EntityTypeDef,
-    RelationshipTypeDef,
-    VerbContract,
-    TaxonomyDef,
-    TaxonomyNode,
-    MembershipRule,
-    ViewDef,
-    PolicyRule,
-    EvidenceRequirement,
-    DocumentTypeDef,
-    ObservationDef,
-    DerivationSpec,
-}
-
-impl std::fmt::Display for ObjectType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let s = match self {
-            Self::AttributeDef => "attribute_def",
-            Self::EntityTypeDef => "entity_type_def",
-            Self::RelationshipTypeDef => "relationship_type_def",
-            Self::VerbContract => "verb_contract",
-            Self::TaxonomyDef => "taxonomy_def",
-            Self::TaxonomyNode => "taxonomy_node",
-            Self::MembershipRule => "membership_rule",
-            Self::ViewDef => "view_def",
-            Self::PolicyRule => "policy_rule",
-            Self::EvidenceRequirement => "evidence_requirement",
-            Self::DocumentTypeDef => "document_type_def",
-            Self::ObservationDef => "observation_def",
-            Self::DerivationSpec => "derivation_spec",
-        };
-        write!(f, "{}", s)
-    }
-}
-
-// ── Security label ────────────────────────────────────────────
-
-/// Security label carried on every registry snapshot (both tiers).
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-pub struct SecurityLabel {
-    #[serde(default)]
-    pub classification: Classification,
-    #[serde(default)]
-    pub pii: bool,
-    #[serde(default)]
-    pub jurisdictions: Vec<String>,
-    #[serde(default)]
-    pub purpose_limitation: Vec<String>,
-    #[serde(default)]
-    pub handling_controls: Vec<HandlingControl>,
-}
-
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum Classification {
-    Public,
-    #[default]
-    Internal,
-    Confidential,
-    Restricted,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum HandlingControl {
-    MaskByDefault,
-    NoExport,
-    DualControl,
-    SecureViewerOnly,
-    NoLlmExternal,
-}
-
-// ── Snapshot metadata ─────────────────────────────────────────
-
-/// Common metadata for every snapshot.
-/// Not a DB row — used as an input struct for creating snapshots.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SnapshotMeta {
-    pub object_type: ObjectType,
-    pub object_id: Uuid,
-    pub version_major: i32,
-    pub version_minor: i32,
-    pub status: SnapshotStatus,
-    pub governance_tier: GovernanceTier,
-    pub trust_class: TrustClass,
-    pub security_label: SecurityLabel,
-    pub change_type: ChangeType,
-    pub change_rationale: Option<String>,
-    pub created_by: String,
-    pub approved_by: Option<String>,
-    pub predecessor_id: Option<Uuid>,
-}
-
-impl SnapshotMeta {
-    /// Create metadata for a new operational object (auto-approved).
-    pub fn new_operational(
-        object_type: ObjectType,
-        object_id: Uuid,
-        created_by: impl Into<String>,
-    ) -> Self {
-        Self {
-            object_type,
-            object_id,
-            version_major: 1,
-            version_minor: 0,
-            status: SnapshotStatus::Active,
-            governance_tier: GovernanceTier::Operational,
-            trust_class: TrustClass::Convenience,
-            security_label: SecurityLabel::default(),
-            change_type: ChangeType::Created,
-            change_rationale: None,
-            created_by: created_by.into(),
-            approved_by: Some("auto".into()),
-            predecessor_id: None,
-        }
-    }
-}
-
-// ── Full snapshot row (from DB) ───────────────────────────────
-
-/// A complete snapshot row as returned from `sem_reg.snapshots`.
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
-pub struct SnapshotRow {
+/// Raw database row from `sem_reg.snapshots`.
+///
+/// All PostgreSQL enum columns are decoded as `String` so we don't need
+/// `sqlx::Type` derives on the canonical enums (which live in the sqlx-free
+/// `sem_os_core` crate). Convert to `SnapshotRow` via `TryFrom`.
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct PgSnapshotRow {
     pub snapshot_id: Uuid,
     pub snapshot_set_id: Option<Uuid>,
-    pub object_type: ObjectType,
+    #[sqlx(try_from = "String")]
+    pub object_type: String,
     pub object_id: Uuid,
     pub version_major: i32,
     pub version_minor: i32,
-    pub status: SnapshotStatus,
-    pub governance_tier: GovernanceTier,
-    pub trust_class: TrustClass,
+    #[sqlx(try_from = "String")]
+    pub status: String,
+    #[sqlx(try_from = "String")]
+    pub governance_tier: String,
+    #[sqlx(try_from = "String")]
+    pub trust_class: String,
     pub security_label: serde_json::Value,
     pub effective_from: DateTime<Utc>,
     pub effective_until: Option<DateTime<Utc>>,
     pub predecessor_id: Option<Uuid>,
-    pub change_type: ChangeType,
+    #[sqlx(try_from = "String")]
+    pub change_type: String,
     pub change_rationale: Option<String>,
     pub created_by: String,
     pub approved_by: Option<String>,
@@ -203,21 +50,42 @@ pub struct SnapshotRow {
     pub created_at: DateTime<Utc>,
 }
 
-impl SnapshotRow {
-    /// Deserialise the JSONB `definition` column into a typed body.
-    pub fn parse_definition<T: serde::de::DeserializeOwned>(&self) -> Result<T, serde_json::Error> {
-        serde_json::from_value(self.definition.clone())
-    }
+impl TryFrom<PgSnapshotRow> for SnapshotRow {
+    type Error = anyhow::Error;
 
-    /// Deserialise the JSONB `security_label` column.
-    pub fn parse_security_label(&self) -> Result<SecurityLabel, serde_json::Error> {
-        serde_json::from_value(self.security_label.clone())
+    fn try_from(row: PgSnapshotRow) -> Result<Self, Self::Error> {
+        Ok(SnapshotRow {
+            snapshot_id: row.snapshot_id,
+            snapshot_set_id: row.snapshot_set_id,
+            object_type: ObjectType::from_str(&row.object_type)
+                .ok_or_else(|| anyhow!("invalid object_type: {}", row.object_type))?,
+            object_id: row.object_id,
+            version_major: row.version_major,
+            version_minor: row.version_minor,
+            status: SnapshotStatus::from_str(&row.status)
+                .ok_or_else(|| anyhow!("invalid status: {}", row.status))?,
+            governance_tier: GovernanceTier::from_str(&row.governance_tier)
+                .ok_or_else(|| anyhow!("invalid governance_tier: {}", row.governance_tier))?,
+            trust_class: TrustClass::from_str(&row.trust_class)
+                .ok_or_else(|| anyhow!("invalid trust_class: {}", row.trust_class))?,
+            security_label: row.security_label,
+            effective_from: row.effective_from,
+            effective_until: row.effective_until,
+            predecessor_id: row.predecessor_id,
+            change_type: ChangeType::from_str(&row.change_type)
+                .ok_or_else(|| anyhow!("invalid change_type: {}", row.change_type))?,
+            change_rationale: row.change_rationale,
+            created_by: row.created_by,
+            approved_by: row.approved_by,
+            definition: row.definition,
+            created_at: row.created_at,
+        })
     }
+}
 
-    /// Version string, e.g. "1.0"
-    pub fn version_string(&self) -> String {
-        format!("{}.{}", self.version_major, self.version_minor)
-    }
+/// Helper to convert a `Vec<PgSnapshotRow>` into `Vec<SnapshotRow>`.
+pub fn pg_rows_to_snapshot_rows(rows: Vec<PgSnapshotRow>) -> anyhow::Result<Vec<SnapshotRow>> {
+    rows.into_iter().map(SnapshotRow::try_from).collect()
 }
 
 // ── Tests ─────────────────────────────────────────────────────

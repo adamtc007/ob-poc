@@ -21,7 +21,7 @@ use super::{
     relationship_type_def::RelationshipTypeDefBody,
     store::SnapshotStore,
     taxonomy_def::{TaxonomyDefBody, TaxonomyNodeBody},
-    types::{ObjectType, SnapshotMeta, SnapshotRow},
+    types::{ObjectType, PgSnapshotRow, SnapshotMeta, SnapshotRow},
     verb_contract::VerbContractBody,
     view_def::ViewDefBody,
 };
@@ -239,12 +239,13 @@ impl RegistryService {
     ) -> Result<PublishOutcome> {
         // Step 1: Run the standard publish gates (proof rule, security, approval, version)
         let predecessor = if let Some(pred_id) = meta.predecessor_id {
-            sqlx::query_as::<_, SnapshotRow>(
+            let pg_row = sqlx::query_as::<_, PgSnapshotRow>(
                 "SELECT * FROM sem_reg.snapshots WHERE snapshot_id = $1",
             )
             .bind(pred_id)
             .fetch_optional(pool)
-            .await?
+            .await?;
+            pg_row.map(SnapshotRow::try_from).transpose()?
         } else {
             None
         };
@@ -299,12 +300,13 @@ impl RegistryService {
     ) -> Result<Uuid> {
         // Evaluate publish gates
         let predecessor = if let Some(pred_id) = meta.predecessor_id {
-            sqlx::query_as::<_, SnapshotRow>(
+            let pg_row = sqlx::query_as::<_, PgSnapshotRow>(
                 "SELECT * FROM sem_reg.snapshots WHERE snapshot_id = $1",
             )
             .bind(pred_id)
             .fetch_optional(pool)
-            .await?
+            .await?;
+            pg_row.map(SnapshotRow::try_from).transpose()?
         } else {
             None
         };

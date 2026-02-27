@@ -11,8 +11,8 @@ use uuid::Uuid;
 
 use sem_os_core::error::SemOsError;
 use sem_os_core::ports::{
-    AuditStore, ChangesetStore, EvidenceInstanceStore, ObjectStore, OutboxStore, ProjectionWriter,
-    Result, SnapshotStore,
+    AuditStore, BootstrapAuditStore, ChangesetStore, EvidenceInstanceStore, ObjectStore,
+    OutboxStore, ProjectionWriter, Result, SnapshotStore,
 };
 use sem_os_core::principal::Principal;
 use sem_os_core::types::*;
@@ -701,7 +701,7 @@ impl PgChangesetStore {
     fn parse_changeset_row(
         row: (Uuid, String, String, String, DateTime<Utc>, DateTime<Utc>),
     ) -> std::result::Result<Changeset, SemOsError> {
-        let status = ChangesetStatus::from_str(&row.1)
+        let status = ChangesetStatus::parse(&row.1)
             .ok_or_else(|| SemOsError::Internal(anyhow!("invalid changeset status: {}", row.1)))?;
         Ok(Changeset {
             changeset_id: row.0,
@@ -1361,6 +1361,103 @@ impl ProjectionWriter for PgProjectionWriter {
         .map_err(|e| anyhow!(e))?;
 
         tx.commit().await.map_err(|e| anyhow!(e))?;
+        Ok(())
+    }
+}
+
+// ── PgBootstrapAuditStore ────────────────────────────────────
+
+/// Postgres-backed bootstrap audit store.
+/// Extracted from `sem_os_server::handlers::bootstrap` so the server
+/// no longer needs a raw `PgPool`.
+pub struct PgBootstrapAuditStore {
+    pool: PgPool,
+}
+
+impl PgBootstrapAuditStore {
+    pub fn new(pool: PgPool) -> Self {
+        Self { pool }
+    }
+}
+
+#[async_trait]
+impl BootstrapAuditStore for PgBootstrapAuditStore {
+    async fn check_bootstrap(&self, bundle_hash: &str) -> Result<Option<(String, Option<Uuid>)>> {
+        let row = sqlx::query_as::<_, (String, Option<Uuid>)>(
+            r#"
+            SELECT status, snapshot_set_id
+            FROM sem_reg.bootstrap_audit
+            WHERE bundle_hash = $1
+            "#,
+        )
+        .bind(bundle_hash)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| anyhow!(e))?;
+
+        Ok(row)
+    }
+
+    async fn start_bootstrap(
+        &self,
+        bundle_hash: &str,
+        actor_id: &str,
+        bundle_counts: serde_json::Value,
+    ) -> Result<()> {
+        sqlx::query(
+            r#"
+            INSERT INTO sem_reg.bootstrap_audit (
+                bundle_hash, origin_actor_id, bundle_counts, status
+            ) VALUES ($1, $2, $3, 'in_progress')
+            ON CONFLICT (bundle_hash) DO UPDATE
+            SET status = 'in_progress',
+                started_at = now(),
+                error = NULL
+            "#,
+        )
+        .bind(bundle_hash)
+        .bind(actor_id)
+        .bind(&bundle_counts)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| anyhow!(e))?;
+
+        Ok(())
+    }
+
+    async fn mark_published(&self, bundle_hash: &str) -> Result<()> {
+        sqlx::query(
+            r#"
+            UPDATE sem_reg.bootstrap_audit
+            SET status = 'published',
+                completed_at = now()
+            WHERE bundle_hash = $1
+            "#,
+        )
+        .bind(bundle_hash)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| anyhow!(e))?;
+
+        Ok(())
+    }
+
+    async fn mark_failed(&self, bundle_hash: &str, error: &str) -> Result<()> {
+        sqlx::query(
+            r#"
+            UPDATE sem_reg.bootstrap_audit
+            SET status = 'failed',
+                completed_at = now(),
+                error = $2
+            WHERE bundle_hash = $1
+            "#,
+        )
+        .bind(bundle_hash)
+        .bind(error)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| anyhow!(e))?;
+
         Ok(())
     }
 }

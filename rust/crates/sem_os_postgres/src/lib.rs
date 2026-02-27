@@ -16,8 +16,8 @@ pub mod store;
 pub use authoring::{PgAuthoringStore, PgScratchSchemaRunner};
 pub use cleanup::PgCleanupStore;
 pub use store::{
-    PgAuditStore, PgChangesetStore, PgEvidenceStore, PgObjectStore, PgOutboxStore,
-    PgProjectionWriter, PgSnapshotStore,
+    PgAuditStore, PgBootstrapAuditStore, PgChangesetStore, PgEvidenceStore, PgObjectStore,
+    PgOutboxStore, PgProjectionWriter, PgSnapshotStore,
 };
 
 use sqlx::PgPool;
@@ -34,6 +34,7 @@ pub struct PgStores {
     pub authoring: PgAuthoringStore,
     pub scratch_runner: PgScratchSchemaRunner,
     pub cleanup: PgCleanupStore,
+    pub bootstrap_audit: PgBootstrapAuditStore,
 }
 
 impl PgStores {
@@ -48,7 +49,8 @@ impl PgStores {
             projections: PgProjectionWriter::new(pool.clone()),
             authoring: PgAuthoringStore::new(pool.clone()),
             scratch_runner: PgScratchSchemaRunner::new(pool.clone()),
-            cleanup: PgCleanupStore::new(pool),
+            cleanup: PgCleanupStore::new(pool.clone()),
+            bootstrap_audit: PgBootstrapAuditStore::new(pool),
         }
     }
 }

@@ -17,15 +17,15 @@ use crate::{
         governance_verbs::GovernanceVerbService,
         ports::{AuthoringStore, ScratchSchemaRunner},
         types::{
-            ChangeSetFull, ChangeSetStatus as AuthoringChangeSetStatus, DiffSummary, DryRunReport,
-            PublishBatch, PublishPlan, ValidationReport,
+            ChangeSetFull, ChangeSetStatus, DiffSummary, DryRunReport, PublishBatch, PublishPlan,
+            ValidationReport,
         },
     },
     context_resolution::{ContextResolutionRequest, ContextResolutionResponse},
     error::SemOsError,
     ports::{
-        AuditStore, ChangesetStore, EvidenceInstanceStore, ObjectStore, OutboxStore,
-        ProjectionWriter, SnapshotStore,
+        AuditStore, BootstrapAuditStore, ChangesetStore, EvidenceInstanceStore, ObjectStore,
+        OutboxStore, ProjectionWriter, SnapshotStore,
     },
     principal::Principal,
     proto::*,
@@ -139,7 +139,7 @@ pub trait CoreService: Send + Sync {
     /// List ChangeSets with optional status filter.
     async fn authoring_list(
         &self,
-        status: Option<AuthoringChangeSetStatus>,
+        status: Option<ChangeSetStatus>,
         limit: i64,
     ) -> Result<Vec<ChangeSetFull>>;
 
@@ -164,6 +164,28 @@ pub trait CoreService: Send + Sync {
         policy: &crate::authoring::cleanup::CleanupPolicy,
     ) -> Result<crate::authoring::cleanup::CleanupReport>;
 
+    // ── Bootstrap audit (idempotent seed bundle tracking) ──────
+
+    /// Check if a bootstrap audit record exists for the given bundle hash.
+    async fn bootstrap_check(
+        &self,
+        bundle_hash: &str,
+    ) -> Result<Option<(String, Option<uuid::Uuid>)>>;
+
+    /// Insert or update a bootstrap audit record to 'in_progress'.
+    async fn bootstrap_start(
+        &self,
+        bundle_hash: &str,
+        actor_id: &str,
+        bundle_counts: serde_json::Value,
+    ) -> Result<()>;
+
+    /// Mark a bootstrap audit record as 'published'.
+    async fn bootstrap_mark_published(&self, bundle_hash: &str) -> Result<()>;
+
+    /// Mark a bootstrap audit record as 'failed' with an error message.
+    async fn bootstrap_mark_failed(&self, bundle_hash: &str, error: &str) -> Result<()>;
+
     /// Test-only: synchronously drain and process all pending outbox events.
     async fn drain_outbox_for_test(&self) -> Result<()>;
 }
@@ -185,6 +207,7 @@ pub struct CoreServiceImpl {
     pub authoring: Option<Arc<dyn AuthoringStore>>,
     pub scratch_runner: Option<Arc<dyn ScratchSchemaRunner>>,
     pub cleanup: Option<Arc<dyn crate::authoring::cleanup::CleanupStore>>,
+    pub bootstrap_audit: Option<Arc<dyn BootstrapAuditStore>>,
 }
 
 impl CoreServiceImpl {
@@ -209,6 +232,7 @@ impl CoreServiceImpl {
             authoring: None,
             scratch_runner: None,
             cleanup: None,
+            bootstrap_audit: None,
         }
     }
 
@@ -236,6 +260,12 @@ impl CoreServiceImpl {
         cleanup: Arc<dyn crate::authoring::cleanup::CleanupStore>,
     ) -> Self {
         self.cleanup = Some(cleanup);
+        self
+    }
+
+    /// Set the bootstrap audit store (builder pattern).
+    pub fn with_bootstrap_audit(mut self, store: Arc<dyn BootstrapAuditStore>) -> Self {
+        self.bootstrap_audit = Some(store);
         self
     }
 
@@ -321,13 +351,40 @@ impl CoreService for CoreServiceImpl {
         _principal: &Principal,
         req: ContextResolutionRequest,
     ) -> Result<ContextResolutionResponse> {
-        // The full 12-step pipeline requires DB-side loading (Steps 1, 2, 2b, 2c)
-        // followed by pure scoring/filtering (Steps 3-12) from context_resolution.rs.
+        // TODO(resolve_context): Wire the full 12-step context resolution pipeline.
         //
-        // Stage 1.3 wires the ports; the full pipeline orchestration is wired in
-        // Stage 1.5 once the adapter provides the DB loading functions.
-        // For now, delegate to the snapshot store for the data-loading steps
-        // and return a minimal response proving the wiring works.
+        // The monolith implementation lives in `rust/src/sem_reg/context_resolution.rs`
+        // and performs a 12-step pipeline:
+        //
+        //   1. Determine snapshot epoch (point_in_time or now)
+        //   2. Resolve subject → entity type + jurisdiction + state
+        //   2b. Load subject's taxonomy memberships (MembershipRuleBody conditions)
+        //   2c. Load subject's relationships (RelationshipTypeDef edge_class/directionality)
+        //   3. Select applicable ViewDefs by taxonomy overlap
+        //   4. Extract verb surface + attribute prominence from top view
+        //   5. Filter verbs by taxonomy membership + ABAC
+        //   6. Filter attributes similarly
+        //   7. Rank by ViewDef prominence weights
+        //   8. Evaluate preconditions for top-N candidate verbs
+        //   9. Evaluate PolicyRules → PolicyVerdicts with snapshot refs
+        //  10. Compute composite AccessDecision
+        //  11. Generate governance signals (unowned objects, stale evidence)
+        //  12. Compute confidence score (deterministic heuristic)
+        //
+        // To wire this here, the following port trait methods are needed:
+        //
+        //   SnapshotStore (or a new BulkLoadStore trait):
+        //     - load_by_type_and_status(object_type, status) → Vec<SnapshotMeta>
+        //     - load_memberships_for_subject(subject_id) → Vec<MembershipRow>
+        //     - load_relationships_for_subject(subject_id) → Vec<RelationshipRow>
+        //     - load_views_by_taxonomy_overlap(taxonomy_ids) → Vec<ViewDefBody>
+        //
+        // Steps 3-12 are pure functions that can be extracted from the monolith's
+        // `context_resolution.rs` without DB dependencies. The scoring, filtering,
+        // and ranking logic is deterministic and testable in isolation.
+        //
+        // The monolith's `resolve_via_direct()` fallback in agent/orchestrator.rs
+        // continues to work in the meantime via the PgPool-based monolith path.
 
         let as_of = req.point_in_time.unwrap_or_else(chrono::Utc::now);
 
@@ -970,7 +1027,7 @@ impl CoreService for CoreServiceImpl {
 
     async fn authoring_list(
         &self,
-        status: Option<AuthoringChangeSetStatus>,
+        status: Option<ChangeSetStatus>,
         limit: i64,
     ) -> Result<Vec<ChangeSetFull>> {
         let authoring = self
@@ -1039,6 +1096,46 @@ impl CoreService for CoreServiceImpl {
         crate::authoring::cleanup::run_cleanup(cleanup.as_ref(), policy)
             .await
             .map_err(|e| SemOsError::Internal(anyhow::anyhow!("{e}")))
+    }
+
+    // ── Bootstrap audit implementations ────────────────────────
+
+    async fn bootstrap_check(
+        &self,
+        bundle_hash: &str,
+    ) -> Result<Option<(String, Option<uuid::Uuid>)>> {
+        let store = self.bootstrap_audit.as_deref().ok_or_else(|| {
+            SemOsError::MigrationPending("bootstrap audit store not configured".into())
+        })?;
+        store.check_bootstrap(bundle_hash).await
+    }
+
+    async fn bootstrap_start(
+        &self,
+        bundle_hash: &str,
+        actor_id: &str,
+        bundle_counts: serde_json::Value,
+    ) -> Result<()> {
+        let store = self.bootstrap_audit.as_deref().ok_or_else(|| {
+            SemOsError::MigrationPending("bootstrap audit store not configured".into())
+        })?;
+        store
+            .start_bootstrap(bundle_hash, actor_id, bundle_counts)
+            .await
+    }
+
+    async fn bootstrap_mark_published(&self, bundle_hash: &str) -> Result<()> {
+        let store = self.bootstrap_audit.as_deref().ok_or_else(|| {
+            SemOsError::MigrationPending("bootstrap audit store not configured".into())
+        })?;
+        store.mark_published(bundle_hash).await
+    }
+
+    async fn bootstrap_mark_failed(&self, bundle_hash: &str, error: &str) -> Result<()> {
+        let store = self.bootstrap_audit.as_deref().ok_or_else(|| {
+            SemOsError::MigrationPending("bootstrap audit store not configured".into())
+        })?;
+        store.mark_failed(bundle_hash, error).await
     }
 
     async fn drain_outbox_for_test(&self) -> Result<()> {

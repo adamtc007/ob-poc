@@ -30,7 +30,7 @@ use crate::sem_reg::context_resolution::{
 };
 use crate::sem_reg::enforce::{enforce_read, enforce_read_label, redacted_stub, EnforceResult};
 use crate::sem_reg::store::SnapshotStore;
-use crate::sem_reg::types::{GovernanceTier, ObjectType, TrustClass};
+use crate::sem_reg::types::ObjectType;
 
 // ── Grounding Context ─────────────────────────────────────────
 
@@ -709,7 +709,7 @@ async fn handle_search(ctx: &SemRegToolContext<'_>, args: &serde_json::Value) ->
 
     // If we have a query embedding, try embedding-based similarity search first
     if let Some(ref embedding) = query_embedding {
-        let ot_str = object_type_filter.map(|ot| ot.to_string());
+        let ot_str = object_type_filter.map(|ot| ot.as_str().to_string());
         match EmbeddingStore::similarity_search(ctx.pool, embedding, ot_str.as_deref(), limit).await
         {
             Ok(sim_results) if !sim_results.is_empty() => {
@@ -799,13 +799,13 @@ async fn handle_search(ctx: &SemRegToolContext<'_>, args: &serde_json::Value) ->
                         .insert(fqn_str.to_string(), r.snapshot_id);
                     *grounding
                         .governance_tiers
-                        .entry(format!("{:?}", r.governance_tier))
+                        .entry(r.governance_tier.clone())
                         .or_insert(0) += 1;
 
                     serde_json::json!({
                         "snapshot_id": r.snapshot_id,
                         "object_id": r.object_id,
-                        "object_type": r.object_type.to_string(),
+                        "object_type": r.object_type,
                         "fqn": r.fqn,
                         "name": r.name,
                         "governance_tier": r.governance_tier,
@@ -2363,11 +2363,11 @@ async fn handle_coverage_report(
 struct SearchResultRow {
     snapshot_id: Uuid,
     object_id: Uuid,
-    object_type: ObjectType,
+    object_type: String,
     fqn: Option<String>,
     name: Option<String>,
-    governance_tier: GovernanceTier,
-    trust_class: TrustClass,
+    governance_tier: String,
+    trust_class: String,
     security_label: serde_json::Value,
 }
 

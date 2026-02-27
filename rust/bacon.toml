@@ -134,22 +134,67 @@ need_stdout = false
 command = ["cargo", "clippy", "-p", "ob-poc-web", "--color", "always"]
 need_stdout = false
 
-# ob-poc-ui (WASM UI)
-[jobs.check-ui]
-command = ["cargo", "check", "-p", "ob-poc-ui", "--color", "always"]
+# ob-poc-types
+[jobs.check-types]
+command = ["cargo", "check", "-p", "ob-poc-types", "--color", "always"]
 need_stdout = false
 
-[jobs.clippy-ui]
-command = ["cargo", "clippy", "-p", "ob-poc-ui", "--color", "always"]
+[jobs.clippy-types]
+command = ["cargo", "clippy", "-p", "ob-poc-types", "--color", "always"]
 need_stdout = false
 
-# ob-poc-graph (graph widget)
-[jobs.check-graph]
-command = ["cargo", "check", "-p", "ob-poc-graph", "--color", "always"]
+# ob-poc-macros
+[jobs.check-macros]
+command = ["cargo", "check", "-p", "ob-poc-macros", "--color", "always"]
 need_stdout = false
 
-[jobs.clippy-graph]
-command = ["cargo", "clippy", "-p", "ob-poc-graph", "--color", "always"]
+[jobs.clippy-macros]
+command = ["cargo", "clippy", "-p", "ob-poc-macros", "--color", "always"]
+need_stdout = false
+
+# ob-execution-types
+[jobs.check-exec-types]
+command = ["cargo", "check", "-p", "ob-execution-types", "--color", "always"]
+need_stdout = false
+
+[jobs.clippy-exec-types]
+command = ["cargo", "clippy", "-p", "ob-execution-types", "--color", "always"]
+need_stdout = false
+
+# ob-semantic-matcher
+[jobs.check-semantic]
+command = ["cargo", "check", "-p", "ob-semantic-matcher", "--color", "always"]
+need_stdout = false
+
+[jobs.clippy-semantic]
+command = ["cargo", "clippy", "-p", "ob-semantic-matcher", "--color", "always"]
+need_stdout = false
+
+# inspector-projection
+[jobs.check-inspector]
+command = ["cargo", "check", "-p", "inspector-projection", "--color", "always"]
+need_stdout = false
+
+[jobs.clippy-inspector]
+command = ["cargo", "clippy", "-p", "inspector-projection", "--color", "always"]
+need_stdout = false
+
+# playbook-core
+[jobs.check-playbook-core]
+command = ["cargo", "check", "-p", "playbook-core", "--color", "always"]
+need_stdout = false
+
+[jobs.clippy-playbook-core]
+command = ["cargo", "clippy", "-p", "playbook-core", "--color", "always"]
+need_stdout = false
+
+# playbook-lower
+[jobs.check-playbook-lower]
+command = ["cargo", "check", "-p", "playbook-lower", "--color", "always"]
+need_stdout = false
+
+[jobs.clippy-playbook-lower]
+command = ["cargo", "clippy", "-p", "playbook-lower", "--color", "always"]
 need_stdout = false
 
 # dsl-lsp (LSP server)
@@ -159,6 +204,101 @@ need_stdout = false
 
 [jobs.clippy-lsp]
 command = ["cargo", "clippy", "-p", "dsl-lsp", "--color", "always"]
+need_stdout = false
+
+# =============================================================================
+# SEMANTIC OS CRATES (sem_os_*)
+# =============================================================================
+
+# sem_os_core
+[jobs.check-sem-core]
+command = ["cargo", "check", "-p", "sem_os_core", "--color", "always"]
+need_stdout = false
+
+[jobs.clippy-sem-core]
+command = ["cargo", "clippy", "-p", "sem_os_core", "--color", "always"]
+need_stdout = false
+
+[jobs.test-sem-core]
+command = ["cargo", "test", "-p", "sem_os_core", "--color", "always"]
+need_stdout = true
+
+# sem_os_postgres
+[jobs.check-sem-pg]
+command = ["cargo", "check", "-p", "sem_os_postgres", "--color", "always"]
+need_stdout = false
+
+[jobs.clippy-sem-pg]
+command = ["cargo", "clippy", "-p", "sem_os_postgres", "--color", "always"]
+need_stdout = false
+
+# sem_os_server
+[jobs.check-sem-server]
+command = ["cargo", "check", "-p", "sem_os_server", "--color", "always"]
+need_stdout = false
+
+[jobs.clippy-sem-server]
+command = ["cargo", "clippy", "-p", "sem_os_server", "--color", "always"]
+need_stdout = false
+
+[jobs.test-sem-server]
+command = ["cargo", "test", "-p", "sem_os_server", "--color", "always"]
+need_stdout = true
+
+# sem_os_client
+[jobs.check-sem-client]
+command = ["cargo", "check", "-p", "sem_os_client", "--color", "always"]
+need_stdout = false
+
+[jobs.clippy-sem-client]
+command = ["cargo", "clippy", "-p", "sem_os_client", "--color", "always"]
+need_stdout = false
+
+# sem_os_obpoc_adapter
+[jobs.check-sem-adapter]
+command = ["cargo", "check", "-p", "sem_os_obpoc_adapter", "--color", "always"]
+need_stdout = false
+
+[jobs.clippy-sem-adapter]
+command = ["cargo", "clippy", "-p", "sem_os_obpoc_adapter", "--color", "always"]
+need_stdout = false
+
+# sem_os_harness
+[jobs.check-sem-harness]
+command = ["cargo", "check", "-p", "sem_os_harness", "--color", "always"]
+need_stdout = false
+
+[jobs.clippy-sem-harness]
+command = ["cargo", "clippy", "-p", "sem_os_harness", "--color", "always"]
+need_stdout = false
+
+# =============================================================================
+# SEMANTIC OS COMPOSITE JOBS
+# =============================================================================
+
+# Check all 6 sem_os crates at once
+[jobs.check-sem-all]
+command = ["cargo", "check", "-p", "sem_os_core", "-p", "sem_os_postgres", "-p", "sem_os_server", "-p", "sem_os_client", "-p", "sem_os_obpoc_adapter", "-p", "sem_os_harness", "--color", "always"]
+need_stdout = false
+
+[jobs.clippy-sem-all]
+command = ["cargo", "clippy", "-p", "sem_os_core", "-p", "sem_os_postgres", "-p", "sem_os_server", "-p", "sem_os_client", "-p", "sem_os_obpoc_adapter", "-p", "sem_os_harness", "--color", "always"]
+need_stdout = false
+
+[jobs.test-sem-all]
+command = ["cargo", "test", "-p", "sem_os_core", "-p", "sem_os_server", "--color", "always"]
+need_stdout = true
+
+# =============================================================================
+# XTASK
+# =============================================================================
+
+[jobs.check-xtask]
+command = ["cargo", "check", "-p", "xtask", "--color", "always"]
+need_stdout = false
+
+[jobs.clippy-xtask]
+command = ["cargo", "clippy", "-p", "xtask", "--color", "always"]
 need_stdout = false
 
 # =============================================================================
@@ -186,6 +326,9 @@ G = "job:clippy-gateway"
 A = "job:clippy-agentic"
 T = "job:clippy-templates"
 L = "job:clippy-lsp"
+
+# Semantic OS
+S = "job:clippy-sem-all"
 
 [settings]
 on_change_strategy = "restart"

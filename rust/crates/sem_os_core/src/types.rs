@@ -20,6 +20,23 @@ pub enum GovernanceTier {
     Operational,
 }
 
+impl GovernanceTier {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Governed => "governed",
+            Self::Operational => "operational",
+        }
+    }
+
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s {
+            "governed" => Some(Self::Governed),
+            "operational" => Some(Self::Operational),
+            _ => None,
+        }
+    }
+}
+
 /// Trust class — graduated trust levels for registry objects.
 /// Invariant: `Proof` is only valid when `governance_tier = Governed`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -28,6 +45,25 @@ pub enum TrustClass {
     Proof,
     DecisionSupport,
     Convenience,
+}
+
+impl TrustClass {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Proof => "proof",
+            Self::DecisionSupport => "decision_support",
+            Self::Convenience => "convenience",
+        }
+    }
+
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s {
+            "proof" => Some(Self::Proof),
+            "decision_support" => Some(Self::DecisionSupport),
+            "convenience" => Some(Self::Convenience),
+            _ => None,
+        }
+    }
 }
 
 /// Snapshot lifecycle status.
@@ -40,6 +76,27 @@ pub enum SnapshotStatus {
     Retired,
 }
 
+impl SnapshotStatus {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Draft => "draft",
+            Self::Active => "active",
+            Self::Deprecated => "deprecated",
+            Self::Retired => "retired",
+        }
+    }
+
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s {
+            "draft" => Some(Self::Draft),
+            "active" => Some(Self::Active),
+            "deprecated" => Some(Self::Deprecated),
+            "retired" => Some(Self::Retired),
+            _ => None,
+        }
+    }
+}
+
 /// Change type for snapshot transitions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -50,6 +107,31 @@ pub enum ChangeType {
     Promotion,
     Deprecation,
     Retirement,
+}
+
+impl ChangeType {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Created => "created",
+            Self::NonBreaking => "non_breaking",
+            Self::Breaking => "breaking",
+            Self::Promotion => "promotion",
+            Self::Deprecation => "deprecation",
+            Self::Retirement => "retirement",
+        }
+    }
+
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s {
+            "created" => Some(Self::Created),
+            "non_breaking" => Some(Self::NonBreaking),
+            "breaking" => Some(Self::Breaking),
+            "promotion" => Some(Self::Promotion),
+            "deprecation" => Some(Self::Deprecation),
+            "retirement" => Some(Self::Retirement),
+            _ => None,
+        }
+    }
 }
 
 /// Registry object type — discriminator for the shared snapshots table.
@@ -390,46 +472,11 @@ fn default_evidence_grade() -> String {
 
 // ── Changeset types ───────────────────────────────────────────
 
-/// Changeset status lifecycle.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum ChangesetStatus {
-    Draft,
-    #[serde(rename = "under_review", alias = "in_review")]
-    UnderReview,
-    Approved,
-    Published,
-    Rejected,
-}
-
-impl ChangesetStatus {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            Self::Draft => "draft",
-            Self::UnderReview => "under_review",
-            Self::Approved => "approved",
-            Self::Published => "published",
-            Self::Rejected => "rejected",
-        }
-    }
-
-    pub fn from_str(s: &str) -> Option<Self> {
-        match s {
-            "draft" => Some(Self::Draft),
-            "under_review" | "in_review" => Some(Self::UnderReview),
-            "approved" => Some(Self::Approved),
-            "published" => Some(Self::Published),
-            "rejected" => Some(Self::Rejected),
-            _ => None,
-        }
-    }
-}
-
-impl std::fmt::Display for ChangesetStatus {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.as_str())
-    }
-}
+// Re-export the canonical 9-state ChangeSetStatus as ChangesetStatus for
+// backward compatibility. The authoring pipeline's ChangeSetStatus is the
+// superset that covers all states (Draft, UnderReview, Approved, Validated,
+// Rejected, DryRunPassed, DryRunFailed, Published, Superseded).
+pub use crate::authoring::types::ChangeSetStatus as ChangesetStatus;
 
 /// Kind of change in a changeset entry.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]

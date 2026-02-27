@@ -13,6 +13,7 @@ use axum::body::Body;
 use http_body_util::BodyExt;
 use hyper::{Request, StatusCode};
 use jsonwebtoken::{encode, EncodingKey, Header};
+use sem_os_core::ports::BootstrapAuditStore;
 use sem_os_core::service::CoreServiceImpl;
 use sem_os_postgres::PgStores;
 use sem_os_server::middleware::jwt::JwtConfig;
@@ -75,7 +76,7 @@ async fn build_test_app() -> axum::Router {
         .await
         .expect("failed to connect to test database");
 
-    let stores = PgStores::new(pool.clone());
+    let stores = PgStores::new(pool);
 
     let outbox: Arc<dyn sem_os_core::ports::OutboxStore> = Arc::new(stores.outbox);
     let projections: Arc<dyn sem_os_core::ports::ProjectionWriter> = Arc::new(stores.projections);
@@ -92,11 +93,12 @@ async fn build_test_app() -> axum::Router {
         .with_changesets(Arc::new(stores.changesets))
         .with_authoring(Arc::new(stores.authoring))
         .with_scratch_runner(Arc::new(stores.scratch_runner))
-        .with_cleanup(Arc::new(stores.cleanup)),
+        .with_cleanup(Arc::new(stores.cleanup))
+        .with_bootstrap_audit(Arc::new(stores.bootstrap_audit) as Arc<dyn BootstrapAuditStore>),
     );
 
     let jwt_config = JwtConfig::from_secret(TEST_JWT_SECRET);
-    build_router(service, pool, jwt_config)
+    build_router(service, jwt_config)
 }
 
 fn sample_propose_body() -> serde_json::Value {

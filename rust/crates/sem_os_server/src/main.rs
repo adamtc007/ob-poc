@@ -38,6 +38,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
+use sem_os_core::ports::BootstrapAuditStore;
 use sem_os_core::service::CoreServiceImpl;
 use sem_os_postgres::PgStores;
 use sem_os_server::dispatcher::OutboxDispatcher;
@@ -72,7 +73,7 @@ async fn main() {
 
     // Build port implementations — Arc-wrap outbox + projections so they're
     // shared between the CoreService and the OutboxDispatcher.
-    let stores = PgStores::new(pool.clone());
+    let stores = PgStores::new(pool);
 
     let outbox: Arc<dyn sem_os_core::ports::OutboxStore> = Arc::new(stores.outbox);
     let projections: Arc<dyn sem_os_core::ports::ProjectionWriter> = Arc::new(stores.projections);
@@ -90,7 +91,8 @@ async fn main() {
         .with_changesets(Arc::new(stores.changesets))
         .with_authoring(Arc::new(stores.authoring))
         .with_scratch_runner(Arc::new(stores.scratch_runner))
-        .with_cleanup(Arc::new(stores.cleanup)),
+        .with_cleanup(Arc::new(stores.cleanup))
+        .with_bootstrap_audit(Arc::new(stores.bootstrap_audit) as Arc<dyn BootstrapAuditStore>),
     );
 
     // Start outbox dispatcher as background task
@@ -123,7 +125,7 @@ async fn main() {
     let jwt_config = JwtConfig::from_secret(jwt_secret.as_bytes());
 
     // Build router
-    let app = build_router(service, pool, jwt_config);
+    let app = build_router(service, jwt_config);
 
     // Bind and serve
     let listener = TcpListener::bind(&bind_addr)

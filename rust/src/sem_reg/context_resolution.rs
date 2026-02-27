@@ -37,7 +37,10 @@ use super::{
     policy_rule::PolicyRuleBody,
     relationship_type_def::RelationshipTypeDefBody,
     store::SnapshotStore,
-    types::{GovernanceTier, ObjectType, SnapshotRow, TrustClass},
+    types::{
+        pg_rows_to_snapshot_rows, GovernanceTier, ObjectType, PgSnapshotRow, SnapshotRow,
+        TrustClass,
+    },
     view_def::ViewDefBody,
 };
 
@@ -1589,7 +1592,7 @@ async fn load_typed_snapshots(
 
     if is_historical {
         // Load all snapshots that were active at as_of
-        let rows = sqlx::query_as::<_, SnapshotRow>(
+        let pg_rows = sqlx::query_as::<_, PgSnapshotRow>(
             r#"
             SELECT *
             FROM sem_reg.snapshots
@@ -1600,11 +1603,11 @@ async fn load_typed_snapshots(
             ORDER BY effective_from DESC
             "#,
         )
-        .bind(object_type)
+        .bind(object_type.as_str())
         .bind(as_of)
         .fetch_all(pool)
         .await?;
-        Ok(rows)
+        pg_rows_to_snapshot_rows(pg_rows)
     } else {
         // Load ALL current active snapshots via pagination.
         // Avoids silent truncation when > 1000 snapshots exist for a type.
@@ -1707,7 +1710,7 @@ pub async fn resolve_context_with_overlay(
 
 /// Load draft snapshots belonging to a changeset.
 async fn load_changeset_drafts(pool: &PgPool, changeset_id: Uuid) -> Result<Vec<SnapshotRow>> {
-    let rows = sqlx::query_as::<_, SnapshotRow>(
+    let pg_rows = sqlx::query_as::<_, PgSnapshotRow>(
         r#"
         SELECT *
         FROM sem_reg.snapshots
@@ -1720,7 +1723,7 @@ async fn load_changeset_drafts(pool: &PgPool, changeset_id: Uuid) -> Result<Vec<
     .bind(changeset_id)
     .fetch_all(pool)
     .await?;
-    Ok(rows)
+    pg_rows_to_snapshot_rows(pg_rows)
 }
 
 // ── Tests ─────────────────────────────────────────────────────

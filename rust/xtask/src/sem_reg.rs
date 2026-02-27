@@ -5,7 +5,9 @@
 use anyhow::{Context, Result};
 use sqlx::PgPool;
 
-use ob_poc::sem_reg::types::{ChangeType, SnapshotMeta};
+use ob_poc::sem_reg::types::{
+    pg_rows_to_snapshot_rows, ChangeType, PgSnapshotRow, SnapshotMeta, SnapshotRow,
+};
 use ob_poc::sem_reg::{ObjectType, RegistryService, SnapshotStore};
 
 /// Show registry statistics (counts by object type).
@@ -348,7 +350,7 @@ pub async fn backfill_labels(dry_run: bool) -> Result<()> {
     let pool = connect().await?;
 
     // Query snapshots with default/empty security labels
-    let rows = sqlx::query_as::<_, ob_poc::sem_reg::SnapshotRow>(
+    let pg_rows = sqlx::query_as::<_, PgSnapshotRow>(
         "SELECT * FROM sem_reg.snapshots \
          WHERE status = 'active' \
            AND effective_until IS NULL \
@@ -359,6 +361,8 @@ pub async fn backfill_labels(dry_run: bool) -> Result<()> {
     )
     .fetch_all(&pool)
     .await?;
+    let rows: Vec<SnapshotRow> =
+        pg_rows_to_snapshot_rows(pg_rows).context("Failed to parse snapshot rows")?;
 
     if rows.is_empty() {
         println!("All active snapshots already have non-default security labels.");
@@ -448,13 +452,15 @@ pub async fn validate(enforce: bool) -> Result<()> {
         GateMode::ReportOnly
     };
 
-    let rows = sqlx::query_as::<_, ob_poc::sem_reg::SnapshotRow>(
+    let pg_rows = sqlx::query_as::<_, PgSnapshotRow>(
         "SELECT * FROM sem_reg.snapshots \
          WHERE status = 'active' AND effective_until IS NULL \
          ORDER BY object_type, definition->>'fqn'",
     )
     .fetch_all(&pool)
     .await?;
+    let rows: Vec<SnapshotRow> =
+        pg_rows_to_snapshot_rows(pg_rows).context("Failed to parse snapshot rows")?;
 
     if rows.is_empty() {
         println!("No active snapshots found.");

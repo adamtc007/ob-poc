@@ -163,6 +163,7 @@ fn build_test_seed_bundle() -> SeedBundle {
         &taxonomies,
         &policies,
         &views,
+        &[],
     )
     .expect("test seed bundle hash");
 
@@ -174,6 +175,7 @@ fn build_test_seed_bundle() -> SeedBundle {
         taxonomies,
         policies,
         views,
+        derivation_specs: vec![],
     }
 }
 
@@ -384,7 +386,7 @@ async fn test_manifest_stability(client: &dyn SemOsClient) {
     let fqn = format!("test.manifest-{unique}");
 
     let verb_contracts = vec![make_verb_contract_seed(&fqn, "test", "Manifest test verb")];
-    let bundle_hash = SeedBundle::compute_hash(&verb_contracts, &[], &[], &[], &[], &[])
+    let bundle_hash = SeedBundle::compute_hash(&verb_contracts, &[], &[], &[], &[], &[], &[])
         .expect("test seed bundle hash");
 
     let bundle = SeedBundle {
@@ -395,6 +397,7 @@ async fn test_manifest_stability(client: &dyn SemOsClient) {
         taxonomies: vec![],
         policies: vec![],
         views: vec![],
+        derivation_specs: vec![],
     };
 
     let resp = client
@@ -423,6 +426,7 @@ async fn test_manifest_stability(client: &dyn SemOsClient) {
         taxonomies: vec![],
         policies: vec![],
         views: vec![],
+        derivation_specs: vec![],
     };
 
     let resp2 = client

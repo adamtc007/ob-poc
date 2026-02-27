@@ -19,7 +19,10 @@ use axum::{
 use sem_os_core::{
     authoring::{
         bundle::{build_bundle_from_map, parse_manifest},
-        types::ChangeSetStatus as AuthoringChangeSetStatus,
+        types::{
+            ChangeSetFull, ChangeSetStatus, DiffSummary, DryRunReport, PublishBatch, PublishPlan,
+            ValidationReport,
+        },
     },
     principal::Principal,
     service::CoreService,
@@ -79,52 +82,44 @@ pub async fn propose(
     Extension(principal): Extension<Principal>,
     Extension(service): Extension<Arc<dyn CoreService>>,
     Json(body): Json<ProposeRequest>,
-) -> Result<Json<serde_json::Value>, AppError> {
+) -> Result<Json<ChangeSetFull>, AppError> {
     let raw = parse_manifest(&body.manifest_yaml)
         .map_err(|e| sem_os_core::error::SemOsError::InvalidInput(e.to_string()))?;
     let bundle = build_bundle_from_map(&raw, &body.artifacts)
         .map_err(|e| sem_os_core::error::SemOsError::InvalidInput(e.to_string()))?;
 
     let cs = service.authoring_propose(&principal, &bundle).await?;
-    let json = serde_json::to_value(&cs)
-        .map_err(|e| sem_os_core::error::SemOsError::Internal(e.into()))?;
-    Ok(Json(json))
+    Ok(Json(cs))
 }
 
 /// Run Stage 1 (pure) validation on a ChangeSet.
 pub async fn validate(
     Extension(service): Extension<Arc<dyn CoreService>>,
     Path(id): Path<String>,
-) -> Result<Json<serde_json::Value>, AppError> {
+) -> Result<Json<ValidationReport>, AppError> {
     let cs_id = parse_uuid(&id)?;
     let report = service.authoring_validate(cs_id).await?;
-    let json = serde_json::to_value(&report)
-        .map_err(|e| sem_os_core::error::SemOsError::Internal(e.into()))?;
-    Ok(Json(json))
+    Ok(Json(report))
 }
 
 /// Run Stage 2 (DB-backed) dry-run on a ChangeSet.
 pub async fn dry_run(
     Extension(service): Extension<Arc<dyn CoreService>>,
     Path(id): Path<String>,
-) -> Result<Json<serde_json::Value>, AppError> {
+) -> Result<Json<DryRunReport>, AppError> {
     let cs_id = parse_uuid(&id)?;
     let report = service.authoring_dry_run(cs_id).await?;
-    let json = serde_json::to_value(&report)
-        .map_err(|e| sem_os_core::error::SemOsError::Internal(e.into()))?;
-    Ok(Json(json))
+    Ok(Json(report))
 }
 
 /// Generate a publish plan with blast-radius analysis. Read-only.
 pub async fn plan_publish(
     Extension(service): Extension<Arc<dyn CoreService>>,
     Path(id): Path<String>,
-) -> Result<Json<serde_json::Value>, AppError> {
+) -> Result<Json<PublishPlan>, AppError> {
     let cs_id = parse_uuid(&id)?;
     let summary = service.authoring_plan_publish(cs_id).await?;
-    let json = serde_json::to_value(&summary)
-        .map_err(|e| sem_os_core::error::SemOsError::Internal(e.into()))?;
-    Ok(Json(json))
+    Ok(Json(summary))
 }
 
 /// Publish a ChangeSet. Transitions DryRunPassed → Published.
@@ -134,15 +129,13 @@ pub async fn publish(
     Extension(service): Extension<Arc<dyn CoreService>>,
     Path(id): Path<String>,
     Json(_body): Json<PublishRequest>,
-) -> Result<Json<serde_json::Value>, AppError> {
+) -> Result<Json<PublishBatch>, AppError> {
     require_publish_permission(&principal)?;
     let cs_id = parse_uuid(&id)?;
     let batch = service
         .authoring_publish(cs_id, &principal.actor_id)
         .await?;
-    let json = serde_json::to_value(&batch)
-        .map_err(|e| sem_os_core::error::SemOsError::Internal(e.into()))?;
-    Ok(Json(json))
+    Ok(Json(batch))
 }
 
 /// Publish multiple ChangeSets atomically in topological order.
@@ -151,53 +144,42 @@ pub async fn publish_batch(
     Extension(principal): Extension<Principal>,
     Extension(service): Extension<Arc<dyn CoreService>>,
     Json(body): Json<PublishBatchRequest>,
-) -> Result<Json<serde_json::Value>, AppError> {
+) -> Result<Json<PublishBatch>, AppError> {
     require_publish_permission(&principal)?;
     let batch = service
         .authoring_publish_batch(&body.change_set_ids, &principal.actor_id)
         .await?;
-    let json = serde_json::to_value(&batch)
-        .map_err(|e| sem_os_core::error::SemOsError::Internal(e.into()))?;
-    Ok(Json(json))
+    Ok(Json(batch))
 }
 
 /// Compute structural diff between two ChangeSets.
 pub async fn diff(
     Extension(service): Extension<Arc<dyn CoreService>>,
     Json(body): Json<DiffRequest>,
-) -> Result<Json<serde_json::Value>, AppError> {
+) -> Result<Json<DiffSummary>, AppError> {
     let summary = service.authoring_diff(body.base_id, body.target_id).await?;
-    let json = serde_json::to_value(&summary)
-        .map_err(|e| sem_os_core::error::SemOsError::Internal(e.into()))?;
-    Ok(Json(json))
+    Ok(Json(summary))
 }
 
 /// List ChangeSets with optional status filter.
 pub async fn list(
     Extension(service): Extension<Arc<dyn CoreService>>,
     Query(query): Query<ListQuery>,
-) -> Result<Json<serde_json::Value>, AppError> {
-    let status = query
-        .status
-        .as_deref()
-        .and_then(AuthoringChangeSetStatus::parse);
+) -> Result<Json<Vec<ChangeSetFull>>, AppError> {
+    let status = query.status.as_deref().and_then(ChangeSetStatus::parse);
 
     let changesets = service.authoring_list(status, query.limit).await?;
-    let json = serde_json::to_value(&changesets)
-        .map_err(|e| sem_os_core::error::SemOsError::Internal(e.into()))?;
-    Ok(Json(json))
+    Ok(Json(changesets))
 }
 
 /// Get a single ChangeSet by ID.
 pub async fn get(
     Extension(service): Extension<Arc<dyn CoreService>>,
     Path(id): Path<String>,
-) -> Result<Json<serde_json::Value>, AppError> {
+) -> Result<Json<ChangeSetFull>, AppError> {
     let cs_id = parse_uuid(&id)?;
     let cs = service.authoring_get(cs_id).await?;
-    let json = serde_json::to_value(&cs)
-        .map_err(|e| sem_os_core::error::SemOsError::Internal(e.into()))?;
-    Ok(Json(json))
+    Ok(Json(cs))
 }
 
 // ── Helpers ──────────────────────────────────────────────────

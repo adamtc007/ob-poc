@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-> **Last reviewed:** 2026-02-26
+> **Last reviewed:** 2026-02-27
 > **Frontend:** React/TypeScript (`ob-poc-ui-react/`) - Chat UI with scope panel, Inspector
 > **Backend:** Rust/Axum (`rust/crates/ob-poc-web/`) - Serves React + REST API
 > **Crates:** 22 active Rust crates (16 ob-poc + 6 sem_os_*; esper_* deprecated; ob-poc-graph + viewport removed)
@@ -6323,7 +6323,7 @@ rust/src/sem_reg/
 | File | Purpose |
 |------|---------|
 | `rust/src/sem_reg/mod.rs` | Module root with re-exports |
-| `rust/src/sem_reg/types.rs` | Core enums (GovernanceTier, TrustClass, ObjectType, etc.) |
+| `rust/src/sem_reg/types.rs` | Re-exports canonical enums from `sem_os_core::types` + `PgSnapshotRow` sqlx adapter with `TryFrom` conversion |
 | `rust/src/sem_reg/store.rs` | `SnapshotStore` — INSERT-only + supersede DB ops |
 | `rust/src/sem_reg/gates.rs` | `evaluate_publish_gates()` — pure functions |
 | `rust/src/sem_reg/registry.rs` | `RegistryService` — typed publish/resolve for all 13 types |
@@ -6392,6 +6392,7 @@ Correctness and safety improvements applied across the Semantic OS:
 ## Semantic OS v1.1 — Standalone Service Architecture
 
 > **Status:** ✅ Complete (2026-02-18) — Stages 1-4 implemented. Harness green in inprocess mode.
+> **Type Unification:** ✅ Complete (2026-02-27) — Canonical enums in `sem_os_core`, monolith re-exports + `PgSnapshotRow` sqlx adapter, `BootstrapAuditStore` port trait, stewardship module refactor, server `PgPool` removal.
 > **Stewardship:** ✅ Complete (2026-02-25) — Phase 0 (Changeset Layer) + Phase 1 (Show Loop). 23 MCP tools, 15 guardrails, REST+SSE.
 > **Schema Visibility:** ✅ Complete (2026-02-25) — `db_introspect` MCP tool + `AttributeSource` real (schema, table, column) triples.
 
@@ -6424,16 +6425,17 @@ Correctness and safety improvements applied across the Semantic OS:
 
 | Crate | Purpose | Key Export |
 |-------|---------|-----------|
-| `sem_os_core` | Core domain: types, ports (traits), service logic, gates, stewardship guardrails, ABAC, security labels | `CoreService` trait, `Principal`, `SnapshotMeta` |
-| `sem_os_postgres` | PostgreSQL store implementations (7 adapters implementing port traits) | `PgStores` convenience constructor |
-| `sem_os_server` | Axum REST server with JWT auth, CORS, outbox dispatcher, 12 routes | `build_router()` |
+| `sem_os_core` | Core domain: canonical types (enums, `SnapshotMeta`, `SnapshotRow`), ports (8 traits), service logic, gates, stewardship guardrails, ABAC, security labels | `CoreService` trait, `Principal`, `SnapshotMeta` |
+| `sem_os_postgres` | PostgreSQL store implementations (8 adapters implementing port traits) | `PgStores` convenience constructor |
+| `sem_os_server` | Axum REST server with JWT auth, CORS, outbox dispatcher, 12 routes (no raw `PgPool` dependency) | `build_router()` |
 | `sem_os_client` | `SemOsClient` trait + `InProcessClient` + `HttpClient` | `SemOsClient` trait (sole API boundary) |
 | `sem_os_harness` | Integration test harness (isolated DB per run, 3 suites) | `run_core_scenario_suite()` |
 | `sem_os_obpoc_adapter` | Verb YAML → seed bundles, scanner with CRUD/entity-type resolution | `build_seed_bundle()` |
 
 ### Key Design Patterns
 
-- **Port-trait isolation**: Core depends on traits only (`SnapshotStore`, `ChangesetStore`, `OutboxStore`, `AuditStore`, `EvidenceInstanceStore`, `ProjectionWriter`, `ObjectStore`). Never imports sqlx directly.
+- **Port-trait isolation**: Core depends on traits only (`SnapshotStore`, `ChangesetStore`, `OutboxStore`, `AuditStore`, `EvidenceInstanceStore`, `ProjectionWriter`, `ObjectStore`, `BootstrapAuditStore`). Never imports sqlx directly.
+- **Type unification**: Canonical enum types (`GovernanceTier`, `TrustClass`, `SnapshotStatus`, `ChangeType`, `ObjectType`, `SecurityLabel`, `SnapshotMeta`, `SnapshotRow`) defined once in `sem_os_core::types`. Monolith re-exports from core + provides `PgSnapshotRow` sqlx adapter with `TryFrom` conversion. `ChangesetStatus` unified: 9-state `ChangeSetStatus` from authoring module re-exported as the single canonical type.
 - **Explicit Principal**: Every method takes `&Principal` — no implicit identity, no thread-local context. ABAC, role checks, and audit all use the explicit principal.
 - **Immutable snapshots + outbox**: Every publish = snapshot INSERT + outbox enqueue in single tx. Outbox dispatcher claims → projects → advances watermark.
 - **Atomic publish gates**: All gates evaluated BEFORE any persistence. Gate failure = zero DB changes.
@@ -6444,17 +6446,38 @@ Correctness and safety improvements applied across the Semantic OS:
 
 ```rust
 pub trait CoreService: Send + Sync {
+    // Core operations
     async fn resolve_context(&self, principal: &Principal, req: ContextResolutionRequest) -> Result<ContextResolutionResponse>;
     async fn get_manifest(&self, snapshot_set_id: &str) -> Result<GetManifestResponse>;
     async fn export_snapshot_set(&self, snapshot_set_id: &str) -> Result<ExportSnapshotSetResponse>;
     async fn bootstrap_seed_bundle(&self, principal: &Principal, bundle: SeedBundle) -> Result<BootstrapSeedBundleResponse>;
     async fn dispatch_tool(&self, principal: &Principal, req: ToolCallRequest) -> Result<ToolCallResponse>;
     async fn list_tool_specs(&self) -> Result<ListToolSpecsResponse>;
+    // Changeset workflow
     async fn promote_changeset(&self, principal: &Principal, changeset_id: &str) -> Result<u32>;
     async fn list_changesets(&self, query: ListChangesetsQuery) -> Result<ListChangesetsResponse>;
     async fn changeset_diff(&self, changeset_id: &str) -> Result<ChangesetDiffResponse>;
     async fn changeset_impact(&self, changeset_id: &str) -> Result<ChangesetImpactResponse>;
     async fn changeset_gate_preview(&self, changeset_id: &str) -> Result<GatePreviewResponse>;
+    // Authoring pipeline (governance verbs)
+    async fn authoring_propose(&self, principal: &Principal, bundle: &BundleContents) -> Result<ChangeSetFull>;
+    async fn authoring_validate(&self, change_set_id: Uuid) -> Result<ValidationReport>;
+    async fn authoring_dry_run(&self, change_set_id: Uuid) -> Result<DryRunReport>;
+    async fn authoring_plan_publish(&self, change_set_id: Uuid) -> Result<PublishPlan>;
+    async fn authoring_publish(&self, change_set_id: Uuid, publisher: &str) -> Result<PublishBatch>;
+    async fn authoring_publish_batch(&self, change_set_ids: &[Uuid], publisher: &str) -> Result<PublishBatch>;
+    async fn authoring_diff(&self, base_id: Uuid, target_id: Uuid) -> Result<DiffSummary>;
+    async fn authoring_list(&self, status: Option<ChangeSetStatus>, limit: i64) -> Result<Vec<ChangeSetFull>>;
+    async fn authoring_get(&self, change_set_id: Uuid) -> Result<ChangeSetFull>;
+    // Authoring health
+    async fn authoring_health_pending(&self) -> Result<PendingChangeSetsHealth>;
+    async fn authoring_health_stale_dryruns(&self) -> Result<StaleDryRunsHealth>;
+    async fn authoring_run_cleanup(&self, policy: &CleanupPolicy) -> Result<CleanupReport>;
+    // Bootstrap audit (idempotent seed bundle tracking)
+    async fn bootstrap_check(&self, bundle_hash: &str) -> Result<Option<(String, Option<Uuid>)>>;
+    async fn bootstrap_start(&self, bundle_hash: &str, actor_id: &str, bundle_counts: serde_json::Value) -> Result<()>;
+    async fn bootstrap_mark_published(&self, bundle_hash: &str) -> Result<()>;
+    async fn bootstrap_mark_failed(&self, bundle_hash: &str, error: &str) -> Result<()>;
 }
 ```
 
@@ -6613,7 +6636,7 @@ DATABASE_URL="postgresql:///data_designer" \
 ```
 rust/src/sem_reg/stewardship/
 ├── mod.rs                    # Module root (11 re-exports)
-├── types.rs                  # All types (Phase 0 + Phase 1)
+├── types.rs                  # Re-exports from sem_os_core::stewardship::types (Phase 0 + Phase 1)
 ├── store.rs                  # StewardshipStore — append-only DB ops
 ├── guardrails.rs             # G01–G15 validation engine
 ├── idempotency.rs            # Idempotency checking + recording
@@ -6630,13 +6653,14 @@ rust/src/sem_reg/stewardship/
 | File | Purpose |
 |------|---------|
 | `rust/crates/sem_os_core/src/service.rs` | CoreServiceImpl: bootstrap, resolve, publish, changeset promote |
-| `rust/crates/sem_os_core/src/ports.rs` | 7 storage port traits (SnapshotStore, ChangesetStore, OutboxStore, AuditStore, EvidenceInstanceStore, ObjectStore, ProjectionWriter) |
-| `rust/crates/sem_os_core/src/stewardship.rs` | Role constraints, proof chain checks, stale draft detection |
+| `rust/crates/sem_os_core/src/ports.rs` | 8 storage port traits (SnapshotStore, ChangesetStore, OutboxStore, AuditStore, EvidenceInstanceStore, ObjectStore, ProjectionWriter, BootstrapAuditStore) |
+| `rust/crates/sem_os_core/src/stewardship/mod.rs` | Role constraints, proof chain checks, stale draft detection |
+| `rust/crates/sem_os_core/src/stewardship/types.rs` | All stewardship type definitions (Phase 0 + Phase 1) |
 | `rust/crates/sem_os_core/src/principal.rs` | `Principal` — explicit actor identity (no implicit context) |
 | `rust/crates/sem_os_core/src/gates/mod.rs` | Publish gate evaluation (proof rule, security, approval, version) |
 | `rust/crates/sem_os_core/src/gates/governance.rs` | 3 governance gates (taxonomy, stewardship, evidence grade) |
 | `rust/crates/sem_os_core/src/gates/technical.rs` | Technical gates (type correctness, verb surface, sink disclosure) |
-| `rust/crates/sem_os_postgres/src/store.rs` | 7 Postgres adapters (~2500 LOC): PgSnapshotStore, PgObjectStore, PgChangesetStore, PgAuditStore, PgOutboxStore, PgEvidenceStore, PgProjectionWriter |
+| `rust/crates/sem_os_postgres/src/store.rs` | 8 Postgres adapters (~2600 LOC): PgSnapshotStore, PgObjectStore, PgChangesetStore, PgAuditStore, PgOutboxStore, PgEvidenceStore, PgProjectionWriter, PgBootstrapAuditStore |
 | `rust/crates/sem_os_server/src/router.rs` | Axum router: 12 protected routes + health |
 | `rust/crates/sem_os_server/src/dispatcher.rs` | Outbox dispatcher: poll → claim → project → watermark |
 | `rust/crates/sem_os_client/src/lib.rs` | SemOsClient trait: the sole API boundary |

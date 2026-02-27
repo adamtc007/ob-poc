@@ -1,37 +1,11 @@
 //! Guardrail Engine — G01 through G15 (spec §8.2).
 //!
 //! Each guardrail is a pure function returning `Option<GuardrailResult>`.
-//! The severity map is defined in `GuardrailId::default_severity()` (types.rs).
+//! The severity map is defined in `GuardrailId::default_severity()` (sem_os_core).
 //! `evaluate_all_guardrails()` runs all 15 checks and collects results.
 
 use super::types::*;
 use crate::sem_reg::types::SnapshotMeta;
-
-/// Default severity map for guardrails — matches spec §8.2 exactly.
-impl GuardrailId {
-    pub fn default_severity(&self) -> GuardrailSeverity {
-        match self {
-            // Block — edit cannot be saved
-            Self::G01RolePermission => GuardrailSeverity::Block,
-            Self::G03TypeConstraint => GuardrailSeverity::Block,
-            Self::G04ProofChainCompatibility => GuardrailSeverity::Block,
-            Self::G05ClassificationRequired => GuardrailSeverity::Block,
-            Self::G06SecurityLabelRequired => GuardrailSeverity::Block,
-            Self::G07SilentMeaningChange => GuardrailSeverity::Block,
-            Self::G08DeprecationWithoutReplacement => GuardrailSeverity::Block,
-            Self::G15DraftUniquenessViolation => GuardrailSeverity::Block,
-            // Warning — must be acknowledged before submit
-            Self::G02NamingConvention => GuardrailSeverity::Warning,
-            Self::G10ConflictDetected => GuardrailSeverity::Warning,
-            Self::G11StaleTemplate => GuardrailSeverity::Warning,
-            Self::G12ObservationImpact => GuardrailSeverity::Warning,
-            Self::G13ResolutionMetadataMissing => GuardrailSeverity::Warning,
-            // Advisory — informational only
-            Self::G09AIKnowledgeBoundary => GuardrailSeverity::Advisory,
-            Self::G14CompositionHintStale => GuardrailSeverity::Advisory,
-        }
-    }
-}
 
 /// Evaluate all applicable guardrails for the current changeset state.
 /// Each guardrail is a pure function returning `Vec<GuardrailResult>`.

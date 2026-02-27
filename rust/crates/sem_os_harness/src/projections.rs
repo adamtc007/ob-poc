@@ -98,9 +98,16 @@ async fn test_projection_watermark_advances(client: &dyn SemOsClient, pool: &PgP
         "Projection test taxonomy",
     )];
 
-    let bundle_hash =
-        SeedBundle::compute_hash(&verb_contracts, &[], &entity_types, &taxonomies, &[], &[])
-            .expect("test seed bundle hash");
+    let bundle_hash = SeedBundle::compute_hash(
+        &verb_contracts,
+        &[],
+        &entity_types,
+        &taxonomies,
+        &[],
+        &[],
+        &[],
+    )
+    .expect("test seed bundle hash");
 
     let bundle = SeedBundle {
         bundle_hash,
@@ -110,6 +117,7 @@ async fn test_projection_watermark_advances(client: &dyn SemOsClient, pool: &PgP
         taxonomies,
         policies: vec![],
         views: vec![],
+        derivation_specs: vec![],
     };
 
     // Bootstrap — creates snapshots + enqueues outbox events.

@@ -129,3 +129,31 @@ pub trait ProjectionWriter: Send + Sync {
     /// can advance projection_watermark.last_outbox_seq atomically.
     async fn write_active_snapshot_set(&self, event: &OutboxEvent) -> Result<()>;
 }
+
+/// Bootstrap audit store — tracks idempotent seed bundle bootstraps.
+///
+/// Extracted from the server's bootstrap handler so that `build_router()`
+/// no longer needs a raw `PgPool`.
+#[async_trait]
+pub trait BootstrapAuditStore: Send + Sync {
+    /// Check if a bootstrap audit record exists for the given bundle hash.
+    /// Returns `(status, snapshot_set_id)` if found.
+    async fn check_bootstrap(
+        &self,
+        bundle_hash: &str,
+    ) -> Result<Option<(String, Option<uuid::Uuid>)>>;
+
+    /// Insert or update a bootstrap audit record to 'in_progress'.
+    async fn start_bootstrap(
+        &self,
+        bundle_hash: &str,
+        actor_id: &str,
+        bundle_counts: serde_json::Value,
+    ) -> Result<()>;
+
+    /// Mark a bootstrap audit record as 'published'.
+    async fn mark_published(&self, bundle_hash: &str) -> Result<()>;
+
+    /// Mark a bootstrap audit record as 'failed' with an error message.
+    async fn mark_failed(&self, bundle_hash: &str, error: &str) -> Result<()>;
+}

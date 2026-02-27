@@ -8,7 +8,7 @@ use chrono::{DateTime, Utc};
 use sqlx::{PgPool, Postgres};
 use uuid::Uuid;
 
-use super::types::{ObjectType, SnapshotMeta, SnapshotRow};
+use super::types::{ObjectType, PgSnapshotRow, SnapshotMeta, SnapshotRow};
 
 /// Database operations for `sem_reg.snapshots`.
 pub struct SnapshotStore;
@@ -68,16 +68,16 @@ impl SnapshotStore {
             "#,
         )
         .bind(snapshot_set_id)
-        .bind(meta.object_type)
+        .bind(meta.object_type.as_str())
         .bind(meta.object_id)
         .bind(meta.version_major)
         .bind(meta.version_minor)
-        .bind(meta.status)
-        .bind(meta.governance_tier)
-        .bind(meta.trust_class)
+        .bind(meta.status.as_str())
+        .bind(meta.governance_tier.as_str())
+        .bind(meta.trust_class.as_str())
         .bind(&security_label_json)
         .bind(meta.predecessor_id)
-        .bind(meta.change_type)
+        .bind(meta.change_type.as_str())
         .bind(&meta.change_rationale)
         .bind(&meta.created_by)
         .bind(&meta.approved_by)
@@ -115,7 +115,7 @@ impl SnapshotStore {
         object_type: ObjectType,
         object_id: Uuid,
     ) -> Result<Option<SnapshotRow>> {
-        let row = sqlx::query_as::<_, SnapshotRow>(
+        let row = sqlx::query_as::<_, PgSnapshotRow>(
             r#"
             SELECT *
             FROM sem_reg.snapshots
@@ -127,11 +127,11 @@ impl SnapshotStore {
             LIMIT 1
             "#,
         )
-        .bind(object_type)
+        .bind(object_type.as_str())
         .bind(object_id)
         .fetch_optional(pool)
         .await?;
-        Ok(row)
+        row.map(SnapshotRow::try_from).transpose()
     }
 
     /// Resolve the snapshot that was active at a specific point in time.
@@ -141,7 +141,7 @@ impl SnapshotStore {
         object_id: Uuid,
         as_of: DateTime<Utc>,
     ) -> Result<Option<SnapshotRow>> {
-        let row = sqlx::query_as::<_, SnapshotRow>(
+        let row = sqlx::query_as::<_, PgSnapshotRow>(
             r#"
             SELECT *
             FROM sem_reg.snapshots
@@ -154,12 +154,12 @@ impl SnapshotStore {
             LIMIT 1
             "#,
         )
-        .bind(object_type)
+        .bind(object_type.as_str())
         .bind(object_id)
         .bind(as_of)
         .fetch_optional(pool)
         .await?;
-        Ok(row)
+        row.map(SnapshotRow::try_from).transpose()
     }
 
     // ── History ───────────────────────────────────────────────
@@ -170,7 +170,7 @@ impl SnapshotStore {
         object_type: ObjectType,
         object_id: Uuid,
     ) -> Result<Vec<SnapshotRow>> {
-        let rows = sqlx::query_as::<_, SnapshotRow>(
+        let rows = sqlx::query_as::<_, PgSnapshotRow>(
             r#"
             SELECT *
             FROM sem_reg.snapshots
@@ -179,11 +179,11 @@ impl SnapshotStore {
             ORDER BY effective_from DESC
             "#,
         )
-        .bind(object_type)
+        .bind(object_type.as_str())
         .bind(object_id)
         .fetch_all(pool)
         .await?;
-        Ok(rows)
+        super::types::pg_rows_to_snapshot_rows(rows)
     }
 
     // ── List / Count ──────────────────────────────────────────
@@ -195,7 +195,7 @@ impl SnapshotStore {
         limit: i64,
         offset: i64,
     ) -> Result<Vec<SnapshotRow>> {
-        let rows = sqlx::query_as::<_, SnapshotRow>(
+        let rows = sqlx::query_as::<_, PgSnapshotRow>(
             r#"
             SELECT *
             FROM sem_reg.snapshots
@@ -206,12 +206,12 @@ impl SnapshotStore {
             LIMIT $2 OFFSET $3
             "#,
         )
-        .bind(object_type)
+        .bind(object_type.as_str())
         .bind(limit)
         .bind(offset)
         .fetch_all(pool)
         .await?;
-        Ok(rows)
+        super::types::pg_rows_to_snapshot_rows(rows)
     }
 
     /// Count active snapshots by object type. If `object_type` is None, counts all.
@@ -219,21 +219,27 @@ impl SnapshotStore {
         pool: &PgPool,
         object_type: Option<ObjectType>,
     ) -> Result<Vec<(ObjectType, i64)>> {
-        let rows = sqlx::query_as::<_, (ObjectType, i64)>(
+        let rows = sqlx::query_as::<_, (String, i64)>(
             r#"
-            SELECT object_type, COUNT(*) as cnt
+            SELECT object_type::text, COUNT(*) as cnt
             FROM sem_reg.snapshots
             WHERE status = 'active'
               AND effective_until IS NULL
-              AND ($1::sem_reg.object_type IS NULL OR object_type = $1)
+              AND ($1::text IS NULL OR object_type::text = $1)
             GROUP BY object_type
             ORDER BY object_type
             "#,
         )
-        .bind(object_type)
+        .bind(object_type.map(|ot| ot.as_str().to_owned()))
         .fetch_all(pool)
         .await?;
-        Ok(rows)
+        rows.into_iter()
+            .map(|(ot_str, cnt)| {
+                let ot = ObjectType::from_str(&ot_str)
+                    .ok_or_else(|| anyhow!("invalid object_type from DB: {}", ot_str))?;
+                Ok((ot, cnt))
+            })
+            .collect()
     }
 
     // ── Lookup by definition field ────────────────────────────
@@ -260,12 +266,12 @@ impl SnapshotStore {
             LIMIT 1
             "#,
         );
-        let row = sqlx::query_as::<_, SnapshotRow>(&query)
-            .bind(object_type)
+        let row = sqlx::query_as::<_, PgSnapshotRow>(&query)
+            .bind(object_type.as_str())
             .bind(field_value)
             .fetch_optional(pool)
             .await?;
-        Ok(row)
+        row.map(SnapshotRow::try_from).transpose()
     }
 
     // ── Publish helper ────────────────────────────────────────
@@ -352,16 +358,16 @@ impl SnapshotStore {
             "#,
         )
         .bind(snapshot_set_id)
-        .bind(meta.object_type)
+        .bind(meta.object_type.as_str())
         .bind(meta.object_id)
         .bind(meta.version_major)
         .bind(meta.version_minor)
-        .bind(meta.status)
-        .bind(meta.governance_tier)
-        .bind(meta.trust_class)
+        .bind(meta.status.as_str())
+        .bind(meta.governance_tier.as_str())
+        .bind(meta.trust_class.as_str())
         .bind(&security_label_json)
         .bind(meta.predecessor_id)
-        .bind(meta.change_type)
+        .bind(meta.change_type.as_str())
         .bind(&meta.change_rationale)
         .bind(&meta.created_by)
         .bind(&meta.approved_by)

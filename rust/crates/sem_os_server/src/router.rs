@@ -8,13 +8,12 @@ use axum::{
     Extension, Router,
 };
 use sem_os_core::service::CoreService;
-use sqlx::PgPool;
 
 use crate::handlers;
 use crate::middleware::jwt::{jwt_auth, JwtConfig};
 
 /// Build the full axum router with all routes and middleware.
-pub fn build_router(service: Arc<dyn CoreService>, pool: PgPool, jwt_config: JwtConfig) -> Router {
+pub fn build_router(service: Arc<dyn CoreService>, jwt_config: JwtConfig) -> Router {
     // Routes that require JWT authentication
     let protected = Router::new()
         .route(
@@ -90,8 +89,5 @@ pub fn build_router(service: Arc<dyn CoreService>, pool: PgPool, jwt_config: Jwt
         );
 
     // Combine and add shared state
-    public
-        .merge(protected)
-        .layer(Extension(service))
-        .layer(Extension(pool))
+    public.merge(protected).layer(Extension(service))
 }

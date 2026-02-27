@@ -1,7 +1,13 @@
-//! Stewardship guardrails — role constraints, proof chain integrity, stale draft detection.
+//! Stewardship module — type definitions + guardrails.
+//!
+//! - `types`: All stewardship type definitions (Phase 0 + Phase 1).
+//! - Guardrails: role constraints, proof chain integrity, stale draft detection.
 //!
 //! These are pure core functions with zero DB dependencies.
 //! Called by `changeset_gate_preview` and `promote_changeset` in CoreService.
+
+pub mod types;
+pub use types::*;
 
 use uuid::Uuid;
 
