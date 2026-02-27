@@ -676,6 +676,7 @@ async fn fetch_direct_parent_lei(client: &reqwest::Client, lei: &str) -> Result<
 // Parent Chain Walking
 // =============================================================================
 
+#[allow(clippy::too_many_arguments)]
 async fn walk_parent_chain(
     client: &reqwest::Client,
     pool: &PgPool,

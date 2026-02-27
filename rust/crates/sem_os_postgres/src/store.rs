@@ -17,10 +17,7 @@ use sem_os_core::ports::{
 use sem_os_core::principal::Principal;
 use sem_os_core::types::*;
 
-use crate::sqlx_types::{
-    encode_change_type, encode_governance_tier, encode_object_type, encode_snapshot_status,
-    encode_trust_class, PgSnapshotRow,
-};
+use crate::sqlx_types::PgSnapshotRow;
 
 // ── PgSnapshotStore ───────────────────────────────────────────
 
@@ -35,92 +32,12 @@ impl PgSnapshotStore {
         Self { pool }
     }
 
-    /// Insert a new snapshot row. Returns the generated snapshot_id.
-    /// Used by CoreService for individual inserts outside the publish_snapshot tx.
-    #[allow(dead_code)]
-    async fn insert_snapshot_row(
-        pool: &PgPool,
-        meta: &SnapshotMeta,
-        definition: &serde_json::Value,
-        snapshot_set_id: Option<Uuid>,
-    ) -> std::result::Result<Uuid, SemOsError> {
-        let security_label_json =
-            serde_json::to_value(&meta.security_label).map_err(|e| anyhow!(e))?;
-        let obj_type = encode_object_type(meta.object_type);
-        let status = encode_snapshot_status(meta.status);
-        let tier = encode_governance_tier(meta.governance_tier);
-        let tc = encode_trust_class(meta.trust_class);
-        let ct = encode_change_type(meta.change_type);
-
-        let snapshot_id = sqlx::query_scalar::<_, Uuid>(
-            r#"
-            INSERT INTO sem_reg.snapshots (
-                snapshot_set_id, object_type, object_id,
-                version_major, version_minor, status,
-                governance_tier, trust_class, security_label,
-                predecessor_id, change_type, change_rationale,
-                created_by, approved_by, definition
-            ) VALUES (
-                $1, $2::sem_reg.object_type, $3,
-                $4, $5, $6::sem_reg.snapshot_status,
-                $7::sem_reg.governance_tier, $8::sem_reg.trust_class, $9,
-                $10, $11::sem_reg.change_type, $12,
-                $13, $14, $15
-            )
-            RETURNING snapshot_id
-            "#,
-        )
-        .bind(snapshot_set_id)
-        .bind(obj_type)
-        .bind(meta.object_id)
-        .bind(meta.version_major)
-        .bind(meta.version_minor)
-        .bind(status)
-        .bind(tier)
-        .bind(tc)
-        .bind(&security_label_json)
-        .bind(meta.predecessor_id)
-        .bind(ct)
-        .bind(&meta.change_rationale)
-        .bind(&meta.created_by)
-        .bind(&meta.approved_by)
-        .bind(definition)
-        .fetch_one(pool)
-        .await
-        .map_err(|e| anyhow!(e))?;
-
-        Ok(snapshot_id)
-    }
-
-    /// Supersede an existing snapshot by setting its effective_until to now.
-    /// Used by CoreService for standalone supersede operations.
-    #[allow(dead_code)]
-    async fn supersede_snapshot_row(
-        pool: &PgPool,
-        predecessor_id: Uuid,
-    ) -> std::result::Result<u64, SemOsError> {
-        let result = sqlx::query(
-            r#"
-            UPDATE sem_reg.snapshots
-            SET effective_until = now()
-            WHERE snapshot_id = $1
-              AND effective_until IS NULL
-            "#,
-        )
-        .bind(predecessor_id)
-        .execute(pool)
-        .await
-        .map_err(|e| anyhow!(e))?;
-        Ok(result.rows_affected())
-    }
-
     /// Resolve the currently active snapshot for an object.
     pub async fn resolve_active(
         pool: &PgPool,
         object_type: ObjectType,
         object_id: Uuid,
     ) -> std::result::Result<Option<SnapshotRow>, SemOsError> {
-        let ot = encode_object_type(object_type);
         let row = sqlx::query_as::<_, PgSnapshotRow>(
             r#"
             SELECT snapshot_id, snapshot_set_id,
@@ -139,12 +56,13 @@ impl PgSnapshotStore {
             LIMIT 1
             "#,
         )
-        .bind(ot)
+        .bind(object_type.as_ref())
         .bind(object_id)
         .fetch_optional(pool)
         .await
         .map_err(|e| anyhow!(e))?;
-        Ok(row.map(|r| r.into()))
+        row.map(|r| r.try_into().map_err(|e: String| SemOsError::Internal(anyhow!(e))))
+            .transpose()
     }
 
     /// Find an active snapshot by a JSONB definition field.
@@ -154,7 +72,6 @@ impl PgSnapshotStore {
         field_name: &str,
         field_value: &str,
     ) -> std::result::Result<Option<SnapshotRow>, SemOsError> {
-        let ot = encode_object_type(object_type);
         let query = format!(
             r#"
             SELECT snapshot_id, snapshot_set_id,
@@ -174,12 +91,13 @@ impl PgSnapshotStore {
             "#,
         );
         let row = sqlx::query_as::<_, PgSnapshotRow>(&query)
-            .bind(ot)
+            .bind(object_type.as_ref())
             .bind(field_value)
             .fetch_optional(pool)
             .await
             .map_err(|e| anyhow!(e))?;
-        Ok(row.map(|r| r.into()))
+        row.map(|r| r.try_into().map_err(|e: String| SemOsError::Internal(anyhow!(e))))
+            .transpose()
     }
 
     /// List active snapshots of a given object type.
@@ -189,7 +107,6 @@ impl PgSnapshotStore {
         limit: i64,
         offset: i64,
     ) -> std::result::Result<Vec<SnapshotRow>, SemOsError> {
-        let ot = encode_object_type(object_type);
         let rows = sqlx::query_as::<_, PgSnapshotRow>(
             r#"
             SELECT snapshot_id, snapshot_set_id,
@@ -207,13 +124,15 @@ impl PgSnapshotStore {
             LIMIT $2 OFFSET $3
             "#,
         )
-        .bind(ot)
+        .bind(object_type.as_ref())
         .bind(limit)
         .bind(offset)
         .fetch_all(pool)
         .await
         .map_err(|e| anyhow!(e))?;
-        Ok(rows.into_iter().map(|r| r.into()).collect())
+        rows.into_iter()
+            .map(|r| r.try_into().map_err(|e: String| SemOsError::Internal(anyhow!(e))))
+            .collect()
     }
 
     /// Publish a new snapshot, superseding the predecessor atomically.
@@ -253,11 +172,6 @@ impl PgSnapshotStore {
         // Insert the new snapshot
         let security_label_json =
             serde_json::to_value(&meta.security_label).map_err(|e| anyhow!(e))?;
-        let obj_type = encode_object_type(meta.object_type);
-        let status = encode_snapshot_status(meta.status);
-        let tier = encode_governance_tier(meta.governance_tier);
-        let tc = encode_trust_class(meta.trust_class);
-        let ct = encode_change_type(meta.change_type);
 
         let snapshot_id = sqlx::query_scalar::<_, Uuid>(
             r#"
@@ -278,16 +192,16 @@ impl PgSnapshotStore {
             "#,
         )
         .bind(snapshot_set_id)
-        .bind(obj_type)
+        .bind(meta.object_type.as_ref())
         .bind(meta.object_id)
         .bind(meta.version_major)
         .bind(meta.version_minor)
-        .bind(status)
-        .bind(tier)
-        .bind(tc)
+        .bind(meta.status.as_ref())
+        .bind(meta.governance_tier.as_ref())
+        .bind(meta.trust_class.as_ref())
         .bind(&security_label_json)
         .bind(meta.predecessor_id)
-        .bind(ct)
+        .bind(meta.change_type.as_ref())
         .bind(&meta.change_rationale)
         .bind(&meta.created_by)
         .bind(&meta.approved_by)
@@ -302,7 +216,7 @@ impl PgSnapshotStore {
             let payload = serde_json::json!({
                 "snapshot_set_id": set_id,
                 "snapshot_id": snapshot_id,
-                "object_type": obj_type,
+                "object_type": meta.object_type.as_ref(),
                 "object_id": meta.object_id,
             });
             sqlx::query(
@@ -349,7 +263,7 @@ impl PgSnapshotStore {
         pool: &PgPool,
         object_type: Option<ObjectType>,
     ) -> std::result::Result<Vec<(String, i64)>, SemOsError> {
-        let ot = object_type.map(encode_object_type);
+        let ot: Option<String> = object_type.map(|t| t.as_ref().to_string());
         let rows = sqlx::query_as::<_, (String, i64)>(
             r#"
             SELECT object_type::text, COUNT(*) as cnt
@@ -433,9 +347,11 @@ impl SnapshotStore for PgSnapshotStore {
                     .get("fqn")
                     .and_then(|v| v.as_str())
                     .ok_or_else(|| anyhow!("snapshot {} has no fqn in definition", sid))?;
+                let object_type = ot.parse::<ObjectType>()
+                    .map_err(|_| anyhow!("unknown object_type '{}' for snapshot {}", ot, sid))?;
                 Ok(SnapshotSummary {
                     snapshot_id: SnapshotId(sid),
-                    object_type: ot,
+                    object_type,
                     fqn: Fqn::new(fqn.to_string()),
                     content_hash: String::new(), // computed on demand
                 })
@@ -483,10 +399,12 @@ impl SnapshotStore for PgSnapshotStore {
                     .get("fqn")
                     .and_then(|v| v.as_str())
                     .ok_or_else(|| anyhow!("snapshot {} has no fqn in definition", sid))?;
+                let object_type = ot.parse::<ObjectType>()
+                    .map_err(|_| anyhow!("unknown object_type '{}' for snapshot {}", ot, sid))?;
                 Ok(SnapshotExport {
                     snapshot_id: SnapshotId(sid),
                     fqn: Fqn::new(fqn.to_string()),
-                    object_type: ot,
+                    object_type,
                     payload: def,
                 })
             })
@@ -552,12 +470,6 @@ impl SnapshotStore for PgSnapshotStore {
             // Insert the new snapshot
             let security_label_json =
                 serde_json::to_value(&meta.security_label).map_err(|e| anyhow!(e))?;
-            let obj_type = encode_object_type(meta.object_type);
-            let status = encode_snapshot_status(meta.status);
-            let tier = encode_governance_tier(meta.governance_tier);
-            let tc = encode_trust_class(meta.trust_class);
-            let ct = encode_change_type(meta.change_type);
-
             let snapshot_id = sqlx::query_scalar::<_, Uuid>(
                 r#"
                 INSERT INTO sem_reg.snapshots (
@@ -577,16 +489,16 @@ impl SnapshotStore for PgSnapshotStore {
                 "#,
             )
             .bind(snapshot_set_id)
-            .bind(obj_type)
+            .bind(meta.object_type.as_ref())
             .bind(meta.object_id)
             .bind(meta.version_major)
             .bind(meta.version_minor)
-            .bind(status)
-            .bind(tier)
-            .bind(tc)
+            .bind(meta.status.as_ref())
+            .bind(meta.governance_tier.as_ref())
+            .bind(meta.trust_class.as_ref())
             .bind(&security_label_json)
             .bind(meta.predecessor_id)
-            .bind(ct)
+            .bind(meta.change_type.as_ref())
             .bind(&meta.change_rationale)
             .bind(&meta.created_by)
             .bind(&meta.approved_by)
@@ -639,14 +551,18 @@ impl SnapshotStore for PgSnapshotStore {
         .await
         .map_err(|e| anyhow!(e))?;
 
-        Ok(rows
+        rows
             .into_iter()
-            .map(|(snapshot_id, object_type, dep_fqn)| DependentSnapshot {
-                snapshot_id,
-                object_type,
-                fqn: dep_fqn,
+            .map(|(snapshot_id, ot, dep_fqn)| {
+                let object_type = ot.parse::<ObjectType>()
+                    .map_err(|_| anyhow!("unknown object_type '{}' for snapshot {}", ot, snapshot_id))?;
+                Ok(DependentSnapshot {
+                    snapshot_id,
+                    object_type,
+                    fqn: dep_fqn,
+                })
             })
-            .collect())
+            .collect::<Result<Vec<_>>>()
     }
 }
 
@@ -678,10 +594,12 @@ impl ObjectStore for PgObjectStore {
         .map_err(|e| anyhow!(e))?
         .ok_or_else(|| SemOsError::NotFound(format!("Snapshot {} not found", snapshot_id.0)))?;
 
+        let object_type = row.0.parse::<ObjectType>()
+            .map_err(|_| anyhow!("unknown object_type '{}' for snapshot {}", row.0, snapshot_id.0))?;
         Ok(TypedObject {
             snapshot_id: snapshot_id.clone(),
             fqn: fqn.clone(),
-            object_type: row.0,
+            object_type,
             definition: row.1,
         })
     }
@@ -701,8 +619,8 @@ impl PgChangesetStore {
     fn parse_changeset_row(
         row: (Uuid, String, String, String, DateTime<Utc>, DateTime<Utc>),
     ) -> std::result::Result<Changeset, SemOsError> {
-        let status = ChangesetStatus::parse(&row.1)
-            .ok_or_else(|| SemOsError::Internal(anyhow!("invalid changeset status: {}", row.1)))?;
+        let status = row.1.parse::<ChangesetStatus>()
+            .map_err(|_| SemOsError::Internal(anyhow!("invalid changeset status: {}", row.1)))?;
         Ok(Changeset {
             changeset_id: row.0,
             status,
@@ -789,7 +707,7 @@ impl ChangesetStore for PgChangesetStore {
             "#,
         )
         .bind(changeset_id)
-        .bind(new_status.as_str())
+        .bind(new_status.as_ref())
         .execute(&self.pool)
         .await
         .map_err(|e| anyhow!(e))?;
@@ -826,22 +744,25 @@ impl ChangesetStore for PgChangesetStore {
         )
         .bind(changeset_id)
         .bind(&input.object_fqn)
-        .bind(&input.object_type)
-        .bind(input.change_kind.as_str())
+        .bind(input.object_type.as_ref())
+        .bind(input.change_kind.as_ref())
         .bind(&input.draft_payload)
         .bind(input.base_snapshot_id)
         .fetch_one(&self.pool)
         .await
         .map_err(|e| anyhow!(e))?;
 
-        let change_kind = ChangeKind::from_str(&row.4)
-            .ok_or_else(|| SemOsError::Internal(anyhow!("invalid change_kind: {}", row.4)))?;
+        let change_kind = row.4.parse::<ChangeKind>()
+            .map_err(|_| SemOsError::Internal(anyhow!("invalid change_kind: {}", row.4)))?;
+
+        let object_type = row.3.parse::<ObjectType>()
+            .map_err(|_| SemOsError::Internal(anyhow!("invalid object_type: {}", row.3)))?;
 
         Ok(ChangesetEntry {
             entry_id: row.0,
             changeset_id: row.1,
             object_fqn: row.2,
-            object_type: row.3,
+            object_type,
             change_kind,
             draft_payload: row.5,
             base_snapshot_id: row.6,
@@ -878,14 +799,17 @@ impl ChangesetStore for PgChangesetStore {
 
         rows.into_iter()
             .map(|row| {
-                let change_kind = ChangeKind::from_str(&row.4).ok_or_else(|| {
+                let object_type = row.3.parse::<ObjectType>().map_err(|_| {
+                    SemOsError::Internal(anyhow!("invalid object_type: {}", row.3))
+                })?;
+                let change_kind = row.4.parse::<ChangeKind>().map_err(|_| {
                     SemOsError::Internal(anyhow!("invalid change_kind: {}", row.4))
                 })?;
                 Ok(ChangesetEntry {
                     entry_id: row.0,
                     changeset_id: row.1,
                     object_fqn: row.2,
-                    object_type: row.3,
+                    object_type,
                     change_kind,
                     draft_payload: row.5,
                     base_snapshot_id: row.6,
@@ -913,14 +837,14 @@ impl ChangesetStore for PgChangesetStore {
         )
         .bind(changeset_id)
         .bind(&input.actor_id)
-        .bind(input.verdict.as_str())
+        .bind(input.verdict.as_ref())
         .bind(&input.comment)
         .fetch_one(&self.pool)
         .await
         .map_err(|e| anyhow!(e))?;
 
-        let verdict = ReviewVerdict::from_str(&row.3)
-            .ok_or_else(|| SemOsError::Internal(anyhow!("invalid verdict: {}", row.3)))?;
+        let verdict = row.3.parse::<ReviewVerdict>()
+            .map_err(|_| SemOsError::Internal(anyhow!("invalid verdict: {}", row.3)))?;
 
         Ok(ChangesetReview {
             review_id: row.0,
@@ -949,8 +873,9 @@ impl ChangesetStore for PgChangesetStore {
 
         rows.into_iter()
             .map(|row| {
-                let verdict = ReviewVerdict::from_str(&row.3)
-                    .ok_or_else(|| SemOsError::Internal(anyhow!("invalid verdict: {}", row.3)))?;
+                let verdict = row.3.parse::<ReviewVerdict>().map_err(|_| {
+                    SemOsError::Internal(anyhow!("invalid verdict: {}", row.3))
+                })?;
                 Ok(ChangesetReview {
                     review_id: row.0,
                     changeset_id: row.1,

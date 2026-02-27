@@ -74,3 +74,51 @@ pub struct AttributeSink {
     pub consuming_verb: String,
     pub arg_name: String,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn serde_round_trip() {
+        let val = AttributeDefBody {
+            fqn: "cbu.jurisdiction_code".into(),
+            name: "jurisdiction_code".into(),
+            description: "ISO jurisdiction".into(),
+            domain: "cbu".into(),
+            data_type: AttributeDataType::Enum(vec!["LU".into(), "IE".into(), "DE".into()]),
+            source: Some(AttributeSource {
+                producing_verb: Some("cbu.create".into()),
+                schema: Some("ob-poc".into()),
+                table: Some("cbus".into()),
+                column: Some("jurisdiction_code".into()),
+                derived: false,
+            }),
+            constraints: Some(AttributeConstraints {
+                required: true,
+                unique: false,
+                min_length: Some(2),
+                max_length: Some(2),
+                pattern: Some("^[A-Z]{2}$".into()),
+                valid_values: Some(vec!["LU".into(), "IE".into()]),
+            }),
+            sinks: vec![AttributeSink {
+                consuming_verb: "session.load-jurisdiction".into(),
+                arg_name: "code".into(),
+            }],
+        };
+        let json = serde_json::to_value(&val).unwrap();
+        // Check Enum variant serialization
+        assert!(json["data_type"]["enum"].is_array());
+        // Check #[serde(default)] on optional fields: omitting them deserializes fine
+        let minimal: AttributeDefBody = serde_json::from_str(
+            r#"{"fqn":"x","name":"x","description":"x","domain":"x","data_type":"string"}"#,
+        ).unwrap();
+        assert!(minimal.source.is_none());
+        assert!(minimal.sinks.is_empty());
+        // Round-trip
+        let back: AttributeDefBody = serde_json::from_value(json.clone()).unwrap();
+        let json2 = serde_json::to_value(&back).unwrap();
+        assert_eq!(json, json2);
+    }
+}

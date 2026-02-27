@@ -69,7 +69,7 @@ where
     let mut manifest_entries = Vec::with_capacity(raw.artifacts.len());
 
     for (idx, entry) in raw.artifacts.iter().enumerate() {
-        let artifact_type = ArtifactType::parse(&entry.artifact_type).ok_or_else(|| {
+        let artifact_type = entry.artifact_type.parse::<ArtifactType>().map_err(|_| {
             SemOsError::InvalidInput(format!(
                 "Unknown artifact type '{}' for path '{}'",
                 entry.artifact_type, entry.path

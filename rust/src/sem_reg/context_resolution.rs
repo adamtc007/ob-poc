@@ -1603,7 +1603,7 @@ async fn load_typed_snapshots(
             ORDER BY effective_from DESC
             "#,
         )
-        .bind(object_type.as_str())
+        .bind(object_type.as_ref())
         .bind(as_of)
         .fetch_all(pool)
         .await?;

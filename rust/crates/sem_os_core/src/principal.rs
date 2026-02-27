@@ -79,3 +79,126 @@ pub struct JwtClaims {
     #[serde(flatten)]
     pub extra: Option<HashMap<String, String>>,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn claims_with_sub(sub: &str) -> JwtClaims {
+        JwtClaims {
+            sub: Some(sub.to_string()),
+            roles: Some(vec!["analyst".into()]),
+            tenancy: Some("tenant-a".into()),
+            extra: Some(HashMap::from([("foo".into(), "bar".into())])),
+        }
+    }
+
+    #[test]
+    fn from_jwt_claims_happy_path() {
+        let claims = claims_with_sub("alice");
+        let p = Principal::from_jwt_claims(&claims).unwrap();
+        assert_eq!(p.actor_id, "alice");
+        assert_eq!(p.roles, vec!["analyst"]);
+        assert_eq!(p.tenancy, Some("tenant-a".into()));
+        assert_eq!(p.claims.get("foo").unwrap(), "bar");
+    }
+
+    #[test]
+    fn from_jwt_claims_missing_sub() {
+        let claims = JwtClaims {
+            sub: None,
+            roles: Some(vec![]),
+            tenancy: None,
+            extra: None,
+        };
+        let err = Principal::from_jwt_claims(&claims).unwrap_err();
+        assert!(matches!(err, SemOsError::Unauthorized(_)));
+    }
+
+    #[test]
+    fn from_jwt_claims_defaults() {
+        let claims = JwtClaims {
+            sub: Some("bob".into()),
+            roles: None,
+            tenancy: None,
+            extra: None,
+        };
+        let p = Principal::from_jwt_claims(&claims).unwrap();
+        assert_eq!(p.actor_id, "bob");
+        assert!(p.roles.is_empty());
+        assert!(p.claims.is_empty());
+        assert!(p.tenancy.is_none());
+    }
+
+    #[test]
+    fn in_process_constructs_correctly() {
+        let p = Principal::in_process("system", vec!["admin".into()]);
+        assert_eq!(p.actor_id, "system");
+        assert_eq!(p.roles, vec!["admin"]);
+        assert!(p.claims.is_empty());
+        assert!(p.tenancy.is_none());
+    }
+
+    #[test]
+    fn has_role_present_and_absent() {
+        let p = Principal::in_process("u", vec!["viewer".into(), "admin".into()]);
+        assert!(p.has_role("admin"));
+        assert!(p.has_role("viewer"));
+        assert!(!p.has_role("superuser"));
+    }
+
+    #[test]
+    fn is_admin_true_when_present() {
+        let p = Principal::in_process("u", vec!["admin".into()]);
+        assert!(p.is_admin());
+    }
+
+    #[test]
+    fn is_admin_false_when_absent() {
+        let p = Principal::in_process("u", vec!["viewer".into()]);
+        assert!(!p.is_admin());
+    }
+
+    #[test]
+    fn require_admin_ok_when_admin() {
+        let p = Principal::in_process("u", vec!["admin".into()]);
+        assert!(p.require_admin().is_ok());
+    }
+
+    #[test]
+    fn require_admin_err_when_not_admin() {
+        let p = Principal::in_process("u", vec!["viewer".into()]);
+        let err = p.require_admin().unwrap_err();
+        assert!(matches!(err, SemOsError::Unauthorized(_)));
+    }
+
+    #[test]
+    fn agent_mode_defaults_to_governed() {
+        let p = Principal::in_process("u", vec![]);
+        assert_eq!(p.agent_mode(), AgentMode::Governed);
+    }
+
+    #[test]
+    fn agent_mode_research_from_claim() {
+        let claims = JwtClaims {
+            sub: Some("u".into()),
+            roles: None,
+            tenancy: None,
+            extra: Some(HashMap::from([("agent_mode".into(), "research".into())])),
+        };
+        let p = Principal::from_jwt_claims(&claims).unwrap();
+        assert_eq!(p.agent_mode(), AgentMode::Research);
+    }
+
+    #[test]
+    fn agent_mode_governed_from_claim() {
+        let claims = JwtClaims {
+            sub: Some("u".into()),
+            roles: None,
+            tenancy: None,
+            extra: Some(HashMap::from([("agent_mode".into(), "governed".into())])),
+        };
+        let p = Principal::from_jwt_claims(&claims).unwrap();
+        assert_eq!(p.agent_mode(), AgentMode::Governed);
+    }
+}

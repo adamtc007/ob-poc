@@ -57,23 +57,33 @@ impl TryFrom<PgSnapshotRow> for SnapshotRow {
         Ok(SnapshotRow {
             snapshot_id: row.snapshot_id,
             snapshot_set_id: row.snapshot_set_id,
-            object_type: ObjectType::from_str(&row.object_type)
-                .ok_or_else(|| anyhow!("invalid object_type: {}", row.object_type))?,
+            object_type: row
+                .object_type
+                .parse::<ObjectType>()
+                .map_err(|_| anyhow!("invalid object_type: {}", row.object_type))?,
             object_id: row.object_id,
             version_major: row.version_major,
             version_minor: row.version_minor,
-            status: SnapshotStatus::from_str(&row.status)
-                .ok_or_else(|| anyhow!("invalid status: {}", row.status))?,
-            governance_tier: GovernanceTier::from_str(&row.governance_tier)
-                .ok_or_else(|| anyhow!("invalid governance_tier: {}", row.governance_tier))?,
-            trust_class: TrustClass::from_str(&row.trust_class)
-                .ok_or_else(|| anyhow!("invalid trust_class: {}", row.trust_class))?,
+            status: row
+                .status
+                .parse::<SnapshotStatus>()
+                .map_err(|_| anyhow!("invalid status: {}", row.status))?,
+            governance_tier: row
+                .governance_tier
+                .parse::<GovernanceTier>()
+                .map_err(|_| anyhow!("invalid governance_tier: {}", row.governance_tier))?,
+            trust_class: row
+                .trust_class
+                .parse::<TrustClass>()
+                .map_err(|_| anyhow!("invalid trust_class: {}", row.trust_class))?,
             security_label: row.security_label,
             effective_from: row.effective_from,
             effective_until: row.effective_until,
             predecessor_id: row.predecessor_id,
-            change_type: ChangeType::from_str(&row.change_type)
-                .ok_or_else(|| anyhow!("invalid change_type: {}", row.change_type))?,
+            change_type: row
+                .change_type
+                .parse::<ChangeType>()
+                .map_err(|_| anyhow!("invalid change_type: {}", row.change_type))?,
             change_rationale: row.change_rationale,
             created_by: row.created_by,
             approved_by: row.approved_by,

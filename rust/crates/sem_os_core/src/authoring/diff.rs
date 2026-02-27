@@ -23,7 +23,7 @@ pub fn diff_changesets(base: &[ChangeSetArtifact], target: &[ChangeSetArtifact])
             None => {
                 added.push(DiffEntry {
                     fqn: key.clone(),
-                    object_type: target_artifact.artifact_type.as_str().to_string(),
+                    object_type: target_artifact.artifact_type.to_string(),
                     detail: Some("New artifact".to_string()),
                 });
             }
@@ -32,7 +32,7 @@ pub fn diff_changesets(base: &[ChangeSetArtifact], target: &[ChangeSetArtifact])
                     let is_breaking = detect_breaking_change(base_artifact, target_artifact);
                     let entry = DiffEntry {
                         fqn: key.clone(),
-                        object_type: target_artifact.artifact_type.as_str().to_string(),
+                        object_type: target_artifact.artifact_type.to_string(),
                         detail: Some(format!(
                             "Hash changed: {} → {}",
                             &base_artifact.content_hash[..8.min(base_artifact.content_hash.len())],
@@ -55,7 +55,7 @@ pub fn diff_changesets(base: &[ChangeSetArtifact], target: &[ChangeSetArtifact])
         if !target_map.contains_key(key) {
             let entry = DiffEntry {
                 fqn: key.clone(),
-                object_type: base_artifact.artifact_type.as_str().to_string(),
+                object_type: base_artifact.artifact_type.to_string(),
                 detail: Some("Removed".to_string()),
             };
             removed.push(entry.clone());
@@ -128,7 +128,7 @@ pub fn summarize_changeset(artifacts: &[ChangeSetArtifact]) -> DiffSummary {
         .iter()
         .map(|a| DiffEntry {
             fqn: artifact_key(a),
-            object_type: a.artifact_type.as_str().to_string(),
+            object_type: a.artifact_type.to_string(),
             detail: a.path.clone(),
         })
         .collect();
@@ -143,7 +143,7 @@ pub fn summarize_changeset(artifacts: &[ChangeSetArtifact]) -> DiffSummary {
         })
         .map(|a| DiffEntry {
             fqn: artifact_key(a),
-            object_type: a.artifact_type.as_str().to_string(),
+            object_type: a.artifact_type.to_string(),
             detail: Some("Contains potentially breaking DDL".to_string()),
         })
         .collect();

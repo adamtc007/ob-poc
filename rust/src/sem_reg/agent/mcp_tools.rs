@@ -709,7 +709,7 @@ async fn handle_search(ctx: &SemRegToolContext<'_>, args: &serde_json::Value) ->
 
     // If we have a query embedding, try embedding-based similarity search first
     if let Some(ref embedding) = query_embedding {
-        let ot_str = object_type_filter.map(|ot| ot.as_str().to_string());
+        let ot_str = object_type_filter.map(|ot| ot.as_ref().to_string());
         match EmbeddingStore::similarity_search(ctx.pool, embedding, ot_str.as_deref(), limit).await
         {
             Ok(sim_results) if !sim_results.is_empty() => {

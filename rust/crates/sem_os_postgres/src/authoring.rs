@@ -121,7 +121,7 @@ impl AuthoringStore for PgAuthoringStore {
         let rows = sqlx::query(
             "UPDATE sem_reg.changesets SET status = $1, updated_at = now() WHERE changeset_id = $2",
         )
-        .bind(new_status.as_str())
+        .bind(new_status.as_ref())
         .bind(change_set_id)
         .execute(&self.pool)
         .await
@@ -184,7 +184,7 @@ impl AuthoringStore for PgAuthoringStore {
                 LIMIT $2
                 "#,
             )
-            .bind(s.as_str())
+            .bind(s.as_ref())
             .bind(limit)
             .fetch_all(&self.pool)
             .await
@@ -227,7 +227,7 @@ impl AuthoringStore for PgAuthoringStore {
             )
             .bind(a.artifact_id)
             .bind(change_set_id)
-            .bind(a.artifact_type.as_str())
+            .bind(a.artifact_type.as_ref())
             .bind(a.ordinal)
             .bind(&a.path)
             .bind(&a.content)
@@ -276,7 +276,7 @@ impl AuthoringStore for PgAuthoringStore {
             "#,
         )
         .bind(change_set_id)
-        .bind(stage.as_str())
+        .bind(stage.as_ref())
         .bind(ok)
         .bind(report)
         .fetch_one(&self.pool)
@@ -306,10 +306,8 @@ impl AuthoringStore for PgAuthoringStore {
         Ok(rows
             .into_iter()
             .map(|r| {
-                let stage = match r.stage.as_str() {
-                    "dry_run" => ValidationStage::DryRun,
-                    _ => ValidationStage::Validate,
-                };
+                let stage = r.stage.parse::<ValidationStage>()
+                    .unwrap_or(ValidationStage::Validate);
                 (r.report_id, stage, r.ok, r.report)
             })
             .collect())
@@ -334,7 +332,7 @@ impl AuthoringStore for PgAuthoringStore {
         .bind(entry.timestamp)
         .bind(&entry.verb)
         .bind(entry.agent_session_id)
-        .bind(entry.agent_mode.map(|m| m.as_str()))
+        .bind(entry.agent_mode.map(|m| m.to_string()))
         .bind(entry.change_set_id)
         .bind(entry.snapshot_set_id)
         .bind(entry.active_snapshot_set_id)
@@ -486,7 +484,7 @@ impl AuthoringStore for PgAuthoringStore {
 
         Ok(rows
             .into_iter()
-            .filter_map(|(s, c)| ChangeSetStatus::parse(&s).map(|status| (status, c)))
+            .filter_map(|(s, c)| s.parse::<ChangeSetStatus>().ok().map(|status| (status, c)))
             .collect())
     }
 
@@ -600,9 +598,7 @@ impl ScratchSchemaRunner for PgScratchSchemaRunner {
 struct ChangeSetRow {
     changeset_id: Uuid,
     status: String,
-    #[allow(dead_code)]
     owner_actor_id: String,
-    #[allow(dead_code)]
     scope: String,
     title: Option<String>,
     rationale: Option<String>,
@@ -614,7 +610,6 @@ struct ChangeSetRow {
     superseded_at: Option<chrono::DateTime<chrono::Utc>>,
     evaluated_against_snapshot_set_id: Option<Uuid>,
     created_at: chrono::DateTime<chrono::Utc>,
-    #[allow(dead_code)]
     updated_at: chrono::DateTime<chrono::Utc>,
 }
 
@@ -622,13 +617,15 @@ impl ChangeSetRow {
     fn into_full(self) -> ChangeSetFull {
         ChangeSetFull {
             change_set_id: self.changeset_id,
-            status: ChangeSetStatus::parse(&self.status).unwrap_or(ChangeSetStatus::Draft),
+            status: self.status.parse::<ChangeSetStatus>().unwrap_or(ChangeSetStatus::Draft),
             content_hash: self.content_hash.unwrap_or_default(),
             hash_version: self.hash_version.unwrap_or_else(|| "v1".into()),
             title: self.title.unwrap_or_default(),
             rationale: self.rationale,
             created_by: self.owner_actor_id,
+            scope: self.scope,
             created_at: self.created_at,
+            updated_at: self.updated_at,
             supersedes_change_set_id: self.supersedes_change_set_id,
             superseded_by: self.superseded_by,
             superseded_at: self.superseded_at,
@@ -655,7 +652,7 @@ impl ArtifactRow {
         ChangeSetArtifact {
             artifact_id: self.artifact_id,
             change_set_id: self.change_set_id,
-            artifact_type: ArtifactType::parse(&self.artifact_type)
+            artifact_type: self.artifact_type.parse::<ArtifactType>()
                 .unwrap_or(ArtifactType::DocJson),
             ordinal: self.ordinal,
             path: self.path,

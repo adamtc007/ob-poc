@@ -4,6 +4,7 @@
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use strum::{AsRefStr, Display, EnumString};
 use uuid::Uuid;
 
 // ── ChangeSet status (7-state, superset of stewardship statuses) ──
@@ -16,10 +17,14 @@ use uuid::Uuid;
 ///   Validated → Rejected (dry-run not attempted)
 ///   Validated → DryRunFailed
 ///   Published → Superseded (when successor declares supersedes_change_set_id)
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Display, EnumString, AsRefStr,
+)]
 #[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
 pub enum ChangeSetStatus {
     Draft,
+    #[strum(serialize = "under_review", serialize = "in_review")]
     UnderReview,
     Approved,
     Validated,
@@ -31,35 +36,6 @@ pub enum ChangeSetStatus {
 }
 
 impl ChangeSetStatus {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            Self::Draft => "draft",
-            Self::UnderReview => "under_review",
-            Self::Approved => "approved",
-            Self::Validated => "validated",
-            Self::Rejected => "rejected",
-            Self::DryRunPassed => "dry_run_passed",
-            Self::DryRunFailed => "dry_run_failed",
-            Self::Published => "published",
-            Self::Superseded => "superseded",
-        }
-    }
-
-    pub fn parse(s: &str) -> Option<Self> {
-        match s {
-            "draft" => Some(Self::Draft),
-            "under_review" | "in_review" => Some(Self::UnderReview),
-            "approved" => Some(Self::Approved),
-            "validated" => Some(Self::Validated),
-            "rejected" => Some(Self::Rejected),
-            "dry_run_passed" => Some(Self::DryRunPassed),
-            "dry_run_failed" => Some(Self::DryRunFailed),
-            "published" => Some(Self::Published),
-            "superseded" => Some(Self::Superseded),
-            _ => None,
-        }
-    }
-
     /// Whether this status is terminal (no further transitions).
     pub fn is_terminal(&self) -> bool {
         matches!(
@@ -77,17 +53,14 @@ impl ChangeSetStatus {
     }
 }
 
-impl std::fmt::Display for ChangeSetStatus {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.as_str())
-    }
-}
-
 // ── Artifact type ──────────────────────────────────────────────
 
 /// Type discriminator for artifacts in a ChangeSet bundle.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Display, EnumString, AsRefStr,
+)]
 #[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
 pub enum ArtifactType {
     MigrationSql,
     MigrationDownSql,
@@ -95,37 +68,6 @@ pub enum ArtifactType {
     AttributeJson,
     TaxonomyJson,
     DocJson,
-}
-
-impl ArtifactType {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            Self::MigrationSql => "migration_sql",
-            Self::MigrationDownSql => "migration_down_sql",
-            Self::VerbYaml => "verb_yaml",
-            Self::AttributeJson => "attribute_json",
-            Self::TaxonomyJson => "taxonomy_json",
-            Self::DocJson => "doc_json",
-        }
-    }
-
-    pub fn parse(s: &str) -> Option<Self> {
-        match s {
-            "migration_sql" => Some(Self::MigrationSql),
-            "migration_down_sql" => Some(Self::MigrationDownSql),
-            "verb_yaml" => Some(Self::VerbYaml),
-            "attribute_json" => Some(Self::AttributeJson),
-            "taxonomy_json" => Some(Self::TaxonomyJson),
-            "doc_json" => Some(Self::DocJson),
-            _ => None,
-        }
-    }
-}
-
-impl std::fmt::Display for ArtifactType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.as_str())
-    }
 }
 
 // ── ChangeSet (full row) ───────────────────────────────────────
@@ -140,7 +82,9 @@ pub struct ChangeSetFull {
     pub title: String,
     pub rationale: Option<String>,
     pub created_by: String,
+    pub scope: String,
     pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
     pub supersedes_change_set_id: Option<Uuid>,
     pub superseded_by: Option<Uuid>,
     pub superseded_at: Option<DateTime<Utc>>,
@@ -187,20 +131,14 @@ pub struct ArtifactManifestEntry {
 // ── Validation report ──────────────────────────────────────────
 
 /// Stage discriminator for validation reports.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Display, EnumString, AsRefStr,
+)]
 #[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
 pub enum ValidationStage {
     Validate,
     DryRun,
-}
-
-impl ValidationStage {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            Self::Validate => "validate",
-            Self::DryRun => "dry_run",
-        }
-    }
 }
 
 /// A validation error with structured code.
@@ -228,6 +166,7 @@ pub enum ErrorSeverity {
 
 /// Stage 1 (pure) validation report.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[must_use]
 pub struct ValidationReport {
     pub ok: bool,
     pub errors: Vec<ValidationError>,
@@ -246,6 +185,7 @@ impl ValidationReport {
 
 /// Stage 2 (DB-backed) dry-run report.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[must_use]
 pub struct DryRunReport {
     pub ok: bool,
     pub errors: Vec<ValidationError>,
@@ -404,13 +344,18 @@ mod tests {
             ChangeSetStatus::Published,
             ChangeSetStatus::Superseded,
         ] {
-            let s = status.as_str();
+            let s: &str = status.as_ref();
             assert_eq!(
-                ChangeSetStatus::parse(s),
+                s.parse::<ChangeSetStatus>().ok(),
                 Some(status),
                 "round-trip failed for {s}"
             );
         }
+        // Alias: "in_review" should parse as UnderReview
+        assert_eq!(
+            "in_review".parse::<ChangeSetStatus>().ok(),
+            Some(ChangeSetStatus::UnderReview)
+        );
     }
 
     #[test]
@@ -423,9 +368,9 @@ mod tests {
             ArtifactType::TaxonomyJson,
             ArtifactType::DocJson,
         ] {
-            let s = at.as_str();
+            let s: &str = at.as_ref();
             assert_eq!(
-                ArtifactType::parse(s),
+                s.parse::<ArtifactType>().ok(),
                 Some(at),
                 "round-trip failed for {s}"
             );

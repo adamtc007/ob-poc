@@ -52,3 +52,49 @@ pub struct LifecycleTransition {
     #[serde(default)]
     pub guard: Option<String>,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn serde_round_trip() {
+        let val = EntityTypeDefBody {
+            fqn: "cbu".into(),
+            name: "Client Business Unit".into(),
+            description: "Atomic trading unit".into(),
+            domain: "cbu".into(),
+            db_table: Some(DbTableMapping {
+                schema: "ob-poc".into(),
+                table: "cbus".into(),
+                primary_key: "cbu_id".into(),
+                name_column: Some("name".into()),
+            }),
+            lifecycle_states: vec![
+                LifecycleStateDef {
+                    name: "draft".into(),
+                    description: Some("Initial state".into()),
+                    transitions: vec![LifecycleTransition {
+                        to: "active".into(),
+                        trigger_verb: Some("cbu.activate".into()),
+                        guard: Some("has_depositary".into()),
+                    }],
+                    terminal: false,
+                },
+                LifecycleStateDef {
+                    name: "active".into(),
+                    description: None,
+                    transitions: vec![],
+                    terminal: true,
+                },
+            ],
+            required_attributes: vec!["cbu.name".into(), "cbu.jurisdiction_code".into()],
+            optional_attributes: vec!["cbu.client_label".into()],
+            parent_type: None,
+        };
+        let json = serde_json::to_value(&val).unwrap();
+        let back: EntityTypeDefBody = serde_json::from_value(json.clone()).unwrap();
+        let json2 = serde_json::to_value(&back).unwrap();
+        assert_eq!(json, json2);
+    }
+}

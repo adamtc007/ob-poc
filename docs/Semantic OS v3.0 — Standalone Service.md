@@ -1,10 +1,12 @@
 # Semantic OS v3.0 — Standalone Service Boundary + Stewardship (Implementation TODO)
 
-**Status:** ✅ IMPLEMENTED (2026-02-25) — Delivered as v1.1 standalone service. See `docs/Semantic_OS_v1_0___Claude_Code_Drop.md` for the executed spec.
+**Status:** ✅ IMPLEMENTED (2026-02-25) + CLEANUP (2026-02-27) — Delivered as v1.1 standalone service. See `docs/Semantic_OS_v1_0___Claude_Code_Drop.md` for the executed spec.
 **Date:** Feb 2026
 **Original Scope:** Refactor Semantic OS v2 first (freeze semantics), then add Standalone boundary, then Stewardship Agent + Workbench.
 
 > **Note:** This was the planning/TODO document. The implementation was executed via the v1.0 Claude Code Drop spec and delivered as 6 workspace crates + 7 migrations (092-098) + stewardship Phase 0-1. The TODO items below reflect the original plan — all have been completed.
+
+> **Pre-Java-port cleanup (2026-02-27):** 25-issue cleanup pass across all 6 sem_os crates (~21,005 LOC). Key changes: strum-based enum derives (eliminates manual `as_str()`/`from_str()`/`Display`), dead code removal (~600 LOC), `CoreService` trait extracted from impl, `Principal` builder + validation hardened, serde round-trip tests for all body types + proto types, `#[must_use]` on decision types, clippy clean. Test count: 60 → 321 unit tests (sem_os_core) + 50 adapter tests.
 
 ---
 

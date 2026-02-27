@@ -47,3 +47,44 @@ pub struct PolicyAction {
     #[serde(default)]
     pub description: Option<String>,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn serde_round_trip() {
+        let val = PolicyRuleBody {
+            fqn: "policy.sanctions_screen".into(),
+            name: "Sanctions Screening".into(),
+            description: "Require screening before onboarding".into(),
+            domain: "kyc".into(),
+            scope: Some("onboarding".into()),
+            priority: 50,
+            predicates: vec![PolicyPredicate {
+                kind: "entity_attribute".into(),
+                field: "entity.jurisdiction_code".into(),
+                operator: "in".into(),
+                value: serde_json::json!(["US", "GB", "EU"]),
+            }],
+            actions: vec![PolicyAction {
+                kind: "require_screening".into(),
+                params: serde_json::json!({"provider": "refinitiv"}),
+                description: Some("Run sanctions check".into()),
+            }],
+            enabled: true,
+        };
+        let json = serde_json::to_value(&val).unwrap();
+        // Check default_priority gives 100
+        let minimal: PolicyRuleBody = serde_json::from_str(
+            r#"{"fqn":"x","name":"x","description":"x","domain":"x"}"#,
+        ).unwrap();
+        assert_eq!(minimal.priority, 100);
+        // Check default_true gives true for enabled
+        assert!(minimal.enabled);
+        // Round-trip
+        let back: PolicyRuleBody = serde_json::from_value(json.clone()).unwrap();
+        let json2 = serde_json::to_value(&back).unwrap();
+        assert_eq!(json, json2);
+    }
+}

@@ -111,8 +111,8 @@ pub fn emit_status_transition(change_set_id: Uuid, from: ChangeSetStatus, to: Ch
     tracing::info!(
         target: "authoring.status_transition",
         %change_set_id,
-        from = from.as_str(),
-        to = to.as_str(),
+        from = from.as_ref(),
+        to = to.as_ref(),
         "changeset status transition"
     );
 }

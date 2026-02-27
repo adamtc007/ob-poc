@@ -376,22 +376,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let core_service = CoreServiceImpl::new(
                     Arc::new(stores.snapshots),
                     Arc::new(stores.objects),
+                    Arc::new(stores.changesets),
                     Arc::new(stores.audit),
                     Arc::new(stores.outbox),
                     Arc::new(stores.evidence),
                     Arc::new(stores.projections),
                 )
-                .with_changesets(Arc::new(stores.changesets))
                 .with_authoring(Arc::new(stores.authoring))
                 .with_scratch_runner(Arc::new(stores.scratch_runner))
                 .with_cleanup(Arc::new(stores.cleanup));
-                let principal = sem_os_core::principal::Principal::in_process(
-                    "ob-poc-web",
-                    vec!["operator".to_string()],
-                );
                 let client = sem_os_client::inprocess::InProcessClient::new(
                     Arc::new(core_service),
-                    principal,
                 );
                 tracing::info!("SemOsClient: InProcess mode (direct CoreService)");
                 Some(Arc::new(client) as Arc<dyn sem_os_client::SemOsClient>)

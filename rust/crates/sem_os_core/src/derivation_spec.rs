@@ -84,3 +84,47 @@ pub struct DerivationTestCase {
     pub inputs: serde_json::Value,
     pub expected: serde_json::Value,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn serde_round_trip() {
+        let val = DerivationSpecBody {
+            fqn: "derived.total_aum".into(),
+            name: "Total AUM".into(),
+            description: "Sum of holdings".into(),
+            output_attribute_fqn: "cbu.total_aum".into(),
+            inputs: vec![DerivationInput {
+                attribute_fqn: "holding.amount".into(),
+                role: "addend".into(),
+                required: true,
+            }],
+            expression: DerivationExpression::FunctionRef {
+                ref_name: "sum_holdings".into(),
+            },
+            null_semantics: NullSemantics::Skip,
+            freshness_rule: Some(FreshnessRule { max_age_seconds: 3600 }),
+            security_inheritance: SecurityInheritanceMode::Strict,
+            evidence_grade: EvidenceGrade::AllowedWithConstraints,
+            tests: vec![DerivationTestCase {
+                inputs: serde_json::json!({"holding.amount": [100, 200]}),
+                expected: serde_json::json!(300),
+            }],
+        };
+        let json = serde_json::to_value(&val).unwrap();
+        // Check tagged enum FunctionRef serialization
+        assert_eq!(json["expression"]["type"], "function_ref");
+        // Check NullSemantics::Skip
+        assert_eq!(json["null_semantics"], "skip");
+        // Check defaults: default_true on DerivationInput.required
+        let input: DerivationInput =
+            serde_json::from_str(r#"{"attribute_fqn":"x","role":"y"}"#).unwrap();
+        assert!(input.required);
+        // Round-trip
+        let back: DerivationSpecBody = serde_json::from_value(json.clone()).unwrap();
+        let json2 = serde_json::to_value(&back).unwrap();
+        assert_eq!(json, json2);
+    }
+}

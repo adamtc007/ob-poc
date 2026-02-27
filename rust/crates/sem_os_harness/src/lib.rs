@@ -476,13 +476,11 @@ mod tests {
         let evidence = Arc::new(PgEvidenceStore::new(pool.clone()));
         let projections = Arc::new(PgProjectionWriter::new(pool));
 
-        let service = Arc::new(
-            CoreServiceImpl::new(snapshots, objects, audit, outbox, evidence, projections)
-                .with_changesets(changesets),
-        );
+        let service = Arc::new(CoreServiceImpl::new(
+            snapshots, objects, changesets, audit, outbox, evidence, projections,
+        ));
 
-        let principal = Principal::in_process("harness-system", vec!["admin".into()]);
-        InProcessClient::new(service, principal)
+        InProcessClient::new(service)
     }
 
     /// Get the admin database URL from the environment.

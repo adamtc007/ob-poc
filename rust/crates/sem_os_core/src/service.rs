@@ -214,17 +214,16 @@ impl CoreServiceImpl {
     pub fn new(
         snapshots: Arc<dyn SnapshotStore>,
         objects: Arc<dyn ObjectStore>,
+        changesets: Arc<dyn ChangesetStore>,
         audit: Arc<dyn AuditStore>,
         outbox: Arc<dyn OutboxStore>,
         evidence: Arc<dyn EvidenceInstanceStore>,
         projections: Arc<dyn ProjectionWriter>,
     ) -> Self {
-        // Legacy 6-arg constructor — creates a no-op changeset store.
-        // Use `with_changesets()` to add a real changeset store.
         Self {
             snapshots,
             objects,
-            changesets: Arc::new(NoopChangesetStore),
+            changesets,
             audit,
             outbox,
             evidence,
@@ -234,12 +233,6 @@ impl CoreServiceImpl {
             cleanup: None,
             bootstrap_audit: None,
         }
-    }
-
-    /// Set the changeset store (builder pattern).
-    pub fn with_changesets(mut self, changesets: Arc<dyn ChangesetStore>) -> Self {
-        self.changesets = changesets;
-        self
     }
 
     /// Set the authoring store (builder pattern).
@@ -284,124 +277,22 @@ impl CoreServiceImpl {
     }
 }
 
-/// No-op changeset store for backward compatibility with 6-arg constructor.
-struct NoopChangesetStore;
-
-#[async_trait]
-impl ChangesetStore for NoopChangesetStore {
-    async fn create_changeset(&self, _: CreateChangesetInput) -> crate::ports::Result<Changeset> {
-        Err(SemOsError::MigrationPending(
-            "changesets not configured".into(),
-        ))
-    }
-    async fn get_changeset(&self, _: Uuid) -> crate::ports::Result<Changeset> {
-        Err(SemOsError::MigrationPending(
-            "changesets not configured".into(),
-        ))
-    }
-    async fn list_changesets(
-        &self,
-        _: Option<&str>,
-        _: Option<&str>,
-        _: Option<&str>,
-    ) -> crate::ports::Result<Vec<Changeset>> {
-        Err(SemOsError::MigrationPending(
-            "changesets not configured".into(),
-        ))
-    }
-    async fn update_status(&self, _: Uuid, _: ChangesetStatus) -> crate::ports::Result<()> {
-        Err(SemOsError::MigrationPending(
-            "changesets not configured".into(),
-        ))
-    }
-    async fn add_entry(
-        &self,
-        _: Uuid,
-        _: AddChangesetEntryInput,
-    ) -> crate::ports::Result<ChangesetEntry> {
-        Err(SemOsError::MigrationPending(
-            "changesets not configured".into(),
-        ))
-    }
-    async fn list_entries(&self, _: Uuid) -> crate::ports::Result<Vec<ChangesetEntry>> {
-        Err(SemOsError::MigrationPending(
-            "changesets not configured".into(),
-        ))
-    }
-    async fn submit_review(
-        &self,
-        _: Uuid,
-        _: SubmitReviewInput,
-    ) -> crate::ports::Result<ChangesetReview> {
-        Err(SemOsError::MigrationPending(
-            "changesets not configured".into(),
-        ))
-    }
-    async fn list_reviews(&self, _: Uuid) -> crate::ports::Result<Vec<ChangesetReview>> {
-        Err(SemOsError::MigrationPending(
-            "changesets not configured".into(),
-        ))
-    }
-}
-
 #[async_trait]
 impl CoreService for CoreServiceImpl {
     async fn resolve_context(
         &self,
         _principal: &Principal,
-        req: ContextResolutionRequest,
+        _req: ContextResolutionRequest,
     ) -> Result<ContextResolutionResponse> {
-        // TODO(resolve_context): Wire the full 12-step context resolution pipeline.
-        //
-        // The monolith implementation lives in `rust/src/sem_reg/context_resolution.rs`
-        // and performs a 12-step pipeline:
-        //
-        //   1. Determine snapshot epoch (point_in_time or now)
-        //   2. Resolve subject → entity type + jurisdiction + state
-        //   2b. Load subject's taxonomy memberships (MembershipRuleBody conditions)
-        //   2c. Load subject's relationships (RelationshipTypeDef edge_class/directionality)
-        //   3. Select applicable ViewDefs by taxonomy overlap
-        //   4. Extract verb surface + attribute prominence from top view
-        //   5. Filter verbs by taxonomy membership + ABAC
-        //   6. Filter attributes similarly
-        //   7. Rank by ViewDef prominence weights
-        //   8. Evaluate preconditions for top-N candidate verbs
-        //   9. Evaluate PolicyRules → PolicyVerdicts with snapshot refs
-        //  10. Compute composite AccessDecision
-        //  11. Generate governance signals (unowned objects, stale evidence)
-        //  12. Compute confidence score (deterministic heuristic)
-        //
-        // To wire this here, the following port trait methods are needed:
-        //
-        //   SnapshotStore (or a new BulkLoadStore trait):
-        //     - load_by_type_and_status(object_type, status) → Vec<SnapshotMeta>
-        //     - load_memberships_for_subject(subject_id) → Vec<MembershipRow>
-        //     - load_relationships_for_subject(subject_id) → Vec<RelationshipRow>
-        //     - load_views_by_taxonomy_overlap(taxonomy_ids) → Vec<ViewDefBody>
-        //
-        // Steps 3-12 are pure functions that can be extracted from the monolith's
-        // `context_resolution.rs` without DB dependencies. The scoring, filtering,
-        // and ranking logic is deterministic and testable in isolation.
-        //
-        // The monolith's `resolve_via_direct()` fallback in agent/orchestrator.rs
-        // continues to work in the meantime via the PgPool-based monolith path.
-
-        let as_of = req.point_in_time.unwrap_or_else(chrono::Utc::now);
-
-        Ok(ContextResolutionResponse {
-            as_of_time: as_of,
-            resolved_at: chrono::Utc::now(),
-            applicable_views: vec![],
-            candidate_verbs: vec![],
-            candidate_attributes: vec![],
-            required_preconditions: vec![],
-            disambiguation_questions: vec![],
-            evidence: Default::default(),
-            policy_verdicts: vec![],
-            security_handling: crate::abac::AccessDecision::Allow,
-            governance_signals: vec![],
-            confidence: 0.0,
-        })
+        // The full 12-step pipeline exists in the monolith
+        // (rust/src/sem_reg/context_resolution.rs) and is invoked via the
+        // PgPool-based path in agent/orchestrator.rs. Wiring it here requires
+        // additional port trait methods (BulkLoadStore) — tracked separately.
+        Err(SemOsError::MigrationPending(
+            "context resolution pipeline not yet wired to standalone service \
+             (requires BulkLoadStore port for Steps 1-2c)"
+                .into(),
+        ))
     }
 
     async fn get_manifest(&self, snapshot_set_id: &str) -> Result<GetManifestResponse> {
@@ -566,25 +457,21 @@ impl CoreService for CoreServiceImpl {
     async fn dispatch_tool(
         &self,
         _principal: &Principal,
-        req: crate::proto::ToolCallRequest,
+        _req: crate::proto::ToolCallRequest,
     ) -> Result<crate::proto::ToolCallResponse> {
-        // CoreServiceImpl does not host tool dispatch logic directly —
-        // the InProcessClient delegates to ob-poc's sem_reg::agent::mcp_tools,
-        // and the HttpClient calls the server endpoint.
-        // This stub exists to satisfy the trait bound.
-        Ok(crate::proto::ToolCallResponse {
-            success: false,
-            data: serde_json::Value::Null,
-            error: Some(format!(
-                "Tool dispatch not available via CoreService stub: {}",
-                req.tool_name
-            )),
-        })
+        // Tool dispatch requires the ob-poc host's sem_reg::agent::mcp_tools.
+        // InProcessClient overrides this; HttpClient calls the server endpoint.
+        Err(SemOsError::MigrationPending(
+            "tool dispatch requires ob-poc host (InProcessClient overrides this method)".into(),
+        ))
     }
 
     async fn list_tool_specs(&self) -> Result<crate::proto::ListToolSpecsResponse> {
-        // Stub — InProcessClient overrides with ob-poc's all_tool_specs().
-        Ok(crate::proto::ListToolSpecsResponse { tools: vec![] })
+        // Tool specs are provided by ob-poc's all_tool_specs().
+        // InProcessClient overrides this; HttpClient calls the server endpoint.
+        Err(SemOsError::MigrationPending(
+            "tool specs require ob-poc host (InProcessClient overrides this method)".into(),
+        ))
     }
 
     async fn promote_changeset(&self, principal: &Principal, changeset_id: &str) -> Result<u32> {
@@ -613,8 +500,11 @@ impl CoreService for CoreServiceImpl {
         crate::stewardship::check_proof_chain_compatibility(&entries, self.snapshots.as_ref())
             .await?;
 
-        // 3. Stale detection: for each entry with a base_snapshot_id,
-        //    verify it still matches the current active snapshot for that FQN.
+        // 3. Stale detection + predecessor resolution: for each entry with a
+        //    base_snapshot_id, verify it still matches the current active snapshot.
+        //    Collect resolved predecessors for version derivation in step 5.
+        let mut predecessors: std::collections::HashMap<Uuid, SnapshotRow> =
+            std::collections::HashMap::new();
         for entry in &entries {
             if let Some(base_id) = entry.base_snapshot_id {
                 let fqn = Fqn::new(&entry.object_fqn);
@@ -627,10 +517,9 @@ impl CoreService for CoreServiceImpl {
                                 entry.object_fqn, base_id, current.snapshot_id
                             )));
                         }
+                        predecessors.insert(entry.entry_id, current);
                     }
                     Err(SemOsError::NotFound(_)) => {
-                        // The base snapshot was active when the entry was created,
-                        // but has since been removed/retired — stale.
                         return Err(SemOsError::Conflict(format!(
                             "stale draft: FQN {} — base_snapshot_id {} no longer has an \
                              active snapshot",
@@ -660,12 +549,7 @@ impl CoreService for CoreServiceImpl {
         // 5. Build batch of snapshots for atomic publish (v3.3: one outbox event).
         let mut items: Vec<(SnapshotMeta, serde_json::Value)> = Vec::with_capacity(entries.len());
         for entry in &entries {
-            let object_type = ObjectType::from_str(&entry.object_type).ok_or_else(|| {
-                SemOsError::InvalidInput(format!(
-                    "unknown object_type '{}' in changeset entry {}",
-                    entry.object_type, entry.entry_id
-                ))
-            })?;
+            let object_type = entry.object_type;
 
             let object_id = crate::ids::object_id_for(object_type, &entry.object_fqn);
 
@@ -680,11 +564,23 @@ impl CoreService for CoreServiceImpl {
                 _ => SnapshotStatus::Active,
             };
 
+            // Derive version from predecessor (resolved in step 3).
+            let (version_major, version_minor) =
+                if let Some(pred) = predecessors.get(&entry.entry_id) {
+                    match entry.change_kind {
+                        ChangeKind::Add => (1, 0),
+                        ChangeKind::Modify => (pred.version_major, pred.version_minor + 1),
+                        ChangeKind::Remove => (pred.version_major, pred.version_minor),
+                    }
+                } else {
+                    (1, 0)
+                };
+
             let meta = SnapshotMeta {
                 object_type,
                 object_id,
-                version_major: 1, // TODO: derive from predecessor
-                version_minor: 0,
+                version_major,
+                version_minor,
                 status,
                 governance_tier: GovernanceTier::Operational,
                 trust_class: TrustClass::Convenience,
@@ -773,8 +669,8 @@ impl CoreService for CoreServiceImpl {
             diff_entries.push(crate::proto::DiffEntry {
                 entry_id: entry.entry_id.to_string(),
                 object_fqn: entry.object_fqn.clone(),
-                object_type: entry.object_type.clone(),
-                change_kind: entry.change_kind.as_str().to_string(),
+                object_type: entry.object_type,
+                change_kind: entry.change_kind.to_string(),
                 base_snapshot_id: entry.base_snapshot_id.map(|id| id.to_string()),
                 current_snapshot_id,
                 is_stale,
@@ -785,7 +681,7 @@ impl CoreService for CoreServiceImpl {
 
         Ok(crate::proto::ChangesetDiffResponse {
             changeset_id: cs_id.to_string(),
-            status: changeset.status.as_str().to_string(),
+            status: changeset.status.to_string(),
             entries: diff_entries,
             stale_count,
         })
@@ -814,18 +710,18 @@ impl CoreService for CoreServiceImpl {
                 .unwrap_or_default();
 
             for dep in dependents {
-                let relationship = match dep.object_type.as_str() {
-                    "view_def" => "surfaces",
-                    "policy_rule" => "governed_by",
-                    "verb_contract" => "references",
-                    "entity_type_def" => "uses_attribute",
-                    "taxonomy_node" => "member_of",
+                let relationship = match dep.object_type {
+                    ObjectType::ViewDef => "surfaces",
+                    ObjectType::PolicyRule => "governed_by",
+                    ObjectType::VerbContract => "references",
+                    ObjectType::EntityTypeDef => "uses_attribute",
+                    ObjectType::TaxonomyNode => "member_of",
                     _ => "depends_on",
                 };
 
                 impacts.push(crate::proto::ImpactEntry {
                     source_fqn: source_fqn.clone(),
-                    source_object_type: source_type.clone(),
+                    source_object_type: *source_type,
                     dependent_fqn: dep.fqn,
                     dependent_object_type: dep.object_type,
                     relationship: relationship.into(),
@@ -888,21 +784,7 @@ impl CoreService for CoreServiceImpl {
         }
 
         for entry in &entries {
-            let object_type = match ObjectType::from_str(&entry.object_type) {
-                Some(t) => t,
-                None => {
-                    gate_results.push(crate::proto::GatePreviewEntry {
-                        entry_id: entry.entry_id.to_string(),
-                        object_fqn: entry.object_fqn.clone(),
-                        gate_name: "object_type_valid".into(),
-                        severity: "error".into(),
-                        passed: false,
-                        reason: Some(format!("Unknown object_type '{}'", entry.object_type)),
-                    });
-                    total_errors += 1;
-                    continue;
-                }
-            };
+            let object_type = entry.object_type;
 
             let object_id = crate::ids::object_id_for(object_type, &entry.object_fqn);
 
@@ -1057,7 +939,7 @@ impl CoreService for CoreServiceImpl {
         let mut total_pending: i64 = 0;
         for (status, count) in &status_counts {
             counts.push(crate::authoring::types::StatusCount {
-                status: status.as_str().to_string(),
+                status: status.to_string(),
                 count: *count,
             });
             if !status.is_terminal() {

@@ -55,9 +55,7 @@ pub async fn run(
 ) -> Result<bool> {
     let suites: Vec<ScenarioSuite> = if let Some(path) = suite_path {
         vec![load_suite(path).context("Failed to load suite")?]
-    } else if all {
-        load_all_suites(scenarios_dir).context("Failed to load suites")?
-    } else if scenario_name.is_some() {
+    } else if all || scenario_name.is_some() {
         load_all_suites(scenarios_dir).context("Failed to load suites")?
     } else {
         anyhow::bail!("Specify --suite, --scenario, or --all");

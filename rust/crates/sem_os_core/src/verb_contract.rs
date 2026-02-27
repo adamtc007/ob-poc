@@ -130,3 +130,75 @@ pub struct VerbContractMetadata {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub phase_tags: Vec<String>,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn serde_round_trip() {
+        let val = VerbContractBody {
+            fqn: "cbu.create".into(),
+            domain: "cbu".into(),
+            action: "create".into(),
+            description: "Create a CBU".into(),
+            behavior: "plugin".into(),
+            args: vec![VerbArgDef {
+                name: "name".into(),
+                arg_type: "string".into(),
+                required: true,
+                description: Some("CBU name".into()),
+                lookup: None,
+                valid_values: None,
+                default: None,
+            }],
+            returns: Some(VerbReturnSpec {
+                return_type: "uuid".into(),
+                schema: None,
+            }),
+            preconditions: vec![VerbPrecondition {
+                kind: "requires_scope".into(),
+                value: "cbu".into(),
+                description: None,
+            }],
+            postconditions: vec![],
+            produces: Some(VerbProducesSpec {
+                entity_type: "cbu".into(),
+                resolved: true,
+            }),
+            consumes: vec![],
+            invocation_phrases: vec!["create cbu".into()],
+            subject_kinds: vec!["cbu".into()],
+            phase_tags: vec![],
+            requires_subject: true,
+            produces_focus: false,
+            metadata: Some(VerbContractMetadata {
+                tier: Some("intent".into()),
+                source_of_truth: None,
+                scope: None,
+                noun: None,
+                tags: vec![],
+                subject_kinds: vec![],
+                phase_tags: vec![],
+            }),
+            crud_mapping: Some(VerbCrudMapping {
+                operation: "insert".into(),
+                table: Some("cbus".into()),
+                schema: Some("ob-poc".into()),
+                key_column: None,
+            }),
+        };
+        let json = serde_json::to_value(&val).unwrap();
+        // Check #[serde(rename = "type")] on returns and produces
+        assert_eq!(json["returns"]["type"], "uuid");
+        assert_eq!(json["produces"]["type"], "cbu");
+        // Check default_true(): requires_subject defaults to true
+        let minimal: VerbContractBody =
+            serde_json::from_str(r#"{"fqn":"x","domain":"x","action":"x","description":"x","behavior":"x"}"#).unwrap();
+        assert!(minimal.requires_subject);
+        // Round-trip
+        let back: VerbContractBody = serde_json::from_value(json.clone()).unwrap();
+        let json2 = serde_json::to_value(&back).unwrap();
+        assert_eq!(json, json2);
+    }
+}

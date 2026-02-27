@@ -85,12 +85,12 @@ async fn build_test_app() -> axum::Router {
         CoreServiceImpl::new(
             Arc::new(stores.snapshots),
             Arc::new(stores.objects),
+            Arc::new(stores.changesets),
             Arc::new(stores.audit),
             Arc::clone(&outbox),
             Arc::new(stores.evidence),
             Arc::clone(&projections),
         )
-        .with_changesets(Arc::new(stores.changesets))
         .with_authoring(Arc::new(stores.authoring))
         .with_scratch_runner(Arc::new(stores.scratch_runner))
         .with_cleanup(Arc::new(stores.cleanup))

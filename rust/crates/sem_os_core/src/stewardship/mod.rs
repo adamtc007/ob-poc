@@ -51,7 +51,7 @@ pub fn validate_role_constraints(
                 "Actor '{}' with roles {:?} may not perform '{}' on '{}'",
                 principal.actor_id,
                 principal.roles,
-                entry.change_kind.as_str(),
+                entry.change_kind.as_ref(),
                 entry.object_fqn,
             )));
         }
@@ -214,4 +214,94 @@ pub async fn detect_stale_drafts(
     }
 
     Ok(conflicts)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::Utc;
+    use serde_json::json;
+
+    fn make_entry(fqn: &str, kind: ChangeKind) -> ChangesetEntry {
+        ChangesetEntry {
+            entry_id: Uuid::new_v4(),
+            changeset_id: Uuid::new_v4(),
+            object_fqn: fqn.to_string(),
+            object_type: crate::types::ObjectType::AttributeDef,
+            change_kind: kind,
+            draft_payload: json!({}),
+            base_snapshot_id: None,
+            created_at: Utc::now(),
+        }
+    }
+
+    #[test]
+    fn admin_may_add_modify_remove() {
+        let principal = Principal::in_process("admin-user", vec!["admin".into()]);
+        let entries = vec![
+            make_entry("attr.a", ChangeKind::Add),
+            make_entry("attr.b", ChangeKind::Modify),
+            make_entry("attr.c", ChangeKind::Remove),
+        ];
+        assert!(validate_role_constraints(&principal, &entries).is_ok());
+    }
+
+    #[test]
+    fn steward_may_add_and_modify() {
+        let principal = Principal::in_process("steward-user", vec!["steward".into()]);
+        let entries = vec![
+            make_entry("attr.a", ChangeKind::Add),
+            make_entry("attr.b", ChangeKind::Modify),
+        ];
+        assert!(validate_role_constraints(&principal, &entries).is_ok());
+    }
+
+    #[test]
+    fn steward_may_not_remove() {
+        let principal = Principal::in_process("steward-user", vec!["steward".into()]);
+        let entries = vec![make_entry("attr.a", ChangeKind::Remove)];
+        let err = validate_role_constraints(&principal, &entries).unwrap_err();
+        assert!(matches!(err, SemOsError::Unauthorized(_)));
+    }
+
+    #[test]
+    fn viewer_may_not_do_anything() {
+        let principal = Principal::in_process("viewer-user", vec!["viewer".into()]);
+        let entries = vec![make_entry("attr.a", ChangeKind::Add)];
+        let err = validate_role_constraints(&principal, &entries).unwrap_err();
+        assert!(matches!(err, SemOsError::Unauthorized(_)));
+    }
+
+    #[test]
+    fn no_roles_may_not_do_anything() {
+        let principal = Principal::in_process("nobody", vec![]);
+        let entries = vec![make_entry("attr.a", ChangeKind::Add)];
+        let err = validate_role_constraints(&principal, &entries).unwrap_err();
+        assert!(matches!(err, SemOsError::Unauthorized(_)));
+    }
+
+    #[test]
+    fn empty_entries_always_ok() {
+        let principal = Principal::in_process("viewer-user", vec!["viewer".into()]);
+        assert!(validate_role_constraints(&principal, &[]).is_ok());
+    }
+
+    #[test]
+    fn one_role_sufficient_even_with_others() {
+        // Has both viewer (no perms) and admin (all perms) — admin should allow Remove
+        let principal =
+            Principal::in_process("multi-role", vec!["viewer".into(), "admin".into()]);
+        let entries = vec![make_entry("attr.a", ChangeKind::Remove)];
+        assert!(validate_role_constraints(&principal, &entries).is_ok());
+    }
+
+    #[test]
+    fn error_message_includes_actor_and_fqn() {
+        let principal = Principal::in_process("bob", vec!["viewer".into()]);
+        let entries = vec![make_entry("my.object", ChangeKind::Modify)];
+        let err = validate_role_constraints(&principal, &entries).unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("bob"), "should contain actor_id");
+        assert!(msg.contains("my.object"), "should contain object FQN");
+    }
 }

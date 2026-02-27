@@ -673,7 +673,7 @@ impl GleifTestHarness {
                             println!("  Found sub-fund with umbrella: {}", lei);
 
                             // Fetch the umbrella
-                            if let Some(umbrella_lei) = umbrella_url.split('/').last() {
+                            if let Some(umbrella_lei) = umbrella_url.split('/').next_back() {
                                 let umbrella_record_url =
                                     format!("{}/lei-records/{}", GLEIF_API_BASE, umbrella_lei);
 

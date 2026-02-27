@@ -13,19 +13,11 @@ use crate::{Result, SemOsClient};
 
 pub struct InProcessClient {
     service: Arc<dyn CoreService>,
-    /// Default principal for operations that don't take an explicit principal.
-    /// Used by `drain_outbox_for_test` and future convenience methods.
-    #[allow(dead_code)]
-    principal: Principal,
 }
 
 impl InProcessClient {
-    /// Create a new InProcessClient wrapping a CoreService.
-    ///
-    /// The `principal` is used as the default identity for operations
-    /// that don't take an explicit principal parameter.
-    pub fn new(service: Arc<dyn CoreService>, principal: Principal) -> Self {
-        Self { service, principal }
+    pub fn new(service: Arc<dyn CoreService>) -> Self {
+        Self { service }
     }
 }
 

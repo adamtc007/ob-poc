@@ -166,7 +166,7 @@ pub async fn list(
     Extension(service): Extension<Arc<dyn CoreService>>,
     Query(query): Query<ListQuery>,
 ) -> Result<Json<Vec<ChangeSetFull>>, AppError> {
-    let status = query.status.as_deref().and_then(ChangeSetStatus::parse);
+    let status = query.status.as_deref().and_then(|s| s.parse::<ChangeSetStatus>().ok());
 
     let changesets = service.authoring_list(status, query.limit).await?;
     Ok(Json(changesets))
@@ -201,7 +201,7 @@ fn require_publish_permission(principal: &Principal) -> Result<(), AppError> {
         return Err(AppError::from(
             sem_os_core::error::SemOsError::Unauthorized(format!(
                 "blocked by AgentMode: {} cannot publish",
-                mode.as_str()
+                mode.as_ref()
             )),
         ));
     }

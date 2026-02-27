@@ -768,7 +768,8 @@ mod tests {
     #[test]
     fn test_changeset_status_roundtrip() {
         let status = ChangesetStatus::UnderReview;
-        assert_eq!(ChangesetStatus::parse(status.as_str()), Some(status));
+        let parsed: ChangesetStatus = status.as_ref().parse().unwrap();
+        assert_eq!(parsed, status);
     }
 
     #[test]

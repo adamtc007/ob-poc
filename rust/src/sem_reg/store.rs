@@ -68,16 +68,16 @@ impl SnapshotStore {
             "#,
         )
         .bind(snapshot_set_id)
-        .bind(meta.object_type.as_str())
+        .bind(meta.object_type.as_ref())
         .bind(meta.object_id)
         .bind(meta.version_major)
         .bind(meta.version_minor)
-        .bind(meta.status.as_str())
-        .bind(meta.governance_tier.as_str())
-        .bind(meta.trust_class.as_str())
+        .bind(meta.status.as_ref())
+        .bind(meta.governance_tier.as_ref())
+        .bind(meta.trust_class.as_ref())
         .bind(&security_label_json)
         .bind(meta.predecessor_id)
-        .bind(meta.change_type.as_str())
+        .bind(meta.change_type.as_ref())
         .bind(&meta.change_rationale)
         .bind(&meta.created_by)
         .bind(&meta.approved_by)
@@ -127,7 +127,7 @@ impl SnapshotStore {
             LIMIT 1
             "#,
         )
-        .bind(object_type.as_str())
+        .bind(object_type.as_ref())
         .bind(object_id)
         .fetch_optional(pool)
         .await?;
@@ -154,7 +154,7 @@ impl SnapshotStore {
             LIMIT 1
             "#,
         )
-        .bind(object_type.as_str())
+        .bind(object_type.as_ref())
         .bind(object_id)
         .bind(as_of)
         .fetch_optional(pool)
@@ -179,7 +179,7 @@ impl SnapshotStore {
             ORDER BY effective_from DESC
             "#,
         )
-        .bind(object_type.as_str())
+        .bind(object_type.as_ref())
         .bind(object_id)
         .fetch_all(pool)
         .await?;
@@ -206,7 +206,7 @@ impl SnapshotStore {
             LIMIT $2 OFFSET $3
             "#,
         )
-        .bind(object_type.as_str())
+        .bind(object_type.as_ref())
         .bind(limit)
         .bind(offset)
         .fetch_all(pool)
@@ -230,13 +230,14 @@ impl SnapshotStore {
             ORDER BY object_type
             "#,
         )
-        .bind(object_type.map(|ot| ot.as_str().to_owned()))
+        .bind(object_type.map(|ot| ot.as_ref().to_owned()))
         .fetch_all(pool)
         .await?;
         rows.into_iter()
             .map(|(ot_str, cnt)| {
-                let ot = ObjectType::from_str(&ot_str)
-                    .ok_or_else(|| anyhow!("invalid object_type from DB: {}", ot_str))?;
+                let ot = ot_str
+                    .parse::<ObjectType>()
+                    .map_err(|_| anyhow!("invalid object_type from DB: {}", ot_str))?;
                 Ok((ot, cnt))
             })
             .collect()
@@ -267,7 +268,7 @@ impl SnapshotStore {
             "#,
         );
         let row = sqlx::query_as::<_, PgSnapshotRow>(&query)
-            .bind(object_type.as_str())
+            .bind(object_type.as_ref())
             .bind(field_value)
             .fetch_optional(pool)
             .await?;
@@ -358,16 +359,16 @@ impl SnapshotStore {
             "#,
         )
         .bind(snapshot_set_id)
-        .bind(meta.object_type.as_str())
+        .bind(meta.object_type.as_ref())
         .bind(meta.object_id)
         .bind(meta.version_major)
         .bind(meta.version_minor)
-        .bind(meta.status.as_str())
-        .bind(meta.governance_tier.as_str())
-        .bind(meta.trust_class.as_str())
+        .bind(meta.status.as_ref())
+        .bind(meta.governance_tier.as_ref())
+        .bind(meta.trust_class.as_ref())
         .bind(&security_label_json)
         .bind(meta.predecessor_id)
-        .bind(meta.change_type.as_str())
+        .bind(meta.change_type.as_ref())
         .bind(&meta.change_rationale)
         .bind(&meta.created_by)
         .bind(&meta.approved_by)

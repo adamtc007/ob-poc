@@ -232,7 +232,7 @@ impl<'a> GovernanceVerbService<'a> {
         // Collect distinct artifact types
         let mut affected_types: Vec<String> = artifacts
             .iter()
-            .map(|a| a.artifact_type.as_str().to_string())
+            .map(|a| a.artifact_type.to_string())
             .collect();
         affected_types.sort();
         affected_types.dedup();
@@ -628,7 +628,11 @@ async fn topological_sort(ids: &[Uuid], store: &dyn AuthoringStore) -> Result<Ve
         sorted.push(id);
         if let Some(dependents) = deps_map.get(&id) {
             for &dep in dependents {
-                let deg = in_degree.get_mut(&dep).unwrap();
+                let deg = in_degree.get_mut(&dep).ok_or_else(|| {
+                    SemOsError::Internal(anyhow::anyhow!(
+                        "topo sort invariant violated: dep {dep} not in in_degree map"
+                    ))
+                })?;
                 *deg -= 1;
                 if *deg == 0 {
                     queue.push_back(dep);
@@ -662,7 +666,9 @@ mod tests {
             title: "Test title".to_string(),
             rationale: Some("Test rationale".to_string()),
             created_by: "test".to_string(),
+            scope: "authoring".to_string(),
             created_at: Utc::now(),
+            updated_at: Utc::now(),
             supersedes_change_set_id: None,
             superseded_by: None,
             superseded_at: None,

@@ -78,17 +78,17 @@ async fn main() {
     let outbox: Arc<dyn sem_os_core::ports::OutboxStore> = Arc::new(stores.outbox);
     let projections: Arc<dyn sem_os_core::ports::ProjectionWriter> = Arc::new(stores.projections);
 
-    // Build core service (with changeset store wired)
+    // Build core service
     let service: Arc<dyn sem_os_core::service::CoreService> = Arc::new(
         CoreServiceImpl::new(
             Arc::new(stores.snapshots),
             Arc::new(stores.objects),
+            Arc::new(stores.changesets),
             Arc::new(stores.audit),
             Arc::clone(&outbox),
             Arc::new(stores.evidence),
             Arc::clone(&projections),
         )
-        .with_changesets(Arc::new(stores.changesets))
         .with_authoring(Arc::new(stores.authoring))
         .with_scratch_runner(Arc::new(stores.scratch_runner))
         .with_cleanup(Arc::new(stores.cleanup))

@@ -26,8 +26,8 @@ pub fn compute_content_hash(
     let mut sorted: Vec<&ChangeSetArtifact> = artifacts.iter().collect();
     sorted.sort_by(|a, b| {
         a.artifact_type
-            .as_str()
-            .cmp(b.artifact_type.as_str())
+            .as_ref()
+            .cmp(b.artifact_type.as_ref())
             .then_with(|| a.ordinal.cmp(&b.ordinal))
             .then_with(|| {
                 a.path
@@ -46,7 +46,7 @@ pub fn compute_content_hash(
 
     for artifact in &sorted {
         let normalized = normalize_content(&artifact.content);
-        hasher.update(artifact.artifact_type.as_str().as_bytes());
+        hasher.update(artifact.artifact_type.as_ref().as_bytes());
         hasher.update(b":");
         hasher.update(artifact.path.as_deref().unwrap_or("").as_bytes());
         hasher.update(b"\n");

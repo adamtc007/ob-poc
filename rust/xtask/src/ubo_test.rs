@@ -326,7 +326,7 @@ async fn seed_scenario_1(pool: &PgPool, verbose: bool) -> Result<()> {
     tx.commit().await?;
 
     if verbose {
-        println!("    Created CBU: {} ({})", "UBO Test: Simple Fund", cbu_id);
+        println!("    Created CBU: UBO Test: Simple Fund ({})", cbu_id);
         println!("    Created Fund Entity: {}", fund_entity_id);
         println!("    Created ManCo Entity: {}", manco_entity_id);
         println!("    Created ownership edge: ManCo -> Fund (100%)");
@@ -527,10 +527,7 @@ async fn seed_scenario_2(pool: &PgPool, verbose: bool) -> Result<()> {
     tx.commit().await?;
 
     if verbose {
-        println!(
-            "    Created CBU: {} ({})",
-            "UBO Test: Hedge Fund LLP", cbu_id
-        );
+        println!("    Created CBU: UBO Test: Hedge Fund LLP ({})", cbu_id);
         println!("    Created 6 entities with 5 UBO edges");
     }
 
@@ -629,7 +626,7 @@ async fn run_scenario_2(pool: &PgPool, verbose: bool) -> Result<()> {
         "Expected 3 beneficial owners (>=25%): John Smith, Jane Doe, GP Principal"
     );
     assert!(
-        evaluation.control_persons.len() >= 1,
+        !evaluation.control_persons.is_empty(),
         "Expected at least 1 control person (GP LLC as general_partner)"
     );
     println!("    PASS: Identified 3 BOs + control person(s)");
@@ -753,10 +750,7 @@ async fn seed_scenario_3(pool: &PgPool, verbose: bool) -> Result<()> {
     tx.commit().await?;
 
     if verbose {
-        println!(
-            "    Created CBU: {} ({})",
-            "UBO Test: Trust Structure", cbu_id
-        );
+        println!("    Created CBU: UBO Test: Trust Structure ({})", cbu_id);
         println!("    Created 7 entities with 6 UBO edges");
     }
 
@@ -830,7 +824,7 @@ async fn run_scenario_3(pool: &PgPool, verbose: bool) -> Result<()> {
         .collect();
 
     assert!(
-        trust_roles.iter().any(|r| *r == "settlor"),
+        trust_roles.contains(&"settlor"),
         "Expected settlor to be identified"
     );
     assert!(

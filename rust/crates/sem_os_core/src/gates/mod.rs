@@ -15,6 +15,7 @@ use crate::types::{
 
 /// Result of a single gate check.
 #[derive(Debug, Clone)]
+#[must_use]
 pub struct GateResult {
     pub gate_name: &'static str,
     pub passed: bool,
@@ -360,6 +361,15 @@ pub enum GateMode {
 pub enum GateSeverity {
     Error,
     Warning,
+}
+
+impl std::fmt::Display for GateSeverity {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Error => write!(f, "error"),
+            Self::Warning => write!(f, "warning"),
+        }
+    }
 }
 
 /// Structured gate failure with metadata for audit and remediation.

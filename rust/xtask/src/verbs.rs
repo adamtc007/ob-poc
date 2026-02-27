@@ -2077,7 +2077,7 @@ fn validate_duration_components(s: &str, valid_designators: &[char]) -> bool {
     while chars.peek().is_some() {
         // Expect one or more digits
         let mut has_digits = false;
-        while chars.peek().map_or(false, |c| c.is_ascii_digit()) {
+        while chars.peek().is_some_and(|c| c.is_ascii_digit()) {
             chars.next();
             has_digits = true;
         }

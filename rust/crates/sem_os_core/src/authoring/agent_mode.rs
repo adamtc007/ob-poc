@@ -10,13 +10,18 @@
 //! |            | focus.*, audit.*, agent.*                  |                                    |
 
 use serde::{Deserialize, Serialize};
+use strum::{AsRefStr, Display, EnumString};
 
 /// Agent operating mode for the Research → Governed boundary.
 ///
 /// Default is `Governed`. Mode switch requires explicit `agent.set-mode` verb
 /// with confirmation.
-#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(
+    Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq, Hash, Display, EnumString,
+    AsRefStr,
+)]
 #[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
 pub enum AgentMode {
     /// Research plane: exploration, schema introspection, ChangeSet authoring.
     ///
@@ -35,13 +40,6 @@ pub enum AgentMode {
 }
 
 impl AgentMode {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            Self::Research => "research",
-            Self::Governed => "governed",
-        }
-    }
-
     /// Whether this mode allows authoring verbs (propose, validate, dry_run, plan).
     pub fn allows_authoring(&self) -> bool {
         matches!(self, AgentMode::Research)
@@ -140,15 +138,6 @@ impl AgentMode {
                 }
                 true
             }
-        }
-    }
-}
-
-impl std::fmt::Display for AgentMode {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            AgentMode::Research => write!(f, "research"),
-            AgentMode::Governed => write!(f, "governed"),
         }
     }
 }

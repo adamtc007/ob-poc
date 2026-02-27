@@ -73,12 +73,7 @@ pub fn build_router(service: Arc<dyn CoreService>, jwt_config: JwtConfig) -> Rou
             "/changesets/:id/publish",
             post(handlers::changesets::publish_changeset),
         )
-        .layer(axum_mw::from_fn(jwt_auth))
-        .layer(Extension(jwt_config));
-
-    // Public routes (no auth)
-    let public = Router::new()
-        .route("/health", get(handlers::health::health))
+        // SemReg health routes (require auth — expose internal registry state)
         .route(
             "/health/semreg/pending-changesets",
             get(handlers::health::semreg_pending_changesets),
@@ -86,7 +81,13 @@ pub fn build_router(service: Arc<dyn CoreService>, jwt_config: JwtConfig) -> Rou
         .route(
             "/health/semreg/stale-dryruns",
             get(handlers::health::semreg_stale_dryruns),
-        );
+        )
+        .layer(axum_mw::from_fn(jwt_auth))
+        .layer(Extension(jwt_config));
+
+    // Public routes (no auth)
+    let public = Router::new()
+        .route("/health", get(handlers::health::health));
 
     // Combine and add shared state
     public.merge(protected).layer(Extension(service))

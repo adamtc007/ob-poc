@@ -1184,8 +1184,8 @@ pub async fn authoring_list(status: Option<&str>, limit: i64) -> Result<()> {
 
     let status_filter = match status {
         Some(s) => {
-            let parsed =
-                sem_os_core::authoring::types::ChangeSetStatus::parse(s).ok_or_else(|| {
+            let parsed: sem_os_core::authoring::types::ChangeSetStatus =
+                s.parse().map_err(|_| {
                     anyhow::anyhow!(
                         "Invalid status '{}'. Valid: draft, validated, rejected, \
                      dry_run_passed, dry_run_failed, published, superseded",
@@ -1211,15 +1211,15 @@ pub async fn authoring_list(status: Option<&str>, limit: i64) -> Result<()> {
     println!("Authoring Pipeline ChangeSets");
     println!("=============================");
     println!(
-        "  {:<38} {:<16} {:<30} {}",
-        "ID", "STATUS", "TITLE", "CREATED"
+        "  {:<38} {:<16} {:<30} CREATED",
+        "ID", "STATUS", "TITLE"
     );
     println!("  {}", "-".repeat(100));
     for cs in &changesets {
         println!(
             "  {:<38} {:<16} {:<30} {}",
             cs.change_set_id,
-            cs.status.as_str(),
+            cs.status,
             truncate_str(&cs.title, 28),
             cs.created_at.format("%Y-%m-%d %H:%M"),
         );
@@ -1241,7 +1241,7 @@ pub async fn authoring_get(id: &str) -> Result<()> {
         .map_err(|e| anyhow::anyhow!("{e}"))?;
 
     println!("ChangeSet: {}", cs.change_set_id);
-    println!("  Status:        {}", cs.status.as_str());
+    println!("  Status:        {}", cs.status);
     println!("  Title:         {}", cs.title);
     if let Some(ref r) = cs.rationale {
         println!("  Rationale:     {}", r);
@@ -1482,7 +1482,7 @@ pub async fn authoring_health() -> Result<()> {
         println!("    (none)");
     } else {
         for (status, count) in &status_counts {
-            println!("    {:<20} {:>6}", status.as_str(), count);
+            println!("    {:<20} {:>6}", status, count);
             if !status.is_terminal() {
                 total_pending += count;
             }
@@ -1500,7 +1500,7 @@ pub async fn authoring_health() -> Result<()> {
         println!(
             "    {} (status: {}, title: {})",
             cs.change_set_id,
-            cs.status.as_str(),
+            cs.status,
             truncate_str(&cs.title, 40),
         );
     }
@@ -1546,7 +1546,7 @@ pub async fn authoring_propose(bundle_path: &str) -> Result<()> {
         .map_err(|e| anyhow::anyhow!("{e}"))?;
 
     println!("Proposed ChangeSet: {}", cs.change_set_id);
-    println!("  Status:       {}", cs.status.as_str());
+    println!("  Status:       {}", cs.status);
     println!("  Title:        {}", cs.title);
     println!("  Content Hash: {}", cs.content_hash);
     println!("  Artifacts:    {}", bundle.artifacts.len());

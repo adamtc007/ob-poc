@@ -2,73 +2,43 @@
 //! These are pure value types — no sqlx, no DB dependencies.
 //! Migrated from sem_reg/types.rs with sqlx derives stripped.
 
-// Several enums intentionally use `from_str() -> Option<Self>` instead of
-// `FromStr` because they return None for unknown values rather than an error.
-#![allow(clippy::should_implement_trait)]
-
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use strum::{AsRefStr, Display, EnumString};
 use uuid::Uuid;
 
 // ── Enums (pure — no sqlx::Type) ─────────────────────────────
 
 /// Governance tier — determines workflow rigour, NOT security posture.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Display, EnumString, AsRefStr,
+)]
 #[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
 pub enum GovernanceTier {
     Governed,
     Operational,
 }
 
-impl GovernanceTier {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            Self::Governed => "governed",
-            Self::Operational => "operational",
-        }
-    }
-
-    pub fn from_str(s: &str) -> Option<Self> {
-        match s {
-            "governed" => Some(Self::Governed),
-            "operational" => Some(Self::Operational),
-            _ => None,
-        }
-    }
-}
-
 /// Trust class — graduated trust levels for registry objects.
 /// Invariant: `Proof` is only valid when `governance_tier = Governed`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Display, EnumString, AsRefStr,
+)]
 #[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
 pub enum TrustClass {
     Proof,
     DecisionSupport,
     Convenience,
 }
 
-impl TrustClass {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            Self::Proof => "proof",
-            Self::DecisionSupport => "decision_support",
-            Self::Convenience => "convenience",
-        }
-    }
-
-    pub fn from_str(s: &str) -> Option<Self> {
-        match s {
-            "proof" => Some(Self::Proof),
-            "decision_support" => Some(Self::DecisionSupport),
-            "convenience" => Some(Self::Convenience),
-            _ => None,
-        }
-    }
-}
-
 /// Snapshot lifecycle status.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Display, EnumString, AsRefStr,
+)]
 #[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
 pub enum SnapshotStatus {
     Draft,
     Active,
@@ -76,30 +46,12 @@ pub enum SnapshotStatus {
     Retired,
 }
 
-impl SnapshotStatus {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            Self::Draft => "draft",
-            Self::Active => "active",
-            Self::Deprecated => "deprecated",
-            Self::Retired => "retired",
-        }
-    }
-
-    pub fn from_str(s: &str) -> Option<Self> {
-        match s {
-            "draft" => Some(Self::Draft),
-            "active" => Some(Self::Active),
-            "deprecated" => Some(Self::Deprecated),
-            "retired" => Some(Self::Retired),
-            _ => None,
-        }
-    }
-}
-
 /// Change type for snapshot transitions.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Display, EnumString, AsRefStr,
+)]
 #[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
 pub enum ChangeType {
     Created,
     NonBreaking,
@@ -109,34 +61,12 @@ pub enum ChangeType {
     Retirement,
 }
 
-impl ChangeType {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            Self::Created => "created",
-            Self::NonBreaking => "non_breaking",
-            Self::Breaking => "breaking",
-            Self::Promotion => "promotion",
-            Self::Deprecation => "deprecation",
-            Self::Retirement => "retirement",
-        }
-    }
-
-    pub fn from_str(s: &str) -> Option<Self> {
-        match s {
-            "created" => Some(Self::Created),
-            "non_breaking" => Some(Self::NonBreaking),
-            "breaking" => Some(Self::Breaking),
-            "promotion" => Some(Self::Promotion),
-            "deprecation" => Some(Self::Deprecation),
-            "retirement" => Some(Self::Retirement),
-            _ => None,
-        }
-    }
-}
-
 /// Registry object type — discriminator for the shared snapshots table.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Display, EnumString, AsRefStr,
+)]
 #[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
 pub enum ObjectType {
     AttributeDef,
     EntityTypeDef,
@@ -151,51 +81,6 @@ pub enum ObjectType {
     DocumentTypeDef,
     ObservationDef,
     DerivationSpec,
-}
-
-impl ObjectType {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            Self::AttributeDef => "attribute_def",
-            Self::EntityTypeDef => "entity_type_def",
-            Self::RelationshipTypeDef => "relationship_type_def",
-            Self::VerbContract => "verb_contract",
-            Self::TaxonomyDef => "taxonomy_def",
-            Self::TaxonomyNode => "taxonomy_node",
-            Self::MembershipRule => "membership_rule",
-            Self::ViewDef => "view_def",
-            Self::PolicyRule => "policy_rule",
-            Self::EvidenceRequirement => "evidence_requirement",
-            Self::DocumentTypeDef => "document_type_def",
-            Self::ObservationDef => "observation_def",
-            Self::DerivationSpec => "derivation_spec",
-        }
-    }
-
-    pub fn from_str(s: &str) -> Option<Self> {
-        match s {
-            "attribute_def" => Some(Self::AttributeDef),
-            "entity_type_def" => Some(Self::EntityTypeDef),
-            "relationship_type_def" => Some(Self::RelationshipTypeDef),
-            "verb_contract" => Some(Self::VerbContract),
-            "taxonomy_def" => Some(Self::TaxonomyDef),
-            "taxonomy_node" => Some(Self::TaxonomyNode),
-            "membership_rule" => Some(Self::MembershipRule),
-            "view_def" => Some(Self::ViewDef),
-            "policy_rule" => Some(Self::PolicyRule),
-            "evidence_requirement" => Some(Self::EvidenceRequirement),
-            "document_type_def" => Some(Self::DocumentTypeDef),
-            "observation_def" => Some(Self::ObservationDef),
-            "derivation_spec" => Some(Self::DerivationSpec),
-            _ => None,
-        }
-    }
-}
-
-impl std::fmt::Display for ObjectType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.as_str())
-    }
 }
 
 // ── Security label ────────────────────────────────────────────
@@ -368,7 +253,7 @@ pub struct EventId(pub Uuid);
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SnapshotSummary {
     pub snapshot_id: SnapshotId,
-    pub object_type: String,
+    pub object_type: ObjectType,
     pub fqn: Fqn,
     pub content_hash: String,
 }
@@ -378,7 +263,7 @@ pub struct SnapshotSummary {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DependentSnapshot {
     pub snapshot_id: uuid::Uuid,
-    pub object_type: String,
+    pub object_type: ObjectType,
     pub fqn: String,
 }
 
@@ -401,7 +286,7 @@ pub struct PublishInput {
 pub struct SnapshotExport {
     pub snapshot_id: SnapshotId,
     pub fqn: Fqn,
-    pub object_type: String,
+    pub object_type: ObjectType,
     pub payload: serde_json::Value,
 }
 
@@ -410,7 +295,7 @@ pub struct SnapshotExport {
 pub struct TypedObject {
     pub snapshot_id: SnapshotId,
     pub fqn: Fqn,
-    pub object_type: String,
+    pub object_type: ObjectType,
     pub definition: serde_json::Value,
 }
 
@@ -479,59 +364,27 @@ fn default_evidence_grade() -> String {
 pub use crate::authoring::types::ChangeSetStatus as ChangesetStatus;
 
 /// Kind of change in a changeset entry.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Display, EnumString, AsRefStr,
+)]
 #[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
 pub enum ChangeKind {
     Add,
     Modify,
     Remove,
 }
 
-impl ChangeKind {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            Self::Add => "add",
-            Self::Modify => "modify",
-            Self::Remove => "remove",
-        }
-    }
-
-    pub fn from_str(s: &str) -> Option<Self> {
-        match s {
-            "add" => Some(Self::Add),
-            "modify" => Some(Self::Modify),
-            "remove" => Some(Self::Remove),
-            _ => None,
-        }
-    }
-}
-
 /// Review verdict for a changeset.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Display, EnumString, AsRefStr,
+)]
 #[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
 pub enum ReviewVerdict {
     Approved,
     Rejected,
     RequestedChanges,
-}
-
-impl ReviewVerdict {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            Self::Approved => "approved",
-            Self::Rejected => "rejected",
-            Self::RequestedChanges => "requested_changes",
-        }
-    }
-
-    pub fn from_str(s: &str) -> Option<Self> {
-        match s {
-            "approved" => Some(Self::Approved),
-            "rejected" => Some(Self::Rejected),
-            "requested_changes" => Some(Self::RequestedChanges),
-            _ => None,
-        }
-    }
 }
 
 /// A changeset — a grouping of draft changes pending review/approval.
@@ -551,7 +404,7 @@ pub struct ChangesetEntry {
     pub entry_id: Uuid,
     pub changeset_id: Uuid,
     pub object_fqn: String,
-    pub object_type: String,
+    pub object_type: ObjectType,
     pub change_kind: ChangeKind,
     pub draft_payload: serde_json::Value,
     pub base_snapshot_id: Option<Uuid>,
@@ -580,7 +433,7 @@ pub struct CreateChangesetInput {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AddChangesetEntryInput {
     pub object_fqn: String,
-    pub object_type: String,
+    pub object_type: ObjectType,
     pub change_kind: ChangeKind,
     pub draft_payload: serde_json::Value,
     pub base_snapshot_id: Option<Uuid>,
@@ -592,15 +445,6 @@ pub struct SubmitReviewInput {
     pub actor_id: String,
     pub verdict: ReviewVerdict,
     pub comment: Option<String>,
-}
-
-/// A stale draft conflict detected during promotion.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StaleDraftConflict {
-    pub entry_id: Uuid,
-    pub object_fqn: String,
-    pub base_snapshot_id: Option<Uuid>,
-    pub current_snapshot_id: Option<Uuid>,
 }
 
 // ── Tests ─────────────────────────────────────────────────────
