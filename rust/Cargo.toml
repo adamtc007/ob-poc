@@ -24,6 +24,7 @@ ob-poc-macros = { path = "crates/ob-poc-macros" }
 sem_os_core = { path = "crates/sem_os_core" }
 sem_os_client = { path = "crates/sem_os_client" }
 sem_os_obpoc_adapter = { path = "crates/sem_os_obpoc_adapter" }
+governed_query_proc = { path = "crates/governed_query_proc" }
 
 # Auto-registration for custom operations
 inventory = "0.3"
@@ -231,6 +232,7 @@ members = [
     "crates/ob-semantic-matcher",
 
     "crates/ob-poc-macros",
+    "crates/governed_query_proc",
 
     "xtask", "crates/playbook-core", "crates/playbook-lower",
     "crates/inspector-projection",

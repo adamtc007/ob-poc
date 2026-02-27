@@ -19,6 +19,8 @@ mod gleif_crawl_dsl;
 mod gleif_import;
 mod gleif_load;
 mod gleif_test;
+mod governed_cache;
+mod governed_check;
 mod harness;
 mod lexicon;
 mod replay_tuner;
@@ -540,6 +542,26 @@ enum Command {
         #[command(subcommand)]
         action: BpmnLiteAction,
     },
+
+    /// GovernedQuery cache management (refresh, stats)
+    ///
+    /// Generates the bincode cache file used by #[governed_query] proc macro
+    /// for compile-time governance verification.
+    GovernedCache {
+        #[command(subcommand)]
+        action: GovernedCacheAction,
+    },
+
+    /// GovernedQuery governance checker
+    ///
+    /// Scans source files for #[governed_query] annotations and checks
+    /// against the live Semantic OS registry. Reports hard errors
+    /// (GC001-GC003) and soft warnings (GC010-GC011).
+    GovernedCheck {
+        /// Fail with non-zero exit code on hard errors (for CI)
+        #[arg(long)]
+        strict: bool,
+    },
 }
 
 #[derive(Subcommand)]
@@ -618,6 +640,21 @@ enum BpmnLiteAction {
         #[arg(long)]
         skip_build: bool,
     },
+}
+
+#[derive(Subcommand)]
+enum GovernedCacheAction {
+    /// Refresh the governed cache from the database
+    ///
+    /// Queries sem_reg.snapshots for active entries and writes
+    /// assets/governed_cache.bin for compile-time verification.
+    Refresh,
+
+    /// Show governed cache statistics
+    ///
+    /// Reads the cache file and prints counts by object type,
+    /// governance tier, and PII status.
+    Stats,
 }
 
 #[derive(Subcommand)]
@@ -1544,6 +1581,17 @@ fn main() -> Result<()> {
             BpmnLiteAction::DockerBuild => bpmn_lite::docker_build(&sh),
             BpmnLiteAction::Deploy { skip_build } => bpmn_lite::deploy(&sh, !skip_build),
         },
+        Command::GovernedCache { action } => {
+            let rt = tokio::runtime::Runtime::new()?;
+            match action {
+                GovernedCacheAction::Refresh => rt.block_on(governed_cache::refresh(None)),
+                GovernedCacheAction::Stats => rt.block_on(governed_cache::stats(None)),
+            }
+        }
+        Command::GovernedCheck { strict } => {
+            let rt = tokio::runtime::Runtime::new()?;
+            rt.block_on(governed_check::run_check(strict))
+        }
     }
 }
 
@@ -1820,6 +1868,11 @@ fn check(sh: &Shell, db: bool) -> Result<()> {
     println!("  Running tests...");
     if db {
         cmd!(sh, "cargo test --features database").run()?;
+
+        // Governance drift check (only with DB access)
+        println!("  Running governance check...");
+        let rt = tokio::runtime::Runtime::new()?;
+        rt.block_on(governed_check::run_check(true))?;
     } else {
         cmd!(sh, "cargo test --lib --features database").run()?;
     }
@@ -1986,6 +2039,13 @@ fn ci(sh: &Shell) -> Result<()> {
 
     println!("\n=== Build ===");
     build(sh, false)?;
+
+    // Governance drift check (requires DATABASE_URL)
+    if std::env::var("DATABASE_URL").is_ok() {
+        println!("\n=== Governance Check ===");
+        let rt = tokio::runtime::Runtime::new()?;
+        rt.block_on(governed_check::run_check(true))?;
+    }
 
     println!("\nCI pipeline passed!");
     Ok(())
