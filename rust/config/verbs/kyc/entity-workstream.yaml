@@ -14,6 +14,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: entity_workstream
+          tags: [kyc]
         behavior: crud
         produces:
           type: workstream
@@ -99,6 +100,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: entity_workstream
+          tags: [kyc]
         behavior: crud
         crud:
           operation: update
@@ -143,6 +145,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: entity_workstream
+          tags: [kyc]
         behavior: crud
         crud:
           operation: update
@@ -182,6 +185,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: entity_workstream
+          tags: [kyc]
         behavior: crud
         crud:
           operation: update
@@ -226,6 +230,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: entity_workstream
+          tags: [kyc]
         behavior: crud
         crud:
           operation: update
@@ -261,6 +266,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: entity_workstream
+          tags: [kyc]
         behavior: crud
         crud:
           operation: update
@@ -299,6 +305,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: entity_workstream
+          tags: [kyc]
         behavior: crud
         crud:
           operation: list_by_fk
@@ -333,6 +340,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: entity_workstream
+          tags: [kyc]
         behavior: crud
         crud:
           operation: select
@@ -363,6 +371,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: entity_workstream
+          tags: [kyc]
         behavior: plugin
         handler: WorkstreamStateOp
         args:

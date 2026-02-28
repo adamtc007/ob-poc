@@ -1564,6 +1564,7 @@ impl ToolHandlers {
             source: crate::agent::orchestrator::UtteranceSource::Mcp,
             sem_os_client: self.sem_os_client.clone(),
             agent_mode: self.agent_mode,
+            goals: vec![],
         };
         let outcome = crate::agent::orchestrator::handle_utterance(&orch_ctx, instruction).await?;
         let result = outcome.pipeline_result;

@@ -17,7 +17,17 @@ use strum::{AsRefStr, Display, EnumString};
 /// Default is `Governed`. Mode switch requires explicit `agent.set-mode` verb
 /// with confirmation.
 #[derive(
-    Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq, Hash, Display, EnumString,
+    Debug,
+    Clone,
+    Copy,
+    Default,
+    Serialize,
+    Deserialize,
+    PartialEq,
+    Eq,
+    Hash,
+    Display,
+    EnumString,
     AsRefStr,
 )]
 #[serde(rename_all = "snake_case")]

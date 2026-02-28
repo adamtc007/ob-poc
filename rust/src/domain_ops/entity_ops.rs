@@ -5,6 +5,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
+use governed_query_proc::governed_query;
 use ob_poc_macros::register_custom_op;
 
 use super::CustomOperation;
@@ -51,6 +52,7 @@ impl CustomOperation for EntityGhostOp {
     }
 
     #[cfg(feature = "database")]
+    #[governed_query(verb = "entity.ghost", skip_principal_check = true)]
     async fn execute(
         &self,
         verb_call: &VerbCall,

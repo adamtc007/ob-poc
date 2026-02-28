@@ -208,7 +208,7 @@ pub async fn refresh(output: Option<PathBuf>) -> Result<()> {
         entries,
     };
 
-    let output_path = output.unwrap_or_else(|| default_cache_path());
+    let output_path = output.unwrap_or_else(default_cache_path);
     let bytes = bincode::serialize(&cache).context("Failed to serialize cache")?;
 
     // Ensure parent directory exists
@@ -231,7 +231,7 @@ pub async fn refresh(output: Option<PathBuf>) -> Result<()> {
 }
 
 pub async fn stats(path: Option<PathBuf>) -> Result<()> {
-    let cache_path = path.unwrap_or_else(|| default_cache_path());
+    let cache_path = path.unwrap_or_else(default_cache_path);
 
     let bytes = std::fs::read(&cache_path).with_context(|| {
         format!(

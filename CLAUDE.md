@@ -1,7 +1,7 @@
 # CLAUDE.md
 
 > **Last reviewed:** 2026-02-27
-> **Frontend:** React/TypeScript (`ob-poc-ui-react/`) - Chat UI with scope panel, Inspector
+> **Frontend:** React/TypeScript (`ob-poc-ui-react/`) - Chat UI with scope panel, Inspector, Semantic OS Tab
 > **Backend:** Rust/Axum (`rust/crates/ob-poc-web/`) - Serves React + REST API
 > **Crates:** 22 active Rust crates (16 ob-poc + 6 sem_os_*; esper_* deprecated; ob-poc-graph + viewport removed)
 > **Verbs:** 1,158 canonical verbs, 15,465 intent patterns (DB-sourced)
@@ -61,6 +61,7 @@
 > **Stewardship Agent (Phase 0-1, Migrations 096-098):** ✅ Complete - Changeset authoring layer, 23 MCP tools, guardrails engine (G01-G15), basis records, conflict detection, idempotency, Show Loop with 4 viewports (Focus/Inspector/Diff/Gates), SSE streaming, REST endpoints, 11 integration tests
 > **Governed Registry Authoring (v0.4, Migrations 099-102):** ✅ Complete + Standalone Verified - Research→Governed two-plane model, 7 governance verbs (propose/validate/dry-run/plan/publish/rollback/diff), content-addressed idempotency (SHA-256), AgentMode gating (Research vs Governed), validation pipeline (Stage 1 artifact integrity + Stage 2 dry-run), batch publish with topological sort, governance audit log, retention/cleanup, 9-state ChangeSetStatus (incl. UnderReview/Approved from stewardship), 321 unit tests + 26 integration tests + 10 HTTP integration tests, 8 CLI subcommands, 10 REST routes, standalone sem_os_server deployment verified
 > **CCIR — Context-Constrained Intent Resolution (Migration 103):** ✅ Complete - ContextEnvelope replaces SemRegVerbPolicy, structured PruneReason (7 variants), deterministic AllowedVerbSetFingerprint (SHA-256), TOCTOU recheck, pre-constrained verb search (allowed verbs threaded into HybridVerbSearcher), SemReg enforcement at dsl_execute, legacy V1 module cleanup (4 modules deleted: ~2,700 LOC), 16 unit tests
+> **Semantic OS Tab:** ✅ Complete - Agent-driven workflow selection UI (`/semantic-os`), goals→phase_tags verb scoping in SemReg, DecisionPacket workflow prompt (Onboarding/KYC/Data Management/Stewardship), session sidebar + registry context panel, `GET /api/sem-os/context` endpoint
 
 This is the root project guide for Claude Code. Domain-specific details are in annexes.
 
@@ -122,9 +123,10 @@ npx md-to-pdf migrations/OB_POC_SCHEMA_ENTITY_OVERVIEW.md
 ```
 ob-poc-ui-react/
 ├── src/
-│   ├── api/              # API client (chat.ts, scope.ts)
+│   ├── api/              # API client (chat.ts, scope.ts, semOs.ts)
 │   ├── features/
 │   │   ├── chat/         # Agent chat UI with scope panel
+│   │   ├── semantic-os/  # Semantic OS workflow UI
 │   │   ├── inspector/    # Projection inspector (tree + detail)
 │   │   └── settings/     # App settings
 │   ├── stores/           # Zustand state management
@@ -138,12 +140,13 @@ ob-poc-ui-react/
 
 | Endpoint | Purpose |
 |----------|---------|
-| `POST /api/session` | Create agent session |
+| `POST /api/session` | Create agent session (with optional `workflow_focus`) |
 | `GET /api/session/:id` | Get session with messages |
 | `POST /api/session/:id/chat` | Send chat message |
 | `GET /api/session/:id/scope-graph` | Get loaded CBUs (scope) |
 | `GET /api/cbu/:id/graph` | Get single CBU's entity graph |
 | `GET /api/projections/:id` | Get Inspector projection |
+| `GET /api/sem-os/context` | Get Semantic OS registry stats + recent changesets |
 
 ### Development
 
@@ -185,6 +188,49 @@ The right-side panel shows loaded CBUs and supports drill-down:
 - **CBU List**: Click any CBU to see its entities
 - **Entity View**: Shows entities within the CBU (persons, organizations)
 - **Auto-refresh**: Updates every 5 seconds to reflect DSL execution
+
+### Semantic OS Tab
+
+The `/semantic-os` route provides an agent-driven workflow for Semantic OS operations. Sessions start with a workflow selection prompt that constrains which verbs the pipeline considers via SemReg `phase_tags` filtering.
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  [Sessions]  │  [Chat Messages]                    │  [Context]     │
+│              │                                     │                │
+│  Session 1   │  Agent: What would you like to      │  Registry Stats│
+│  Session 2   │  work on?                           │  ├─ Attrs: 120 │
+│  + New       │  [Onboarding] [KYC]                 │  ├─ Verbs: 340 │
+│              │  [Data Mgmt] [Stewardship]          │  └─ ...        │
+│              │                                     │  Changesets    │
+│              │  [Input: Type a message...]         │  └─ Draft: 3   │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**Workflow Selection Flow:**
+1. User clicks "New Session" → `POST /api/session { workflow_focus: "semantic-os" }`
+2. Backend returns `DecisionPacket` with 4 workflow choices (Onboarding, KYC, Data Management, Stewardship)
+3. User selects workflow → sets `session.context.stage_focus = "semos-{workflow}"`
+4. All subsequent utterances flow through SemReg with `goals = ["{workflow}"]`
+5. `filter_and_rank_verbs()` filters to verbs whose `phase_tags` overlap with goals
+
+**Goals → Phase Tags Pipeline:**
+```
+stage_focus "semos-kyc" → goals ["kyc"] → ContextResolutionRequest
+    → filter_and_rank_verbs(goals=["kyc"])
+    → verb.phase_tags contains "kyc"? include + boost
+    → ContextEnvelope { allowed_verbs } → IntentPipeline
+```
+
+**Key Files:**
+
+| File | Purpose |
+|------|---------|
+| `ob-poc-ui-react/src/features/semantic-os/SemOsPage.tsx` | 3-column layout (sidebar, chat, context panel) |
+| `ob-poc-ui-react/src/features/semantic-os/components/SemOsSidebar.tsx` | Session list with own localStorage (`ob-poc-semos-sessions`) |
+| `ob-poc-ui-react/src/features/semantic-os/components/SemOsContextPanel.tsx` | Registry stats + recent changesets (auto-refresh 10s) |
+| `ob-poc-ui-react/src/api/semOs.ts` | API client for `GET /api/sem-os/context` |
+| `rust/src/api/agent_routes.rs` | Session creation with `workflow_focus` + DecisionPacket |
+| `rust/src/sem_reg/context_resolution.rs` | `filter_and_rank_verbs()` with goals→phase_tags filtering |
 
 ---
 

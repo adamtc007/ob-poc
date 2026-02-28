@@ -9,6 +9,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: case_screening
+          tags: [kyc]
         behavior: crud
         produces:
           type: screening
@@ -64,6 +65,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: case_screening
+          tags: [kyc]
         behavior: crud
         consumes:
           - arg: screening-id
@@ -113,6 +115,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: case_screening
+          tags: [kyc]
         behavior: crud
         crud:
           operation: update
@@ -163,6 +166,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: case_screening
+          tags: [kyc]
         behavior: crud
         crud:
           operation: list_by_fk

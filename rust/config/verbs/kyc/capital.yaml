@@ -13,6 +13,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: capital
+          tags: [kyc]
         behavior: crud
         crud:
           operation: upsert
@@ -118,6 +119,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: capital
+          tags: [kyc]
         behavior: crud
         crud:
           operation: upsert
@@ -174,6 +176,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: capital
+          tags: [kyc]
         behavior: plugin
         plugin:
           handler: CapitalTransferOp
@@ -232,6 +235,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: capital
+          tags: [kyc]
         behavior: plugin
         plugin:
           handler: CapitalReconcileOp
@@ -269,6 +273,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: capital
+          tags: [kyc]
         behavior: plugin
         plugin:
           handler: CapitalOwnershipChainOp
@@ -298,6 +303,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: capital
+          tags: [kyc]
         behavior: plugin
         plugin:
           handler: CapitalIssueSharesOp
@@ -330,6 +336,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: capital
+          tags: [kyc]
         behavior: plugin
         plugin:
           handler: CapitalCancelSharesOp
@@ -362,6 +369,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: capital
+          tags: [kyc]
         behavior: crud
         crud:
           operation: list_by_fk
@@ -388,6 +396,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: capital
+          tags: [kyc]
         behavior: crud
         crud:
           operation: list_by_fk

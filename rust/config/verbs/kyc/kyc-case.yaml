@@ -15,6 +15,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: kyc_case
+          tags: [kyc]
         behavior: plugin
         handler: KycCaseCreateOp
         produces:
@@ -104,6 +105,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: kyc_case
+          tags: [kyc]
         behavior: plugin
         handler: KycCaseUpdateStatusOp
         emits_event: case.status-changed
@@ -146,6 +148,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: kyc_case
+          tags: [kyc]
         behavior: crud
         crud:
           operation: update
@@ -186,6 +189,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: kyc_case
+          tags: [kyc]
         behavior: crud
         crud:
           operation: update
@@ -238,6 +242,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: kyc_case
+          tags: [kyc]
         behavior: crud
         crud:
           operation: update
@@ -281,6 +286,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: kyc_case
+          tags: [kyc]
         behavior: plugin
         handler: KycCaseCloseOp
         emits_event: case.closed
@@ -325,6 +331,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: kyc_case
+          tags: [kyc]
         behavior: crud
         crud:
           operation: select
@@ -355,6 +362,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: kyc_case
+          tags: [kyc]
         behavior: crud
         crud:
           operation: list_by_fk
@@ -389,6 +397,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: kyc_case
+          tags: [kyc]
         behavior: crud
         crud:
           operation: update
@@ -445,6 +454,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: kyc_case
+          tags: [kyc]
         behavior: plugin
         handler: KycCaseStateOp
         args:

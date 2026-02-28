@@ -47,7 +47,7 @@ domains:
           source_of_truth: entity
           scope: global
           noun: entity
-          tags: [lifecycle, creation]
+          tags: [lifecycle, creation, onboarding]
         produces:
           type: entity
           subtype: limited_company
@@ -98,7 +98,7 @@ domains:
           source_of_truth: entity
           scope: global
           noun: entity
-          tags: [lifecycle, creation]
+          tags: [lifecycle, creation, onboarding]
         produces:
           type: entity
           subtype: proper_person
@@ -148,7 +148,7 @@ domains:
           source_of_truth: entity
           scope: global
           noun: entity
-          tags: [lifecycle, creation]
+          tags: [lifecycle, creation, onboarding]
         produces:
           type: entity
           subtype: trust
@@ -198,7 +198,7 @@ domains:
           source_of_truth: entity
           scope: global
           noun: entity
-          tags: [lifecycle, creation]
+          tags: [lifecycle, creation, onboarding]
         produces:
           type: entity
           subtype: partnership
@@ -254,7 +254,7 @@ domains:
           source_of_truth: entity
           scope: global
           noun: entity
-          tags: [lifecycle, upsert]
+          tags: [lifecycle, upsert, onboarding]
         produces:
           type: entity
           subtype: limited_company
@@ -310,7 +310,7 @@ domains:
           source_of_truth: entity
           scope: global
           noun: entity
-          tags: [lifecycle, upsert]
+          tags: [lifecycle, upsert, onboarding]
         produces:
           type: entity
           subtype: proper_person
@@ -361,7 +361,7 @@ domains:
           source_of_truth: entity
           scope: global
           noun: entity
-          tags: [lifecycle, upsert]
+          tags: [lifecycle, upsert, onboarding]
         produces:
           type: entity
           subtype: trust
@@ -412,7 +412,7 @@ domains:
           source_of_truth: entity
           scope: global
           noun: entity
-          tags: [lifecycle, upsert]
+          tags: [lifecycle, upsert, onboarding]
         produces:
           type: entity
           subtype: partnership
@@ -458,7 +458,7 @@ domains:
           tier: diagnostics
           source_of_truth: entity
           noun: entity
-          tags: [query]
+          tags: [query, onboarding]
         crud:
           operation: select
           table: entities
@@ -493,7 +493,7 @@ domains:
           source_of_truth: entity
           scope: global
           noun: entity
-          tags: [lifecycle, modification]
+          tags: [lifecycle, modification, onboarding]
         crud:
           operation: update
           table: entities
@@ -532,7 +532,7 @@ domains:
           source_of_truth: entity
           scope: global
           noun: entity
-          tags: [lifecycle, deletion]
+          tags: [lifecycle, deletion, onboarding]
         crud:
           operation: delete
           table: entities
@@ -567,7 +567,7 @@ domains:
           tier: diagnostics
           source_of_truth: entity
           noun: entity
-          tags: [query, listing]
+          tags: [query, listing, onboarding]
         crud:
           operation: select
           table: entities
@@ -602,7 +602,7 @@ domains:
           tier: diagnostics
           source_of_truth: entity
           noun: entity
-          tags: [query, batch]
+          tags: [query, batch, onboarding]
         plugin:
           handler: entity_query
         args:
@@ -640,7 +640,7 @@ domains:
           source_of_truth: entity
           scope: global
           noun: entity
-          tags: [lifecycle, ghost, creation]
+          tags: [lifecycle, ghost, creation, onboarding]
         plugin:
           handler: entity_ghost
         produces:
@@ -677,7 +677,7 @@ domains:
           source_of_truth: entity
           scope: global
           noun: entity
-          tags: [lifecycle, ghost, identification]
+          tags: [lifecycle, ghost, identification, onboarding]
         plugin:
           handler: entity_identify
         args:
@@ -727,7 +727,7 @@ domains:
           source_of_truth: entity
           scope: global
           noun: entity
-          tags: [lifecycle, ghost, verification]
+          tags: [lifecycle, ghost, verification, onboarding]
         crud:
           operation: update
           table: entity_proper_persons
@@ -757,7 +757,7 @@ domains:
           tier: diagnostics
           source_of_truth: entity
           noun: entity
-          tags: [query, ghost, listing]
+          tags: [query, ghost, listing, onboarding]
         crud:
           operation: select
           table: entity_proper_persons
@@ -792,7 +792,7 @@ domains:
           source_of_truth: entity
           scope: global
           noun: entity
-          tags: [lifecycle, placeholder, macro]
+          tags: [lifecycle, placeholder, macro, onboarding]
         plugin:
           handler: entity_ensure_or_placeholder
         args:
@@ -860,7 +860,7 @@ domains:
           source_of_truth: entity
           scope: global
           noun: entity
-          tags: [lifecycle, placeholder, resolution]
+          tags: [lifecycle, placeholder, resolution, onboarding]
         plugin:
           handler: entity_resolve_placeholder
         args:
@@ -912,7 +912,7 @@ domains:
           tier: diagnostics
           source_of_truth: entity
           noun: entity
-          tags: [query, placeholder, listing]
+          tags: [query, placeholder, listing, onboarding]
         plugin:
           handler: entity_list_placeholders
         args:
@@ -936,7 +936,7 @@ domains:
           tier: diagnostics
           source_of_truth: entity
           noun: entity
-          tags: [query, placeholder, stats]
+          tags: [query, placeholder, stats, onboarding]
         plugin:
           handler: entity_placeholder_summary
         args:

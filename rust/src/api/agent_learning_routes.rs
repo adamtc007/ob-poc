@@ -611,7 +611,32 @@ pub(crate) async fn handle_decision_reply(
                     }
                 }
                 DecisionKind::ClarifyScope => {
-                    format!("Selected scope: {}", choice.label)
+                    // Check if this is a Semantic OS workflow selection
+                    let is_semos = packet.trace.decision_reason == "semos_workflow_selection";
+                    if is_semos {
+                        // Map choice → stage_focus for verb phase_tag filtering
+                        let stage_focus = match choice.id.as_str() {
+                            "1" => "semos-onboarding",
+                            "2" => "semos-kyc",
+                            "3" => "semos-data-management",
+                            "4" => "semos-stewardship",
+                            _ => "semos-data-management", // safe default
+                        };
+                        session.context.stage_focus = Some(stage_focus.to_string());
+                        tracing::info!(
+                            session_id = %session_id,
+                            stage_focus = %stage_focus,
+                            workflow = %choice.label,
+                            "Semantic OS workflow selected — stage_focus set"
+                        );
+                        format!(
+                            "Great, let's work on **{}**. I'll focus on {} verbs and tools. How can I help?",
+                            choice.label,
+                            choice.label.to_lowercase()
+                        )
+                    } else {
+                        format!("Selected scope: {}", choice.label)
+                    }
                 }
                 DecisionKind::ClarifyDeal => {
                     // Handle deal selection

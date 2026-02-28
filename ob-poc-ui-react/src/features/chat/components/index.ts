@@ -7,3 +7,4 @@ export { DecisionCard } from "./DecisionCard";
 export { ChatSidebar } from "./ChatSidebar";
 export { ChatInput } from "./ChatInput";
 export { ScopePanel } from "./ScopePanel";
+export { VerbBrowser } from "./VerbBrowser";

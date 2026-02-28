@@ -10,6 +10,7 @@ import type {
   ChatSessionSummary,
   ChatMessage,
   DecisionPacket,
+  VerbProfile,
 } from '../types/chat';
 
 /** Chat state */
@@ -26,6 +27,9 @@ interface ChatState {
 
   // Input
   inputValue: string;
+
+  // Available verbs (populated on every chat response)
+  availableVerbs: VerbProfile[];
 
   // Errors
   error: string | null;
@@ -48,6 +52,9 @@ interface ChatActions {
   // Decision packets
   setPendingDecision: (decision: DecisionPacket | null) => void;
 
+  // Available verbs
+  setAvailableVerbs: (verbs: VerbProfile[]) => void;
+
   // Input
   setInputValue: (value: string) => void;
   clearInput: () => void;
@@ -66,6 +73,7 @@ const initialState: ChatState = {
   isStreaming: false,
   streamingContent: '',
   pendingDecision: null,
+  availableVerbs: [],
   inputValue: '',
   error: null,
 };
@@ -124,6 +132,8 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
   clearStreamingContent: () => set({ streamingContent: '' }),
 
   setPendingDecision: (pendingDecision) => set({ pendingDecision }),
+
+  setAvailableVerbs: (availableVerbs) => set({ availableVerbs }),
 
   setInputValue: (inputValue) => set({ inputValue }),
 

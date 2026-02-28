@@ -477,7 +477,13 @@ mod tests {
         let projections = Arc::new(PgProjectionWriter::new(pool));
 
         let service = Arc::new(CoreServiceImpl::new(
-            snapshots, objects, changesets, audit, outbox, evidence, projections,
+            snapshots,
+            objects,
+            changesets,
+            audit,
+            outbox,
+            evidence,
+            projections,
         ));
 
         InProcessClient::new(service)

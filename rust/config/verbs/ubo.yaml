@@ -21,7 +21,7 @@ domains:
           source_of_truth: entity
           scope: global
           noun: ubo
-          tags: [ownership, relationship, create]
+          tags: [ownership, relationship, create, kyc]
         crud:
           operation: upsert
           table: entity_relationships
@@ -216,7 +216,7 @@ domains:
           source_of_truth: entity
           scope: global
           noun: ubo
-          tags: [ownership, relationship, update]
+          tags: [ownership, relationship, update, kyc]
         crud:
           operation: update
           table: entity_relationships
@@ -262,7 +262,7 @@ domains:
           source_of_truth: entity
           scope: global
           noun: ubo
-          tags: [ownership, relationship, lifecycle]
+          tags: [ownership, relationship, lifecycle, kyc]
         crud:
           operation: update
           table: entity_relationships
@@ -300,7 +300,7 @@ domains:
           source_of_truth: entity
           scope: global
           noun: ubo
-          tags: [ownership, relationship, delete]
+          tags: [ownership, relationship, delete, kyc]
         crud:
           operation: delete
           table: entity_relationships
@@ -337,7 +337,7 @@ domains:
           source_of_truth: entity
           scope: global
           noun: ubo
-          tags: [control, relationship, create]
+          tags: [control, relationship, create, kyc]
         crud:
           operation: upsert
           table: entity_relationships
@@ -410,7 +410,7 @@ domains:
           source_of_truth: entity
           scope: global
           noun: ubo
-          tags: [control, relationship, lifecycle]
+          tags: [control, relationship, lifecycle, kyc]
         crud:
           operation: update
           table: entity_relationships
@@ -448,7 +448,7 @@ domains:
           source_of_truth: entity
           scope: global
           noun: ubo
-          tags: [control, relationship, delete]
+          tags: [control, relationship, delete, kyc]
         crud:
           operation: delete
           table: entity_relationships
@@ -485,7 +485,7 @@ domains:
           source_of_truth: entity
           scope: global
           noun: ubo
-          tags: [trust, relationship, create]
+          tags: [trust, relationship, create, kyc]
         crud:
           operation: upsert
           table: entity_relationships
@@ -566,7 +566,7 @@ domains:
           source_of_truth: entity
           scope: global
           noun: ubo
-          tags: [trust, relationship, lifecycle]
+          tags: [trust, relationship, lifecycle, kyc]
         crud:
           operation: update
           table: entity_relationships
@@ -603,7 +603,7 @@ domains:
           source_of_truth: entity
           scope: global
           noun: ubo
-          tags: [trust, relationship, delete]
+          tags: [trust, relationship, delete, kyc]
         crud:
           operation: delete
           table: entity_relationships
@@ -637,7 +637,7 @@ domains:
           source_of_truth: entity
           scope: global
           noun: ubo
-          tags: [relationship, delete, generic]
+          tags: [relationship, delete, generic, kyc]
         crud:
           operation: delete
           table: entity_relationships
@@ -673,7 +673,7 @@ domains:
           source_of_truth: entity
           scope: global
           noun: ubo
-          tags: [ownership, query, temporal]
+          tags: [ownership, query, temporal, kyc]
         args:
           - name: entity-id
             type: uuid
@@ -706,7 +706,7 @@ domains:
           source_of_truth: entity
           scope: global
           noun: ubo
-          tags: [ownership, query]
+          tags: [ownership, query, kyc]
         crud:
           operation: list_by_fk
           table: entity_relationships_current
@@ -744,7 +744,7 @@ domains:
           source_of_truth: entity
           scope: cbu
           noun: ubo
-          tags: [query, ubo-candidates]
+          tags: [query, ubo-candidates, kyc]
         crud:
           operation: list_by_fk
           table: v_ubo_candidates
@@ -776,7 +776,7 @@ domains:
           source_of_truth: entity
           scope: global
           noun: ubo
-          tags: [ownership, query, reverse-lookup]
+          tags: [ownership, query, reverse-lookup, kyc]
         crud:
           operation: list_by_fk
           table: entity_relationships_current
@@ -814,7 +814,7 @@ domains:
           source_of_truth: entity
           scope: cbu
           noun: ubo
-          tags: [computation, ownership, graph-traversal]
+          tags: [computation, ownership, graph-traversal, kyc]
         args:
           - name: cbu-id
             type: uuid
@@ -922,7 +922,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: ubo
-          tags: [computation, ownership, graph-traversal, chain]
+          tags: [computation, ownership, graph-traversal, chain, kyc]
         args:
           - name: case-id
             type: uuid

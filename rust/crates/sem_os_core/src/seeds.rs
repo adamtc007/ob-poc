@@ -135,11 +135,17 @@ mod tests {
     use serde_json::json;
 
     fn make_verb(fqn: &str) -> VerbContractSeed {
-        VerbContractSeed { fqn: fqn.into(), payload: json!({"desc": fqn}) }
+        VerbContractSeed {
+            fqn: fqn.into(),
+            payload: json!({"desc": fqn}),
+        }
     }
 
     fn make_attr(fqn: &str) -> AttributeSeed {
-        AttributeSeed { fqn: fqn.into(), payload: json!({"type": "string"}) }
+        AttributeSeed {
+            fqn: fqn.into(),
+            payload: json!({"type": "string"}),
+        }
     }
 
     fn empty_hash(verbs: &[VerbContractSeed], attrs: &[AttributeSeed]) -> String {
@@ -176,7 +182,10 @@ mod tests {
     fn compute_hash_changes_with_content() {
         let h_empty = empty_hash(&[], &[]);
         let h_one = empty_hash(&[make_verb("x.y")], &[]);
-        assert_ne!(h_empty, h_one, "different content must produce different hash");
+        assert_ne!(
+            h_empty, h_one,
+            "different content must produce different hash"
+        );
     }
 
     #[test]
@@ -185,11 +194,26 @@ mod tests {
             bundle_hash: "v1:abc123".into(),
             verb_contracts: vec![make_verb("cbu.create")],
             attributes: vec![make_attr("cbu.name")],
-            entity_types: vec![EntityTypeSeed { fqn: "cbu".into(), payload: json!({}) }],
-            taxonomies: vec![TaxonomySeed { fqn: "domain.kyc".into(), payload: json!({}) }],
-            policies: vec![PolicySeed { fqn: "p.rule".into(), payload: json!({}) }],
-            views: vec![ViewSeed { fqn: "v.default".into(), payload: json!({}) }],
-            derivation_specs: vec![DerivationSpecSeed { fqn: "d.spec".into(), payload: json!({}) }],
+            entity_types: vec![EntityTypeSeed {
+                fqn: "cbu".into(),
+                payload: json!({}),
+            }],
+            taxonomies: vec![TaxonomySeed {
+                fqn: "domain.kyc".into(),
+                payload: json!({}),
+            }],
+            policies: vec![PolicySeed {
+                fqn: "p.rule".into(),
+                payload: json!({}),
+            }],
+            views: vec![ViewSeed {
+                fqn: "v.default".into(),
+                payload: json!({}),
+            }],
+            derivation_specs: vec![DerivationSpecSeed {
+                fqn: "d.spec".into(),
+                payload: json!({}),
+            }],
         };
         let json_str = serde_json::to_string(&bundle).unwrap();
         let restored: SeedBundle = serde_json::from_str(&json_str).unwrap();
@@ -206,13 +230,41 @@ mod tests {
     #[test]
     fn individual_seed_types_serde_round_trip() {
         let seeds: Vec<serde_json::Value> = vec![
-            serde_json::to_value(VerbContractSeed { fqn: "v.c".into(), payload: json!(1) }).unwrap(),
-            serde_json::to_value(AttributeSeed { fqn: "a.s".into(), payload: json!(2) }).unwrap(),
-            serde_json::to_value(EntityTypeSeed { fqn: "e.t".into(), payload: json!(3) }).unwrap(),
-            serde_json::to_value(TaxonomySeed { fqn: "t.x".into(), payload: json!(4) }).unwrap(),
-            serde_json::to_value(PolicySeed { fqn: "p.r".into(), payload: json!(5) }).unwrap(),
-            serde_json::to_value(ViewSeed { fqn: "v.d".into(), payload: json!(6) }).unwrap(),
-            serde_json::to_value(DerivationSpecSeed { fqn: "d.s".into(), payload: json!(7) }).unwrap(),
+            serde_json::to_value(VerbContractSeed {
+                fqn: "v.c".into(),
+                payload: json!(1),
+            })
+            .unwrap(),
+            serde_json::to_value(AttributeSeed {
+                fqn: "a.s".into(),
+                payload: json!(2),
+            })
+            .unwrap(),
+            serde_json::to_value(EntityTypeSeed {
+                fqn: "e.t".into(),
+                payload: json!(3),
+            })
+            .unwrap(),
+            serde_json::to_value(TaxonomySeed {
+                fqn: "t.x".into(),
+                payload: json!(4),
+            })
+            .unwrap(),
+            serde_json::to_value(PolicySeed {
+                fqn: "p.r".into(),
+                payload: json!(5),
+            })
+            .unwrap(),
+            serde_json::to_value(ViewSeed {
+                fqn: "v.d".into(),
+                payload: json!(6),
+            })
+            .unwrap(),
+            serde_json::to_value(DerivationSpecSeed {
+                fqn: "d.s".into(),
+                payload: json!(7),
+            })
+            .unwrap(),
         ];
         // Deserialize each back to its concrete type
         let _: VerbContractSeed = serde_json::from_value(seeds[0].clone()).unwrap();

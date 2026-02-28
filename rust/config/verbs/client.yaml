@@ -22,7 +22,7 @@ verbs:
       scope: cbu
       internal: false
       noun: onboarding_status
-      tags: [client-portal, read-only]
+      tags: [client-portal, read-only, onboarding]
       subject_kinds: [client, cbu]
     args:
       - name: cbu-id
@@ -43,7 +43,7 @@ verbs:
       scope: cbu
       internal: false
       noun: outstanding_request
-      tags: [client-portal, read-only]
+      tags: [client-portal, read-only, onboarding]
       subject_kinds: [client, cbu]
     args:
       - name: cbu-id
@@ -69,7 +69,7 @@ verbs:
       scope: cbu
       internal: false
       noun: request_detail
-      tags: [client-portal, read-only]
+      tags: [client-portal, read-only, onboarding]
       subject_kinds: [client, cbu]
     args:
       - name: request-id
@@ -90,7 +90,7 @@ verbs:
       scope: cbu
       internal: false
       noun: entity_info
-      tags: [client-portal, read-only]
+      tags: [client-portal, read-only, onboarding]
       subject_kinds: [client, cbu]
     args:
       - name: entity-id
@@ -116,7 +116,7 @@ verbs:
       writes_operational: true
       internal: false
       noun: document_submission
-      tags: [client-portal, write]
+      tags: [client-portal, write, onboarding]
       subject_kinds: [client, cbu]
     args:
       - name: request-id
@@ -154,7 +154,7 @@ verbs:
       writes_operational: true
       internal: false
       noun: info_submission
-      tags: [client-portal, write]
+      tags: [client-portal, write, onboarding]
       subject_kinds: [client, cbu]
     args:
       - name: request-id
@@ -189,7 +189,7 @@ verbs:
       writes_operational: true
       internal: false
       noun: request_note
-      tags: [client-portal, write]
+      tags: [client-portal, write, onboarding]
       subject_kinds: [client, cbu]
     args:
       - name: request-id
@@ -219,7 +219,7 @@ verbs:
       writes_operational: true
       internal: false
       noun: clarification_request
-      tags: [client-portal, write]
+      tags: [client-portal, write, onboarding]
       subject_kinds: [client, cbu]
     args:
       - name: request-id
@@ -248,7 +248,7 @@ verbs:
       scope: cbu
       internal: false
       noun: collection_session
-      tags: [client-portal, guided-collection]
+      tags: [client-portal, guided-collection, onboarding]
       subject_kinds: [client, cbu]
     args:
       - name: request-id
@@ -269,7 +269,7 @@ verbs:
       scope: cbu
       internal: false
       noun: collection_response
-      tags: [client-portal, guided-collection]
+      tags: [client-portal, guided-collection, onboarding]
       subject_kinds: [client, cbu]
     args:
       - name: field
@@ -295,7 +295,7 @@ verbs:
       scope: cbu
       internal: false
       noun: collection_confirmation
-      tags: [client-portal, guided-collection]
+      tags: [client-portal, guided-collection, onboarding]
       subject_kinds: [client, cbu]
     args:
       - name: confirmed
@@ -321,7 +321,7 @@ verbs:
       writes_operational: true
       internal: false
       noun: escalation_request
-      tags: [client-portal, escalation]
+      tags: [client-portal, escalation, onboarding]
       subject_kinds: [client, cbu]
     args:
       - name: reason

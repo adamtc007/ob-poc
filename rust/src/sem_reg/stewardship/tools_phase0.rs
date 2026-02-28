@@ -1744,7 +1744,10 @@ impl From<ChangesetDbRow> for ChangesetRow {
     fn from(r: ChangesetDbRow) -> Self {
         Self {
             changeset_id: r.changeset_id,
-            status: r.status.parse::<ChangesetStatus>().unwrap_or(ChangesetStatus::Draft),
+            status: r
+                .status
+                .parse::<ChangesetStatus>()
+                .unwrap_or(ChangesetStatus::Draft),
             owner_actor_id: r.owner_actor_id,
             scope: r.scope,
             created_at: r.created_at,

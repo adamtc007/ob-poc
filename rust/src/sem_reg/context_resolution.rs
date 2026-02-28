@@ -529,6 +529,7 @@ pub async fn resolve_context(
         req.entity_kind.as_deref(),
         &memberships,
         &relationships,
+        &req.goals,
     )?;
 
     // Step 6: Filter attributes similarly
@@ -1012,6 +1013,7 @@ fn filter_and_rank_verbs(
     entity_kind: Option<&str>,
     memberships: &SubjectMemberships,
     relationships: &SubjectRelationships,
+    goals: &[String],
 ) -> Result<Vec<VerbCandidate>> {
     let mut candidates = Vec::new();
 
@@ -1097,6 +1099,32 @@ fn filter_and_rank_verbs(
                 rank_score += (overlap as f64 * 0.05).min(0.1);
             }
             // Verbs without taxonomy memberships pass through — they are unconstrained
+        }
+
+        // Goal-based phase_tag filtering: if goals are specified, filter to verbs
+        // whose phase_tags overlap with the requested goals.
+        // Graceful degradation: if goals is empty, all verbs pass.
+        if !goals.is_empty() {
+            let verb_phase_tags: Vec<String> = body
+                .get("phase_tags")
+                .and_then(|v| serde_json::from_value(v.clone()).ok())
+                .unwrap_or_default();
+            if !verb_phase_tags.is_empty() {
+                let overlap = verb_phase_tags
+                    .iter()
+                    .any(|pt| goals.iter().any(|g| g == pt));
+                if !overlap {
+                    tracing::trace!(
+                        verb_fqn = %fqn,
+                        verb_phase_tags = ?verb_phase_tags,
+                        goals = ?goals,
+                        "Verb filtered out: phase_tags don't overlap with goals"
+                    );
+                    continue;
+                }
+                rank_score += 0.10; // Boost for goal-aligned verbs
+            }
+            // Verbs without phase_tags pass through (unconstrained)
         }
 
         // D5: Relationship-aware ranking — boost verbs whose domain matches

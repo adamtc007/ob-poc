@@ -13,6 +13,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: trust
+          tags: [kyc]
         behavior: crud
         crud:
           operation: upsert
@@ -136,6 +137,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: trust
+          tags: [kyc]
         behavior: crud
         crud:
           operation: update
@@ -182,6 +184,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: trust
+          tags: [kyc]
         behavior: crud
         crud:
           operation: update
@@ -209,6 +212,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: trust
+          tags: [kyc]
         behavior: crud
         crud:
           operation: list_by_fk
@@ -242,6 +246,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: trust
+          tags: [kyc]
         behavior: crud
         crud:
           operation: list_by_fk
@@ -277,6 +282,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: trust
+          tags: [kyc]
         behavior: plugin
         plugin:
           handler: TrustAnalyzeControlOp
@@ -317,6 +323,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: trust
+          tags: [kyc]
         behavior: plugin
         plugin:
           handler: TrustIdentifyUbosOp
@@ -358,6 +365,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: trust
+          tags: [kyc]
         behavior: plugin
         plugin:
           handler: TrustClassifyOp

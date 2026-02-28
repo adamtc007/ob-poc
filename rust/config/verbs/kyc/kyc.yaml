@@ -32,6 +32,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: kyc_case
+          tags: [kyc]
         lifecycle:
           requires_scope: cbu
         invocation_phrases:

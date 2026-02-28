@@ -29,7 +29,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: cbu
-          tags: [lifecycle, write]
+          tags: [lifecycle, write, onboarding]
         produces:
           type: cbu
           resolved: false
@@ -117,7 +117,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: cbu
-          tags: [read, query]
+          tags: [read, query, onboarding]
         crud:
           operation: select
           table: cbus
@@ -156,7 +156,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: cbu
-          tags: [lifecycle, write]
+          tags: [lifecycle, write, onboarding]
         crud:
           operation: update
           table: cbus
@@ -209,7 +209,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: cbu
-          tags: [lifecycle, write, destructive]
+          tags: [lifecycle, write, destructive, onboarding]
         crud:
           operation: delete
           table: cbus
@@ -237,7 +237,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: cbu
-          tags: [lifecycle, write, destructive, cascade]
+          tags: [lifecycle, write, destructive, cascade, onboarding]
         plugin:
           handler: CbuDeleteCascadeOp
         args:
@@ -275,7 +275,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: cbu
-          tags: [read, query, list]
+          tags: [read, query, list, onboarding]
         crud:
           operation: select
           table: cbus
@@ -311,7 +311,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: cbu
-          tags: [lifecycle, write, idempotent]
+          tags: [lifecycle, write, idempotent, onboarding]
         produces:
           type: cbu
           resolved: false
@@ -372,7 +372,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: cbu
-          tags: [relationship, write, role]
+          tags: [relationship, write, role, onboarding]
         consumes:
           - arg: cbu-id
             type: cbu
@@ -446,7 +446,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: cbu
-          tags: [relationship, write, role]
+          tags: [relationship, write, role, onboarding]
         crud:
           operation: role_unlink
           junction: cbu_entity_roles
@@ -492,7 +492,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: cbu
-          tags: [read, query, relationship]
+          tags: [read, query, relationship, onboarding]
         crud:
           operation: list_parties
           junction: cbu_entity_roles
@@ -522,7 +522,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: cbu
-          tags: [lifecycle, write, classification]
+          tags: [lifecycle, write, classification, onboarding]
         crud:
           operation: update
           table: cbus
@@ -562,7 +562,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: cbu
-          tags: [read, query, detailed]
+          tags: [read, query, detailed, onboarding]
         plugin:
           handler: CbuShowOp
         args:
@@ -592,7 +592,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: cbu
-          tags: [relationship, write, product]
+          tags: [relationship, write, product, onboarding]
         plugin:
           handler: CbuAddProductOp
         args:
@@ -627,7 +627,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: cbu
-          tags: [relationship, write, product]
+          tags: [relationship, write, product, onboarding]
         crud:
           operation: delete
           table: service_delivery_map
@@ -666,7 +666,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: cbu
-          tags: [lifecycle, write, decision, kyc]
+          tags: [lifecycle, write, decision, kyc, onboarding]
         plugin:
           handler: CbuDecideOp
         consumes:
@@ -736,7 +736,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: cbu
-          tags: [evidence, write, kyc]
+          tags: [evidence, write, kyc, onboarding]
         crud:
           operation: insert
           table: cbu_evidence
@@ -801,7 +801,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: cbu
-          tags: [evidence, write, kyc, verification]
+          tags: [evidence, write, kyc, verification, onboarding]
         crud:
           operation: update
           table: cbu_evidence
@@ -841,7 +841,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: cbu
-          tags: [evidence, read, query, kyc]
+          tags: [evidence, read, query, kyc, onboarding]
         crud:
           operation: list_by_fk
           table: cbu_evidence

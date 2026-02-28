@@ -16,6 +16,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: skeleton_build
+          tags: [kyc]
         behavior: plugin
         plugin:
           handler: SkeletonBuildOp

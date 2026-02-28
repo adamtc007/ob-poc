@@ -181,7 +181,9 @@ impl Default for DerivationFunctionRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::derivation_spec::{DerivationExpression, DerivationInput, DerivationSpecBody, NullSemantics};
+    use crate::derivation_spec::{
+        DerivationExpression, DerivationInput, DerivationSpecBody, NullSemantics,
+    };
     use crate::types::Classification;
 
     fn make_spec(fn_name: &str, null_sem: NullSemantics) -> DerivationSpecBody {
@@ -195,7 +197,9 @@ mod tests {
                 role: "primary".into(),
                 required: true,
             }],
-            expression: DerivationExpression::FunctionRef { ref_name: fn_name.into() },
+            expression: DerivationExpression::FunctionRef {
+                ref_name: fn_name.into(),
+            },
             null_semantics: null_sem,
             freshness_rule: None,
             security_inheritance: Default::default(),
@@ -217,13 +221,18 @@ mod tests {
     #[test]
     fn register_and_evaluate() {
         let mut reg = DerivationFunctionRegistry::new();
-        reg.register("double", Arc::new(|inputs: &serde_json::Value| {
-            let n = inputs.get("in.val").and_then(|v| v.as_i64()).unwrap_or(0);
-            Ok(serde_json::json!(n * 2))
-        }));
+        reg.register(
+            "double",
+            Arc::new(|inputs: &serde_json::Value| {
+                let n = inputs.get("in.val").and_then(|v| v.as_i64()).unwrap_or(0);
+                Ok(serde_json::json!(n * 2))
+            }),
+        );
         let spec = make_spec("double", NullSemantics::Error);
         let inputs = serde_json::json!({"in.val": 5});
-        let result = reg.evaluate(&spec, &inputs, &[empty_label()], Uuid::nil(), vec![]).unwrap();
+        let result = reg
+            .evaluate(&spec, &inputs, &[empty_label()], Uuid::nil(), vec![])
+            .unwrap();
         assert_eq!(result.value, serde_json::json!(10));
     }
 
@@ -232,17 +241,34 @@ mod tests {
         let reg = DerivationFunctionRegistry::new();
         let spec = make_spec("missing_fn", NullSemantics::Error);
         let inputs = serde_json::json!({"in.val": 1});
-        let err = reg.evaluate(&spec, &inputs, &[], Uuid::nil(), vec![]).unwrap_err();
-        assert_eq!(err, DerivationError::FunctionNotFound { ref_name: "missing_fn".into() });
+        let err = reg
+            .evaluate(&spec, &inputs, &[], Uuid::nil(), vec![])
+            .unwrap_err();
+        assert_eq!(
+            err,
+            DerivationError::FunctionNotFound {
+                ref_name: "missing_fn".into()
+            }
+        );
     }
 
     #[test]
     fn null_required_input_error_semantics() {
         let mut reg = DerivationFunctionRegistry::new();
-        reg.register("noop", Arc::new(|_: &serde_json::Value| Ok(serde_json::json!(null))));
+        reg.register(
+            "noop",
+            Arc::new(|_: &serde_json::Value| Ok(serde_json::json!(null))),
+        );
         let spec = make_spec("noop", NullSemantics::Error);
         let inputs = serde_json::json!({});
-        let err = reg.evaluate(&spec, &inputs, &[], Uuid::nil(), vec![]).unwrap_err();
-        assert_eq!(err, DerivationError::NullRequiredInput { attribute_fqn: "in.val".into() });
+        let err = reg
+            .evaluate(&spec, &inputs, &[], Uuid::nil(), vec![])
+            .unwrap_err();
+        assert_eq!(
+            err,
+            DerivationError::NullRequiredInput {
+                attribute_fqn: "in.val".into()
+            }
+        );
     }
 }

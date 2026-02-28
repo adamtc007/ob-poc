@@ -8,7 +8,7 @@
  *      -> Onboarding Requests
  */
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import {
   ChevronRight,
   ChevronDown,
@@ -191,7 +191,10 @@ function TreeNode({
   const hasChildren = node.children && node.children.length > 0;
   const isExpanded = expandedNodes.has(node.id);
   const isSelected = selectedNodeId === node.id;
-  const Icon = getNodeIcon(node.type);
+  const nodeIcon = useMemo(
+    () => getNodeIcon(node.type)({ size: 14, className: "flex-shrink-0 text-[var(--text-muted)]" }),
+    [node.type],
+  );
 
   const handleToggle = useCallback(
     (e: React.MouseEvent) => {
@@ -231,7 +234,7 @@ function TreeNode({
         ) : (
           <span className="w-5" />
         )}
-        <Icon size={14} className="flex-shrink-0 text-[var(--text-muted)]" />
+        {nodeIcon}
         <span className="text-sm truncate flex-1">{node.label}</span>
         {node.childCount !== undefined && node.childCount > 0 && (
           <span className="text-xs text-[var(--text-muted)] tabular-nums">

@@ -1,5 +1,9 @@
 /**
- * Chat Page - Agent chat UI
+ * SemOsPage - Semantic OS agent interface
+ *
+ * Three-column layout reusing chat components for message display and input.
+ * Sessions are created with workflow_focus="semantic-os" which triggers a
+ * workflow selection decision packet on the backend.
  */
 
 import { useParams } from "react-router-dom";
@@ -9,11 +13,11 @@ import { Loader2 } from "lucide-react";
 import { chatApi } from "../../api/chat";
 import { queryKeys, queryClient } from "../../lib/query";
 import { useChatStore } from "../../stores/chat";
-import { ChatSidebar, ChatMessage, ChatInput, ScopePanel, VerbBrowser } from "./components";
-import { DealPanel } from "../deal/components";
+import { ChatMessage, ChatInput } from "../chat/components";
+import { SemOsSidebar, SemOsContextPanel } from "./components";
 import type { DecisionReply } from "../../types/chat";
 
-export function ChatPage() {
+export function SemOsPage() {
   const { sessionId } = useParams<{ sessionId?: string }>();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const {
@@ -22,12 +26,11 @@ export function ChatPage() {
     addMessage,
     isStreaming,
     setStreaming,
-    setAvailableVerbs,
   } = useChatStore();
 
-  // Fetch session if ID is provided
+  // Fetch session if ID is provided (reuses chat session endpoints)
   const { data, isLoading, error } = useQuery({
-    queryKey: queryKeys.chat.session(sessionId || ""),
+    queryKey: queryKeys.semOs.session(sessionId || ""),
     queryFn: () => chatApi.getSession(sessionId!),
     enabled: !!sessionId,
   });
@@ -53,7 +56,6 @@ export function ChatPage() {
       return chatApi.sendMessage(sessionId, { message });
     },
     onMutate: (message) => {
-      // Optimistically add user message
       addMessage({
         id: `temp-${Date.now()}`,
         role: "user",
@@ -63,11 +65,7 @@ export function ChatPage() {
       setStreaming(true);
     },
     onSuccess: (response) => {
-      // Replace temp message with real one and add assistant response
       setCurrentSession(response.session);
-      if (response.available_verbs?.length) {
-        setAvailableVerbs(response.available_verbs);
-      }
       setStreaming(false);
     },
     onError: () => {
@@ -75,7 +73,7 @@ export function ChatPage() {
     },
   });
 
-  // Decision reply mutation
+  // Decision reply mutation (for workflow selection and other decisions)
   const replyMutation = useMutation({
     mutationFn: (reply: DecisionReply) => {
       if (!sessionId) throw new Error("No session selected");
@@ -84,7 +82,7 @@ export function ChatPage() {
     onSuccess: (message) => {
       addMessage(message);
       queryClient.invalidateQueries({
-        queryKey: queryKeys.chat.session(sessionId!),
+        queryKey: queryKeys.semOs.session(sessionId!),
       });
     },
   });
@@ -97,7 +95,6 @@ export function ChatPage() {
   );
 
   const handleCancel = useCallback(() => {
-    // TODO: Implement streaming cancellation
     setStreaming(false);
   }, [setStreaming]);
 
@@ -114,7 +111,7 @@ export function ChatPage() {
   return (
     <div className="flex h-full">
       {/* Left sidebar - Session list */}
-      <ChatSidebar className="w-64 flex-shrink-0 border-r border-[var(--border-primary)] bg-[var(--bg-secondary)]" />
+      <SemOsSidebar className="w-64 flex-shrink-0 border-r border-[var(--border-primary)] bg-[var(--bg-secondary)]" />
 
       {/* Main chat area */}
       <div className="flex flex-1 flex-col">
@@ -136,22 +133,27 @@ export function ChatPage() {
             <div className="flex h-full items-center justify-center">
               <div className="text-center">
                 <h2 className="text-xl font-semibold text-[var(--text-primary)]">
-                  Start a Conversation
+                  Semantic OS
                 </h2>
                 <p className="mt-2 text-[var(--text-secondary)]">
-                  Select a session from the sidebar or create a new one.
+                  Create a new session to start working with the semantic
+                  registry.
+                </p>
+                <p className="mt-1 text-sm text-[var(--text-muted)]">
+                  You&apos;ll choose a workflow focus: Onboarding, KYC, Data
+                  Management, or Stewardship.
                 </p>
               </div>
             </div>
           ) : (
-            <div className="space-y-4 max-w-3xl mx-auto">
+            <div className="mx-auto max-w-3xl space-y-4">
               {currentSession.messages.length === 0 ? (
                 <div className="py-12 text-center">
                   <h3 className="text-lg font-medium text-[var(--text-primary)]">
                     Loading...
                   </h3>
                   <p className="mt-2 text-sm text-[var(--text-secondary)]">
-                    Setting up your session.
+                    Setting up your Semantic OS session.
                   </p>
                 </div>
               ) : (
@@ -184,24 +186,17 @@ export function ChatPage() {
           isStreaming={isStreaming}
           disabled={!sessionId || sendMutation.isPending}
           placeholder={
-            sessionId ? "Type a message..." : "Select or create a session first"
+            sessionId
+              ? "Type a message..."
+              : "Select or create a session first"
           }
         />
       </div>
 
-      {/* Right sidebar - Scope, Verbs, and Deal panels */}
-      <div className="w-72 flex-shrink-0 border-l border-[var(--border-primary)] bg-[var(--bg-secondary)] flex flex-col overflow-hidden">
-        {/* Deal context panel */}
-        {sessionId && <DealPanel sessionId={sessionId} />}
-
-        {/* Scope panel showing loaded CBUs */}
-        <ScopePanel sessionId={sessionId} />
-
-        {/* Available commands / verb browser */}
-        <VerbBrowser className="border-t border-[var(--border-primary)]" />
-      </div>
+      {/* Right sidebar - Registry context */}
+      <SemOsContextPanel className="w-64 flex-shrink-0 border-l border-[var(--border-primary)] bg-[var(--bg-secondary)]" />
     </div>
   );
 }
 
-export default ChatPage;
+export default SemOsPage;

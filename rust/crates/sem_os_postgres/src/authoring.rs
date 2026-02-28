@@ -306,7 +306,9 @@ impl AuthoringStore for PgAuthoringStore {
         Ok(rows
             .into_iter()
             .map(|r| {
-                let stage = r.stage.parse::<ValidationStage>()
+                let stage = r
+                    .stage
+                    .parse::<ValidationStage>()
                     .unwrap_or(ValidationStage::Validate);
                 (r.report_id, stage, r.ok, r.report)
             })
@@ -617,7 +619,10 @@ impl ChangeSetRow {
     fn into_full(self) -> ChangeSetFull {
         ChangeSetFull {
             change_set_id: self.changeset_id,
-            status: self.status.parse::<ChangeSetStatus>().unwrap_or(ChangeSetStatus::Draft),
+            status: self
+                .status
+                .parse::<ChangeSetStatus>()
+                .unwrap_or(ChangeSetStatus::Draft),
             content_hash: self.content_hash.unwrap_or_default(),
             hash_version: self.hash_version.unwrap_or_else(|| "v1".into()),
             title: self.title.unwrap_or_default(),
@@ -652,7 +657,9 @@ impl ArtifactRow {
         ChangeSetArtifact {
             artifact_id: self.artifact_id,
             change_set_id: self.change_set_id,
-            artifact_type: self.artifact_type.parse::<ArtifactType>()
+            artifact_type: self
+                .artifact_type
+                .parse::<ArtifactType>()
                 .unwrap_or(ArtifactType::DocJson),
             ordinal: self.ordinal,
             path: self.path,

@@ -13,6 +13,7 @@ import type {
   SendMessageResponse,
   DecisionReply,
   ChatMessage,
+  VerbProfile,
 } from "../types/chat";
 
 /**
@@ -100,8 +101,12 @@ export const chatApi = {
   },
 
   /** Create a new chat session */
-  async createSession(title?: string): Promise<ChatSession> {
+  async createSession(title?: string, workflowFocus?: string): Promise<ChatSession> {
     // Backend returns CreateSessionResponse: { session_id, created_at, state, welcome_message, decision? }
+    const body: Record<string, unknown> = {};
+    if (workflowFocus) {
+      body.workflow_focus = workflowFocus;
+    }
     const backend = await api.post<
       BackendSession & {
         welcome_message?: string;
@@ -118,7 +123,7 @@ export const chatApi = {
           confirm_token?: string;
         };
       }
-    >("/session", {});
+    >("/session", body);
     const session = mapBackendSession(backend);
     if (title) {
       session.title = title;
@@ -208,6 +213,7 @@ export const chatApi = {
       intent_tier?: unknown;
       clarification?: unknown;
       error?: string;
+      available_verbs?: VerbProfile[];
       // Backend DecisionPacket for client group/deal/verb clarification
       decision?: {
         packet_id: string;
@@ -324,6 +330,7 @@ export const chatApi = {
     return {
       message: assistantMessage,
       session: await chatApi.getSession(sessionId),
+      available_verbs: response.available_verbs,
     };
   },
 

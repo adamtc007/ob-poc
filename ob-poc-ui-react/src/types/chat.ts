@@ -141,6 +141,26 @@ export interface ChatSessionSummary {
   last_message_preview?: string;
 }
 
+/** Verb argument profile */
+export interface VerbArgProfile {
+  name: string;
+  arg_type: string;
+  required: boolean;
+  valid_values?: string[];
+  description?: string;
+}
+
+/** Verb profile (structured verb universe item) */
+export interface VerbProfile {
+  fqn: string;
+  domain: string;
+  description: string;
+  sexpr: string;
+  args: VerbArgProfile[];
+  preconditions_met: boolean;
+  governance_tier: string;
+}
+
 /** Send message request */
 export interface SendMessageRequest {
   message: string;
@@ -151,4 +171,5 @@ export interface SendMessageRequest {
 export interface SendMessageResponse {
   message: ChatMessage;
   session: ChatSession;
+  available_verbs?: VerbProfile[];
 }

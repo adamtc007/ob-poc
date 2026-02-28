@@ -21,6 +21,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: tollgate
+          tags: [kyc]
         behavior: plugin
         plugin:
           handler: TollgateEvaluateOp
@@ -75,6 +76,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: tollgate
+          tags: [kyc]
         behavior: plugin
         plugin:
           handler: TollgateGetMetricsOp
@@ -122,6 +124,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: tollgate
+          tags: [kyc]
         behavior: crud
         crud:
           operation: update
@@ -184,6 +187,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: tollgate
+          tags: [kyc]
         behavior: plugin
         plugin:
           handler: TollgateOverrideOp
@@ -232,6 +236,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: tollgate
+          tags: [kyc]
         behavior: crud
         crud:
           operation: list_by_fk
@@ -267,6 +272,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: tollgate
+          tags: [kyc]
         behavior: crud
         crud:
           operation: select
@@ -295,6 +301,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: tollgate
+          tags: [kyc]
         behavior: plugin
         plugin:
           handler: TollgateDecisionReadinessOp
@@ -330,6 +337,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: tollgate
+          tags: [kyc]
         behavior: crud
         crud:
           operation: select
@@ -354,6 +362,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: tollgate
+          tags: [kyc]
         behavior: crud
         crud:
           operation: update
@@ -396,6 +405,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: tollgate
+          tags: [kyc]
         behavior: plugin
         plugin:
           handler: TollgateEvaluateGateOp

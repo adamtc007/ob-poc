@@ -113,7 +113,8 @@ mod tests {
         // Check #[serde(default)] on optional fields: omitting them deserializes fine
         let minimal: AttributeDefBody = serde_json::from_str(
             r#"{"fqn":"x","name":"x","description":"x","domain":"x","data_type":"string"}"#,
-        ).unwrap();
+        )
+        .unwrap();
         assert!(minimal.source.is_none());
         assert!(minimal.sinks.is_empty());
         // Round-trip

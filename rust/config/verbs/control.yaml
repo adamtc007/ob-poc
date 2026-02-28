@@ -18,6 +18,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: control
+          tags: [data-management]
         behavior: crud
         crud:
           operation: upsert
@@ -106,6 +107,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: control
+          tags: [data-management]
         behavior: crud
         crud:
           operation: update
@@ -145,6 +147,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: control
+          tags: [data-management]
         behavior: crud
         crud:
           operation: list_by_fk
@@ -183,6 +186,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: control
+          tags: [data-management]
         behavior: crud
         crud:
           operation: list_by_fk
@@ -220,6 +224,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: control
+          tags: [data-management]
         behavior: plugin
         plugin:
           handler: ControlAnalyzeOp
@@ -271,6 +276,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: control
+          tags: [data-management]
         behavior: plugin
         plugin:
           handler: ControlBuildGraphOp
@@ -321,6 +327,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: control
+          tags: [data-management]
         behavior: plugin
         plugin:
           handler: ControlIdentifyUbosOp
@@ -372,6 +379,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: control
+          tags: [data-management]
         behavior: plugin
         plugin:
           handler: ControlTraceChainOp
@@ -425,6 +433,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: control
+          tags: [data-management]
         behavior: plugin
         plugin:
           handler: ControlReconcileOwnershipOp
@@ -479,6 +488,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: board_controller
+          tags: [data-management]
         behavior: plugin
         plugin:
           handler: ShowBoardControllerOp
@@ -538,6 +548,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: board_controller
+          tags: [data-management]
         behavior: plugin
         plugin:
           handler: RecomputeBoardControllerOp
@@ -591,6 +602,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: board_controller
+          tags: [data-management]
         behavior: plugin
         plugin:
           handler: SetBoardControllerOp
@@ -650,6 +662,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: board_controller
+          tags: [data-management]
         behavior: plugin
         plugin:
           handler: ClearBoardControllerOverrideOp
@@ -687,6 +700,7 @@ domains:
           source_of_truth: external
           scope: cbu
           noun: board_controller
+          tags: [data-management]
         behavior: plugin
         plugin:
           handler: ImportPscRegisterOp
@@ -746,6 +760,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: control
+          tags: [data-management]
         behavior: plugin
         plugin:
           handler: ControlComputeControllersOp
@@ -793,6 +808,7 @@ domains:
           source_of_truth: external
           scope: cbu
           noun: board_controller
+          tags: [data-management]
         behavior: plugin
         plugin:
           handler: ImportGleifControlOp

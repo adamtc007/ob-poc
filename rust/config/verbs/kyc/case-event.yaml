@@ -9,6 +9,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: case_event
+          tags: [kyc]
         behavior: crud
         crud:
           operation: insert
@@ -79,6 +80,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: case_event
+          tags: [kyc]
         behavior: crud
         crud:
           operation: list_by_fk

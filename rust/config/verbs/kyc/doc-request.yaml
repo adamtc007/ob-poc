@@ -9,6 +9,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: doc_request
+          tags: [kyc]
         behavior: crud
         crud:
           operation: upsert
@@ -87,6 +88,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: doc_request
+          tags: [kyc]
         behavior: crud
         crud:
           operation: update
@@ -117,6 +119,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: doc_request
+          tags: [kyc]
         behavior: crud
         crud:
           operation: update
@@ -157,6 +160,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: doc_request
+          tags: [kyc]
         behavior: crud
         crud:
           operation: update
@@ -191,6 +195,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: doc_request
+          tags: [kyc]
         behavior: crud
         crud:
           operation: update
@@ -224,6 +229,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: doc_request
+          tags: [kyc]
         behavior: crud
         crud:
           operation: update
@@ -257,6 +263,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: doc_request
+          tags: [kyc]
         behavior: crud
         crud:
           operation: list_by_fk

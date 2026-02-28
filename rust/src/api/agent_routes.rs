@@ -481,6 +481,8 @@ pub(crate) fn create_agent_router_with_state(state: AgentState) -> Router {
             "/api/batch/add-products",
             post(crate::api::agent_dsl_routes::batch_add_products),
         )
+        // Semantic OS context
+        .route("/api/sem-os/context", get(get_semos_context))
         // Learning/feedback (captures user corrections for continuous improvement)
         .route(
             "/api/agent/correction",
@@ -515,10 +517,56 @@ async fn create_session(
     tracing::info!("Domain hint: {:?}", req.domain_hint);
     tracing::info!("Initial client: {:?}", req.initial_client);
     tracing::info!("Structure type: {:?}", req.structure_type);
+    tracing::info!("Workflow focus: {:?}", req.workflow_focus);
 
     let mut session = UnifiedSession::new_for_entity(None, "cbu", None, req.domain_hint.clone());
     let session_id = session.id;
     let created_at = session.created_at;
+
+    // Semantic OS workflow: skip client resolution, present workflow selection
+    if req.workflow_focus.as_deref() == Some("semantic-os") {
+        tracing::info!("Semantic OS session — building workflow selection packet");
+
+        // Store in memory
+        {
+            let mut sessions = state.sessions.write().await;
+            session.add_agent_message(
+                "Welcome to Semantic OS. What would you like to work on?".to_string(),
+                None,
+                None,
+            );
+            let packet = build_semos_workflow_decision(session_id);
+            session.pending_decision = Some(packet.clone());
+            sessions.insert(session_id, session);
+        }
+
+        // Persist to database asynchronously
+        let session_repo = state.session_repo.clone();
+        tokio::spawn(async move {
+            if let Err(e) = session_repo
+                .create_session_with_id(session_id, None, None)
+                .await
+            {
+                tracing::error!("Failed to persist session {}: {}", session_id, e);
+            }
+        });
+
+        let decision = {
+            let sessions = state.sessions.read().await;
+            sessions
+                .get(&session_id)
+                .and_then(|s| s.pending_decision.clone())
+        };
+
+        let response = CreateSessionResponse {
+            session_id,
+            created_at,
+            state: SessionState::New.into(),
+            welcome_message: "Welcome to Semantic OS. What would you like to work on?".to_string(),
+            decision,
+        };
+        return Ok(Json(response));
+    }
 
     // Wire initial client constraint if provided
     let (final_state, welcome_message) = if let Some(ref client_ref) = req.initial_client {
@@ -628,6 +676,177 @@ async fn create_session(
         response.welcome_message
     );
     Ok(Json(response))
+}
+
+// ============================================================================
+// Semantic OS Context
+// ============================================================================
+
+/// Response for GET /api/sem-os/context
+#[derive(Debug, Clone, serde::Serialize)]
+struct SemOsContextResponse {
+    /// Snapshot counts by object type (e.g., {"attribute_def": 120, "verb_contract": 85})
+    registry_stats: std::collections::HashMap<String, i64>,
+    /// Recent changesets (last 10)
+    recent_changesets: Vec<ChangesetSummary>,
+    /// Current agent mode ("governed" or "research")
+    agent_mode: String,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+struct ChangesetSummary {
+    id: Uuid,
+    title: Option<String>,
+    status: String,
+    created_by: Option<String>,
+    created_at: Option<chrono::DateTime<chrono::Utc>>,
+    entry_count: i64,
+}
+
+/// GET /api/sem-os/context — registry stats, recent changesets, agent mode
+async fn get_semos_context(
+    State(state): State<AgentState>,
+) -> Result<Json<SemOsContextResponse>, StatusCode> {
+    // 1. Registry stats from sem_reg.v_registry_stats
+    let stats_rows: Vec<(String, i64)> = sqlx::query_as(
+        r#"
+        SELECT object_type::text, count
+        FROM sem_reg.v_registry_stats
+        "#,
+    )
+    .fetch_all(&state.pool)
+    .await
+    .unwrap_or_default();
+
+    let registry_stats: std::collections::HashMap<String, i64> =
+        stats_rows.into_iter().collect();
+
+    // 2. Recent changesets (last 10)
+    let changeset_rows: Vec<(Uuid, Option<String>, String, Option<String>, Option<chrono::DateTime<chrono::Utc>>, i64)> = sqlx::query_as(
+        r#"
+        SELECT
+            c.id,
+            c.title,
+            c.status::text,
+            c.created_by,
+            c.created_at,
+            COALESCE((SELECT count(*) FROM sem_reg.changeset_entries e WHERE e.change_set_id = c.id), 0) as entry_count
+        FROM sem_reg.changesets c
+        ORDER BY c.created_at DESC NULLS LAST
+        LIMIT 10
+        "#,
+    )
+    .fetch_all(&state.pool)
+    .await
+    .unwrap_or_default();
+
+    let recent_changesets: Vec<ChangesetSummary> = changeset_rows
+        .into_iter()
+        .map(|(id, title, status, created_by, created_at, entry_count)| ChangesetSummary {
+            id,
+            title,
+            status,
+            created_by,
+            created_at,
+            entry_count,
+        })
+        .collect();
+
+    // 3. Agent mode — default is Governed
+    let agent_mode = sem_os_core::authoring::agent_mode::AgentMode::default().to_string();
+
+    Ok(Json(SemOsContextResponse {
+        registry_stats,
+        recent_changesets,
+        agent_mode,
+    }))
+}
+
+/// Build a Semantic OS workflow selection decision packet.
+///
+/// Presents 4 workflow choices that map to `stage_focus` values,
+/// which thread through `goals` → `phase_tags` verb filtering.
+fn build_semos_workflow_decision(session_id: Uuid) -> ob_poc_types::DecisionPacket {
+    use ob_poc_types::{
+        ClarificationPayload, DecisionKind, DecisionPacket, DecisionTrace, ScopeOption,
+        ScopePayload, SessionStateView, UserChoice,
+    };
+
+    let choices = vec![
+        UserChoice {
+            id: "1".to_string(),
+            label: "Onboarding".to_string(),
+            description: "Define entity types, attributes, and verb contracts for client onboarding"
+                .to_string(),
+            is_escape: false,
+        },
+        UserChoice {
+            id: "2".to_string(),
+            label: "KYC".to_string(),
+            description:
+                "Configure KYC workflows, evidence requirements, and screening rules"
+                    .to_string(),
+            is_escape: false,
+        },
+        UserChoice {
+            id: "3".to_string(),
+            label: "Data Management".to_string(),
+            description: "Manage taxonomies, policies, and data governance rules".to_string(),
+            is_escape: false,
+        },
+        UserChoice {
+            id: "4".to_string(),
+            label: "Stewardship".to_string(),
+            description: "Author and publish governed changes to the semantic registry".to_string(),
+            is_escape: false,
+        },
+    ];
+
+    let scope_options: Vec<ScopeOption> = choices
+        .iter()
+        .map(|c| ScopeOption {
+            desc: format!("{}: {}", c.label, c.description),
+            method: "workflow_selection".to_string(),
+            score: 1.0,
+            expect_count: None,
+            sample: vec![],
+            snapshot_id: None,
+        })
+        .collect();
+
+    DecisionPacket {
+        packet_id: Uuid::new_v4().to_string(),
+        kind: DecisionKind::ClarifyScope,
+        session: SessionStateView {
+            session_id: Some(session_id),
+            client_group_anchor: None,
+            client_group_name: None,
+            persona: None,
+            last_confirmed_verb: None,
+        },
+        utterance: String::new(),
+        payload: ClarificationPayload::Scope(ScopePayload {
+            options: scope_options,
+            context_hint: Some("Semantic OS workflow selection".to_string()),
+        }),
+        prompt: "Welcome to Semantic OS. What would you like to work on?".to_string(),
+        choices,
+        best_plan: None,
+        alternatives: vec![],
+        requires_confirm: false,
+        confirm_token: None,
+        trace: DecisionTrace {
+            config_version: "1.0".to_string(),
+            entity_snapshot_hash: None,
+            lexicon_snapshot_hash: None,
+            semantic_lane_enabled: false,
+            embedding_model_id: None,
+            verb_margin: 0.0,
+            scope_margin: 0.0,
+            kind_margin: 0.0,
+            decision_reason: "semos_workflow_selection".to_string(),
+        },
+    }
 }
 
 /// Build a client group decision packet for new sessions.
@@ -1157,7 +1376,11 @@ async fn cancel_subsession(
     }))
 }
 
-/// Generate help text showing all available MCP tools/commands
+/// Generate help text showing all available MCP tools/commands.
+///
+/// Retained as a **fallback** for when SemReg is unavailable.
+/// The primary path is `generate_options_from_envelope()`.
+#[allow(dead_code)]
 fn generate_commands_help() -> String {
     r#"# Available Commands
 
@@ -1684,6 +1907,431 @@ fn generate_verbs_help(domain_filter: Option<&str>) -> String {
     output
 }
 
+// =============================================================================
+// SemReg-sourced options (single source of truth for verb discovery)
+// =============================================================================
+
+/// Build an s-expression signature for a verb by looking up its args in the
+/// `RuntimeVerbRegistry` (the same global static the DSL parser/compiler uses).
+///
+/// Returns `None` if the verb is not found in the YAML-sourced registry (possible
+/// for SemReg-only verbs without YAML definitions — unlikely but handled).
+fn build_sexpr_signature(fqn: &str) -> Option<String> {
+    use crate::dsl_v2::config::types::ArgType;
+
+    let reg = runtime_registry();
+    let verb = reg.get_by_name(fqn)?;
+
+    let mut parts = vec![format!("({}", fqn)];
+
+    for arg in &verb.args {
+        let type_hint = if arg.lookup.is_some() {
+            "<Entity>".to_string()
+        } else if let Some(ref vals) = arg.valid_values {
+            let joined = vals
+                .iter()
+                .map(|v| format!("\"{}\"", v))
+                .collect::<Vec<_>>()
+                .join("|");
+            format!("<{}>", joined)
+        } else {
+            let label = match arg.arg_type {
+                ArgType::String => "string",
+                ArgType::Integer => "integer",
+                ArgType::Decimal => "decimal",
+                ArgType::Boolean => "boolean",
+                ArgType::Date => "date",
+                ArgType::Timestamp => "timestamp",
+                ArgType::Uuid => "uuid",
+                ArgType::UuidArray | ArgType::UuidList => "uuid[]",
+                ArgType::Json => "json",
+                ArgType::Lookup => "Entity",
+                ArgType::StringList => "string[]",
+                ArgType::Map => "map",
+                ArgType::SymbolRef => "symbol",
+                ArgType::Object => "object",
+            };
+            format!("<{}>", label)
+        };
+
+        if arg.required {
+            parts.push(format!(":{} {}", arg.name, type_hint));
+        } else {
+            parts.push(format!("[:{} {}]", arg.name, type_hint));
+        }
+    }
+
+    parts.push(")".to_string());
+    Some(parts.join(" "))
+}
+
+/// Build structured verb profiles from a `ContextEnvelope`.
+///
+/// Produces a `Vec<VerbProfile>` with full s-expression signatures and typed
+/// argument details.  Applies the same `AgentMode` filter as the markdown
+/// `/commands` renderer so the UI sees exactly the same verb universe.
+///
+/// When SemReg returns an empty verb set (e.g. fresh session with no context),
+/// falls back to the full `RuntimeVerbRegistry` so the UI always has a
+/// populated verb palette.
+#[cfg(feature = "database")]
+fn build_verb_profiles(
+    envelope: &crate::agent::context_envelope::ContextEnvelope,
+    agent_mode: &sem_os_core::authoring::agent_mode::AgentMode,
+) -> Vec<ob_poc_types::chat::VerbProfile> {
+    use crate::dsl_v2::config::types::ArgType;
+    use ob_poc_types::chat::{VerbArgProfile, VerbProfile};
+
+    let reg = runtime_registry();
+
+    // Helper: build arg profiles for a verb from the RuntimeVerbRegistry
+    let build_args = |fqn: &str| -> Vec<VerbArgProfile> {
+        reg.get_by_name(fqn)
+            .map(|verb| {
+                verb.args
+                    .iter()
+                    .map(|arg| {
+                        let type_label = if arg.lookup.is_some() {
+                            "Entity".to_string()
+                        } else {
+                            match arg.arg_type {
+                                ArgType::String => "string",
+                                ArgType::Integer => "integer",
+                                ArgType::Decimal => "decimal",
+                                ArgType::Boolean => "boolean",
+                                ArgType::Date => "date",
+                                ArgType::Timestamp => "timestamp",
+                                ArgType::Uuid => "uuid",
+                                ArgType::UuidArray | ArgType::UuidList => "uuid[]",
+                                ArgType::Json => "json",
+                                ArgType::Lookup => "Entity",
+                                ArgType::StringList => "string[]",
+                                ArgType::Map => "map",
+                                ArgType::SymbolRef => "symbol",
+                                ArgType::Object => "object",
+                            }
+                            .to_string()
+                        };
+                        VerbArgProfile {
+                            name: arg.name.clone(),
+                            arg_type: type_label,
+                            required: arg.required,
+                            valid_values: arg.valid_values.clone(),
+                            description: arg.description.clone(),
+                        }
+                    })
+                    .collect()
+            })
+            .unwrap_or_default()
+    };
+
+    // If SemReg returned verb contracts, use those (constrained universe)
+    if !envelope.allowed_verb_contracts.is_empty() {
+        return envelope
+            .allowed_verb_contracts
+            .iter()
+            .filter(|v| agent_mode.is_verb_allowed(&v.fqn))
+            .map(|v| {
+                let domain = v.fqn.split('.').next().unwrap_or("unknown").to_string();
+                let sexpr =
+                    build_sexpr_signature(&v.fqn).unwrap_or_else(|| format!("({})", v.fqn));
+                VerbProfile {
+                    fqn: v.fqn.clone(),
+                    domain,
+                    description: v.description.clone(),
+                    sexpr,
+                    args: build_args(&v.fqn),
+                    preconditions_met: v.preconditions_met,
+                    governance_tier: v.governance_tier.clone(),
+                }
+            })
+            .collect();
+    }
+
+    // Fallback: SemReg returned no verbs — build from full RuntimeVerbRegistry
+    tracing::debug!(
+        "SemReg returned empty verb set; falling back to RuntimeVerbRegistry ({} verbs)",
+        reg.len()
+    );
+    reg.all_verbs()
+        .filter(|v| agent_mode.is_verb_allowed(&v.full_name))
+        .map(|v| {
+            let sexpr = build_sexpr_signature(&v.full_name)
+                .unwrap_or_else(|| format!("({})", v.full_name));
+            VerbProfile {
+                fqn: v.full_name.clone(),
+                domain: v.domain.clone(),
+                description: v.description.clone(),
+                sexpr,
+                args: build_args(&v.full_name),
+                preconditions_met: true, // No SemReg context — assume met
+                governance_tier: "operational".to_string(), // Default tier
+            }
+        })
+        .collect()
+}
+
+/// Derive a human-readable workflow label from the session's `stage_focus`.
+fn workflow_label_from_stage_focus(stage_focus: Option<&str>) -> &str {
+    match stage_focus {
+        Some("semos-onboarding") => "Onboarding",
+        Some("semos-kyc") => "KYC",
+        Some("semos-data-management") => "Data Management",
+        Some("semos-stewardship") => "Stewardship",
+        _ => "All Domains",
+    }
+}
+
+/// Format a `ContextEnvelope` as a user-facing markdown options response.
+///
+/// This is the **single source of truth** formatter for `/options`, `/verbs`,
+/// `/commands`, and natural-language "what are my options?" triggers.
+///
+/// The envelope comes from `resolve_sem_reg_verbs()` — the same function the
+/// orchestrator calls for every chat utterance.  The `AgentMode` post-filter
+/// mirrors Stage A.3 in `handle_utterance()`.
+#[cfg(feature = "database")]
+fn generate_options_from_envelope(
+    envelope: &crate::agent::context_envelope::ContextEnvelope,
+    session: &UnifiedSession,
+    agent_mode: &sem_os_core::authoring::agent_mode::AgentMode,
+) -> String {
+    generate_options_from_envelope_inner(envelope, session, agent_mode, None)
+}
+
+/// Domain-filtered variant of `generate_options_from_envelope`.
+///
+/// Only shows verbs whose domain matches `domain_filter`.  If no verbs match,
+/// lists the available domains from the allowed set.
+#[cfg(feature = "database")]
+fn generate_options_from_envelope_filtered(
+    envelope: &crate::agent::context_envelope::ContextEnvelope,
+    session: &UnifiedSession,
+    agent_mode: &sem_os_core::authoring::agent_mode::AgentMode,
+    domain_filter: &str,
+) -> String {
+    generate_options_from_envelope_inner(envelope, session, agent_mode, Some(domain_filter))
+}
+
+/// Shared implementation for both filtered and unfiltered options rendering.
+#[cfg(feature = "database")]
+fn generate_options_from_envelope_inner(
+    envelope: &crate::agent::context_envelope::ContextEnvelope,
+    session: &UnifiedSession,
+    agent_mode: &sem_os_core::authoring::agent_mode::AgentMode,
+    domain_filter: Option<&str>,
+) -> String {
+    use std::collections::BTreeMap;
+
+    // 1. Apply AgentMode filter — mirrors Stage A.3 in handle_utterance()
+    let mode_filtered: Vec<&crate::agent::context_envelope::VerbCandidateSummary> = envelope
+        .allowed_verb_contracts
+        .iter()
+        .filter(|v| agent_mode.is_verb_allowed(&v.fqn))
+        .collect();
+
+    // 2. Apply optional domain filter
+    let candidates: Vec<&crate::agent::context_envelope::VerbCandidateSummary> = if let Some(df) =
+        domain_filter
+    {
+        mode_filtered
+            .into_iter()
+            .filter(|v| {
+                v.fqn
+                    .split('.')
+                    .next()
+                    .map(|d| d == df)
+                    .unwrap_or(false)
+            })
+            .collect()
+    } else {
+        mode_filtered
+    };
+
+    // 3. Derive workflow label
+    let stage_focus = session.context.stage_focus.as_deref();
+    let workflow = workflow_label_from_stage_focus(stage_focus);
+
+    // 4. Handle empty result — fall back to RuntimeVerbRegistry when SemReg
+    //    returned no verbs (same fallback as build_verb_profiles).
+    if candidates.is_empty() {
+        if let Some(df) = domain_filter {
+            // Domain filter on empty envelope — try RuntimeVerbRegistry for that domain
+            let reg = runtime_registry();
+            let domain_verbs: Vec<_> = reg
+                .all_verbs()
+                .filter(|v| agent_mode.is_verb_allowed(&v.full_name))
+                .filter(|v| v.domain == df)
+                .collect();
+
+            if domain_verbs.is_empty() {
+                let mut available_domains: Vec<String> = reg
+                    .all_verbs()
+                    .filter(|v| agent_mode.is_verb_allowed(&v.full_name))
+                    .map(|v| v.domain.clone())
+                    .collect::<std::collections::HashSet<_>>()
+                    .into_iter()
+                    .collect();
+                available_domains.sort();
+
+                return format!(
+                    "No verbs available for domain **'{}'** in your current context.\n\n\
+                     **Available domains:** {}\n\n\
+                     *Try `/verbs {}` or `/options` to see all.*",
+                    df,
+                    available_domains.join(", "),
+                    available_domains.first().map(|s| s.as_str()).unwrap_or("session"),
+                );
+            }
+
+            // Render the domain verbs from registry
+            let mut output = String::new();
+            output.push_str(&format!(
+                "# Available Options — {} Workflow\n\n",
+                workflow,
+            ));
+            output.push_str(&format!(
+                "**Verbs:** {} (domain: {}) | **Mode:** {}\n\n",
+                domain_verbs.len(),
+                df,
+                agent_mode,
+            ));
+            output.push_str(&format!("## {} ({} verbs)\n\n", df, domain_verbs.len()));
+            for v in &domain_verbs {
+                output.push_str(&format!(
+                    "**`{}`** — {}\n",
+                    v.full_name, v.description,
+                ));
+                if let Some(sexpr) = build_sexpr_signature(&v.full_name) {
+                    output.push_str("```\n");
+                    output.push_str(&sexpr);
+                    output.push('\n');
+                    output.push_str("```\n");
+                }
+                output.push('\n');
+            }
+            output.push_str("---\n*Showing full verb registry (SemReg not constrained).*\n");
+            return output;
+        }
+
+        // No domain filter, empty envelope — fall back to full RuntimeVerbRegistry
+        tracing::debug!(
+            "SemReg returned empty verb set for /commands; falling back to RuntimeVerbRegistry"
+        );
+        let reg = runtime_registry();
+        let mut registry_domains: BTreeMap<&str, Vec<_>> = BTreeMap::new();
+        let mut total = 0usize;
+        for v in reg.all_verbs() {
+            if agent_mode.is_verb_allowed(&v.full_name) {
+                registry_domains
+                    .entry(v.domain.as_str())
+                    .or_default()
+                    .push(v);
+                total += 1;
+            }
+        }
+
+        let mut output = String::new();
+        output.push_str(&format!(
+            "# Available Options — {} Workflow\n\n",
+            workflow,
+        ));
+        output.push_str(&format!(
+            "**Verbs:** {} | **Mode:** {} | **Domains:** {}\n\n",
+            total,
+            agent_mode,
+            registry_domains.len(),
+        ));
+
+        for (domain, verbs) in &registry_domains {
+            output.push_str(&format!("## {} ({} verbs)\n\n", domain, verbs.len()));
+            for v in verbs {
+                output.push_str(&format!(
+                    "**`{}`** — {}\n",
+                    v.full_name, v.description,
+                ));
+                if let Some(sexpr) = build_sexpr_signature(&v.full_name) {
+                    output.push_str("```\n");
+                    output.push_str(&sexpr);
+                    output.push('\n');
+                    output.push_str("```\n");
+                }
+                output.push('\n');
+            }
+        }
+
+        output.push_str("---\n*Showing full verb registry (SemReg not constrained).*\n");
+        return output;
+    }
+
+    // 5. Group by domain, sort within each domain by rank_score descending
+    let mut domains: BTreeMap<&str, Vec<&crate::agent::context_envelope::VerbCandidateSummary>> =
+        BTreeMap::new();
+    for v in &candidates {
+        let domain = v.fqn.split('.').next().unwrap_or("unknown");
+        domains.entry(domain).or_default().push(v);
+    }
+    for verbs in domains.values_mut() {
+        verbs.sort_by(|a, b| {
+            b.rank_score
+                .partial_cmp(&a.rank_score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+    }
+
+    // 6. Build markdown output
+    let mut output = String::new();
+
+    // Header
+    output.push_str(&format!(
+        "# Available Options — {} Workflow\n\n",
+        workflow,
+    ));
+    output.push_str(&format!(
+        "**Verbs:** {} | **Mode:** {} | **Fingerprint:** {}\n\n",
+        candidates.len(),
+        agent_mode,
+        envelope.fingerprint,
+    ));
+
+    // Domain sections
+    for (domain, verbs) in &domains {
+        output.push_str(&format!("## {} ({} verbs)\n\n", domain, verbs.len()));
+
+        for v in verbs {
+            // Verb name + description + precondition note
+            let precond_note = if v.preconditions_met {
+                String::new()
+            } else {
+                " *(preconditions not met)*".to_string()
+            };
+            output.push_str(&format!(
+                "**`{}`** — {}{}\n",
+                v.fqn, v.description, precond_note,
+            ));
+
+            // S-expression signature (from RuntimeVerbRegistry)
+            if let Some(sexpr) = build_sexpr_signature(&v.fqn) {
+                output.push_str("```\n");
+                output.push_str(&sexpr);
+                output.push('\n');
+                output.push_str("```\n");
+            }
+
+            output.push('\n');
+        }
+    }
+
+    // Footer
+    output.push_str("---\n");
+    output.push_str(&format!(
+        "*Same verb set used by the agent pipeline. Fingerprint: {}*\n",
+        envelope.fingerprint,
+    ));
+
+    output
+}
+
 /// POST /api/session/:id/chat - Process chat message and generate DSL via LLM
 ///
 /// Pipeline: User message → Intent extraction (tool call) → DSL builder → Linter → Feedback loop
@@ -1750,15 +2398,89 @@ async fn chat_session(
         }
     };
 
-    // Handle slash commands: /commands, /verbs, /help with optional domain filter
+    // Handle slash commands and natural-language option triggers.
+    //
+    // ALL verb discovery now flows through `resolve_options()` → `resolve_sem_reg_verbs()`,
+    // the **same** function the orchestrator calls in `handle_utterance()`.
+    // Old static helpers (`generate_commands_help`, `generate_verbs_help`) are kept as
+    // fallbacks only — used when SemReg is unavailable.
     let trimmed_msg = req.message.trim().to_lowercase();
     let parts: Vec<&str> = trimmed_msg.split_whitespace().collect();
 
-    match parts.as_slice() {
-        // /help or /commands (no args) - show MCP tools overview
-        ["/help"] | ["/commands"] | ["show", "commands"] => {
+    // Detect which kind of options request this is (if any).
+    #[derive(Clone)]
+    enum OptionsKind<'a> {
+        All,
+        Filtered(&'a str),
+    }
+
+    let options_kind: Option<OptionsKind<'_>> = match parts.as_slice() {
+        // Natural language triggers
+        ["what", "are", "my", "options"]
+        | ["what", "are", "my", "options?"]
+        | ["/options"]
+        | ["options"]
+        | ["options?"]
+        | ["show", "options"]
+        | ["show", "my", "options"]
+        | ["what", "can", "i", "do"]
+        | ["what", "can", "i", "do?"]
+        // Existing commands now SemReg-sourced
+        | ["/help"]
+        | ["/commands"]
+        | ["show", "commands"]
+        | ["/verbs"] => Some(OptionsKind::All),
+
+        // Domain-filtered options
+        ["/commands" | "/verbs", domain] => Some(OptionsKind::Filtered(domain)),
+
+        _ => None,
+    };
+
+    if let Some(kind) = options_kind {
+        #[cfg(feature = "database")]
+        {
+            let actor = crate::policy::ActorResolver::from_headers(&headers);
+            let agent_mode = sem_os_core::authoring::agent_mode::AgentMode::default();
+
+            let (message, available_verbs) = match state
+                .agent_service
+                .resolve_options(&session, actor)
+                .await
+            {
+                Ok(envelope) => {
+                    let msg = match &kind {
+                        OptionsKind::Filtered(df) => {
+                            generate_options_from_envelope_filtered(
+                                &envelope,
+                                &session,
+                                &agent_mode,
+                                df,
+                            )
+                        }
+                        OptionsKind::All => {
+                            generate_options_from_envelope(&envelope, &session, &agent_mode)
+                        }
+                    };
+                    let verbs = Some(build_verb_profiles(&envelope, &agent_mode));
+                    (msg, verbs)
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        session_id = %session.id,
+                        error = %e,
+                        "SemReg unavailable for options — falling back to static help"
+                    );
+                    let msg = match &kind {
+                        OptionsKind::Filtered(df) => generate_verbs_help(Some(df)),
+                        OptionsKind::All => generate_verbs_help(None),
+                    };
+                    (msg, None)
+                }
+            };
+
             return Ok(Json(ChatResponse {
-                message: generate_commands_help(),
+                message,
                 dsl: None,
                 session_state: to_session_state_enum(&session.state),
                 commands: None,
@@ -1769,12 +2491,17 @@ async fn chat_session(
                 current_ref_index: None,
                 dsl_hash: None,
                 decision: None,
+                available_verbs,
             }));
         }
-        // /commands <domain> or /verbs <domain> - show verbs for domain
-        ["/commands" | "/verbs", domain] => {
+        #[cfg(not(feature = "database"))]
+        {
+            let message = match &kind {
+                OptionsKind::Filtered(df) => generate_verbs_help(Some(df)),
+                OptionsKind::All => generate_verbs_help(None),
+            };
             return Ok(Json(ChatResponse {
-                message: generate_verbs_help(Some(domain)),
+                message,
                 dsl: None,
                 session_state: to_session_state_enum(&session.state),
                 commands: None,
@@ -1785,25 +2512,9 @@ async fn chat_session(
                 current_ref_index: None,
                 dsl_hash: None,
                 decision: None,
+                available_verbs: None,
             }));
         }
-        // /verbs (no args) - show all verbs
-        ["/verbs"] => {
-            return Ok(Json(ChatResponse {
-                message: generate_verbs_help(None),
-                dsl: None,
-                session_state: to_session_state_enum(&session.state),
-                commands: None,
-                disambiguation_request: None,
-                verb_disambiguation: None,
-                intent_tier: None,
-                unresolved_refs: None,
-                current_ref_index: None,
-                dsl_hash: None,
-                decision: None,
-            }));
-        }
-        _ => {} // Not a slash command, continue to orchestrator pipeline
     }
 
     // Make session mutable for the rest of the handler
@@ -1834,6 +2545,7 @@ async fn chat_session(
                 current_ref_index: None,
                 dsl_hash: None,
                 decision: None,
+                available_verbs: None,
             }));
         }
     };
@@ -1871,6 +2583,32 @@ async fn chat_session(
     // =========================================================================
     // let _debug_info: Option<ob_poc_types::ChatDebugInfo> = None;
 
+    // =========================================================================
+    // VERB UNIVERSE — resolve constrained verb profiles for this session
+    // =========================================================================
+    #[cfg(feature = "database")]
+    let available_verbs = {
+        let verb_actor = crate::policy::ActorResolver::from_headers(&headers);
+        let agent_mode = sem_os_core::authoring::agent_mode::AgentMode::default();
+        match state
+            .agent_service
+            .resolve_options(&session, verb_actor)
+            .await
+        {
+            Ok(envelope) => Some(build_verb_profiles(&envelope, &agent_mode)),
+            Err(e) => {
+                tracing::warn!(
+                    session_id = %session.id,
+                    error = %e,
+                    "SemReg unavailable for verb profiles"
+                );
+                None
+            }
+        }
+    };
+    #[cfg(not(feature = "database"))]
+    let available_verbs: Option<Vec<ob_poc_types::chat::VerbProfile>> = None;
+
     // Return response using API types (single source of truth)
     Ok(Json(ChatResponse {
         message: response.message,
@@ -1890,6 +2628,7 @@ async fn chat_session(
         current_ref_index: response.current_ref_index,
         dsl_hash: response.dsl_hash,
         decision: response.decision,
+        available_verbs,
     }))
 }
 

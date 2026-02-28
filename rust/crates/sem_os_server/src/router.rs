@@ -86,8 +86,7 @@ pub fn build_router(service: Arc<dyn CoreService>, jwt_config: JwtConfig) -> Rou
         .layer(Extension(jwt_config));
 
     // Public routes (no auth)
-    let public = Router::new()
-        .route("/health", get(handlers::health::health));
+    let public = Router::new().route("/health", get(handlers::health::health));
 
     // Combine and add shared state
     public.merge(protected).layer(Extension(service))

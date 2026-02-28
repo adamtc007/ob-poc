@@ -13,6 +13,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: request
+          tags: [kyc]
         behavior: plugin
         plugin:
           handler: RequestCreateOp
@@ -89,6 +90,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: request
+          tags: [kyc]
         behavior: crud
         crud:
           operation: select
@@ -141,6 +143,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: request
+          tags: [kyc]
         behavior: plugin
         plugin:
           handler: RequestOverdueOp
@@ -181,6 +184,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: request
+          tags: [kyc]
         behavior: plugin
         plugin:
           handler: RequestFulfillOp
@@ -224,6 +228,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: request
+          tags: [kyc]
         behavior: plugin
         plugin:
           handler: RequestCancelOp
@@ -251,6 +256,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: request
+          tags: [kyc]
         behavior: plugin
         plugin:
           handler: RequestExtendOp
@@ -283,6 +289,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: request
+          tags: [kyc]
         behavior: plugin
         plugin:
           handler: RequestRemindOp
@@ -317,6 +324,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: request
+          tags: [kyc]
         behavior: plugin
         plugin:
           handler: RequestEscalateOp
@@ -348,6 +356,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: request
+          tags: [kyc]
         behavior: plugin
         plugin:
           handler: RequestWaiveOp

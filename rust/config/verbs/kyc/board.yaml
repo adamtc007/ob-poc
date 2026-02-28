@@ -13,6 +13,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: board_member
+          tags: [kyc]
           subject_kinds: [cbu, company]
         behavior: crud
         crud:
@@ -122,6 +123,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: board_member
+          tags: [kyc]
           subject_kinds: [cbu, company]
         behavior: crud
         crud:
@@ -154,6 +156,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: board_member
+          tags: [kyc]
           subject_kinds: [cbu, company]
         behavior: crud
         crud:
@@ -185,6 +188,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: board_member
+          tags: [kyc]
           subject_kinds: [cbu, company]
         behavior: crud
         crud:
@@ -216,6 +220,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: board_member
+          tags: [kyc]
           subject_kinds: [cbu, company]
         behavior: crud
         crud:
@@ -330,6 +335,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: board_member
+          tags: [kyc]
           subject_kinds: [cbu, company]
         behavior: crud
         crud:
@@ -362,6 +368,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: board_member
+          tags: [kyc]
           subject_kinds: [cbu, company]
         behavior: crud
         crud:
@@ -393,6 +400,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: board_member
+          tags: [kyc]
           subject_kinds: [cbu, company]
         behavior: crud
         crud:
@@ -428,6 +436,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: board_member
+          tags: [kyc]
           subject_kinds: [cbu, company]
         behavior: plugin
         plugin:

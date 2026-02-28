@@ -30,7 +30,7 @@ domains:
           scope: global
           noun: lei
           subject_kinds: [company, legal_entity]
-          tags: [gleif, external-api, enrichment]
+          tags: [gleif, external-api, enrichment, onboarding]
         args:
           - name: lei
             type: string
@@ -69,7 +69,7 @@ domains:
           scope: global
           noun: lei
           subject_kinds: [company, legal_entity]
-          tags: [gleif, external-api, search]
+          tags: [gleif, external-api, search, onboarding]
         args:
           - name: name
             type: string
@@ -118,7 +118,7 @@ domains:
           scope: global
           noun: lei
           subject_kinds: [company, legal_entity]
-          tags: [gleif, external-api, import, hierarchy]
+          tags: [gleif, external-api, import, hierarchy, onboarding]
         args:
           - name: root-lei
             type: string
@@ -164,7 +164,7 @@ domains:
           scope: global
           noun: lei
           subject_kinds: [company, legal_entity]
-          tags: [gleif, external-api, import, funds]
+          tags: [gleif, external-api, import, funds, onboarding]
         args:
           - name: manager-lei
             type: string
@@ -204,7 +204,7 @@ domains:
           scope: global
           noun: lei
           subject_kinds: [company, legal_entity]
-          tags: [gleif, external-api, refresh]
+          tags: [gleif, external-api, refresh, onboarding]
         args:
           - name: entity-id
             type: uuid
@@ -238,7 +238,7 @@ domains:
           scope: global
           noun: lei
           subject_kinds: [company, legal_entity]
-          tags: [gleif, external-api, lookup]
+          tags: [gleif, external-api, lookup, onboarding]
         args:
           - name: lei
             type: string
@@ -256,7 +256,7 @@ domains:
           scope: global
           noun: lei
           subject_kinds: [company, legal_entity]
-          tags: [gleif, external-api, lookup, relationship]
+          tags: [gleif, external-api, lookup, relationship, onboarding]
         args:
           - name: lei
             type: string
@@ -274,7 +274,7 @@ domains:
           scope: global
           noun: lei
           subject_kinds: [company, legal_entity]
-          tags: [gleif, external-api, lookup, relationship]
+          tags: [gleif, external-api, lookup, relationship, onboarding]
         args:
           - name: lei
             type: string
@@ -302,7 +302,7 @@ domains:
           scope: global
           noun: lei
           subject_kinds: [company, legal_entity]
-          tags: [gleif, external-api, trace, ownership]
+          tags: [gleif, external-api, trace, ownership, onboarding]
         args:
           - name: lei
             type: string
@@ -332,7 +332,7 @@ domains:
           scope: global
           noun: lei
           subject_kinds: [company, legal_entity]
-          tags: [gleif, external-api, lookup, funds]
+          tags: [gleif, external-api, lookup, funds, onboarding]
         args:
           - name: manager-lei
             type: string
@@ -361,7 +361,7 @@ domains:
           scope: global
           noun: lei
           subject_kinds: [company, legal_entity]
-          tags: [gleif, external-api, lookup, successor]
+          tags: [gleif, external-api, lookup, successor, onboarding]
         args:
           - name: lei
             type: string
@@ -386,7 +386,7 @@ domains:
           scope: global
           noun: lei
           subject_kinds: [company, legal_entity]
-          tags: [gleif, external-api, lookup, relationship, funds]
+          tags: [gleif, external-api, lookup, relationship, funds, onboarding]
         args:
           - name: lei
             type: string
@@ -416,7 +416,7 @@ domains:
           scope: global
           noun: lei
           subject_kinds: [company, legal_entity]
-          tags: [gleif, external-api, lookup, relationship, funds]
+          tags: [gleif, external-api, lookup, relationship, funds, onboarding]
         args:
           - name: lei
             type: string
@@ -446,7 +446,7 @@ domains:
           scope: global
           noun: lei
           subject_kinds: [company, legal_entity]
-          tags: [gleif, external-api, lookup, relationship, funds]
+          tags: [gleif, external-api, lookup, relationship, funds, onboarding]
         args:
           - name: lei
             type: string
@@ -476,7 +476,7 @@ domains:
           scope: global
           noun: lei
           subject_kinds: [company, legal_entity]
-          tags: [gleif, external-api, lookup, isin]
+          tags: [gleif, external-api, lookup, isin, onboarding]
         args:
           - name: isin
             type: string
@@ -507,7 +507,7 @@ domains:
           source_of_truth: external
           scope: global
           noun: client_group
-          tags: [gleif, external-api, import, client-group, discovery, funds]
+          tags: [gleif, external-api, import, client-group, discovery, funds, onboarding]
         args:
           - name: group-id
             type: uuid

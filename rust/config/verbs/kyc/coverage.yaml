@@ -27,6 +27,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: coverage
+          tags: [kyc]
         behavior: plugin
         plugin:
           handler: CoverageComputeOp

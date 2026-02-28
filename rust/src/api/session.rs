@@ -2950,6 +2950,11 @@ pub struct CreateSessionRequest {
     /// Optional structure type to filter by (pe, sicav, hedge, etc.)
     #[serde(default)]
     pub structure_type: Option<String>,
+    /// Optional workflow focus (e.g., "semantic-os").
+    /// When set to "semantic-os", the session starts with a workflow selection
+    /// decision packet instead of the normal client group resolution.
+    #[serde(default)]
+    pub workflow_focus: Option<String>,
 }
 
 /// Welcome message constant - agent's opening question

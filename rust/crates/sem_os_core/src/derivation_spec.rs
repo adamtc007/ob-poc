@@ -105,7 +105,9 @@ mod tests {
                 ref_name: "sum_holdings".into(),
             },
             null_semantics: NullSemantics::Skip,
-            freshness_rule: Some(FreshnessRule { max_age_seconds: 3600 }),
+            freshness_rule: Some(FreshnessRule {
+                max_age_seconds: 3600,
+            }),
             security_inheritance: SecurityInheritanceMode::Strict,
             evidence_grade: EvidenceGrade::AllowedWithConstraints,
             tests: vec![DerivationTestCase {

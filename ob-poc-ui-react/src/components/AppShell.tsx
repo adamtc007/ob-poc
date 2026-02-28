@@ -3,13 +3,14 @@
  */
 
 import { Outlet, NavLink } from 'react-router-dom';
-import { Search, MessageSquare, Settings, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, MessageSquare, Database, Settings, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '../lib/utils';
 
 const navItems = [
   { to: '/inspector', icon: Search, label: 'Inspector' },
   { to: '/chat', icon: MessageSquare, label: 'Chat' },
+  { to: '/semantic-os', icon: Database, label: 'Semantic OS' },
   { to: '/settings', icon: Settings, label: 'Settings' },
 ];
 

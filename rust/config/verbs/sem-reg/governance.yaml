@@ -34,6 +34,7 @@ domains:
           category: governance_review
           context: scripted_ok
           side_effects: facts_only
+          tags: [stewardship]
         behavior: plugin
         handler: GovernanceGatePrecheckOp
         invocation_phrases:
@@ -60,6 +61,7 @@ domains:
           category: governance_review
           context: scripted_ok
           side_effects: state_write
+          tags: [stewardship]
         behavior: plugin
         handler: GovernanceSubmitForReviewOp
         invocation_phrases:
@@ -86,6 +88,7 @@ domains:
           category: governance_review
           context: scripted_ok
           side_effects: state_write
+          tags: [stewardship]
         behavior: plugin
         handler: GovernanceRecordReviewOp
         invocation_phrases:
@@ -123,6 +126,7 @@ domains:
           category: governance_pipeline
           context: scripted_ok
           side_effects: state_write
+          tags: [stewardship]
         behavior: plugin
         handler: GovernanceValidateOp
         invocation_phrases:
@@ -149,6 +153,7 @@ domains:
           category: governance_pipeline
           context: scripted_ok
           side_effects: state_write
+          tags: [stewardship]
         behavior: plugin
         handler: GovernanceDryRunOp
         invocation_phrases:
@@ -175,6 +180,7 @@ domains:
           category: governance_pipeline
           context: scripted_ok
           side_effects: facts_only
+          tags: [stewardship]
         behavior: plugin
         handler: GovernancePlanPublishOp
         invocation_phrases:
@@ -201,6 +207,7 @@ domains:
           category: governance_pipeline
           context: scripted_ok
           side_effects: state_write
+          tags: [stewardship]
         behavior: plugin
         handler: GovernancePublishOp
         invocation_phrases:
@@ -227,6 +234,7 @@ domains:
           category: governance_pipeline
           context: scripted_ok
           side_effects: state_write
+          tags: [stewardship]
         behavior: plugin
         handler: GovernancePublishBatchOp
         invocation_phrases:
@@ -253,6 +261,7 @@ domains:
           category: governance_pipeline
           context: scripted_ok
           side_effects: state_write
+          tags: [stewardship]
         behavior: plugin
         handler: GovernanceRollbackOp
         invocation_phrases:

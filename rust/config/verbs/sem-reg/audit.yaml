@@ -31,6 +31,7 @@ domains:
           category: audit_planning
           context: scripted_ok
           side_effects: state_write
+          tags: [stewardship]
         behavior: plugin
         handler: AuditCreatePlanOp
         invocation_phrases:
@@ -61,6 +62,7 @@ domains:
           category: audit_planning
           context: scripted_ok
           side_effects: state_write
+          tags: [stewardship]
         behavior: plugin
         handler: AuditAddPlanStepOp
         invocation_phrases:
@@ -94,6 +96,7 @@ domains:
           category: audit_planning
           context: scripted_ok
           side_effects: facts_only
+          tags: [stewardship]
         behavior: plugin
         handler: AuditValidatePlanOp
         invocation_phrases:
@@ -119,6 +122,7 @@ domains:
           category: audit_planning
           context: scripted_ok
           side_effects: state_write
+          tags: [stewardship]
         behavior: plugin
         handler: AuditExecutePlanStepOp
         invocation_phrases:
@@ -151,6 +155,7 @@ domains:
           category: audit_recording
           context: scripted_ok
           side_effects: state_write
+          tags: [stewardship]
         behavior: plugin
         handler: AuditRecordDecisionOp
         invocation_phrases:
@@ -185,6 +190,7 @@ domains:
           category: audit_recording
           context: scripted_ok
           side_effects: state_write
+          tags: [stewardship]
         behavior: plugin
         handler: AuditRecordEscalationOp
         invocation_phrases:
@@ -219,6 +225,7 @@ domains:
           category: audit_recording
           context: scripted_ok
           side_effects: state_write
+          tags: [stewardship]
         behavior: plugin
         handler: AuditRecordDisambiguationOp
         invocation_phrases:
@@ -256,6 +263,7 @@ domains:
           category: audit_recording
           context: scripted_ok
           side_effects: state_write
+          tags: [stewardship]
         behavior: plugin
         handler: AuditRecordObservationOp
         invocation_phrases:

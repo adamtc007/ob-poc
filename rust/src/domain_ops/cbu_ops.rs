@@ -5,6 +5,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
+use governed_query_proc::governed_query;
 use ob_poc_macros::register_custom_op;
 
 use super::helpers::{extract_bool_opt, extract_int_opt, extract_string_opt, get_required_uuid};
@@ -47,6 +48,7 @@ impl CustomOperation for CbuCreateOp {
     }
 
     #[cfg(feature = "database")]
+    #[governed_query(verb = "cbu.create", skip_principal_check = true)]
     async fn execute(
         &self,
         verb_call: &VerbCall,

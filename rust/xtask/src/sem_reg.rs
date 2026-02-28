@@ -1210,10 +1210,7 @@ pub async fn authoring_list(status: Option<&str>, limit: i64) -> Result<()> {
 
     println!("Authoring Pipeline ChangeSets");
     println!("=============================");
-    println!(
-        "  {:<38} {:<16} {:<30} CREATED",
-        "ID", "STATUS", "TITLE"
-    );
+    println!("  {:<38} {:<16} {:<30} CREATED", "ID", "STATUS", "TITLE");
     println!("  {}", "-".repeat(100));
     for cs in &changesets {
         println!(

@@ -61,8 +61,11 @@ impl PgSnapshotStore {
         .fetch_optional(pool)
         .await
         .map_err(|e| anyhow!(e))?;
-        row.map(|r| r.try_into().map_err(|e: String| SemOsError::Internal(anyhow!(e))))
-            .transpose()
+        row.map(|r| {
+            r.try_into()
+                .map_err(|e: String| SemOsError::Internal(anyhow!(e)))
+        })
+        .transpose()
     }
 
     /// Find an active snapshot by a JSONB definition field.
@@ -96,8 +99,11 @@ impl PgSnapshotStore {
             .fetch_optional(pool)
             .await
             .map_err(|e| anyhow!(e))?;
-        row.map(|r| r.try_into().map_err(|e: String| SemOsError::Internal(anyhow!(e))))
-            .transpose()
+        row.map(|r| {
+            r.try_into()
+                .map_err(|e: String| SemOsError::Internal(anyhow!(e)))
+        })
+        .transpose()
     }
 
     /// List active snapshots of a given object type.
@@ -131,7 +137,10 @@ impl PgSnapshotStore {
         .await
         .map_err(|e| anyhow!(e))?;
         rows.into_iter()
-            .map(|r| r.try_into().map_err(|e: String| SemOsError::Internal(anyhow!(e))))
+            .map(|r| {
+                r.try_into()
+                    .map_err(|e: String| SemOsError::Internal(anyhow!(e)))
+            })
             .collect()
     }
 
@@ -347,7 +356,8 @@ impl SnapshotStore for PgSnapshotStore {
                     .get("fqn")
                     .and_then(|v| v.as_str())
                     .ok_or_else(|| anyhow!("snapshot {} has no fqn in definition", sid))?;
-                let object_type = ot.parse::<ObjectType>()
+                let object_type = ot
+                    .parse::<ObjectType>()
                     .map_err(|_| anyhow!("unknown object_type '{}' for snapshot {}", ot, sid))?;
                 Ok(SnapshotSummary {
                     snapshot_id: SnapshotId(sid),
@@ -399,7 +409,8 @@ impl SnapshotStore for PgSnapshotStore {
                     .get("fqn")
                     .and_then(|v| v.as_str())
                     .ok_or_else(|| anyhow!("snapshot {} has no fqn in definition", sid))?;
-                let object_type = ot.parse::<ObjectType>()
+                let object_type = ot
+                    .parse::<ObjectType>()
                     .map_err(|_| anyhow!("unknown object_type '{}' for snapshot {}", ot, sid))?;
                 Ok(SnapshotExport {
                     snapshot_id: SnapshotId(sid),
@@ -551,11 +562,11 @@ impl SnapshotStore for PgSnapshotStore {
         .await
         .map_err(|e| anyhow!(e))?;
 
-        rows
-            .into_iter()
+        rows.into_iter()
             .map(|(snapshot_id, ot, dep_fqn)| {
-                let object_type = ot.parse::<ObjectType>()
-                    .map_err(|_| anyhow!("unknown object_type '{}' for snapshot {}", ot, snapshot_id))?;
+                let object_type = ot.parse::<ObjectType>().map_err(|_| {
+                    anyhow!("unknown object_type '{}' for snapshot {}", ot, snapshot_id)
+                })?;
                 Ok(DependentSnapshot {
                     snapshot_id,
                     object_type,
@@ -594,8 +605,13 @@ impl ObjectStore for PgObjectStore {
         .map_err(|e| anyhow!(e))?
         .ok_or_else(|| SemOsError::NotFound(format!("Snapshot {} not found", snapshot_id.0)))?;
 
-        let object_type = row.0.parse::<ObjectType>()
-            .map_err(|_| anyhow!("unknown object_type '{}' for snapshot {}", row.0, snapshot_id.0))?;
+        let object_type = row.0.parse::<ObjectType>().map_err(|_| {
+            anyhow!(
+                "unknown object_type '{}' for snapshot {}",
+                row.0,
+                snapshot_id.0
+            )
+        })?;
         Ok(TypedObject {
             snapshot_id: snapshot_id.clone(),
             fqn: fqn.clone(),
@@ -619,7 +635,9 @@ impl PgChangesetStore {
     fn parse_changeset_row(
         row: (Uuid, String, String, String, DateTime<Utc>, DateTime<Utc>),
     ) -> std::result::Result<Changeset, SemOsError> {
-        let status = row.1.parse::<ChangesetStatus>()
+        let status = row
+            .1
+            .parse::<ChangesetStatus>()
             .map_err(|_| SemOsError::Internal(anyhow!("invalid changeset status: {}", row.1)))?;
         Ok(Changeset {
             changeset_id: row.0,
@@ -752,10 +770,14 @@ impl ChangesetStore for PgChangesetStore {
         .await
         .map_err(|e| anyhow!(e))?;
 
-        let change_kind = row.4.parse::<ChangeKind>()
+        let change_kind = row
+            .4
+            .parse::<ChangeKind>()
             .map_err(|_| SemOsError::Internal(anyhow!("invalid change_kind: {}", row.4)))?;
 
-        let object_type = row.3.parse::<ObjectType>()
+        let object_type = row
+            .3
+            .parse::<ObjectType>()
             .map_err(|_| SemOsError::Internal(anyhow!("invalid object_type: {}", row.3)))?;
 
         Ok(ChangesetEntry {
@@ -799,12 +821,14 @@ impl ChangesetStore for PgChangesetStore {
 
         rows.into_iter()
             .map(|row| {
-                let object_type = row.3.parse::<ObjectType>().map_err(|_| {
-                    SemOsError::Internal(anyhow!("invalid object_type: {}", row.3))
-                })?;
-                let change_kind = row.4.parse::<ChangeKind>().map_err(|_| {
-                    SemOsError::Internal(anyhow!("invalid change_kind: {}", row.4))
-                })?;
+                let object_type = row
+                    .3
+                    .parse::<ObjectType>()
+                    .map_err(|_| SemOsError::Internal(anyhow!("invalid object_type: {}", row.3)))?;
+                let change_kind = row
+                    .4
+                    .parse::<ChangeKind>()
+                    .map_err(|_| SemOsError::Internal(anyhow!("invalid change_kind: {}", row.4)))?;
                 Ok(ChangesetEntry {
                     entry_id: row.0,
                     changeset_id: row.1,
@@ -843,7 +867,9 @@ impl ChangesetStore for PgChangesetStore {
         .await
         .map_err(|e| anyhow!(e))?;
 
-        let verdict = row.3.parse::<ReviewVerdict>()
+        let verdict = row
+            .3
+            .parse::<ReviewVerdict>()
             .map_err(|_| SemOsError::Internal(anyhow!("invalid verdict: {}", row.3)))?;
 
         Ok(ChangesetReview {
@@ -873,9 +899,10 @@ impl ChangesetStore for PgChangesetStore {
 
         rows.into_iter()
             .map(|row| {
-                let verdict = row.3.parse::<ReviewVerdict>().map_err(|_| {
-                    SemOsError::Internal(anyhow!("invalid verdict: {}", row.3))
-                })?;
+                let verdict = row
+                    .3
+                    .parse::<ReviewVerdict>()
+                    .map_err(|_| SemOsError::Internal(anyhow!("invalid verdict: {}", row.3)))?;
                 Ok(ChangesetReview {
                     review_id: row.0,
                     changeset_id: row.1,

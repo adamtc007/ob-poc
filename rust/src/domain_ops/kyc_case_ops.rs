@@ -6,6 +6,7 @@
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
+use governed_query_proc::governed_query;
 use ob_poc_macros::register_custom_op;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -75,6 +76,7 @@ impl CustomOperation for KycCaseCreateOp {
     }
 
     #[cfg(feature = "database")]
+    #[governed_query(verb = "kyc-case.create", skip_principal_check = true)]
     async fn execute(
         &self,
         verb_call: &VerbCall,

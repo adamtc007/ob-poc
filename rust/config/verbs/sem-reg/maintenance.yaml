@@ -32,6 +32,7 @@ domains:
           category: maintenance_health
           context: scripted_ok
           side_effects: facts_only
+          tags: [stewardship]
         behavior: plugin
         handler: MaintenanceHealthPendingOp
         invocation_phrases:
@@ -54,6 +55,7 @@ domains:
           category: maintenance_health
           context: scripted_ok
           side_effects: facts_only
+          tags: [stewardship]
         behavior: plugin
         handler: MaintenanceHealthStaleDryrunsOp
         invocation_phrases:
@@ -79,6 +81,7 @@ domains:
           category: maintenance_ops
           context: scripted_ok
           side_effects: state_write
+          tags: [stewardship]
         behavior: plugin
         handler: MaintenanceCleanupOp
         invocation_phrases:
@@ -104,6 +107,7 @@ domains:
           category: maintenance_ops
           context: scripted_ok
           side_effects: state_write
+          tags: [stewardship]
         behavior: plugin
         handler: MaintenanceBootstrapSeedsOp
         invocation_phrases:
@@ -129,6 +133,7 @@ domains:
           category: maintenance_ops
           context: scripted_ok
           side_effects: facts_only
+          tags: [stewardship]
         behavior: plugin
         handler: MaintenanceDrainOutboxOp
         invocation_phrases:
@@ -154,6 +159,7 @@ domains:
           category: maintenance_ops
           context: scripted_ok
           side_effects: state_write
+          tags: [stewardship]
         behavior: plugin
         handler: MaintenanceReindexEmbeddingsOp
         invocation_phrases:
@@ -184,6 +190,7 @@ domains:
           category: maintenance_ops
           context: scripted_ok
           side_effects: facts_only
+          tags: [stewardship]
         behavior: plugin
         handler: MaintenanceValidateSchemaSyncOp
         invocation_phrases:

@@ -220,6 +220,47 @@ pub struct VerbSelectionPolicyDebug {
     pub ambiguity_margin: Option<f32>,
 }
 
+// ============================================================================
+// VERB PROFILES (structured verb universe returned on every chat response)
+// ============================================================================
+
+/// Full profile of a verb available in the current session context.
+/// Includes s-expression signature and typed argument details.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VerbProfile {
+    /// Fully-qualified name (e.g., "cbu.create")
+    pub fqn: String,
+    /// Domain (e.g., "cbu")
+    pub domain: String,
+    /// Human-readable description
+    pub description: String,
+    /// S-expression usage signature (e.g., "(cbu.create :name <string> [:kind <string>])")
+    pub sexpr: String,
+    /// Typed argument details
+    pub args: Vec<VerbArgProfile>,
+    /// Whether all preconditions are met for this verb
+    pub preconditions_met: bool,
+    /// Governance tier (e.g., "governed", "operational")
+    pub governance_tier: String,
+}
+
+/// Profile of a single verb argument.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VerbArgProfile {
+    /// Argument name (e.g., "name", "kind")
+    pub name: String,
+    /// Type label (e.g., "string", "uuid", "Entity")
+    pub arg_type: String,
+    /// Whether this argument is required
+    pub required: bool,
+    /// Valid enum values, if constrained
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub valid_values: Option<Vec<String>>,
+    /// Description of the argument
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+}
+
 /// Chat response from agent
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChatResponse {
@@ -272,6 +313,11 @@ pub struct ChatResponse {
     /// When present, UI should show decision prompt with choices
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub decision: Option<DecisionPacket>,
+
+    /// Constrained verb universe for this session context.
+    /// Populated on every response — same data as /commands but structured.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub available_verbs: Option<Vec<VerbProfile>>,
 }
 
 /// Session state enum for typed responses - matches server's SessionState

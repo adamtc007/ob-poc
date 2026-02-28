@@ -42,7 +42,7 @@ domains:
           source_of_truth: session
           scope: global
           noun: view_state
-          tags: [navigation, universe, filtering]
+          tags: [navigation, universe, filtering, data-management]
         args:
           - name: client
             type: uuid
@@ -102,7 +102,7 @@ domains:
           source_of_truth: session
           scope: cbu
           noun: view_state
-          tags: [navigation, book, client]
+          tags: [navigation, book, client, data-management]
         args:
           - name: client
             type: uuid
@@ -140,7 +140,7 @@ domains:
           source_of_truth: session
           scope: cbu
           noun: view_state
-          tags: [navigation, focus, cbu]
+          tags: [navigation, focus, cbu, data-management]
         args:
           - name: cbu-id
             type: uuid
@@ -186,7 +186,7 @@ domains:
           source_of_truth: session
           scope: global
           noun: view_state
-          tags: [navigation, entity, filtering]
+          tags: [navigation, entity, filtering, data-management]
         args:
           - name: entity-type
             type: string_list
@@ -230,7 +230,7 @@ domains:
           source_of_truth: session
           scope: global
           noun: view_state
-          tags: [refinement, filtering]
+          tags: [refinement, filtering, data-management]
         args:
           - name: include
             type: object
@@ -273,7 +273,7 @@ domains:
           source_of_truth: session
           scope: global
           noun: view_state
-          tags: [refinement, reset]
+          tags: [refinement, reset, data-management]
         args: []
         returns:
           type: view_state
@@ -304,7 +304,7 @@ domains:
           source_of_truth: session
           scope: global
           noun: view_state
-          tags: [selection]
+          tags: [selection, data-management]
         args:
           - name: ids
             type: uuid_list
@@ -348,7 +348,7 @@ domains:
           source_of_truth: session
           scope: global
           noun: view_state
-          tags: [visualization, layout]
+          tags: [visualization, layout, data-management]
         args:
           - name: mode
             type: string
@@ -408,7 +408,7 @@ domains:
           source_of_truth: session
           scope: global
           noun: view_state
-          tags: [navigation, fractal, zoom]
+          tags: [navigation, fractal, zoom, data-management]
         args:
           - name: node-id
             type: uuid
@@ -440,7 +440,7 @@ domains:
           source_of_truth: session
           scope: global
           noun: view_state
-          tags: [navigation, fractal, zoom]
+          tags: [navigation, fractal, zoom, data-management]
         args: []
         returns:
           type: view_state
@@ -468,7 +468,7 @@ domains:
           source_of_truth: session
           scope: global
           noun: view_state
-          tags: [navigation, fractal, breadcrumbs]
+          tags: [navigation, fractal, breadcrumbs, data-management]
         args:
           - name: depth
             type: integer
@@ -503,7 +503,7 @@ domains:
           source_of_truth: session
           scope: global
           noun: view_state
-          tags: [navigation, fractal, breadcrumbs, introspection]
+          tags: [navigation, fractal, breadcrumbs, introspection, data-management]
         args: []
         returns:
           type: object

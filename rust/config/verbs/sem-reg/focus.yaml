@@ -33,6 +33,7 @@ domains:
           category: focus_management
           context: scripted_ok
           side_effects: facts_only
+          tags: [stewardship]
         behavior: plugin
         handler: FocusGetOp
         invocation_phrases:
@@ -55,6 +56,7 @@ domains:
           category: focus_management
           context: scripted_ok
           side_effects: state_write
+          tags: [stewardship]
         behavior: plugin
         handler: FocusSetOp
         invocation_phrases:
@@ -88,6 +90,7 @@ domains:
           category: focus_display
           context: scripted_ok
           side_effects: facts_only
+          tags: [stewardship]
         behavior: plugin
         handler: FocusRenderOp
         invocation_phrases:
@@ -110,6 +113,7 @@ domains:
           category: focus_display
           context: scripted_ok
           side_effects: facts_only
+          tags: [stewardship]
         behavior: plugin
         handler: FocusViewportOp
         invocation_phrases:
@@ -142,6 +146,7 @@ domains:
           category: focus_display
           context: scripted_ok
           side_effects: facts_only
+          tags: [stewardship]
         behavior: plugin
         handler: FocusDiffOp
         invocation_phrases:
@@ -171,6 +176,7 @@ domains:
           category: focus_management
           context: scripted_ok
           side_effects: state_write
+          tags: [stewardship]
         behavior: plugin
         handler: FocusCaptureManifestOp
         invocation_phrases:

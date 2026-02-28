@@ -33,6 +33,7 @@ domains:
           category: changeset_authoring
           context: scripted_ok
           side_effects: state_write
+          tags: [stewardship]
         behavior: plugin
         handler: ChangesetComposeOp
         invocation_phrases:
@@ -63,6 +64,7 @@ domains:
           category: changeset_authoring
           context: scripted_ok
           side_effects: state_write
+          tags: [stewardship]
         behavior: plugin
         handler: ChangesetAddItemOp
         invocation_phrases:
@@ -101,6 +103,7 @@ domains:
           category: changeset_authoring
           context: scripted_ok
           side_effects: state_write
+          tags: [stewardship]
         behavior: plugin
         handler: ChangesetRemoveItemOp
         invocation_phrases:
@@ -130,6 +133,7 @@ domains:
           category: changeset_authoring
           context: scripted_ok
           side_effects: state_write
+          tags: [stewardship]
         behavior: plugin
         handler: ChangesetRefineItemOp
         invocation_phrases:
@@ -171,6 +175,7 @@ domains:
           category: changeset_authoring
           context: scripted_ok
           side_effects: facts_only
+          tags: [stewardship]
         behavior: plugin
         handler: ChangesetSuggestOp
         invocation_phrases:
@@ -197,6 +202,7 @@ domains:
           category: changeset_authoring
           context: scripted_ok
           side_effects: state_write
+          tags: [stewardship]
         behavior: plugin
         handler: ChangesetApplyTemplateOp
         invocation_phrases:
@@ -229,6 +235,7 @@ domains:
           category: changeset_evidence
           context: scripted_ok
           side_effects: state_write
+          tags: [stewardship]
         behavior: plugin
         handler: ChangesetAttachBasisOp
         invocation_phrases:
@@ -263,6 +270,7 @@ domains:
           category: changeset_evidence
           context: scripted_ok
           side_effects: facts_only
+          tags: [stewardship]
         behavior: plugin
         handler: ChangesetValidateEditOp
         invocation_phrases:
@@ -296,6 +304,7 @@ domains:
           category: changeset_analysis
           context: scripted_ok
           side_effects: facts_only
+          tags: [stewardship]
         behavior: plugin
         handler: ChangesetCrossReferenceOp
         invocation_phrases:
@@ -322,6 +331,7 @@ domains:
           category: changeset_analysis
           context: scripted_ok
           side_effects: facts_only
+          tags: [stewardship]
         behavior: plugin
         handler: ChangesetImpactAnalysisOp
         invocation_phrases:
@@ -351,6 +361,7 @@ domains:
           category: changeset_authoring
           context: scripted_ok
           side_effects: state_write
+          tags: [stewardship]
         behavior: plugin
         handler: ChangesetResolveConflictOp
         invocation_phrases:
@@ -388,6 +399,7 @@ domains:
           category: changeset_query
           context: scripted_ok
           side_effects: facts_only
+          tags: [stewardship]
         behavior: plugin
         handler: ChangesetListOp
         invocation_phrases:
@@ -414,6 +426,7 @@ domains:
           category: changeset_query
           context: scripted_ok
           side_effects: facts_only
+          tags: [stewardship]
         behavior: plugin
         handler: ChangesetGetOp
         invocation_phrases:
@@ -440,6 +453,7 @@ domains:
           category: changeset_query
           context: scripted_ok
           side_effects: facts_only
+          tags: [stewardship]
         behavior: plugin
         handler: ChangesetDiffOp
         invocation_phrases:

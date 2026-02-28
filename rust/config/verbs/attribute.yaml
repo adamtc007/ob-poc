@@ -13,6 +13,7 @@ domains:
           source_of_truth: catalog
           scope: global
           noun: attribute
+          tags: [data-management]
         behavior: crud
         crud:
           operation: upsert
@@ -103,6 +104,7 @@ domains:
           source_of_truth: catalog
           scope: global
           noun: attribute
+          tags: [data-management]
         behavior: crud
         crud:
           operation: update
@@ -138,6 +140,7 @@ domains:
           source_of_truth: catalog
           scope: global
           noun: attribute
+          tags: [data-management]
         behavior: crud
         crud:
           operation: select
@@ -157,6 +160,7 @@ domains:
           source_of_truth: catalog
           scope: global
           noun: attribute
+          tags: [data-management]
         behavior: crud
         crud:
           operation: select
@@ -179,6 +183,7 @@ domains:
           source_of_truth: catalog
           scope: global
           noun: attribute
+          tags: [data-management]
         behavior: crud
         crud:
           operation: upsert
@@ -251,6 +256,7 @@ domains:
           source_of_truth: catalog
           scope: global
           noun: attribute
+          tags: [data-management]
         behavior: crud
         crud:
           operation: delete
@@ -285,6 +291,7 @@ domains:
           source_of_truth: catalog
           scope: global
           noun: attribute
+          tags: [data-management]
         behavior: plugin
         handler: attribute_list_sources
         args:
@@ -300,6 +307,7 @@ domains:
           source_of_truth: catalog
           scope: global
           noun: attribute
+          tags: [data-management]
         behavior: plugin
         handler: attribute_list_sinks
         args:
@@ -315,6 +323,7 @@ domains:
           source_of_truth: catalog
           scope: global
           noun: attribute
+          tags: [data-management]
         behavior: plugin
         handler: attribute_trace_lineage
         args:
@@ -330,6 +339,7 @@ domains:
           source_of_truth: catalog
           scope: global
           noun: attribute
+          tags: [data-management]
         behavior: plugin
         handler: attribute_list_by_document
         args:
@@ -350,6 +360,7 @@ domains:
           source_of_truth: catalog
           scope: global
           noun: attribute
+          tags: [data-management]
         behavior: plugin
         handler: attribute_check_coverage
         args:

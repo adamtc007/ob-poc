@@ -72,10 +72,22 @@ mod tests {
 
     #[test]
     fn membership_kind_snake_case() {
-        assert_eq!(serde_json::to_value(MembershipKind::Direct).unwrap(), "direct");
-        assert_eq!(serde_json::to_value(MembershipKind::Inherited).unwrap(), "inherited");
-        assert_eq!(serde_json::to_value(MembershipKind::Conditional).unwrap(), "conditional");
-        assert_eq!(serde_json::to_value(MembershipKind::Excluded).unwrap(), "excluded");
+        assert_eq!(
+            serde_json::to_value(MembershipKind::Direct).unwrap(),
+            "direct"
+        );
+        assert_eq!(
+            serde_json::to_value(MembershipKind::Inherited).unwrap(),
+            "inherited"
+        );
+        assert_eq!(
+            serde_json::to_value(MembershipKind::Conditional).unwrap(),
+            "conditional"
+        );
+        assert_eq!(
+            serde_json::to_value(MembershipKind::Excluded).unwrap(),
+            "excluded"
+        );
     }
 
     #[test]

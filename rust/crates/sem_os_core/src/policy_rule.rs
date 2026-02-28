@@ -76,9 +76,9 @@ mod tests {
         };
         let json = serde_json::to_value(&val).unwrap();
         // Check default_priority gives 100
-        let minimal: PolicyRuleBody = serde_json::from_str(
-            r#"{"fqn":"x","name":"x","description":"x","domain":"x"}"#,
-        ).unwrap();
+        let minimal: PolicyRuleBody =
+            serde_json::from_str(r#"{"fqn":"x","name":"x","description":"x","domain":"x"}"#)
+                .unwrap();
         assert_eq!(minimal.priority, 100);
         // Check default_true gives true for enabled
         assert!(minimal.enabled);

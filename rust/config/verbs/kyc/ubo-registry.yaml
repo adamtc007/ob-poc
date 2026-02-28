@@ -22,7 +22,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: ubo_registry
-          tags: [ubo, registry, lifecycle]
+          tags: [ubo, registry, lifecycle, kyc]
         behavior: plugin
         handler: UboRegistryPromoteOp
         args:
@@ -49,7 +49,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: ubo_registry
-          tags: [ubo, registry, lifecycle]
+          tags: [ubo, registry, lifecycle, kyc]
         behavior: plugin
         handler: UboRegistryAdvanceOp
         args:

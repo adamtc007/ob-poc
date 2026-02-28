@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { queryClient } from "./lib/query";
 import { AppShell, ErrorBoundary } from "./components";
 import { ChatPage } from "./features/chat/ChatPage";
+import { SemOsPage } from "./features/semantic-os/SemOsPage";
 import { DealPage } from "./features/deal/DealPage";
 import { InspectorPage } from "./features/inspector/InspectorPage";
 import { SettingsPage } from "./features/settings/SettingsPage";
@@ -56,6 +57,22 @@ function App() {
                 element={
                   <ErrorBoundary>
                     <ChatPage />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="semantic-os"
+                element={
+                  <ErrorBoundary>
+                    <SemOsPage />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="semantic-os/:sessionId"
+                element={
+                  <ErrorBoundary>
+                    <SemOsPage />
                   </ErrorBoundary>
                 }
               />

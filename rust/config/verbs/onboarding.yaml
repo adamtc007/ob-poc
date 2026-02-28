@@ -9,6 +9,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: onboarding
+          tags: [onboarding]
           subject_kinds: [cbu]
         behavior: plugin
         plugin:

@@ -481,6 +481,15 @@ impl AgentService {
     ) -> crate::agent::orchestrator::OrchestratorContext {
         use crate::agent::orchestrator::OrchestratorContext;
 
+        // Map stage_focus to SemReg goals for verb phase_tag filtering.
+        // Convention: stage_focus "semos-kyc" → goals ["kyc"].
+        let goals = match session.context.stage_focus.as_deref() {
+            Some(s) if s.starts_with("semos-") => {
+                vec![s.strip_prefix("semos-").unwrap().to_string()]
+            }
+            _ => vec![],
+        };
+
         OrchestratorContext {
             actor,
             session_id: Some(session.id),
@@ -494,6 +503,7 @@ impl AgentService {
             source,
             sem_os_client: self.sem_os_client.clone(),
             agent_mode: sem_os_core::authoring::agent_mode::AgentMode::default(),
+            goals,
         }
     }
 
@@ -514,6 +524,27 @@ impl AgentService {
         }
 
         Some(lookup_svc)
+    }
+
+    /// Resolve the allowed verb set for the current session context.
+    ///
+    /// Uses the **same** `build_orchestrator_context()` + `resolve_sem_reg_verbs()`
+    /// path as `process_chat()` / `handle_utterance()`, guaranteeing the returned
+    /// `ContextEnvelope` carries the identical verb set the agent pipeline would use.
+    #[cfg(feature = "database")]
+    pub async fn resolve_options(
+        &self,
+        session: &crate::session::UnifiedSession,
+        actor: crate::sem_reg::abac::ActorContext,
+    ) -> Result<crate::agent::context_envelope::ContextEnvelope, String> {
+        let ctx = self.build_orchestrator_context(
+            session,
+            actor,
+            crate::agent::orchestrator::UtteranceSource::Chat,
+        );
+        let envelope =
+            crate::agent::orchestrator::resolve_sem_reg_verbs(&ctx, None).await;
+        Ok(envelope)
     }
 
     /// ONE PATH - all user prompts:

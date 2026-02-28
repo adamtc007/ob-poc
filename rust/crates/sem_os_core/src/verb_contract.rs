@@ -193,8 +193,10 @@ mod tests {
         assert_eq!(json["returns"]["type"], "uuid");
         assert_eq!(json["produces"]["type"], "cbu");
         // Check default_true(): requires_subject defaults to true
-        let minimal: VerbContractBody =
-            serde_json::from_str(r#"{"fqn":"x","domain":"x","action":"x","description":"x","behavior":"x"}"#).unwrap();
+        let minimal: VerbContractBody = serde_json::from_str(
+            r#"{"fqn":"x","domain":"x","action":"x","description":"x","behavior":"x"}"#,
+        )
+        .unwrap();
         assert!(minimal.requires_subject);
         // Round-trip
         let back: VerbContractBody = serde_json::from_value(json.clone()).unwrap();

@@ -56,6 +56,10 @@ pub struct OrchestratorContext {
     /// verbs but blocks publish; Governed blocks authoring exploration but allows
     /// publish and business verbs. Default: Governed.
     pub agent_mode: AgentMode,
+    /// Workflow goals derived from session stage_focus (e.g., ["kyc"], ["onboarding"]).
+    /// Threaded into SemReg ContextResolutionRequest to filter verbs by phase_tags.
+    /// Empty means no goal filtering (all verbs pass).
+    pub goals: Vec<String>,
 }
 
 /// Where the utterance originated.
@@ -819,7 +823,7 @@ pub async fn handle_utterance_with_forced_verb(
 /// Returns a rich envelope preserving allowed verbs, pruned verbs with reasons,
 /// deterministic fingerprint, evidence gaps, and governance signals.
 #[cfg(feature = "database")]
-async fn resolve_sem_reg_verbs(
+pub(crate) async fn resolve_sem_reg_verbs(
     ctx: &OrchestratorContext,
     entity_kind: Option<&str>,
 ) -> ContextEnvelope {
@@ -865,7 +869,7 @@ async fn resolve_via_client(
         subject,
         intent: None,
         actor: core_actor,
-        goals: vec![],
+        goals: ctx.goals.clone(),
         constraints: Default::default(),
         evidence_mode: EvidenceMode::default(),
         point_in_time: None,
@@ -914,7 +918,7 @@ async fn resolve_via_direct(
         subject,
         intent: None,
         actor: ctx.actor.clone(),
-        goals: vec![],
+        goals: ctx.goals.clone(),
         constraints: Default::default(),
         evidence_mode: EvidenceMode::default(),
         point_in_time: None,

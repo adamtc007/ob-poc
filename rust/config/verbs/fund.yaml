@@ -26,6 +26,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: fund
+          tags: [onboarding]
           subject_kinds: [fund]
         behavior: crud
         produces:
@@ -166,6 +167,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: fund
+          tags: [onboarding]
           subject_kinds: [fund]
         behavior: crud
         produces:
@@ -266,6 +268,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: fund
+          tags: [onboarding]
           subject_kinds: [fund]
         behavior: crud
         produces:
@@ -359,6 +362,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: fund
+          tags: [onboarding]
           subject_kinds: [fund]
         behavior: crud
         produces:
@@ -456,6 +460,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: fund
+          tags: [onboarding]
           subject_kinds: [fund]
         behavior: crud
         produces:
@@ -559,6 +564,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: fund
+          tags: [onboarding]
           subject_kinds: [fund]
         behavior: crud
         produces:
@@ -651,6 +657,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: fund
+          tags: [onboarding]
           subject_kinds: [fund]
         behavior: crud
         produces:
@@ -731,6 +738,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: fund
+          tags: [onboarding]
           subject_kinds: [fund]
         behavior: crud
         produces:
@@ -807,6 +815,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: fund
+          tags: [onboarding]
           subject_kinds: [fund]
         behavior: crud
         produces:
@@ -902,6 +911,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: fund
+          tags: [onboarding]
           subject_kinds: [fund]
         behavior: crud
         crud:
@@ -960,6 +970,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: fund
+          tags: [onboarding]
           subject_kinds: [fund]
         behavior: crud
         crud:
@@ -1013,6 +1024,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: fund
+          tags: [onboarding]
           subject_kinds: [fund]
         behavior: crud
         crud:
@@ -1067,6 +1079,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: fund
+          tags: [onboarding]
           subject_kinds: [fund]
         behavior: crud
         crud:
@@ -1102,6 +1115,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: fund
+          tags: [onboarding]
           subject_kinds: [fund]
         behavior: crud
         crud:
@@ -1137,6 +1151,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: fund
+          tags: [onboarding]
           subject_kinds: [fund]
         behavior: crud
         crud:
@@ -1177,6 +1192,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: fund
+          tags: [onboarding]
           subject_kinds: [fund]
         behavior: crud
         crud:
@@ -1251,6 +1267,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: fund
+          tags: [onboarding]
           subject_kinds: [fund]
         behavior: crud
         crud:
@@ -1288,6 +1305,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: fund
+          tags: [onboarding]
           subject_kinds: [fund]
         behavior: crud
         crud:
@@ -1321,6 +1339,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: fund
+          tags: [onboarding]
           subject_kinds: [fund]
         behavior: crud
         crud:
@@ -1356,6 +1375,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: fund
+          tags: [onboarding]
           subject_kinds: [fund]
         behavior: crud
         crud:

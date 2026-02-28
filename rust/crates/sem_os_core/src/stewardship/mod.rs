@@ -289,8 +289,7 @@ mod tests {
     #[test]
     fn one_role_sufficient_even_with_others() {
         // Has both viewer (no perms) and admin (all perms) — admin should allow Remove
-        let principal =
-            Principal::in_process("multi-role", vec!["viewer".into(), "admin".into()]);
+        let principal = Principal::in_process("multi-role", vec!["viewer".into(), "admin".into()]);
         let entries = vec![make_entry("attr.a", ChangeKind::Remove)];
         assert!(validate_role_constraints(&principal, &entries).is_ok());
     }

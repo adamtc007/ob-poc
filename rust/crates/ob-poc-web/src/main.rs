@@ -385,9 +385,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .with_authoring(Arc::new(stores.authoring))
                 .with_scratch_runner(Arc::new(stores.scratch_runner))
                 .with_cleanup(Arc::new(stores.cleanup));
-                let client = sem_os_client::inprocess::InProcessClient::new(
-                    Arc::new(core_service),
-                );
+                let client = sem_os_client::inprocess::InProcessClient::new(Arc::new(core_service));
                 tracing::info!("SemOsClient: InProcess mode (direct CoreService)");
                 Some(Arc::new(client) as Arc<dyn sem_os_client::SemOsClient>)
             }
