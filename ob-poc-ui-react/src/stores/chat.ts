@@ -13,6 +13,13 @@ import type {
   VerbProfile,
 } from '../types/chat';
 
+/** Surface metadata from SessionVerbSurface */
+export interface VerbSurfaceMeta {
+  fingerprint: string;
+  totalRegistry: number;
+  finalCount: number;
+}
+
 /** Chat state */
 interface ChatState {
   // Sessions
@@ -30,6 +37,9 @@ interface ChatState {
 
   // Available verbs (populated on every chat response)
   availableVerbs: VerbProfile[];
+
+  // Verb surface metadata (fingerprint + counts)
+  verbSurfaceMeta: VerbSurfaceMeta | null;
 
   // Errors
   error: string | null;
@@ -53,7 +63,7 @@ interface ChatActions {
   setPendingDecision: (decision: DecisionPacket | null) => void;
 
   // Available verbs
-  setAvailableVerbs: (verbs: VerbProfile[]) => void;
+  setAvailableVerbs: (verbs: VerbProfile[], meta?: VerbSurfaceMeta) => void;
 
   // Input
   setInputValue: (value: string) => void;
@@ -74,6 +84,7 @@ const initialState: ChatState = {
   streamingContent: '',
   pendingDecision: null,
   availableVerbs: [],
+  verbSurfaceMeta: null,
   inputValue: '',
   error: null,
 };
@@ -133,7 +144,7 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
 
   setPendingDecision: (pendingDecision) => set({ pendingDecision }),
 
-  setAvailableVerbs: (availableVerbs) => set({ availableVerbs }),
+  setAvailableVerbs: (availableVerbs, meta) => set({ availableVerbs, verbSurfaceMeta: meta ?? null }),
 
   setInputValue: (inputValue) => set({ inputValue }),
 

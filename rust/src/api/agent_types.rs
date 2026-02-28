@@ -191,6 +191,17 @@ pub fn default_watch_timeout() -> u64 {
     30000
 }
 
+/// Query parameters for verb surface endpoint
+#[derive(Debug, Deserialize)]
+pub struct VerbSurfaceQuery {
+    /// Filter to specific domain (e.g., "kyc", "cbu")
+    #[serde(default)]
+    pub domain: Option<String>,
+    /// Include excluded verbs with prune reasons
+    #[serde(default)]
+    pub include_excluded: bool,
+}
+
 /// Response from session watch endpoint
 #[derive(Debug, Serialize)]
 pub struct WatchResponse {

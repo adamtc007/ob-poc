@@ -109,7 +109,10 @@ pub async fn run_check(strict: bool) -> Result<()> {
 
     // 2. Query DB for current state
     let db_state = query_db_state(&pool).await?;
-    println!("Registry: {} active/deprecated FQNs in database.", db_state.len());
+    println!(
+        "Registry: {} active/deprecated FQNs in database.",
+        db_state.len()
+    );
 
     // 3. Run all checks
     let mut result = CheckResult::default();
@@ -215,9 +218,7 @@ fn check_annotations(
                         file: ann.file.display().to_string(),
                         line: ann.line,
                         verb: ann.verb.clone(),
-                        message: format!(
-                            "attribute `{attr_fqn}` not found in registry"
-                        ),
+                        message: format!("attribute `{attr_fqn}` not found in registry"),
                     });
                 }
                 Some(entry) => {
@@ -366,11 +367,15 @@ fn print_results(result: &CheckResult) {
                 Severity::Info => " INFO",
             };
             if f.line > 0 {
-                println!("  [{prefix}] {code} {file}:{line}  verb={verb}",
-                    code = f.code, file = f.file, line = f.line, verb = f.verb);
+                println!(
+                    "  [{prefix}] {code} {file}:{line}  verb={verb}",
+                    code = f.code,
+                    file = f.file,
+                    line = f.line,
+                    verb = f.verb
+                );
             } else {
-                println!("  [{prefix}] {code} {file}",
-                    code = f.code, file = f.file);
+                println!("  [{prefix}] {code} {file}", code = f.code, file = f.file);
             }
             println!("         {}", f.message);
         }
@@ -524,27 +529,54 @@ mod governed_cache_types {
 
     #[derive(Debug, Deserialize)]
     #[serde(rename_all = "snake_case")]
-    pub enum GovernanceTier { Governed, Operational }
-
-    #[derive(Debug, Deserialize)]
-    #[serde(rename_all = "snake_case")]
-    pub enum TrustClass { Proof, DecisionSupport, Convenience }
-
-    #[derive(Debug, Deserialize)]
-    #[serde(rename_all = "snake_case")]
-    pub enum SnapshotStatus { Draft, Active, Deprecated, Retired }
-
-    #[derive(Debug, Deserialize)]
-    #[serde(rename_all = "snake_case")]
-    pub enum ObjectType {
-        AttributeDef, EntityTypeDef, RelationshipTypeDef, VerbContract,
-        TaxonomyDef, TaxonomyNode, MembershipRule, ViewDef, PolicyRule,
-        EvidenceRequirement, DocumentTypeDef, ObservationDef, DerivationSpec,
+    pub enum GovernanceTier {
+        Governed,
+        Operational,
     }
 
     #[derive(Debug, Deserialize)]
     #[serde(rename_all = "snake_case")]
-    pub enum Classification { Public, Internal, Confidential, Restricted }
+    pub enum TrustClass {
+        Proof,
+        DecisionSupport,
+        Convenience,
+    }
+
+    #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "snake_case")]
+    pub enum SnapshotStatus {
+        Draft,
+        Active,
+        Deprecated,
+        Retired,
+    }
+
+    #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "snake_case")]
+    pub enum ObjectType {
+        AttributeDef,
+        EntityTypeDef,
+        RelationshipTypeDef,
+        VerbContract,
+        TaxonomyDef,
+        TaxonomyNode,
+        MembershipRule,
+        ViewDef,
+        PolicyRule,
+        EvidenceRequirement,
+        DocumentTypeDef,
+        ObservationDef,
+        DerivationSpec,
+    }
+
+    #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "snake_case")]
+    pub enum Classification {
+        Public,
+        Internal,
+        Confidential,
+        Restricted,
+    }
 
     #[derive(Debug, Deserialize)]
     pub struct GovernedCache {

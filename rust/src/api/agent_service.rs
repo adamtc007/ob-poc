@@ -504,6 +504,7 @@ impl AgentService {
             sem_os_client: self.sem_os_client.clone(),
             agent_mode: sem_os_core::authoring::agent_mode::AgentMode::default(),
             goals,
+            stage_focus: session.context.stage_focus.clone(),
         }
     }
 
@@ -542,8 +543,7 @@ impl AgentService {
             actor,
             crate::agent::orchestrator::UtteranceSource::Chat,
         );
-        let envelope =
-            crate::agent::orchestrator::resolve_sem_reg_verbs(&ctx, None).await;
+        let envelope = crate::agent::orchestrator::resolve_sem_reg_verbs(&ctx, None).await;
         Ok(envelope)
     }
 

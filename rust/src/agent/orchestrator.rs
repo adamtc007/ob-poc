@@ -21,6 +21,9 @@ use sqlx::PgPool;
 
 use crate::agent::context_envelope::ContextEnvelope;
 use crate::agent::telemetry;
+use crate::agent::verb_surface::{
+    compute_session_verb_surface, SessionVerbSurface, VerbSurfaceContext, VerbSurfaceFailPolicy,
+};
 use crate::lookup::LookupService;
 use crate::mcp::intent_pipeline::{IntentPipeline, PipelineOutcome, PipelineResult};
 use crate::mcp::scope_resolution::ScopeContext;
@@ -60,6 +63,9 @@ pub struct OrchestratorContext {
     /// Threaded into SemReg ContextResolutionRequest to filter verbs by phase_tags.
     /// Empty means no goal filtering (all verbs pass).
     pub goals: Vec<String>,
+    /// Session workflow focus (e.g., "semos-kyc", "semos-onboarding").
+    /// Used by `SessionVerbSurface` for domain-level workflow filtering.
+    pub stage_focus: Option<String>,
 }
 
 /// Where the utterance originated.
@@ -78,6 +84,10 @@ pub struct OrchestratorOutcome {
     /// Contains allowed verbs, pruned verbs with reasons, fingerprint, governance signals.
     #[cfg(feature = "database")]
     pub context_envelope: Option<ContextEnvelope>,
+    /// Consolidated verb surface computed for this turn (all governance layers applied).
+    /// When present, replaces ad-hoc inline SemReg + AgentMode filtering.
+    #[cfg(feature = "database")]
+    pub surface: Option<SessionVerbSurface>,
     pub lookup_result: Option<crate::lookup::LookupResult>,
     pub trace: IntentTrace,
 }
@@ -141,6 +151,8 @@ pub struct IntentTrace {
     pub toctou_result: Option<String>,
     /// New fingerprint from TOCTOU recheck (populated on drift or denial)
     pub toctou_new_fingerprint: Option<String>,
+    /// SessionVerbSurface fingerprint (format: "vs1:<hex>"), distinct from SemReg fingerprint.
+    pub surface_fingerprint: Option<String>,
 }
 
 /// Returns true for pipeline outcomes that are "early exits" -- scope resolution,
@@ -202,6 +214,32 @@ pub async fn handle_utterance(
     // -- Step 2: SemReg context resolution -> ContextEnvelope --
     let envelope = resolve_sem_reg_verbs(ctx, dominant_entity_kind.as_deref()).await;
 
+    // -- Step 2.5: Compute SessionVerbSurface (all governance layers) --
+    let fail_policy = if policy.semreg_fail_closed() {
+        VerbSurfaceFailPolicy::FailClosed
+    } else {
+        VerbSurfaceFailPolicy::FailOpen
+    };
+    let surface_ctx = VerbSurfaceContext {
+        agent_mode: ctx.agent_mode,
+        stage_focus: ctx.stage_focus.as_deref(),
+        envelope: &envelope,
+        fail_policy,
+        entity_state: None, // Lifecycle filtering deferred to Phase 3
+    };
+    let surface = compute_session_verb_surface(&surface_ctx);
+
+    tracing::debug!(
+        total = surface.filter_summary.total_registry,
+        after_mode = surface.filter_summary.after_agent_mode,
+        after_workflow = surface.filter_summary.after_workflow,
+        after_semreg = surface.filter_summary.after_semreg,
+        final_count = surface.filter_summary.final_count,
+        fingerprint = %surface.surface_fingerprint.0,
+        fail_policy = ?surface.fail_policy_applied,
+        "SessionVerbSurface computed"
+    );
+
     // Extract verb names for trace (backward-compatible with sem_reg_verb_filter)
     let sem_reg_verb_names: Option<Vec<String>> = if envelope.is_unavailable() {
         None
@@ -210,14 +248,17 @@ pub async fn handle_utterance(
     };
 
     // -- Stage A: Discover candidates (no DSL generation yet) --
-    // Phase 3 CCIR: pass SemReg allowed verbs into pipeline for pre-constrained search.
-    // The pipeline threads these to HybridVerbSearcher::search() so disallowed verbs
-    // are never returned from any tier. The post-filter in Stage A.2 below is kept as
-    // a safety net / debug assertion (belt-and-suspenders).
+    // Use SessionVerbSurface's allowed FQN set as pre-constraint for verb search.
+    // This consolidates SemReg + AgentMode + workflow filtering into one set.
+    let surface_allowed: std::collections::HashSet<String> = surface.allowed_fqns();
     let searcher = (*ctx.verb_searcher).clone();
     let pipeline = {
         let p = IntentPipeline::with_pool(searcher, ctx.pool.clone());
-        if !envelope.is_unavailable() && !envelope.is_deny_all() {
+        if !surface_allowed.is_empty() {
+            p.with_allowed_verbs(surface_allowed.clone())
+        } else if !envelope.is_unavailable() && !envelope.is_deny_all() {
+            // Fallback: if surface is empty but envelope has verbs, use envelope directly
+            // (safety net for edge cases)
             p.with_allowed_verbs(envelope.allowed_verbs.clone())
         } else {
             p
@@ -266,6 +307,7 @@ pub async fn handle_utterance(
         let mut outcome = OrchestratorOutcome {
             pipeline_result: discovery_result,
             context_envelope: Some(envelope),
+            surface: Some(surface),
             lookup_result,
             trace,
         };
@@ -276,18 +318,29 @@ pub async fn handle_utterance(
     // NOTE: Direct DSL early-exit (dsl: prefix) was removed in Phase 0B CCIR.
     // All DSL — including operator-provided — flows through SemReg filtering below.
 
-    // -- Stage A.2: Apply SemReg policy via ContextEnvelope --
+    // -- Stage A.2+A.3: Apply SessionVerbSurface as post-filter (belt-and-suspenders) --
+    // The pre-constraint (surface_allowed) should have already filtered verb search results.
+    // This post-filter catches any verbs that slipped through (e.g., from phonetic fallback).
     let mut sem_reg_denied_all = false;
     let mut semreg_unavailable = false;
     let mut blocked_reason: Option<String> = None;
     let mut filtered_candidates = discovery_result.verb_candidates.clone();
+    let mut agent_mode_blocked = Vec::new();
 
     if envelope.is_unavailable() {
         semreg_unavailable = true;
-        if policy.semreg_fail_closed() {
-            tracing::warn!("SemReg unavailable -- fail-closed (strict mode)");
-            blocked_reason = Some("SemReg unavailable (strict mode requires SemReg)".into());
-            filtered_candidates.clear();
+        if matches!(
+            surface.fail_policy_applied,
+            VerbSurfaceFailPolicy::FailClosed
+        ) {
+            // FailClosed: only safe-harbor verbs survive
+            let before_count = filtered_candidates.len();
+            filtered_candidates.retain(|v| surface_allowed.contains(&v.verb));
+            if filtered_candidates.is_empty() && before_count > 0 {
+                tracing::warn!("SemReg unavailable -- fail-closed (safe-harbor only)");
+                blocked_reason =
+                    Some("SemReg unavailable (fail-closed: only safe-harbor verbs)".into());
+            }
         } else {
             tracing::info!("SemReg unavailable -- fail-open (permissive mode)");
         }
@@ -301,48 +354,41 @@ pub async fn handle_utterance(
             tracing::warn!("SemReg returned DenyAll -- fail-open (permissive mode)");
         }
     } else {
-        // AllowedSet — filter candidates against allowed verbs
-        let allowed = &envelope.allowed_verbs;
+        // Post-filter against consolidated surface (SemReg + AgentMode + workflow)
         let before_count = filtered_candidates.len();
-        filtered_candidates.retain(|v| allowed.contains(&v.verb));
+        filtered_candidates.retain(|v| {
+            if surface_allowed.contains(&v.verb) {
+                true
+            } else {
+                // Track why the verb was blocked (for trace)
+                if !ctx.agent_mode.is_verb_allowed(&v.verb) {
+                    agent_mode_blocked.push(v.verb.clone());
+                }
+                false
+            }
+        });
         if filtered_candidates.is_empty() && before_count > 0 {
             sem_reg_denied_all = true;
             if policy.semreg_fail_closed() {
                 tracing::warn!(
                     before = before_count,
-                    allowed_count = allowed.len(),
+                    surface_count = surface_allowed.len(),
                     strict = true,
-                    "SemReg filtered ALL verb candidates -- fail-closed (strict mode)"
+                    "SessionVerbSurface filtered ALL verb candidates -- fail-closed"
                 );
-                blocked_reason = Some("SemReg denied all verb candidates (strict mode)".into());
+                blocked_reason =
+                    Some("All verb candidates excluded by governance surface (strict mode)".into());
             } else {
                 tracing::warn!(
                     before = before_count,
-                    allowed_count = allowed.len(),
+                    surface_count = surface_allowed.len(),
                     strict = false,
-                    "SemReg filtered ALL verb candidates -- falling back to unfiltered (permissive)"
+                    "SessionVerbSurface filtered ALL verb candidates -- falling back to unfiltered (permissive)"
                 );
                 filtered_candidates = discovery_result.verb_candidates.clone();
             }
         }
     }
-
-    // -- Stage A.3: Apply AgentMode filter --
-    // Research mode blocks publish/publish-batch; Governed blocks authoring exploration verbs.
-    let mut agent_mode_blocked = Vec::new();
-    filtered_candidates.retain(|v| {
-        if ctx.agent_mode.is_verb_allowed(&v.verb) {
-            true
-        } else {
-            tracing::debug!(
-                verb = %v.verb,
-                mode = %ctx.agent_mode,
-                "AgentMode blocked verb"
-            );
-            agent_mode_blocked.push(v.verb.clone());
-            false
-        }
-    });
 
     let post_filter: Vec<(String, f32)> = filtered_candidates
         .iter()
@@ -513,6 +559,8 @@ pub async fn handle_utterance(
         trace.selection_source = "semreg".to_string();
         trace.forced_verb = chosen_post.clone();
     }
+    // Stamp surface fingerprint into trace
+    trace.surface_fingerprint = Some(surface.surface_fingerprint.0.clone());
 
     tracing::info!(
         source = ?trace.source,
@@ -526,6 +574,7 @@ pub async fn handle_utterance(
         chosen_verb_pre = ?trace.chosen_verb_pre_semreg,
         chosen_verb_post = ?trace.chosen_verb_post_semreg,
         fingerprint = ?trace.allowed_verbs_fingerprint,
+        surface_fingerprint = ?trace.surface_fingerprint,
         pruned_count = trace.pruned_verbs_count,
         toctou = ?trace.toctou_result,
         "IntentTrace"
@@ -535,6 +584,7 @@ pub async fn handle_utterance(
     let mut outcome = OrchestratorOutcome {
         pipeline_result: result,
         context_envelope: Some(envelope),
+        surface: Some(surface),
         lookup_result,
         trace,
     };
@@ -646,6 +696,7 @@ fn build_trace(
         toctou_recheck_performed,
         toctou_result,
         toctou_new_fingerprint,
+        surface_fingerprint: None, // Set by caller after build_trace()
     }
 }
 
@@ -799,6 +850,7 @@ pub async fn handle_utterance_with_forced_verb(
         toctou_recheck_performed: false,
         toctou_result: None,
         toctou_new_fingerprint: None,
+        surface_fingerprint: None, // No surface computed for forced-verb path
     };
 
     tracing::info!(
@@ -811,6 +863,7 @@ pub async fn handle_utterance_with_forced_verb(
     let mut outcome = OrchestratorOutcome {
         pipeline_result: result,
         context_envelope: None,
+        surface: None, // No surface computed for forced-verb path
         lookup_result,
         trace,
     };
@@ -1044,6 +1097,7 @@ mod tests {
             toctou_recheck_performed: false,
             toctou_result: None,
             toctou_new_fingerprint: None,
+            surface_fingerprint: None,
         }
     }
 

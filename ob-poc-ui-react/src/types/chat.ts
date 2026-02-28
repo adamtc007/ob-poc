@@ -172,4 +172,6 @@ export interface SendMessageResponse {
   message: ChatMessage;
   session: ChatSession;
   available_verbs?: VerbProfile[];
+  /** SessionVerbSurface fingerprint — "vs1:<sha256>". Changes when visible verb set changes. */
+  surface_fingerprint?: string;
 }

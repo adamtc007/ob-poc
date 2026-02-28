@@ -75,8 +75,8 @@ pub use crate::api::agent_types::{
     ResolveByRefIdRequest, ResolveByRefIdResponse, ResolveRefRequest, ResolveRefResponse,
     SetBindingRequest, SetBindingResponse, SetFocusRequest, SetFocusResponse,
     SubSessionChatRequest, SubSessionMessage, SubSessionStateResponse, UnresolvedRef,
-    ValidationError, ValidationResult, VerbInfo, VocabQuery, VocabResponse, WatchQuery,
-    WatchResponse,
+    ValidationError, ValidationResult, VerbInfo, VerbSurfaceQuery, VocabQuery, VocabResponse,
+    WatchQuery, WatchResponse,
 };
 
 // ============================================================================
@@ -403,6 +403,10 @@ pub(crate) fn create_agent_router_with_state(state: AgentState) -> Router {
         .route("/api/session/:id/clear", post(clear_session_dsl))
         .route("/api/session/:id/bind", post(set_session_binding))
         .route("/api/session/:id/context", get(get_session_context))
+        .route(
+            "/api/session/:id/verb-surface",
+            get(get_session_verb_surface),
+        )
         .route("/api/session/:id/focus", post(set_session_focus))
         .route("/api/session/:id/dsl/enrich", get(get_enriched_dsl))
         .route("/api/session/:id/watch", get(watch_session))
@@ -718,10 +722,10 @@ async fn get_semos_context(
     .await
     .unwrap_or_default();
 
-    let registry_stats: std::collections::HashMap<String, i64> =
-        stats_rows.into_iter().collect();
+    let registry_stats: std::collections::HashMap<String, i64> = stats_rows.into_iter().collect();
 
     // 2. Recent changesets (last 10)
+    #[allow(clippy::type_complexity)]
     let changeset_rows: Vec<(Uuid, Option<String>, String, Option<String>, Option<chrono::DateTime<chrono::Utc>>, i64)> = sqlx::query_as(
         r#"
         SELECT
@@ -742,14 +746,16 @@ async fn get_semos_context(
 
     let recent_changesets: Vec<ChangesetSummary> = changeset_rows
         .into_iter()
-        .map(|(id, title, status, created_by, created_at, entry_count)| ChangesetSummary {
-            id,
-            title,
-            status,
-            created_by,
-            created_at,
-            entry_count,
-        })
+        .map(
+            |(id, title, status, created_by, created_at, entry_count)| ChangesetSummary {
+                id,
+                title,
+                status,
+                created_by,
+                created_at,
+                entry_count,
+            },
+        )
         .collect();
 
     // 3. Agent mode — default is Governed
@@ -776,16 +782,16 @@ fn build_semos_workflow_decision(session_id: Uuid) -> ob_poc_types::DecisionPack
         UserChoice {
             id: "1".to_string(),
             label: "Onboarding".to_string(),
-            description: "Define entity types, attributes, and verb contracts for client onboarding"
-                .to_string(),
+            description:
+                "Define entity types, attributes, and verb contracts for client onboarding"
+                    .to_string(),
             is_escape: false,
         },
         UserChoice {
             id: "2".to_string(),
             label: "KYC".to_string(),
-            description:
-                "Configure KYC workflows, evidence requirements, and screening rules"
-                    .to_string(),
+            description: "Configure KYC workflows, evidence requirements, and screening rules"
+                .to_string(),
             is_escape: false,
         },
         UserChoice {
@@ -1968,16 +1974,17 @@ fn build_sexpr_signature(fqn: &str) -> Option<String> {
 /// Build structured verb profiles from a `ContextEnvelope`.
 ///
 /// Produces a `Vec<VerbProfile>` with full s-expression signatures and typed
-/// argument details.  Applies the same `AgentMode` filter as the markdown
-/// `/commands` renderer so the UI sees exactly the same verb universe.
+/// argument details.  Uses the `SessionVerbSurface` when available to respect
+/// all governance layers (SI-1: no ungoverned expansion).
 ///
-/// When SemReg returns an empty verb set (e.g. fresh session with no context),
-/// falls back to the full `RuntimeVerbRegistry` so the UI always has a
-/// populated verb palette.
+/// When a surface is provided, uses `surface.verbs` for the fallback path
+/// (which respects FailPolicy) instead of the raw `RuntimeVerbRegistry`.
+/// When no surface is available, falls back to the envelope-based path.
 #[cfg(feature = "database")]
 fn build_verb_profiles(
     envelope: &crate::agent::context_envelope::ContextEnvelope,
     agent_mode: &sem_os_core::authoring::agent_mode::AgentMode,
+    surface: Option<&crate::agent::verb_surface::SessionVerbSurface>,
 ) -> Vec<ob_poc_types::chat::VerbProfile> {
     use crate::dsl_v2::config::types::ArgType;
     use ob_poc_types::chat::{VerbArgProfile, VerbProfile};
@@ -2033,8 +2040,7 @@ fn build_verb_profiles(
             .filter(|v| agent_mode.is_verb_allowed(&v.fqn))
             .map(|v| {
                 let domain = v.fqn.split('.').next().unwrap_or("unknown").to_string();
-                let sexpr =
-                    build_sexpr_signature(&v.fqn).unwrap_or_else(|| format!("({})", v.fqn));
+                let sexpr = build_sexpr_signature(&v.fqn).unwrap_or_else(|| format!("({})", v.fqn));
                 VerbProfile {
                     fqn: v.fqn.clone(),
                     domain,
@@ -2048,24 +2054,55 @@ fn build_verb_profiles(
             .collect();
     }
 
-    // Fallback: SemReg returned no verbs — build from full RuntimeVerbRegistry
-    tracing::debug!(
-        "SemReg returned empty verb set; falling back to RuntimeVerbRegistry ({} verbs)",
+    // Fallback: SemReg returned no verb contracts.
+    // SI-1: use SessionVerbSurface (which respects FailPolicy) instead of raw registry.
+    if let Some(surface) = surface {
+        tracing::debug!(
+            "SemReg returned empty verb contracts; using SessionVerbSurface ({} verbs, policy={:?})",
+            surface.verbs.len(),
+            surface.fail_policy_applied,
+        );
+        return surface
+            .verbs
+            .iter()
+            .map(|sv| {
+                let sexpr =
+                    build_sexpr_signature(&sv.fqn).unwrap_or_else(|| format!("({})", sv.fqn));
+                VerbProfile {
+                    fqn: sv.fqn.clone(),
+                    domain: sv.domain.clone(),
+                    description: sv.description.clone(),
+                    sexpr,
+                    args: build_args(&sv.fqn),
+                    preconditions_met: sv.lifecycle_eligible,
+                    governance_tier: sv
+                        .governance_tier
+                        .clone()
+                        .unwrap_or_else(|| "operational".to_string()),
+                }
+            })
+            .collect();
+    }
+
+    // Last resort: no surface available — use AgentMode-filtered registry.
+    // This path should only be hit in tests or if surface computation fails.
+    tracing::warn!(
+        "No SessionVerbSurface available; falling back to RuntimeVerbRegistry ({} verbs)",
         reg.len()
     );
     reg.all_verbs()
         .filter(|v| agent_mode.is_verb_allowed(&v.full_name))
         .map(|v| {
-            let sexpr = build_sexpr_signature(&v.full_name)
-                .unwrap_or_else(|| format!("({})", v.full_name));
+            let sexpr =
+                build_sexpr_signature(&v.full_name).unwrap_or_else(|| format!("({})", v.full_name));
             VerbProfile {
                 fqn: v.full_name.clone(),
                 domain: v.domain.clone(),
                 description: v.description.clone(),
                 sexpr,
                 args: build_args(&v.full_name),
-                preconditions_met: true, // No SemReg context — assume met
-                governance_tier: "operational".to_string(), // Default tier
+                preconditions_met: true,
+                governance_tier: "operational".to_string(),
             }
         })
         .collect()
@@ -2090,13 +2127,17 @@ fn workflow_label_from_stage_focus(stage_focus: Option<&str>) -> &str {
 /// The envelope comes from `resolve_sem_reg_verbs()` — the same function the
 /// orchestrator calls for every chat utterance.  The `AgentMode` post-filter
 /// mirrors Stage A.3 in `handle_utterance()`.
+///
+/// SI-1: When a `SessionVerbSurface` is provided, uses surface verbs for the
+/// fallback path instead of the ungoverned `RuntimeVerbRegistry`.
 #[cfg(feature = "database")]
 fn generate_options_from_envelope(
     envelope: &crate::agent::context_envelope::ContextEnvelope,
     session: &UnifiedSession,
     agent_mode: &sem_os_core::authoring::agent_mode::AgentMode,
+    surface: Option<&crate::agent::verb_surface::SessionVerbSurface>,
 ) -> String {
-    generate_options_from_envelope_inner(envelope, session, agent_mode, None)
+    generate_options_from_envelope_inner(envelope, session, agent_mode, None, surface)
 }
 
 /// Domain-filtered variant of `generate_options_from_envelope`.
@@ -2109,8 +2150,15 @@ fn generate_options_from_envelope_filtered(
     session: &UnifiedSession,
     agent_mode: &sem_os_core::authoring::agent_mode::AgentMode,
     domain_filter: &str,
+    surface: Option<&crate::agent::verb_surface::SessionVerbSurface>,
 ) -> String {
-    generate_options_from_envelope_inner(envelope, session, agent_mode, Some(domain_filter))
+    generate_options_from_envelope_inner(
+        envelope,
+        session,
+        agent_mode,
+        Some(domain_filter),
+        surface,
+    )
 }
 
 /// Shared implementation for both filtered and unfiltered options rendering.
@@ -2120,6 +2168,7 @@ fn generate_options_from_envelope_inner(
     session: &UnifiedSession,
     agent_mode: &sem_os_core::authoring::agent_mode::AgentMode,
     domain_filter: Option<&str>,
+    surface: Option<&crate::agent::verb_surface::SessionVerbSurface>,
 ) -> String {
     use std::collections::BTreeMap;
 
@@ -2131,33 +2180,98 @@ fn generate_options_from_envelope_inner(
         .collect();
 
     // 2. Apply optional domain filter
-    let candidates: Vec<&crate::agent::context_envelope::VerbCandidateSummary> = if let Some(df) =
-        domain_filter
-    {
-        mode_filtered
-            .into_iter()
-            .filter(|v| {
-                v.fqn
-                    .split('.')
-                    .next()
-                    .map(|d| d == df)
-                    .unwrap_or(false)
-            })
-            .collect()
-    } else {
-        mode_filtered
-    };
+    let candidates: Vec<&crate::agent::context_envelope::VerbCandidateSummary> =
+        if let Some(df) = domain_filter {
+            mode_filtered
+                .into_iter()
+                .filter(|v| v.fqn.split('.').next().map(|d| d == df).unwrap_or(false))
+                .collect()
+        } else {
+            mode_filtered
+        };
 
     // 3. Derive workflow label
     let stage_focus = session.context.stage_focus.as_deref();
     let workflow = workflow_label_from_stage_focus(stage_focus);
 
-    // 4. Handle empty result — fall back to RuntimeVerbRegistry when SemReg
-    //    returned no verbs (same fallback as build_verb_profiles).
+    // 4. Handle empty result.
+    // SI-1: Use SessionVerbSurface (which respects FailPolicy) instead of
+    // the ungoverned RuntimeVerbRegistry. Only fall back to the raw registry
+    // when no surface is available (test paths, surface computation failure).
     if candidates.is_empty() {
+        if let Some(surf) = surface {
+            // ── Surface-based fallback (governed) ───────────────────
+            let surface_verbs: Vec<_> = if let Some(df) = domain_filter {
+                surf.verbs_for_domain(df)
+            } else {
+                surf.verbs.iter().collect()
+            };
+
+            if surface_verbs.is_empty() {
+                if domain_filter.is_some() {
+                    let available = surf.domains();
+                    return format!(
+                        "No verbs available for domain **'{}'** in your current context.\n\n\
+                         **Available domains:** {}\n\n\
+                         *Try `/verbs {}` or `/options` to see all.*",
+                        domain_filter.unwrap_or("?"),
+                        available.join(", "),
+                        available.first().copied().unwrap_or("session"),
+                    );
+                }
+                return format!(
+                    "# Available Options — {} Workflow\n\n\
+                     No verbs available in your current context (policy: {:?}).\n",
+                    workflow, surf.fail_policy_applied,
+                );
+            }
+
+            // Group surface verbs by domain
+            let mut surf_domains: BTreeMap<&str, Vec<&crate::agent::verb_surface::SurfaceVerb>> =
+                BTreeMap::new();
+            for sv in &surface_verbs {
+                surf_domains.entry(sv.domain.as_str()).or_default().push(sv);
+            }
+
+            let mut output = String::new();
+            output.push_str(&format!("# Available Options — {} Workflow\n\n", workflow,));
+            let policy_note = if surf.is_safe_harbor() {
+                " *(safe-harbor — SemReg not constrained)*"
+            } else {
+                ""
+            };
+            output.push_str(&format!(
+                "**Verbs:** {} | **Mode:** {} | **Domains:** {} | **Fingerprint:** {}{}\n\n",
+                surface_verbs.len(),
+                agent_mode,
+                surf_domains.len(),
+                surf.surface_fingerprint,
+                policy_note,
+            ));
+
+            for (domain, verbs) in &surf_domains {
+                output.push_str(&format!("## {} ({} verbs)\n\n", domain, verbs.len()));
+                for sv in verbs {
+                    output.push_str(&format!("**`{}`** — {}\n", sv.fqn, sv.description,));
+                    if let Some(sexpr) = build_sexpr_signature(&sv.fqn) {
+                        output.push_str("```\n");
+                        output.push_str(&sexpr);
+                        output.push('\n');
+                        output.push_str("```\n");
+                    }
+                    output.push('\n');
+                }
+            }
+            return output;
+        }
+
+        // ── No surface available — last-resort RuntimeVerbRegistry fallback ─
+        tracing::warn!(
+            "No SessionVerbSurface available for /commands; falling back to RuntimeVerbRegistry"
+        );
+        let reg = runtime_registry();
+
         if let Some(df) = domain_filter {
-            // Domain filter on empty envelope — try RuntimeVerbRegistry for that domain
-            let reg = runtime_registry();
             let domain_verbs: Vec<_> = reg
                 .all_verbs()
                 .filter(|v| agent_mode.is_verb_allowed(&v.full_name))
@@ -2180,16 +2294,15 @@ fn generate_options_from_envelope_inner(
                      *Try `/verbs {}` or `/options` to see all.*",
                     df,
                     available_domains.join(", "),
-                    available_domains.first().map(|s| s.as_str()).unwrap_or("session"),
+                    available_domains
+                        .first()
+                        .map(|s| s.as_str())
+                        .unwrap_or("session"),
                 );
             }
 
-            // Render the domain verbs from registry
             let mut output = String::new();
-            output.push_str(&format!(
-                "# Available Options — {} Workflow\n\n",
-                workflow,
-            ));
+            output.push_str(&format!("# Available Options — {} Workflow\n\n", workflow,));
             output.push_str(&format!(
                 "**Verbs:** {} (domain: {}) | **Mode:** {}\n\n",
                 domain_verbs.len(),
@@ -2198,10 +2311,7 @@ fn generate_options_from_envelope_inner(
             ));
             output.push_str(&format!("## {} ({} verbs)\n\n", df, domain_verbs.len()));
             for v in &domain_verbs {
-                output.push_str(&format!(
-                    "**`{}`** — {}\n",
-                    v.full_name, v.description,
-                ));
+                output.push_str(&format!("**`{}`** — {}\n", v.full_name, v.description,));
                 if let Some(sexpr) = build_sexpr_signature(&v.full_name) {
                     output.push_str("```\n");
                     output.push_str(&sexpr);
@@ -2214,11 +2324,6 @@ fn generate_options_from_envelope_inner(
             return output;
         }
 
-        // No domain filter, empty envelope — fall back to full RuntimeVerbRegistry
-        tracing::debug!(
-            "SemReg returned empty verb set for /commands; falling back to RuntimeVerbRegistry"
-        );
-        let reg = runtime_registry();
         let mut registry_domains: BTreeMap<&str, Vec<_>> = BTreeMap::new();
         let mut total = 0usize;
         for v in reg.all_verbs() {
@@ -2232,10 +2337,7 @@ fn generate_options_from_envelope_inner(
         }
 
         let mut output = String::new();
-        output.push_str(&format!(
-            "# Available Options — {} Workflow\n\n",
-            workflow,
-        ));
+        output.push_str(&format!("# Available Options — {} Workflow\n\n", workflow,));
         output.push_str(&format!(
             "**Verbs:** {} | **Mode:** {} | **Domains:** {}\n\n",
             total,
@@ -2246,10 +2348,7 @@ fn generate_options_from_envelope_inner(
         for (domain, verbs) in &registry_domains {
             output.push_str(&format!("## {} ({} verbs)\n\n", domain, verbs.len()));
             for v in verbs {
-                output.push_str(&format!(
-                    "**`{}`** — {}\n",
-                    v.full_name, v.description,
-                ));
+                output.push_str(&format!("**`{}`** — {}\n", v.full_name, v.description,));
                 if let Some(sexpr) = build_sexpr_signature(&v.full_name) {
                     output.push_str("```\n");
                     output.push_str(&sexpr);
@@ -2283,10 +2382,7 @@ fn generate_options_from_envelope_inner(
     let mut output = String::new();
 
     // Header
-    output.push_str(&format!(
-        "# Available Options — {} Workflow\n\n",
-        workflow,
-    ));
+    output.push_str(&format!("# Available Options — {} Workflow\n\n", workflow,));
     output.push_str(&format!(
         "**Verbs:** {} | **Mode:** {} | **Fingerprint:** {}\n\n",
         candidates.len(),
@@ -2443,41 +2539,57 @@ async fn chat_session(
             let actor = crate::policy::ActorResolver::from_headers(&headers);
             let agent_mode = sem_os_core::authoring::agent_mode::AgentMode::default();
 
-            let (message, available_verbs) = match state
-                .agent_service
-                .resolve_options(&session, actor)
-                .await
-            {
-                Ok(envelope) => {
-                    let msg = match &kind {
-                        OptionsKind::Filtered(df) => {
-                            generate_options_from_envelope_filtered(
+            let (message, available_verbs) =
+                match state.agent_service.resolve_options(&session, actor).await {
+                    Ok(envelope) => {
+                        // Compute SessionVerbSurface from envelope (SI-1)
+                        let surface = {
+                            use crate::agent::verb_surface::{
+                                compute_session_verb_surface, VerbSurfaceContext,
+                                VerbSurfaceFailPolicy,
+                            };
+                            let ctx = VerbSurfaceContext {
+                                agent_mode,
+                                stage_focus: session.context.stage_focus.as_deref(),
+                                envelope: &envelope,
+                                fail_policy: VerbSurfaceFailPolicy::default(),
+                                entity_state: None,
+                            };
+                            compute_session_verb_surface(&ctx)
+                        };
+
+                        let msg = match &kind {
+                            OptionsKind::Filtered(df) => generate_options_from_envelope_filtered(
                                 &envelope,
                                 &session,
                                 &agent_mode,
                                 df,
-                            )
-                        }
-                        OptionsKind::All => {
-                            generate_options_from_envelope(&envelope, &session, &agent_mode)
-                        }
-                    };
-                    let verbs = Some(build_verb_profiles(&envelope, &agent_mode));
-                    (msg, verbs)
-                }
-                Err(e) => {
-                    tracing::warn!(
-                        session_id = %session.id,
-                        error = %e,
-                        "SemReg unavailable for options — falling back to static help"
-                    );
-                    let msg = match &kind {
-                        OptionsKind::Filtered(df) => generate_verbs_help(Some(df)),
-                        OptionsKind::All => generate_verbs_help(None),
-                    };
-                    (msg, None)
-                }
-            };
+                                Some(&surface),
+                            ),
+                            OptionsKind::All => generate_options_from_envelope(
+                                &envelope,
+                                &session,
+                                &agent_mode,
+                                Some(&surface),
+                            ),
+                        };
+                        let verbs =
+                            Some(build_verb_profiles(&envelope, &agent_mode, Some(&surface)));
+                        (msg, verbs)
+                    }
+                    Err(e) => {
+                        tracing::warn!(
+                            session_id = %session.id,
+                            error = %e,
+                            "SemReg unavailable for options — falling back to static help"
+                        );
+                        let msg = match &kind {
+                            OptionsKind::Filtered(df) => generate_verbs_help(Some(df)),
+                            OptionsKind::All => generate_verbs_help(None),
+                        };
+                        (msg, None)
+                    }
+                };
 
             return Ok(Json(ChatResponse {
                 message,
@@ -2492,6 +2604,7 @@ async fn chat_session(
                 dsl_hash: None,
                 decision: None,
                 available_verbs,
+                surface_fingerprint: None,
             }));
         }
         #[cfg(not(feature = "database"))]
@@ -2513,6 +2626,7 @@ async fn chat_session(
                 dsl_hash: None,
                 decision: None,
                 available_verbs: None,
+                surface_fingerprint: None,
             }));
         }
     }
@@ -2546,6 +2660,7 @@ async fn chat_session(
                 dsl_hash: None,
                 decision: None,
                 available_verbs: None,
+                surface_fingerprint: None,
             }));
         }
     };
@@ -2587,7 +2702,7 @@ async fn chat_session(
     // VERB UNIVERSE — resolve constrained verb profiles for this session
     // =========================================================================
     #[cfg(feature = "database")]
-    let available_verbs = {
+    let (available_verbs, surface_fingerprint) = {
         let verb_actor = crate::policy::ActorResolver::from_headers(&headers);
         let agent_mode = sem_os_core::authoring::agent_mode::AgentMode::default();
         match state
@@ -2595,19 +2710,42 @@ async fn chat_session(
             .resolve_options(&session, verb_actor)
             .await
         {
-            Ok(envelope) => Some(build_verb_profiles(&envelope, &agent_mode)),
+            Ok(envelope) => {
+                // Compute SessionVerbSurface from envelope (SI-1)
+                let surface = {
+                    use crate::agent::verb_surface::{
+                        compute_session_verb_surface, VerbSurfaceContext, VerbSurfaceFailPolicy,
+                    };
+                    let ctx = VerbSurfaceContext {
+                        agent_mode,
+                        stage_focus: session.context.stage_focus.as_deref(),
+                        envelope: &envelope,
+                        fail_policy: VerbSurfaceFailPolicy::default(),
+                        entity_state: None,
+                    };
+                    compute_session_verb_surface(&ctx)
+                };
+                let fp = Some(surface.surface_fingerprint.0.clone());
+                (
+                    Some(build_verb_profiles(&envelope, &agent_mode, Some(&surface))),
+                    fp,
+                )
+            }
             Err(e) => {
                 tracing::warn!(
                     session_id = %session.id,
                     error = %e,
                     "SemReg unavailable for verb profiles"
                 );
-                None
+                (None, None)
             }
         }
     };
     #[cfg(not(feature = "database"))]
-    let available_verbs: Option<Vec<ob_poc_types::chat::VerbProfile>> = None;
+    let (available_verbs, surface_fingerprint): (
+        Option<Vec<ob_poc_types::chat::VerbProfile>>,
+        Option<String>,
+    ) = (None, None);
 
     // Return response using API types (single source of truth)
     Ok(Json(ChatResponse {
@@ -2629,6 +2767,7 @@ async fn chat_session(
         dsl_hash: response.dsl_hash,
         decision: response.decision,
         available_verbs,
+        surface_fingerprint,
     }))
 }
 
@@ -4011,6 +4150,118 @@ async fn get_session_context(
     };
 
     Ok(Json(ob_poc_types::GetContextResponse { context }))
+}
+
+/// GET /api/session/:id/verb-surface - Get the current session's visible verb surface
+///
+/// Returns the `SessionVerbSurface` computed from the session's current context
+/// (agent mode, workflow focus, SemReg envelope, entity state). Supports optional
+/// domain filtering and excluded verb inclusion.
+///
+/// Query parameters:
+/// - `domain` (optional): Filter to a specific domain (e.g., "kyc")
+/// - `include_excluded` (optional, default false): Include excluded verbs with prune reasons
+async fn get_session_verb_surface(
+    State(state): State<AgentState>,
+    Path(session_id): Path<Uuid>,
+    Query(query): Query<VerbSurfaceQuery>,
+) -> Result<Json<ob_poc_types::chat::VerbSurfaceResponse>, StatusCode> {
+    use crate::agent::context_envelope::ContextEnvelope;
+    use crate::agent::verb_surface::{
+        compute_session_verb_surface, VerbSurfaceContext, VerbSurfaceFailPolicy,
+    };
+
+    // Read session context
+    let stage_focus = {
+        let sessions = state.sessions.read().await;
+        let session = sessions.get(&session_id).ok_or(StatusCode::NOT_FOUND)?;
+        session.context.stage_focus.clone()
+    };
+    let agent_mode = sem_os_core::authoring::agent_mode::AgentMode::default();
+
+    // Build context — use unavailable envelope since we don't have a live SemReg
+    // resolution for a GET request. The surface will apply FailPolicy accordingly.
+    let envelope = ContextEnvelope::unavailable();
+    let ctx = VerbSurfaceContext {
+        agent_mode,
+        stage_focus: stage_focus.as_deref(),
+        envelope: &envelope,
+        fail_policy: VerbSurfaceFailPolicy::default(),
+        entity_state: None,
+    };
+    let surface = compute_session_verb_surface(&ctx);
+
+    // Build verb entries (optionally filtered by domain)
+    let verbs: Vec<ob_poc_types::chat::VerbSurfaceEntry> = if let Some(ref domain) = query.domain {
+        surface
+            .verbs_for_domain(domain)
+            .into_iter()
+            .map(|v| ob_poc_types::chat::VerbSurfaceEntry {
+                fqn: v.fqn.clone(),
+                domain: v.domain.clone(),
+                action: v.action.clone(),
+                description: v.description.clone(),
+                governance_tier: v.governance_tier.clone(),
+                lifecycle_eligible: v.lifecycle_eligible,
+                rank_boost: v.rank_boost,
+            })
+            .collect()
+    } else {
+        surface
+            .verbs
+            .iter()
+            .map(|v| ob_poc_types::chat::VerbSurfaceEntry {
+                fqn: v.fqn.clone(),
+                domain: v.domain.clone(),
+                action: v.action.clone(),
+                description: v.description.clone(),
+                governance_tier: v.governance_tier.clone(),
+                lifecycle_eligible: v.lifecycle_eligible,
+                rank_boost: v.rank_boost,
+            })
+            .collect()
+    };
+
+    // Build excluded list if requested
+    let excluded = if query.include_excluded {
+        Some(
+            surface
+                .excluded
+                .iter()
+                .map(|e| ob_poc_types::chat::VerbSurfaceExcludedEntry {
+                    fqn: e.fqn.clone(),
+                    reasons: e
+                        .reasons
+                        .iter()
+                        .map(|r| ob_poc_types::chat::VerbSurfacePruneReason {
+                            layer: format!("{:?}", r.layer),
+                            reason: r.reason.clone(),
+                        })
+                        .collect(),
+                })
+                .collect(),
+        )
+    } else {
+        None
+    };
+
+    Ok(Json(ob_poc_types::chat::VerbSurfaceResponse {
+        final_count: verbs.len(),
+        verbs,
+        total_registry: surface.filter_summary.total_registry,
+        surface_fingerprint: surface.surface_fingerprint.0.clone(),
+        fail_policy: format!("{:?}", surface.fail_policy_applied),
+        filter_summary: ob_poc_types::chat::VerbSurfaceFilterSummary {
+            total_registry: surface.filter_summary.total_registry,
+            after_agent_mode: surface.filter_summary.after_agent_mode,
+            after_workflow: surface.filter_summary.after_workflow,
+            after_semreg: surface.filter_summary.after_semreg,
+            after_lifecycle: surface.filter_summary.after_lifecycle,
+            after_actor: surface.filter_summary.after_actor,
+            final_count: surface.filter_summary.final_count,
+        },
+        excluded,
+    }))
 }
 
 /// GET /api/session/:id/dsl/enrich - Get enriched DSL with binding info for display

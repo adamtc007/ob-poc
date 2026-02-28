@@ -1,11 +1,11 @@
 # CLAUDE.md
 
-> **Last reviewed:** 2026-02-27
+> **Last reviewed:** 2026-02-28
 > **Frontend:** React/TypeScript (`ob-poc-ui-react/`) - Chat UI with scope panel, Inspector, Semantic OS Tab
 > **Backend:** Rust/Axum (`rust/crates/ob-poc-web/`) - Serves React + REST API
 > **Crates:** 22 active Rust crates (16 ob-poc + 6 sem_os_*; esper_* deprecated; ob-poc-graph + viewport removed)
 > **Verbs:** 1,158 canonical verbs, 15,465 intent patterns (DB-sourced)
-> **MCP Tools:** ~101 tools (DSL, verbs, learning, session, batch, research, taxonomy, sem_reg, stewardship, db_introspect)
+> **MCP Tools:** ~102 tools (DSL, verbs, learning, session, batch, research, taxonomy, sem_reg, stewardship, db_introspect, session_verb_surface)
 > **Migrations:** 103 schema migrations (001-077 + 072b seed + 078-091 sem_reg + 087-089 agent/runbook + 092-098 sem_os standalone + stewardship + 099-100 authoring + 101-102 standalone remediation + 103 CCIR telemetry)
 > **Schema Overview:** `migrations/OB_POC_SCHEMA_ENTITY_OVERVIEW.md` — living doc, 18 sections, ~220 tables (ob-poc + kyc + sem_reg + sem_reg_authoring), 15 mermaid ER diagrams
 > **Embeddings:** Candle local (384-dim, BGE-small-en-v1.5) - 15,465 patterns vectorized
@@ -61,6 +61,7 @@
 > **Stewardship Agent (Phase 0-1, Migrations 096-098):** ✅ Complete - Changeset authoring layer, 23 MCP tools, guardrails engine (G01-G15), basis records, conflict detection, idempotency, Show Loop with 4 viewports (Focus/Inspector/Diff/Gates), SSE streaming, REST endpoints, 11 integration tests
 > **Governed Registry Authoring (v0.4, Migrations 099-102):** ✅ Complete + Standalone Verified - Research→Governed two-plane model, 7 governance verbs (propose/validate/dry-run/plan/publish/rollback/diff), content-addressed idempotency (SHA-256), AgentMode gating (Research vs Governed), validation pipeline (Stage 1 artifact integrity + Stage 2 dry-run), batch publish with topological sort, governance audit log, retention/cleanup, 9-state ChangeSetStatus (incl. UnderReview/Approved from stewardship), 321 unit tests + 26 integration tests + 10 HTTP integration tests, 8 CLI subcommands, 10 REST routes, standalone sem_os_server deployment verified
 > **CCIR — Context-Constrained Intent Resolution (Migration 103):** ✅ Complete - ContextEnvelope replaces SemRegVerbPolicy, structured PruneReason (7 variants), deterministic AllowedVerbSetFingerprint (SHA-256), TOCTOU recheck, pre-constrained verb search (allowed verbs threaded into HybridVerbSearcher), SemReg enforcement at dsl_execute, legacy V1 module cleanup (4 modules deleted: ~2,700 LOC), 16 unit tests
+> **SessionVerbSurface:** ✅ Complete - Consolidated governance layer composition (SemReg CCIR + AgentMode + workflow phase + lifecycle + actor gating), 8-step compute pipeline, dual fingerprints (surface `vs1:` + SemReg `v1:`), FailClosed safe-harbor (~30 verbs), MCP tool `session_verb_surface`, REST endpoint `GET /api/session/:id/verb-surface`, ChatResponse enrichment, React VerbBrowser governance badges, 13 unit tests
 > **Semantic OS Tab:** ✅ Complete - Agent-driven workflow selection UI (`/semantic-os`), goals→phase_tags verb scoping in SemReg, DecisionPacket workflow prompt (Onboarding/KYC/Data Management/Stewardship), session sidebar + registry context panel, `GET /api/sem-os/context` endpoint
 
 This is the root project guide for Claude Code. Domain-specific details are in annexes.
@@ -5749,6 +5750,7 @@ When you see these in a task, read the corresponding annex first:
 | "change_sets_archive", "cleanup", "retention", "archive orphan" | CLAUDE.md §Governed Registry Authoring §Observability |
 | "sem-reg propose", "sem-reg authoring-list", "sem-reg authoring-status" | CLAUDE.md §Governed Registry Authoring §CLI |
 | "ContextEnvelope", "context_envelope", "CCIR", "PruneReason", "AllowedVerbSetFingerprint", "TOCTOU recheck" | CLAUDE.md §Agent Intent Pipeline Hardening §CCIR |
+| "SessionVerbSurface", "verb surface", "VerbSurfaceFailPolicy", "FailClosed", "safe-harbor", "SurfaceFingerprint", "PruneLayer", "compute_session_verb_surface" | CLAUDE.md §SessionVerbSurface |
 | "ownership.refresh", "OwnershipRefreshOp", "bridge ManCo", "derive CBU groups" | `rust/src/domain_ops/manco_ops.rs` |
 
 ---
@@ -7126,3 +7128,130 @@ ContextEnvelope {
 - `dsl_execute` validates verb FQNs against ContextEnvelope before execution
 - SemReg failure: structured `warn!` with fallback flag, trace shows `sem_reg_verb_filter: null` — never silent
 - Trace levels: INFO = summary (verb, confidence, source), DEBUG = full detail (utterance, entities, candidates)
+
+### SessionVerbSurface — Governance Layer Composition
+
+> **Implemented:** 2026-02-28
+> **Tests:** 13 unit tests + 1483 total passing
+
+**Problem Solved:** Multiple governance layers (SemReg CCIR, AgentMode, workflow phase, lifecycle state, actor gating) were applied inline across 3+ code paths (`build_verb_profiles`, `generate_options_from_envelope`, orchestrator pre-filter chain) with inconsistent behavior — notably a SI-1 violation where `build_verb_profiles()` silently fell back to the full 642-verb `RuntimeVerbRegistry` when the `ContextEnvelope` was empty. `SessionVerbSurface` consolidates all layers into a single, queryable, fingerprinted Rust type computed once per turn.
+
+**Architecture:**
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  8-STEP COMPUTE PIPELINE (compute_session_verb_surface)                      │
+│                                                                              │
+│  1. Base set — RuntimeVerbRegistry (~642 verbs)                             │
+│  2. AgentMode filter — Research vs Governed                                 │
+│  3. Workflow phase filter — stage_focus → domain allowlists                 │
+│  4. SemReg CCIR — ContextEnvelope.allowed_verbs (pre-constraint)            │
+│  5. Lifecycle state filter — VerbLifecycle.requires_states vs entity state  │
+│  6. Actor gating — Extension point (passthrough)                            │
+│  7. FailPolicy — If SemReg unavailable + FailClosed → safe-harbor set      │
+│  8. Rank & Fingerprint — Sort by domain, compute SurfaceFingerprint        │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Core Types (`rust/src/agent/verb_surface.rs`):**
+
+| Type | Purpose |
+|------|---------|
+| `SessionVerbSurface` | Final computed verb set with metadata, fingerprints, filter summary |
+| `SurfaceVerb` | Visible verb with FQN, domain, action, description, governance tier, lifecycle eligibility |
+| `ExcludedVerb` | Excluded verb with multi-reason `Vec<SurfacePrune>` (SI-3: additive) |
+| `SurfacePrune` | Single exclusion reason: `PruneLayer` + reason string |
+| `PruneLayer` | Enum: `AgentMode`, `WorkflowPhase`, `SemRegCcir`, `LifecycleState`, `ActorGating`, `FailPolicy` |
+| `VerbSurfaceFailPolicy` | `FailClosed` (default: ~30 safe-harbor verbs) or `FailOpen` (dev-only) |
+| `SurfaceFingerprint` | Format `vs1:<sha256-hex>` — includes filter context, distinct from SemReg `v1:<hex>` |
+| `FilterSummary` | Counts at each pipeline stage (total_registry → final_count) |
+| `VerbSurfaceContext` | Input: agent_mode, stage_focus, envelope, fail_policy, entity_state |
+
+**Safety Invariants:**
+- **SI-1**: No ungoverned expansion — when SemReg is unavailable, FailClosed reduces to ~30 safe-harbor verbs
+- **SI-2**: Dual fingerprints — `surface_fingerprint` (`vs1:`) captures ALL filter context; `semreg_fingerprint` (`v1:`) captures CCIR-internal state; never conflated
+- **SI-3**: Additive exclusion reasons — a verb excluded by multiple layers accumulates all reasons
+
+**FailClosed Safe-Harbor Verbs (~30):**
+- `session.*` (load, unload, clear, info, list, undo, redo)
+- `view.*` (universe, book, cbu, drill, surface)
+- `agent.*` (help, status, teach)
+
+**Workflow Phase → Domain Mapping:**
+
+| stage_focus | Allowed Domains |
+|-------------|----------------|
+| `semos-onboarding` | cbu, entity, session, view, agent, contract |
+| `semos-kyc` | kyc, screening, document, requirement, session, view, agent |
+| `semos-data` | registry, changeset, governance, session, view, agent |
+| `semos-stewardship` | focus, changeset, governance, audit, session, view, agent |
+
+**Orchestrator Integration (`rust/src/agent/orchestrator.rs`):**
+
+Stage 2.5 in the orchestrator pipeline computes the surface once per turn:
+
+```rust
+// Stage 2.5: Compute SessionVerbSurface
+let surface_ctx = VerbSurfaceContext::new(agent_mode)
+    .with_envelope(envelope.clone())
+    .with_stage_focus(stage_focus)
+    .with_fail_policy(VerbSurfaceFailPolicy::FailClosed);
+let verb_surface = compute_session_verb_surface(&verb_registry, &surface_ctx);
+
+// Thread allowed verbs into IntentPipeline
+let allowed: HashSet<String> = verb_surface.verbs.iter().map(|v| v.fqn.clone()).collect();
+pipeline.with_allowed_verbs(allowed);
+
+// Enrich IntentTrace with surface fingerprint
+trace.surface_fingerprint = Some(verb_surface.surface_fingerprint.0.clone());
+```
+
+**MCP Tool: `session_verb_surface`**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `session_id` | string | yes | Session to query |
+| `include_excluded` | boolean | no | Include excluded verbs with prune reasons |
+| `domain_filter` | string | no | Filter to specific domain |
+
+**REST Endpoint: `GET /api/session/:id/verb-surface`**
+
+Query params: `?domain=kyc&include_excluded=true`
+
+Returns `VerbSurfaceResponse` with verbs, filter_summary, surface_fingerprint, and optionally excluded verbs.
+
+**ChatResponse Enrichment:**
+
+Every chat response includes `surface_fingerprint: Option<String>` from the computed surface, enabling the UI to detect when the verb set has changed.
+
+**React UI (VerbBrowser):**
+- Governance tier badge on each verb card (Governed/Operational)
+- Lifecycle eligibility indicator (greyed out if not eligible)
+- Filter summary at top: "Showing 80 of 642 verbs (filtered by KYC workflow + Governed mode)"
+- `VerbSurfaceMeta` state in Zustand store tracking fingerprint + filter counts
+
+**Key Files:**
+
+| File | Purpose |
+|------|---------|
+| `rust/src/agent/verb_surface.rs` | **NEW** — Core types + `compute_session_verb_surface()` + 13 unit tests |
+| `rust/src/agent/mod.rs` | `pub mod verb_surface;` |
+| `rust/src/agent/orchestrator.rs` | Stage 2.5 surface computation + pre-filter wiring |
+| `rust/src/agent/context_envelope.rs` | `#[cfg(test)] test_with_verbs()` helper |
+| `rust/src/api/agent_routes.rs` | REST endpoint + ChatResponse enrichment |
+| `rust/src/mcp/tools.rs` | `session_verb_surface` tool definition |
+| `rust/src/mcp/handlers/session_tools.rs` | MCP handler |
+| `rust/crates/ob-poc-types/src/chat.rs` | `VerbSurfaceResponse`, `VerbProfileWithGovernance` |
+| `ob-poc-ui-react/src/types/chat.ts` | `VerbProfile` with governance_tier, surface_fingerprint |
+| `ob-poc-ui-react/src/stores/chat.ts` | `VerbSurfaceMeta` state |
+| `ob-poc-ui-react/src/features/chat/components/VerbBrowser.tsx` | Governance badges, eligibility display |
+| `ob-poc-ui-react/src/features/chat/ChatPage.tsx` | Surface metadata wiring |
+
+**Consumed (read-only):**
+
+| File | Purpose |
+|------|---------|
+| `rust/src/agent/context_envelope.rs` | `ContextEnvelope` consumed as Step 4 input |
+| `rust/crates/dsl-core/src/config/types.rs` | `VerbLifecycle` consumed for lifecycle filtering |
+| `rust/src/dsl_v2/runtime_registry.rs` | `RuntimeVerbRegistry` consumed as Step 1 base set |
+| `rust/src/mcp/intent_pipeline.rs` | `with_allowed_verbs()` called with surface-derived set |

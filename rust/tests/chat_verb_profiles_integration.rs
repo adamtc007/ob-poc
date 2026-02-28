@@ -10,8 +10,8 @@
 //! ```
 
 use axum::body::Body;
-use axum::Router;
 use axum::http::{Request, StatusCode};
+use axum::Router;
 use serde_json::Value;
 use std::sync::Arc;
 use tower::ServiceExt;
@@ -36,19 +36,21 @@ async fn build_test_app() -> Router {
         use sem_os_postgres::PgStores;
 
         let stores = PgStores::new(pool.clone());
-        let core_service = Arc::new(CoreServiceImpl::new(
-            Arc::new(stores.snapshots),
-            Arc::new(stores.objects),
-            Arc::new(stores.changesets),
-            Arc::new(stores.audit),
-            Arc::new(stores.outbox),
-            Arc::new(stores.evidence),
-            Arc::new(stores.projections),
-        )
-        .with_bootstrap_audit(Arc::new(stores.bootstrap_audit))
-        .with_authoring(Arc::new(stores.authoring))
-        .with_scratch_runner(Arc::new(stores.scratch_runner))
-        .with_cleanup(Arc::new(stores.cleanup)));
+        let core_service = Arc::new(
+            CoreServiceImpl::new(
+                Arc::new(stores.snapshots),
+                Arc::new(stores.objects),
+                Arc::new(stores.changesets),
+                Arc::new(stores.audit),
+                Arc::new(stores.outbox),
+                Arc::new(stores.evidence),
+                Arc::new(stores.projections),
+            )
+            .with_bootstrap_audit(Arc::new(stores.bootstrap_audit))
+            .with_authoring(Arc::new(stores.authoring))
+            .with_scratch_runner(Arc::new(stores.scratch_runner))
+            .with_cleanup(Arc::new(stores.cleanup)),
+        );
 
         Some(Arc::new(InProcessClient::new(core_service)) as Arc<dyn sem_os_client::SemOsClient>)
     };
@@ -139,11 +141,11 @@ async fn test_chat_response_includes_available_verbs() {
         resp.as_object().map(|o| o.keys().collect::<Vec<_>>())
     );
 
-    let verbs_arr = verbs.unwrap().as_array().expect("available_verbs must be an array");
-    eprintln!(
-        "[TEST] available_verbs count: {}",
-        verbs_arr.len()
-    );
+    let verbs_arr = verbs
+        .unwrap()
+        .as_array()
+        .expect("available_verbs must be an array");
+    eprintln!("[TEST] available_verbs count: {}", verbs_arr.len());
 
     // 4. Must have at least some verbs (SemReg returns the full constrained universe)
     assert!(
@@ -154,12 +156,18 @@ async fn test_chat_response_includes_available_verbs() {
     // 5. Validate shape of first verb profile
     let first = &verbs_arr[0];
     assert!(first.get("fqn").is_some(), "VerbProfile must have 'fqn'");
-    assert!(first.get("domain").is_some(), "VerbProfile must have 'domain'");
+    assert!(
+        first.get("domain").is_some(),
+        "VerbProfile must have 'domain'"
+    );
     assert!(
         first.get("description").is_some(),
         "VerbProfile must have 'description'"
     );
-    assert!(first.get("sexpr").is_some(), "VerbProfile must have 'sexpr'");
+    assert!(
+        first.get("sexpr").is_some(),
+        "VerbProfile must have 'sexpr'"
+    );
     assert!(first.get("args").is_some(), "VerbProfile must have 'args'");
     assert!(
         first.get("preconditions_met").is_some(),
@@ -223,10 +231,7 @@ async fn test_verb_profiles_have_sexpr_signatures() {
                 .and_then(|n| n.as_str())
                 .map_or(false, |n| n == "name")
         });
-        assert!(
-            name_arg.is_some(),
-            "cbu.create must have a 'name' argument"
-        );
+        assert!(name_arg.is_some(), "cbu.create must have a 'name' argument");
         if let Some(arg) = name_arg {
             assert_eq!(
                 arg.get("required").and_then(|r| r.as_bool()),
@@ -265,18 +270,12 @@ async fn test_verb_profiles_on_every_turn() {
     // Turn 1
     let resp1 = send_chat(&mut app, &session_id, "hello").await;
     let verbs1 = resp1.get("available_verbs");
-    assert!(
-        verbs1.is_some(),
-        "Turn 1 must include available_verbs"
-    );
+    assert!(verbs1.is_some(), "Turn 1 must include available_verbs");
 
     // Turn 2
     let resp2 = send_chat(&mut app, &session_id, "what verbs are available?").await;
     let verbs2 = resp2.get("available_verbs");
-    assert!(
-        verbs2.is_some(),
-        "Turn 2 must include available_verbs"
-    );
+    assert!(verbs2.is_some(), "Turn 2 must include available_verbs");
 
     // Turn 3 — slash command (may take early return path)
     let resp3 = send_chat(&mut app, &session_id, "/help").await;
@@ -297,19 +296,13 @@ async fn test_slash_commands_still_works() {
     let session_id = create_session(&mut app).await;
 
     let resp = send_chat(&mut app, &session_id, "/commands").await;
-    let message = resp
-        .get("message")
-        .and_then(|m| m.as_str())
-        .unwrap_or("");
+    let message = resp.get("message").and_then(|m| m.as_str()).unwrap_or("");
 
     assert!(
         !message.is_empty(),
         "/commands must return a non-empty message"
     );
-    eprintln!(
-        "[TEST] /commands message length: {} chars",
-        message.len()
-    );
+    eprintln!("[TEST] /commands message length: {} chars", message.len());
 
     // /commands is an early return — note whether available_verbs is present
     let has_verbs = resp.get("available_verbs").is_some();
@@ -341,11 +334,7 @@ async fn test_verb_profiles_have_domains() {
         .filter_map(|v| v.get("domain").and_then(|d| d.as_str()))
         .collect();
 
-    eprintln!(
-        "[TEST] Domains found ({}): {:?}",
-        domains.len(),
-        domains
-    );
+    eprintln!("[TEST] Domains found ({}): {:?}", domains.len(), domains);
 
     // Should have multiple domains
     assert!(

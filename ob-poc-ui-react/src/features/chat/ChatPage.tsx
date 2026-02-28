@@ -66,7 +66,12 @@ export function ChatPage() {
       // Replace temp message with real one and add assistant response
       setCurrentSession(response.session);
       if (response.available_verbs?.length) {
-        setAvailableVerbs(response.available_verbs);
+        setAvailableVerbs(
+          response.available_verbs,
+          response.surface_fingerprint
+            ? { fingerprint: response.surface_fingerprint, totalRegistry: 0, finalCount: response.available_verbs.length }
+            : undefined,
+        );
       }
       setStreaming(false);
     },

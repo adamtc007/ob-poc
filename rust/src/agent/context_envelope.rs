@@ -295,6 +295,25 @@ impl ContextEnvelope {
         &self.fingerprint.0
     }
 
+    /// Create a test envelope with specific allowed verbs (deny_all = false, unavailable = false).
+    #[cfg(test)]
+    pub fn test_with_verbs(verbs: &[&str]) -> Self {
+        let allowed: HashSet<String> = verbs.iter().map(|v| v.to_string()).collect();
+        let fingerprint = AllowedVerbSetFingerprint::compute(&allowed);
+        ContextEnvelope {
+            allowed_verbs: allowed,
+            allowed_verb_contracts: vec![],
+            pruned_verbs: vec![],
+            fingerprint,
+            evidence_gaps: vec![],
+            governance_signals: vec![],
+            snapshot_set_id: None,
+            computed_at: Utc::now(),
+            deny_all: false,
+            unavailable: false,
+        }
+    }
+
     /// Perform a TOCTOU recheck against a fresh envelope.
     ///
     /// Compares the original fingerprint with the new envelope's fingerprint

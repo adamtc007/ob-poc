@@ -1005,6 +1005,7 @@ fn compute_view_overlap(
 
 // ── Step 5: Filter and Rank Verbs ─────────────────────────────
 
+#[allow(clippy::too_many_arguments)]
 fn filter_and_rank_verbs(
     verb_rows: &[SnapshotRow],
     actor: &ActorContext,

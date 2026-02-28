@@ -307,6 +307,101 @@ impl ToolHandlers {
         }
     }
 
+    /// Return the current session's visible verb surface with governance metadata.
+    ///
+    /// Computes the `SessionVerbSurface` by running the 8-step governance pipeline
+    /// (AgentMode → Workflow Phase → SemReg CCIR → Lifecycle → Actor → FailPolicy → Rank).
+    pub(super) async fn session_verb_surface(&self, args: Value) -> Result<Value> {
+        use crate::agent::context_envelope::ContextEnvelope;
+        use crate::agent::verb_surface::{
+            compute_session_verb_surface, VerbSurfaceContext, VerbSurfaceFailPolicy,
+        };
+
+        let include_excluded = args["include_excluded"].as_bool().unwrap_or(false);
+        let domain_filter = args["domain_filter"].as_str();
+
+        // Build VerbSurfaceContext from current session state.
+        // In the MCP context we use defaults for most fields since there's no
+        // active chat session — the tool is introspection-only.
+        let agent_mode = self.agent_mode;
+        let envelope = ContextEnvelope::unavailable();
+        let ctx = VerbSurfaceContext {
+            agent_mode,
+            stage_focus: None,
+            envelope: &envelope,
+            fail_policy: VerbSurfaceFailPolicy::default(),
+            entity_state: None,
+        };
+        let surface = compute_session_verb_surface(&ctx);
+
+        // Filter verbs by domain if requested
+        let verbs: Vec<&crate::agent::verb_surface::SurfaceVerb> =
+            if let Some(domain) = domain_filter {
+                surface.verbs_for_domain(domain)
+            } else {
+                surface.verbs.iter().collect()
+            };
+
+        let verbs_json: Vec<serde_json::Value> = verbs
+            .iter()
+            .map(|v| {
+                json!({
+                    "fqn": v.fqn,
+                    "domain": v.domain,
+                    "action": v.action,
+                    "description": v.description,
+                    "governance_tier": v.governance_tier,
+                    "lifecycle_eligible": v.lifecycle_eligible,
+                    "rank_boost": v.rank_boost,
+                })
+            })
+            .collect();
+
+        let mut result = json!({
+            "verbs": verbs_json,
+            "verb_count": verbs.len(),
+            "surface_fingerprint": surface.surface_fingerprint.0,
+            "fail_policy": format!("{:?}", surface.fail_policy_applied),
+            "computed_at": surface.computed_at.to_rfc3339(),
+            "filter_summary": {
+                "total_registry": surface.filter_summary.total_registry,
+                "after_agent_mode": surface.filter_summary.after_agent_mode,
+                "after_workflow": surface.filter_summary.after_workflow,
+                "after_semreg": surface.filter_summary.after_semreg,
+                "after_lifecycle": surface.filter_summary.after_lifecycle,
+                "after_actor": surface.filter_summary.after_actor,
+                "final_count": surface.filter_summary.final_count,
+            },
+        });
+
+        if include_excluded {
+            let excluded_json: Vec<serde_json::Value> = surface
+                .excluded
+                .iter()
+                .map(|e| {
+                    let reasons: Vec<serde_json::Value> = e
+                        .reasons
+                        .iter()
+                        .map(|r| {
+                            json!({
+                                "layer": format!("{:?}", r.layer),
+                                "reason": r.reason,
+                            })
+                        })
+                        .collect();
+                    json!({
+                        "fqn": e.fqn,
+                        "reasons": reasons,
+                    })
+                })
+                .collect();
+            result["excluded"] = json!(excluded_json);
+            result["excluded_count"] = json!(surface.excluded.len());
+        }
+
+        Ok(result)
+    }
+
     /// List saved sessions
     pub(super) async fn session_list(&self, args: Value) -> Result<Value> {
         use crate::session::UnifiedSession;

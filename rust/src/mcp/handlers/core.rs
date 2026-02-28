@@ -109,6 +109,7 @@ tool_name_enum! {
     SessionUndo             => "session_undo",
     SessionRedo             => "session_redo",
     SessionInfo             => "session_info",
+    SessionVerbSurface      => "session_verb_surface",
     SessionList             => "session_list",
     EntitySearch            => "entity_search",
     ResolutionStart         => "resolution_start",
@@ -404,6 +405,7 @@ impl ToolHandlers {
             ToolName::SessionUndo => self.session_undo(args).await,
             ToolName::SessionRedo => self.session_redo(args).await,
             ToolName::SessionInfo => self.session_info(args).await,
+            ToolName::SessionVerbSurface => self.session_verb_surface(args).await,
             ToolName::SessionList => self.session_list(args).await,
             ToolName::EntitySearch => self.entity_search(args).await,
             ToolName::ResolutionStart => self.resolution_start(args).await,
@@ -1565,6 +1567,7 @@ impl ToolHandlers {
             sem_os_client: self.sem_os_client.clone(),
             agent_mode: self.agent_mode,
             goals: vec![],
+            stage_focus: None,
         };
         let outcome = crate::agent::orchestrator::handle_utterance(&orch_ctx, instruction).await?;
         let result = outcome.pipeline_result;

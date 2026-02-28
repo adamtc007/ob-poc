@@ -318,6 +318,72 @@ pub struct ChatResponse {
     /// Populated on every response — same data as /commands but structured.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub available_verbs: Option<Vec<VerbProfile>>,
+
+    /// SessionVerbSurface fingerprint for this turn.
+    /// Format: "vs1:<sha256-hex>". Changes when the visible verb set changes.
+    /// Enables UI to detect surface drift and refresh VerbBrowser.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub surface_fingerprint: Option<String>,
+}
+
+/// Verb surface response for the REST endpoint.
+/// Returns the full SessionVerbSurface with governance metadata.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VerbSurfaceResponse {
+    /// Visible verbs with governance metadata
+    pub verbs: Vec<VerbSurfaceEntry>,
+    /// Total verbs in registry before filtering
+    pub total_registry: usize,
+    /// Final visible count
+    pub final_count: usize,
+    /// Surface fingerprint (format: "vs1:<sha256-hex>")
+    pub surface_fingerprint: String,
+    /// Fail policy applied
+    pub fail_policy: String,
+    /// Filter summary showing progressive narrowing at each stage
+    pub filter_summary: VerbSurfaceFilterSummary,
+    /// Excluded verbs with prune reasons (only if include_excluded=true)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub excluded: Option<Vec<VerbSurfaceExcludedEntry>>,
+}
+
+/// A verb entry in the verb surface response.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VerbSurfaceEntry {
+    pub fqn: String,
+    pub domain: String,
+    pub action: String,
+    pub description: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub governance_tier: Option<String>,
+    pub lifecycle_eligible: bool,
+    pub rank_boost: f64,
+}
+
+/// Filter summary showing how many verbs survived each stage.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VerbSurfaceFilterSummary {
+    pub total_registry: usize,
+    pub after_agent_mode: usize,
+    pub after_workflow: usize,
+    pub after_semreg: usize,
+    pub after_lifecycle: usize,
+    pub after_actor: usize,
+    pub final_count: usize,
+}
+
+/// An excluded verb with structured prune reasons.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VerbSurfaceExcludedEntry {
+    pub fqn: String,
+    pub reasons: Vec<VerbSurfacePruneReason>,
+}
+
+/// A single prune reason explaining why a verb was excluded.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VerbSurfacePruneReason {
+    pub layer: String,
+    pub reason: String,
 }
 
 /// Session state enum for typed responses - matches server's SessionState

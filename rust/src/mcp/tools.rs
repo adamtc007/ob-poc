@@ -545,6 +545,40 @@ Use to understand current session state before operations."#.into(),
             }),
         },
         Tool {
+            name: "session_verb_surface".into(),
+            description: r#"Return the current session's visible verb surface with governance metadata.
+
+Computes the SessionVerbSurface — the set of verbs available after applying all
+governance layers (AgentMode, workflow phase, SemReg CCIR, lifecycle state, actor gating).
+
+Returns:
+- verbs: Array of visible verbs with FQN, domain, description, governance_tier
+- surface_fingerprint: "vs1:<sha256>" — changes when the visible set changes
+- filter_summary: Counts at each pipeline stage (total → after_agent_mode → ... → final)
+- fail_policy: "fail_closed" or "fail_open"
+- excluded: (if include_excluded=true) Array of excluded verbs with prune reasons
+
+Use to understand exactly which verbs are available in the current governance context."#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "session_id": {
+                        "type": "string",
+                        "description": "Session UUID. Uses default session if omitted."
+                    },
+                    "include_excluded": {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "If true, include excluded verbs with prune reasons"
+                    },
+                    "domain_filter": {
+                        "type": "string",
+                        "description": "Filter to verbs in a specific domain (e.g., 'kyc', 'cbu')"
+                    }
+                }
+            }),
+        },
+        Tool {
             name: "session_list".into(),
             description: r#"List saved sessions.
 

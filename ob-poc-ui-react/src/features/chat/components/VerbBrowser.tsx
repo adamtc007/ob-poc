@@ -1,9 +1,14 @@
 /**
- * VerbBrowser - Progressive disclosure verb panel.
+ * VerbBrowser - Progressive disclosure verb panel with governance metadata.
  *
  * Stage 1: Show domain categories as clickable cards (auto-expanded on first load).
  * Stage 2: After clicking a domain, show that domain's verbs with search.
  * Clicking a verb inserts its s-expression into the chat input.
+ *
+ * Governance enhancements:
+ * - Filter summary banner showing "Showing X of Y verbs (filtered by ...)"
+ * - Governance tier badge on each verb card
+ * - Preconditions eligibility indicator (greyed out if not met)
  */
 
 import { useState, useMemo, useEffect, useRef } from 'react';
@@ -14,6 +19,8 @@ import {
   Code2,
   Layers,
   Search,
+  Shield,
+  ShieldAlert,
   Terminal,
 } from 'lucide-react';
 import { useChatStore } from '../../../stores/chat';
@@ -21,6 +28,28 @@ import type { VerbProfile } from '../../../types/chat';
 
 interface VerbBrowserProps {
   className?: string;
+}
+
+/** Governance tier badge */
+function TierBadge({ tier }: { tier: string }) {
+  if (!tier) return null;
+
+  const colors: Record<string, string> = {
+    governed: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
+    operational: 'bg-sky-500/15 text-sky-400 border-sky-500/30',
+    proof: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
+  };
+
+  const color = colors[tier.toLowerCase()] ?? 'bg-gray-500/15 text-gray-400 border-gray-500/30';
+
+  return (
+    <span
+      className={`inline-flex items-center px-1 py-0 text-[9px] font-medium rounded border ${color}`}
+      title={`Governance tier: ${tier}`}
+    >
+      {tier}
+    </span>
+  );
 }
 
 function VerbItem({
@@ -31,6 +60,7 @@ function VerbItem({
   onSelect: (verb: VerbProfile) => void;
 }) {
   const [showArgs, setShowArgs] = useState(false);
+  const isEligible = verb.preconditions_met;
 
   return (
     <div className="group">
@@ -40,17 +70,35 @@ function VerbItem({
           e.preventDefault();
           setShowArgs(!showArgs);
         }}
-        className="w-full text-left px-2 py-1.5 rounded text-xs hover:bg-[var(--bg-tertiary)] transition-colors"
-        title={`Click to insert: ${verb.sexpr}\nRight-click for args`}
+        className={`w-full text-left px-2 py-1.5 rounded text-xs transition-colors ${
+          isEligible
+            ? 'hover:bg-[var(--bg-tertiary)]'
+            : 'opacity-50 hover:bg-[var(--bg-tertiary)]'
+        }`}
+        title={
+          isEligible
+            ? `Click to insert: ${verb.sexpr}\nRight-click for args`
+            : `Preconditions not met — ${verb.sexpr}\nRight-click for args`
+        }
       >
         <div className="flex items-center gap-1.5">
-          <Code2 size={11} className="flex-shrink-0 text-[var(--accent-blue)]" />
-          <span className="font-mono text-[var(--text-primary)] truncate">
+          {isEligible ? (
+            <Code2 size={11} className="flex-shrink-0 text-[var(--accent-blue)]" />
+          ) : (
+            <ShieldAlert size={11} className="flex-shrink-0 text-[var(--text-muted)]" />
+          )}
+          <span className={`font-mono truncate ${isEligible ? 'text-[var(--text-primary)]' : 'text-[var(--text-muted)]'}`}>
             {verb.fqn}
           </span>
+          <div className="ml-auto flex-shrink-0">
+            <TierBadge tier={verb.governance_tier} />
+          </div>
         </div>
         <div className="text-[10px] text-[var(--text-muted)] mt-0.5 truncate pl-4">
           {verb.description}
+          {!isEligible && (
+            <span className="ml-1 text-[var(--accent-orange)]">(preconditions not met)</span>
+          )}
         </div>
       </button>
 
@@ -130,6 +178,9 @@ function DomainVerbList({
     );
   }, [verbs, search]);
 
+  // Count eligible vs total
+  const eligibleCount = filtered.filter((v) => v.preconditions_met).length;
+
   return (
     <div className="flex flex-col max-h-[60vh]">
       {/* Header with back */}
@@ -143,7 +194,9 @@ function DomainVerbList({
         <span className="text-xs font-medium text-[var(--text-primary)] flex-1 truncate">
           {domain}
         </span>
-        <span className="text-[10px] text-[var(--text-muted)]">{verbs.length} verbs</span>
+        <span className="text-[10px] text-[var(--text-muted)]">
+          {eligibleCount}/{verbs.length} eligible
+        </span>
       </div>
 
       {/* Search */}
@@ -185,7 +238,7 @@ function DomainVerbList({
 }
 
 export function VerbBrowser({ className = '' }: VerbBrowserProps) {
-  const { availableVerbs, setInputValue } = useChatStore();
+  const { availableVerbs, verbSurfaceMeta, setInputValue } = useChatStore();
   const [isExpanded, setIsExpanded] = useState(false);
   const [selectedDomain, setSelectedDomain] = useState<string | null>(null);
   const [domainSearch, setDomainSearch] = useState('');
@@ -242,6 +295,11 @@ export function VerbBrowser({ className = '' }: VerbBrowserProps) {
     ? domains.find(([d]) => d === selectedDomain)?.[1] ?? []
     : [];
 
+  // Build filter description for the summary banner
+  const filterDescription = verbSurfaceMeta?.totalRegistry
+    ? `Showing ${totalCount} of ${verbSurfaceMeta.totalRegistry} verbs`
+    : `${totalCount} verbs`;
+
   return (
     <div className={className}>
       {/* Header */}
@@ -281,6 +339,16 @@ export function VerbBrowser({ className = '' }: VerbBrowserProps) {
         ) : (
           /* Stage 1: Domain cards */
           <div className="flex flex-col max-h-[60vh]">
+            {/* Filter summary banner */}
+            {verbSurfaceMeta && (
+              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--bg-tertiary)] border-b border-[var(--border-primary)]">
+                <Shield size={12} className="flex-shrink-0 text-emerald-400" />
+                <span className="text-[10px] text-[var(--text-secondary)] truncate">
+                  {filterDescription}
+                </span>
+              </div>
+            )}
+
             {/* Domain search (only if many domains) */}
             {domains.length > 8 && (
               <div className="px-2 py-1.5 border-b border-[var(--border-primary)]">
