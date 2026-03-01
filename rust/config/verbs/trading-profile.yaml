@@ -19,6 +19,13 @@ domains:
           - "import trading profile"
           - "load trading profile"
           - "import profile for"
+          - "upload trading mandate document"
+          - "ingest trading profile YAML"
+          - "bring in trading configuration"
+          - "load custody mandate profile"
+          - "import mandate from file"
+          - "load profile from JSON"
+          - "import trading setup document"
         metadata:
           tier: intent
           source_of_truth: matrix
@@ -76,6 +83,13 @@ domains:
           - "show trading profile"
           - "get trading profile"
           - "read trading profile"
+          - "display trading mandate details"
+          - "view profile configuration"
+          - "fetch trading profile by ID"
+          - "what does this mandate contain"
+          - "retrieve trading profile record"
+          - "look up trading profile"
+          - "show mandate setup"
         metadata:
           tier: diagnostics
           source_of_truth: matrix
@@ -102,6 +116,13 @@ domains:
           - "get active profile"
           - "show active trading profile"
           - "current trading profile"
+          - "which mandate is live"
+          - "show current trading configuration"
+          - "what profile is active now"
+          - "display live trading mandate"
+          - "fetch active mandate for CBU"
+          - "get production trading profile"
+          - "show live profile version"
         metadata:
           tier: diagnostics
           source_of_truth: matrix
@@ -132,6 +153,8 @@ domains:
           - "get version history"
           - "list CBU profile versions"
           - "show profile changelog"
+          - "how many mandate versions exist"
+          - "display all trading profile drafts"
         behavior: crud
         metadata:
           tier: diagnostics
@@ -169,6 +192,8 @@ domains:
           - "set profile as active"
           - "go live with profile"
           - "activate CBU profile"
+          - "put mandate into production"
+          - "promote profile to live"
         behavior: plugin
         handler: activate_trading_profile
         metadata:
@@ -199,6 +224,11 @@ domains:
           - "sync trading profile"
           - "deploy profile"
           - "apply trading profile"
+          - "push mandate to operational tables"
+          - "project profile to universe and SSIs"
+          - "sync profile to custody tables"
+          - "deploy trading configuration live"
+          - "write profile to settlement tables"
         metadata:
           tier: composite
           source_of_truth: matrix
@@ -247,6 +277,8 @@ domains:
           - "diff profile versions"
           - "compare changes"
           - "show profile delta"
+          - "highlight mandate differences"
+          - "what is different between versions"
         behavior: plugin
         handler: diff_trading_profiles
         metadata:
@@ -284,6 +316,8 @@ domains:
           - "start profile edit"
           - "create draft from active"
           - "begin profile changes"
+          - "open new mandate draft"
+          - "initialize trading profile draft"
         behavior: plugin
         handler: create_draft_trading_profile
         metadata:
@@ -322,6 +356,8 @@ domains:
           - "replicate trading setup"
           - "clone configuration"
           - "copy to target CBU"
+          - "duplicate mandate to another structure"
+          - "replicate trading mandate across CBUs"
         behavior: plugin
         handler: clone_trading_profile_to_cbu
         metadata:
@@ -377,6 +413,9 @@ domains:
           - "create version"
           - "increment profile version"
           - "save as new version"
+          - "draft revision of active mandate"
+          - "fork new version from live"
+          - "create amendment to trading profile"
         behavior: plugin
         handler: create_new_version_trading_profile
         metadata:
@@ -481,6 +520,7 @@ domains:
           - "disable asset class"
           - "exclude instrument type"
           - "drop instrument class"
+          - "take asset class out of universe"
         behavior: plugin
         handler: remove_instrument_class_from_profile
         metadata:
@@ -556,6 +596,9 @@ domains:
           - "drop trading venue"
           - "remove market MIC"
           - "disable market"
+          - "stop trading on this venue"
+          - "revoke market access for CBU"
+          - "take exchange out of universe"
         behavior: plugin
         handler: remove_market_from_profile
         metadata:
@@ -590,6 +633,9 @@ domains:
           - "set primary currency"
           - "configure base currency"
           - "set CBU base currency"
+          - "define fund denomination currency"
+          - "what is the reporting currency"
+          - "change mandate base currency"
         behavior: plugin
         handler: set_profile_base_currency
         metadata:
@@ -618,6 +664,9 @@ domains:
           - "allow currency trading"
           - "add currency to profile"
           - "include currency"
+          - "authorize FX settlement in this currency"
+          - "enable safekeeping in new currency"
+          - "allow this currency for trading"
         behavior: plugin
         handler: add_allowed_currency_to_profile
         metadata:
@@ -649,6 +698,8 @@ domains:
           - "add new SSI"
           - "set up standing instruction"
           - "create settlement instruction"
+          - "register safekeeping and cash accounts"
+          - "add custody account settlement route"
         behavior: plugin
         handler: add_ssi_to_profile
         metadata:
@@ -707,6 +758,9 @@ domains:
           - "deactivate SSI"
           - "remove from SSIs"
           - "drop standing instruction"
+          - "take out settlement instruction"
+          - "retire this custody SSI"
+          - "remove safekeeping account route"
         behavior: plugin
         handler: remove_ssi_from_profile
         metadata:
@@ -740,6 +794,8 @@ domains:
           - "create routing rule"
           - "add rule to profile"
           - "define booking rule"
+          - "set up trade routing logic"
+          - "configure settlement routing for market"
         behavior: plugin
         handler: add_booking_rule_to_profile
         metadata:
@@ -800,6 +856,10 @@ domains:
           - "drop routing rule"
           - "deactivate booking rule"
           - "remove rule"
+          - "delete SSI selection rule"
+          - "take out booking routing logic"
+          - "clear trade routing rule"
+          - "remove settlement routing entry"
         behavior: plugin
         handler: remove_booking_rule_from_profile
         metadata:
@@ -889,6 +949,9 @@ domains:
           - "add ISDA product coverage"
           - "expand ISDA coverage"
           - "add to ISDA products"
+          - "enable OTC asset class under ISDA"
+          - "cover derivatives product in ISDA"
+          - "authorize new product on ISDA"
         behavior: plugin
         handler: TradingProfileAddIsdaCoverageOp
         metadata:
@@ -984,6 +1047,9 @@ domains:
           - "add eligible securities"
           - "configure CSA margin"
           - "add collateral assets"
+          - "define accepted margin collateral"
+          - "permit government bonds as collateral"
+          - "add haircut schedule for collateral"
         behavior: plugin
         handler: TradingProfileAddCsaCollateralOp
         metadata:
@@ -1031,6 +1097,9 @@ domains:
           - "link collateral SSI"
           - "configure CSA settlement"
           - "attach SSI to CSA"
+          - "point margin calls to this SSI"
+          - "wire collateral transfers to account"
+          - "set collateral movement settlement route"
         behavior: plugin
         handler: link_csa_ssi_in_profile
         metadata:
@@ -1062,6 +1131,10 @@ domains:
           - "deactivate ISDA"
           - "drop ISDA settings"
           - "remove ISDA from profile"
+          - "terminate ISDA master agreement"
+          - "take counterparty off ISDA"
+          - "delete OTC counterparty relationship"
+          - "remove derivatives agreement"
         behavior: plugin
         handler: remove_isda_config_from_profile
         metadata:
@@ -1092,6 +1165,10 @@ domains:
           - "deactivate CSA"
           - "drop CSA settings"
           - "remove CSA from profile"
+          - "terminate credit support annex"
+          - "delete collateral agreement for counterparty"
+          - "remove margin agreement from ISDA"
+          - "drop variation margin CSA"
         behavior: plugin
         handler: remove_csa_config_from_profile
         metadata:
@@ -1130,6 +1207,9 @@ domains:
           - "configure IM relationship"
           - "add discretionary mandate"
           - "create IM agreement"
+          - "appoint investment manager to profile"
+          - "authorize asset manager for trading"
+          - "onboard new investment manager"
         behavior: plugin
         handler: add_im_mandate_to_profile
         metadata:
@@ -1195,6 +1275,9 @@ domains:
           - "adjust mandate scope"
           - "change discretionary scope"
           - "modify IM permissions"
+          - "expand manager authorized markets"
+          - "restrict IM to these instruments"
+          - "change which markets manager trades"
         behavior: plugin
         handler: update_im_scope_in_profile
         metadata:
@@ -1231,6 +1314,10 @@ domains:
           - "remove management mandate"
           - "deactivate IM relationship"
           - "delete IM mandate"
+          - "revoke investment manager appointment"
+          - "offboard asset manager"
+          - "terminate discretionary management agreement"
+          - "cancel IM authorization"
         behavior: plugin
         handler: remove_im_mandate_from_profile
         metadata:
@@ -1262,6 +1349,8 @@ domains:
           - "validate activation ready"
           - "run go live checks"
           - "pre-activation validation"
+          - "is this mandate production ready"
+          - "run readiness checks on profile"
         behavior: plugin
         handler: validate_profile_go_live_ready
         metadata:
@@ -1293,6 +1382,9 @@ domains:
           - "validate settlement coverage"
           - "coverage validation"
           - "check all markets covered"
+          - "are all instruments mapped to SSIs"
+          - "find gaps in booking rule coverage"
+          - "which markets lack settlement routes"
         behavior: plugin
         handler: validate_universe_coverage
         metadata:
@@ -1331,6 +1423,8 @@ domains:
           - "submit profile changes"
           - "request go-live approval"
           - "submit profile for review"
+          - "send mandate to client for sign-off"
+          - "route profile for client approval"
         behavior: plugin
         handler: submit_trading_profile
         metadata:
@@ -1366,6 +1460,8 @@ domains:
           - "approve activation"
           - "authorize trading setup"
           - "approve trading profile activation"
+          - "sign off on mandate"
+          - "confirm profile for production"
         behavior: plugin
         handler: approve_trading_profile
         metadata:
@@ -1400,6 +1496,9 @@ domains:
           - "send back for changes"
           - "reject activation request"
           - "deny profile approval"
+          - "return mandate for rework"
+          - "fail approval on trading profile"
+          - "push profile back to draft"
         behavior: plugin
         handler: reject_trading_profile
         metadata:
@@ -1434,6 +1533,9 @@ domains:
           - "archive superseded profile"
           - "store in archive"
           - "mark profile archived"
+          - "retire this trading mandate"
+          - "soft delete old profile version"
+          - "shelve inactive trading profile"
         behavior: plugin
         handler: archive_trading_profile
         metadata:
@@ -1464,6 +1566,17 @@ domains:
 
       ca.enable-event-types:
         description: Enable CA event types for this trading profile
+        invocation_phrases:
+          - "enable corporate action types"
+          - "turn on CA events"
+          - "enable dividend events"
+          - "enable stock split"
+          - "activate CA event types"
+          - "enable CA processing"
+          - "turn on event types"
+          - "subscribe to corporate action notifications"
+          - "add event types to CA policy"
+          - "permit rights issue processing"
         behavior: plugin
         handler: TradingProfileCaEnableEventTypesOp
         metadata:
@@ -1489,6 +1602,17 @@ domains:
 
       ca.disable-event-types:
         description: Disable CA event types for this trading profile
+        invocation_phrases:
+          - "disable corporate action types"
+          - "turn off CA events"
+          - "disable dividend events"
+          - "disable CA processing"
+          - "deactivate event types"
+          - "turn off CA events"
+          - "stop processing these CA events"
+          - "remove event types from policy"
+          - "exclude corporate action categories"
+          - "unsubscribe from CA event types"
         behavior: plugin
         handler: TradingProfileCaDisableEventTypesOp
         metadata:
@@ -1510,6 +1634,17 @@ domains:
 
       ca.set-notification-policy:
         description: Configure CA notification settings
+        invocation_phrases:
+          - "set CA notification policy"
+          - "configure CA notifications"
+          - "set notification preferences"
+          - "configure event alerts"
+          - "set CA alert policy"
+          - "notification settings"
+          - "configure CA alerts"
+          - "how should CA events be communicated"
+          - "set corporate action delivery channels"
+          - "configure SLA for CA notifications"
         behavior: plugin
         handler: TradingProfileCaSetNotificationOp
         metadata:
@@ -1540,6 +1675,17 @@ domains:
 
       ca.set-election-policy:
         description: Configure who makes CA elections and requirements
+        invocation_phrases:
+          - "set CA election policy"
+          - "configure election defaults"
+          - "set default elections"
+          - "election policy settings"
+          - "configure CA choices"
+          - "set election preferences"
+          - "configure automatic elections"
+          - "who decides on corporate actions"
+          - "set auto-instruct threshold for CA"
+          - "define CA election authority"
         behavior: plugin
         handler: TradingProfileCaSetElectionOp
         metadata:
@@ -1574,6 +1720,17 @@ domains:
 
       ca.set-default-option:
         description: Set default election for specific event type
+        invocation_phrases:
+          - "set default CA option"
+          - "configure default election"
+          - "set default choice"
+          - "set automatic election"
+          - "configure default option"
+          - "set fallback election"
+          - "default CA selection"
+          - "always elect cash for dividends"
+          - "set standing instruction for rights"
+          - "configure auto-elect for event type"
         behavior: plugin
         handler: TradingProfileCaSetDefaultOp
         metadata:
@@ -1605,6 +1762,17 @@ domains:
 
       ca.remove-default-option:
         description: Remove default election for specific event type
+        invocation_phrases:
+          - "remove default CA option"
+          - "clear default election"
+          - "remove automatic election"
+          - "delete default option"
+          - "clear default choice"
+          - "remove CA default"
+          - "stop auto-electing for this event"
+          - "unset standing CA election"
+          - "revert to manual election"
+          - "remove fallback option for CA"
         behavior: plugin
         handler: TradingProfileCaRemoveDefaultOp
         metadata:
@@ -1625,6 +1793,17 @@ domains:
 
       ca.add-cutoff-rule:
         description: Add deadline cutoff rule for market/depository
+        invocation_phrases:
+          - "add CA cutoff rule"
+          - "set election cutoff"
+          - "add deadline rule"
+          - "configure cutoff time"
+          - "add instruction deadline"
+          - "set CA deadline"
+          - "add cutoff configuration"
+          - "define internal deadline for depository"
+          - "set warning days before market deadline"
+          - "configure escalation cutoff for CA"
         behavior: plugin
         handler: TradingProfileCaAddCutoffOp
         metadata:
@@ -1668,6 +1847,17 @@ domains:
 
       ca.remove-cutoff-rule:
         description: Remove cutoff rule by market/depository
+        invocation_phrases:
+          - "remove CA cutoff rule"
+          - "delete cutoff rule"
+          - "remove deadline rule"
+          - "clear cutoff configuration"
+          - "remove instruction deadline"
+          - "drop internal deadline for market"
+          - "clear depository cutoff setting"
+          - "delete CA escalation rule"
+          - "remove warning days configuration"
+          - "unset election deadline rule"
         behavior: plugin
         handler: TradingProfileCaRemoveCutoffOp
         metadata:
@@ -1691,6 +1881,17 @@ domains:
 
       ca.link-proceeds-ssi:
         description: Map CA proceeds to settlement instruction
+        invocation_phrases:
+          - "link proceeds SSI"
+          - "set CA proceeds account"
+          - "link dividend SSI"
+          - "configure proceeds settlement"
+          - "set proceeds destination"
+          - "link CA payout SSI"
+          - "configure proceeds routing"
+          - "map CA cash payout to SSI"
+          - "assign settlement for stock dividends"
+          - "route corporate action proceeds"
         behavior: plugin
         handler: TradingProfileCaLinkSsiOp
         metadata:
@@ -1723,6 +1924,17 @@ domains:
 
       ca.remove-proceeds-ssi:
         description: Remove CA proceeds SSI mapping
+        invocation_phrases:
+          - "remove proceeds SSI"
+          - "unlink proceeds account"
+          - "remove dividend SSI"
+          - "clear proceeds SSI"
+          - "remove payout routing"
+          - "delete proceeds link"
+          - "detach CA payout settlement instruction"
+          - "unmap stock dividend SSI"
+          - "clear cash proceeds routing"
+          - "remove CA settlement destination"
         behavior: plugin
         handler: TradingProfileCaRemoveSsiOp
         metadata:
@@ -1749,6 +1961,17 @@ domains:
 
       ca.get-policy:
         description: Get current CA policy configuration from trading profile
+        invocation_phrases:
+          - "get CA policy"
+          - "show CA configuration"
+          - "view CA settings"
+          - "display CA policy"
+          - "get corporate action policy"
+          - "show CA setup"
+          - "view event policy"
+          - "what are the CA rules"
+          - "retrieve corporate action configuration"
+          - "inspect CA election and cutoff setup"
         behavior: plugin
         handler: TradingProfileCaGetPolicyOp
         metadata:

@@ -9,6 +9,15 @@ domains:
           source_of_truth: catalog
           scope: global
           noun: template
+        invocation_phrases:
+          - "invoke template"
+          - "run template with parameters"
+          - "execute template"
+          - "apply template"
+          - "expand template"
+          - "use template for setup"
+          - "trigger template execution"
+          - "instantiate workflow template"
         behavior: plugin
         plugin:
           handler: template_invoke
@@ -33,6 +42,15 @@ domains:
           source_of_truth: catalog
           scope: global
           noun: template
+        invocation_phrases:
+          - "batch execute template"
+          - "run template across all CBUs"
+          - "apply template in bulk"
+          - "batch process with template"
+          - "execute template for each item"
+          - "bulk apply template"
+          - "iterate template over results"
+          - "run batch template operation"
         behavior: plugin
         plugin:
           handler: template_batch

@@ -10,6 +10,15 @@ domains:
           source_of_truth: catalog
           scope: cbu
           noun: service_resource
+        invocation_phrases:
+          - "read service resource type"
+          - "get resource type details"
+          - "show service resource definition"
+          - "look up resource type by code"
+          - "fetch resource type information"
+          - "describe this service resource"
+          - "what is this resource type"
+          - "display resource type specification"
         behavior: crud
         crud:
           operation: select
@@ -40,6 +49,15 @@ domains:
           source_of_truth: catalog
           scope: cbu
           noun: service_resource
+        invocation_phrases:
+          - "list service resource types"
+          - "show all resource types"
+          - "browse resource type catalog"
+          - "what resource types are available"
+          - "display resource types with filters"
+          - "enumerate service resource definitions"
+          - "get all resource types"
+          - "search resource type catalog"
         behavior: crud
         crud:
           operation: select
@@ -77,6 +95,15 @@ domains:
           source_of_truth: catalog
           scope: cbu
           noun: service_resource
+        invocation_phrases:
+          - "list resources for a service"
+          - "show resource types under this service"
+          - "what resources does this service require"
+          - "get resources linked to service"
+          - "which resource types belong to service"
+          - "display resource capabilities for service"
+          - "find resources by service"
+          - "enumerate resources for service delivery"
         behavior: crud
         crud:
           operation: select_with_join
@@ -106,6 +133,15 @@ domains:
           source_of_truth: catalog
           scope: cbu
           noun: service_resource
+        invocation_phrases:
+          - "list attribute requirements for resource"
+          - "show required attributes for resource type"
+          - "what attributes does this resource need"
+          - "get resource attribute specifications"
+          - "display mandatory attributes for resource"
+          - "which attributes are required for provisioning"
+          - "enumerate resource attribute requirements"
+          - "check attribute needs for resource type"
         behavior: crud
         crud:
           operation: list_by_fk
@@ -136,6 +172,15 @@ domains:
           source_of_truth: catalog
           scope: cbu
           noun: service_resource
+        invocation_phrases:
+          - "provision a resource instance"
+          - "create resource instance for CBU"
+          - "set up resource for structure"
+          - "provision service resource for client"
+          - "deploy new resource instance"
+          - "instantiate service resource"
+          - "stand up resource for custody account"
+          - "create new resource provisioning request"
         behavior: plugin
         handler: resource_instance_create
         args:
@@ -223,6 +268,15 @@ domains:
           source_of_truth: catalog
           scope: cbu
           noun: service_resource
+        invocation_phrases:
+          - "set attribute on resource instance"
+          - "update resource instance attribute"
+          - "assign attribute value to resource"
+          - "configure resource instance property"
+          - "change resource attribute value"
+          - "enter attribute for provisioned resource"
+          - "modify resource instance configuration"
+          - "set property on service resource"
         behavior: plugin
         handler: resource_set_attr
         args:
@@ -260,6 +314,15 @@ domains:
           source_of_truth: catalog
           scope: cbu
           noun: service_resource
+        invocation_phrases:
+          - "activate resource instance"
+          - "enable service resource"
+          - "make resource instance active"
+          - "go live with resource instance"
+          - "turn on provisioned resource"
+          - "set resource instance to active"
+          - "activate provisioned service resource"
+          - "bring resource instance online"
         behavior: plugin
         handler: resource_activate
         args:
@@ -274,6 +337,15 @@ domains:
           source_of_truth: catalog
           scope: cbu
           noun: service_resource
+        invocation_phrases:
+          - "suspend resource instance"
+          - "pause service resource"
+          - "temporarily disable resource"
+          - "put resource instance on hold"
+          - "freeze provisioned resource"
+          - "halt resource instance operations"
+          - "suspend active service resource"
+          - "take resource instance offline temporarily"
         behavior: plugin
         handler: resource_suspend
         args:
@@ -297,6 +369,15 @@ domains:
           source_of_truth: catalog
           scope: cbu
           noun: service_resource
+        invocation_phrases:
+          - "decommission resource instance"
+          - "retire service resource"
+          - "permanently remove resource instance"
+          - "shut down provisioned resource"
+          - "decommission and archive resource"
+          - "terminate resource instance"
+          - "wind down service resource"
+          - "take resource out of service"
         behavior: plugin
         handler: resource_decommission
         args:
@@ -320,6 +401,15 @@ domains:
           source_of_truth: catalog
           scope: cbu
           noun: service_resource
+        invocation_phrases:
+          - "validate resource instance attributes"
+          - "check required attributes are set"
+          - "are all attributes filled for resource"
+          - "verify resource attribute completeness"
+          - "run attribute validation on resource"
+          - "is this resource ready for activation"
+          - "check attribute compliance for resource"
+          - "validate provisioning attribute requirements"
         behavior: plugin
         handler: resource_validate_attrs
         args:

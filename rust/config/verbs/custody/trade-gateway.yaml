@@ -14,6 +14,15 @@ domains:
           source_of_truth: matrix
           scope: cbu
           noun: trade_gateway
+        invocation_phrases:
+          - "define a new trade gateway"
+          - "register SWIFT FIN connectivity"
+          - "add FIX protocol gateway"
+          - "set up Omgeo CTM gateway"
+          - "create Bloomberg TOMS connection"
+          - "configure Tradeweb gateway endpoint"
+          - "provision MarkitWire trade gateway"
+          - "register new settlement gateway"
         behavior: crud
         crud:
           operation: upsert
@@ -72,6 +81,15 @@ domains:
           source_of_truth: matrix
           scope: cbu
           noun: trade_gateway
+        invocation_phrases:
+          - "show gateway definition details"
+          - "read trade gateway configuration"
+          - "get gateway by code"
+          - "what protocol does this gateway use"
+          - "display gateway supported events"
+          - "inspect SWIFT gateway settings"
+          - "view FIX gateway specification"
+          - "check gateway provider details"
         behavior: crud
         crud:
           operation: select
@@ -99,6 +117,15 @@ domains:
           source_of_truth: matrix
           scope: cbu
           noun: trade_gateway
+        invocation_phrases:
+          - "list available trade gateways"
+          - "show all configured gateways"
+          - "which FIX gateways exist"
+          - "display SWIFT gateway inventory"
+          - "what trade connectivity is available"
+          - "browse gateways by protocol"
+          - "show registered gateway endpoints"
+          - "list gateways by type"
         behavior: crud
         crud:
           operation: select
@@ -130,6 +157,15 @@ domains:
           source_of_truth: matrix
           scope: cbu
           noun: trade_gateway
+        invocation_phrases:
+          - "enable gateway for this CBU"
+          - "connect fund to SWIFT gateway"
+          - "provision FIX connectivity for CBU"
+          - "link CBU to trade gateway"
+          - "set up CTM connectivity for fund"
+          - "onboard CBU to settlement gateway"
+          - "enable Tradeweb connection for CBU"
+          - "configure gateway credentials for fund"
         behavior: crud
         crud:
           operation: upsert
@@ -209,6 +245,15 @@ domains:
           source_of_truth: matrix
           scope: cbu
           noun: trade_gateway
+        invocation_phrases:
+          - "activate gateway connectivity"
+          - "go live on trade gateway"
+          - "mark gateway connection as active"
+          - "promote gateway from testing"
+          - "switch gateway status to active"
+          - "complete gateway UAT and activate"
+          - "enable live trade flow on gateway"
+          - "transition gateway to production"
         behavior: crud
         crud:
           operation: update
@@ -238,6 +283,15 @@ domains:
           source_of_truth: matrix
           scope: cbu
           noun: trade_gateway
+        invocation_phrases:
+          - "suspend gateway connectivity"
+          - "pause trade routing via gateway"
+          - "temporarily disable gateway"
+          - "hold gateway for maintenance"
+          - "stop sending trades through gateway"
+          - "suspend SWIFT connectivity for CBU"
+          - "freeze FIX connection for fund"
+          - "take gateway offline"
         behavior: crud
         crud:
           operation: update
@@ -270,6 +324,15 @@ domains:
           source_of_truth: matrix
           scope: cbu
           noun: trade_gateway
+        invocation_phrases:
+          - "list gateway connections for CBU"
+          - "show CBU trade connectivity status"
+          - "which gateways are enabled for fund"
+          - "display SWIFT connections for this CBU"
+          - "get all gateway links for structure"
+          - "check CBU settlement gateway setup"
+          - "show active FIX connections for CBU"
+          - "what trade gateways does CBU use"
         behavior: crud
         crud:
           operation: list_by_fk
@@ -307,6 +370,15 @@ domains:
           source_of_truth: matrix
           scope: cbu
           noun: trade_gateway
+        invocation_phrases:
+          - "add trade routing rule for CBU"
+          - "route equity trades through SWIFT gateway"
+          - "create settlement routing by instrument class"
+          - "set up gateway rule for market"
+          - "configure counterparty-specific trade routing"
+          - "assign priority routing for lifecycle event"
+          - "define FIX routing for OTC trades"
+          - "map instrument class to settlement gateway"
         behavior: crud
         crud:
           operation: upsert
@@ -403,6 +475,15 @@ domains:
           source_of_truth: matrix
           scope: cbu
           noun: trade_gateway
+        invocation_phrases:
+          - "list trade routing rules for CBU"
+          - "show settlement routing configuration"
+          - "display gateway routing by priority"
+          - "which gateway handles equity confirmations"
+          - "get routing rules for lifecycle event"
+          - "check trade routing setup for fund"
+          - "show active gateway routing table"
+          - "what are the routing rules for this CBU"
         behavior: crud
         crud:
           operation: list_by_fk
@@ -441,6 +522,15 @@ domains:
           source_of_truth: matrix
           scope: cbu
           noun: trade_gateway
+        invocation_phrases:
+          - "remove trade routing rule"
+          - "delete gateway routing entry"
+          - "clear routing rule for instrument class"
+          - "drop settlement routing for counterparty"
+          - "unassign gateway from lifecycle event"
+          - "remove FIX routing for this market"
+          - "delete SWIFT routing rule for CBU"
+          - "take out obsolete routing configuration"
         behavior: crud
         crud:
           operation: delete
@@ -465,6 +555,15 @@ domains:
           source_of_truth: matrix
           scope: cbu
           noun: trade_gateway
+        invocation_phrases:
+          - "set fallback gateway for CBU"
+          - "configure backup settlement route"
+          - "add failover gateway on timeout"
+          - "define secondary trade routing path"
+          - "set up gateway failover for rejections"
+          - "configure SWIFT fallback to FIX gateway"
+          - "add backup connectivity for trade routing"
+          - "assign fallback for primary gateway failure"
         behavior: crud
         crud:
           operation: upsert
@@ -537,6 +636,15 @@ domains:
           source_of_truth: matrix
           scope: cbu
           noun: trade_gateway
+        invocation_phrases:
+          - "list fallback gateway configurations"
+          - "show backup settlement routes for CBU"
+          - "display gateway failover setup"
+          - "what fallback gateways are configured"
+          - "check failover routing for this fund"
+          - "get all backup trade connectivity"
+          - "show gateway resilience configuration"
+          - "list secondary routing paths for CBU"
         behavior: crud
         crud:
           operation: list_by_fk

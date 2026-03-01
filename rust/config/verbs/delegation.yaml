@@ -4,6 +4,15 @@ domains:
     verbs:
       add:
         description: Add a delegation relationship (idempotent by delegator+delegate+scope+cbu)
+        invocation_phrases:
+          - "add delegation"
+          - "delegate investment management"
+          - "create delegation relationship"
+          - "appoint sub-advisor"
+          - "delegate function to provider"
+          - "set up service delegation"
+          - "outsource function to"
+          - "establish delegation arrangement"
         metadata:
           tier: intent
           source_of_truth: operational
@@ -92,6 +101,15 @@ domains:
 
       end:
         description: End a delegation
+        invocation_phrases:
+          - "end delegation"
+          - "terminate delegation arrangement"
+          - "revoke sub-advisor delegation"
+          - "cancel service delegation"
+          - "close delegation relationship"
+          - "withdraw delegation of function"
+          - "stop outsourcing to provider"
+          - "wind down delegation"
         metadata:
           tier: intent
           source_of_truth: operational
@@ -117,6 +135,15 @@ domains:
 
       list-delegates:
         description: List who an entity delegates to
+        invocation_phrases:
+          - "list delegates"
+          - "show delegated service providers"
+          - "who do we delegate to"
+          - "list outsourced functions"
+          - "show sub-advisors"
+          - "view delegation arrangements"
+          - "which providers have delegations"
+          - "list all delegated parties"
         metadata:
           tier: reference
           source_of_truth: operational
@@ -144,6 +171,15 @@ domains:
 
       list-delegations-received:
         description: List delegations an entity has received
+        invocation_phrases:
+          - "list delegations received"
+          - "show inbound delegations"
+          - "what functions are delegated to us"
+          - "which mandates do we manage"
+          - "list received service delegations"
+          - "show delegated responsibilities"
+          - "view incoming delegation arrangements"
+          - "what has been delegated to this entity"
         metadata:
           tier: reference
           source_of_truth: operational

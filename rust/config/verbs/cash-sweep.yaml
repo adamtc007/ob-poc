@@ -14,6 +14,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: cash_sweep
+        invocation_phrases:
+          - "configure cash sweep"
+          - "set up cash sweep"
+          - "create cash sweep configuration"
+          - "add STIF sweep"
+          - "configure overnight sweep"
+          - "set up money market sweep"
+          - "create sweep for currency"
+          - "add cash management sweep"
         behavior: crud
         crud:
           operation: upsert
@@ -116,6 +125,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: cash_sweep
+        invocation_phrases:
+          - "link sweep to resource"
+          - "connect sweep to cash resource"
+          - "assign resource to sweep"
+          - "attach cash resource to sweep"
+          - "map sweep to resource instance"
+          - "bind sweep configuration to resource"
+          - "associate sweep with cash resource"
+          - "link cash sweep resource"
         behavior: crud
         crud:
           operation: update
@@ -147,6 +165,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: cash_sweep
+        invocation_phrases:
+          - "list cash sweeps"
+          - "show sweep configurations"
+          - "what sweeps are configured"
+          - "display cash sweep settings"
+          - "get sweep configs for structure"
+          - "show active cash sweeps"
+          - "list STIF configurations"
+          - "view sweep setup for CBU"
         behavior: crud
         crud:
           operation: list_by_fk
@@ -178,6 +205,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: cash_sweep
+        invocation_phrases:
+          - "update sweep threshold"
+          - "change cash sweep amount"
+          - "modify sweep threshold"
+          - "adjust minimum sweep balance"
+          - "set new sweep threshold"
+          - "change sweep trigger amount"
+          - "update minimum cash balance"
+          - "modify sweep cutoff amount"
         behavior: crud
         crud:
           operation: update
@@ -203,6 +239,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: cash_sweep
+        invocation_phrases:
+          - "update sweep timing"
+          - "change sweep schedule"
+          - "modify sweep time"
+          - "adjust sweep frequency"
+          - "change when sweep runs"
+          - "update sweep to daily"
+          - "set sweep timezone"
+          - "reschedule cash sweep"
         behavior: crud
         crud:
           operation: update
@@ -241,6 +286,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: cash_sweep
+        invocation_phrases:
+          - "change sweep vehicle"
+          - "switch to different STIF"
+          - "change money market fund"
+          - "update sweep investment vehicle"
+          - "switch sweep to overnight repo"
+          - "change cash sweep destination"
+          - "move sweep to new vehicle"
+          - "update sweep fund"
         behavior: crud
         crud:
           operation: update
@@ -281,6 +335,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: cash_sweep
+        invocation_phrases:
+          - "suspend cash sweep"
+          - "pause sweep"
+          - "deactivate cash sweep"
+          - "turn off sweep"
+          - "disable sweep for now"
+          - "halt cash sweep"
+          - "put sweep on hold"
+          - "stop sweep temporarily"
         behavior: crud
         crud:
           operation: update
@@ -304,6 +367,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: cash_sweep
+        invocation_phrases:
+          - "reactivate cash sweep"
+          - "turn sweep back on"
+          - "re-enable sweep"
+          - "resume cash sweep"
+          - "restart sweep"
+          - "bring sweep back online"
+          - "activate sweep again"
+          - "unsuspend cash sweep"
         behavior: crud
         crud:
           operation: update
@@ -327,6 +399,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: cash_sweep
+        invocation_phrases:
+          - "remove cash sweep"
+          - "delete sweep configuration"
+          - "remove sweep setup"
+          - "drop cash sweep config"
+          - "eliminate sweep"
+          - "remove sweep for currency"
+          - "delete sweep entry"
+          - "clear cash sweep configuration"
         behavior: crud
         crud:
           operation: delete

@@ -20,6 +20,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: service_intent
+        invocation_phrases:
+          - "create a service intent"
+          - "declare service intent for CBU"
+          - "register new service subscription"
+          - "set up service intent"
+          - "what services does this CBU need"
+          - "add service intent to structure"
+          - "initiate service delivery request"
+          - "configure service for client unit"
         behavior: plugin
         handler: ServiceIntentCreateOp
         args:
@@ -66,6 +75,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: service_intent
+        invocation_phrases:
+          - "list service intents for CBU"
+          - "show all service subscriptions"
+          - "what services are configured"
+          - "display service intent list"
+          - "get service intents for structure"
+          - "which services has this CBU requested"
+          - "enumerate service delivery requests"
+          - "view current service intents"
         behavior: plugin
         handler: ServiceIntentListOp
         args:
@@ -88,6 +106,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: service_intent
+        invocation_phrases:
+          - "supersede service intent"
+          - "replace existing service intent"
+          - "update service intent with new options"
+          - "override service subscription"
+          - "revise service delivery configuration"
+          - "change service intent options"
+          - "amend the current service intent"
+          - "create new version of service intent"
         behavior: plugin
         handler: ServiceIntentSupersedeOp
         args:
@@ -112,6 +139,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: discovery
+        invocation_phrases:
+          - "run resource discovery"
+          - "discover required resources for CBU"
+          - "determine service resource definitions"
+          - "what resources does this CBU need"
+          - "execute SRDEF discovery"
+          - "identify required service resources"
+          - "map service intents to resources"
+          - "find resource requirements for structure"
         behavior: plugin
         handler: DiscoveryRunOp
         args:
@@ -134,6 +170,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: discovery
+        invocation_phrases:
+          - "explain resource discovery results"
+          - "why was this SRDEF discovered"
+          - "show discovery rationale"
+          - "explain service resource requirements"
+          - "what triggered this resource requirement"
+          - "describe discovery reasoning for CBU"
+          - "how were resources determined"
+          - "justify resource discovery output"
         behavior: plugin
         handler: DiscoveryExplainOp
         args:
@@ -159,6 +204,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: attribute_requirements
+        invocation_phrases:
+          - "roll up attribute requirements"
+          - "merge attribute needs from SRDEFs"
+          - "consolidate resource attribute requirements"
+          - "aggregate attribute requirements for CBU"
+          - "what attributes are needed for provisioning"
+          - "compute attribute rollup for resources"
+          - "collect required attributes across services"
+          - "summarize attribute requirements"
         behavior: plugin
         handler: AttributeRollupOp
         args:
@@ -181,6 +235,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: attribute_values
+        invocation_phrases:
+          - "populate attribute values automatically"
+          - "auto-fill attribute values from sources"
+          - "fill in resource attributes for CBU"
+          - "source attribute values for provisioning"
+          - "enrich attributes from entity data"
+          - "derive attribute values from documents"
+          - "pre-populate required attributes"
+          - "auto-populate service resource attributes"
         behavior: plugin
         handler: AttributePopulateOp
         args:
@@ -207,6 +270,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: attribute_gaps
+        invocation_phrases:
+          - "show attribute gaps"
+          - "what attributes are still missing"
+          - "identify missing required attributes"
+          - "display attribute value gaps"
+          - "which attributes need to be filled"
+          - "check for missing provisioning data"
+          - "find unfilled attribute requirements"
+          - "list outstanding attribute gaps for CBU"
         behavior: plugin
         handler: AttributeGapsOp
         args:
@@ -233,6 +305,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: attribute_value
+        invocation_phrases:
+          - "set attribute value manually"
+          - "enter attribute value for resource"
+          - "provide attribute value for CBU"
+          - "manually fill in attribute"
+          - "override attribute value with evidence"
+          - "assign value to resource attribute"
+          - "update attribute for service provisioning"
+          - "supply missing attribute value"
         behavior: plugin
         handler: AttributeSetOp
         args:
@@ -269,6 +350,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: provisioning
+        invocation_phrases:
+          - "run provisioning for CBU"
+          - "provision service resources"
+          - "create resources for ready SRDEFs"
+          - "execute resource provisioning"
+          - "start provisioning orchestrator"
+          - "provision all ready resources"
+          - "trigger service resource creation"
+          - "deploy resources for this structure"
         behavior: plugin
         handler: ProvisioningRunOp
         args:
@@ -295,6 +385,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: provisioning_status
+        invocation_phrases:
+          - "check provisioning request status"
+          - "what is the provisioning status"
+          - "show provisioning progress"
+          - "is provisioning complete"
+          - "get status of resource provisioning"
+          - "track provisioning request"
+          - "where is my provisioning request"
+          - "display provisioning outcome"
         behavior: plugin
         handler: ProvisioningStatusOp
         args:
@@ -316,6 +415,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: readiness
+        invocation_phrases:
+          - "compute service readiness"
+          - "check if CBU is ready to transact"
+          - "determine good to transact status"
+          - "assess service readiness for structure"
+          - "is this CBU ready for business"
+          - "calculate readiness score"
+          - "evaluate transactional readiness"
+          - "run readiness check for services"
         behavior: plugin
         handler: ReadinessComputeOp
         args:
@@ -338,6 +446,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: blocking_reasons
+        invocation_phrases:
+          - "explain readiness blockers"
+          - "why is this service not ready"
+          - "show blocking reasons for readiness"
+          - "what is preventing transact readiness"
+          - "list readiness failure reasons"
+          - "explain service delivery blockers"
+          - "identify readiness impediments"
+          - "why can this CBU not transact yet"
         behavior: plugin
         handler: ReadinessExplainOp
         args:
@@ -373,6 +490,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: pipeline
+        invocation_phrases:
+          - "run the full service pipeline"
+          - "execute end-to-end provisioning pipeline"
+          - "run complete onboarding pipeline for CBU"
+          - "discovery through readiness pipeline"
+          - "provision everything for this structure"
+          - "full service delivery pipeline"
+          - "orchestrate complete resource lifecycle"
+          - "run all pipeline stages for CBU"
         behavior: plugin
         handler: PipelineFullOp
         args:

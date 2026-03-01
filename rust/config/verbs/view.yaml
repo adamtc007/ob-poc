@@ -34,6 +34,14 @@ domains:
           - "give me the full picture"
           - "show complete universe"
           - "view all records"
+          - "show my universe"
+          - "display universe view"
+          - "view universe"
+          - "show universe view"
+          - "display the universe"
+          - "show all cbus in universe"
+          - "universe view"
+          - "see the universe"
         behavior: plugin
         plugin:
           handler: ViewUniverseOp
@@ -400,6 +408,7 @@ domains:
           - "magnify this area"
           - "zoom in for detail"
           - "get closer view"
+          - "show more detail"
         behavior: plugin
         plugin:
           handler: ViewZoomInOp
@@ -432,6 +441,7 @@ domains:
           - "see wider context"
           - "zoom out one level"
           - "show less detail"
+          - "go back up"
         behavior: plugin
         plugin:
           handler: ViewZoomOutOp
@@ -495,6 +505,7 @@ domains:
           - "show navigation trail"
           - "display breadcrumb trail"
           - "current navigation path"
+          - "view breadcrumbs"
         behavior: plugin
         plugin:
           handler: ViewBreadcrumbsOp
@@ -525,6 +536,8 @@ domains:
           - "where am I now"
           - "show session status"
           - "display current state"
+          - "get view status"
+          - "check view state"
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -549,6 +562,8 @@ domains:
           - "info about selected"
           - "selected items info"
           - "describe selection"
+          - "view selection details"
+          - "get selection info"
         metadata:
           tier: intent
           source_of_truth: operational

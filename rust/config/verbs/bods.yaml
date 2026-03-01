@@ -85,6 +85,15 @@ domains:
           source_of_truth: external
           scope: global
           noun: bods_statement
+        invocation_phrases:
+          - "link entity to BODS"
+          - "associate entity with BODS statement"
+          - "connect entity to ownership record"
+          - "map entity to BODS"
+          - "match entity to BODS data"
+          - "link to beneficial ownership record"
+          - "bind entity to BODS statement"
+          - "correlate entity with BODS"
         behavior: crud
         crud:
           operation: upsert
@@ -168,6 +177,15 @@ domains:
           source_of_truth: external
           scope: global
           noun: bods_statement
+        invocation_phrases:
+          - "list BODS for entity"
+          - "show ownership statements for entity"
+          - "get BODS records for entity"
+          - "what BODS data exists for entity"
+          - "show beneficial ownership for entity"
+          - "entity BODS statements"
+          - "list linked BODS records"
+          - "find BODS data for this entity"
         behavior: crud
         crud:
           operation: list_by_fk
@@ -194,6 +212,15 @@ domains:
           source_of_truth: external
           scope: global
           noun: bods_statement
+        invocation_phrases:
+          - "find BODS by LEI"
+          - "look up BODS using LEI"
+          - "search BODS by LEI code"
+          - "find ownership data by LEI"
+          - "BODS lookup by LEI"
+          - "get BODS entity for LEI"
+          - "locate BODS record by LEI"
+          - "search beneficial ownership by LEI"
         behavior: plugin
         args:
           - name: lei
@@ -210,6 +237,15 @@ domains:
           source_of_truth: external
           scope: global
           noun: bods_statement
+        invocation_phrases:
+          - "list beneficial owners"
+          - "show BODS persons"
+          - "list UBO persons"
+          - "who are the beneficial owners"
+          - "show natural persons in BODS"
+          - "list persons with ownership"
+          - "get beneficial owner persons"
+          - "find persons by nationality"
         behavior: crud
         crud:
           operation: select
@@ -238,6 +274,15 @@ domains:
           source_of_truth: external
           scope: global
           noun: bods_statement
+        invocation_phrases:
+          - "list ownership statements"
+          - "show ownership chains"
+          - "who owns this entity"
+          - "display ownership records"
+          - "get ownership data for entity"
+          - "show BODS ownership links"
+          - "trace ownership statements"
+          - "list control and ownership"
         behavior: plugin
         args:
           - name: subject-lei
@@ -269,6 +314,15 @@ domains:
           source_of_truth: external
           scope: global
           noun: bods_statement
+        invocation_phrases:
+          - "sync BODS from GLEIF"
+          - "import GLEIF reporting exceptions"
+          - "update BODS from GLEIF"
+          - "pull GLEIF ownership data"
+          - "sync beneficial ownership from GLEIF"
+          - "refresh BODS with GLEIF data"
+          - "import GLEIF exception data"
+          - "synchronize GLEIF to BODS"
         behavior: plugin
         args:
           - name: entity-id

@@ -14,6 +14,15 @@ domains:
           scope: cbu
           noun: capital
           tags: [kyc]
+        invocation_phrases:
+          - "define share class for company"
+          - "create new share class"
+          - "add ordinary shares"
+          - "set up preference shares"
+          - "register capital share class"
+          - "configure voting share class"
+          - "establish share structure"
+          - "record share class from articles"
         behavior: crud
         crud:
           operation: upsert
@@ -120,6 +129,15 @@ domains:
           scope: cbu
           noun: capital
           tags: [kyc]
+        invocation_phrases:
+          - "allocate shares to shareholder"
+          - "assign share holding"
+          - "record beneficial ownership stake"
+          - "give shares to entity"
+          - "create shareholder holding record"
+          - "register share allocation"
+          - "add shares to PSC register"
+          - "record equity ownership"
         behavior: crud
         crud:
           operation: upsert
@@ -177,6 +195,15 @@ domains:
           scope: cbu
           noun: capital
           tags: [kyc]
+        invocation_phrases:
+          - "transfer shares between holders"
+          - "record share transfer"
+          - "move shares to new owner"
+          - "change of ownership on register"
+          - "log equity transfer"
+          - "process share sale transaction"
+          - "register share movement"
+          - "update beneficial owner after transfer"
         behavior: plugin
         plugin:
           handler: CapitalTransferOp
@@ -236,6 +263,15 @@ domains:
           scope: cbu
           noun: capital
           tags: [kyc]
+        invocation_phrases:
+          - "reconcile capital structure"
+          - "verify shareholding totals"
+          - "check ownership percentages match"
+          - "validate share register integrity"
+          - "do holdings add up"
+          - "run capital reconciliation check"
+          - "confirm issued shares match allocated"
+          - "audit share class balances"
         behavior: plugin
         plugin:
           handler: CapitalReconcileOp
@@ -274,6 +310,15 @@ domains:
           scope: cbu
           noun: capital
           tags: [kyc]
+        invocation_phrases:
+          - "trace ownership chain upward"
+          - "get UBO ownership path"
+          - "show beneficial ownership chain"
+          - "compute indirect ownership percentage"
+          - "follow ownership to ultimate parent"
+          - "who ultimately owns this entity"
+          - "traverse equity control chain"
+          - "map ownership hierarchy for CDD"
         behavior: plugin
         plugin:
           handler: CapitalOwnershipChainOp
@@ -304,6 +349,15 @@ domains:
           scope: cbu
           noun: capital
           tags: [kyc]
+        invocation_phrases:
+          - "issue new shares"
+          - "increase issued share capital"
+          - "add more shares to class"
+          - "record new share issuance"
+          - "expand authorized capital"
+          - "dilute existing shareholders"
+          - "allot additional shares"
+          - "register share issuance event"
         behavior: plugin
         plugin:
           handler: CapitalIssueSharesOp
@@ -337,6 +391,15 @@ domains:
           scope: cbu
           noun: capital
           tags: [kyc]
+        invocation_phrases:
+          - "cancel shares from register"
+          - "record share buyback"
+          - "reduce issued share capital"
+          - "retire shares from class"
+          - "process share cancellation"
+          - "remove shares from issuance"
+          - "record capital reduction"
+          - "buy back and cancel shares"
         behavior: plugin
         plugin:
           handler: CapitalCancelSharesOp
@@ -370,6 +433,15 @@ domains:
           scope: cbu
           noun: capital
           tags: [kyc]
+        invocation_phrases:
+          - "list share classes for issuer"
+          - "show capital structure"
+          - "what share classes exist"
+          - "get all share types"
+          - "display company equity classes"
+          - "view share register summary"
+          - "show authorized share classes"
+          - "list voting and non-voting shares"
         behavior: crud
         crud:
           operation: list_by_fk
@@ -397,6 +469,15 @@ domains:
           scope: cbu
           noun: capital
           tags: [kyc]
+        invocation_phrases:
+          - "list shareholders for class"
+          - "show PSC register entries"
+          - "who holds these shares"
+          - "get beneficial owners of shares"
+          - "display shareholder register"
+          - "view share ownership breakdown"
+          - "show holders for equity class"
+          - "list persons with significant control"
         behavior: crud
         crud:
           operation: list_by_fk

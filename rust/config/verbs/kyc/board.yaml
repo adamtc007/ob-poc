@@ -15,6 +15,15 @@ domains:
           noun: board_member
           tags: [kyc]
           subject_kinds: [cbu, company]
+        invocation_phrases:
+          - "appoint director to board"
+          - "add board member"
+          - "who is the new director"
+          - "assign person to board seat"
+          - "register board appointment"
+          - "nominate director for company"
+          - "record new board member"
+          - "install director on entity board"
         behavior: crud
         crud:
           operation: upsert
@@ -125,6 +134,15 @@ domains:
           noun: board_member
           tags: [kyc]
           subject_kinds: [cbu, company]
+        invocation_phrases:
+          - "remove director from board"
+          - "record board resignation"
+          - "director stepped down"
+          - "terminate board appointment"
+          - "who resigned from board"
+          - "log board member removal"
+          - "end director term"
+          - "deactivate board seat holder"
         behavior: crud
         crud:
           operation: update
@@ -158,6 +176,15 @@ domains:
           noun: board_member
           tags: [kyc]
           subject_kinds: [cbu, company]
+        invocation_phrases:
+          - "show board composition"
+          - "who sits on the board"
+          - "list directors for company"
+          - "get board members"
+          - "display current board seats"
+          - "show entity board makeup"
+          - "which directors serve here"
+          - "view board of directors"
         behavior: crud
         crud:
           operation: list_by_fk
@@ -190,6 +217,15 @@ domains:
           noun: board_member
           tags: [kyc]
           subject_kinds: [cbu, company]
+        invocation_phrases:
+          - "where does this person sit"
+          - "list board positions for person"
+          - "show directorships held"
+          - "which boards does person serve"
+          - "get all board seats"
+          - "find director appointments"
+          - "person board membership history"
+          - "how many boards do they serve"
         behavior: crud
         crud:
           operation: list_by_fk
@@ -222,6 +258,15 @@ domains:
           noun: board_member
           tags: [kyc]
           subject_kinds: [cbu, company]
+        invocation_phrases:
+          - "grant board appointment right"
+          - "record appointment power from SHA"
+          - "who can appoint directors"
+          - "add director nomination right"
+          - "register appointment right from articles"
+          - "assign board appointment power"
+          - "record veto over appointments"
+          - "capture shareholder appointment right"
         behavior: crud
         crud:
           operation: upsert
@@ -337,6 +382,15 @@ domains:
           noun: board_member
           tags: [kyc]
           subject_kinds: [cbu, company]
+        invocation_phrases:
+          - "revoke board appointment right"
+          - "remove director nomination power"
+          - "terminate appointment right"
+          - "cancel board appointment privilege"
+          - "withdraw appointment authority"
+          - "end director appointment right"
+          - "deactivate nomination power"
+          - "remove veto over board appointments"
         behavior: crud
         crud:
           operation: update
@@ -370,6 +424,15 @@ domains:
           noun: board_member
           tags: [kyc]
           subject_kinds: [cbu, company]
+        invocation_phrases:
+          - "who has appointment rights"
+          - "show board nomination powers"
+          - "list appointment rights for entity"
+          - "which shareholders appoint directors"
+          - "display board control rights"
+          - "get director appointment privileges"
+          - "who controls board appointments"
+          - "view nomination rights over board"
         behavior: crud
         crud:
           operation: list_by_fk
@@ -402,6 +465,15 @@ domains:
           noun: board_member
           tags: [kyc]
           subject_kinds: [cbu, company]
+        invocation_phrases:
+          - "show rights held by entity"
+          - "what appointment powers does it hold"
+          - "list boards they can appoint to"
+          - "get held appointment rights"
+          - "which boards can entity control"
+          - "display held nomination powers"
+          - "where does entity have board power"
+          - "find all held appointment rights"
         behavior: crud
         crud:
           operation: list_by_fk
@@ -438,6 +510,15 @@ domains:
           noun: board_member
           tags: [kyc]
           subject_kinds: [cbu, company]
+        invocation_phrases:
+          - "analyze board control structure"
+          - "who controls the board"
+          - "assess board power dynamics"
+          - "identify board majority controller"
+          - "check board control for CDD"
+          - "evaluate board governance control"
+          - "determine UBO through board"
+          - "board control analysis for KYC"
         behavior: plugin
         plugin:
           handler: BoardAnalyzeControlOp

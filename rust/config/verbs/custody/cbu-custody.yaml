@@ -17,6 +17,15 @@ domains:
           scope: cbu
           noun: universe
           tags: [read, operational-state]
+        invocation_phrases:
+          - "show traded universe for CBU"
+          - "what instruments does this fund trade"
+          - "list settlement universe"
+          - "which markets are in scope"
+          - "display instrument coverage"
+          - "what can this structure trade"
+          - "show DVP and FOP instruments"
+          - "check universe completeness"
         crud:
           operation: list_by_fk
           table: cbu_instrument_universe
@@ -44,6 +53,15 @@ domains:
           scope: cbu
           noun: ssi
           tags: [read, operational-state]
+        invocation_phrases:
+          - "show settlement instructions for CBU"
+          - "list SSIs for this fund"
+          - "what are the standing instructions"
+          - "display SWIFT settlement details"
+          - "which BICs are configured"
+          - "show active SSI records"
+          - "check settlement routing setup"
+          - "what custodian accounts exist"
         crud:
           operation: list_by_fk
           table: cbu_ssi
@@ -79,6 +97,15 @@ domains:
           scope: cbu
           noun: booking_rule
           tags: [read, operational-state]
+        invocation_phrases:
+          - "show booking rules for this CBU"
+          - "what are the settlement routing rules"
+          - "list trade booking priorities"
+          - "how are DVP trades routed"
+          - "display SSI selection rules"
+          - "which rule matches FOP trades"
+          - "check booking rule coverage"
+          - "show active routing configuration"
         crud:
           operation: list_by_fk
           table: ssi_booking_rules
@@ -111,6 +138,15 @@ domains:
           scope: cbu
           noun: agent_override
           tags: [read, operational-state]
+        invocation_phrases:
+          - "show agent overrides for SSI"
+          - "list settlement agent exceptions"
+          - "what BIC overrides exist"
+          - "display correspondent bank overrides"
+          - "check sub-custodian routing overrides"
+          - "are there agent substitutions"
+          - "show SWIFT intermediary overrides"
+          - "which agents are overridden"
         crud:
           operation: list_by_fk
           table: cbu_ssi_agent_override
@@ -145,6 +181,15 @@ domains:
           scope: cbu
           noun: coverage_gap
           tags: [read, validation, gap-analysis]
+        invocation_phrases:
+          - "find SSI coverage gaps"
+          - "which instruments lack booking rules"
+          - "check for missing settlement routes"
+          - "run coverage gap analysis"
+          - "are all universe entries covered"
+          - "identify uncovered instrument classes"
+          - "what DVP trades have no SSI"
+          - "show settlement coverage shortfalls"
         args:
           - name: cbu-id
             type: uuid
@@ -168,6 +213,15 @@ domains:
           scope: cbu
           noun: coverage_validation
           tags: [read, validation, coverage-check]
+        invocation_phrases:
+          - "validate settlement coverage"
+          - "is the booking setup complete"
+          - "check all instruments have SSIs"
+          - "run booking rule validation"
+          - "verify DVP FOP coverage"
+          - "does this CBU pass coverage check"
+          - "are settlement instructions complete"
+          - "confirm routing rule completeness"
         lifecycle:
           reads_tables:
             - custody.cbu_instrument_universe
@@ -196,6 +250,15 @@ domains:
           scope: cbu
           noun: ssi_lookup
           tags: [read, routing, alert-simulation]
+        invocation_phrases:
+          - "find SSI for this trade"
+          - "which SSI matches these characteristics"
+          - "simulate ALERT SSI lookup"
+          - "resolve settlement instruction for equity"
+          - "what BIC routes this currency"
+          - "test booking rule matching"
+          - "where does this DVP settle"
+          - "look up custodian for market"
         lifecycle:
           reads_tables:
             - custody.cbu_ssi
@@ -246,6 +309,15 @@ domains:
           writes_operational: true
           noun: ssi_setup
           tags: [bulk-import, document-driven]
+        invocation_phrases:
+          - "bulk import SSIs from document"
+          - "load settlement instructions from file"
+          - "import SSI onboarding spreadsheet"
+          - "set up SSIs for new CBU"
+          - "provision standing instructions in bulk"
+          - "ingest SWIFT settlement data"
+          - "initialize SSI configuration"
+          - "onboard settlement routes from template"
         args:
           - name: cbu-id
             type: uuid

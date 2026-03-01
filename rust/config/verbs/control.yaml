@@ -13,6 +13,8 @@ domains:
           - "create control"
           - "link controller"
           - "add management control"
+          - "register significant influence over entity"
+          - "establish corporate governance link"
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -102,6 +104,9 @@ domains:
           - "control relationship ended"
           - "end board control"
           - "close control link"
+          - "revoke management control over entity"
+          - "discontinue significant influence"
+          - "unlink controlling party from subsidiary"
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -142,6 +147,8 @@ domains:
           - "view control relationships"
           - "show controlling parties"
           - "list control sources"
+          - "which entities have voting control"
+          - "display corporate governance controllers"
         metadata:
           tier: reference
           source_of_truth: workflow
@@ -181,6 +188,8 @@ domains:
           - "what is controlled"
           - "show control targets"
           - "list control targets"
+          - "which subsidiaries does this entity govern"
+          - "display entities under management control"
         metadata:
           tier: reference
           source_of_truth: workflow
@@ -219,6 +228,17 @@ domains:
           Comprehensive control analysis for any entity type.
           Routes to appropriate analyzer based on entity_type.
           Aggregates all control vectors: ownership, board, trust, partnership.
+        invocation_phrases:
+          - "analyze control for entity"
+          - "run control analysis"
+          - "who has control over this"
+          - "aggregate control vectors"
+          - "assess voting and board control"
+          - "determine controlling parties"
+          - "evaluate governance control"
+          - "analyze ownership and control"
+          - "compute significant influence across all vectors"
+          - "review indirect control and subsidiaries"
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -271,6 +291,17 @@ domains:
           Build full control graph for a CBU.
           Nodes: entities, persons, positions
           Edges: OWNS, CONTROLS, APPOINTS, INFLUENCES, HOLDS_POSITION
+        invocation_phrases:
+          - "build control graph"
+          - "generate ownership graph for CBU"
+          - "map control relationships"
+          - "create control structure diagram"
+          - "visualize ownership hierarchy"
+          - "show full control network"
+          - "construct entity control graph"
+          - "build governance graph for structure"
+          - "render corporate governance topology"
+          - "map subsidiary and board control links"
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -322,6 +353,22 @@ domains:
           - Board majority control
           - Trust control (trustee discretion, appointor power)
           - Partnership GP control
+        invocation_phrases:
+          - "who owns this company"
+          - "who owns this"
+          - "identify owners"
+          - "find ubos"
+          - "identify ubos"
+          - "who are the beneficial owners"
+          - "find ultimate beneficial owners"
+          - "discover ubos"
+          - "identify beneficial owners"
+          - "who ultimately owns"
+          - "who owns this entity"
+          - "find the ubos"
+          - "calculate ownership"
+          - "trace beneficial ownership"
+          - "who controls this company"
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -374,6 +421,17 @@ domains:
         description: |
           Trace a specific control chain from one entity to another.
           Returns the path and cumulative control percentage.
+        invocation_phrases:
+          - "show ownership chain"
+          - "trace ownership"
+          - "ownership chain"
+          - "follow ownership"
+          - "trace control chain"
+          - "show control chain"
+          - "ownership hierarchy"
+          - "trace ownership path"
+          - "follow indirect control to ultimate parent"
+          - "map control path between two entities"
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -428,6 +486,17 @@ domains:
             - Verify voting shares sum to 100%
             - Identify gaps or overlaps
             - Flag discrepancies
+        invocation_phrases:
+          - "reconcile ownership percentages"
+          - "verify shares sum to 100"
+          - "check ownership totals"
+          - "find ownership gaps"
+          - "detect ownership discrepancies"
+          - "validate shareholder percentages"
+          - "reconcile voting shares"
+          - "audit ownership breakdown"
+          - "cross-check control percentages for entity"
+          - "verify voting rights allocation completeness"
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -483,6 +552,12 @@ domains:
           - "who controls the board"
           - "board controller for"
           - "get board controller"
+          - "display board of directors controller"
+          - "who has board appointment rights"
+          - "identify governing board controller"
+          - "which entity controls the board"
+          - "show board governance anchor"
+          - "view controlling party for board"
         metadata:
           tier: diagnostics
           source_of_truth: workflow
@@ -543,6 +618,13 @@ domains:
           - "recompute board controller"
           - "recalculate board controller"
           - "refresh board controller"
+          - "rederive board governance anchor"
+          - "update board control computation"
+          - "re-evaluate board appointment analysis"
+          - "recalculate who governs the board"
+          - "force board controller derivation"
+          - "rebuild board control determination"
+          - "run fresh board controller analysis"
         metadata:
           tier: composite
           source_of_truth: workflow
@@ -597,6 +679,13 @@ domains:
           - "set board controller"
           - "override board controller"
           - "manually set board controller"
+          - "designate board governance controller"
+          - "assign board control to entity"
+          - "force board controller to specific party"
+          - "apply manual board controller override"
+          - "specify who controls the board"
+          - "set corporate governance controller manually"
+          - "override computed board control determination"
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -657,6 +746,14 @@ domains:
         invocation_phrases:
           - "clear board controller override"
           - "remove board controller override"
+          - "revert to computed board controller"
+          - "delete manual board controller designation"
+          - "undo board controller override"
+          - "restore automatic board governance derivation"
+          - "reset board controller to computed"
+          - "withdraw board control manual override"
+          - "cancel board controller override"
+          - "return to derived board controller"
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -695,6 +792,13 @@ domains:
           - "import psc register"
           - "import persons with significant control"
           - "load psc data"
+          - "fetch companies house PSC filings"
+          - "ingest significant control register"
+          - "load UK PSC register data"
+          - "import persons of significant control"
+          - "pull PSC data from companies house"
+          - "load corporate governance from PSC register"
+          - "import significant control persons for entity"
         metadata:
           tier: composite
           source_of_truth: external
@@ -755,6 +859,12 @@ domains:
           - "derive governance controllers"
           - "find who controls this entity"
           - "calculate control hierarchy"
+          - "determine management and board controllers"
+          - "identify controlling parties for KYC case"
+          - "compute corporate governance controller candidates"
+          - "derive control from management edges"
+          - "run controller derivation for entity"
+          - "analyze who has significant control"
         metadata:
           tier: composite
           source_of_truth: workflow
@@ -803,6 +913,13 @@ domains:
           - "import gleif control"
           - "import lei control data"
           - "load gleif hierarchy"
+          - "fetch GLEIF parent child relationships"
+          - "import LEI relationship records"
+          - "load corporate control from GLEIF"
+          - "pull ultimate parent from LEI data"
+          - "ingest GLEIF control hierarchy for entity"
+          - "import LEI parent subsidiary control links"
+          - "load GLEIF corporate governance relationships"
         metadata:
           tier: composite
           source_of_truth: external

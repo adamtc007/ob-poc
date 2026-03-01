@@ -19,6 +19,15 @@ domains:
           scope: cbu
           noun: partnership
           tags: [kyc]
+        invocation_phrases:
+          - "add partner to partnership"
+          - "register new GP or LP"
+          - "admit limited partner with commitment"
+          - "record new partnership member"
+          - "add general partner to fund"
+          - "register LP capital commitment"
+          - "onboard new partner to structure"
+          - "create partnership interest holder"
         behavior: crud
         crud:
           operation: upsert
@@ -113,6 +122,15 @@ domains:
           scope: cbu
           noun: partnership
           tags: [kyc]
+        invocation_phrases:
+          - "record capital contribution"
+          - "log partner drawdown payment"
+          - "register LP capital call response"
+          - "capture partnership capital paid in"
+          - "record GP contribution"
+          - "process capital drawdown"
+          - "log partnership funding received"
+          - "add contribution to capital account"
         behavior: plugin
         plugin:
           handler: PartnershipContributionOp
@@ -156,6 +174,15 @@ domains:
           scope: cbu
           noun: partnership
           tags: [kyc]
+        invocation_phrases:
+          - "record distribution to partner"
+          - "log profit distribution"
+          - "process return of capital"
+          - "distribute partnership proceeds"
+          - "record LP payout"
+          - "log partnership distribution event"
+          - "pay out partner capital"
+          - "record liquidation distribution"
         behavior: plugin
         plugin:
           handler: PartnershipDistributionOp
@@ -199,6 +226,15 @@ domains:
           scope: cbu
           noun: partnership
           tags: [kyc]
+        invocation_phrases:
+          - "withdraw partner from partnership"
+          - "record partner exit"
+          - "remove LP from fund"
+          - "process partner withdrawal"
+          - "deactivate partnership member"
+          - "record GP retirement"
+          - "log partner departure"
+          - "close out partner capital account"
         behavior: crud
         crud:
           operation: update
@@ -238,6 +274,15 @@ domains:
           scope: cbu
           noun: partnership
           tags: [kyc]
+        invocation_phrases:
+          - "list partners in partnership"
+          - "show all GPs and LPs"
+          - "who are the partners"
+          - "get partnership member register"
+          - "display limited partners"
+          - "view partnership capital table"
+          - "show partner commitments"
+          - "list active partnership interests"
         behavior: crud
         crud:
           operation: list_by_fk
@@ -277,6 +322,15 @@ domains:
           scope: cbu
           noun: partnership
           tags: [kyc]
+        invocation_phrases:
+          - "reconcile partnership capital"
+          - "verify profit shares sum correctly"
+          - "check partnership capital balances"
+          - "do LP commitments reconcile"
+          - "validate partnership allocation totals"
+          - "run partnership capital audit"
+          - "verify unfunded commitments"
+          - "check GP and LP capital positions"
         behavior: plugin
         plugin:
           handler: PartnershipReconcileOp
@@ -326,6 +380,15 @@ domains:
           scope: cbu
           noun: partnership
           tags: [kyc]
+        invocation_phrases:
+          - "analyze partnership control structure"
+          - "who controls this partnership"
+          - "identify UBOs from partnership"
+          - "determine GP control for CDD"
+          - "assess LP voting control"
+          - "partnership UBO analysis"
+          - "find controlling persons in fund"
+          - "evaluate partnership governance for KYC"
         behavior: plugin
         plugin:
           handler: PartnershipAnalyzeControlOp

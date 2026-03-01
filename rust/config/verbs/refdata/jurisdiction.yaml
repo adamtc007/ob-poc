@@ -9,6 +9,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: jurisdiction
+        invocation_phrases:
+          - "add a new jurisdiction"
+          - "register jurisdiction code"
+          - "create jurisdiction reference entry"
+          - "configure a new jurisdiction"
+          - "set up jurisdiction definition"
+          - "define regulatory jurisdiction"
+          - "upsert jurisdiction record"
+          - "add domicile jurisdiction"
         behavior: crud
         crud:
           operation: upsert
@@ -64,6 +73,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: jurisdiction
+        invocation_phrases:
+          - "look up jurisdiction by code"
+          - "get jurisdiction details"
+          - "show me this jurisdiction"
+          - "fetch jurisdiction definition"
+          - "what is this jurisdiction code"
+          - "read jurisdiction reference record"
+          - "find jurisdiction by country code"
+          - "retrieve jurisdiction information"
         behavior: crud
         crud:
           operation: select
@@ -84,6 +102,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: jurisdiction
+        invocation_phrases:
+          - "list all jurisdictions"
+          - "show available jurisdictions"
+          - "what jurisdictions are configured"
+          - "display jurisdiction reference table"
+          - "enumerate active domicile codes"
+          - "get all jurisdiction records"
+          - "which jurisdictions are supported"
+          - "show me jurisdictions by region"
         behavior: crud
         crud:
           operation: select
@@ -109,6 +136,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: jurisdiction
+        invocation_phrases:
+          - "delete a jurisdiction"
+          - "remove jurisdiction record"
+          - "drop jurisdiction from reference data"
+          - "purge a jurisdiction code"
+          - "remove domicile from system"
+          - "delete jurisdiction reference entry"
+          - "clean up unused jurisdiction"
+          - "eliminate jurisdiction record"
         behavior: crud
         crud:
           operation: delete

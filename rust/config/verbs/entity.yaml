@@ -38,10 +38,16 @@ domains:
         description: Create a limited company entity
         behavior: crud
         invocation_phrases:
-          - create company
-          - add company
-          - create limited company
-          - register company
+          - "create company"
+          - "add company"
+          - "create limited company"
+          - "register company"
+          - "new company entity"
+          - "set up company"
+          - "create organisation"
+          - "add new legal entity"
+          - "register limited company"
+          - "create corporate entity"
         metadata:
           tier: intent
           source_of_truth: entity
@@ -89,10 +95,16 @@ domains:
         description: Create a natural person entity
         behavior: crud
         invocation_phrases:
-          - create person
-          - add person
-          - add individual
-          - create individual
+          - "create person"
+          - "add person"
+          - "add individual"
+          - "create individual"
+          - "register natural person"
+          - "new person entity"
+          - "create director"
+          - "add UBO person"
+          - "create beneficial owner"
+          - "register individual"
         metadata:
           tier: intent
           source_of_truth: entity
@@ -143,6 +155,17 @@ domains:
       create-trust-discretionary:
         description: Create a discretionary trust entity
         behavior: crud
+        invocation_phrases:
+          - "create trust"
+          - "add discretionary trust"
+          - "create trust entity"
+          - "register trust"
+          - "new trust"
+          - "set up discretionary trust"
+          - "create trust structure"
+          - "add trust"
+          - "establish trust"
+          - "create new trust entity"
         metadata:
           tier: intent
           source_of_truth: entity
@@ -193,6 +216,17 @@ domains:
       create-partnership-limited:
         description: Create a limited partnership entity
         behavior: crud
+        invocation_phrases:
+          - "create partnership"
+          - "add limited partnership"
+          - "create LP"
+          - "register partnership"
+          - "new limited partnership"
+          - "set up partnership entity"
+          - "create partnership structure"
+          - "add LP entity"
+          - "establish limited partnership"
+          - "create new partnership"
         metadata:
           tier: intent
           source_of_truth: entity
@@ -249,6 +283,12 @@ domains:
           - "add or update company"
           - "upsert company"
           - "ensure counterparty"
+          - "ensure company exists"
+          - "get or create company"
+          - "idempotent company create"
+          - "ensure limited company"
+          - "find or create company"
+          - "ensure corporate entity"
         metadata:
           tier: intent
           source_of_truth: entity
@@ -305,6 +345,13 @@ domains:
           - "ensure person"
           - "add or update person"
           - "upsert person"
+          - "ensure person exists"
+          - "get or create person"
+          - "idempotent person create"
+          - "find or create individual"
+          - "ensure individual exists"
+          - "ensure natural person"
+          - "ensure individual"
         metadata:
           tier: intent
           source_of_truth: entity
@@ -356,6 +403,17 @@ domains:
       ensure-trust-discretionary:
         description: Create or update a discretionary trust entity (idempotent by name)
         behavior: crud
+        invocation_phrases:
+          - "ensure trust"
+          - "add or update trust"
+          - "upsert trust"
+          - "ensure trust exists"
+          - "get or create trust"
+          - "find or create trust"
+          - "ensure discretionary trust"
+          - "idempotent trust create"
+          - "ensure trust entity"
+          - "ensure trust structure"
         metadata:
           tier: intent
           source_of_truth: entity
@@ -407,6 +465,17 @@ domains:
       ensure-partnership-limited:
         description: Create or update a limited partnership entity (idempotent by name)
         behavior: crud
+        invocation_phrases:
+          - "ensure partnership"
+          - "add or update partnership"
+          - "upsert partnership"
+          - "ensure partnership exists"
+          - "get or create partnership"
+          - "find or create LP"
+          - "ensure limited partnership"
+          - "idempotent partnership create"
+          - "ensure LP entity"
+          - "ensure partnership structure"
         metadata:
           tier: intent
           source_of_truth: entity
@@ -453,6 +522,17 @@ domains:
 
       read:
         description: Read an entity by ID
+        invocation_phrases:
+          - "read entity"
+          - "get entity"
+          - "show entity"
+          - "view entity"
+          - "fetch entity details"
+          - "look up entity"
+          - "find entity by id"
+          - "describe entity"
+          - "entity details"
+          - "retrieve entity"
         behavior: crud
         metadata:
           tier: diagnostics
@@ -487,6 +567,8 @@ domains:
           - "modify entity"
           - "change entity name"
           - "update entity attributes"
+          - "amend entity"
+          - "update party details"
         behavior: crud
         metadata:
           tier: intent
@@ -526,6 +608,17 @@ domains:
           type: affected
       delete:
         description: Delete an entity (cascades to type extension)
+        invocation_phrases:
+          - "delete entity"
+          - "remove entity"
+          - "drop entity"
+          - "delete person"
+          - "delete company"
+          - "remove party"
+          - "delete entity record"
+          - "destroy entity"
+          - "erase entity"
+          - "remove entity from system"
         behavior: crud
         metadata:
           tier: intent
@@ -562,6 +655,8 @@ domains:
           - "list all entities"
           - "display entities"
           - "get entity list"
+          - "enumerate entities"
+          - "browse entities"
         behavior: crud
         metadata:
           tier: diagnostics
@@ -597,6 +692,17 @@ domains:
 
       query:
         description: Query entities for batch template iteration (returns entity refs, not records)
+        invocation_phrases:
+          - "query entities"
+          - "search entities"
+          - "find entities"
+          - "entity search"
+          - "filter entities"
+          - "query entity by name"
+          - "entity query"
+          - "search for entities"
+          - "find matching entities"
+          - "entity lookup"
         behavior: plugin
         metadata:
           tier: diagnostics
@@ -634,6 +740,17 @@ domains:
 
       ghost:
         description: Create a ghost person entity (name only, minimal attributes)
+        invocation_phrases:
+          - "create ghost entity"
+          - "add ghost person"
+          - "create ghost"
+          - "ghost entity"
+          - "create provisional person"
+          - "add unverified person"
+          - "create name-only entity"
+          - "ghost a person"
+          - "create preliminary entity"
+          - "add ghost record"
         behavior: plugin
         metadata:
           tier: intent
@@ -671,6 +788,17 @@ domains:
 
       identify:
         description: Add identifying attributes to a ghost entity (transitions to IDENTIFIED state)
+        invocation_phrases:
+          - "identify ghost entity"
+          - "add identity to ghost"
+          - "identify person"
+          - "set ghost identity"
+          - "add identifying details"
+          - "identify entity"
+          - "resolve ghost identity"
+          - "add ID to ghost"
+          - "enrich ghost entity"
+          - "provide ghost identification"
         behavior: plugin
         metadata:
           tier: intent
@@ -721,6 +849,17 @@ domains:
 
       verify:
         description: Mark an identified entity as verified (transitions to VERIFIED state)
+        invocation_phrases:
+          - "verify entity"
+          - "confirm entity identity"
+          - "mark entity verified"
+          - "verify person"
+          - "approve entity identification"
+          - "verify ghost entity"
+          - "confirm ghost identity"
+          - "entity verification"
+          - "complete entity verification"
+          - "mark as verified"
         behavior: crud
         metadata:
           tier: intent
@@ -752,6 +891,17 @@ domains:
 
       list-ghosts:
         description: List ghost entities requiring identification
+        invocation_phrases:
+          - "list ghost entities"
+          - "show ghosts"
+          - "list unverified entities"
+          - "show ghost persons"
+          - "list pending ghosts"
+          - "display ghost entities"
+          - "get ghost list"
+          - "view unidentified entities"
+          - "show provisional entities"
+          - "list entities needing identification"
         behavior: crud
         metadata:
           tier: diagnostics
@@ -787,6 +937,12 @@ domains:
           - "get or placeholder"
           - "entity placeholder"
           - "deferred entity"
+          - "create placeholder entity"
+          - "placeholder for entity"
+          - "ensure or placeholder"
+          - "find or create placeholder"
+          - "get entity or create placeholder"
+          - "deferred entity resolution"
         metadata:
           tier: intent
           source_of_truth: entity
@@ -855,6 +1011,13 @@ domains:
           - "resolve placeholder"
           - "link placeholder to entity"
           - "replace placeholder"
+          - "resolve placeholder entity"
+          - "convert placeholder to real entity"
+          - "swap placeholder"
+          - "placeholder resolution"
+          - "assign entity to placeholder"
+          - "fill placeholder"
+          - "resolve deferred entity"
         metadata:
           tier: intent
           source_of_truth: entity
@@ -908,6 +1071,13 @@ domains:
           - "list placeholders"
           - "show pending placeholders"
           - "view unresolved entities"
+          - "list placeholder entities"
+          - "show unresolved placeholders"
+          - "display placeholders"
+          - "get placeholder list"
+          - "view deferred entities"
+          - "list pending entity placeholders"
+          - "show placeholders for CBU"
         metadata:
           tier: diagnostics
           source_of_truth: entity
@@ -931,6 +1101,17 @@ domains:
 
       placeholder-summary:
         description: Get placeholder summary statistics for a CBU
+        invocation_phrases:
+          - "placeholder summary"
+          - "placeholder statistics"
+          - "show placeholder stats"
+          - "placeholder status"
+          - "how many placeholders"
+          - "placeholder overview"
+          - "get placeholder summary"
+          - "placeholder count"
+          - "view placeholder statistics"
+          - "placeholder report"
         behavior: plugin
         metadata:
           tier: diagnostics

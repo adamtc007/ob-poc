@@ -9,6 +9,15 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: holding
+        invocation_phrases:
+          - "create holding in share class"
+          - "register new investor position"
+          - "add holding for investor"
+          - "set up share class holding"
+          - "what holdings need creating"
+          - "open position in this class"
+          - "book investor into share class"
+          - "new TA holding record"
         behavior: crud
         crud:
           operation: upsert
@@ -64,6 +73,15 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: holding
+        invocation_phrases:
+          - "create holding for investor record"
+          - "link holding to TA investor"
+          - "add position for this investor"
+          - "register holding via investor ID"
+          - "set up TA holding record"
+          - "book investor position in class"
+          - "attach holding to investor"
+          - "new holding with provider reference"
         behavior: crud
         crud:
           operation: upsert
@@ -151,6 +169,15 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: holding
+        invocation_phrases:
+          - "ensure holding exists for investor"
+          - "upsert investor position record"
+          - "guarantee holding is registered"
+          - "make sure holding is in place"
+          - "does this holding exist already"
+          - "idempotent holding setup"
+          - "verify or create investor holding"
+          - "ensure position record in register"
         behavior: crud
         crud:
           operation: upsert
@@ -244,6 +271,15 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: holding
+        invocation_phrases:
+          - "update units on this holding"
+          - "adjust position size"
+          - "change holding unit count"
+          - "modify investor position amount"
+          - "correct units in register"
+          - "how do I adjust holding units"
+          - "amend cost basis on position"
+          - "restate investor holding balance"
         behavior: crud
         crud:
           operation: update
@@ -279,6 +315,15 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: holding
+        invocation_phrases:
+          - "change holding status"
+          - "update position lifecycle state"
+          - "suspend this investor holding"
+          - "mark holding as transferred"
+          - "set holding to pending"
+          - "what status is this holding"
+          - "transition holding to active"
+          - "update register status for position"
         behavior: crud
         crud:
           operation: update
@@ -318,6 +363,15 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: holding
+        invocation_phrases:
+          - "show holding details"
+          - "get investor position info"
+          - "look up this holding"
+          - "what is the holding balance"
+          - "fetch holding record by ID"
+          - "display position details"
+          - "read holding from register"
+          - "show cost basis for holding"
         behavior: crud
         crud:
           operation: select
@@ -344,6 +398,15 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: holding
+        invocation_phrases:
+          - "list holdings in share class"
+          - "show investors in this class"
+          - "who holds this share class"
+          - "get all positions for ISIN"
+          - "show register for share class"
+          - "display holders by class"
+          - "investor list for this class"
+          - "which investors hold this class"
         behavior: crud
         crud:
           operation: list_by_fk
@@ -378,6 +441,15 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: holding
+        invocation_phrases:
+          - "list all holdings for investor"
+          - "show positions across share classes"
+          - "what does this investor hold"
+          - "get portfolio for investor entity"
+          - "investor holdings across all funds"
+          - "display all positions for entity"
+          - "which classes does investor hold"
+          - "show investor portfolio breakdown"
         behavior: crud
         crud:
           operation: list_by_fk
@@ -404,6 +476,15 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: holding
+        invocation_phrases:
+          - "list holdings for investor record"
+          - "show TA positions for investor"
+          - "get holdings by investor ID"
+          - "display register for TA investor"
+          - "what positions does investor have"
+          - "fetch holdings via TA record"
+          - "investor record position summary"
+          - "show holdings linked to investor"
         behavior: crud
         crud:
           operation: list_by_fk
@@ -430,6 +511,15 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: holding
+        invocation_phrases:
+          - "close this investor holding"
+          - "mark position as closed"
+          - "deactivate holding in register"
+          - "close out investor position"
+          - "shut down this holding"
+          - "zero out and close position"
+          - "terminate holding record"
+          - "archive this investor position"
         behavior: crud
         crud:
           operation: update

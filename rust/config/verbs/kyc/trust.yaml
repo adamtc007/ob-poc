@@ -14,6 +14,15 @@ domains:
           scope: cbu
           noun: trust
           tags: [kyc]
+        invocation_phrases:
+          - "record trust deed provision"
+          - "add beneficiary provision to trust"
+          - "capture trust provision for settlor"
+          - "log discretionary trust provision"
+          - "enter appointor power from deed"
+          - "who holds protector power"
+          - "record income beneficiary entitlement"
+          - "add reserved power provision"
         behavior: crud
         crud:
           operation: upsert
@@ -138,6 +147,15 @@ domains:
           scope: cbu
           noun: trust
           tags: [kyc]
+        invocation_phrases:
+          - "update trust provision details"
+          - "change discretion level on provision"
+          - "modify beneficiary interest percentage"
+          - "amend vesting conditions for trust"
+          - "revise trust deed provision"
+          - "adjust beneficial interest allocation"
+          - "edit protector power terms"
+          - "update vesting date for beneficiary"
         behavior: crud
         crud:
           operation: update
@@ -185,6 +203,15 @@ domains:
           scope: cbu
           noun: trust
           tags: [kyc]
+        invocation_phrases:
+          - "revoke trust provision"
+          - "end beneficiary entitlement"
+          - "terminate appointor power"
+          - "remove protector from trust deed"
+          - "deactivate discretionary provision"
+          - "close out trust provision"
+          - "revoke settlor reserved power"
+          - "end capital beneficiary interest"
         behavior: crud
         crud:
           operation: update
@@ -213,6 +240,15 @@ domains:
           scope: cbu
           noun: trust
           tags: [kyc]
+        invocation_phrases:
+          - "list trust deed provisions"
+          - "show all provisions for trust"
+          - "what provisions does this trust have"
+          - "display beneficiary and power provisions"
+          - "get trust provision schedule"
+          - "show discretionary trust entitlements"
+          - "list active trust deed clauses"
+          - "enumerate trust control provisions"
         behavior: crud
         crud:
           operation: list_by_fk
@@ -247,6 +283,15 @@ domains:
           scope: cbu
           noun: trust
           tags: [kyc]
+        invocation_phrases:
+          - "list provisions held by entity"
+          - "what trust interests does this person hold"
+          - "show beneficial interests for holder"
+          - "find trust roles for this party"
+          - "which trusts is this entity beneficiary of"
+          - "get all trust provisions by holder"
+          - "show settlor and appointor positions"
+          - "list trust powers held by person"
         behavior: crud
         crud:
           operation: list_by_fk
@@ -283,6 +328,15 @@ domains:
           scope: cbu
           noun: trust
           tags: [kyc]
+        invocation_phrases:
+          - "analyze trust control vectors"
+          - "who controls this trust"
+          - "assess trustee discretion and influence"
+          - "map appointor and protector powers"
+          - "evaluate settlor reserved powers"
+          - "determine trust control structure"
+          - "analyze trust deed power distribution"
+          - "identify controlling parties of trust"
         behavior: plugin
         plugin:
           handler: TrustAnalyzeControlOp
@@ -324,6 +378,15 @@ domains:
           scope: cbu
           noun: trust
           tags: [kyc]
+        invocation_phrases:
+          - "identify trust UBOs"
+          - "who are the beneficial owners"
+          - "find UBOs from trust structure"
+          - "determine beneficial ownership of trust"
+          - "run trust UBO discovery"
+          - "which beneficiaries exceed twenty-five percent"
+          - "identify ultimate beneficial owners"
+          - "assess trust beneficial interest thresholds"
         behavior: plugin
         plugin:
           handler: TrustIdentifyUbosOp
@@ -366,6 +429,15 @@ domains:
           scope: cbu
           noun: trust
           tags: [kyc]
+        invocation_phrases:
+          - "classify trust type"
+          - "what type of trust is this"
+          - "determine trust classification"
+          - "is this a discretionary or bare trust"
+          - "classify trust from provisions"
+          - "infer trust category from deed"
+          - "categorize trust structure type"
+          - "assess trust as fixed interest or accumulation"
         behavior: plugin
         plugin:
           handler: TrustClassifyOp

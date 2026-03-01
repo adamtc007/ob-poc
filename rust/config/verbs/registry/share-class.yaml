@@ -11,6 +11,15 @@ domains:
           scope: cbu
           noun: share_class
           tags: [fund, share_class, creation]
+        invocation_phrases:
+          - "create new share class for fund"
+          - "add share class to this CBU"
+          - "set up UCITS share class"
+          - "register new fund share class"
+          - "create institutional share class"
+          - "how do I add a share class"
+          - "define share class with ISIN"
+          - "new retail share class for vehicle"
         crud:
           operation: upsert
           table: share_classes
@@ -146,6 +155,15 @@ domains:
           scope: cbu
           noun: share_class
           tags: [fund, share_class, upsert, isin]
+        invocation_phrases:
+          - "ensure share class exists by ISIN"
+          - "upsert share class for fund"
+          - "sync share class from data provider"
+          - "guarantee share class is registered"
+          - "idempotent share class setup by ISIN"
+          - "verify or create share class"
+          - "make sure share class is on file"
+          - "import share class by ISIN code"
         crud:
           operation: upsert
           table: share_classes
@@ -280,6 +298,15 @@ domains:
           scope: cbu
           noun: share_class
           tags: [fund, share_class, nav, update]
+        invocation_phrases:
+          - "update NAV for share class"
+          - "set new NAV per share"
+          - "post daily NAV to share class"
+          - "refresh net asset value"
+          - "enter latest NAV for fund class"
+          - "how do I update the NAV"
+          - "publish new NAV per unit"
+          - "record NAV at valuation date"
         crud:
           operation: update
           table: share_classes
@@ -315,6 +342,15 @@ domains:
           scope: cbu
           noun: share_class
           tags: [fund, share_class, query]
+        invocation_phrases:
+          - "show share class details"
+          - "look up this share class"
+          - "get share class by ID"
+          - "what is the current NAV"
+          - "fetch share class information"
+          - "display share class fee structure"
+          - "read share class from register"
+          - "show fund class ISIN and currency"
         crud:
           operation: select
           table: share_classes
@@ -341,6 +377,15 @@ domains:
           scope: cbu
           noun: share_class
           tags: [fund, share_class, query, list]
+        invocation_phrases:
+          - "list share classes for fund"
+          - "show all classes in this CBU"
+          - "what share classes does fund have"
+          - "get share class register for fund"
+          - "display fund class lineup"
+          - "which share classes are active"
+          - "enumerate share classes by vehicle"
+          - "show available share classes"
         crud:
           operation: list_by_fk
           table: share_classes
@@ -371,6 +416,15 @@ domains:
           scope: cbu
           noun: share_class
           tags: [fund, share_class, lifecycle, close]
+        invocation_phrases:
+          - "close share class to subscriptions"
+          - "shut down share class"
+          - "stop accepting new investors"
+          - "close fund class to new money"
+          - "soft close this share class"
+          - "how do I close a share class"
+          - "mark share class as closed"
+          - "suspend subscriptions for share class"
         crud:
           operation: update
           table: share_classes

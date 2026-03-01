@@ -16,6 +16,15 @@ domains:
           source_of_truth: entity
           scope: cbu
           noun: identifier
+        invocation_phrases:
+          - "attach identifier to entity"
+          - "add external ID"
+          - "register identifier for company"
+          - "link identifier to party"
+          - "set entity identifier"
+          - "assign external reference"
+          - "add tax ID to entity"
+          - "record BIC for entity"
         behavior: crud
         crud:
           operation: upsert
@@ -102,6 +111,15 @@ domains:
           source_of_truth: entity
           scope: cbu
           noun: identifier
+        invocation_phrases:
+          - "attach LEI to entity"
+          - "add LEI code"
+          - "set legal entity identifier"
+          - "record GLEIF LEI"
+          - "link LEI to company"
+          - "assign LEI number"
+          - "register LEI for entity"
+          - "store LEI from GLEIF"
         behavior: crud
         crud:
           operation: upsert
@@ -173,6 +191,15 @@ domains:
           source_of_truth: entity
           scope: cbu
           noun: identifier
+        invocation_phrases:
+          - "attach Clearstream reference"
+          - "add Clearstream KV number"
+          - "link Clearstream account"
+          - "set Clearstream ID"
+          - "record CASCADE reference"
+          - "register Clearstream KV"
+          - "assign Clearstream identifier"
+          - "store Clearstream account number"
         behavior: crud
         crud:
           operation: upsert
@@ -231,6 +258,15 @@ domains:
           source_of_truth: entity
           scope: cbu
           noun: identifier
+        invocation_phrases:
+          - "validate this identifier"
+          - "mark identifier as verified"
+          - "confirm identifier is valid"
+          - "approve identifier validation"
+          - "verify LEI is current"
+          - "mark ID as validated"
+          - "certify identifier source"
+          - "confirm external ID"
         behavior: crud
         crud:
           operation: update
@@ -260,6 +296,15 @@ domains:
           source_of_truth: entity
           scope: cbu
           noun: identifier
+        invocation_phrases:
+          - "invalidate this identifier"
+          - "mark identifier as expired"
+          - "expire this LEI"
+          - "flag identifier as invalid"
+          - "deactivate external ID"
+          - "revoke identifier validation"
+          - "mark ID as lapsed"
+          - "set identifier as inactive"
         behavior: crud
         crud:
           operation: update
@@ -288,6 +333,15 @@ domains:
           source_of_truth: entity
           scope: cbu
           noun: identifier
+        invocation_phrases:
+          - "remove identifier from entity"
+          - "delete external ID"
+          - "detach identifier"
+          - "remove LEI from entity"
+          - "drop this identifier"
+          - "unlink external reference"
+          - "clear identifier record"
+          - "strip identifier from party"
         behavior: crud
         crud:
           operation: delete
@@ -309,6 +363,15 @@ domains:
           source_of_truth: entity
           scope: cbu
           noun: identifier
+        invocation_phrases:
+          - "list identifiers for entity"
+          - "show all IDs for company"
+          - "what identifiers does this have"
+          - "get entity external references"
+          - "display LEIs and identifiers"
+          - "show registered identifiers"
+          - "list external IDs"
+          - "which identifiers are on file"
         behavior: crud
         crud:
           operation: list_by_fk
@@ -340,6 +403,15 @@ domains:
           source_of_truth: entity
           scope: cbu
           noun: identifier
+        invocation_phrases:
+          - "find entity by LEI"
+          - "look up LEI code"
+          - "search by LEI number"
+          - "who has this LEI"
+          - "resolve LEI to entity"
+          - "match LEI to company"
+          - "which entity owns this LEI"
+          - "look up legal entity identifier"
         behavior: crud
         crud:
           operation: select
@@ -362,6 +434,15 @@ domains:
           source_of_truth: entity
           scope: cbu
           noun: identifier
+        invocation_phrases:
+          - "find by Clearstream reference"
+          - "look up Clearstream KV"
+          - "search by CASCADE number"
+          - "who has this Clearstream ID"
+          - "resolve Clearstream reference"
+          - "match Clearstream account"
+          - "look up KV reference"
+          - "find entity by Clearstream"
         behavior: crud
         crud:
           operation: select
@@ -387,6 +468,15 @@ domains:
           source_of_truth: entity
           scope: cbu
           noun: identifier
+        invocation_phrases:
+          - "find by ISIN"
+          - "look up ISIN code"
+          - "search entity by ISIN"
+          - "which fund has this ISIN"
+          - "resolve ISIN to entity"
+          - "match ISIN to share class"
+          - "look up security identifier"
+          - "find fund by ISIN"
         behavior: crud
         crud:
           operation: select
@@ -409,6 +499,15 @@ domains:
           source_of_truth: entity
           scope: cbu
           noun: identifier
+        invocation_phrases:
+          - "update LEI status"
+          - "refresh LEI from GLEIF"
+          - "mark LEI as lapsed"
+          - "change LEI status"
+          - "set LEI renewal date"
+          - "update GLEIF LEI status"
+          - "mark LEI as issued"
+          - "sync LEI status from GLEIF"
         behavior: crud
         crud:
           operation: update

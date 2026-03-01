@@ -9,6 +9,15 @@ domains:
           source_of_truth: catalog
           scope: global
           noun: service
+        invocation_phrases:
+          - "read service details"
+          - "get service by code"
+          - "show service definition"
+          - "look up custody service"
+          - "fetch service catalog entry"
+          - "describe this service"
+          - "what is this service"
+          - "display service information"
         behavior: crud
         crud:
           operation: select
@@ -39,6 +48,15 @@ domains:
           source_of_truth: catalog
           scope: global
           noun: service
+        invocation_phrases:
+          - "list available services"
+          - "show all services in catalog"
+          - "what services are offered"
+          - "browse service catalog"
+          - "display active services"
+          - "enumerate custody services"
+          - "get service list with filters"
+          - "search services by type"
         behavior: crud
         crud:
           operation: select
@@ -71,6 +89,15 @@ domains:
           source_of_truth: catalog
           scope: global
           noun: service
+        invocation_phrases:
+          - "list services for a product"
+          - "show services under this product"
+          - "what services does this product include"
+          - "get services linked to product"
+          - "which services are bundled with product"
+          - "display product service offerings"
+          - "find services by product"
+          - "enumerate mandatory services for product"
         behavior: crud
         crud:
           operation: select_with_join

@@ -10,6 +10,15 @@ domains:
           scope: cbu
           noun: isda
           internal: true
+        invocation_phrases:
+          - "create ISDA master agreement"
+          - "set up ISDA with counterparty"
+          - "register new ISDA agreement"
+          - "add OTC derivatives agreement"
+          - "provision ISDA under NY law"
+          - "create English law ISDA"
+          - "establish master agreement for swaps"
+          - "onboard ISDA for this CBU"
         behavior: crud
         crud:
           operation: upsert
@@ -65,6 +74,15 @@ domains:
           scope: cbu
           noun: isda
           internal: true
+        invocation_phrases:
+          - "add product coverage to ISDA"
+          - "extend ISDA to cover IRS"
+          - "include CDS under this agreement"
+          - "add instrument class to ISDA"
+          - "which OTC products does ISDA cover"
+          - "assign ISDA taxonomy for derivatives"
+          - "link swap class to agreement"
+          - "broaden ISDA product scope"
         behavior: crud
         crud:
           operation: upsert
@@ -115,6 +133,15 @@ domains:
           scope: cbu
           noun: isda
           internal: true
+        invocation_phrases:
+          - "add CSA to ISDA agreement"
+          - "attach credit support annex"
+          - "set up VM CSA for collateral"
+          - "configure initial margin CSA"
+          - "add collateral annex with threshold"
+          - "provision CSA minimum transfer amount"
+          - "link collateral SSI to CSA"
+          - "establish credit support terms"
         behavior: crud
         crud:
           operation: upsert
@@ -172,6 +199,15 @@ domains:
           scope: cbu
           noun: isda
           internal: true
+        invocation_phrases:
+          - "remove product from ISDA"
+          - "drop instrument class coverage"
+          - "remove IRS from agreement scope"
+          - "exclude CDS from ISDA"
+          - "narrow ISDA product coverage"
+          - "delete ISDA coverage entry"
+          - "remove OTC class from agreement"
+          - "unlink product from ISDA"
         behavior: crud
         crud:
           operation: delete
@@ -192,6 +228,15 @@ domains:
           scope: cbu
           noun: isda
           internal: true
+        invocation_phrases:
+          - "remove CSA from ISDA"
+          - "detach credit support annex"
+          - "delete VM CSA agreement"
+          - "remove initial margin annex"
+          - "drop collateral support terms"
+          - "cancel CSA arrangement"
+          - "remove collateral annex from ISDA"
+          - "delete credit support configuration"
         behavior: crud
         crud:
           operation: delete
@@ -211,6 +256,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: isda
+        invocation_phrases:
+          - "list ISDA agreements for CBU"
+          - "show OTC master agreements"
+          - "which ISDAs does this fund have"
+          - "display derivatives agreements"
+          - "what counterparties have ISDAs"
+          - "show active ISDA contracts"
+          - "check ISDA coverage for this CBU"
+          - "list all master agreements"
         behavior: crud
         crud:
           operation: list_by_fk

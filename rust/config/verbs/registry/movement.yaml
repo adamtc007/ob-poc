@@ -9,6 +9,15 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: movement
+        invocation_phrases:
+          - "record investor subscription order"
+          - "book subscription into fund"
+          - "process new subscription for LP"
+          - "investor buying units in share class"
+          - "enter subscription trade for holding"
+          - "how do I record a subscription"
+          - "add subscription movement to register"
+          - "create subscription at today NAV"
         behavior: crud
         crud:
           operation: upsert
@@ -77,6 +86,15 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: movement
+        invocation_phrases:
+          - "record investor redemption"
+          - "process redemption from fund"
+          - "investor selling units out"
+          - "book redemption at current NAV"
+          - "LP redeeming from share class"
+          - "enter redemption trade for holding"
+          - "how do I redeem units"
+          - "submit redemption order for investor"
         behavior: crud
         crud:
           operation: upsert
@@ -145,6 +163,15 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: movement
+        invocation_phrases:
+          - "record incoming transfer of units"
+          - "book transfer in from another TA"
+          - "receive units into holding"
+          - "process inbound unit transfer"
+          - "investor transferring units in"
+          - "register incoming transfer movement"
+          - "how do I transfer units in"
+          - "accept unit transfer from external"
         behavior: crud
         crud:
           operation: upsert
@@ -200,6 +227,15 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: movement
+        invocation_phrases:
+          - "record outgoing transfer of units"
+          - "transfer units out to another TA"
+          - "send units from this holding"
+          - "process outbound unit transfer"
+          - "investor transferring units out"
+          - "register outgoing transfer movement"
+          - "how do I transfer units out"
+          - "move units to external register"
         behavior: crud
         crud:
           operation: upsert
@@ -256,6 +292,15 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: movement
+        invocation_phrases:
+          - "record LP commitment to fund"
+          - "book investor capital commitment"
+          - "register PE fund commitment amount"
+          - "new commitment from limited partner"
+          - "how much did investor commit"
+          - "enter total commitment for LP"
+          - "set up capital commitment"
+          - "record VC fund commitment"
         behavior: crud
         crud:
           operation: upsert
@@ -319,6 +364,15 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: movement
+        invocation_phrases:
+          - "record capital call from LP"
+          - "issue drawdown notice to investors"
+          - "call capital from limited partners"
+          - "process capital call for PE fund"
+          - "book drawdown against commitment"
+          - "how do I call capital"
+          - "send capital call to investor"
+          - "record fund drawdown from LP"
         behavior: crud
         crud:
           operation: upsert
@@ -387,6 +441,15 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: movement
+        invocation_phrases:
+          - "record distribution to LP"
+          - "pay out profit distribution"
+          - "process return of capital"
+          - "book dividend distribution to investor"
+          - "distribute proceeds to limited partners"
+          - "how do I record a distribution"
+          - "issue capital return to investors"
+          - "enter fund distribution payment"
         behavior: crud
         crud:
           operation: upsert
@@ -466,6 +529,15 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: movement
+        invocation_phrases:
+          - "record recallable distribution"
+          - "issue distribution with recall option"
+          - "GP recallable payout to LP"
+          - "book distribution that can be recalled"
+          - "process recallable capital return"
+          - "distribution with recall deadline"
+          - "how do I make a recallable distribution"
+          - "enter recallable payout to investor"
         behavior: crud
         crud:
           operation: upsert
@@ -528,6 +600,15 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: movement
+        invocation_phrases:
+          - "confirm pending movement"
+          - "approve movement for settlement"
+          - "mark movement as confirmed"
+          - "confirm subscription or redemption"
+          - "validate pending trade movement"
+          - "how do I confirm a movement"
+          - "accept movement into register"
+          - "confirm investor trade order"
         behavior: crud
         crud:
           operation: update
@@ -557,6 +638,15 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: movement
+        invocation_phrases:
+          - "settle movement in register"
+          - "mark movement as settled"
+          - "movement settlement complete"
+          - "confirm settlement of trade"
+          - "finalize settlement for movement"
+          - "how do I settle a movement"
+          - "close out movement settlement"
+          - "record settlement date for trade"
         behavior: crud
         crud:
           operation: update
@@ -590,6 +680,15 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: movement
+        invocation_phrases:
+          - "cancel pending movement"
+          - "void this subscription order"
+          - "cancel redemption before settlement"
+          - "reverse pending trade movement"
+          - "withdraw movement from register"
+          - "how do I cancel a movement"
+          - "abort pending fund transaction"
+          - "cancel investor trade order"
         behavior: crud
         crud:
           operation: update
@@ -623,6 +722,15 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: movement
+        invocation_phrases:
+          - "mark movement as failed"
+          - "fail this trade movement"
+          - "movement settlement failed"
+          - "record movement failure reason"
+          - "flag failed subscription or redemption"
+          - "how do I fail a movement"
+          - "report failed fund transaction"
+          - "movement could not be processed"
         behavior: crud
         crud:
           operation: update
@@ -660,6 +768,15 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: movement
+        invocation_phrases:
+          - "list movements for this holding"
+          - "show transaction history for holding"
+          - "what movements does this holding have"
+          - "get all trades for investor holding"
+          - "display movement ledger for holding"
+          - "subscription and redemption history"
+          - "show capital calls and distributions"
+          - "list fund movements by holding"
         behavior: crud
         crud:
           operation: list_by_fk
@@ -694,6 +811,15 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: movement
+        invocation_phrases:
+          - "show movement details"
+          - "look up this movement"
+          - "get movement record by ID"
+          - "what is this movement status"
+          - "fetch movement from register"
+          - "display movement trade details"
+          - "read movement settlement info"
+          - "show subscription or redemption details"
         behavior: crud
         crud:
           operation: select

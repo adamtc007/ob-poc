@@ -9,6 +9,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: role
+        invocation_phrases:
+          - "add a new entity role"
+          - "register role definition"
+          - "create role reference entry"
+          - "configure a new role type"
+          - "set up entity role"
+          - "define a role like UBO"
+          - "upsert role record"
+          - "add role for onboarding"
         behavior: crud
         crud:
           operation: upsert
@@ -38,6 +47,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: role
+        invocation_phrases:
+          - "look up role by name"
+          - "get role details"
+          - "show me this role definition"
+          - "fetch role record"
+          - "what is this entity role"
+          - "read role reference data"
+          - "find role by name"
+          - "retrieve role information"
         behavior: crud
         crud:
           operation: select
@@ -58,6 +76,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: role
+        invocation_phrases:
+          - "list all entity roles"
+          - "show available roles"
+          - "what roles are defined"
+          - "display role reference table"
+          - "enumerate role types"
+          - "get all role records"
+          - "which roles can be assigned"
+          - "show me the role list"
         behavior: crud
         crud:
           operation: select
@@ -75,6 +102,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: role
+        invocation_phrases:
+          - "delete a role"
+          - "remove role definition"
+          - "drop role from reference data"
+          - "purge a role record"
+          - "remove entity role type"
+          - "delete role reference entry"
+          - "clean up unused role"
+          - "eliminate role record"
         behavior: crud
         crud:
           operation: delete

@@ -9,6 +9,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: settlement_type
+        invocation_phrases:
+          - "add a new settlement type"
+          - "register settlement method"
+          - "create settlement type entry"
+          - "configure DVP or FOP type"
+          - "set up settlement instruction type"
+          - "define settlement type code"
+          - "upsert settlement type record"
+          - "add trade settlement method"
         behavior: crud
         crud:
           operation: upsert
@@ -52,6 +61,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: settlement_type
+        invocation_phrases:
+          - "look up settlement type by code"
+          - "get settlement type details"
+          - "show me this settlement method"
+          - "fetch settlement type definition"
+          - "what is this settlement type"
+          - "read settlement type record"
+          - "find settlement type by code"
+          - "retrieve settlement method info"
         behavior: crud
         crud:
           operation: select
@@ -72,6 +90,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: settlement_type
+        invocation_phrases:
+          - "list all settlement types"
+          - "show available settlement methods"
+          - "what settlement types exist"
+          - "display settlement type codes"
+          - "enumerate DVP FOP RVP types"
+          - "get all settlement type records"
+          - "which settlement types are active"
+          - "show me the settlement type list"
         behavior: crud
         crud:
           operation: select
@@ -93,6 +120,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: settlement_type
+        invocation_phrases:
+          - "deactivate a settlement type"
+          - "disable this settlement method"
+          - "retire settlement type code"
+          - "turn off a settlement type"
+          - "mark settlement type as inactive"
+          - "remove settlement method from list"
+          - "suspend a settlement type"
+          - "deprecate this settlement method"
         behavior: crud
         crud:
           operation: update

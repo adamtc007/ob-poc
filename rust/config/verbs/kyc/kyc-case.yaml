@@ -10,6 +10,14 @@ domains:
           - "start onboarding"
           - "create case for"
           - "open kyc case for deal"
+          - "new kyc case"
+          - "open new kyc case"
+          - "start kyc case"
+          - "open a kyc case"
+          - "create new case"
+          - "initiate kyc case"
+          - "begin kyc case"
+          - "start new case"
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -100,6 +108,11 @@ domains:
           - "advance case"
           - "move case to"
           - "set case status"
+          - "transition case status"
+          - "progress case to next stage"
+          - "update kyc case status"
+          - "change kyc status"
+          - "move case forward"
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -143,6 +156,13 @@ domains:
           - "escalate case"
           - "escalate kyc case"
           - "raise to senior"
+          - "escalate to compliance"
+          - "raise case priority"
+          - "bump case to senior reviewer"
+          - "escalate to management"
+          - "flag case for escalation"
+          - "refer case to senior"
+          - "raise kyc escalation"
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -184,6 +204,13 @@ domains:
           - "assign case"
           - "assign to analyst"
           - "assign case to"
+          - "reassign case"
+          - "assign kyc case to analyst"
+          - "allocate case to reviewer"
+          - "set case analyst"
+          - "assign reviewer to case"
+          - "hand off case to"
+          - "transfer case to"
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -237,6 +264,12 @@ domains:
           - "rate case risk"
           - "assign risk level"
           - "set kyc risk"
+          - "classify risk rating"
+          - "update risk rating"
+          - "change case risk level"
+          - "mark case as high risk"
+          - "set risk classification"
+          - "assign kyc risk rating"
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -281,6 +314,11 @@ domains:
           - "finalize case"
           - "approve case"
           - "reject case"
+          - "complete kyc review"
+          - "close out case"
+          - "finish case"
+          - "resolve case"
+          - "mark case closed"
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -326,6 +364,12 @@ domains:
           - "get case details"
           - "show case"
           - "view case"
+          - "retrieve case"
+          - "look up case"
+          - "fetch case details"
+          - "display case information"
+          - "show kyc case details"
+          - "get case info"
         metadata:
           tier: reference
           source_of_truth: workflow
@@ -357,6 +401,12 @@ domains:
           - "show cases for"
           - "list kyc cases"
           - "get cases for cbu"
+          - "show all cases"
+          - "display cases for structure"
+          - "list open cases"
+          - "get kyc cases for"
+          - "which cases exist for"
+          - "find cases by cbu"
         metadata:
           tier: reference
           source_of_truth: workflow
@@ -392,6 +442,12 @@ domains:
           - "reopen kyc case"
           - "restart case"
           - "remediate case"
+          - "reopen for remediation"
+          - "reactivate case"
+          - "resume closed case"
+          - "open case again"
+          - "restart kyc review"
+          - "trigger periodic review"
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -449,6 +505,11 @@ domains:
           - "show case status"
           - "case summary"
           - "case overview"
+          - "full case status"
+          - "case with workstreams"
+          - "show case progress"
+          - "what is the case state"
+          - "get case overview with workstreams"
         metadata:
           tier: intent
           source_of_truth: workflow

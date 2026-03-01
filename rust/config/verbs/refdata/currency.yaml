@@ -9,6 +9,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: currency
+        invocation_phrases:
+          - "add a new currency"
+          - "register currency ISO code"
+          - "create currency reference entry"
+          - "configure a new currency"
+          - "set up currency definition"
+          - "define currency with ISO code"
+          - "upsert currency record"
+          - "add settlement currency"
         behavior: crud
         crud:
           operation: upsert
@@ -52,6 +61,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: currency
+        invocation_phrases:
+          - "look up currency by ISO code"
+          - "get currency details"
+          - "show me this currency"
+          - "fetch currency definition"
+          - "what is this currency code"
+          - "read currency reference record"
+          - "find currency by code"
+          - "retrieve currency information"
         behavior: crud
         crud:
           operation: select
@@ -72,6 +90,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: currency
+        invocation_phrases:
+          - "list all currencies"
+          - "show available currencies"
+          - "what currencies are configured"
+          - "display currency reference table"
+          - "enumerate active currencies"
+          - "get all currency records"
+          - "which currencies are active"
+          - "show me the currency list"
         behavior: crud
         crud:
           operation: select
@@ -93,6 +120,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: currency
+        invocation_phrases:
+          - "deactivate a currency"
+          - "disable this currency code"
+          - "retire a currency"
+          - "turn off a currency"
+          - "mark currency as inactive"
+          - "remove currency from active list"
+          - "suspend a currency code"
+          - "deprecate this currency"
         behavior: crud
         crud:
           operation: update

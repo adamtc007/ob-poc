@@ -9,6 +9,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: instrument_class
+        invocation_phrases:
+          - "add an instrument class"
+          - "register asset class definition"
+          - "create instrument class with CFI"
+          - "configure instrument type mapping"
+          - "set up new asset class"
+          - "define instrument class taxonomy"
+          - "upsert instrument class record"
+          - "add SMPG instrument classification"
         behavior: crud
         crud:
           operation: upsert
@@ -76,6 +85,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: instrument_class
+        invocation_phrases:
+          - "look up instrument class by code"
+          - "get instrument class details"
+          - "show me this asset class"
+          - "fetch instrument class definition"
+          - "what is this instrument class"
+          - "read instrument class record"
+          - "find instrument class by code"
+          - "retrieve asset class information"
         behavior: crud
         crud:
           operation: select
@@ -95,6 +113,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: instrument_class
+        invocation_phrases:
+          - "list all instrument classes"
+          - "show available asset classes"
+          - "what instrument classes exist"
+          - "display instrument class taxonomy"
+          - "enumerate ISDA asset classes"
+          - "get all instrument class records"
+          - "filter instrument classes by SMPG"
+          - "show me the asset class list"
         behavior: crud
         crud:
           operation: select

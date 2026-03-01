@@ -14,6 +14,15 @@ domains:
           scope: cbu
           noun: request
           tags: [kyc]
+        invocation_phrases:
+          - "create outstanding request"
+          - "raise new KYC request"
+          - "solicit information from client"
+          - "open document or info request"
+          - "add pending request to case"
+          - "create blocking request on workstream"
+          - "request missing information"
+          - "raise CDD information request"
         behavior: plugin
         plugin:
           handler: RequestCreateOp
@@ -91,6 +100,15 @@ domains:
           scope: cbu
           noun: request
           tags: [kyc]
+        invocation_phrases:
+          - "list outstanding requests"
+          - "show pending KYC requests"
+          - "what requests are open"
+          - "get all information requests"
+          - "view document requests for case"
+          - "show unresolved client requests"
+          - "list pending requests by status"
+          - "display outstanding compliance requests"
         behavior: crud
         crud:
           operation: select
@@ -144,6 +162,15 @@ domains:
           scope: cbu
           noun: request
           tags: [kyc]
+        invocation_phrases:
+          - "show overdue requests"
+          - "which requests are past due"
+          - "list expired KYC requests"
+          - "find overdue document requests"
+          - "what information requests are late"
+          - "check for overdue compliance items"
+          - "show requests past deadline"
+          - "get breached SLA requests"
         behavior: plugin
         plugin:
           handler: RequestOverdueOp
@@ -185,6 +212,15 @@ domains:
           scope: cbu
           noun: request
           tags: [kyc]
+        invocation_phrases:
+          - "fulfill outstanding request"
+          - "mark request as received"
+          - "complete document request"
+          - "satisfy information request"
+          - "close request with evidence"
+          - "confirm client submission received"
+          - "mark KYC request fulfilled"
+          - "resolve pending request"
         behavior: plugin
         plugin:
           handler: RequestFulfillOp
@@ -229,6 +265,15 @@ domains:
           scope: cbu
           noun: request
           tags: [kyc]
+        invocation_phrases:
+          - "cancel outstanding request"
+          - "withdraw pending request"
+          - "cancel document request"
+          - "revoke information request"
+          - "abort KYC request"
+          - "remove pending client request"
+          - "cancel compliance request"
+          - "void open request"
         behavior: plugin
         plugin:
           handler: RequestCancelOp
@@ -257,6 +302,15 @@ domains:
           scope: cbu
           noun: request
           tags: [kyc]
+        invocation_phrases:
+          - "extend request due date"
+          - "grant deadline extension"
+          - "push back request deadline"
+          - "extend compliance request timeline"
+          - "give more time on request"
+          - "postpone request due date"
+          - "extend KYC request deadline"
+          - "move request expiry date"
         behavior: plugin
         plugin:
           handler: RequestExtendOp
@@ -290,6 +344,15 @@ domains:
           scope: cbu
           noun: request
           tags: [kyc]
+        invocation_phrases:
+          - "send request reminder"
+          - "remind client about request"
+          - "follow up on pending request"
+          - "send document request chaser"
+          - "nudge client for information"
+          - "resend request notification"
+          - "chase outstanding KYC request"
+          - "send reminder for overdue item"
         behavior: plugin
         plugin:
           handler: RequestRemindOp
@@ -325,6 +388,15 @@ domains:
           scope: cbu
           noun: request
           tags: [kyc]
+        invocation_phrases:
+          - "escalate overdue request"
+          - "escalate outstanding KYC request"
+          - "raise request to senior reviewer"
+          - "flag request for management attention"
+          - "escalate unresponsive client request"
+          - "elevate blocked compliance request"
+          - "escalate request to supervisor"
+          - "trigger request escalation path"
         behavior: plugin
         plugin:
           handler: RequestEscalateOp
@@ -357,6 +429,15 @@ domains:
           scope: cbu
           noun: request
           tags: [kyc]
+        invocation_phrases:
+          - "waive request requirement"
+          - "grant waiver on KYC request"
+          - "exempt client from request"
+          - "approve request waiver"
+          - "waive outstanding document request"
+          - "override request with senior approval"
+          - "waive compliance request"
+          - "skip request with justification"
         behavior: plugin
         plugin:
           handler: RequestWaiveOp

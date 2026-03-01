@@ -197,7 +197,6 @@ domains:
 
       refresh:
         description: Refresh stale GLEIF data for entities
-        behavior: plugin
         metadata:
           tier: intent
           source_of_truth: external
@@ -205,6 +204,16 @@ domains:
           noun: lei
           subject_kinds: [company, legal_entity]
           tags: [gleif, external-api, refresh, onboarding]
+        invocation_phrases:
+          - "refresh GLEIF data for entity"
+          - "update stale LEI records"
+          - "resync entity from GLEIF API"
+          - "how do I refresh LEI data"
+          - "pull latest GLEIF information"
+          - "re-import LEI details"
+          - "update outdated GLEIF records"
+          - "force GLEIF data refresh"
+        behavior: plugin
         args:
           - name: entity-id
             type: uuid
@@ -231,7 +240,6 @@ domains:
 
       get-record:
         description: Fetch raw GLEIF record for an LEI (does not persist)
-        behavior: plugin
         metadata:
           tier: diagnostics
           source_of_truth: external
@@ -239,6 +247,16 @@ domains:
           noun: lei
           subject_kinds: [company, legal_entity]
           tags: [gleif, external-api, lookup, onboarding]
+        invocation_phrases:
+          - "fetch raw GLEIF record"
+          - "get LEI details from GLEIF"
+          - "look up entity in GLEIF"
+          - "show GLEIF record for LEI"
+          - "retrieve LEI registration data"
+          - "what does GLEIF say about this LEI"
+          - "pull GLEIF API record"
+          - "inspect raw LEI record"
+        behavior: plugin
         args:
           - name: lei
             type: string
@@ -249,7 +267,6 @@ domains:
 
       get-parent:
         description: Get direct parent relationship from GLEIF
-        behavior: plugin
         metadata:
           tier: diagnostics
           source_of_truth: external
@@ -257,6 +274,16 @@ domains:
           noun: lei
           subject_kinds: [company, legal_entity]
           tags: [gleif, external-api, lookup, relationship, onboarding]
+        invocation_phrases:
+          - "get parent entity from GLEIF"
+          - "who is the direct parent"
+          - "find parent company via LEI"
+          - "show GLEIF parent relationship"
+          - "look up corporate parent"
+          - "fetch parent LEI record"
+          - "what is the holding company"
+          - "get immediate parent from GLEIF"
+        behavior: plugin
         args:
           - name: lei
             type: string
@@ -267,7 +294,6 @@ domains:
 
       get-children:
         description: Get direct children from GLEIF
-        behavior: plugin
         metadata:
           tier: diagnostics
           source_of_truth: external
@@ -275,6 +301,16 @@ domains:
           noun: lei
           subject_kinds: [company, legal_entity]
           tags: [gleif, external-api, lookup, relationship, onboarding]
+        invocation_phrases:
+          - "get subsidiary entities from GLEIF"
+          - "list children for this LEI"
+          - "show subsidiaries via GLEIF"
+          - "what entities does this company own"
+          - "fetch child LEI records"
+          - "find direct subsidiaries"
+          - "look up GLEIF child relationships"
+          - "who are the sub-entities"
+        behavior: plugin
         args:
           - name: lei
             type: string
@@ -325,7 +361,6 @@ domains:
 
       get-managed-funds:
         description: Get all funds managed by an investment manager from GLEIF
-        behavior: plugin
         metadata:
           tier: diagnostics
           source_of_truth: external
@@ -333,6 +368,16 @@ domains:
           noun: lei
           subject_kinds: [company, legal_entity]
           tags: [gleif, external-api, lookup, funds, onboarding]
+        invocation_phrases:
+          - "get funds managed by this entity"
+          - "list managed funds from GLEIF"
+          - "show fund portfolio for manager"
+          - "which funds does this IM manage"
+          - "fetch managed fund LEIs"
+          - "look up funds under management"
+          - "find GLEIF fund relationships"
+          - "what funds are managed by this LEI"
+        behavior: plugin
         args:
           - name: manager-lei
             type: string
@@ -354,7 +399,6 @@ domains:
 
       resolve-successor:
         description: Resolve a merged or inactive LEI to its current successor entity
-        behavior: plugin
         metadata:
           tier: diagnostics
           source_of_truth: external
@@ -362,6 +406,16 @@ domains:
           noun: lei
           subject_kinds: [company, legal_entity]
           tags: [gleif, external-api, lookup, successor, onboarding]
+        invocation_phrases:
+          - "resolve successor for merged LEI"
+          - "find current entity for inactive LEI"
+          - "trace LEI merger successor"
+          - "what replaced this LEI"
+          - "look up successor after corporate merger"
+          - "resolve lapsed LEI to active entity"
+          - "follow LEI succession chain"
+          - "find active replacement for retired LEI"
+        behavior: plugin
         args:
           - name: lei
             type: string
@@ -379,7 +433,6 @@ domains:
 
       get-umbrella:
         description: Get umbrella fund for a sub-fund (IS_SUBFUND_OF relationship). SICAVs have no umbrella - use get-manager instead.
-        behavior: plugin
         metadata:
           tier: diagnostics
           source_of_truth: external
@@ -387,6 +440,16 @@ domains:
           noun: lei
           subject_kinds: [company, legal_entity]
           tags: [gleif, external-api, lookup, relationship, funds, onboarding]
+        invocation_phrases:
+          - "get umbrella fund from GLEIF"
+          - "find parent SICAV for sub-fund"
+          - "which umbrella does this fund belong to"
+          - "look up sub-fund umbrella relationship"
+          - "show umbrella structure for fund"
+          - "fetch umbrella LEI for sub-fund"
+          - "resolve sub-fund to umbrella"
+          - "what is the umbrella for this compartment"
+        behavior: plugin
         args:
           - name: lei
             type: string
@@ -409,7 +472,6 @@ domains:
 
       get-manager:
         description: Get fund manager for a fund (IS_FUND-MANAGED_BY relationship). Use this for SICAVs which have no umbrella above them.
-        behavior: plugin
         metadata:
           tier: diagnostics
           source_of_truth: external
@@ -417,6 +479,16 @@ domains:
           noun: lei
           subject_kinds: [company, legal_entity]
           tags: [gleif, external-api, lookup, relationship, funds, onboarding]
+        invocation_phrases:
+          - "get fund manager from GLEIF"
+          - "who manages this fund"
+          - "find investment manager for fund LEI"
+          - "look up ManCo for this fund"
+          - "show fund management relationship"
+          - "fetch manager LEI for fund"
+          - "which entity is the fund manager"
+          - "resolve GLEIF fund manager relationship"
+        behavior: plugin
         args:
           - name: lei
             type: string
@@ -439,7 +511,6 @@ domains:
 
       get-master-fund:
         description: Get master fund for a feeder fund (IS_FEEDER_TO relationship)
-        behavior: plugin
         metadata:
           tier: diagnostics
           source_of_truth: external
@@ -447,6 +518,16 @@ domains:
           noun: lei
           subject_kinds: [company, legal_entity]
           tags: [gleif, external-api, lookup, relationship, funds, onboarding]
+        invocation_phrases:
+          - "get master fund for feeder"
+          - "find master fund via GLEIF"
+          - "which master fund does this feed into"
+          - "look up feeder-to-master relationship"
+          - "show master-feeder fund structure"
+          - "resolve feeder fund to master"
+          - "fetch master fund LEI"
+          - "trace feeder fund upstream"
+        behavior: plugin
         args:
           - name: lei
             type: string
@@ -469,7 +550,6 @@ domains:
 
       lookup-by-isin:
         description: Look up entity LEI by ISIN (uses GLEIF ISIN-LEI mapping)
-        behavior: plugin
         metadata:
           tier: diagnostics
           source_of_truth: external
@@ -477,6 +557,16 @@ domains:
           noun: lei
           subject_kinds: [company, legal_entity]
           tags: [gleif, external-api, lookup, isin, onboarding]
+        invocation_phrases:
+          - "find LEI by ISIN code"
+          - "look up issuer for this ISIN"
+          - "resolve ISIN to LEI"
+          - "which entity issued this security"
+          - "map ISIN to legal entity"
+          - "get LEI from security identifier"
+          - "cross-reference ISIN with GLEIF"
+          - "find issuing entity for ISIN"
+        behavior: plugin
         args:
           - name: isin
             type: string

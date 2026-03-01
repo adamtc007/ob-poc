@@ -186,6 +186,15 @@ domains:
       mark-expired:
         description: Mark a requirement as expired (document validity lapsed)
         behavior: crud
+        invocation_phrases:
+          - "mark requirement as expired"
+          - "expire document requirement"
+          - "document validity has lapsed"
+          - "requirement no longer valid"
+          - "flag expired requirement"
+          - "document has expired"
+          - "set requirement to expired"
+          - "expire the evidence"
         metadata:
           tier: intent
           source_of_truth: operational
@@ -255,6 +264,15 @@ domains:
       get:
         description: Get a requirement by ID
         behavior: crud
+        invocation_phrases:
+          - "get requirement details"
+          - "show requirement by ID"
+          - "look up document requirement"
+          - "fetch requirement record"
+          - "display requirement info"
+          - "what is this requirement"
+          - "requirement status check"
+          - "pull up requirement"
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -363,6 +381,15 @@ domains:
       with-status:
         description: Get requirements with latest version status (joined view)
         behavior: crud
+        invocation_phrases:
+          - "requirements with status"
+          - "show requirement collection progress"
+          - "document status dashboard"
+          - "which requirements are satisfied"
+          - "requirement tracker view"
+          - "requirement and version status"
+          - "collection status for workflow"
+          - "how are the requirements progressing"
         metadata:
           tier: diagnostics
           source_of_truth: operational

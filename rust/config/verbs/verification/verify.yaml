@@ -12,6 +12,15 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: verify
+        invocation_phrases:
+          - "detect suspicious patterns"
+          - "run pattern detection"
+          - "check for circular ownership"
+          - "scan for layering structures"
+          - "find nominee usage"
+          - "adversarial pattern analysis"
+          - "any red flags in structure"
+          - "screen for opacity patterns"
         behavior: plugin
         args:
           - name: cbu-id
@@ -43,6 +52,15 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: verify
+        invocation_phrases:
+          - "detect evasion signals"
+          - "check for document avoidance"
+          - "analyze response delays"
+          - "is client being evasive"
+          - "evasion pattern analysis"
+          - "flag selective responses"
+          - "look for changing explanations"
+          - "document request compliance check"
         behavior: plugin
         args:
           - name: case-id
@@ -68,6 +86,15 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: verify
+        invocation_phrases:
+          - "raise verification challenge"
+          - "challenge client on inconsistency"
+          - "open formal challenge"
+          - "flag issue for client response"
+          - "create challenge for low confidence"
+          - "question client about mismatch"
+          - "raise concern on observation"
+          - "issue verification query"
         behavior: crud
         crud:
           operation: insert
@@ -167,6 +194,15 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: verify
+        invocation_phrases:
+          - "record challenge response"
+          - "client responded to challenge"
+          - "log challenge reply"
+          - "submit response to query"
+          - "capture client explanation"
+          - "enter challenge answer"
+          - "attach evidence to challenge"
+          - "update challenge with response"
         behavior: crud
         crud:
           operation: update
@@ -206,6 +242,15 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: verify
+        invocation_phrases:
+          - "resolve verification challenge"
+          - "close challenge as accepted"
+          - "reject challenge response"
+          - "waive verification challenge"
+          - "mark challenge resolved"
+          - "decide on challenge outcome"
+          - "escalate unresolved challenge"
+          - "finalize challenge decision"
         behavior: crud
         crud:
           operation: update
@@ -260,6 +305,15 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: verify
+        invocation_phrases:
+          - "list verification challenges"
+          - "show open challenges for CBU"
+          - "any outstanding challenges"
+          - "get challenge history"
+          - "display pending challenges"
+          - "what challenges are open"
+          - "challenges by severity"
+          - "review challenge queue"
         behavior: crud
         crud:
           operation: list_by_fk
@@ -302,6 +356,15 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: verify
+        invocation_phrases:
+          - "escalate verification issue"
+          - "refer to compliance officer"
+          - "send to MLRO for review"
+          - "raise to senior analyst"
+          - "escalate to committee"
+          - "flag for higher authority"
+          - "needs senior oversight"
+          - "bump to next approval level"
         behavior: crud
         crud:
           operation: insert
@@ -373,6 +436,15 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: verify
+        invocation_phrases:
+          - "record escalation decision"
+          - "resolve escalation outcome"
+          - "approve escalated issue"
+          - "reject escalation request"
+          - "close escalation with decision"
+          - "what was the escalation ruling"
+          - "enter escalation verdict"
+          - "decide on escalated matter"
         behavior: crud
         crud:
           operation: update
@@ -421,6 +493,15 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: verify
+        invocation_phrases:
+          - "list verification escalations"
+          - "show escalation queue for CBU"
+          - "any pending escalations"
+          - "get escalation history"
+          - "what issues are escalated"
+          - "display MLRO referrals"
+          - "escalations awaiting decision"
+          - "review outstanding escalations"
         behavior: crud
         crud:
           operation: list_by_fk
@@ -462,6 +543,15 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: verify
+        invocation_phrases:
+          - "calculate confidence score"
+          - "what is the confidence level"
+          - "aggregate observation confidence"
+          - "compute verification confidence"
+          - "how confident are we on entity"
+          - "confidence breakdown for attributes"
+          - "assess data quality score"
+          - "run confidence assessment"
         behavior: plugin
         args:
           - name: entity-id
@@ -488,6 +578,15 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: verify
+        invocation_phrases:
+          - "get verification status"
+          - "show KYC verification progress"
+          - "verification summary for CBU"
+          - "how far along is verification"
+          - "check due diligence status"
+          - "overall verification health report"
+          - "where do we stand on verification"
+          - "display verification dashboard"
         behavior: plugin
         args:
           - name: cbu-id
@@ -510,6 +609,15 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: verify
+        invocation_phrases:
+          - "verify entity against GLEIF"
+          - "check Companies House registry"
+          - "cross-reference with external registry"
+          - "run registry verification check"
+          - "validate LEI against GLEIF"
+          - "compare entity to SEC Edgar"
+          - "registry mismatch check"
+          - "corroborate entity with public records"
         behavior: plugin
         args:
           - name: entity-id
@@ -540,6 +648,15 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: verify
+        invocation_phrases:
+          - "assert minimum confidence threshold"
+          - "enforce verification gate"
+          - "check confidence meets requirement"
+          - "gate on verification score"
+          - "block if confidence below threshold"
+          - "require minimum data quality"
+          - "assert KYC readiness threshold"
+          - "validate confidence before proceeding"
         behavior: plugin
         args:
           - name: cbu-id
@@ -587,6 +704,15 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: verify
+        invocation_phrases:
+          - "record detected pattern manually"
+          - "log suspicious ownership pattern"
+          - "register red flag finding"
+          - "capture circular ownership finding"
+          - "add pattern to case file"
+          - "document layering observation"
+          - "flag nominee usage pattern"
+          - "enter adverse pattern manually"
         behavior: crud
         crud:
           operation: insert
@@ -661,6 +787,15 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: verify
+        invocation_phrases:
+          - "resolve detected pattern"
+          - "dismiss pattern as false positive"
+          - "close pattern finding"
+          - "mark pattern as resolved"
+          - "clear false positive flag"
+          - "confirm pattern is benign"
+          - "dispose of pattern alert"
+          - "adjudicate flagged pattern"
         behavior: crud
         crud:
           operation: update
@@ -705,6 +840,15 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: verify
+        invocation_phrases:
+          - "list detected patterns"
+          - "show flagged patterns for CBU"
+          - "any unresolved pattern alerts"
+          - "get pattern detection history"
+          - "display red flags found"
+          - "what patterns were detected"
+          - "review pattern findings"
+          - "show false positive candidates"
         behavior: crud
         crud:
           operation: list_by_fk

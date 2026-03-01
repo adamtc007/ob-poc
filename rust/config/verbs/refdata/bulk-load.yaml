@@ -12,6 +12,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: bulk_load
+        invocation_phrases:
+          - "load market reference data"
+          - "import markets from file"
+          - "bulk load market definitions"
+          - "populate markets table from YAML"
+          - "seed market data from file"
+          - "how do I load markets"
+          - "upload market reference records"
+          - "import exchange data from YAML"
         behavior: plugin
         handler: load_markets_from_yaml
         args:
@@ -35,6 +44,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: bulk_load
+        invocation_phrases:
+          - "load instrument class taxonomy"
+          - "import instrument classes from file"
+          - "bulk load asset class definitions"
+          - "populate instrument class table"
+          - "seed instrument classes from YAML"
+          - "upload instrument type reference data"
+          - "how do I load instrument classes"
+          - "import CFI class taxonomy"
         behavior: plugin
         handler: load_instrument_classes_from_yaml
         args:
@@ -57,6 +75,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: bulk_load
+        invocation_phrases:
+          - "load subcustodian network data"
+          - "import subcustodians from file"
+          - "bulk load agent bank network"
+          - "populate subcustodian network table"
+          - "seed subcustodian data from YAML"
+          - "upload local agent bank records"
+          - "how do I load subcustodians"
+          - "import custody network from file"
         behavior: plugin
         handler: load_subcustodians_from_yaml
         args:
@@ -79,6 +106,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: bulk_load
+        invocation_phrases:
+          - "load SLA templates from file"
+          - "import service level agreements"
+          - "bulk load SLA definitions"
+          - "populate SLA template table"
+          - "seed SLA data from YAML"
+          - "upload service level templates"
+          - "how do I load SLA templates"
+          - "import SLA reference data"
         behavior: plugin
         handler: load_sla_templates_from_yaml
         args:
@@ -101,6 +137,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: bulk_load
+        invocation_phrases:
+          - "load all reference data"
+          - "import all refdata from directory"
+          - "bulk load everything at once"
+          - "populate all reference tables"
+          - "seed all reference data"
+          - "run full reference data import"
+          - "how do I reload all refdata"
+          - "initialize all reference data tables"
         behavior: plugin
         handler: load_all_refdata
         args:

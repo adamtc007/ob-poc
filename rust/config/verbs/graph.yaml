@@ -22,6 +22,15 @@ domains:
           source_of_truth: entity
           scope: cbu
           noun: graph
+        invocation_phrases:
+          - "show the graph"
+          - "display entity graph for CBU"
+          - "visualize ownership structure"
+          - "render the graph view"
+          - "what does the structure look like"
+          - "show me the full graph"
+          - "build graph from CBU"
+          - "open graph visualization"
         behavior: graph_query
         graph_query:
           operation: view
@@ -65,6 +74,15 @@ domains:
           source_of_truth: entity
           scope: cbu
           noun: graph
+        invocation_phrases:
+          - "focus on this entity"
+          - "zoom into node"
+          - "show neighborhood of entity"
+          - "highlight this node"
+          - "drill into entity connections"
+          - "what surrounds this entity"
+          - "expand node neighborhood"
+          - "center graph on entity"
         behavior: graph_query
         graph_query:
           operation: focus
@@ -113,6 +131,15 @@ domains:
           source_of_truth: entity
           scope: cbu
           noun: graph
+        invocation_phrases:
+          - "filter the graph"
+          - "show only entities by role"
+          - "narrow graph by jurisdiction"
+          - "filter nodes by type"
+          - "hide unrelated nodes"
+          - "show graph for custody layer"
+          - "apply filter to graph"
+          - "restrict graph to UBO layer"
         behavior: graph_query
         graph_query:
           operation: filter
@@ -286,6 +313,15 @@ domains:
           source_of_truth: entity
           scope: cbu
           noun: graph
+        invocation_phrases:
+          - "find connected entities"
+          - "show all linked nodes"
+          - "what is connected to this"
+          - "discover related entities"
+          - "traverse connections from entity"
+          - "list connected parties"
+          - "show reachable nodes"
+          - "find related within depth"
         behavior: graph_query
         graph_query:
           operation: find_connected
@@ -333,6 +369,15 @@ domains:
           source_of_truth: entity
           scope: cbu
           noun: graph
+        invocation_phrases:
+          - "show parent entities"
+          - "who owns this entity"
+          - "trace ownership upward"
+          - "find ultimate parent"
+          - "show ownership chain above"
+          - "list controlling entities"
+          - "walk up the ownership tree"
+          - "find ancestor companies"
         behavior: graph_query
         graph_query:
           operation: ancestors
@@ -368,6 +413,15 @@ domains:
           source_of_truth: entity
           scope: cbu
           noun: graph
+        invocation_phrases:
+          - "show subsidiaries"
+          - "what does this entity own"
+          - "trace ownership downward"
+          - "list controlled entities below"
+          - "find all sub-entities"
+          - "show downstream ownership"
+          - "walk down the ownership tree"
+          - "find child companies"
         behavior: graph_query
         graph_query:
           operation: descendants
@@ -454,6 +508,15 @@ domains:
           source_of_truth: entity
           scope: cbu
           noun: graph
+        invocation_phrases:
+          - "compare graph snapshots"
+          - "what changed in the graph"
+          - "diff between two snapshots"
+          - "show graph differences"
+          - "compare before and after"
+          - "detect ownership changes"
+          - "highlight graph modifications"
+          - "show delta between versions"
         behavior: graph_query
         graph_query:
           operation: compare

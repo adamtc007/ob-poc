@@ -14,6 +14,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: instruction_profile
+        invocation_phrases:
+          - "define SWIFT message type"
+          - "add MT540 settlement instruction"
+          - "register ISO 20022 message format"
+          - "configure FIX message for trades"
+          - "set up MX instruction type"
+          - "create trade confirmation message type"
+          - "add FpML message definition"
+          - "define settlement instruction format"
         behavior: crud
         crud:
           operation: upsert
@@ -66,6 +75,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: instruction_profile
+        invocation_phrases:
+          - "list available SWIFT message types"
+          - "show instruction message formats"
+          - "what MT messages are configured"
+          - "display ISO 20022 message types"
+          - "which FIX messages are supported"
+          - "show settlement instruction formats"
+          - "list trade lifecycle messages"
+          - "what message standards exist"
         behavior: crud
         crud:
           operation: select
@@ -94,6 +112,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: instruction_profile
+        invocation_phrases:
+          - "create instruction template"
+          - "set up SWIFT message template"
+          - "define MT settlement template"
+          - "build ISO 20022 instruction layout"
+          - "configure trade message template"
+          - "add field mapping template"
+          - "create confirmation message template"
+          - "design instruction output format"
         behavior: crud
         crud:
           operation: upsert
@@ -146,6 +173,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: instruction_profile
+        invocation_phrases:
+          - "show instruction template details"
+          - "read SWIFT message template"
+          - "view template field mappings"
+          - "display settlement instruction layout"
+          - "get template by code"
+          - "check template validation rules"
+          - "inspect message template configuration"
+          - "what does this template contain"
         behavior: crud
         crud:
           operation: select
@@ -170,6 +206,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: instruction_profile
+        invocation_phrases:
+          - "list instruction templates"
+          - "show all message templates"
+          - "what SWIFT templates are available"
+          - "display settlement instruction templates"
+          - "which templates cover MT540"
+          - "list configured message layouts"
+          - "show available instruction formats"
+          - "browse trade message templates"
         behavior: crud
         crud:
           operation: select
@@ -195,6 +240,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: instruction_profile
+        invocation_phrases:
+          - "show template assignments for CBU"
+          - "which templates are assigned here"
+          - "list instruction profile assignments"
+          - "what SWIFT templates does this CBU use"
+          - "display CBU message template mapping"
+          - "check settlement instruction assignments"
+          - "which lifecycle events have templates"
+          - "show assigned message formats"
         behavior: crud
         crud:
           operation: list_by_fk
@@ -234,6 +288,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: instruction_profile
+        invocation_phrases:
+          - "show field overrides for assignment"
+          - "list message field customizations"
+          - "what fields are overridden"
+          - "display template field exceptions"
+          - "check SWIFT field override values"
+          - "are there custom field mappings"
+          - "show instruction field modifications"
+          - "list overridden message fields"
         behavior: crud
         crud:
           operation: list_by_fk

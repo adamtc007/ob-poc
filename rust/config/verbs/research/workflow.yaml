@@ -25,6 +25,15 @@ domains:
           scope: global
           noun: research_decision
           tags: [write, workflow, audit-trail]
+        invocation_phrases:
+          - "record research decision"
+          - "log entity selection decision"
+          - "capture source matching outcome"
+          - "save research selection result"
+          - "document the research finding"
+          - "record which candidate was chosen"
+          - "log due diligence decision"
+          - "write research decision to audit trail"
         behavior: crud
         crud:
           operation: insert
@@ -151,6 +160,15 @@ domains:
           scope: global
           noun: research_action
           tags: [write, workflow, audit-trail]
+        invocation_phrases:
+          - "record research action taken"
+          - "log import execution step"
+          - "capture data enrichment action"
+          - "save what was done during research"
+          - "document the research execution"
+          - "record source import action"
+          - "log GLEIF import action"
+          - "write action to audit trail"
         behavior: crud
         crud:
           operation: insert
@@ -298,6 +316,15 @@ domains:
           scope: global
           noun: research_anomaly
           tags: [write, workflow, validation]
+        invocation_phrases:
+          - "record data anomaly found"
+          - "flag validation issue from import"
+          - "log post-import discrepancy"
+          - "capture data quality anomaly"
+          - "report entity data inconsistency"
+          - "record mismatch in imported data"
+          - "flag suspicious research finding"
+          - "log compliance validation anomaly"
         behavior: crud
         crud:
           operation: insert
@@ -345,6 +372,15 @@ domains:
           scope: global
           noun: research_anomaly
           tags: [write, workflow, validation, resolution]
+        invocation_phrases:
+          - "resolve the data anomaly"
+          - "close out validation issue"
+          - "mark anomaly as resolved"
+          - "address the data discrepancy"
+          - "fix the import anomaly"
+          - "clear the validation finding"
+          - "resolve compliance data issue"
+          - "close anomaly with resolution"
         behavior: crud
         crud:
           operation: update
@@ -460,6 +496,15 @@ domains:
           scope: global
           noun: research_decision
           tags: [read, query, workflow]
+        invocation_phrases:
+          - "show pending research decisions"
+          - "what decisions need my input"
+          - "list unresolved research selections"
+          - "any decisions waiting for review"
+          - "outstanding entity matching decisions"
+          - "show ambiguous matches needing confirmation"
+          - "which research items need approval"
+          - "pending due diligence decisions"
         behavior: crud
         crud:
           operation: select

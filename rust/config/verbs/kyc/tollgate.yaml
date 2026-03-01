@@ -22,6 +22,15 @@ domains:
           scope: cbu
           noun: tollgate
           tags: [kyc]
+        invocation_phrases:
+          - "run tollgate evaluation for case"
+          - "evaluate kyc tollgate checkpoint"
+          - "check verification completeness against thresholds"
+          - "is the case passing tollgate"
+          - "compute tollgate metrics and score"
+          - "assess kyc gate readiness"
+          - "run compliance gate evaluation"
+          - "evaluate case against tollgate criteria"
         behavior: plugin
         plugin:
           handler: TollgateEvaluateOp
@@ -77,6 +86,15 @@ domains:
           scope: cbu
           noun: tollgate
           tags: [kyc]
+        invocation_phrases:
+          - "get current tollgate metrics"
+          - "compute kyc metrics without recording"
+          - "show verification metrics for structure"
+          - "what are the compliance metrics"
+          - "preview tollgate scores before evaluation"
+          - "check ownership and screening percentages"
+          - "fetch kyc completeness metrics"
+          - "display evidence coverage statistics"
         behavior: plugin
         plugin:
           handler: TollgateGetMetricsOp
@@ -125,6 +143,15 @@ domains:
           scope: cbu
           noun: tollgate
           tags: [kyc]
+        invocation_phrases:
+          - "set tollgate threshold value"
+          - "update compliance gate threshold"
+          - "configure kyc metric threshold"
+          - "change blocking threshold for metric"
+          - "adjust tollgate pass criteria"
+          - "modify verification threshold setting"
+          - "set minimum score for gate"
+          - "update tollgate comparison rule"
         behavior: crud
         crud:
           operation: update
@@ -188,6 +215,15 @@ domains:
           scope: cbu
           noun: tollgate
           tags: [kyc]
+        invocation_phrases:
+          - "override tollgate failure"
+          - "record management override for gate"
+          - "approve tollgate waiver with justification"
+          - "grant compliance gate exception"
+          - "override blocking tollgate result"
+          - "submit tollgate override approval"
+          - "waive failed tollgate checkpoint"
+          - "authorize tollgate bypass for case"
         behavior: plugin
         plugin:
           handler: TollgateOverrideOp
@@ -237,6 +273,15 @@ domains:
           scope: cbu
           noun: tollgate
           tags: [kyc]
+        invocation_phrases:
+          - "list tollgate evaluations for case"
+          - "show evaluation history for case"
+          - "get all gate results for case"
+          - "what tollgate checks were run"
+          - "review past tollgate assessments"
+          - "display compliance gate evaluation log"
+          - "show tollgate pass fail history"
+          - "list prior checkpoint evaluations"
         behavior: crud
         crud:
           operation: list_by_fk
@@ -273,6 +318,15 @@ domains:
           scope: cbu
           noun: tollgate
           tags: [kyc]
+        invocation_phrases:
+          - "list all tollgate thresholds"
+          - "show configured compliance gate thresholds"
+          - "get threshold settings for tollgates"
+          - "what are the current gate limits"
+          - "display blocking and warning thresholds"
+          - "review tollgate pass criteria"
+          - "list metric thresholds by type"
+          - "show kyc gate configuration"
         behavior: crud
         crud:
           operation: select
@@ -302,6 +356,15 @@ domains:
           scope: cbu
           noun: tollgate
           tags: [kyc]
+        invocation_phrases:
+          - "check decision readiness for case"
+          - "is the case ready for decision"
+          - "get decision readiness summary"
+          - "what is blocking case approval"
+          - "show evidence completeness for decision"
+          - "assess if case can proceed"
+          - "check outstanding blockers for case"
+          - "summarize case readiness status"
         behavior: plugin
         plugin:
           handler: TollgateDecisionReadinessOp
@@ -338,6 +401,15 @@ domains:
           scope: cbu
           noun: tollgate
           tags: [kyc]
+        invocation_phrases:
+          - "list tollgate overrides"
+          - "show active gate waivers"
+          - "get overrides for case"
+          - "which tollgates have been waived"
+          - "display management override history"
+          - "list compliance gate exceptions"
+          - "show approved tollgate bypasses"
+          - "review override audit trail"
         behavior: crud
         crud:
           operation: select
@@ -363,6 +435,15 @@ domains:
           scope: cbu
           noun: tollgate
           tags: [kyc]
+        invocation_phrases:
+          - "expire tollgate override"
+          - "revoke gate waiver early"
+          - "manually expire compliance override"
+          - "cancel active tollgate exception"
+          - "terminate override before expiry"
+          - "withdraw tollgate bypass approval"
+          - "force expire gate waiver"
+          - "end tollgate override immediately"
         behavior: crud
         crud:
           operation: update

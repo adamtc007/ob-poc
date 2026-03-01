@@ -10,6 +10,15 @@ domains:
           scope: cbu
           noun: doc_request
           tags: [kyc]
+        invocation_phrases:
+          - "create document request"
+          - "request KYC document from client"
+          - "solicit passport or ID"
+          - "add document to collection list"
+          - "create CDD document request"
+          - "request proof of address"
+          - "ask for incorporation certificate"
+          - "initiate document solicitation"
         behavior: crud
         crud:
           operation: upsert
@@ -89,6 +98,15 @@ domains:
           scope: cbu
           noun: doc_request
           tags: [kyc]
+        invocation_phrases:
+          - "mark document as requested"
+          - "confirm document request sent"
+          - "set document status to requested"
+          - "record outreach for document"
+          - "document request dispatched"
+          - "mark KYC doc as solicited"
+          - "flag document formally requested"
+          - "update doc request to sent"
         behavior: crud
         crud:
           operation: update
@@ -120,6 +138,15 @@ domains:
           scope: cbu
           noun: doc_request
           tags: [kyc]
+        invocation_phrases:
+          - "record document received"
+          - "mark document as received"
+          - "client submitted the document"
+          - "passport has been received"
+          - "log document arrival"
+          - "update doc request to received"
+          - "acknowledge document submission"
+          - "record KYC document intake"
         behavior: crud
         crud:
           operation: update
@@ -161,6 +188,15 @@ domains:
           scope: cbu
           noun: doc_request
           tags: [kyc]
+        invocation_phrases:
+          - "verify KYC document"
+          - "approve document as valid"
+          - "mark document verified"
+          - "confirm document passes QA"
+          - "validate submitted document"
+          - "accept document for CDD"
+          - "document verification complete"
+          - "sign off on document quality"
         behavior: crud
         crud:
           operation: update
@@ -196,6 +232,15 @@ domains:
           scope: cbu
           noun: doc_request
           tags: [kyc]
+        invocation_phrases:
+          - "reject KYC document"
+          - "document failed quality check"
+          - "decline submitted document"
+          - "send document back for resubmission"
+          - "mark document as rejected"
+          - "document does not meet requirements"
+          - "refuse document with reason"
+          - "flag document as unacceptable"
         behavior: crud
         crud:
           operation: update
@@ -230,6 +275,15 @@ domains:
           scope: cbu
           noun: doc_request
           tags: [kyc]
+        invocation_phrases:
+          - "waive document requirement"
+          - "skip this document request"
+          - "exempt from document collection"
+          - "override document requirement"
+          - "waive KYC document obligation"
+          - "grant document waiver"
+          - "mark document as not required"
+          - "approve document exemption"
         behavior: crud
         crud:
           operation: update
@@ -264,6 +318,15 @@ domains:
           scope: cbu
           noun: doc_request
           tags: [kyc]
+        invocation_phrases:
+          - "list document requests for workstream"
+          - "show outstanding document requests"
+          - "what documents are still needed"
+          - "display document collection status"
+          - "get KYC document checklist"
+          - "which documents are missing"
+          - "view document request tracker"
+          - "show CDD document progress"
         behavior: crud
         crud:
           operation: list_by_fk

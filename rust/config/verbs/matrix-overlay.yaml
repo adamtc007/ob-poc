@@ -20,6 +20,15 @@ domains:
           source_of_truth: matrix
           scope: cbu
           noun: matrix_overlay
+        invocation_phrases:
+          - "subscribe CBU to product"
+          - "add product subscription"
+          - "enable product for structure"
+          - "activate product on CBU"
+          - "sign up for custody product"
+          - "enroll CBU in service"
+          - "add product to fund"
+          - "subscribe to prime brokerage"
         behavior: crud
         crud:
           operation: upsert
@@ -70,6 +79,15 @@ domains:
           source_of_truth: matrix
           scope: cbu
           noun: matrix_overlay
+        invocation_phrases:
+          - "unsubscribe from product"
+          - "cancel product subscription"
+          - "terminate product for CBU"
+          - "remove product from structure"
+          - "end custody product subscription"
+          - "off-board product service"
+          - "deactivate product subscription"
+          - "drop product from fund"
         behavior: crud
         crud:
           operation: update
@@ -94,6 +112,15 @@ domains:
           source_of_truth: matrix
           scope: cbu
           noun: matrix_overlay
+        invocation_phrases:
+          - "suspend product subscription"
+          - "pause subscription temporarily"
+          - "hold product for CBU"
+          - "freeze product subscription"
+          - "temporarily disable product"
+          - "put subscription on hold"
+          - "suspend custody service"
+          - "pause product enrollment"
         behavior: crud
         crud:
           operation: update
@@ -117,6 +144,15 @@ domains:
           source_of_truth: matrix
           scope: cbu
           noun: matrix_overlay
+        invocation_phrases:
+          - "reactivate subscription"
+          - "resume suspended product"
+          - "re-enable product for CBU"
+          - "restore product subscription"
+          - "unsuspend product service"
+          - "bring subscription back online"
+          - "restart product enrollment"
+          - "activate suspended subscription"
         behavior: crud
         crud:
           operation: update
@@ -140,6 +176,15 @@ domains:
           source_of_truth: matrix
           scope: cbu
           noun: matrix_overlay
+        invocation_phrases:
+          - "list product subscriptions"
+          - "show products for CBU"
+          - "what products is CBU subscribed to"
+          - "display active subscriptions"
+          - "get product list for fund"
+          - "which products are enabled"
+          - "show subscription status"
+          - "list enrolled products"
         behavior: crud
         crud:
           operation: list_by_fk
@@ -183,6 +228,15 @@ domains:
           source_of_truth: matrix
           scope: cbu
           noun: matrix_overlay
+        invocation_phrases:
+          - "add product overlay"
+          - "apply overlay to matrix"
+          - "add services to matrix entry"
+          - "overlay product on trading matrix"
+          - "attach product to instrument class"
+          - "layer product onto matrix"
+          - "add SLA overlay"
+          - "extend matrix with product"
         behavior: crud
         crud:
           operation: upsert
@@ -278,6 +332,15 @@ domains:
           source_of_truth: matrix
           scope: cbu
           noun: matrix_overlay
+        invocation_phrases:
+          - "remove product overlay"
+          - "delete overlay from matrix"
+          - "strip product from matrix entry"
+          - "detach overlay"
+          - "remove services from matrix"
+          - "clear product overlay"
+          - "drop overlay for instrument"
+          - "unlink product from matrix"
         behavior: crud
         crud:
           operation: delete
@@ -299,6 +362,15 @@ domains:
           source_of_truth: matrix
           scope: cbu
           noun: matrix_overlay
+        invocation_phrases:
+          - "suspend matrix overlay"
+          - "pause product overlay"
+          - "hold overlay temporarily"
+          - "freeze overlay on matrix"
+          - "disable overlay entry"
+          - "temporarily suspend overlay"
+          - "put overlay on hold"
+          - "deactivate matrix overlay"
         behavior: crud
         crud:
           operation: update
@@ -322,6 +394,15 @@ domains:
           source_of_truth: matrix
           scope: cbu
           noun: matrix_overlay
+        invocation_phrases:
+          - "activate matrix overlay"
+          - "resume suspended overlay"
+          - "re-enable overlay"
+          - "restore overlay on matrix"
+          - "bring overlay back online"
+          - "unsuspend product overlay"
+          - "reactivate overlay entry"
+          - "turn overlay back on"
         behavior: crud
         crud:
           operation: update
@@ -345,6 +426,15 @@ domains:
           source_of_truth: matrix
           scope: cbu
           noun: matrix_overlay
+        invocation_phrases:
+          - "list matrix overlays"
+          - "show product overlays for CBU"
+          - "what overlays are applied"
+          - "display overlay entries"
+          - "get all overlays"
+          - "show active overlays"
+          - "list overlays on matrix"
+          - "which overlays are on this CBU"
         behavior: crud
         crud:
           operation: list_by_fk
@@ -379,6 +469,15 @@ domains:
           source_of_truth: matrix
           scope: cbu
           noun: matrix_overlay
+        invocation_phrases:
+          - "list overlays for subscription"
+          - "show overlays by product"
+          - "what overlays does subscription have"
+          - "get overlays for product subscription"
+          - "display subscription overlays"
+          - "which overlays apply to subscription"
+          - "show product-level overlays"
+          - "list overlays under subscription"
         behavior: crud
         crud:
           operation: list_by_fk
@@ -404,6 +503,15 @@ domains:
           source_of_truth: matrix
           scope: cbu
           noun: matrix_overlay
+        invocation_phrases:
+          - "show effective trading matrix"
+          - "get combined matrix view"
+          - "what is the effective matrix"
+          - "display matrix with overlays"
+          - "show merged product matrix"
+          - "compute effective matrix"
+          - "view trading matrix with products"
+          - "render full matrix"
         behavior: plugin
         plugin:
           handler: MatrixEffectiveOp
@@ -456,6 +564,15 @@ domains:
           source_of_truth: matrix
           scope: cbu
           noun: matrix_overlay
+        invocation_phrases:
+          - "show matrix gaps"
+          - "find missing resources"
+          - "what is incomplete in matrix"
+          - "identify coverage gaps"
+          - "show service gaps"
+          - "find lifecycle gaps"
+          - "detect missing SSIs or connections"
+          - "run gap analysis on matrix"
         behavior: plugin
         plugin:
           handler: MatrixUnifiedGapsOp
@@ -493,6 +610,15 @@ domains:
           source_of_truth: matrix
           scope: cbu
           noun: matrix_overlay
+        invocation_phrases:
+          - "compare product offerings"
+          - "diff products on matrix"
+          - "what does each product add"
+          - "compare custody vs prime brokerage"
+          - "show product differences"
+          - "side-by-side product comparison"
+          - "contrast product services"
+          - "compare product SLAs"
         behavior: plugin
         plugin:
           handler: MatrixCompareProductsOp

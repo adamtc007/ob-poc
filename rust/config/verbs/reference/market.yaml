@@ -9,6 +9,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: market
+        invocation_phrases:
+          - "add a new market"
+          - "register exchange by MIC code"
+          - "create market reference entry"
+          - "configure a trading venue"
+          - "set up new exchange"
+          - "define market with MIC"
+          - "upsert market record"
+          - "add stock exchange to refdata"
         behavior: crud
         crud:
           operation: upsert
@@ -53,6 +62,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: market
+        invocation_phrases:
+          - "look up market by MIC"
+          - "get market details"
+          - "show me this exchange"
+          - "fetch market definition"
+          - "what is this MIC code"
+          - "read market reference record"
+          - "find market by MIC code"
+          - "retrieve exchange information"
         behavior: crud
         crud:
           operation: select
@@ -72,6 +90,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: market
+        invocation_phrases:
+          - "list all markets"
+          - "show available exchanges"
+          - "what markets are configured"
+          - "display market reference table"
+          - "enumerate trading venues"
+          - "get all market records"
+          - "which exchanges are supported"
+          - "show me markets by country"
         behavior: crud
         crud:
           operation: select

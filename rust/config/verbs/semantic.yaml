@@ -26,6 +26,15 @@ domains:
           source_of_truth: catalog
           scope: global
           noun: semantic
+        invocation_phrases:
+          - "get onboarding state"
+          - "show stage progress for CBU"
+          - "where are we in onboarding"
+          - "what stages are complete"
+          - "derive semantic state"
+          - "onboarding progress check"
+          - "show gaps and blockers"
+          - "current onboarding status"
         behavior: plugin
         plugin:
           handler: SemanticStateOp
@@ -57,6 +66,15 @@ domains:
           source_of_truth: catalog
           scope: global
           noun: semantic
+        invocation_phrases:
+          - "list onboarding stages"
+          - "show all defined stages"
+          - "what stages exist"
+          - "display stage dependencies"
+          - "available onboarding stages"
+          - "stage definition overview"
+          - "get all stage definitions"
+          - "onboarding stage catalog"
         behavior: plugin
         plugin:
           handler: SemanticListStagesOp
@@ -73,6 +91,15 @@ domains:
           source_of_truth: catalog
           scope: global
           noun: semantic
+        invocation_phrases:
+          - "stages for product"
+          - "what stages does custody need"
+          - "required stages for product"
+          - "onboarding path for product"
+          - "product stage requirements"
+          - "which stages for fund accounting"
+          - "show product onboarding steps"
+          - "product specific stage list"
         behavior: plugin
         plugin:
           handler: SemanticStagesForProductOp
@@ -104,6 +131,15 @@ domains:
           source_of_truth: catalog
           scope: global
           noun: semantic
+        invocation_phrases:
+          - "what should I do next"
+          - "next actions for CBU"
+          - "show actionable stages"
+          - "what is unblocked"
+          - "suggest next onboarding step"
+          - "ready stages for progress"
+          - "unblocked items to work on"
+          - "next steps in onboarding"
         behavior: plugin
         plugin:
           handler: SemanticNextActionsOp
@@ -131,6 +167,15 @@ domains:
           source_of_truth: catalog
           scope: global
           noun: semantic
+        invocation_phrases:
+          - "what entities are missing"
+          - "missing roles for stage"
+          - "which parties need to be added"
+          - "gaps in entity setup"
+          - "incomplete entity requirements"
+          - "entities needed to proceed"
+          - "what is missing for completion"
+          - "show missing structure members"
         behavior: plugin
         plugin:
           handler: SemanticMissingEntitiesOp
@@ -166,6 +211,15 @@ domains:
           source_of_truth: catalog
           scope: global
           noun: semantic
+        invocation_phrases:
+          - "get prompt context"
+          - "generate agent context"
+          - "build prompt for CBU"
+          - "semantic context for agent"
+          - "prepare onboarding summary"
+          - "context for decision support"
+          - "format state for prompt"
+          - "agent briefing for CBU"
         behavior: plugin
         plugin:
           handler: SemanticPromptContextOp

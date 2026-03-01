@@ -14,6 +14,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: tax_config
+        invocation_phrases:
+          - "define tax jurisdiction and rates"
+          - "add withholding tax country"
+          - "register new tax jurisdiction"
+          - "set up country withholding rules"
+          - "configure tax authority for market"
+          - "what reclaim deadlines apply here"
+          - "provision jurisdiction tax defaults"
+          - "create tax jurisdiction profile"
         behavior: crud
         crud:
           operation: upsert
@@ -77,6 +86,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: tax_config
+        invocation_phrases:
+          - "list available tax jurisdictions"
+          - "show countries with withholding tax"
+          - "which jurisdictions allow reclaim"
+          - "display tax authority reference data"
+          - "what withholding rates are defined"
+          - "check tax jurisdiction coverage"
+          - "show reclaim-eligible countries"
+          - "browse tax jurisdictions by country"
         behavior: crud
         crud:
           operation: select
@@ -108,6 +126,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: tax_config
+        invocation_phrases:
+          - "set bilateral treaty withholding rate"
+          - "configure double taxation agreement"
+          - "add treaty rate for dividend income"
+          - "what is the DTA rate between countries"
+          - "apply reduced withholding under treaty"
+          - "register interest income treaty rate"
+          - "set beneficial owner treaty entitlement"
+          - "provision treaty rate for jurisdiction pair"
         behavior: crud
         crud:
           operation: upsert
@@ -203,6 +230,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: tax_config
+        invocation_phrases:
+          - "show treaty rates between jurisdictions"
+          - "list DTA withholding rates"
+          - "what treaty rates apply for dividends"
+          - "display bilateral tax treaty schedule"
+          - "check reduced rate for income type"
+          - "which treaties cover interest income"
+          - "show withholding treaty reference data"
+          - "list all tax treaty configurations"
         behavior: crud
         crud:
           operation: select
@@ -236,6 +272,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: tax_config
+        invocation_phrases:
+          - "set tax status for this fund"
+          - "configure CBU investor type for tax"
+          - "mark fund as tax-exempt in jurisdiction"
+          - "assign FATCA status to CBU"
+          - "set qualified intermediary designation"
+          - "update CRS reporting classification"
+          - "apply pension fund tax exemption"
+          - "configure sovereign wealth tax status"
         behavior: crud
         crud:
           operation: upsert
@@ -344,6 +389,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: tax_config
+        invocation_phrases:
+          - "show tax status for this CBU"
+          - "list fund tax classifications"
+          - "what FATCA status is configured"
+          - "display investor type per jurisdiction"
+          - "check tax exemption settings"
+          - "which jurisdictions have QI status"
+          - "show CBU tax documentation status"
+          - "list CRS and FATCA designations"
         behavior: crud
         crud:
           operation: list_by_fk
@@ -377,6 +431,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: tax_config
+        invocation_phrases:
+          - "configure tax reclaim for jurisdiction"
+          - "set up withholding tax recovery"
+          - "enable automatic reclaim processing"
+          - "assign reclaim service provider"
+          - "set minimum reclaim threshold amount"
+          - "configure batch reclaim frequency"
+          - "outsource tax reclaim to provider"
+          - "provision reclaim fee structure"
         behavior: crud
         crud:
           operation: upsert
@@ -470,6 +533,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: tax_config
+        invocation_phrases:
+          - "list reclaim configurations for CBU"
+          - "show tax recovery setup by jurisdiction"
+          - "which reclaim methods are configured"
+          - "display active reclaim providers"
+          - "check reclaim batch frequency settings"
+          - "what jurisdictions have reclaim enabled"
+          - "show minimum reclaim thresholds"
+          - "list outsourced reclaim arrangements"
         behavior: crud
         crud:
           operation: list_by_fk
@@ -503,6 +575,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: tax_config
+        invocation_phrases:
+          - "deactivate tax reclaim processing"
+          - "stop reclaim for this jurisdiction"
+          - "disable withholding tax recovery"
+          - "suspend reclaim configuration"
+          - "turn off automatic reclaim"
+          - "cancel outsourced reclaim arrangement"
+          - "halt tax reclaim submissions"
+          - "decommission reclaim for country"
         behavior: crud
         crud:
           operation: update
@@ -535,6 +616,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: tax_config
+        invocation_phrases:
+          - "set tax reporting obligation"
+          - "configure FATCA reporting for fund"
+          - "register CRS reporting status"
+          - "add DAC6 obligation for CBU"
+          - "assign GIIN for FATCA compliance"
+          - "set qualified intermediary reporting"
+          - "configure 871(m) withholding regime"
+          - "provision UK CDOT reporting"
         behavior: crud
         crud:
           operation: upsert
@@ -638,6 +728,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: tax_config
+        invocation_phrases:
+          - "list tax reporting obligations for CBU"
+          - "show FATCA and CRS registrations"
+          - "which reporting regimes apply"
+          - "display GIIN and QI designations"
+          - "check CBU tax compliance status"
+          - "what DAC6 obligations exist"
+          - "show reporting entity assignments"
+          - "list active tax regime registrations"
         behavior: crud
         crud:
           operation: list_by_fk

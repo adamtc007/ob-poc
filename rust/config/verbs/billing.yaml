@@ -31,6 +31,12 @@ domains:
           - "new billing profile"
           - "set up billing"
           - "create fee profile"
+          - "add billing profile"
+          - "establish billing profile"
+          - "configure billing for deal"
+          - "initialize fee billing"
+          - "set up fee profile"
+          - "create new billing configuration"
         args:
           - name: deal-id
             type: uuid
@@ -119,6 +125,13 @@ domains:
           - "activate billing profile"
           - "start billing"
           - "enable billing"
+          - "go live with billing"
+          - "turn on billing"
+          - "make billing active"
+          - "begin billing"
+          - "activate fee profile"
+          - "enable fee billing"
+          - "switch billing on"
         args:
           - name: profile-id
             type: uuid
@@ -139,6 +152,13 @@ domains:
           - "suspend billing profile"
           - "pause billing"
           - "hold billing"
+          - "freeze billing"
+          - "put billing on hold"
+          - "temporarily stop billing"
+          - "suspend fee profile"
+          - "deactivate billing temporarily"
+          - "halt billing"
+          - "pause fee billing"
         args:
           - name: profile-id
             type: uuid
@@ -163,6 +183,13 @@ domains:
           - "close billing profile"
           - "end billing"
           - "terminate billing"
+          - "stop billing"
+          - "shut down billing"
+          - "decommission billing profile"
+          - "close fee profile"
+          - "offboard billing"
+          - "end fee billing"
+          - "terminate fee profile"
         args:
           - name: profile-id
             type: uuid
@@ -191,6 +218,13 @@ domains:
           - "get billing profile"
           - "show billing profile"
           - "billing profile details"
+          - "view billing profile"
+          - "retrieve billing profile"
+          - "look up billing profile"
+          - "fetch billing profile"
+          - "display billing profile"
+          - "billing profile info"
+          - "read billing profile"
         args:
           - name: profile-id
             type: uuid
@@ -215,6 +249,13 @@ domains:
           - "list billing profiles"
           - "show billing profiles"
           - "all billing profiles"
+          - "get all billing profiles"
+          - "display billing profiles"
+          - "view billing profiles"
+          - "billing profiles for deal"
+          - "billing profiles for CBU"
+          - "show all fee profiles"
+          - "enumerate billing profiles"
         args:
           - name: deal-id
             type: uuid
@@ -251,6 +292,13 @@ domains:
           - "add billing account target"
           - "link account to billing"
           - "add billable account"
+          - "attach account to billing profile"
+          - "add account to billing"
+          - "include account in billing"
+          - "connect account to billing"
+          - "register billing account"
+          - "assign account to billing profile"
+          - "map account to billing"
         args:
           - name: profile-id
             type: uuid
@@ -309,6 +357,13 @@ domains:
           - "remove billing account target"
           - "unlink account from billing"
           - "deactivate billing account"
+          - "detach account from billing"
+          - "disconnect account from billing"
+          - "delete billing account target"
+          - "drop account from billing"
+          - "exclude account from billing"
+          - "take account off billing"
+          - "remove account from billing profile"
         args:
           - name: target-id
             type: uuid
@@ -333,6 +388,13 @@ domains:
           - "list billing account targets"
           - "show billable accounts"
           - "billing accounts"
+          - "get billing account targets"
+          - "display billable accounts"
+          - "view billing account targets"
+          - "show accounts linked to billing"
+          - "which accounts are being billed"
+          - "list accounts in billing profile"
+          - "show billing targets"
         args:
           - name: profile-id
             type: uuid
@@ -361,6 +423,13 @@ domains:
           - "create billing period"
           - "new billing period"
           - "start billing cycle"
+          - "open billing period"
+          - "begin billing cycle"
+          - "set up billing period"
+          - "initialize billing period"
+          - "add billing period"
+          - "create new fee period"
+          - "start new billing period"
         args:
           - name: profile-id
             type: uuid
@@ -394,6 +463,13 @@ domains:
           - "calculate billing period"
           - "run fee calculation"
           - "calculate fees"
+          - "compute billing fees"
+          - "run billing calculation"
+          - "execute fee calculation"
+          - "process billing period"
+          - "calculate period fees"
+          - "compute fees for period"
+          - "run fee computation"
         args:
           - name: period-id
             type: uuid
@@ -417,6 +493,13 @@ domains:
           - "review billing period"
           - "mark billing reviewed"
           - "apply billing adjustments"
+          - "review fees for period"
+          - "check billing period"
+          - "review fee calculations"
+          - "audit billing period"
+          - "verify billing calculations"
+          - "sign off on billing review"
+          - "complete billing review"
         args:
           - name: period-id
             type: uuid
@@ -448,6 +531,13 @@ domains:
           - "approve billing period"
           - "approve fees"
           - "sign off billing"
+          - "authorize billing period"
+          - "approve fee calculation"
+          - "confirm billing approval"
+          - "approve period for invoicing"
+          - "finalize billing approval"
+          - "approve billing for invoice"
+          - "grant billing approval"
         args:
           - name: period-id
             type: uuid
@@ -475,6 +565,13 @@ domains:
           - "generate invoice"
           - "create invoice"
           - "invoice billing period"
+          - "produce invoice"
+          - "issue invoice"
+          - "build invoice from billing"
+          - "create fee invoice"
+          - "generate billing invoice"
+          - "emit invoice for period"
+          - "prepare invoice"
         args:
           - name: period-id
             type: uuid
@@ -497,6 +594,13 @@ domains:
           - "dispute billing period"
           - "raise billing dispute"
           - "contest fees"
+          - "challenge billing charges"
+          - "file billing dispute"
+          - "dispute fee calculation"
+          - "object to billing"
+          - "contest billing period"
+          - "raise fee dispute"
+          - "submit billing challenge"
         args:
           - name: period-id
             type: uuid
@@ -525,6 +629,13 @@ domains:
           - "billing period summary"
           - "show billing period"
           - "billing period details"
+          - "view billing period"
+          - "get billing period info"
+          - "display billing period lines"
+          - "billing period breakdown"
+          - "show fee period details"
+          - "period fee summary"
+          - "view period line items"
         args:
           - name: period-id
             type: uuid
@@ -546,6 +657,12 @@ domains:
           - "billing revenue report"
           - "fee revenue"
           - "total revenue"
+          - "show revenue"
+          - "revenue by deal"
+          - "fee revenue report"
+          - "revenue breakdown"
+          - "total billing revenue"
+          - "revenue analytics"
         args:
           - name: deal-id
             type: uuid

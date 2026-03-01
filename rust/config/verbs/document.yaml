@@ -457,6 +457,15 @@ domains:
       # ========================================================================
       get:
         description: Get document with latest version status
+        invocation_phrases:
+          - "get document details"
+          - "show document status"
+          - "retrieve document record"
+          - "look up document"
+          - "fetch document information"
+          - "view document with version status"
+          - "what is the document status"
+          - "check document current version"
         behavior: crud
         metadata:
           tier: diagnostics
@@ -478,6 +487,15 @@ domains:
 
       list-versions:
         description: List all versions of a document
+        invocation_phrases:
+          - "list document versions"
+          - "show version history"
+          - "get all document submissions"
+          - "view document revision history"
+          - "how many versions exist"
+          - "show previous document uploads"
+          - "list all document revisions"
+          - "track document version trail"
         behavior: crud
         metadata:
           tier: diagnostics

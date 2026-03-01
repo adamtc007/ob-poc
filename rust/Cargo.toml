@@ -126,6 +126,7 @@ sem_os_core = { path = "crates/sem_os_core" }
 sem_os_postgres = { path = "crates/sem_os_postgres" }
 tokio-stream = "0.1"
 proptest = "1.4"
+toml = "0.8"
 
 [build-dependencies]
 tonic-build = "0.12"

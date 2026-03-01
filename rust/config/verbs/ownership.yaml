@@ -68,6 +68,17 @@ domains:
 
       snapshot.list:
         description: List ownership snapshots for an issuer
+        invocation_phrases:
+          - "list ownership snapshots"
+          - "show ownership history"
+          - "view ownership records"
+          - "list snapshots for issuer"
+          - "show ownership timeline"
+          - "display ownership snapshots"
+          - "get snapshot history"
+          - "list historical ownership"
+          - "show beneficial ownership history"
+          - "what ownership snapshots exist"
         metadata:
           tier: intent
           source_of_truth: entity
@@ -121,6 +132,17 @@ domains:
 
       snapshot.get:
         description: Get a specific ownership snapshot
+        invocation_phrases:
+          - "get ownership snapshot"
+          - "show specific snapshot"
+          - "view snapshot details"
+          - "retrieve ownership record"
+          - "display snapshot"
+          - "fetch snapshot by ID"
+          - "get snapshot details"
+          - "retrieve beneficial ownership snapshot"
+          - "look up ownership record"
+          - "fetch ownership position snapshot"
         metadata:
           tier: intent
           source_of_truth: entity
@@ -156,6 +178,7 @@ domains:
           - "show who controls what"
           - "display ownership control"
           - "get control position summary"
+          - "show voting rights breakdown"
         metadata:
           tier: intent
           source_of_truth: entity
@@ -218,6 +241,8 @@ domains:
           - "who owns controlling stake"
           - "show ultimate controller"
           - "find who controls"
+          - "identify beneficial owner with control"
+          - "who holds majority voting rights"
         metadata:
           tier: intent
           source_of_truth: entity
@@ -248,6 +273,17 @@ domains:
 
       right.add-to-class:
         description: Add a special right attached to a share class
+        invocation_phrases:
+          - "add class right"
+          - "attach right to class"
+          - "add share class right"
+          - "grant class voting right"
+          - "add board appointment right"
+          - "attach veto to class"
+          - "add anti-dilution right"
+          - "grant tag along right"
+          - "assign special right to share class"
+          - "register class-level entitlement"
         metadata:
           tier: intent
           source_of_truth: entity
@@ -348,6 +384,17 @@ domains:
 
       right.add-to-holder:
         description: Add a special right attached to a specific holder (side letter)
+        invocation_phrases:
+          - "add holder right"
+          - "grant investor right"
+          - "add side letter right"
+          - "attach right to holder"
+          - "grant board observer"
+          - "add information rights"
+          - "grant protective provision"
+          - "add investor veto"
+          - "attach entitlement to shareholder"
+          - "register holder-level special right"
         metadata:
           tier: intent
           source_of_truth: entity
@@ -464,6 +511,17 @@ domains:
 
       right.end:
         description: End a special right (set effective_to date)
+        invocation_phrases:
+          - "end special right"
+          - "terminate right"
+          - "expire holder right"
+          - "remove special right"
+          - "end board right"
+          - "terminate veto right"
+          - "close out right"
+          - "revoke shareholder entitlement"
+          - "sunset ownership right"
+          - "expire voting right"
         metadata:
           tier: intent
           source_of_truth: entity
@@ -489,6 +547,17 @@ domains:
 
       right.list-for-issuer:
         description: List all special rights for an issuer
+        invocation_phrases:
+          - "list issuer rights"
+          - "show rights for company"
+          - "display special rights"
+          - "list all rights"
+          - "show company rights"
+          - "view issuer special rights"
+          - "get rights summary"
+          - "show equity rights for company"
+          - "list shareholder register rights"
+          - "what entitlements exist for issuer"
         metadata:
           tier: intent
           source_of_truth: entity
@@ -518,6 +587,17 @@ domains:
 
       right.list-for-holder:
         description: List all special rights held by an entity
+        invocation_phrases:
+          - "list holder rights"
+          - "show my rights"
+          - "display investor rights"
+          - "what rights do they have"
+          - "list entity rights"
+          - "show rights held"
+          - "view holder entitlements"
+          - "show beneficial owner rights"
+          - "what rights does this investor have"
+          - "list UBO special entitlements"
         metadata:
           tier: intent
           source_of_truth: entity
@@ -561,6 +641,7 @@ domains:
           - "run ownership comparison"
           - "verify ownership data"
           - "cross-check ownership"
+          - "match register against GLEIF data"
         metadata:
           tier: intent
           source_of_truth: entity
@@ -622,6 +703,17 @@ domains:
 
       reconcile.findings:
         description: List findings from a reconciliation run
+        invocation_phrases:
+          - "show reconciliation findings"
+          - "list discrepancies"
+          - "view reconcile results"
+          - "show ownership mismatches"
+          - "display findings"
+          - "get reconciliation errors"
+          - "show what doesn't match"
+          - "list ownership discrepancies found"
+          - "view reconciliation breaks"
+          - "what ownership data conflicts exist"
         metadata:
           tier: intent
           source_of_truth: entity
@@ -668,6 +760,17 @@ domains:
 
       reconcile.resolve-finding:
         description: Resolve a reconciliation finding
+        invocation_phrases:
+          - "resolve finding"
+          - "close reconciliation issue"
+          - "mark as resolved"
+          - "acknowledge finding"
+          - "dismiss false positive"
+          - "resolve discrepancy"
+          - "close out finding"
+          - "mark reconciliation break as resolved"
+          - "clear ownership discrepancy"
+          - "flag finding as false positive"
         metadata:
           tier: intent
           source_of_truth: entity
@@ -709,6 +812,17 @@ domains:
 
       reconcile.list-runs:
         description: List reconciliation runs for an issuer
+        invocation_phrases:
+          - "list reconciliation runs"
+          - "show reconcile history"
+          - "view past reconciliations"
+          - "list previous runs"
+          - "show reconciliation jobs"
+          - "display run history"
+          - "get reconciliation audit trail"
+          - "show BODS reconciliation history"
+          - "list completed ownership comparisons"
+          - "view past ownership cross-checks"
         metadata:
           tier: intent
           source_of_truth: entity
@@ -758,6 +872,8 @@ domains:
           - "find unidentified holders"
           - "show ownership gaps"
           - "check total coverage"
+          - "where is ownership look-through incomplete"
+          - "identify UBO coverage gaps"
         metadata:
           tier: intent
           source_of_truth: entity
@@ -802,6 +918,8 @@ domains:
           - "trace path to owner"
           - "find connection between"
           - "map ownership route"
+          - "trace beneficial ownership chain upward"
+          - "show equity stake path between entities"
         metadata:
           tier: intent
           source_of_truth: entity

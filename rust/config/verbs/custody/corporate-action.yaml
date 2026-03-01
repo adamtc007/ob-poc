@@ -18,6 +18,15 @@ domains:
           scope: global
           noun: ca_event_type
           tags: [reference-data, seeding]
+        invocation_phrases:
+          - "define a corporate action type"
+          - "add new CA event category"
+          - "register dividend event type"
+          - "set up rights issue event"
+          - "create mandatory CA definition"
+          - "configure voluntary CA event"
+          - "add ISO corporate action code"
+          - "seed CA event reference data"
         crud:
           operation: upsert
           table: ca_event_types
@@ -70,6 +79,15 @@ domains:
           scope: global
           noun: ca_event_type
           tags: [read, reference-data]
+        invocation_phrases:
+          - "list corporate action event types"
+          - "show all CA categories"
+          - "what CA events are defined"
+          - "display elective event types"
+          - "which mandatory events exist"
+          - "show income CA types"
+          - "list reorganization event codes"
+          - "what ISO CA codes are available"
         crud:
           operation: select
           table: ca_event_types
@@ -107,6 +125,15 @@ domains:
           noun: ca_preference
           internal: true
           tags: [projection, materialize-target]
+        invocation_phrases:
+          - "set CA processing preferences"
+          - "configure corporate action elections"
+          - "set default dividend election"
+          - "choose auto-instruct for CA"
+          - "update CA threshold settings"
+          - "set manual processing for rights"
+          - "configure income event handling"
+          - "apply CA preference to CBU"
         crud:
           operation: upsert
           table: cbu_ca_preferences
@@ -188,6 +215,15 @@ domains:
           scope: cbu
           noun: ca_preference
           tags: [read, operational-state]
+        invocation_phrases:
+          - "show CA preferences for CBU"
+          - "list corporate action settings"
+          - "what election defaults are configured"
+          - "display CA processing rules"
+          - "how are dividends being handled"
+          - "check auto-instruct settings"
+          - "show voluntary CA elections"
+          - "which event types have preferences"
         crud:
           operation: list_by_fk
           table: cbu_ca_preferences
@@ -223,6 +259,15 @@ domains:
           noun: ca_preference
           internal: true
           tags: [projection, materialize-target]
+        invocation_phrases:
+          - "remove CA preference"
+          - "delete corporate action setting"
+          - "clear election default"
+          - "remove auto-instruct preference"
+          - "drop CA processing rule"
+          - "unset dividend preference"
+          - "remove income event handling"
+          - "clear CA configuration for event"
         crud:
           operation: delete
           table: cbu_ca_preferences
@@ -250,6 +295,15 @@ domains:
           noun: instruction_window
           internal: true
           tags: [projection, materialize-target]
+        invocation_phrases:
+          - "set CA instruction deadline"
+          - "configure election cutoff window"
+          - "set warning days for CA"
+          - "define escalation deadline for events"
+          - "how many days before cutoff"
+          - "configure CA market deadline rules"
+          - "set internal cutoff buffer"
+          - "define instruction window for market"
         crud:
           operation: upsert
           table: cbu_ca_instruction_windows
@@ -329,6 +383,15 @@ domains:
           scope: cbu
           noun: instruction_window
           tags: [read, operational-state]
+        invocation_phrases:
+          - "show CA instruction windows"
+          - "list election deadline rules"
+          - "what are the cutoff configurations"
+          - "display warning and escalation days"
+          - "check CA deadline settings"
+          - "show market cutoff buffers"
+          - "when do CA instructions close"
+          - "list instruction window per market"
         crud:
           operation: list_by_fk
           table: cbu_ca_instruction_windows
@@ -365,6 +428,15 @@ domains:
           noun: ca_ssi_mapping
           internal: true
           tags: [projection, materialize-target]
+        invocation_phrases:
+          - "link SSI to corporate action"
+          - "map CA payment to settlement route"
+          - "set SSI for dividend payments"
+          - "assign settlement instruction for CA"
+          - "configure CA delivery SSI"
+          - "which SSI receives CA proceeds"
+          - "route CA cash to specific BIC"
+          - "connect CA event to custodian account"
         crud:
           operation: upsert
           table: cbu_ca_ssi_mappings
@@ -428,6 +500,15 @@ domains:
           scope: cbu
           noun: ca_ssi_mapping
           tags: [read, operational-state]
+        invocation_phrases:
+          - "show CA SSI mappings"
+          - "list corporate action settlement links"
+          - "which SSIs handle CA payments"
+          - "display CA delivery routing"
+          - "check dividend payment SSI setup"
+          - "show CA proceeds settlement config"
+          - "what are the CA SSI assignments"
+          - "list event to SSI mappings"
         crud:
           operation: list_by_fk
           table: cbu_ca_ssi_mappings

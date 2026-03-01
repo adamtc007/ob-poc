@@ -9,6 +9,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: case_type
+        invocation_phrases:
+          - "add a new case type"
+          - "register KYC case type"
+          - "create case type reference entry"
+          - "configure a case classification"
+          - "set up new review type"
+          - "define a case type code"
+          - "what case types can I add"
+          - "upsert case type record"
         behavior: crud
         crud:
           operation: upsert
@@ -52,6 +61,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: case_type
+        invocation_phrases:
+          - "look up case type by code"
+          - "get case type details"
+          - "show me this case type"
+          - "fetch case type definition"
+          - "what is this case type"
+          - "read case type reference record"
+          - "find case type by code"
+          - "retrieve case type information"
         behavior: crud
         crud:
           operation: select
@@ -72,6 +90,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: case_type
+        invocation_phrases:
+          - "list all case types"
+          - "show available case classifications"
+          - "what case types exist"
+          - "display KYC case types"
+          - "enumerate review type codes"
+          - "get all case type records"
+          - "which case types are active"
+          - "show me the case type list"
         behavior: crud
         crud:
           operation: select
@@ -93,6 +120,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: case_type
+        invocation_phrases:
+          - "deactivate a case type"
+          - "disable this case classification"
+          - "retire case type code"
+          - "turn off a case type"
+          - "mark case type as inactive"
+          - "remove case type from active list"
+          - "suspend a case type"
+          - "deprecate this review type"
         behavior: crud
         crud:
           operation: update

@@ -10,6 +10,17 @@ domains:
       # === Template Operations (read-only reference data) ===
       list-templates:
         description: List available SLA templates
+        invocation_phrases:
+          - "list SLA templates"
+          - "show SLA templates"
+          - "available SLA templates"
+          - "get SLA templates"
+          - "display service level templates"
+          - "what SLA templates exist"
+          - "browse service level agreement templates"
+          - "show all KPI templates"
+          - "which SLA templates are available"
+          - "fetch SLA template catalog"
         metadata:
           tier: reference
           source_of_truth: operational
@@ -45,6 +56,17 @@ domains:
 
       read-template:
         description: Read SLA template by code
+        invocation_phrases:
+          - "read SLA template"
+          - "show SLA template details"
+          - "get SLA template"
+          - "view SLA template"
+          - "describe SLA template"
+          - "inspect service level template"
+          - "what does this SLA template cover"
+          - "look up SLA template by code"
+          - "show KPI targets for template"
+          - "retrieve SLA template definition"
         metadata:
           tier: reference
           source_of_truth: operational
@@ -66,6 +88,17 @@ domains:
       # === Commitment Operations ===
       commit:
         description: Create SLA commitment for CBU (idempotent by cbu+template+profile)
+        invocation_phrases:
+          - "commit SLA"
+          - "create SLA commitment"
+          - "set SLA commitment"
+          - "establish SLA"
+          - "agree service level"
+          - "add service level agreement"
+          - "define SLA for this CBU"
+          - "set up SLA commitment"
+          - "assign SLA to client unit"
+          - "register new SLA target"
         metadata:
           tier: intent
           source_of_truth: operational
@@ -154,6 +187,17 @@ domains:
 
       bind-to-profile:
         description: Bind SLA commitment to trading profile
+        invocation_phrases:
+          - "bind SLA to profile"
+          - "attach SLA to trading profile"
+          - "link SLA to profile"
+          - "apply SLA to mandate"
+          - "associate SLA with trading profile"
+          - "connect SLA commitment to profile"
+          - "set SLA on trading mandate"
+          - "map SLA to mandate profile"
+          - "assign service level to profile"
+          - "tie SLA to trading profile"
         metadata:
           tier: intent
           source_of_truth: operational
@@ -184,6 +228,17 @@ domains:
 
       bind-to-service:
         description: Bind SLA commitment to service
+        invocation_phrases:
+          - "bind SLA to service"
+          - "attach SLA to service"
+          - "link SLA to service"
+          - "apply SLA to service"
+          - "associate SLA with service"
+          - "connect commitment to service"
+          - "set service level on service"
+          - "map SLA commitment to service"
+          - "assign SLA target to service"
+          - "tie service level to service"
         metadata:
           tier: intent
           source_of_truth: operational
@@ -215,6 +270,17 @@ domains:
 
       bind-to-resource:
         description: Bind SLA commitment to service resource instance
+        invocation_phrases:
+          - "bind SLA to resource"
+          - "attach SLA to resource"
+          - "link SLA to resource"
+          - "apply SLA to resource"
+          - "associate SLA with resource instance"
+          - "connect commitment to resource"
+          - "set SLA on resource instance"
+          - "assign service level to resource"
+          - "map SLA to resource instance"
+          - "tie SLA commitment to resource"
         metadata:
           tier: intent
           source_of_truth: operational
@@ -246,6 +312,17 @@ domains:
 
       bind-to-isda:
         description: Bind SLA commitment to ISDA agreement
+        invocation_phrases:
+          - "bind SLA to ISDA"
+          - "attach SLA to ISDA agreement"
+          - "link SLA to ISDA"
+          - "apply SLA to ISDA"
+          - "associate SLA with ISDA"
+          - "connect SLA commitment to ISDA"
+          - "set service level on ISDA"
+          - "map SLA to ISDA agreement"
+          - "assign SLA target to ISDA"
+          - "tie service level to ISDA"
         metadata:
           tier: intent
           source_of_truth: operational
@@ -271,6 +348,17 @@ domains:
 
       bind-to-csa:
         description: Bind SLA commitment to CSA agreement
+        invocation_phrases:
+          - "bind SLA to CSA"
+          - "attach SLA to credit support annex"
+          - "link SLA to CSA"
+          - "apply SLA to CSA"
+          - "associate SLA with CSA"
+          - "connect SLA commitment to CSA"
+          - "set service level on CSA"
+          - "map SLA to credit support annex"
+          - "assign SLA target to CSA"
+          - "tie service level to CSA"
         metadata:
           tier: intent
           source_of_truth: operational
@@ -296,6 +384,17 @@ domains:
 
       list-commitments:
         description: List SLA commitments for CBU
+        invocation_phrases:
+          - "list SLA commitments"
+          - "show active SLAs"
+          - "get SLA commitments"
+          - "display commitments"
+          - "what SLAs are active"
+          - "show service level agreements for CBU"
+          - "which SLAs apply to this unit"
+          - "view all SLA commitments"
+          - "enumerate active service levels"
+          - "check current SLA commitments"
         metadata:
           tier: reference
           source_of_truth: operational
@@ -326,6 +425,17 @@ domains:
 
       suspend-commitment:
         description: Suspend an SLA commitment
+        invocation_phrases:
+          - "suspend SLA"
+          - "pause SLA commitment"
+          - "deactivate SLA"
+          - "suspend service level"
+          - "put SLA on hold"
+          - "temporarily disable SLA"
+          - "freeze SLA commitment"
+          - "halt service level agreement"
+          - "place SLA in suspended state"
+          - "stop SLA monitoring temporarily"
         metadata:
           tier: intent
           source_of_truth: operational
@@ -350,6 +460,17 @@ domains:
       # === Measurement Operations ===
       record-measurement:
         description: Record SLA measurement for period
+        invocation_phrases:
+          - "record SLA measurement"
+          - "log SLA metric"
+          - "record service level"
+          - "capture SLA measurement"
+          - "log performance metric"
+          - "submit SLA KPI measurement"
+          - "enter uptime measurement"
+          - "report turnaround time metric"
+          - "capture response time measurement"
+          - "log settlement window performance"
         metadata:
           tier: intent
           source_of_truth: operational
@@ -414,6 +535,17 @@ domains:
 
       list-measurements:
         description: List measurements for SLA commitment
+        invocation_phrases:
+          - "list SLA measurements"
+          - "show SLA metrics"
+          - "get SLA history"
+          - "display measurements"
+          - "SLA measurement history"
+          - "view KPI performance history"
+          - "show service level metrics over time"
+          - "what were the SLA results"
+          - "retrieve measurement trend data"
+          - "check SLA performance records"
         metadata:
           tier: reference
           source_of_truth: operational
@@ -445,6 +577,17 @@ domains:
       # === Breach Operations ===
       report-breach:
         description: Report SLA breach
+        invocation_phrases:
+          - "report SLA breach"
+          - "log SLA violation"
+          - "record SLA breach"
+          - "report service level breach"
+          - "SLA breach notification"
+          - "raise SLA breach incident"
+          - "flag missed SLA target"
+          - "register cut-off time breach"
+          - "report settlement window violation"
+          - "notify of SLA non-compliance"
         metadata:
           tier: intent
           source_of_truth: operational
@@ -508,6 +651,17 @@ domains:
 
       update-remediation:
         description: Update breach remediation status
+        invocation_phrases:
+          - "update remediation"
+          - "update SLA breach fix"
+          - "remediation progress"
+          - "update breach remediation"
+          - "remediation status update"
+          - "set remediation plan for breach"
+          - "change breach fix status"
+          - "track remediation action progress"
+          - "modify breach corrective action"
+          - "advance remediation due date"
         metadata:
           tier: intent
           source_of_truth: operational
@@ -547,6 +701,17 @@ domains:
 
       resolve-breach:
         description: Mark breach as resolved
+        invocation_phrases:
+          - "resolve SLA breach"
+          - "close SLA breach"
+          - "mark breach resolved"
+          - "complete remediation"
+          - "breach resolution"
+          - "finalize breach corrective action"
+          - "confirm SLA breach is fixed"
+          - "close out remediation"
+          - "mark SLA violation as resolved"
+          - "sign off breach resolution"
         metadata:
           tier: intent
           source_of_truth: operational
@@ -570,6 +735,17 @@ domains:
 
       escalate-breach:
         description: Escalate breach
+        invocation_phrases:
+          - "escalate SLA breach"
+          - "escalate breach"
+          - "raise SLA issue"
+          - "SLA escalation"
+          - "escalate service level issue"
+          - "escalate unresolved SLA breach"
+          - "raise breach to senior management"
+          - "elevate SLA violation severity"
+          - "trigger SLA escalation procedure"
+          - "forward breach for executive review"
         metadata:
           tier: intent
           source_of_truth: operational
@@ -595,6 +771,17 @@ domains:
 
       list-open-breaches:
         description: List open breaches for CBU
+        invocation_phrases:
+          - "list open SLA breaches"
+          - "show active breaches"
+          - "unresolved SLA breaches"
+          - "get open breaches"
+          - "outstanding SLA violations"
+          - "which SLA breaches are still open"
+          - "show pending breach remediations"
+          - "display unresolved service level issues"
+          - "any outstanding SLA breaches"
+          - "check for open SLA incidents"
         metadata:
           tier: reference
           source_of_truth: operational

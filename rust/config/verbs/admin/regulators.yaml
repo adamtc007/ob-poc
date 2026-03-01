@@ -12,6 +12,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: regulators
+        invocation_phrases:
+          - "list regulators"
+          - "show all regulators"
+          - "which regulators are recognized"
+          - "get regulators for jurisdiction"
+          - "list regulatory bodies"
+          - "show recognized regulators"
+          - "what regulators do we have"
+          - "display regulators"
         behavior: crud
         crud:
           operation: select
@@ -42,6 +51,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: regulators
+        invocation_phrases:
+          - "get regulator details"
+          - "look up regulator by code"
+          - "show regulator info"
+          - "find regulator"
+          - "read regulator record"
+          - "regulator details for code"
+          - "what is this regulator"
+          - "fetch regulator"
         behavior: crud
         crud:
           operation: select
@@ -62,6 +80,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: regulators
+        invocation_phrases:
+          - "add a regulator"
+          - "create new regulator"
+          - "register a regulatory body"
+          - "add recognized regulator"
+          - "set up new regulator"
+          - "define regulator"
+          - "onboard a regulator"
+          - "new regulatory authority"
         behavior: crud
         crud:
           operation: upsert
@@ -107,6 +134,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: regulators
+        invocation_phrases:
+          - "update regulator"
+          - "change regulator details"
+          - "modify regulator"
+          - "edit regulator record"
+          - "update regulatory tier"
+          - "change regulator URL"
+          - "amend regulator info"
+          - "update regulator registry URL"
         behavior: crud
         crud:
           operation: update
@@ -139,6 +175,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: regulators
+        invocation_phrases:
+          - "deactivate regulator"
+          - "disable regulator"
+          - "remove regulator"
+          - "retire regulator"
+          - "mark regulator inactive"
+          - "turn off regulator"
+          - "decommission regulator"
+          - "sunset regulator"
         behavior: crud
         crud:
           operation: update
@@ -165,6 +210,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: regulators
+        invocation_phrases:
+          - "list regulatory tiers"
+          - "show regulatory tiers"
+          - "what tiers are defined"
+          - "get all regulatory tiers"
+          - "display tier classifications"
+          - "show tier levels"
+          - "list tier codes"
+          - "regulatory tier options"
         behavior: crud
         crud:
           operation: select
@@ -182,6 +236,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: regulators
+        invocation_phrases:
+          - "get regulatory tier"
+          - "look up tier by code"
+          - "show tier details"
+          - "read tier record"
+          - "find regulatory tier"
+          - "what tier is this"
+          - "fetch tier info"
+          - "tier details"
         behavior: crud
         crud:
           operation: select

@@ -4,6 +4,15 @@ domains:
     verbs:
       record:
         description: Record a service delivery for a CBU (upsert by cbu+product+service)
+        invocation_phrases:
+          - "record service delivery"
+          - "log delivery for CBU"
+          - "track service fulfillment"
+          - "register delivery event"
+          - "add delivery record"
+          - "capture service delivery"
+          - "record product delivery"
+          - "log service provision"
         metadata:
           tier: intent
           source_of_truth: operational
@@ -70,6 +79,15 @@ domains:
 
       complete:
         description: Mark a service delivery as complete
+        invocation_phrases:
+          - "complete service delivery"
+          - "mark delivery as done"
+          - "confirm delivery completed"
+          - "finalize service delivery"
+          - "close delivery record"
+          - "delivery fulfilled for CBU"
+          - "mark service as delivered"
+          - "confirm product delivery"
         metadata:
           tier: intent
           source_of_truth: operational
@@ -132,6 +150,15 @@ domains:
 
       fail:
         description: Mark a service delivery as failed
+        invocation_phrases:
+          - "fail service delivery"
+          - "mark delivery as failed"
+          - "report delivery failure"
+          - "flag failed delivery"
+          - "record delivery failure reason"
+          - "service delivery did not complete"
+          - "delivery failed for CBU"
+          - "log failed service provision"
         metadata:
           tier: intent
           source_of_truth: operational

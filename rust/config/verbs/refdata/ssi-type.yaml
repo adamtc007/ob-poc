@@ -9,6 +9,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: ssi_type
+        invocation_phrases:
+          - "add a new SSI type"
+          - "register SSI classification"
+          - "create SSI type entry"
+          - "configure settlement instruction type"
+          - "set up SSI category"
+          - "define SSI type code"
+          - "upsert SSI type record"
+          - "add standing instruction type"
         behavior: crud
         crud:
           operation: upsert
@@ -52,6 +61,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: ssi_type
+        invocation_phrases:
+          - "look up SSI type by code"
+          - "get SSI type details"
+          - "show me this SSI type"
+          - "fetch SSI type definition"
+          - "what is this SSI type"
+          - "read SSI type reference record"
+          - "find SSI type by code"
+          - "retrieve standing instruction type"
         behavior: crud
         crud:
           operation: select
@@ -72,6 +90,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: ssi_type
+        invocation_phrases:
+          - "list all SSI types"
+          - "show available SSI categories"
+          - "what SSI types exist"
+          - "display SSI type codes"
+          - "enumerate standing instruction types"
+          - "get all SSI type records"
+          - "which SSI types are active"
+          - "show me the SSI type list"
         behavior: crud
         crud:
           operation: select
@@ -93,6 +120,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: ssi_type
+        invocation_phrases:
+          - "deactivate an SSI type"
+          - "disable this SSI classification"
+          - "retire SSI type code"
+          - "turn off an SSI type"
+          - "mark SSI type as inactive"
+          - "remove SSI type from list"
+          - "suspend a standing instruction type"
+          - "deprecate this SSI type"
         behavior: crud
         crud:
           operation: update

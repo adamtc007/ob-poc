@@ -14,6 +14,15 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: investment_manager
+        invocation_phrases:
+          - "assign investment manager"
+          - "add IM to structure"
+          - "link manager to CBU"
+          - "set investment manager for fund"
+          - "appoint sub-advisor"
+          - "register IM assignment"
+          - "assign portfolio manager"
+          - "add trading manager to CBU"
         behavior: crud
         crud:
           operation: upsert
@@ -144,6 +153,15 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: investment_manager
+        invocation_phrases:
+          - "set IM trading scope"
+          - "update manager scope"
+          - "change IM market scope"
+          - "restrict manager to markets"
+          - "set instrument scope for IM"
+          - "modify investment manager scope"
+          - "update IM currency scope"
+          - "adjust manager trading permissions"
         behavior: crud
         crud:
           operation: update
@@ -185,6 +203,15 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: investment_manager
+        invocation_phrases:
+          - "link IM to SWIFT connection"
+          - "set instruction delivery"
+          - "connect IM to messaging resource"
+          - "wire IM to connectivity"
+          - "link manager to FIX connection"
+          - "assign instruction channel"
+          - "set IM delivery method"
+          - "connect trading instructions"
         behavior: crud
         crud:
           operation: update
@@ -216,6 +243,15 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: investment_manager
+        invocation_phrases:
+          - "list investment managers"
+          - "show IM assignments"
+          - "who manages this CBU"
+          - "display assigned managers"
+          - "get all IMs for fund"
+          - "show portfolio managers"
+          - "list manager assignments"
+          - "which IMs are on this structure"
         behavior: crud
         crud:
           operation: list_by_fk
@@ -247,6 +283,15 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: investment_manager
+        invocation_phrases:
+          - "suspend investment manager"
+          - "pause IM assignment"
+          - "temporarily disable manager"
+          - "hold IM trading access"
+          - "freeze IM assignment"
+          - "suspend manager from CBU"
+          - "pause portfolio manager"
+          - "deactivate IM temporarily"
         behavior: crud
         crud:
           operation: update
@@ -270,6 +315,15 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: investment_manager
+        invocation_phrases:
+          - "terminate investment manager"
+          - "end IM assignment"
+          - "remove manager from CBU"
+          - "off-board investment manager"
+          - "close IM relationship"
+          - "revoke manager assignment"
+          - "terminate portfolio manager"
+          - "end manager trading access"
         behavior: crud
         crud:
           operation: update
@@ -297,6 +351,15 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: investment_manager
+        invocation_phrases:
+          - "find manager for trade"
+          - "which IM handles this market"
+          - "resolve IM for instrument class"
+          - "who trades equities for this CBU"
+          - "match trade to manager"
+          - "find IM by market scope"
+          - "which manager covers this currency"
+          - "look up IM for trade"
         behavior: plugin
         handler: find_im_for_trade
         args:

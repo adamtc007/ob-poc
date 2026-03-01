@@ -9,6 +9,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: entity_settlement
+        invocation_phrases:
+          - "set counterparty BIC code"
+          - "assign settlement identity to entity"
+          - "register SWIFT BIC for counterparty"
+          - "configure ALERT participant ID"
+          - "set LEI for settlement"
+          - "update entity settlement identity"
+          - "link BIC to counterparty"
+          - "provision CTM participant details"
         behavior: crud
         crud:
           operation: upsert
@@ -56,6 +65,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: entity_settlement
+        invocation_phrases:
+          - "add counterparty SSI"
+          - "register settlement instruction for entity"
+          - "set up SWIFT routing for counterparty"
+          - "add ALERT SSI for broker"
+          - "configure safekeeping account details"
+          - "add DVP settlement route for entity"
+          - "provision counterparty BIC and account"
+          - "create entity settlement instruction"
         behavior: crud
         crud:
           operation: upsert
@@ -147,6 +165,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: entity_settlement
+        invocation_phrases:
+          - "remove counterparty SSI"
+          - "delete settlement instruction for entity"
+          - "deactivate SSI for broker"
+          - "remove SWIFT routing for counterparty"
+          - "clear entity settlement details"
+          - "drop safekeeping account link"
+          - "cancel counterparty settlement route"
+          - "remove ALERT SSI record"
         behavior: crud
         crud:
           operation: delete

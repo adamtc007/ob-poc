@@ -21,6 +21,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: temporal
+        invocation_phrases:
+          - "ownership as of date"
+          - "who owned entity on date"
+          - "historical ownership lookup"
+          - "ownership structure at date"
+          - "point in time ownership"
+          - "shareholders on specific date"
+          - "ownership snapshot for date"
+          - "past ownership relationships"
         behavior: plugin
         plugin:
           handler: temporal_ownership_as_of
@@ -51,6 +60,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: temporal
+        invocation_phrases:
+          - "UBO chain as of date"
+          - "who were the UBOs on date"
+          - "historical beneficial owners"
+          - "trace ownership chain at date"
+          - "UBO lookback for date"
+          - "beneficial ownership at point in time"
+          - "past UBO structure"
+          - "UBOs at approval date"
         behavior: plugin
         plugin:
           handler: temporal_ubo_chain_as_of
@@ -90,6 +108,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: temporal
+        invocation_phrases:
+          - "CBU relationships as of date"
+          - "structure relationships at date"
+          - "historical relationships for CBU"
+          - "who was connected on date"
+          - "relationship snapshot at date"
+          - "past CBU relationship map"
+          - "control and ownership at date"
+          - "CBU structure lookback"
         behavior: plugin
         plugin:
           handler: temporal_cbu_relationships_as_of
@@ -120,6 +147,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: temporal
+        invocation_phrases:
+          - "CBU roles as of date"
+          - "who held which roles on date"
+          - "historical role assignments"
+          - "entity roles at point in time"
+          - "past depositary for CBU"
+          - "role holders on specific date"
+          - "role snapshot for date"
+          - "who was assigned on date"
         behavior: plugin
         plugin:
           handler: temporal_cbu_roles_as_of
@@ -150,6 +186,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: temporal
+        invocation_phrases:
+          - "state at KYC approval"
+          - "CBU snapshot at approval"
+          - "what was approved"
+          - "structure when case approved"
+          - "approved state lookback"
+          - "KYC approval point snapshot"
+          - "entity state at sign-off"
+          - "show approved structure"
         behavior: plugin
         plugin:
           handler: temporal_cbu_state_at_approval
@@ -179,6 +224,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: temporal
+        invocation_phrases:
+          - "relationship change history"
+          - "audit trail for relationship"
+          - "how has relationship changed"
+          - "relationship modification log"
+          - "track relationship changes"
+          - "relationship version history"
+          - "when did relationship change"
+          - "show relationship audit"
         behavior: plugin
         plugin:
           handler: temporal_relationship_history
@@ -203,6 +257,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: temporal
+        invocation_phrases:
+          - "entity change history"
+          - "all changes for entity"
+          - "entity audit trail"
+          - "what changed for this person"
+          - "entity relationship timeline"
+          - "historical changes for entity"
+          - "track entity modifications"
+          - "show entity history"
         behavior: plugin
         plugin:
           handler: temporal_entity_history
@@ -245,6 +308,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: temporal
+        invocation_phrases:
+          - "compare ownership between dates"
+          - "ownership diff across dates"
+          - "what ownership changed"
+          - "before and after ownership"
+          - "ownership delta analysis"
+          - "side by side ownership comparison"
+          - "track ownership changes over time"
+          - "who was added or removed"
         behavior: plugin
         plugin:
           handler: temporal_compare_ownership

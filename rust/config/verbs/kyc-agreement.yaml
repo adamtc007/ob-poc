@@ -12,6 +12,15 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: kyc_agreement
+        invocation_phrases:
+          - "create KYC service agreement"
+          - "set up sponsor agreement"
+          - "new KYC agreement with sponsor"
+          - "establish KYC service contract"
+          - "add KYC sponsor relationship"
+          - "register service agreement"
+          - "create KYC-as-a-service agreement"
+          - "onboard KYC sponsor"
         behavior: crud
         crud:
           operation: upsert
@@ -80,6 +89,15 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: kyc_agreement
+        invocation_phrases:
+          - "show KYC agreement details"
+          - "get service agreement"
+          - "view KYC sponsor agreement"
+          - "read agreement terms"
+          - "what are the agreement details"
+          - "display KYC service contract"
+          - "look up KYC agreement"
+          - "fetch sponsor agreement info"
         behavior: crud
         crud:
           operation: select
@@ -104,6 +122,15 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: kyc_agreement
+        invocation_phrases:
+          - "list KYC agreements"
+          - "show all service agreements"
+          - "what agreements does sponsor have"
+          - "display KYC contracts"
+          - "get agreements for sponsor"
+          - "show sponsor agreements"
+          - "list active KYC agreements"
+          - "which KYC agreements exist"
         behavior: crud
         crud:
           operation: select
@@ -129,6 +156,15 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: kyc_agreement
+        invocation_phrases:
+          - "update agreement status"
+          - "change KYC agreement status"
+          - "activate service agreement"
+          - "suspend KYC agreement"
+          - "terminate sponsor agreement"
+          - "set agreement to active"
+          - "modify agreement status"
+          - "advance agreement state"
         behavior: crud
         crud:
           operation: update

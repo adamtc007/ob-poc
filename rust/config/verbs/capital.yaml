@@ -15,6 +15,13 @@ domains:
 
       share-class.create:
         description: Create a new share class for an issuer
+        invocation_phrases:
+          - "create share class"
+          - "add share class"
+          - "new share class"
+          - "create equity class"
+          - "set up share class"
+          - "register share class"
         metadata:
           tier: intent
           source_of_truth: register
@@ -91,6 +98,11 @@ domains:
 
       share-class.add-identifier:
         description: Add an identifier (ISIN, SEDOL, etc.) to a share class
+        invocation_phrases:
+          - "add share class identifier"
+          - "set share class ISIN"
+          - "add identifier to share class"
+          - "register share class code"
         metadata:
           tier: intent
           source_of_truth: register
@@ -147,6 +159,12 @@ domains:
 
       share-class.list:
         description: List share classes for an issuer
+        invocation_phrases:
+          - "list share classes"
+          - "show share classes"
+          - "get all share classes"
+          - "what share classes exist"
+          - "display share classes"
         metadata:
           tier: reference
           source_of_truth: register
@@ -174,6 +192,12 @@ domains:
 
       share-class.get-supply:
         description: Get current supply state for a share class
+        invocation_phrases:
+          - "get share supply"
+          - "show share supply"
+          - "how many shares issued"
+          - "share class supply"
+          - "check share supply"
         metadata:
           tier: reference
           source_of_truth: register
@@ -204,6 +228,12 @@ domains:
 
       issue.initial:
         description: Initial issuance of shares (incorporation/fund launch)
+        invocation_phrases:
+          - "initial share issuance"
+          - "IPO shares"
+          - "issue initial shares"
+          - "initial offering"
+          - "first issuance"
         metadata:
           tier: intent
           source_of_truth: register
@@ -243,6 +273,12 @@ domains:
 
       issue.new:
         description: Subsequent issuance (capital raise)
+        invocation_phrases:
+          - "issue new shares"
+          - "secondary issuance"
+          - "additional share issue"
+          - "issue more shares"
+          - "new share issuance"
         metadata:
           tier: intent
           source_of_truth: register
@@ -281,6 +317,12 @@ domains:
 
       split:
         description: Stock split (e.g., 2:1 doubles shares)
+        invocation_phrases:
+          - "stock split"
+          - "share split"
+          - "split shares"
+          - "divide shares"
+          - "reverse split"
         metadata:
           tier: intent
           source_of_truth: register
@@ -321,6 +363,12 @@ domains:
 
       buyback:
         description: Share buyback into treasury
+        invocation_phrases:
+          - "share buyback"
+          - "buy back shares"
+          - "stock buyback"
+          - "repurchase shares"
+          - "treasury share purchase"
         metadata:
           tier: intent
           source_of_truth: register
@@ -356,6 +404,12 @@ domains:
 
       cancel:
         description: Permanent share cancellation
+        invocation_phrases:
+          - "cancel shares"
+          - "retire shares"
+          - "cancel treasury shares"
+          - "extinguish shares"
+          - "reduce share capital"
         metadata:
           tier: intent
           source_of_truth: register
@@ -395,6 +449,12 @@ domains:
 
       dilution.grant-options:
         description: Grant stock options to a holder
+        invocation_phrases:
+          - "grant stock options"
+          - "issue employee options"
+          - "option grant"
+          - "create option grant"
+          - "allocate stock options"
         metadata:
           tier: intent
           source_of_truth: register
@@ -468,6 +528,12 @@ domains:
 
       dilution.issue-warrant:
         description: Issue warrants to an investor
+        invocation_phrases:
+          - "issue warrant"
+          - "create warrant"
+          - "new warrant issuance"
+          - "grant warrants"
+          - "issue equity warrant"
         metadata:
           tier: intent
           source_of_truth: register
@@ -524,6 +590,12 @@ domains:
 
       dilution.create-safe:
         description: Create a SAFE (Simple Agreement for Future Equity)
+        invocation_phrases:
+          - "create SAFE"
+          - "issue SAFE"
+          - "new SAFE agreement"
+          - "simple agreement for future equity"
+          - "create SAFE note"
         metadata:
           tier: intent
           source_of_truth: register
@@ -579,6 +651,12 @@ domains:
 
       dilution.create-convertible-note:
         description: Create a convertible note
+        invocation_phrases:
+          - "create convertible note"
+          - "issue convertible"
+          - "new convertible debt"
+          - "convertible loan note"
+          - "create convertible bond"
         metadata:
           tier: intent
           source_of_truth: register
@@ -635,6 +713,12 @@ domains:
 
       dilution.exercise:
         description: Exercise options/warrants and convert to shares
+        invocation_phrases:
+          - "exercise options"
+          - "exercise warrant"
+          - "convert options to shares"
+          - "exercise dilution instrument"
+          - "option exercise"
         metadata:
           tier: intent
           source_of_truth: register
@@ -673,6 +757,12 @@ domains:
 
       dilution.forfeit:
         description: Forfeit/cancel unvested or unexercised instruments
+        invocation_phrases:
+          - "forfeit options"
+          - "cancel vested options"
+          - "forfeit warrants"
+          - "expire unexercised options"
+          - "option forfeiture"
         metadata:
           tier: intent
           source_of_truth: register
@@ -701,6 +791,12 @@ domains:
 
       dilution.list:
         description: List dilution instruments for an issuer
+        invocation_phrases:
+          - "list dilution instruments"
+          - "show options and warrants"
+          - "list outstanding options"
+          - "show dilution schedule"
+          - "get dilution instruments"
         metadata:
           tier: reference
           source_of_truth: register
@@ -747,6 +843,12 @@ domains:
 
       dilution.get-summary:
         description: Get dilution summary for an issuer
+        invocation_phrases:
+          - "dilution summary"
+          - "show dilution impact"
+          - "get dilution overview"
+          - "fully diluted summary"
+          - "dilution analysis"
         metadata:
           tier: reference
           source_of_truth: register
@@ -774,6 +876,11 @@ domains:
 
       control-config.set:
         description: Set control thresholds for an issuer
+        invocation_phrases:
+          - "set control configuration"
+          - "configure control thresholds"
+          - "set ownership control rules"
+          - "update control config"
         metadata:
           tier: intent
           source_of_truth: register
@@ -857,6 +964,11 @@ domains:
 
       control-config.get:
         description: Get control configuration for an issuer
+        invocation_phrases:
+          - "get control configuration"
+          - "show control config"
+          - "view control thresholds"
+          - "check control settings"
         metadata:
           tier: reference
           source_of_truth: register
@@ -889,6 +1001,13 @@ domains:
 
       cap-table:
         description: Get full cap table for an issuer
+        invocation_phrases:
+          - "show cap table"
+          - "capitalization table"
+          - "get cap table"
+          - "display cap table"
+          - "view capitalization"
+          - "who owns what shares"
         metadata:
           tier: intent
           source_of_truth: register
@@ -931,6 +1050,12 @@ domains:
 
       holders:
         description: List all holders for an issuer with ownership percentages
+        invocation_phrases:
+          - "list shareholders"
+          - "show holders"
+          - "who holds shares"
+          - "get shareholder list"
+          - "display shareholders"
         metadata:
           tier: intent
           source_of_truth: register

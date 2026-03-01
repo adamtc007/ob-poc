@@ -9,6 +9,15 @@ domains:
           source_of_truth: catalog
           scope: global
           noun: product
+        invocation_phrases:
+          - "show product details"
+          - "get product by code"
+          - "look up product"
+          - "what is this product"
+          - "display product information"
+          - "fetch product record"
+          - "read product catalog entry"
+          - "describe this product"
         behavior: crud
         crud:
           operation: select
@@ -39,6 +48,15 @@ domains:
           source_of_truth: catalog
           scope: global
           noun: product
+        invocation_phrases:
+          - "list available products"
+          - "show product catalog"
+          - "what products are available"
+          - "display all products"
+          - "get product list"
+          - "show active products"
+          - "browse product catalog"
+          - "enumerate custody products"
         behavior: crud
         crud:
           operation: select

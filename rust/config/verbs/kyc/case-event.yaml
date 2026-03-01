@@ -10,6 +10,15 @@ domains:
           scope: cbu
           noun: case_event
           tags: [kyc]
+        invocation_phrases:
+          - "log event on KYC case"
+          - "record case activity"
+          - "add audit trail entry"
+          - "capture case event"
+          - "write case history note"
+          - "record CDD activity step"
+          - "log action taken on case"
+          - "add event to case timeline"
         behavior: crud
         crud:
           operation: insert
@@ -81,6 +90,15 @@ domains:
           scope: cbu
           noun: case_event
           tags: [kyc]
+        invocation_phrases:
+          - "show case event history"
+          - "list KYC case events"
+          - "get audit trail for case"
+          - "display case activity log"
+          - "what happened on this case"
+          - "view case timeline"
+          - "show CDD activity history"
+          - "retrieve case event log"
         behavior: crud
         crud:
           operation: list_by_fk

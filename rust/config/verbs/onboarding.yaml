@@ -11,6 +11,15 @@ domains:
           noun: onboarding
           tags: [onboarding]
           subject_kinds: [cbu]
+        invocation_phrases:
+          - "auto-complete onboarding"
+          - "finish onboarding automatically"
+          - "generate missing onboarding steps"
+          - "complete CBU setup automatically"
+          - "fill in remaining onboarding"
+          - "auto-generate missing entities"
+          - "progress onboarding to completion"
+          - "run auto-complete for structure"
         behavior: plugin
         plugin:
           handler: OnboardingAutoCompleteOp

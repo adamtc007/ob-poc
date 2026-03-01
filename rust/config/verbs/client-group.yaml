@@ -28,6 +28,15 @@ domains:
 
       entity-add:
         description: "Add an entity to this client group's universe"
+        invocation_phrases:
+          - "add entity to client group"
+          - "include entity in group"
+          - "register entity under group"
+          - "assign entity to client"
+          - "which entities belong to this group"
+          - "onboard entity into group"
+          - "link entity to client group"
+          - "add member to client group"
         behavior: plugin
         handler: ClientGroupEntityAddOp
         metadata:
@@ -71,6 +80,15 @@ domains:
 
       entity-remove:
         description: "Remove an entity from this client group (or mark historical)"
+        invocation_phrases:
+          - "remove entity from group"
+          - "drop entity from client group"
+          - "exclude entity from group"
+          - "mark entity as historical"
+          - "take entity out of group"
+          - "deregister entity from client"
+          - "detach entity from group"
+          - "retire entity from client group"
         behavior: plugin
         handler: ClientGroupEntityRemoveOp
         metadata:
@@ -205,6 +223,15 @@ domains:
 
       tag-remove:
         description: "Remove a shorthand tag"
+        invocation_phrases:
+          - "remove tag from entity"
+          - "delete shorthand label"
+          - "untag this entity"
+          - "clear entity tag"
+          - "drop entity shorthand"
+          - "remove entity label"
+          - "strip tag from entity"
+          - "erase shorthand tag"
         behavior: plugin
         handler: ClientGroupTagRemoveOp
         metadata:
@@ -406,6 +433,15 @@ domains:
 
       reject-entity:
         description: "Mark a suspected entity as NOT belonging to client"
+        invocation_phrases:
+          - "reject entity from group"
+          - "this entity does not belong"
+          - "exclude suspected entity"
+          - "mark entity as not belonging"
+          - "deny group membership"
+          - "reject suspected member"
+          - "decline entity membership"
+          - "disqualify entity from group"
         behavior: plugin
         handler: ClientGroupRejectEntityOp
         metadata:
@@ -521,6 +557,15 @@ domains:
 
       remove-role:
         description: "Remove a role assignment from an entity"
+        invocation_phrases:
+          - "remove role from entity"
+          - "unassign role in group"
+          - "revoke entity role"
+          - "strip role from entity"
+          - "clear role assignment"
+          - "remove manco designation"
+          - "end role assignment"
+          - "detach role from entity"
         behavior: plugin
         handler: ClientGroupRemoveRoleOp
         metadata:

@@ -14,6 +14,15 @@ domains:
           scope: global
           noun: attribute
           tags: [data-management]
+        invocation_phrases:
+          - "define a new attribute"
+          - "add attribute to registry"
+          - "register new data attribute"
+          - "create attribute definition"
+          - "set up a new attribute"
+          - "add field to catalogue"
+          - "define data element"
+          - "register attribute for KYC"
         behavior: crud
         crud:
           operation: upsert
@@ -105,6 +114,15 @@ domains:
           scope: global
           noun: attribute
           tags: [data-management]
+        invocation_phrases:
+          - "update attribute definition"
+          - "modify attribute"
+          - "change attribute settings"
+          - "edit attribute validation rules"
+          - "update data element"
+          - "change attribute applicability"
+          - "modify field definition"
+          - "adjust attribute properties"
         behavior: crud
         crud:
           operation: update
@@ -141,6 +159,15 @@ domains:
           scope: global
           noun: attribute
           tags: [data-management]
+        invocation_phrases:
+          - "get attribute details"
+          - "show attribute definition"
+          - "look up attribute"
+          - "describe attribute"
+          - "what is this attribute"
+          - "fetch attribute by ID"
+          - "read attribute info"
+          - "find attribute definition"
         behavior: crud
         crud:
           operation: select
@@ -161,6 +188,15 @@ domains:
           scope: global
           noun: attribute
           tags: [data-management]
+        invocation_phrases:
+          - "list all attributes"
+          - "show attribute catalogue"
+          - "what attributes are defined"
+          - "display attributes by category"
+          - "show identity attributes"
+          - "list compliance data elements"
+          - "browse attribute registry"
+          - "get all registered attributes"
         behavior: crud
         crud:
           operation: select
@@ -184,6 +220,15 @@ domains:
           scope: global
           noun: attribute
           tags: [data-management]
+        invocation_phrases:
+          - "map attribute to document"
+          - "link attribute to document type"
+          - "connect attribute to document"
+          - "set document as attribute source"
+          - "define document attribute mapping"
+          - "add attribute extraction from document"
+          - "associate field with document type"
+          - "configure document data extraction"
         behavior: crud
         crud:
           operation: upsert
@@ -257,6 +302,15 @@ domains:
           scope: global
           noun: attribute
           tags: [data-management]
+        invocation_phrases:
+          - "unmap attribute from document"
+          - "remove attribute document link"
+          - "disconnect attribute from document"
+          - "delete document attribute mapping"
+          - "unlink attribute from document type"
+          - "remove extraction mapping"
+          - "detach attribute from document"
+          - "clear document attribute association"
         behavior: crud
         crud:
           operation: delete
@@ -292,6 +346,15 @@ domains:
           scope: global
           noun: attribute
           tags: [data-management]
+        invocation_phrases:
+          - "list attribute sources"
+          - "which documents provide this attribute"
+          - "show source documents for attribute"
+          - "where does this data come from"
+          - "find authoritative sources for attribute"
+          - "what documents contain this field"
+          - "show proof documents for attribute"
+          - "attribute source documents"
         behavior: plugin
         handler: attribute_list_sources
         args:
@@ -308,6 +371,15 @@ domains:
           scope: global
           noun: attribute
           tags: [data-management]
+        invocation_phrases:
+          - "list attribute sinks"
+          - "which documents need this attribute"
+          - "show consuming documents for attribute"
+          - "where is this data required"
+          - "what documents require this field"
+          - "find attribute consumers"
+          - "show dependent documents"
+          - "attribute sink documents"
         behavior: plugin
         handler: attribute_list_sinks
         args:
@@ -324,6 +396,15 @@ domains:
           scope: global
           noun: attribute
           tags: [data-management]
+        invocation_phrases:
+          - "trace attribute lineage"
+          - "show attribute data flow"
+          - "where does this attribute flow"
+          - "attribute provenance chain"
+          - "show full lineage for field"
+          - "trace data element end to end"
+          - "attribute impact analysis"
+          - "follow attribute through pipeline"
         behavior: plugin
         handler: attribute_trace_lineage
         args:
@@ -340,6 +421,15 @@ domains:
           scope: global
           noun: attribute
           tags: [data-management]
+        invocation_phrases:
+          - "list attributes for document type"
+          - "show document attributes"
+          - "what attributes does this document have"
+          - "get fields for document type"
+          - "show data extracted from document"
+          - "list mapped attributes for document"
+          - "document type attribute coverage"
+          - "what can we extract from this document"
         behavior: plugin
         handler: attribute_list_by_document
         args:
@@ -361,6 +451,15 @@ domains:
           scope: global
           noun: attribute
           tags: [data-management]
+        invocation_phrases:
+          - "check attribute coverage"
+          - "what attributes are missing"
+          - "document coverage report"
+          - "are all required attributes mapped"
+          - "coverage gap analysis for document"
+          - "show unmapped attributes"
+          - "attribute completeness check"
+          - "verify document attribute coverage"
         behavior: plugin
         handler: attribute_check_coverage
         args:

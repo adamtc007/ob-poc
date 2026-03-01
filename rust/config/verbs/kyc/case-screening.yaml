@@ -10,6 +10,15 @@ domains:
           scope: cbu
           noun: case_screening
           tags: [kyc]
+        invocation_phrases:
+          - "run sanctions screening"
+          - "start PEP check"
+          - "initiate adverse media screening"
+          - "screen entity for sanctions"
+          - "begin AML screening"
+          - "launch compliance screening"
+          - "check against sanctions lists"
+          - "run CDD screening check"
         behavior: crud
         produces:
           type: screening
@@ -66,6 +75,15 @@ domains:
           scope: cbu
           noun: case_screening
           tags: [kyc]
+        invocation_phrases:
+          - "complete sanctions screening"
+          - "record screening results"
+          - "finish PEP check"
+          - "mark screening as done"
+          - "close AML screening with status"
+          - "submit screening completion"
+          - "log screening outcome"
+          - "finalize compliance screening results"
         behavior: crud
         consumes:
           - arg: screening-id
@@ -116,6 +134,15 @@ domains:
           scope: cbu
           noun: case_screening
           tags: [kyc]
+        invocation_phrases:
+          - "review screening hit"
+          - "assess sanctions match"
+          - "evaluate PEP screening result"
+          - "confirm or dismiss screening hit"
+          - "review adverse media match"
+          - "is this a true positive"
+          - "adjudicate screening alert"
+          - "resolve screening hit finding"
         behavior: crud
         crud:
           operation: update
@@ -167,6 +194,15 @@ domains:
           scope: cbu
           noun: case_screening
           tags: [kyc]
+        invocation_phrases:
+          - "list screenings for workstream"
+          - "show all screening results"
+          - "what screenings have been run"
+          - "get screening status by workstream"
+          - "display sanctions and PEP checks"
+          - "view compliance screening history"
+          - "show screening coverage for entity"
+          - "which screenings are pending"
         behavior: crud
         crud:
           operation: list_by_fk

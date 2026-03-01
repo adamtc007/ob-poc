@@ -9,6 +9,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: batch
+        invocation_phrases:
+          - "pause the batch"
+          - "hold batch processing"
+          - "pause bulk operation"
+          - "stop batch temporarily"
+          - "suspend batch execution"
+          - "halt the batch run"
+          - "freeze batch processing"
+          - "pause current bulk job"
         behavior: plugin
         plugin:
           handler: batch_pause
@@ -24,6 +33,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: batch
+        invocation_phrases:
+          - "resume the batch"
+          - "continue batch processing"
+          - "restart paused batch"
+          - "unpause the batch"
+          - "resume bulk operation"
+          - "pick up where we left off"
+          - "continue the batch run"
+          - "resume batch execution"
         behavior: plugin
         plugin:
           handler: batch_resume
@@ -39,6 +57,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: batch
+        invocation_phrases:
+          - "continue batch for more items"
+          - "process next batch items"
+          - "do a few more"
+          - "run next N items"
+          - "continue with more entries"
+          - "process additional batch items"
+          - "advance batch by count"
+          - "step through batch items"
         behavior: plugin
         plugin:
           handler: batch_continue
@@ -59,6 +86,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: batch
+        invocation_phrases:
+          - "skip this batch item"
+          - "skip current item"
+          - "move to next item"
+          - "bypass this entry"
+          - "skip and continue"
+          - "pass on this one"
+          - "skip this CBU"
+          - "move past current item"
         behavior: plugin
         plugin:
           handler: batch_skip
@@ -78,6 +114,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: batch
+        invocation_phrases:
+          - "abort the batch"
+          - "cancel batch processing"
+          - "stop the batch entirely"
+          - "kill batch execution"
+          - "terminate batch run"
+          - "abort bulk operation"
+          - "cancel all remaining items"
+          - "end batch immediately"
         behavior: plugin
         plugin:
           handler: batch_abort
@@ -97,6 +142,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: batch
+        invocation_phrases:
+          - "batch status"
+          - "how is the batch doing"
+          - "show batch progress"
+          - "check batch execution status"
+          - "how many items processed"
+          - "batch completion percentage"
+          - "what is the batch progress"
+          - "get bulk operation status"
         behavior: plugin
         plugin:
           handler: batch_status
@@ -112,6 +166,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: batch
+        invocation_phrases:
+          - "bulk add products to CBUs"
+          - "add products to multiple structures"
+          - "batch assign products"
+          - "add custody products in bulk"
+          - "apply products across CBUs"
+          - "mass product assignment"
+          - "add products to all structures"
+          - "bulk product setup"
         behavior: plugin
         plugin:
           handler: batch_add_products

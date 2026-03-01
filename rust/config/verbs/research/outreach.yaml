@@ -93,6 +93,15 @@ domains:
           scope: global
           noun: outreach_request
           tags: [write, workflow, status-update]
+        invocation_phrases:
+          - "mark outreach as sent"
+          - "flag request as dispatched"
+          - "confirm disclosure was sent"
+          - "did we send the request"
+          - "update request to sent"
+          - "mark the request dispatched"
+          - "set outreach status to sent"
+          - "record that request was mailed"
         behavior: crud
         crud:
           operation: update
@@ -119,6 +128,15 @@ domains:
           scope: global
           noun: outreach_request
           tags: [write, workflow, status-update]
+        invocation_phrases:
+          - "send a reminder to counterparty"
+          - "chase the client again"
+          - "follow up on disclosure request"
+          - "has the reminder been sent"
+          - "nudge them for a response"
+          - "send another outreach reminder"
+          - "re-request ownership information"
+          - "escalate the pending request"
         behavior: crud
         crud:
           operation: update
@@ -181,6 +199,15 @@ domains:
           scope: global
           noun: outreach_request
           tags: [write, workflow, status-update]
+        invocation_phrases:
+          - "close the outreach request"
+          - "mark request as complete"
+          - "finish the disclosure request"
+          - "is the outreach resolved"
+          - "wrap up this information request"
+          - "close out the pending outreach"
+          - "finalize the counterparty request"
+          - "archive the outreach request"
         behavior: crud
         crud:
           operation: update
@@ -215,6 +242,15 @@ domains:
           scope: global
           noun: outreach_request
           tags: [read, query, workflow]
+        invocation_phrases:
+          - "show pending outreach requests"
+          - "what requests are still open"
+          - "list outstanding disclosure requests"
+          - "any pending information requests"
+          - "show open counterparty requests"
+          - "which outreach is still waiting"
+          - "display all unanswered requests"
+          - "check for pending disclosures"
         behavior: crud
         crud:
           operation: select
@@ -268,6 +304,15 @@ domains:
           scope: global
           noun: outreach_request
           tags: [read, query, workflow]
+        invocation_phrases:
+          - "show outreach request details"
+          - "get the disclosure request info"
+          - "look up this outreach request"
+          - "what is the request status"
+          - "pull up the request details"
+          - "view specific outreach record"
+          - "retrieve request information"
+          - "check this request"
         behavior: crud
         crud:
           operation: select

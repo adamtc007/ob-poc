@@ -111,6 +111,17 @@ domains:
             - skipped_reason
       read:
         description: Read a CBU by ID
+        invocation_phrases:
+          - "read CBU"
+          - "get CBU"
+          - "fetch CBU details"
+          - "show CBU by ID"
+          - "view CBU info"
+          - "describe CBU"
+          - "lookup CBU"
+          - "find CBU by ID"
+          - "display CBU record"
+          - "retrieve CBU"
         behavior: crud
         metadata:
           tier: diagnostics
@@ -203,6 +214,17 @@ domains:
           type: affected
       delete:
         description: Delete a CBU (fails if has dependencies - use delete-cascade for full cleanup)
+        invocation_phrases:
+          - "delete CBU"
+          - "remove CBU"
+          - "drop structure"
+          - "delete business unit"
+          - "remove structure"
+          - "delete client unit"
+          - "close CBU"
+          - "terminate CBU"
+          - "deregister CBU"
+          - "destroy CBU"
         behavior: crud
         metadata:
           tier: intent
@@ -231,6 +253,17 @@ domains:
 
       delete-cascade:
         description: Delete a CBU and all related data (entities, roles, documents, etc.)
+        invocation_phrases:
+          - "delete CBU and all dependencies"
+          - "purge CBU completely"
+          - "cascade delete CBU"
+          - "full cleanup CBU"
+          - "delete CBU with all entities"
+          - "remove CBU and related data"
+          - "deep delete CBU"
+          - "wipe CBU entirely"
+          - "remove structure and all linked data"
+          - "cascade remove business unit"
         behavior: plugin
         metadata:
           tier: intent
@@ -269,6 +302,14 @@ domains:
           - "list all business units"
           - "show CBUs for client"
           - "get CBU list"
+          - "list all cbus"
+          - "show cbu list"
+          - "display all cbus"
+          - "list every cbu"
+          - "show me all cbus"
+          - "get all cbus"
+          - "what cbus exist"
+          - "show cbus in database"
         behavior: crud
         metadata:
           tier: diagnostics
@@ -305,6 +346,17 @@ domains:
           type: record_set
       ensure:
         description: Create or update a CBU by natural key
+        invocation_phrases:
+          - "ensure CBU exists"
+          - "create or update CBU"
+          - "upsert CBU"
+          - "guarantee CBU"
+          - "ensure structure exists"
+          - "idempotent CBU create"
+          - "setup CBU if missing"
+          - "create CBU if not exists"
+          - "ensure business unit"
+          - "sync CBU"
         behavior: crud
         metadata:
           tier: intent
@@ -366,6 +418,17 @@ domains:
           capture: true
       assign-role:
         description: Assign a role to an entity within a CBU
+        invocation_phrases:
+          - "assign role to entity"
+          - "give role in CBU"
+          - "add entity role"
+          - "link entity with role"
+          - "make entity depositary"
+          - "appoint depositary"
+          - "assign participant role"
+          - "add party to structure"
+          - "designate entity role"
+          - "set entity role in CBU"
         behavior: crud
         metadata:
           tier: intent
@@ -440,6 +503,10 @@ domains:
           - "remove entity from CBU"
           - "unlink entity role"
           - "remove participant"
+          - "revoke entity role"
+          - "detach party from structure"
+          - "remove party role"
+          - "strip role from entity"
         behavior: crud
         metadata:
           tier: intent
@@ -486,6 +553,17 @@ domains:
           type: affected
       parties:
         description: List all parties (entities with their roles) for a CBU
+        invocation_phrases:
+          - "show parties in CBU"
+          - "list entities in CBU"
+          - "list participants"
+          - "show all roles in structure"
+          - "list entity roles"
+          - "view CBU parties"
+          - "who is in this CBU"
+          - "list CBU members"
+          - "show CBU stakeholders"
+          - "display parties and roles"
         behavior: crud
         metadata:
           tier: diagnostics
@@ -516,6 +594,17 @@ domains:
           type: record_set
       set-category:
         description: Set CBU relationship category (FUND_MANDATE, CORPORATE_GROUP, etc.)
+        invocation_phrases:
+          - "set CBU category"
+          - "categorize CBU"
+          - "classify structure"
+          - "set structure type"
+          - "assign CBU category"
+          - "mark as fund mandate"
+          - "define CBU classification"
+          - "set relationship category"
+          - "tag CBU category"
+          - "change CBU type"
         behavior: crud
         metadata:
           tier: intent
@@ -556,6 +645,17 @@ domains:
           type: affected
       show:
         description: Show full CBU structure including entities, roles, documents, screenings
+        invocation_phrases:
+          - "show CBU structure"
+          - "display full CBU"
+          - "show CBU details"
+          - "describe CBU structure"
+          - "view complete structure"
+          - "show CBU with entities and roles"
+          - "inspect CBU"
+          - "show everything about CBU"
+          - "display structure details"
+          - "full CBU overview"
         behavior: plugin
         metadata:
           tier: diagnostics
@@ -586,6 +686,17 @@ domains:
 
       add-product:
         description: Add a product to a CBU (creates service_delivery_map entries for all services)
+        invocation_phrases:
+          - "add product to CBU"
+          - "assign product to structure"
+          - "enable product for CBU"
+          - "subscribe CBU to product"
+          - "add custody product"
+          - "activate product on CBU"
+          - "link product to structure"
+          - "add service to CBU"
+          - "provision product for CBU"
+          - "onboard product to structure"
         behavior: plugin
         metadata:
           tier: intent
@@ -621,6 +732,17 @@ domains:
 
       remove-product:
         description: Remove a product from a CBU (deletes service_delivery_map entries)
+        invocation_phrases:
+          - "remove product from CBU"
+          - "unsubscribe CBU from product"
+          - "disable product for CBU"
+          - "detach product from structure"
+          - "drop product from CBU"
+          - "deactivate product on CBU"
+          - "remove service from CBU"
+          - "unlink product from structure"
+          - "revoke product access"
+          - "offboard product from CBU"
         behavior: crud
         metadata:
           tier: intent
@@ -660,6 +782,17 @@ domains:
 
       decide:
         description: Record KYC/AML decision for CBU collective state (entities, UBOs, documents)
+        invocation_phrases:
+          - "record KYC decision"
+          - "approve CBU"
+          - "reject CBU"
+          - "make CBU decision"
+          - "decide on CBU status"
+          - "record AML decision"
+          - "approve structure"
+          - "CBU approval decision"
+          - "finalize CBU review"
+          - "submit CBU decision"
         behavior: plugin
         metadata:
           tier: intent
@@ -730,6 +863,17 @@ domains:
           description: Decision record with outcome and resulting CBU status
       attach-evidence:
         description: Attach evidence (document or attestation) to CBU
+        invocation_phrases:
+          - "attach evidence to CBU"
+          - "add document to CBU"
+          - "link evidence to structure"
+          - "upload CBU evidence"
+          - "attach proof to CBU"
+          - "add attestation to CBU"
+          - "submit evidence for CBU"
+          - "associate document with CBU"
+          - "attach screening result"
+          - "add verification evidence"
         behavior: crud
         metadata:
           tier: intent
@@ -795,6 +939,17 @@ domains:
           capture: true
       verify-evidence:
         description: Mark evidence as verified or rejected
+        invocation_phrases:
+          - "verify CBU evidence"
+          - "approve evidence"
+          - "reject evidence"
+          - "mark evidence as verified"
+          - "validate CBU evidence"
+          - "review evidence status"
+          - "confirm evidence"
+          - "check evidence validity"
+          - "verify document for CBU"
+          - "update evidence verification"
         behavior: crud
         metadata:
           tier: intent
@@ -835,6 +990,17 @@ domains:
           type: affected
       list-evidence:
         description: List evidence for a CBU
+        invocation_phrases:
+          - "list CBU evidence"
+          - "show evidence for CBU"
+          - "get CBU documents"
+          - "view evidence attached to structure"
+          - "display CBU attestations"
+          - "list proof for CBU"
+          - "show all evidence"
+          - "what evidence does CBU have"
+          - "list verification records"
+          - "check CBU evidence status"
         behavior: crud
         metadata:
           tier: diagnostics
@@ -880,6 +1046,8 @@ domains:
           - "create CBUs from GLEIF funds"
           - "onboard allianz funds"
           - "create cbus for allianz"
+          - "bulk onboard from client group"
+          - "generate CBUs from group entities"
         behavior: plugin
         handler: CbuCreateFromClientGroupOp
         metadata:

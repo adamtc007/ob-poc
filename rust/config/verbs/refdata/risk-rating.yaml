@@ -9,6 +9,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: risk_rating
+        invocation_phrases:
+          - "add a new risk rating"
+          - "register risk rating level"
+          - "create risk rating entry"
+          - "configure a risk classification"
+          - "set up new risk tier"
+          - "define risk rating code"
+          - "upsert risk rating record"
+          - "add KYC risk level"
         behavior: crud
         crud:
           operation: upsert
@@ -57,6 +66,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: risk_rating
+        invocation_phrases:
+          - "look up risk rating by code"
+          - "get risk rating details"
+          - "show me this risk level"
+          - "fetch risk rating definition"
+          - "what is this risk rating"
+          - "read risk classification record"
+          - "find risk rating by code"
+          - "retrieve risk tier information"
         behavior: crud
         crud:
           operation: select
@@ -77,6 +95,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: risk_rating
+        invocation_phrases:
+          - "list all risk ratings"
+          - "show available risk levels"
+          - "what risk ratings exist"
+          - "display risk classification table"
+          - "enumerate risk tier codes"
+          - "get all risk rating records"
+          - "which risk ratings are active"
+          - "show me the risk rating scale"
         behavior: crud
         crud:
           operation: select
@@ -98,6 +125,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: risk_rating
+        invocation_phrases:
+          - "deactivate a risk rating"
+          - "disable this risk level"
+          - "retire risk rating code"
+          - "turn off a risk tier"
+          - "mark risk rating as inactive"
+          - "remove risk level from list"
+          - "suspend a risk classification"
+          - "deprecate this risk rating"
         behavior: crud
         crud:
           operation: update

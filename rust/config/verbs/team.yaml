@@ -9,6 +9,17 @@ domains:
 
       create:
         description: "Create a new team with delegated authority"
+        invocation_phrases:
+          - "create team"
+          - "new team"
+          - "add team"
+          - "set up team"
+          - "register team"
+          - "create a service team"
+          - "provision new operations team"
+          - "establish team for fund ops"
+          - "set up client service team"
+          - "build new custody team"
         metadata:
           tier: intent
           source_of_truth: operational
@@ -74,6 +85,17 @@ domains:
 
       read:
         description: "Read team details"
+        invocation_phrases:
+          - "show team"
+          - "get team details"
+          - "view team"
+          - "describe team"
+          - "team info"
+          - "what team is this"
+          - "display team configuration"
+          - "look up service team"
+          - "fetch team summary"
+          - "show team structure and authority"
         metadata:
           tier: reference
           source_of_truth: operational
@@ -99,6 +121,17 @@ domains:
 
       archive:
         description: "Archive team (soft delete)"
+        invocation_phrases:
+          - "archive team"
+          - "deactivate team"
+          - "retire team"
+          - "remove team"
+          - "close team"
+          - "shut down the operations team"
+          - "wind down service team"
+          - "sunset this team"
+          - "discontinue team access"
+          - "disable team and memberships"
         metadata:
           tier: intent
           source_of_truth: operational
@@ -135,6 +168,17 @@ domains:
 
       add-member:
         description: "Add user to team with role"
+        invocation_phrases:
+          - "add team member"
+          - "add member to team"
+          - "assign person to team"
+          - "join team"
+          - "add user to team"
+          - "onboard analyst to the team"
+          - "assign relationship manager to team"
+          - "enroll user in service team"
+          - "include user on operations team"
+          - "put this person on the team"
         metadata:
           tier: intent
           source_of_truth: operational
@@ -187,6 +231,17 @@ domains:
 
       remove-member:
         description: "Remove user from team (specific role)"
+        invocation_phrases:
+          - "remove team member"
+          - "remove member from team"
+          - "unassign from team"
+          - "leave team"
+          - "remove user from team"
+          - "take analyst off the team"
+          - "drop member from operations team"
+          - "revoke team membership"
+          - "offboard user from service team"
+          - "end team membership for user"
         metadata:
           tier: intent
           source_of_truth: operational
@@ -226,6 +281,17 @@ domains:
 
       update-member:
         description: "Update member's role key"
+        invocation_phrases:
+          - "update team member"
+          - "change member role"
+          - "modify team membership"
+          - "update member permissions"
+          - "change team member role"
+          - "promote team member to lead"
+          - "adjust analyst role on team"
+          - "edit membership role assignment"
+          - "reassign member role within team"
+          - "set new role for team member"
         metadata:
           tier: intent
           source_of_truth: operational
@@ -249,6 +315,17 @@ domains:
 
       transfer-member:
         description: "Move user from one team to another (end old, create new)"
+        invocation_phrases:
+          - "transfer team member"
+          - "move member to another team"
+          - "transfer between teams"
+          - "reassign team member"
+          - "move analyst to different team"
+          - "relocate user across teams"
+          - "switch team for this member"
+          - "migrate member to new team"
+          - "transfer user from ops to trading"
+          - "move relationship manager between teams"
         metadata:
           tier: intent
           source_of_truth: operational
@@ -294,6 +371,17 @@ domains:
 
       add-governance-member:
         description: "Add governance member with optional legal appointment link"
+        invocation_phrases:
+          - "add governance member"
+          - "assign governance role"
+          - "add governance access"
+          - "grant governance membership"
+          - "appoint conducting officer to board"
+          - "register governance participant"
+          - "add user to investment committee"
+          - "assign board member role"
+          - "enroll conducting officer"
+          - "provision governance team access"
         metadata:
           tier: intent
           source_of_truth: operational
@@ -348,6 +436,17 @@ domains:
 
       verify-governance-access:
         description: "Audit governance access against legal appointments"
+        invocation_phrases:
+          - "verify governance access"
+          - "check governance permissions"
+          - "validate governance role"
+          - "can user govern"
+          - "audit governance team access"
+          - "is this user on the board"
+          - "confirm conducting officer appointment"
+          - "review governance access rights"
+          - "does user have governance authority"
+          - "check legal appointment for member"
         metadata:
           tier: reference
           source_of_truth: operational
@@ -371,6 +470,17 @@ domains:
 
       add-cbu-access:
         description: "Add CBU to team's explicit access list"
+        invocation_phrases:
+          - "grant CBU access"
+          - "add CBU access to team"
+          - "assign CBU to team"
+          - "allow team to access CBU"
+          - "give team access to structure"
+          - "link team to client business unit"
+          - "authorize team for this CBU"
+          - "enable CBU visibility for team"
+          - "provision team CBU permissions"
+          - "connect team to fund structure"
         metadata:
           tier: intent
           source_of_truth: operational
@@ -401,6 +511,17 @@ domains:
 
       remove-cbu-access:
         description: "Remove CBU from team's access"
+        invocation_phrases:
+          - "revoke CBU access"
+          - "remove CBU access from team"
+          - "unassign CBU from team"
+          - "deny team CBU access"
+          - "withdraw team access to structure"
+          - "block team from this CBU"
+          - "disconnect team from fund"
+          - "disable CBU visibility for team"
+          - "take away team CBU permissions"
+          - "terminate team access to unit"
         metadata:
           tier: intent
           source_of_truth: operational
@@ -427,6 +548,17 @@ domains:
 
       grant-service:
         description: "Grant service entitlement to team"
+        invocation_phrases:
+          - "grant service to team"
+          - "add service access"
+          - "assign service to team"
+          - "enable service for team"
+          - "provision client portal access"
+          - "allow reporting portal for team"
+          - "give team repair queue access"
+          - "entitle team to trade instruction"
+          - "turn on service permissions"
+          - "activate service entitlement for team"
         metadata:
           tier: intent
           source_of_truth: operational
@@ -466,6 +598,17 @@ domains:
 
       revoke-service:
         description: "Revoke service entitlement"
+        invocation_phrases:
+          - "revoke service from team"
+          - "remove service access"
+          - "disable service for team"
+          - "unassign service"
+          - "take away portal access"
+          - "withdraw reporting entitlement"
+          - "turn off service for team"
+          - "block team from repair queue"
+          - "terminate service permissions"
+          - "deactivate team service entitlement"
         metadata:
           tier: intent
           source_of_truth: operational
@@ -498,6 +641,17 @@ domains:
 
       list-members:
         description: "List team members"
+        invocation_phrases:
+          - "list team members"
+          - "show team members"
+          - "who is on the team"
+          - "get team roster"
+          - "display team members"
+          - "show all analysts on team"
+          - "view team membership roster"
+          - "which users belong to this team"
+          - "enumerate team member assignments"
+          - "fetch team personnel list"
         metadata:
           tier: reference
           source_of_truth: operational
@@ -522,6 +676,17 @@ domains:
 
       list-cbus:
         description: "List CBUs team can access"
+        invocation_phrases:
+          - "list team CBUs"
+          - "show team CBU access"
+          - "which CBUs can team access"
+          - "get team CBU list"
+          - "team CBU assignments"
+          - "what structures does team cover"
+          - "display team fund access scope"
+          - "show all units assigned to team"
+          - "view team CBU permissions"
+          - "list accessible structures for team"
         metadata:
           tier: reference
           source_of_truth: operational
@@ -555,6 +720,17 @@ domains:
     verbs:
       create:
         description: "Create portal user"
+        invocation_phrases:
+          - "create user"
+          - "new user"
+          - "add user"
+          - "register user"
+          - "set up user account"
+          - "provision portal user"
+          - "onboard new analyst account"
+          - "create relationship manager account"
+          - "add a new team member account"
+          - "register custody operations user"
         metadata:
           tier: intent
           source_of_truth: operational
@@ -596,6 +772,17 @@ domains:
 
       suspend:
         description: "Suspend user access"
+        invocation_phrases:
+          - "suspend user"
+          - "deactivate user"
+          - "disable user account"
+          - "lock user"
+          - "freeze user access"
+          - "temporarily block user login"
+          - "put user account on hold"
+          - "pause user portal access"
+          - "suspend analyst permissions"
+          - "lock out this team member"
         metadata:
           tier: intent
           source_of_truth: operational
@@ -617,6 +804,17 @@ domains:
 
       reactivate:
         description: "Reactivate suspended user"
+        invocation_phrases:
+          - "reactivate user"
+          - "re-enable user"
+          - "restore user access"
+          - "unlock user"
+          - "unsuspend user"
+          - "bring user account back online"
+          - "reinstate suspended analyst"
+          - "resume user portal access"
+          - "activate user account again"
+          - "lift user suspension"
         metadata:
           tier: intent
           source_of_truth: operational
@@ -638,6 +836,17 @@ domains:
 
       offboard:
         description: "Offboard user completely (left company)"
+        invocation_phrases:
+          - "offboard user"
+          - "remove user"
+          - "terminate user access"
+          - "user offboarding"
+          - "decommission user"
+          - "process user leaver"
+          - "close user account permanently"
+          - "complete offboarding for analyst"
+          - "revoke all access for departed user"
+          - "finalize user departure"
         metadata:
           tier: intent
           source_of_truth: operational
@@ -674,6 +883,17 @@ domains:
 
       list-teams:
         description: "List user's team memberships"
+        invocation_phrases:
+          - "list user teams"
+          - "show user teams"
+          - "which teams is user in"
+          - "get user team membership"
+          - "user team assignments"
+          - "what teams does this analyst belong to"
+          - "show all team memberships for user"
+          - "where is this user assigned"
+          - "display user team roles"
+          - "fetch team affiliations for member"
         metadata:
           tier: reference
           source_of_truth: operational
@@ -692,6 +912,17 @@ domains:
 
       list-cbus:
         description: "List all CBUs user can access"
+        invocation_phrases:
+          - "list user CBUs"
+          - "show user CBU access"
+          - "which CBUs can user access"
+          - "get user CBU list"
+          - "user CBU permissions"
+          - "what structures can this user see"
+          - "show funds accessible by analyst"
+          - "display user access scope"
+          - "which units is user entitled to"
+          - "view user structure permissions"
         metadata:
           tier: reference
           source_of_truth: operational
@@ -717,6 +948,17 @@ domains:
 
       check-access:
         description: "Check user access to specific CBU"
+        invocation_phrases:
+          - "check user access"
+          - "verify user permissions"
+          - "can user access"
+          - "user access check"
+          - "validate user authorization"
+          - "does analyst have CBU access"
+          - "confirm user entitlement to fund"
+          - "test user access to structure"
+          - "is user authorized for this CBU"
+          - "audit user access control"
         metadata:
           tier: diagnostics
           source_of_truth: operational

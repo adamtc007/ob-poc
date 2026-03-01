@@ -9,6 +9,17 @@ domains:
     verbs:
       set:
         description: Set pricing source for instrument class
+        invocation_phrases:
+          - "set pricing config"
+          - "configure pricing"
+          - "update pricing configuration"
+          - "set pricing source"
+          - "define pricing rules"
+          - "assign Bloomberg pricing feed"
+          - "change pricing vendor for instrument"
+          - "which source prices this asset"
+          - "set mark-to-market source"
+          - "configure price feed provider"
         metadata:
           tier: intent
           source_of_truth: catalog
@@ -134,6 +145,17 @@ domains:
 
       link-resource:
         description: Link pricing config to pricing feed resource
+        invocation_phrases:
+          - "link pricing resource"
+          - "attach pricing source"
+          - "connect pricing provider"
+          - "link data source to pricing"
+          - "wire up price feed"
+          - "bind Refinitiv feed to config"
+          - "associate pricing vendor resource"
+          - "map pricing source to instrument"
+          - "connect Bloomberg feed to config"
+          - "attach valuation data provider"
         metadata:
           tier: intent
           source_of_truth: catalog
@@ -165,6 +187,17 @@ domains:
 
       list:
         description: List pricing configurations for CBU
+        invocation_phrases:
+          - "list pricing configs"
+          - "show pricing configurations"
+          - "get pricing configs"
+          - "display pricing setups"
+          - "what pricing sources are configured"
+          - "show all price feeds"
+          - "which vendors supply prices"
+          - "view pricing source assignments"
+          - "list active pricing providers"
+          - "what is the pricing setup"
         metadata:
           tier: reference
           source_of_truth: catalog
@@ -200,6 +233,17 @@ domains:
 
       remove:
         description: Remove pricing configuration
+        invocation_phrases:
+          - "remove pricing config"
+          - "delete pricing configuration"
+          - "unset pricing config"
+          - "clear pricing rules"
+          - "drop pricing source assignment"
+          - "remove price feed configuration"
+          - "delete pricing vendor setup"
+          - "eliminate pricing rule entry"
+          - "discard pricing source mapping"
+          - "purge pricing config for instrument"
         metadata:
           tier: intent
           source_of_truth: catalog
@@ -220,6 +264,17 @@ domains:
 
       deactivate:
         description: Deactivate pricing configuration
+        invocation_phrases:
+          - "deactivate pricing config"
+          - "disable pricing"
+          - "turn off pricing config"
+          - "suspend pricing configuration"
+          - "pause pricing source feed"
+          - "deactivate price vendor link"
+          - "stop using this pricing source"
+          - "switch off valuation feed"
+          - "freeze pricing configuration"
+          - "temporarily disable price source"
         metadata:
           tier: intent
           source_of_truth: catalog
@@ -243,6 +298,17 @@ domains:
 
       find-for-instrument:
         description: Find pricing source for given instrument characteristics
+        invocation_phrases:
+          - "find pricing for instrument"
+          - "which pricing applies"
+          - "get pricing config for instrument"
+          - "instrument pricing lookup"
+          - "where does this security price from"
+          - "resolve pricing source for bond"
+          - "what vendor prices this equity"
+          - "look up price feed for asset"
+          - "how is this instrument valued"
+          - "which source provides this price"
         metadata:
           tier: reference
           source_of_truth: catalog
@@ -282,6 +348,17 @@ domains:
 
       set-valuation-schedule:
         description: "Set position valuation frequency and timing"
+        invocation_phrases:
+          - "set valuation schedule"
+          - "configure NAV schedule"
+          - "set NAV calculation schedule"
+          - "define valuation timing"
+          - "schedule mark-to-market frequency"
+          - "set end-of-day valuation time"
+          - "configure position pricing schedule"
+          - "when should NAV be calculated"
+          - "define daily valuation cutoff"
+          - "set intraday pricing frequency"
         metadata:
           tier: intent
           source_of_truth: catalog
@@ -359,6 +436,17 @@ domains:
 
       list-valuation-schedules:
         description: "List valuation schedules for CBU"
+        invocation_phrases:
+          - "list valuation schedules"
+          - "show NAV schedules"
+          - "get valuation schedules"
+          - "display valuation timing"
+          - "what is the NAV calculation frequency"
+          - "when are positions valued"
+          - "show mark-to-market schedule"
+          - "view pricing schedule for fund"
+          - "what valuation frequency is configured"
+          - "list all NAV timing rules"
         metadata:
           tier: reference
           source_of_truth: catalog
@@ -392,6 +480,17 @@ domains:
 
       set-fallback-chain:
         description: "Define multi-source pricing fallback chain"
+        invocation_phrases:
+          - "set pricing fallback chain"
+          - "configure fallback pricing"
+          - "set fallback sources"
+          - "define pricing fallback order"
+          - "create price source cascade"
+          - "set secondary pricing vendor"
+          - "configure backup price feed"
+          - "define Bloomberg then Refinitiv fallback"
+          - "what happens when primary source fails"
+          - "establish pricing source priority order"
         metadata:
           tier: intent
           source_of_truth: catalog
@@ -460,6 +559,17 @@ domains:
 
       list-fallback-chains:
         description: "List pricing fallback chains for CBU"
+        invocation_phrases:
+          - "list fallback chains"
+          - "show pricing fallbacks"
+          - "get fallback chains"
+          - "display pricing fallback order"
+          - "what are the backup pricing sources"
+          - "show price source cascade"
+          - "view fallback vendor priority"
+          - "which secondary feeds are configured"
+          - "list pricing source priority order"
+          - "what is the pricing failover setup"
         metadata:
           tier: reference
           source_of_truth: catalog
@@ -493,6 +603,17 @@ domains:
 
       set-stale-policy:
         description: "Configure stale price handling policy"
+        invocation_phrases:
+          - "set stale price policy"
+          - "configure stale pricing rules"
+          - "set staleness threshold"
+          - "define stale price handling"
+          - "set maximum price age limit"
+          - "configure price freshness rules"
+          - "what to do with old prices"
+          - "set stale price escalation action"
+          - "define price expiry tolerance"
+          - "configure aged price suspension rules"
         metadata:
           tier: intent
           source_of_truth: catalog
@@ -553,6 +674,17 @@ domains:
 
       list-stale-policies:
         description: "List stale price policies for CBU"
+        invocation_phrases:
+          - "list stale price policies"
+          - "show staleness rules"
+          - "get stale policies"
+          - "display stale price handling"
+          - "what is the price freshness policy"
+          - "view stale price thresholds"
+          - "show maximum price age settings"
+          - "how are expired prices handled"
+          - "list price staleness escalation rules"
+          - "what happens with aged prices"
         metadata:
           tier: reference
           source_of_truth: catalog
@@ -586,6 +718,17 @@ domains:
 
       set-nav-threshold:
         description: "Set NAV impact alert threshold"
+        invocation_phrases:
+          - "set NAV threshold"
+          - "configure NAV tolerance"
+          - "set NAV swing threshold"
+          - "define NAV check limits"
+          - "set price movement alert limit"
+          - "configure net asset value tolerance"
+          - "define NAV swing gate percentage"
+          - "set position valuation alert threshold"
+          - "configure pricing deviation limits"
+          - "when should NAV breaches trigger alerts"
         metadata:
           tier: intent
           source_of_truth: catalog
@@ -647,6 +790,17 @@ domains:
 
       list-nav-thresholds:
         description: "List NAV impact thresholds for CBU"
+        invocation_phrases:
+          - "list NAV thresholds"
+          - "show NAV tolerances"
+          - "get NAV thresholds"
+          - "display NAV check limits"
+          - "what are the pricing deviation limits"
+          - "show NAV swing alert settings"
+          - "view price movement tolerances"
+          - "what NAV impact triggers an alert"
+          - "list valuation breach thresholds"
+          - "show net asset value alert limits"
         metadata:
           tier: reference
           source_of_truth: catalog

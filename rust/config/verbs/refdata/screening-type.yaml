@@ -9,6 +9,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: screening_type
+        invocation_phrases:
+          - "add a new screening type"
+          - "register screening classification"
+          - "create screening type entry"
+          - "configure screening category"
+          - "set up PEP or sanctions type"
+          - "define screening type code"
+          - "upsert screening type record"
+          - "add compliance screening category"
         behavior: crud
         crud:
           operation: upsert
@@ -52,6 +61,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: screening_type
+        invocation_phrases:
+          - "look up screening type by code"
+          - "get screening type details"
+          - "show me this screening type"
+          - "fetch screening classification record"
+          - "what is this screening type"
+          - "read screening type definition"
+          - "find screening type by code"
+          - "retrieve screening category info"
         behavior: crud
         crud:
           operation: select
@@ -72,6 +90,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: screening_type
+        invocation_phrases:
+          - "list all screening types"
+          - "show available screening categories"
+          - "what screening types exist"
+          - "display screening classification codes"
+          - "enumerate compliance screening types"
+          - "get all screening type records"
+          - "which screening types are active"
+          - "show me the screening type list"
         behavior: crud
         crud:
           operation: select
@@ -93,6 +120,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: screening_type
+        invocation_phrases:
+          - "deactivate a screening type"
+          - "disable this screening classification"
+          - "retire screening type code"
+          - "turn off a screening category"
+          - "mark screening type as inactive"
+          - "remove screening type from list"
+          - "suspend a screening classification"
+          - "deprecate this screening type"
         behavior: crud
         crud:
           operation: update

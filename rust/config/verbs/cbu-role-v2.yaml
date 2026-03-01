@@ -108,6 +108,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: cbu_role
+        invocation_phrases:
+          - "assign ownership stake"
+          - "add shareholder to structure"
+          - "record beneficial ownership percentage"
+          - "set LP interest in fund"
+          - "who holds equity in this entity"
+          - "register ownership interest"
+          - "I need to add an owner"
+          - "link shareholder with percentage"
         behavior: plugin
         custom_handler: cbu_role_assign_ownership
 
@@ -177,6 +186,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: cbu_role
+        invocation_phrases:
+          - "appoint director to board"
+          - "assign conducting officer"
+          - "add managing director"
+          - "who is the company secretary"
+          - "register board member"
+          - "I need to add a controller"
+          - "set chairman for entity"
+          - "assign controlling person role"
         behavior: plugin
         custom_handler: cbu_role_assign_control
 
@@ -246,6 +264,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: cbu_role
+        invocation_phrases:
+          - "assign trustee role"
+          - "add settlor to trust"
+          - "register trust beneficiary"
+          - "appoint trust protector"
+          - "who is the trust enforcer"
+          - "add discretionary beneficiary"
+          - "I need to set up trust roles"
+          - "assign appointor to trust structure"
         behavior: plugin
         custom_handler: cbu_role_assign_trust
 
@@ -319,6 +346,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: cbu_role
+        invocation_phrases:
+          - "assign ManCo to fund"
+          - "set investment manager for SICAV"
+          - "add feeder fund relationship"
+          - "link sub-fund to umbrella"
+          - "who is the fund sponsor"
+          - "register fund promoter"
+          - "I need to assign a fund role"
+          - "designate depositary for fund"
         behavior: plugin
         custom_handler: cbu_role_assign_fund
 
@@ -396,6 +432,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: cbu_role
+        invocation_phrases:
+          - "assign custodian to structure"
+          - "add transfer agent"
+          - "set prime broker for fund"
+          - "register auditor for entity"
+          - "who is the TA for this fund"
+          - "appoint paying agent"
+          - "I need to add a service provider"
+          - "assign valuation agent role"
         behavior: plugin
         custom_handler: cbu_role_assign_service
 
@@ -459,6 +504,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: cbu_role
+        invocation_phrases:
+          - "add authorized signatory"
+          - "register authorized trader"
+          - "grant power of attorney"
+          - "add settlement contact"
+          - "who can sign for this entity"
+          - "assign account operator"
+          - "I need to add a signatory"
+          - "authorize representative for trading"
         behavior: plugin
         custom_handler: cbu_role_assign_signatory
 
@@ -519,6 +573,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: cbu_role
+        invocation_phrases:
+          - "remove role from entity"
+          - "revoke director appointment"
+          - "unassign custodian role"
+          - "remove signatory authorization"
+          - "end role assignment"
+          - "I need to remove a role"
+          - "take away this entity role"
+          - "delete role assignment from structure"
         behavior: crud
         crud:
           operation: delete
@@ -552,6 +615,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: cbu_role
+        invocation_phrases:
+          - "list all roles for structure"
+          - "show entity roles in CBU"
+          - "what roles are assigned"
+          - "who has roles in this fund"
+          - "display role assignments"
+          - "show directors and officers"
+          - "I need to see all roles"
+          - "list service providers and signatories"
         behavior: crud
         crud:
           operation: select

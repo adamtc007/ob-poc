@@ -12,6 +12,15 @@ domains:
           source_of_truth: external
           scope: cbu
           noun: regulatory
+        invocation_phrases:
+          - "add regulatory registration"
+          - "register entity with regulator"
+          - "record regulatory license"
+          - "add regulator to entity"
+          - "entity is regulated by"
+          - "set up regulatory registration"
+          - "log regulatory approval"
+          - "capture regulatory status"
         behavior: crud
         crud:
           operation: upsert
@@ -76,6 +85,15 @@ domains:
           source_of_truth: external
           scope: cbu
           noun: regulatory
+        invocation_phrases:
+          - "list regulatory registrations"
+          - "show entity regulators"
+          - "which regulators cover entity"
+          - "get regulatory licenses"
+          - "display registration history"
+          - "what registrations does entity have"
+          - "all regulators for this entity"
+          - "regulatory registrations on file"
         behavior: crud
         crud:
           operation: select
@@ -102,6 +120,15 @@ domains:
           source_of_truth: external
           scope: cbu
           noun: regulatory
+        invocation_phrases:
+          - "verify regulatory registration"
+          - "confirm regulator status"
+          - "check registration is valid"
+          - "validate regulatory license"
+          - "is entity still registered"
+          - "verify with the regulator"
+          - "registration verification check"
+          - "confirm regulatory approval"
         behavior: plugin
         plugin:
           handler: RegistrationVerifyOp
@@ -141,6 +168,15 @@ domains:
           source_of_truth: external
           scope: cbu
           noun: regulatory
+        invocation_phrases:
+          - "remove regulatory registration"
+          - "withdraw registration"
+          - "entity no longer regulated"
+          - "deregister from regulator"
+          - "cancel regulatory license"
+          - "mark registration as withdrawn"
+          - "revoke regulatory status"
+          - "end regulatory registration"
         behavior: crud
         crud:
           operation: update
@@ -173,6 +209,15 @@ domains:
           source_of_truth: external
           scope: cbu
           noun: regulatory
+        invocation_phrases:
+          - "check regulatory status"
+          - "is entity regulated"
+          - "regulatory status summary"
+          - "does entity qualify for simplified DD"
+          - "show regulatory overview"
+          - "any active registrations"
+          - "entity regulatory health check"
+          - "what is the regulatory position"
         behavior: plugin
         plugin:
           handler: RegulatoryStatusCheckOp

@@ -300,6 +300,15 @@ domains:
           category: agent_control
           context: interactive_only
           side_effects: runtime_state
+        invocation_phrases:
+          - "set confidence threshold"
+          - "adjust auto-proceed threshold"
+          - "change agent threshold"
+          - "configure confidence level"
+          - "set ambiguity floor"
+          - "tune matching sensitivity"
+          - "adjust selection threshold"
+          - "modify confidence settings"
         behavior: plugin
         handler: AgentSetThresholdOp
         args:
@@ -324,6 +333,15 @@ domains:
           category: agent_control
           context: interactive_only
           side_effects: runtime_state
+        invocation_phrases:
+          - "set agent mode"
+          - "switch to agent mode"
+          - "switch to hybrid mode"
+          - "change agent operating mode"
+          - "go fully autonomous"
+          - "enable manual mode"
+          - "toggle agent mode"
+          - "change to hybrid"
         behavior: plugin
         handler: AgentSetModeOp
         args:

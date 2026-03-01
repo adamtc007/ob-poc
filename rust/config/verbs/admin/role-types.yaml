@@ -12,6 +12,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: role_types
+        invocation_phrases:
+          - "list role types"
+          - "show all role types"
+          - "what role types exist"
+          - "get available roles"
+          - "display role type categories"
+          - "show me the roles"
+          - "enumerate role types"
+          - "which roles are defined"
         behavior: crud
         crud:
           operation: select
@@ -38,6 +47,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: role_types
+        invocation_phrases:
+          - "get role type details"
+          - "show role type by code"
+          - "look up role type"
+          - "fetch role type info"
+          - "what is this role type"
+          - "describe a role type"
+          - "read role type definition"
+          - "find role type by code"
         behavior: crud
         crud:
           operation: select
@@ -58,6 +76,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: role_types
+        invocation_phrases:
+          - "create a role type"
+          - "add new role type"
+          - "register role type"
+          - "define a new role"
+          - "set up role type"
+          - "add role to reference data"
+          - "create custody role type"
+          - "new role type entry"
         behavior: crud
         crud:
           operation: upsert
@@ -123,6 +150,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: role_types
+        invocation_phrases:
+          - "update role type"
+          - "modify role type settings"
+          - "change role type configuration"
+          - "edit role type"
+          - "adjust role type triggers"
+          - "update KYC triggers for role"
+          - "change screening settings on role"
+          - "modify role type properties"
         behavior: crud
         crud:
           operation: update
@@ -163,6 +199,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: role_types
+        invocation_phrases:
+          - "deactivate role type"
+          - "disable a role type"
+          - "retire role type"
+          - "turn off role type"
+          - "remove role type from active"
+          - "decommission role type"
+          - "mark role type inactive"
+          - "sunset a role type"
         behavior: crud
         crud:
           operation: update

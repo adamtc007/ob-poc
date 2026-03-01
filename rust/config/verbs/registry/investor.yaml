@@ -15,6 +15,15 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: investor
+        invocation_phrases:
+          - "create new investor record"
+          - "register incoming investor enquiry"
+          - "add investor to the fund"
+          - "onboard new LP investor"
+          - "set up institutional investor"
+          - "new retail investor enquiry"
+          - "start investor onboarding process"
+          - "register professional investor"
         behavior: crud
         crud:
           operation: insert
@@ -86,6 +95,15 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: investor
+        invocation_phrases:
+          - "ensure investor record exists"
+          - "upsert investor by entity"
+          - "guarantee investor is registered"
+          - "idempotent investor setup"
+          - "verify or create investor record"
+          - "make sure investor is on file"
+          - "sync investor from data provider"
+          - "ensure LP record for entity"
         behavior: crud
         crud:
           operation: upsert
@@ -159,6 +177,15 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: investor
+        invocation_phrases:
+          - "show investor details"
+          - "look up this investor"
+          - "get investor record info"
+          - "what is investor lifecycle state"
+          - "fetch investor by ID"
+          - "display investor profile"
+          - "read investor from register"
+          - "show investor tax jurisdiction"
         behavior: crud
         crud:
           operation: select
@@ -185,6 +212,15 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: investor
+        invocation_phrases:
+          - "list investors for this fund"
+          - "show all investors in CBU"
+          - "who invests in this structure"
+          - "get investor register for fund"
+          - "display LP list for fund"
+          - "which investors are onboarded"
+          - "show active investors by state"
+          - "investor list for this vehicle"
         behavior: crud
         crud:
           operation: list_by_fk
@@ -215,6 +251,15 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: investor
+        invocation_phrases:
+          - "list investor records for entity"
+          - "show funds entity invests in"
+          - "where is this entity invested"
+          - "get all investor records across CBUs"
+          - "cross-fund investor positions"
+          - "which funds does entity hold"
+          - "entity investment footprint"
+          - "display investor records by entity"
         behavior: crud
         crud:
           operation: list_by_fk
@@ -245,6 +290,15 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: investor
+        invocation_phrases:
+          - "request documents from investor"
+          - "solicit KYC docs for investor"
+          - "send document request to LP"
+          - "ask investor for ID documents"
+          - "what documents are needed"
+          - "initiate document collection"
+          - "start investor doc gathering"
+          - "trigger investor document request"
         behavior: plugin
         plugin_handler: investor_request_documents
         args:
@@ -272,6 +326,15 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: investor
+        invocation_phrases:
+          - "start KYC for investor"
+          - "begin investor due diligence"
+          - "kick off KYC review"
+          - "initiate investor KYC check"
+          - "start AML screening on investor"
+          - "open KYC case for LP"
+          - "begin investor verification process"
+          - "launch KYC for new subscriber"
         behavior: plugin
         plugin_handler: investor_start_kyc
         args:
@@ -306,6 +369,15 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: investor
+        invocation_phrases:
+          - "approve investor KYC"
+          - "clear investor due diligence"
+          - "KYC passed for this investor"
+          - "approve LP for subscription"
+          - "sign off investor KYC review"
+          - "mark KYC as approved"
+          - "complete investor verification"
+          - "set risk rating and approve"
         behavior: plugin
         plugin_handler: investor_approve_kyc
         args:
@@ -346,6 +418,15 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: investor
+        invocation_phrases:
+          - "reject investor KYC"
+          - "fail investor due diligence"
+          - "decline investor application"
+          - "KYC failed for this investor"
+          - "reject LP subscription request"
+          - "turn down investor onboarding"
+          - "deny investor based on screening"
+          - "mark KYC as rejected"
         behavior: plugin
         plugin_handler: investor_reject_kyc
         args:
@@ -375,6 +456,15 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: investor
+        invocation_phrases:
+          - "mark investor as eligible"
+          - "approve investor for subscription"
+          - "investor can now subscribe"
+          - "grant subscription eligibility"
+          - "clear investor to invest"
+          - "enable subscription for LP"
+          - "set eligible share classes"
+          - "open subscription window for investor"
         behavior: plugin
         plugin_handler: investor_mark_eligible
         args:
@@ -402,6 +492,15 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: investor
+        invocation_phrases:
+          - "record investor subscription"
+          - "book subscription for LP"
+          - "investor has subscribed"
+          - "confirm subscription into fund"
+          - "register initial subscription"
+          - "process subscription order"
+          - "link holding to subscriber"
+          - "complete subscription booking"
         behavior: plugin
         plugin_handler: investor_record_subscription
         args:
@@ -436,6 +535,15 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: investor
+        invocation_phrases:
+          - "activate investor holding"
+          - "move investor to active status"
+          - "confirm investor is active holder"
+          - "investor settlement complete"
+          - "finalize investor activation"
+          - "mark investor as active"
+          - "transition subscriber to holder"
+          - "activate LP in the register"
         behavior: plugin
         plugin_handler: investor_activate
         args:
@@ -459,6 +567,15 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: investor
+        invocation_phrases:
+          - "start investor redemption"
+          - "begin redemption process"
+          - "investor wants to redeem"
+          - "initiate LP redemption"
+          - "process redemption request"
+          - "start full fund redemption"
+          - "partial redemption for investor"
+          - "investor submitted redemption notice"
         behavior: plugin
         plugin_handler: investor_start_redemption
         args:
@@ -487,6 +604,15 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: investor
+        invocation_phrases:
+          - "complete investor redemption"
+          - "finalize redemption settlement"
+          - "redemption proceeds paid out"
+          - "close out investor redemption"
+          - "mark redemption as settled"
+          - "investor redemption is done"
+          - "finish LP redemption process"
+          - "settle and complete redemption"
         behavior: plugin
         plugin_handler: investor_complete_redemption
         args:
@@ -514,6 +640,15 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: investor
+        invocation_phrases:
+          - "offboard this investor"
+          - "remove investor from fund"
+          - "terminate investor relationship"
+          - "investor has fully redeemed"
+          - "close investor account"
+          - "complete investor offboarding"
+          - "mark investor as offboarded"
+          - "exit investor from register"
         behavior: plugin
         plugin_handler: investor_offboard
         args:
@@ -550,6 +685,15 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: investor
+        invocation_phrases:
+          - "suspend this investor"
+          - "freeze investor account"
+          - "put investor on hold"
+          - "block investor for AML concern"
+          - "sanctions match suspend investor"
+          - "regulatory hold on investor"
+          - "halt investor transactions"
+          - "place investor under suspension"
         behavior: plugin
         plugin_handler: investor_suspend
         args:
@@ -586,6 +730,15 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: investor
+        invocation_phrases:
+          - "reinstate suspended investor"
+          - "lift investor suspension"
+          - "unfreeze investor account"
+          - "remove hold on investor"
+          - "reactivate suspended LP"
+          - "clear investor suspension"
+          - "restore investor to previous state"
+          - "resume investor from suspension"
         behavior: plugin
         plugin_handler: investor_reinstate
         args:
@@ -627,6 +780,15 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: investor
+        invocation_phrases:
+          - "schedule investor KYC review"
+          - "set next review date"
+          - "when is investor review due"
+          - "plan periodic KYC refresh"
+          - "set annual review for investor"
+          - "schedule AML re-screening"
+          - "book next due diligence review"
+          - "update investor review calendar"
         behavior: crud
         crud:
           operation: update
@@ -661,6 +823,15 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: investor
+        invocation_phrases:
+          - "show investor lifecycle history"
+          - "get state change audit trail"
+          - "investor status change log"
+          - "what transitions has investor had"
+          - "show investor onboarding timeline"
+          - "display investor audit history"
+          - "track investor state changes"
+          - "review investor lifecycle events"
         behavior: crud
         crud:
           operation: list_by_fk
@@ -688,6 +859,15 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: investor
+        invocation_phrases:
+          - "count investors by state"
+          - "how many investors per status"
+          - "investor breakdown by lifecycle"
+          - "show investor state distribution"
+          - "dashboard of investor statuses"
+          - "pending vs active investor count"
+          - "investor pipeline summary"
+          - "how many LPs in each stage"
         behavior: plugin
         plugin_handler: investor_count_by_state
         args:

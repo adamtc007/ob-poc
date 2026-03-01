@@ -1,0 +1,957 @@
+# ============================================================================
+# INTENT PIPELINE TEST FIXTURES
+# ============================================================================
+# Purpose: Test utterance → verb selection accuracy
+# Usage:   cargo test --test intent_hit_rate -- --nocapture
+#
+# Categories:
+#   direct    — Uses verb vocabulary directly ("create a CBU")
+#   natural   — Natural business language ("onboard a new client")
+#   indirect  — Implies verb without naming it ("what documents are missing?")
+#   contextual — Requires workflow/entity context to disambiguate
+#   adversarial — Tests semantic collision resistance
+#   multi_intent — User wants 2+ actions (should match primary)
+#
+# Difficulty:
+#   easy   — Should match on lexicon/exact (Tier 0-2)
+#   medium — Requires semantic search (Tier 6) with good embeddings
+#   hard   — Requires LLM classifier or contextual boost
+#   expert — Domain expert language, abbreviations, implicit context
+#
+# NOTE: All utterances are what a real custody bank onboarding analyst,
+# compliance officer, or relationship manager would actually say.
+# ============================================================================
+
+# ============================================================================
+# CBU DOMAIN — Client Business Unit Lifecycle
+# ============================================================================
+
+[[test]]
+utterance = "create a new CBU for Allianz Global Investors in Luxembourg"
+expected_verb = "cbu.create"
+category = "direct"
+difficulty = "easy"
+domain_hint = "cbu"
+
+[[test]]
+utterance = "I need to onboard a new client"
+expected_verb = "cbu.create"
+category = "natural"
+difficulty = "medium"
+notes = "Classic natural language - 'onboard' maps to cbu.create"
+
+[[test]]
+utterance = "set up a fund structure for BlackRock"
+expected_verb = "cbu.create"
+category = "natural"
+difficulty = "medium"
+
+[[test]]
+utterance = "spin up a CBU"
+expected_verb = "cbu.create"
+category = "natural"
+difficulty = "medium"
+notes = "Informal language"
+
+[[test]]
+utterance = "show me all the CBUs"
+expected_verb = "cbu.list"
+category = "direct"
+difficulty = "easy"
+
+[[test]]
+utterance = "what clients do we have in Germany?"
+expected_verb = "cbu.list"
+category = "indirect"
+difficulty = "hard"
+notes = "Needs to infer 'clients in Germany' = cbu.list with jurisdiction filter"
+
+[[test]]
+utterance = "how many onboarding cases are open right now?"
+expected_verb = "cbu.list"
+category = "indirect"
+difficulty = "hard"
+
+[[test]]
+utterance = "update the jurisdiction to Ireland for this CBU"
+expected_verb = "cbu.update"
+category = "direct"
+difficulty = "easy"
+
+[[test]]
+utterance = "change the fund name"
+expected_verb = "cbu.update"
+category = "natural"
+difficulty = "medium"
+
+[[test]]
+utterance = "assign Goldman Sachs as custodian for this CBU"
+expected_verb = "cbu.assign-role"
+category = "natural"
+difficulty = "medium"
+notes = "Collision risk: cbu.assign-role vs cbu.role.assign"
+
+[[test]]
+utterance = "make State Street the transfer agent"
+expected_verb = "cbu.role.assign"
+category = "natural"
+difficulty = "hard"
+notes = "Role assignment - should prefer cbu.role.assign (v2)"
+
+[[test]]
+utterance = "who are the parties on this CBU?"
+expected_verb = "cbu.parties"
+category = "natural"
+difficulty = "medium"
+
+[[test]]
+utterance = "add custody services to this client"
+expected_verb = "cbu.add-product"
+category = "natural"
+difficulty = "medium"
+
+[[test]]
+utterance = "what products does this CBU have?"
+expected_verb = "cbu.read"
+category = "indirect"
+difficulty = "hard"
+alt_verbs = ["cbu.show"]
+
+[[test]]
+utterance = "delete the test CBU I just created"
+expected_verb = "cbu.delete"
+category = "direct"
+difficulty = "easy"
+
+[[test]]
+utterance = "nuke everything under this CBU including all roles"
+expected_verb = "cbu.delete-cascade"
+category = "natural"
+difficulty = "hard"
+notes = "Informal - 'nuke everything' implies cascade delete"
+
+# ============================================================================
+# ENTITY DOMAIN — Legal Entity Management
+# ============================================================================
+
+[[test]]
+utterance = "create a legal entity for HSBC Holdings plc"
+expected_verb = "entity.create-limited-company"
+category = "direct"
+difficulty = "easy"
+
+[[test]]
+utterance = "add a new company"
+expected_verb = "entity.create-limited-company"
+category = "natural"
+difficulty = "medium"
+
+[[test]]
+utterance = "register John Smith as a person"
+expected_verb = "entity.create-proper-person"
+category = "natural"
+difficulty = "medium"
+notes = "Must distinguish company vs person entity type"
+
+[[test]]
+utterance = "I need to add a trust — Cayman Islands discretionary trust"
+expected_verb = "entity.create-trust-discretionary"
+category = "natural"
+difficulty = "hard"
+notes = "Must pick trust-discretionary over limited-company"
+
+[[test]]
+utterance = "add a limited partnership for the GP structure"
+expected_verb = "entity.create-partnership-limited"
+category = "natural"
+difficulty = "hard"
+
+[[test]]
+utterance = "show me all entities"
+expected_verb = "entity.list"
+category = "direct"
+difficulty = "easy"
+
+[[test]]
+utterance = "which entities haven't been verified yet?"
+expected_verb = "entity.list-placeholders"
+category = "indirect"
+difficulty = "hard"
+alt_verbs = ["entity.list-ghosts"]
+notes = "Could also be entity.list with filter"
+
+[[test]]
+utterance = "update the registered address for this entity"
+expected_verb = "entity.update"
+category = "direct"
+difficulty = "easy"
+
+[[test]]
+utterance = "resolve this placeholder to the real entity"
+expected_verb = "entity.resolve-placeholder"
+category = "direct"
+difficulty = "medium"
+
+# ============================================================================
+# SCREENING DOMAIN — KYC Screening (Sanctions, PEP, Adverse Media)
+# ============================================================================
+
+[[test]]
+utterance = "run sanctions screening on this entity"
+expected_verb = "screening.sanctions"
+category = "direct"
+difficulty = "easy"
+
+[[test]]
+utterance = "check if they're on any sanctions lists"
+expected_verb = "screening.sanctions"
+category = "natural"
+difficulty = "medium"
+
+[[test]]
+utterance = "is this person a PEP?"
+expected_verb = "screening.pep"
+category = "natural"
+difficulty = "medium"
+
+[[test]]
+utterance = "check for politically exposed persons"
+expected_verb = "screening.pep"
+category = "natural"
+difficulty = "medium"
+
+[[test]]
+utterance = "run a full screening — sanctions, PEP, and adverse media"
+expected_verb = "screening.sanctions"
+category = "multi_intent"
+difficulty = "hard"
+alt_verbs = ["screening.pep", "screening.adverse-media"]
+notes = "User wants all three - should at least match the first"
+
+[[test]]
+utterance = "any negative news about this company?"
+expected_verb = "screening.adverse-media"
+category = "natural"
+difficulty = "medium"
+
+[[test]]
+utterance = "do the AML checks"
+expected_verb = "screening.sanctions"
+category = "natural"
+difficulty = "hard"
+notes = "'AML checks' is vague - could be sanctions, PEP, or both"
+
+[[test]]
+utterance = "screen them"
+expected_verb = "screening.sanctions"
+category = "natural"
+difficulty = "hard"
+notes = "Very terse - needs context to disambiguate"
+
+[[test]]
+utterance = "has anyone flagged this entity before?"
+expected_verb = "screening.adverse-media"
+category = "indirect"
+difficulty = "expert"
+notes = "Requires understanding 'flagged' in screening context"
+
+# ============================================================================
+# UBO DOMAIN — Beneficial Ownership
+# ============================================================================
+
+[[test]]
+utterance = "who are the beneficial owners?"
+expected_verb = "ubo.list-ubos"
+category = "natural"
+difficulty = "medium"
+
+[[test]]
+utterance = "show me the ownership structure"
+expected_verb = "ubo.list-owners"
+category = "natural"
+difficulty = "medium"
+notes = "Collision risk: ubo.list-owners vs ownership.compute vs control.list-controllers"
+
+[[test]]
+utterance = "add an ownership stake — Vanguard holds 25% of this entity"
+expected_verb = "ubo.add-ownership"
+category = "natural"
+difficulty = "medium"
+
+[[test]]
+utterance = "who controls this company?"
+expected_verb = "ubo.list-ubos"
+category = "natural"
+difficulty = "hard"
+alt_verbs = ["ownership.who-controls", "control.list-controllers"]
+notes = "Major collision point between ubo/ownership/control domains"
+
+[[test]]
+utterance = "add a control relationship — board appointment"
+expected_verb = "ubo.add-control"
+category = "natural"
+difficulty = "medium"
+
+[[test]]
+utterance = "calculate the UBOs for this CBU"
+expected_verb = "ubo.calculate"
+category = "direct"
+difficulty = "easy"
+
+[[test]]
+utterance = "trace the ownership chain from the top entity down"
+expected_verb = "ubo.trace-chains"
+category = "natural"
+difficulty = "medium"
+alt_verbs = ["ownership.trace-chain"]
+
+[[test]]
+utterance = "this person died last month"
+expected_verb = "ubo.mark-deceased"
+category = "indirect"
+difficulty = "expert"
+notes = "Implied action from factual statement"
+
+[[test]]
+utterance = "the settlor appointed a new trustee"
+expected_verb = "ubo.add-trust-role"
+category = "indirect"
+difficulty = "expert"
+notes = "Trust-specific language - must understand settlor/trustee vocabulary"
+
+[[test]]
+utterance = "waive the ownership verification — low risk client"
+expected_verb = "ubo.waive-verification"
+category = "natural"
+difficulty = "medium"
+
+[[test]]
+utterance = "ownership was transferred from Parent Co to New Holdco"
+expected_verb = "ubo.update-ownership"
+category = "indirect"
+difficulty = "hard"
+alt_verbs = ["ubo.convergence-supersede"]
+
+# ============================================================================
+# FUND DOMAIN — Fund Structures
+# ============================================================================
+
+[[test]]
+utterance = "create an umbrella fund — UCITS, Luxembourg domiciled"
+expected_verb = "fund.create-umbrella"
+category = "direct"
+difficulty = "easy"
+
+[[test]]
+utterance = "set up a new subfund under the umbrella"
+expected_verb = "fund.create-subfund"
+category = "natural"
+difficulty = "medium"
+
+[[test]]
+utterance = "add a share class — accumulating, EUR denominated"
+expected_verb = "fund.create-share-class"
+category = "natural"
+difficulty = "medium"
+
+[[test]]
+utterance = "create a master-feeder structure"
+expected_verb = "fund.create-master"
+category = "natural"
+difficulty = "hard"
+alt_verbs = ["fund.create-feeder"]
+notes = "Could mean either master or feeder creation"
+
+[[test]]
+utterance = "link the Cayman feeder to the Irish master"
+expected_verb = "fund.link-feeder"
+category = "natural"
+difficulty = "medium"
+
+[[test]]
+utterance = "what subfunds are in this umbrella?"
+expected_verb = "fund.list-subfunds"
+category = "natural"
+difficulty = "easy"
+
+[[test]]
+utterance = "show me all the share classes"
+expected_verb = "fund.list-share-classes"
+category = "natural"
+difficulty = "easy"
+
+[[test]]
+utterance = "BlackRock fund invests 30% NAV in the Vanguard fund"
+expected_verb = "fund.add-investment"
+category = "indirect"
+difficulty = "expert"
+notes = "Must understand fund-of-funds cross-investment"
+
+[[test]]
+utterance = "who invests in this fund?"
+expected_verb = "fund.list-investors"
+category = "natural"
+difficulty = "medium"
+
+[[test]]
+utterance = "create a standalone fund — AIF, Jersey"
+expected_verb = "fund.create-standalone"
+category = "direct"
+difficulty = "medium"
+
+# ============================================================================
+# DOCUMENT DOMAIN
+# ============================================================================
+
+[[test]]
+utterance = "what documents do we still need from this entity?"
+expected_verb = "document.missing-for-entity"
+category = "natural"
+difficulty = "medium"
+
+[[test]]
+utterance = "request the certificate of incorporation"
+expected_verb = "document.solicit"
+category = "natural"
+difficulty = "medium"
+
+[[test]]
+utterance = "upload the passport for John Smith"
+expected_verb = "document.upload-version"
+category = "direct"
+difficulty = "easy"
+
+[[test]]
+utterance = "verify this document"
+expected_verb = "document.verify"
+category = "direct"
+difficulty = "easy"
+
+[[test]]
+utterance = "reject the articles of association — wrong entity name"
+expected_verb = "document.reject"
+category = "natural"
+difficulty = "medium"
+
+[[test]]
+utterance = "extract the data from this uploaded document"
+expected_verb = "document.extract"
+category = "direct"
+difficulty = "easy"
+
+[[test]]
+utterance = "what type of documents do we collect for limited companies?"
+expected_verb = "document.catalog"
+category = "indirect"
+difficulty = "hard"
+
+[[test]]
+utterance = "send out the whole doc pack for this entity"
+expected_verb = "document.solicit-set"
+category = "natural"
+difficulty = "hard"
+notes = "'doc pack' → solicit-set (batch solicitation)"
+
+# ============================================================================
+# DEAL DOMAIN — Deal Lifecycle
+# ============================================================================
+
+[[test]]
+utterance = "create a new deal for Allianz"
+expected_verb = "deal.create"
+category = "direct"
+difficulty = "easy"
+
+[[test]]
+utterance = "add BlackRock as a participant on this deal"
+expected_verb = "deal.add-participant"
+category = "direct"
+difficulty = "easy"
+
+[[test]]
+utterance = "what's the status of the deal?"
+expected_verb = "deal.get"
+category = "natural"
+difficulty = "medium"
+alt_verbs = ["deal.summary"]
+
+[[test]]
+utterance = "show me the deal timeline"
+expected_verb = "deal.timeline"
+category = "direct"
+difficulty = "easy"
+
+[[test]]
+utterance = "set up the rate card for custody services"
+expected_verb = "deal.create-rate-card"
+category = "natural"
+difficulty = "medium"
+
+[[test]]
+utterance = "add a fee line — 2bps on AUM, quarterly"
+expected_verb = "deal.add-rate-card-line"
+category = "natural"
+difficulty = "hard"
+notes = "Must understand 'bps on AUM' = rate card line"
+
+[[test]]
+utterance = "propose the rate card to the client"
+expected_verb = "deal.propose-rate-card"
+category = "natural"
+difficulty = "medium"
+
+[[test]]
+utterance = "the client wants to counter our pricing"
+expected_verb = "deal.counter-rate-card"
+category = "indirect"
+difficulty = "hard"
+
+[[test]]
+utterance = "move the deal to approved"
+expected_verb = "deal.update-status"
+category = "natural"
+difficulty = "medium"
+
+[[test]]
+utterance = "kick off onboarding for this deal's products"
+expected_verb = "deal.request-onboarding"
+category = "natural"
+difficulty = "hard"
+
+[[test]]
+utterance = "cancel this deal — client withdrew"
+expected_verb = "deal.cancel"
+category = "direct"
+difficulty = "easy"
+
+# ============================================================================
+# GLEIF DOMAIN — LEI / Corporate Hierarchy
+# ============================================================================
+
+[[test]]
+utterance = "look up the LEI for HSBC"
+expected_verb = "gleif.search"
+category = "natural"
+difficulty = "medium"
+
+[[test]]
+utterance = "import the corporate hierarchy from GLEIF"
+expected_verb = "gleif.import-tree"
+category = "natural"
+difficulty = "medium"
+
+[[test]]
+utterance = "who is the parent company according to GLEIF?"
+expected_verb = "gleif.get-parent"
+category = "natural"
+difficulty = "medium"
+
+[[test]]
+utterance = "import all the managed funds for this asset manager"
+expected_verb = "gleif.import-managed-funds"
+category = "natural"
+difficulty = "medium"
+
+[[test]]
+utterance = "enrich the entity data from GLEIF"
+expected_verb = "gleif.enrich"
+category = "direct"
+difficulty = "easy"
+
+[[test]]
+utterance = "pull in the LEI hierarchy for this client group"
+expected_verb = "gleif.import-to-client-group"
+category = "natural"
+difficulty = "hard"
+
+# ============================================================================
+# OWNERSHIP / CONTROL DOMAINS
+# ============================================================================
+
+[[test]]
+utterance = "compute the ownership waterfall"
+expected_verb = "ownership.compute"
+category = "natural"
+difficulty = "medium"
+
+[[test]]
+utterance = "who ultimately controls this entity?"
+expected_verb = "ownership.who-controls"
+category = "natural"
+difficulty = "medium"
+notes = "Collision: ownership.who-controls vs ubo.list-ubos vs control.list-controllers"
+
+[[test]]
+utterance = "reconcile the ownership percentages"
+expected_verb = "ownership.reconcile"
+category = "direct"
+difficulty = "easy"
+
+[[test]]
+utterance = "trace the chain from Vanguard down to the subfund"
+expected_verb = "ownership.trace-chain"
+category = "natural"
+difficulty = "medium"
+alt_verbs = ["ubo.trace-chains"]
+
+[[test]]
+utterance = "are there any gaps in the ownership structure?"
+expected_verb = "ownership.analyze-gaps"
+category = "natural"
+difficulty = "medium"
+
+[[test]]
+utterance = "who is the board-appointed controller?"
+expected_verb = "control.show-board-controller"
+category = "natural"
+difficulty = "hard"
+
+[[test]]
+utterance = "import the PSC register data"
+expected_verb = "control.import-psc-register"
+category = "natural"
+difficulty = "medium"
+
+# ============================================================================
+# VIEW / SESSION DOMAIN — Navigation
+# ============================================================================
+
+[[test]]
+utterance = "show me everything"
+expected_verb = "view.universe"
+category = "natural"
+difficulty = "easy"
+
+[[test]]
+utterance = "load the Allianz book"
+expected_verb = "view.book"
+category = "direct"
+difficulty = "easy"
+
+[[test]]
+utterance = "zoom into this node"
+expected_verb = "view.zoom-in"
+category = "direct"
+difficulty = "easy"
+
+[[test]]
+utterance = "go back"
+expected_verb = "view.back-to"
+category = "natural"
+difficulty = "easy"
+alt_verbs = ["view.zoom-out"]
+
+[[test]]
+utterance = "load the Allianz cluster"
+expected_verb = "session.load-cluster"
+category = "direct"
+difficulty = "easy"
+
+[[test]]
+utterance = "switch to the BlackRock client"
+expected_verb = "session.set-client"
+category = "natural"
+difficulty = "medium"
+
+[[test]]
+utterance = "filter to UK entities only"
+expected_verb = "session.filter-jurisdiction"
+category = "natural"
+difficulty = "medium"
+
+[[test]]
+utterance = "load the deal"
+expected_verb = "session.load-deal"
+category = "direct"
+difficulty = "easy"
+
+[[test]]
+utterance = "show me the galaxy for Germany"
+expected_verb = "session.load-galaxy"
+category = "direct"
+difficulty = "easy"
+
+[[test]]
+utterance = "I want to work as a compliance officer"
+expected_verb = "session.set-persona"
+category = "indirect"
+difficulty = "hard"
+
+# ============================================================================
+# CLIENT GROUP DOMAIN
+# ============================================================================
+
+[[test]]
+utterance = "discover the entities in this client group"
+expected_verb = "client-group.discover-entities"
+category = "direct"
+difficulty = "easy"
+
+[[test]]
+utterance = "start the discovery process for this group"
+expected_verb = "client-group.start-discovery"
+category = "natural"
+difficulty = "medium"
+
+[[test]]
+utterance = "confirm this entity belongs to the group"
+expected_verb = "client-group.confirm-entity"
+category = "natural"
+difficulty = "medium"
+
+[[test]]
+utterance = "show me the relationships in this group"
+expected_verb = "client-group.list-relationships"
+category = "natural"
+difficulty = "easy"
+
+[[test]]
+utterance = "who are the parties in this group?"
+expected_verb = "client-group.parties"
+category = "natural"
+difficulty = "medium"
+
+[[test]]
+utterance = "search for entities matching 'Vanguard' in this group"
+expected_verb = "client-group.search"
+category = "natural"
+difficulty = "medium"
+
+# ============================================================================
+# ADVERSARIAL / COLLISION TESTS
+# These test cases are designed to expose semantic collisions where
+# multiple verbs are plausible but context should disambiguate.
+# ============================================================================
+
+[[test]]
+utterance = "list the roles"
+expected_verb = "cbu.role.list"
+category = "adversarial"
+difficulty = "hard"
+alt_verbs = ["client-group.list-roles"]
+notes = "Ambiguous without entity context — CBU vs client group roles"
+
+[[test]]
+utterance = "add a relationship"
+expected_verb = "client-group.add-relationship"
+category = "adversarial"
+difficulty = "hard"
+alt_verbs = ["ubo.add-ownership", "ubo.add-control"]
+notes = "Extremely vague — relationship could be ownership, control, or group"
+
+[[test]]
+utterance = "verify it"
+expected_verb = "document.verify"
+category = "adversarial"
+difficulty = "expert"
+alt_verbs = ["entity.verify", "control.reconcile-ownership", "cbu.verify-evidence"]
+notes = "'it' = anaphoric reference requiring session context"
+
+[[test]]
+utterance = "run the check"
+expected_verb = "screening.sanctions"
+category = "adversarial"
+difficulty = "expert"
+alt_verbs = ["screening.pep", "ownership.reconcile", "cbu.role.validate"]
+notes = "Extremely vague — 'check' is overloaded"
+
+[[test]]
+utterance = "show the structure"
+expected_verb = "ubo.list-owners"
+category = "adversarial"
+difficulty = "hard"
+alt_verbs = ["fund.list-subfunds", "client-group.list-relationships", "ownership.compute"]
+notes = "'structure' = ownership? fund? corporate?"
+
+[[test]]
+utterance = "import the data"
+expected_verb = "gleif.import-tree"
+category = "adversarial"
+difficulty = "expert"
+alt_verbs = ["gleif.enrich", "control.import-psc-register", "bods.sync-from-gleif"]
+notes = "'import data' could be any external data source"
+
+[[test]]
+utterance = "create a new one"
+expected_verb = "cbu.create"
+category = "adversarial"
+difficulty = "expert"
+alt_verbs = ["entity.create-limited-company", "fund.create-umbrella", "deal.create"]
+notes = "Completely ambiguous without context"
+
+# ============================================================================
+# EXPERT DOMAIN LANGUAGE
+# These use real custody banking / compliance terminology that
+# a senior onboarding analyst or compliance officer would use.
+# ============================================================================
+
+[[test]]
+utterance = "pull the BODS data for this LEI"
+expected_verb = "bods.find-by-lei"
+category = "natural"
+difficulty = "expert"
+notes = "BODS = Beneficial Ownership Data Standard"
+
+[[test]]
+utterance = "run the RBA assessment"
+expected_verb = "screening.sanctions"
+category = "indirect"
+difficulty = "expert"
+notes = "RBA = Risk Based Approach — implies full screening suite"
+
+[[test]]
+utterance = "check the PSC register"
+expected_verb = "control.import-psc-register"
+category = "natural"
+difficulty = "expert"
+notes = "PSC = Persons with Significant Control (UK)"
+
+[[test]]
+utterance = "set up the NAV calc service"
+expected_verb = "cbu.add-product"
+category = "indirect"
+difficulty = "expert"
+notes = "NAV calculation is a product/service — maps to add-product"
+
+[[test]]
+utterance = "add the TA and fund accounting"
+expected_verb = "cbu.add-product"
+category = "indirect"
+difficulty = "expert"
+notes = "TA = Transfer Agent — a product/service"
+
+[[test]]
+utterance = "compute the 25% threshold test"
+expected_verb = "ubo.calculate"
+category = "indirect"
+difficulty = "expert"
+notes = "25% threshold = UBO determination threshold under 4AMLD/5AMLD"
+
+[[test]]
+utterance = "flag the circular ownership"
+expected_verb = "ownership.reconcile"
+category = "indirect"
+difficulty = "expert"
+notes = "Circular ownership detection is part of reconciliation"
+
+[[test]]
+utterance = "check for OFAC hits"
+expected_verb = "screening.sanctions"
+category = "natural"
+difficulty = "expert"
+notes = "OFAC = US sanctions body — maps to sanctions screening"
+
+[[test]]
+utterance = "onboard the sub-custodian"
+expected_verb = "cbu.create"
+category = "natural"
+difficulty = "expert"
+notes = "Sub-custodian is an entity type in custody banking"
+
+[[test]]
+utterance = "KYC refresh for this entity"
+expected_verb = "screening.sanctions"
+category = "indirect"
+difficulty = "expert"
+alt_verbs = ["screening.pep", "screening.adverse-media", "document.missing-for-entity"]
+notes = "KYC refresh = re-run all screenings + check doc currency"
+
+[[test]]
+utterance = "nominee structure — need to pierce the veil"
+expected_verb = "ubo.trace-chains"
+category = "indirect"
+difficulty = "expert"
+notes = "Piercing the veil = looking through nominee to find real UBO"
+
+[[test]]
+utterance = "where's the CDD pack for this client?"
+expected_verb = "document.for-entity"
+category = "indirect"
+difficulty = "expert"
+notes = "CDD = Customer Due Diligence pack = document collection for entity"
+
+# ============================================================================
+# AGENT / META COMMANDS
+# ============================================================================
+
+[[test]]
+utterance = "teach the system that 'spin up' means create CBU"
+expected_verb = "agent.teach"
+category = "direct"
+difficulty = "easy"
+
+[[test]]
+utterance = "undo"
+expected_verb = "session.undo"
+category = "direct"
+difficulty = "easy"
+
+[[test]]
+utterance = "what tools do you have?"
+expected_verb = "agent.list-tools"
+category = "natural"
+difficulty = "easy"
+
+[[test]]
+utterance = "switch to research mode"
+expected_verb = "agent.set-authoring-mode"
+category = "natural"
+difficulty = "medium"
+alt_verbs = ["agent.set-mode"]
+
+[[test]]
+utterance = "confirm"
+expected_verb = "agent.confirm"
+category = "direct"
+difficulty = "easy"
+
+[[test]]
+utterance = "no, go back"
+expected_verb = "agent.reject"
+category = "natural"
+difficulty = "medium"
+
+# ============================================================================
+# CONTRACT / BILLING DOMAINS
+# ============================================================================
+
+[[test]]
+utterance = "create a master services agreement"
+expected_verb = "contract.create"
+category = "natural"
+difficulty = "medium"
+
+[[test]]
+utterance = "add a billing schedule — monthly in arrears"
+expected_verb = "billing.create-schedule"
+category = "natural"
+difficulty = "medium"
+
+[[test]]
+utterance = "what's the fee for custody on this product?"
+expected_verb = "deal.list-rate-card-lines"
+category = "indirect"
+difficulty = "hard"
+notes = "Fee inquiry maps to rate card lines on the deal"
+
+# ============================================================================
+# BOOKING PRINCIPAL DOMAIN
+# ============================================================================
+
+[[test]]
+utterance = "set up a booking principal for this deal"
+expected_verb = "booking-principal.create"
+category = "direct"
+difficulty = "medium"
+
+[[test]]
+utterance = "which booking entity handles custody for Ireland?"
+expected_verb = "booking-principal.list"
+category = "natural"
+difficulty = "hard"
+
+[[test]]
+utterance = "assign the booking location"
+expected_verb = "booking-location.create"
+category = "natural"
+difficulty = "medium"

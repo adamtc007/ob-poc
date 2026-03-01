@@ -9,6 +9,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: client_type
+        invocation_phrases:
+          - "add a new client type"
+          - "register client classification"
+          - "create client type entry"
+          - "configure a client category"
+          - "set up new client type"
+          - "define client type code"
+          - "upsert client type record"
+          - "what client types can I add"
         behavior: crud
         crud:
           operation: upsert
@@ -52,6 +61,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: client_type
+        invocation_phrases:
+          - "look up client type by code"
+          - "get client type details"
+          - "show me this client type"
+          - "fetch client classification record"
+          - "what is this client type"
+          - "read client type definition"
+          - "find client type by code"
+          - "retrieve client category info"
         behavior: crud
         crud:
           operation: select
@@ -72,6 +90,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: client_type
+        invocation_phrases:
+          - "list all client types"
+          - "show available client categories"
+          - "what client types exist"
+          - "display client classification codes"
+          - "enumerate client type options"
+          - "get all client type records"
+          - "which client types are active"
+          - "show me the client type list"
         behavior: crud
         crud:
           operation: select
@@ -93,6 +120,15 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: client_type
+        invocation_phrases:
+          - "deactivate a client type"
+          - "disable this client classification"
+          - "retire client type code"
+          - "turn off a client type"
+          - "mark client type as inactive"
+          - "remove client type from list"
+          - "suspend a client category"
+          - "deprecate this client type"
         behavior: crud
         crud:
           operation: update
