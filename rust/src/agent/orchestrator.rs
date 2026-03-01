@@ -803,6 +803,136 @@ pub async fn handle_utterance_with_forced_verb(
         .map(|lr| lr.entities.iter().map(|e| e.mention_text.clone()).collect())
         .unwrap_or_default();
 
+    // -- SemReg context resolution for forced-verb path --
+    // Even though the user selected this verb, we still validate it against
+    // the current SemReg allowed set. This closes the TOCTOU gap where the
+    // verb was allowed at discovery time but may have been revoked since.
+    let envelope = resolve_sem_reg_verbs(ctx, dominant_entity_kind.as_deref()).await;
+
+    let sem_reg_verb_names: Option<Vec<String>> = if envelope.is_unavailable() {
+        None
+    } else {
+        Some(envelope.allowed_verbs.iter().cloned().collect())
+    };
+
+    let allowed_verbs_fingerprint = if envelope.is_unavailable() {
+        None
+    } else {
+        Some(envelope.fingerprint_str().to_string())
+    };
+    let pruned_verbs_count = envelope.pruned_count();
+
+    // Check if the forced verb is still allowed
+    let mut sem_reg_denied_all = false;
+    let semreg_unavailable = envelope.is_unavailable();
+    let mut blocked_reason: Option<String> = None;
+    let mut verb_denied = false;
+
+    if envelope.is_unavailable() {
+        if policy.semreg_fail_closed() {
+            // Check safe-harbor verbs
+            if !crate::agent::verb_surface::is_safe_harbor_verb(forced_verb_fqn) {
+                blocked_reason = Some(format!(
+                    "SemReg unavailable (fail-closed): verb '{}' not in safe-harbor set",
+                    forced_verb_fqn
+                ));
+                verb_denied = true;
+                tracing::warn!(
+                    verb = forced_verb_fqn,
+                    "Forced verb denied: SemReg unavailable in strict mode"
+                );
+            }
+        }
+    } else if envelope.is_deny_all() {
+        sem_reg_denied_all = true;
+        if policy.semreg_fail_closed() {
+            blocked_reason = Some("SemReg denied all verbs for this subject (strict mode)".into());
+            verb_denied = true;
+            tracing::warn!(
+                verb = forced_verb_fqn,
+                "Forced verb denied: SemReg deny-all in strict mode"
+            );
+        }
+    } else if !envelope.is_allowed(forced_verb_fqn) {
+        blocked_reason = Some(format!(
+            "Forced verb '{}' not in SemReg allowed set (fingerprint: {})",
+            forced_verb_fqn,
+            envelope.fingerprint_str()
+        ));
+        verb_denied = true;
+        tracing::warn!(
+            verb = forced_verb_fqn,
+            fingerprint = %envelope.fingerprint_str(),
+            "Forced verb denied by SemReg"
+        );
+    }
+
+    // If verb is denied in strict mode, return a blocked outcome
+    if verb_denied && policy.semreg_fail_closed() {
+        use crate::mcp::intent_pipeline::StructuredIntent;
+
+        let trace = IntentTrace {
+            utterance: utterance.to_string(),
+            source: ctx.source.clone(),
+            entity_candidates,
+            dominant_entity: dominant_entity_name,
+            sem_reg_verb_filter: sem_reg_verb_names,
+            verb_candidates_pre_filter: vec![],
+            verb_candidates_post_filter: vec![],
+            final_verb: None,
+            final_confidence: 0.0,
+            dsl_generated: None,
+            dsl_hash: None,
+            bypass_used: None,
+            dsl_source: Some(format!("{:?}", ctx.source)),
+            sem_reg_mode: "strict".into(),
+            sem_reg_denied_all,
+            policy_gate_snapshot: policy.snapshot(),
+            forced_verb: Some(forced_verb_fqn.to_string()),
+            blocked_reason: blocked_reason.clone(),
+            chosen_verb_pre_semreg: None,
+            chosen_verb_post_semreg: None,
+            semreg_policy: envelope.label().to_string(),
+            semreg_unavailable,
+            selection_source: "user_choice".to_string(),
+            macro_semreg_checked: false,
+            macro_denied_verbs: vec![],
+            dominant_entity_kind,
+            entity_kind_filtered: false,
+            telemetry_persisted: false,
+            agent_mode: ctx.agent_mode.to_string(),
+            agent_mode_blocked_verbs: vec![],
+            allowed_verbs_fingerprint,
+            pruned_verbs_count,
+            toctou_recheck_performed: true,
+            toctou_result: Some("denied".to_string()),
+            toctou_new_fingerprint: Some(envelope.fingerprint_str().to_string()),
+            surface_fingerprint: None,
+        };
+
+        let mut outcome = OrchestratorOutcome {
+            pipeline_result: PipelineResult {
+                intent: StructuredIntent::empty(),
+                verb_candidates: vec![],
+                dsl: String::new(),
+                dsl_hash: None,
+                valid: false,
+                validation_error: blocked_reason,
+                unresolved_refs: vec![],
+                missing_required: vec![],
+                outcome: PipelineOutcome::NeedsClarification,
+                scope_resolution: None,
+                scope_context: None,
+            },
+            context_envelope: Some(envelope),
+            surface: None,
+            lookup_result,
+            trace,
+        };
+        emit_telemetry(ctx, utterance, &mut outcome).await;
+        return Ok(outcome);
+    }
+
     let searcher = (*ctx.verb_searcher).clone();
     let pipeline = IntentPipeline::with_pool(searcher, ctx.pool.clone());
 
@@ -815,7 +945,7 @@ pub async fn handle_utterance_with_forced_verb(
         source: ctx.source.clone(),
         entity_candidates,
         dominant_entity: dominant_entity_name,
-        sem_reg_verb_filter: None,
+        sem_reg_verb_filter: sem_reg_verb_names,
         verb_candidates_pre_filter: vec![],
         verb_candidates_post_filter: vec![(forced_verb_fqn.to_string(), 1.0)],
         final_verb: Some(forced_verb_fqn.to_string()),
@@ -835,8 +965,8 @@ pub async fn handle_utterance_with_forced_verb(
         blocked_reason: None,
         chosen_verb_pre_semreg: None,
         chosen_verb_post_semreg: Some(forced_verb_fqn.to_string()),
-        semreg_policy: "unavailable".to_string(),
-        semreg_unavailable: false,
+        semreg_policy: envelope.label().to_string(),
+        semreg_unavailable,
         selection_source: "user_choice".to_string(),
         macro_semreg_checked: false,
         macro_denied_verbs: vec![],
@@ -845,25 +975,27 @@ pub async fn handle_utterance_with_forced_verb(
         telemetry_persisted: false,
         agent_mode: ctx.agent_mode.to_string(),
         agent_mode_blocked_verbs: vec![],
-        allowed_verbs_fingerprint: None,
-        pruned_verbs_count: 0,
-        toctou_recheck_performed: false,
-        toctou_result: None,
+        allowed_verbs_fingerprint,
+        pruned_verbs_count,
+        toctou_recheck_performed: true,
+        toctou_result: Some("still_allowed".to_string()),
         toctou_new_fingerprint: None,
-        surface_fingerprint: None, // No surface computed for forced-verb path
+        surface_fingerprint: None,
     };
 
     tracing::info!(
         source = ?trace.source,
         forced_verb = forced_verb_fqn,
         dsl_generated = trace.dsl_generated.is_some(),
+        fingerprint = ?trace.allowed_verbs_fingerprint,
+        toctou = ?trace.toctou_result,
         "IntentTrace (forced verb)"
     );
 
     let mut outcome = OrchestratorOutcome {
         pipeline_result: result,
-        context_envelope: None,
-        surface: None, // No surface computed for forced-verb path
+        context_envelope: Some(envelope),
+        surface: None,
         lookup_result,
         trace,
     };

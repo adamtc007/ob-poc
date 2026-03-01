@@ -41,6 +41,8 @@ pub struct AgentState {
     pub entity_linker: Arc<dyn EntityLinkingService>,
     /// Server-side policy enforcement for single-pipeline invariants
     pub policy_gate: Arc<PolicyGate>,
+    /// Semantic OS client for SemReg verb filtering (governance enforcement)
+    pub sem_os_client: Option<Arc<dyn sem_os_client::SemOsClient>>,
 }
 
 impl AgentState {
@@ -242,6 +244,7 @@ impl AgentState {
             expansion_audit,
             entity_linker,
             policy_gate,
+            sem_os_client,
         }
     }
 }

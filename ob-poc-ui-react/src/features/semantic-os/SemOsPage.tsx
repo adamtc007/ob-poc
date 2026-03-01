@@ -14,7 +14,7 @@ import { Loader2 } from "lucide-react";
 import { chatApi } from "../../api/chat";
 import { queryKeys, queryClient } from "../../lib/query";
 import { useChatStore } from "../../stores/chat";
-import { ChatMessage, ChatInput } from "../chat/components";
+import { ChatMessage, ChatInput, VerbBrowser } from "../chat/components";
 import { SemOsContextPanel } from "./components";
 import type { DecisionReply } from "../../types/chat";
 
@@ -65,6 +65,23 @@ export function SemOsPage() {
     }
   }, [data, sessionId, setCurrentSession]);
 
+  // Fetch verb surface when session loads
+  useEffect(() => {
+    if (!sessionId) return;
+    chatApi.getVerbSurface(sessionId).then((result) => {
+      if (result.verbs.length > 0) {
+        setAvailableVerbs(
+          result.verbs,
+          result.surface_fingerprint
+            ? { fingerprint: result.surface_fingerprint, totalRegistry: result.totalRegistry ?? 0, finalCount: result.verbs.length }
+            : undefined,
+        );
+      }
+    }).catch((err) => {
+      console.warn("[SemOsPage] getVerbSurface failed:", err);
+    });
+  }, [sessionId, setAvailableVerbs]);
+
   // Scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -114,8 +131,16 @@ export function SemOsPage() {
       if (!sessionId) throw new Error("No session selected");
       return chatApi.replyToDecision(sessionId, reply);
     },
-    onSuccess: (message) => {
-      addMessage(message);
+    onSuccess: (response) => {
+      addMessage(response.message);
+      if (response.available_verbs?.length) {
+        setAvailableVerbs(
+          response.available_verbs,
+          response.surface_fingerprint
+            ? { fingerprint: response.surface_fingerprint, totalRegistry: 0, finalCount: response.available_verbs.length }
+            : undefined,
+        );
+      }
       queryClient.invalidateQueries({
         queryKey: queryKeys.semOs.session(sessionId!),
       });
@@ -125,6 +150,13 @@ export function SemOsPage() {
   const handleSend = useCallback(
     (message: string) => {
       sendMutation.mutate(message);
+    },
+    [sendMutation],
+  );
+
+  const handleVerbSubmit = useCallback(
+    (sexpr: string) => {
+      sendMutation.mutate(sexpr);
     },
     [sendMutation],
   );
@@ -228,8 +260,11 @@ export function SemOsPage() {
         />
       </div>
 
-      {/* Right sidebar - Registry context */}
-      <SemOsContextPanel className="w-64 flex-shrink-0 border-l border-[var(--border-primary)] bg-[var(--bg-secondary)]" />
+      {/* Right sidebar - Registry context + Verb browser */}
+      <div className="w-64 flex-shrink-0 border-l border-[var(--border-primary)] bg-[var(--bg-secondary)] flex flex-col overflow-hidden">
+        <SemOsContextPanel className="" />
+        <VerbBrowser className="border-t border-[var(--border-primary)]" onVerbSubmit={handleVerbSubmit} />
+      </div>
     </div>
   );
 }

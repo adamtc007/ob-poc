@@ -123,7 +123,7 @@ pub struct FilterSummary {
 /// Domain prefixes that are always safe (navigation, help, session management).
 const SAFE_HARBOR_DOMAINS: &[&str] = &["session", "view", "agent"];
 
-fn is_safe_harbor_verb(fqn: &str) -> bool {
+pub fn is_safe_harbor_verb(fqn: &str) -> bool {
     SAFE_HARBOR_DOMAINS
         .iter()
         .any(|domain| fqn.starts_with(&format!("{domain}.")))

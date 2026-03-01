@@ -514,6 +514,9 @@ pub(crate) async fn handle_decision_reply(
         return Err(StatusCode::CONFLICT);
     }
 
+    // Track whether SemOS workflow was selected (stage_focus changed)
+    let mut semos_stage_changed = false;
+
     // Handle based on reply type (using ob_poc_types::UserReply)
     let response = match &req.reply {
         UserReply::Select { index } => {
@@ -623,6 +626,7 @@ pub(crate) async fn handle_decision_reply(
                             _ => "semos-data-management", // safe default
                         };
                         session.context.stage_focus = Some(stage_focus.to_string());
+                        semos_stage_changed = true;
                         tracing::info!(
                             session_id = %session_id,
                             stage_focus = %stage_focus,
@@ -683,6 +687,8 @@ pub(crate) async fn handle_decision_reply(
                 execution_result: None,
                 message,
                 complete: true,
+                available_verbs: None,
+                surface_fingerprint: None,
             }
         }
 
@@ -716,6 +722,8 @@ pub(crate) async fn handle_decision_reply(
                 execution_result: None,
                 message: "Execution confirmed".to_string(),
                 complete: true,
+                available_verbs: None,
+                surface_fingerprint: None,
             }
         }
 
@@ -729,6 +737,8 @@ pub(crate) async fn handle_decision_reply(
                 execution_result: None,
                 message: format!("Processing: {}", text),
                 complete: true,
+                available_verbs: None,
+                surface_fingerprint: None,
             }
         }
 
@@ -743,6 +753,8 @@ pub(crate) async fn handle_decision_reply(
                 execution_result: None,
                 message: format!("Narrowing by: {}", term),
                 complete: false,
+                available_verbs: None,
+                surface_fingerprint: None,
             }
         }
 
@@ -756,6 +768,8 @@ pub(crate) async fn handle_decision_reply(
                 execution_result: None,
                 message: "Showing more options".to_string(),
                 complete: false,
+                available_verbs: None,
+                surface_fingerprint: None,
             }
         }
 
@@ -769,8 +783,89 @@ pub(crate) async fn handle_decision_reply(
                 execution_result: None,
                 message: "Cancelled".to_string(),
                 complete: true,
+                available_verbs: None,
+                surface_fingerprint: None,
             }
         }
+    };
+
+    // If SemOS workflow changed, compute updated verb surface for the UI
+    let response = if semos_stage_changed {
+        // Clone session with updated stage_focus, then drop write lock
+        let session_clone = sessions.get(&session_id).cloned();
+        drop(sessions);
+
+        if let Some(session_snap) = session_clone {
+            use crate::agent::verb_surface::{
+                compute_session_verb_surface, VerbSurfaceContext, VerbSurfaceFailPolicy,
+            };
+
+            let actor = crate::sem_reg::abac::ActorContext {
+                actor_id: "decision-reply".to_string(),
+                roles: vec!["viewer".to_string()],
+                department: None,
+                clearance: None,
+                jurisdictions: vec![],
+            };
+            let agent_mode = sem_os_core::authoring::agent_mode::AgentMode::default();
+
+            let (envelope, fail_policy) = match state
+                .agent_service
+                .resolve_options(&session_snap, actor)
+                .await
+            {
+                Ok(env) => (env, VerbSurfaceFailPolicy::FailOpen),
+                Err(e) => {
+                    tracing::warn!("[handle_decision_reply] SemReg resolution failed: {e}");
+                    (
+                        crate::agent::context_envelope::ContextEnvelope::unavailable(),
+                        VerbSurfaceFailPolicy::default(),
+                    )
+                }
+            };
+
+            let ctx = VerbSurfaceContext {
+                agent_mode,
+                stage_focus: session_snap.context.stage_focus.as_deref(),
+                envelope: &envelope,
+                fail_policy,
+                entity_state: None,
+            };
+            let surface = compute_session_verb_surface(&ctx);
+
+            let verbs: Vec<ob_poc_types::chat::VerbSurfaceEntry> = surface
+                .verbs
+                .iter()
+                .map(|v| ob_poc_types::chat::VerbSurfaceEntry {
+                    fqn: v.fqn.clone(),
+                    domain: v.domain.clone(),
+                    action: v.action.clone(),
+                    description: v.description.clone(),
+                    governance_tier: v.governance_tier.clone(),
+                    lifecycle_eligible: v.lifecycle_eligible,
+                    rank_boost: v.rank_boost,
+                })
+                .collect();
+
+            let fingerprint = surface.surface_fingerprint.0.clone();
+
+            tracing::info!(
+                verb_count = verbs.len(),
+                fingerprint = %fingerprint,
+                "Pushing updated verb surface after workflow selection"
+            );
+
+            DecisionReplyResponse {
+                available_verbs: Some(verbs),
+                surface_fingerprint: Some(fingerprint),
+                ..response
+            }
+        } else {
+            response
+        }
+    } else {
+        drop(sessions);
+        response
     };
 
     Ok(Json(response))

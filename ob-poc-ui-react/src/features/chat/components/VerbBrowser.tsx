@@ -28,6 +28,8 @@ import type { VerbProfile } from '../../../types/chat';
 
 interface VerbBrowserProps {
   className?: string;
+  /** When provided, clicking a verb submits it directly instead of filling the input */
+  onVerbSubmit?: (sexpr: string) => void;
 }
 
 /** Governance tier badge */
@@ -237,19 +239,20 @@ function DomainVerbList({
   );
 }
 
-export function VerbBrowser({ className = '' }: VerbBrowserProps) {
+export function VerbBrowser({ className = '', onVerbSubmit }: VerbBrowserProps) {
   const { availableVerbs, verbSurfaceMeta, setInputValue } = useChatStore();
   const [isExpanded, setIsExpanded] = useState(false);
   const [selectedDomain, setSelectedDomain] = useState<string | null>(null);
   const [domainSearch, setDomainSearch] = useState('');
-  const prevCountRef = useRef(0);
+  const hasAutoExpanded = useRef(false);
 
   // Auto-expand when verbs first arrive
   useEffect(() => {
-    if (availableVerbs.length > 0 && prevCountRef.current === 0) {
-      setIsExpanded(true);
+    if (availableVerbs.length > 0 && !hasAutoExpanded.current) {
+      hasAutoExpanded.current = true;
+      // Defer to avoid synchronous setState in effect
+      queueMicrotask(() => setIsExpanded(true));
     }
-    prevCountRef.current = availableVerbs.length;
   }, [availableVerbs.length]);
 
   // Group verbs by domain
@@ -283,7 +286,11 @@ export function VerbBrowser({ className = '' }: VerbBrowserProps) {
   }, [domains, domainSearch]);
 
   const handleSelectVerb = (verb: VerbProfile) => {
-    setInputValue(verb.sexpr);
+    if (onVerbSubmit) {
+      onVerbSubmit(verb.sexpr);
+    } else {
+      setInputValue(verb.sexpr);
+    }
   };
 
   if (totalCount === 0) {

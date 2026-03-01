@@ -415,4 +415,10 @@ pub struct DecisionReplyResponse {
     /// Whether the decision is complete
     #[serde(default)]
     pub complete: bool,
+    /// Updated verb surface after workflow change (e.g., stage_focus set)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub available_verbs: Option<Vec<crate::chat::VerbSurfaceEntry>>,
+    /// Surface fingerprint for drift detection
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub surface_fingerprint: Option<String>,
 }

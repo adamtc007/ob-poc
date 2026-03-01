@@ -41,6 +41,23 @@ export function ChatPage() {
     }
   }, [data, sessionId, setCurrentSession]);
 
+  // Fetch verb surface when session loads
+  useEffect(() => {
+    if (!sessionId) return;
+    chatApi.getVerbSurface(sessionId).then((result) => {
+      if (result.verbs.length > 0) {
+        setAvailableVerbs(
+          result.verbs,
+          result.surface_fingerprint
+            ? { fingerprint: result.surface_fingerprint, totalRegistry: result.totalRegistry ?? 0, finalCount: result.verbs.length }
+            : undefined,
+        );
+      }
+    }).catch((err) => {
+      console.warn("[ChatPage] getVerbSurface failed:", err);
+    });
+  }, [sessionId, setAvailableVerbs]);
+
   // Scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -91,8 +108,16 @@ export function ChatPage() {
       if (!sessionId) throw new Error("No session selected");
       return chatApi.replyToDecision(sessionId, reply);
     },
-    onSuccess: (message) => {
-      addMessage(message);
+    onSuccess: (response) => {
+      addMessage(response.message);
+      if (response.available_verbs?.length) {
+        setAvailableVerbs(
+          response.available_verbs,
+          response.surface_fingerprint
+            ? { fingerprint: response.surface_fingerprint, totalRegistry: 0, finalCount: response.available_verbs.length }
+            : undefined,
+        );
+      }
       queryClient.invalidateQueries({
         queryKey: queryKeys.chat.session(sessionId!),
       });
@@ -102,6 +127,13 @@ export function ChatPage() {
   const handleSend = useCallback(
     (message: string) => {
       sendMutation.mutate(message);
+    },
+    [sendMutation],
+  );
+
+  const handleVerbSubmit = useCallback(
+    (sexpr: string) => {
+      sendMutation.mutate(sexpr);
     },
     [sendMutation],
   );
@@ -208,7 +240,7 @@ export function ChatPage() {
         <ScopePanel sessionId={sessionId} />
 
         {/* Available commands / verb browser */}
-        <VerbBrowser className="border-t border-[var(--border-primary)]" />
+        <VerbBrowser className="border-t border-[var(--border-primary)]" onVerbSubmit={handleVerbSubmit} />
       </div>
     </div>
   );

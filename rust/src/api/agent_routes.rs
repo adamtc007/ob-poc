@@ -2967,6 +2967,80 @@ async fn execute_session_dsl(
             }
         };
 
+        // SemReg verb validation: check all verb FQNs in parsed AST are allowed
+        if let Some(ref client) = state.sem_os_client {
+            use dsl_core::Statement;
+            let actor = crate::policy::ActorResolver::from_env();
+            let envelope = crate::agent::orchestrator::resolve_allowed_verbs(
+                client.as_ref(),
+                &actor,
+                Some(session_id),
+            )
+            .await;
+
+            if envelope.is_unavailable() {
+                let policy_gate = crate::policy::PolicyGate::from_env();
+                if policy_gate.semreg_fail_closed() {
+                    tracing::warn!(
+                        session = %session_id,
+                        "execute_session_dsl: SemReg unavailable — blocked in strict mode"
+                    );
+                    return Ok(Json(ExecuteResponse {
+                        success: false,
+                        results: Vec::new(),
+                        errors: vec![
+                            "SemReg unavailable — execution blocked in strict mode".to_string()
+                        ],
+                        new_state: current_state.into(),
+                        bindings: None,
+                    }));
+                }
+            } else if envelope.is_deny_all() {
+                tracing::warn!(
+                    session = %session_id,
+                    "execute_session_dsl: SemReg deny-all — blocking execution"
+                );
+                return Ok(Json(ExecuteResponse {
+                    success: false,
+                    results: Vec::new(),
+                    errors: vec!["SemReg denied execution: no verbs are allowed".to_string()],
+                    new_state: current_state.into(),
+                    bindings: None,
+                }));
+            } else {
+                let denied_verbs: Vec<String> = program
+                    .statements
+                    .iter()
+                    .filter_map(|stmt| {
+                        if let Statement::VerbCall(vc) = stmt {
+                            let fqn = format!("{}.{}", vc.domain, vc.verb);
+                            if !envelope.is_allowed(&fqn) {
+                                return Some(fqn);
+                            }
+                        }
+                        None
+                    })
+                    .collect();
+                if !denied_verbs.is_empty() {
+                    tracing::warn!(
+                        session = %session_id,
+                        denied = ?denied_verbs,
+                        "execute_session_dsl: SemReg denied verbs"
+                    );
+                    return Ok(Json(ExecuteResponse {
+                        success: false,
+                        results: Vec::new(),
+                        errors: vec![format!(
+                            "SemReg denied execution: verbs not in allowed set: {}",
+                            denied_verbs.join(", ")
+                        )],
+                        new_state: current_state.into(),
+                        bindings: None,
+                    }));
+                }
+            }
+        }
+
         // CSG VALIDATION (includes dataflow)
         tracing::debug!("[EXEC] Starting CSG validation");
         tracing::debug!(
@@ -4172,21 +4246,42 @@ async fn get_session_verb_surface(
     };
 
     // Read session context
-    let stage_focus = {
+    let session = {
         let sessions = state.sessions.read().await;
-        let session = sessions.get(&session_id).ok_or(StatusCode::NOT_FOUND)?;
-        session.context.stage_focus.clone()
+        sessions
+            .get(&session_id)
+            .cloned()
+            .ok_or(StatusCode::NOT_FOUND)?
     };
     let agent_mode = sem_os_core::authoring::agent_mode::AgentMode::default();
 
-    // Build context — use unavailable envelope since we don't have a live SemReg
-    // resolution for a GET request. The surface will apply FailPolicy accordingly.
-    let envelope = ContextEnvelope::unavailable();
+    // Resolve real SemReg verb set via the same path as the chat pipeline.
+    // On failure, fall back to unavailable envelope with FailOpen (this is a
+    // read-only UI population endpoint, not a governance enforcement point).
+    let actor = crate::sem_reg::abac::ActorContext {
+        actor_id: "verb-surface-api".to_string(),
+        roles: vec!["viewer".to_string()],
+        department: None,
+        clearance: None,
+        jurisdictions: vec![],
+    };
+    let (envelope, fail_policy) = match state.agent_service.resolve_options(&session, actor).await {
+        Ok(env) => (env, VerbSurfaceFailPolicy::FailOpen),
+        Err(e) => {
+            tracing::warn!(
+                "[get_session_verb_surface] SemReg resolution failed, falling back: {e}"
+            );
+            (
+                ContextEnvelope::unavailable(),
+                VerbSurfaceFailPolicy::default(),
+            )
+        }
+    };
     let ctx = VerbSurfaceContext {
         agent_mode,
-        stage_focus: stage_focus.as_deref(),
+        stage_focus: session.context.stage_focus.as_deref(),
         envelope: &envelope,
-        fail_policy: VerbSurfaceFailPolicy::default(),
+        fail_policy,
         entity_state: None,
     };
     let surface = compute_session_verb_surface(&ctx);

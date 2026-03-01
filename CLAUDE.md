@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-> **Last reviewed:** 2026-02-28
+> **Last reviewed:** 2026-03-01
 > **Frontend:** React/TypeScript (`ob-poc-ui-react/`) - Chat UI with scope panel, Inspector, Semantic OS Tab
 > **Backend:** Rust/Axum (`rust/crates/ob-poc-web/`) - Serves React + REST API
 > **Crates:** 22 active Rust crates (16 ob-poc + 6 sem_os_*; esper_* deprecated; ob-poc-graph + viewport removed)
@@ -7128,6 +7128,37 @@ ContextEnvelope {
 - `dsl_execute` validates verb FQNs against ContextEnvelope before execution
 - SemReg failure: structured `warn!` with fallback flag, trace shows `sem_reg_verb_filter: null` — never silent
 - Trace levels: INFO = summary (verb, confidence, source), DEBUG = full detail (utterance, entities, candidates)
+
+### DSL Execution Governance Matrix
+
+Every DSL execution entry point must pass SemReg verb validation and PolicyGate checks. The following matrix documents all 9 entry points with their governance enforcement status, verified against the codebase as of 2026-03-01.
+
+| Entry Point | File | SemReg Check | PolicyGate | Notes |
+|-------------|------|:---:|:---:|-------|
+| MCP `dsl_execute` | `core.rs:627` | ✅ AST-level per verb | ✅ Env-based | Parses program → extracts verb FQNs → checks each against `ContextEnvelope.allowed_verbs` |
+| MCP `dsl_execute_submission` | `core.rs:1204` | ✅ AST-level per verb | ✅ Env-based | Same 3-branch pattern: `is_unavailable()` → `is_deny_all()` → `!is_allowed(fqn)` |
+| MCP `dsl_generate` | `core.rs:1591` | ✅ Via orchestrator | ✅ Env-based | Delegates to `handle_utterance()` — full SessionVerbSurface pipeline |
+| REST `POST /chat` | via orchestrator | ✅ Surface + pre-constraint | ✅ Headers | Full SessionVerbSurface at Stage 2.5 + pre-constrained `HybridVerbSearcher` |
+| REST `execute_session_dsl` | `agent_routes.rs:2775` | ✅ AST-level per verb | ✅ Headers | `resolve_allowed_verbs()` → `ContextEnvelope` → per-verb `is_allowed()` |
+| REST `GET /verb-surface` | `agent_routes.rs:4238` | ✅ FailOpen (read-only) | N/A (viewer) | Returns governed verb set for UI display |
+| `execute_onboarding_dsl` | `agent_dsl_routes.rs:2155` | ✅ AST-level per verb | ✅ Env-based | Same 3-branch pattern as `dsl_execute` |
+| `batch_add_products` | `agent_dsl_routes.rs:2292` | ✅ Template verb gate | ✅ Env-based | Validates `cbu.add-product` against `ContextEnvelope` before batch execution |
+| `handle_utterance_with_forced_verb` | `orchestrator.rs:778` | ✅ TOCTOU recheck | ✅ Env-based | Full `ContextEnvelope` validation + TOCTOU fields populated in `IntentTrace` |
+
+**Common SemReg Check Pattern (3-branch):**
+```rust
+if envelope.is_unavailable() {
+    // SemReg unavailable — fail-closed or fail-open per VerbSurfaceFailPolicy
+} else if envelope.is_deny_all() {
+    // SemReg explicitly denied all verbs for this session context
+    return Err("All verbs denied by SemReg policy");
+} else if !envelope.is_allowed(&verb_fqn) {
+    // Specific verb not in allowed set
+    return Err(format!("Verb '{}' not allowed by SemReg policy", verb_fqn));
+}
+```
+
+**Governance Bypass Prevention:** As of 2026-03-01, all DSL execution paths pass through SemReg validation. The direct DSL bypass (`dsl:` prefix) was removed. No entry point can execute a verb that is not in the session's `ContextEnvelope.allowed_verbs` set.
 
 ### SessionVerbSurface — Governance Layer Composition
 

@@ -348,7 +348,7 @@ export const chatApi = {
   async replyToDecision(
     sessionId: string,
     reply: DecisionReply,
-  ): Promise<ChatMessage> {
+  ): Promise<{ message: ChatMessage; available_verbs?: VerbProfile[]; surface_fingerprint?: string }> {
     // Map frontend DecisionReply to backend DecisionReplyRequest format
     // Backend expects: { packet_id, reply: UserReply } where UserReply is a tagged enum
     let userReply: unknown;
@@ -370,15 +370,67 @@ export const chatApi = {
       message?: string;
       response?: string;
       next_packet?: unknown;
+      available_verbs?: VerbProfile[];
+      surface_fingerprint?: string;
     }>(`/session/${sessionId}/decision/reply`, {
       packet_id: reply.packet_id,
       reply: userReply,
     });
+
+    const verbs: VerbProfile[] = (response.available_verbs || []).map((v) => ({
+      fqn: v.fqn,
+      domain: v.domain,
+      description: v.description,
+      sexpr: `(${v.fqn})`,
+      args: v.args || [],
+      preconditions_met: v.preconditions_met ?? true,
+      governance_tier: v.governance_tier || "operational",
+    }));
+
     return {
-      id: `${sessionId}-${Date.now()}`,
-      role: "assistant",
-      content: response.message || response.response || "Decision recorded.",
-      timestamp: new Date().toISOString(),
+      message: {
+        id: `${sessionId}-${Date.now()}`,
+        role: "assistant" as const,
+        content: response.message || response.response || "Decision recorded.",
+        timestamp: new Date().toISOString(),
+      },
+      available_verbs: verbs.length > 0 ? verbs : undefined,
+      surface_fingerprint: response.surface_fingerprint,
+    };
+  },
+
+  /** Get verb surface for a session */
+  async getVerbSurface(sessionId: string): Promise<{ verbs: VerbProfile[]; surface_fingerprint?: string; totalRegistry?: number }> {
+    const response = await api.get<{
+      verbs?: Array<{
+        fqn: string;
+        domain: string;
+        action?: string;
+        description: string;
+        governance_tier?: string;
+        preconditions_met?: boolean;
+      }>;
+      filter_summary?: {
+        total_registry: number;
+        final_count: number;
+      };
+      surface_fingerprint?: string;
+    }>(`/session/${sessionId}/verb-surface`);
+
+    const verbs: VerbProfile[] = (response.verbs || []).map((v) => ({
+      fqn: v.fqn,
+      domain: v.domain,
+      description: v.description,
+      sexpr: `(${v.fqn})`,
+      args: [],
+      preconditions_met: v.preconditions_met ?? true,
+      governance_tier: v.governance_tier || "operational",
+    }));
+
+    return {
+      verbs,
+      surface_fingerprint: response.surface_fingerprint,
+      totalRegistry: response.filter_summary?.total_registry,
     };
   },
 

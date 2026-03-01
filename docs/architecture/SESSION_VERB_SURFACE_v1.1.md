@@ -1,11 +1,11 @@
 # Session Verb Surface — Architecture, Capabilities & Remediation Plan
 
-> **Version:** 1.1 (peer-reviewed)  
-> **Date:** 28 February 2026  
-> **Status:** Draft — Post Peer Review  
-> **Authors:** Adam TC / Claude Opus 4.6  
-> **Platform:** ob-poc (BNY Mellon Enterprise Onboarding)  
-> **Commit:** `e440bfd` (74-verb management agent surface)  
+> **Version:** 1.2 (implementation complete)
+> **Date:** 1 March 2026
+> **Status:** Implemented — Phases 1-3 complete, Phase 4 partially complete
+> **Authors:** Adam TC / Claude Opus 4.6
+> **Platform:** ob-poc (BNY Mellon Enterprise Onboarding)
+> **Commit:** `e440bfd` (74-verb management agent surface) → current HEAD
 > **Reviewer:** External peer review (v1.0 → v1.1 delta)
 
 ---
@@ -16,6 +16,7 @@
 |---------|------|--------|---------|
 | 1.0 | 28 Feb 2026 | Adam TC / Claude Opus 4.6 | Initial draft from codebase audit of commit `e440bfd` |
 | 1.1 | 28 Feb 2026 | Adam TC / Claude Opus 4.6 | Peer review patches: dual fingerprint story, `VerbSurfaceFailPolicy`, ABAC pipeline position, multi-reason exclusions, embedding search mitigation. Two new gaps (G7, G8), three new risks, updated acceptance criteria. See §9.2 for full change log. |
+| 1.2 | 1 Mar 2026 | Adam TC / Claude Opus 4.6 | Implementation status update. Phases 1-3 complete (SessionVerbSurface type, MCP tool, REST endpoint, workflow phase filtering, lifecycle narrowing, orchestrator integration). Phase 4 partially complete (VerbBrowser wired, verb-surface REST endpoint, ChatResponse fingerprint enrichment; WebSocket delta notifications deferred). 6 UI/UX bugs fixed + 5 governance bypasses closed. All 9 DSL execution entry points verified with SemReg governance. |
 
 ---
 
@@ -121,12 +122,12 @@ This section provides a factual audit of the codebase as of commit `e440bfd`. Ea
 | `IntentTrace` (orchestrator.rs) | IMPLEMENTED | Captures pre/post filter verb candidates, SemReg policy, `agent_mode_blocked`, fingerprint. | Complete audit trail AFTER resolution. Not queryable BEFORE. |
 | `Verb Prominence` (context_resolution.rs) | IMPLEMENTED | Rank scoring from ViewDef domain match, entity-kind boost, taxonomy, relationships. | Orders verbs by relevance. Domain match = 0.8, cross-domain = 0.3, entity-kind boost +0.15. |
 | `Governance Gates` (sem_os_core/gates/) | IMPLEMENTED | 4 technical gates including `verb_surface_disclosure` (I/O surface completeness). | Ensures verb contracts declare all attributes they read/write. |
-| `SessionVerbSurface` type | MISSING | No first-class type composing all layers into single queryable surface. | The missing abstraction this paper addresses. |
-| `session_verb_surface` MCP tool | MISSING | No MCP tool returning context-aware verb set. | Agent cannot ask "what verbs are available to me right now?" |
-| Lifecycle State Narrowing | MISSING | Verb YAML has `lifecycle.requires_states` but not aggregated into valid-transition queries. | Entity in state "draft" should only show draft-valid transitions. |
-| Surface Delta Notifications | MISSING | No event emitted when verb surface changes. | Agent unaware surface changed. |
-| Workflow → Verb Filter | PARTIAL | `stage_focus` is set but not threaded to verb filtering in CCIR pipeline. | Selecting "KYC" workflow should narrow to kyc.* + session.* domains. |
-| `VerbSurfaceFailPolicy` | MISSING | No explicit fail-policy. `build_verb_profiles()` silently falls back to full registry. | Governance gap: SI-1 violation. |
+| `SessionVerbSurface` type | **IMPLEMENTED** *(v1.2)* | 8-step compute pipeline in `verb_surface.rs`. Composes all governance layers into single queryable surface with dual fingerprints. 13 unit tests. | Core abstraction. `compute_session_verb_surface()` used by orchestrator Stage 2.5. |
+| `session_verb_surface` MCP tool | **IMPLEMENTED** *(v1.2)* | MCP tool returning structured verb set with governance metadata, filter summary, fingerprints. | Agent queries available verbs via `session_verb_surface` tool call. |
+| Lifecycle State Narrowing | **IMPLEMENTED** *(v1.2)* | Step 5 of compute pipeline evaluates `VerbLifecycle.requires_states` against entity state. | Entity in wrong state → verb excluded with `PruneLayer::LifecycleState`. |
+| Surface Delta Notifications | PARTIAL *(v1.2)* | `surface_fingerprint` in every `ChatResponse` enables UI diff detection. WebSocket push deferred. | UI compares fingerprints; full push notification not yet implemented. |
+| Workflow → Verb Filter | **IMPLEMENTED** *(v1.2)* | Step 3 of compute pipeline: `stage_focus` → domain allowlists (4 workflow mappings). Applied before SemReg CCIR. | Selecting "KYC" narrows to kyc + screening + document + session + view + agent domains. |
+| `VerbSurfaceFailPolicy` | **IMPLEMENTED** *(v1.2)* | `FailClosed` (default: ~30 safe-harbor verbs) and `FailOpen` (dev-only). No silent fallback to full registry. | SI-1 enforced. `is_safe_harbor_verb()` gates FailClosed set. |
 
 ### 3.2 Data Flow: Current State
 
@@ -146,33 +147,33 @@ This section provides a factual audit of the codebase as of commit `e440bfd`. Ea
 
 ## 4. Gap Analysis
 
-### 4.1 Gap G1: No SessionVerbSurface Abstraction
+### 4.1 Gap G1: No SessionVerbSurface Abstraction — ✅ RESOLVED (v1.2)
 
-**Severity: P0** | **Impact:** All consumers
+**Severity: P0** | **Impact:** All consumers | **Status:** Resolved by `rust/src/agent/verb_surface.rs`
 
 There is no Rust type that represents the composed, session-aware verb surface. The function `f(session_state, agent_mode, loaded_cbus, active_entity, workflow_phase, actor_role) → Set<VerbDef>` does not exist as a named, testable, cacheable unit. Instead, the verb set is computed ad-hoc in three places: (a) `build_verb_profiles()`, (b) `generate_options_from_envelope()`, and (c) the orchestrator's pre-filter + post-filter chain. These share the same underlying `ContextEnvelope` but diverge in fallback behaviour and output format.
 
 **Risk:** Divergence between what `/commands` shows and what the orchestrator allows.
 
-### 4.2 Gap G2: Verb Surface Not Session-Resident
+### 4.2 Gap G2: Verb Surface Not Session-Resident — PARTIAL (v1.2)
 
-**Severity: P0** | **Impact:** Agent, UI, Audit
+**Severity: P0** | **Impact:** Agent, UI, Audit | **Status:** Computed per-turn at orchestrator Stage 2.5. Cached fingerprint in ChatResponse enables UI diff. Full session-resident caching + delta push deferred.
 
 The verb surface is computed on-demand, not maintained as part of the session's live state. The agent doesn't know the surface changed after a CBU load unless it explicitly re-queries. No diff, no event, no auto-refresh.
 
 **Risk:** Stale UI state. Agent proposes verbs from an expired surface.
 
-### 4.3 Gap G3: Lifecycle State Not Aggregated
+### 4.3 Gap G3: Lifecycle State Not Aggregated — ✅ RESOLVED (v1.2)
 
-**Severity: P1** | **Impact:** Entity transitions
+**Severity: P1** | **Impact:** Entity transitions | **Status:** Step 5 of compute pipeline evaluates lifecycle constraints.
 
 Verb YAML definitions include `lifecycle.requires_states` and `lifecycle.transitions_to` fields. These are evaluated at execution time by the verb executor — not at surface-computation time. No aggregation of "given entity X in state Y, which verbs are valid transitions?"
 
 **Risk:** User sees verbs that will fail at execution because the entity is in the wrong lifecycle state.
 
-### 4.4 Gap G4: Workflow Phase Not Threaded to Verb Filtering
+### 4.4 Gap G4: Workflow Phase Not Threaded to Verb Filtering — ✅ RESOLVED (v1.2)
 
-**Severity: P1** | **Impact:** Progressive narrowing
+**Severity: P1** | **Impact:** Progressive narrowing | **Status:** Step 3 of compute pipeline maps `stage_focus` to domain allowlists before CCIR.
 
 `session.context.stage_focus` is set by workflow selection but not passed into the CCIR pipeline as a filter. The ContextEnvelope is unaware of workflow phase.
 
@@ -180,9 +181,9 @@ Verb YAML definitions include `lifecycle.requires_states` and `lifecycle.transit
 
 **Risk:** Selecting "KYC" workflow still shows all 642 verbs (filtered by SemReg entity context only, not by workflow domain scope).
 
-### 4.5 Gap G5: No MCP Tool for Agent Surface Query
+### 4.5 Gap G5: No MCP Tool for Agent Surface Query — ✅ RESOLVED (v1.2)
 
-**Severity: P1** | **Impact:** Agent autonomy
+**Severity: P1** | **Impact:** Agent autonomy | **Status:** `session_verb_surface` MCP tool implemented + `GET /api/session/:id/verb-surface` REST endpoint.
 
 The existing `registry.verb-surface` MCP tool (`sem_reg_verb_surface`) returns inputs/outputs/preconditions for a *single named verb* (requires `verb_fqn` parameter). No MCP tool returns the *session-wide* verb surface.
 
@@ -198,17 +199,17 @@ While `with_allowed_verbs()` post-filters search results, the BGE-small-en-v1.5 
 
 **Risk:** Reduced search recall on narrowed surfaces.
 
-### 4.7 Gap G7: Fingerprint Ambiguity *(v1.1 — new)*
+### 4.7 Gap G7: Fingerprint Ambiguity *(v1.1 — new)* — ✅ RESOLVED (v1.2)
 
-**Severity: P0** | **Impact:** UI refresh, Agent awareness
+**Severity: P0** | **Impact:** UI refresh, Agent awareness | **Status:** Dual fingerprints implemented: `semreg_fingerprint` (`v1:`) + `surface_fingerprint` (`vs1:`).
 
 The existing `AllowedVerbSetFingerprint` is computed from sorted allowed FQNs only (SHA-256 in `context_envelope.rs`). It does not incorporate AgentMode, workflow phase, lifecycle state, or loaded CBU scope. A workflow phase change that filters verbs via a post-CCIR layer would *not* change the SemReg fingerprint, even though the visible surface changed.
 
 **Risk:** UI keying refresh off `semreg_fingerprint` would miss surface changes from non-SemReg layers.
 
-### 4.8 Gap G8: Fail-Open Accidental Disclosure *(v1.1 — new)*
+### 4.8 Gap G8: Fail-Open Accidental Disclosure *(v1.1 — new)* — ✅ RESOLVED (v1.2)
 
-**Severity: P0** | **Impact:** Governance integrity
+**Severity: P0** | **Impact:** Governance integrity | **Status:** `VerbSurfaceFailPolicy::FailClosed` enforced. ~30 safe-harbor verbs only when SemReg unavailable. SI-1 enforced across all paths.
 
 `build_verb_profiles()` (line ~2060, agent_routes.rs) falls back to the full `RuntimeVerbRegistry` when SemReg returns an empty verb set, with `preconditions_met: true` and `governance_tier: "operational"` defaults. Similarly, `generate_options_from_envelope()` has the same fallback. These are silent governance bypasses — the user sees all 642 verbs with no indication that governance was not applied.
 
@@ -408,12 +409,12 @@ Four phases, each independently testable and deployable. Effort estimates assume
 
 ### 6.1 Phase Overview
 
-| Phase | Deliverable | Priority | Effort | Gaps | Dependency |
-|-------|------------|----------|--------|------|------------|
-| 1 | SessionVerbSurface type + `compute()` + FailPolicy | P0 | 2–3 days | G1, G7, G8 | None |
-| 2 | session_verb_surface MCP tool + `/commands` rewire | P0 | 1–2 days | G2, G5 | Phase 1 |
-| 3 | Workflow phase threading + lifecycle narrowing | P1 | 2–3 days | G3, G4 | Phase 1 |
-| 4 | React command palette + delta notifications | P2 | 3–4 days | G2, G6 | Phase 2 |
+| Phase | Deliverable | Priority | Effort | Gaps | Dependency | Status |
+|-------|------------|----------|--------|------|------------|--------|
+| 1 | SessionVerbSurface type + `compute()` + FailPolicy | P0 | 2–3 days | G1, G7, G8 | None | ✅ Complete |
+| 2 | session_verb_surface MCP tool + `/commands` rewire | P0 | 1–2 days | G2, G5 | Phase 1 | ✅ Complete |
+| 3 | Workflow phase threading + lifecycle narrowing | P1 | 2–3 days | G3, G4 | Phase 1 | ✅ Complete |
+| 4 | React command palette + delta notifications | P2 | 3–4 days | G2, G6 | Phase 2 | Partial (VerbBrowser wired; WebSocket delta deferred) |
 
 ### 6.2 Phase 1: Foundation — SessionVerbSurface Type
 
@@ -574,3 +575,38 @@ Four phases, each independently testable and deployable. Effort estimates assume
 | §6.3 AC4 | Added zero-fallback criterion | Enforces path removal |
 | §7 | 3 new risks | Fingerprint ambiguity, fail-open disclosure, redundant ABAC |
 | §8 | 2 new metrics | Governance bypasses (target: 0), fingerprint false-negatives (target: 0) |
+
+### 9.4 DSL Execution Governance Matrix *(v1.2 — new)*
+
+All 9 DSL execution entry points verified with SemReg governance checks as of 1 March 2026.
+
+| Entry Point | File | SemReg Check | PolicyGate | Notes |
+|-------------|------|:---:|:---:|-------|
+| MCP `dsl_execute` | `core.rs:627` | ✅ AST-level per verb | ✅ Env-based | Parses program → extracts verb FQNs → checks each against `ContextEnvelope.allowed_verbs` |
+| MCP `dsl_execute_submission` | `core.rs:1204` | ✅ AST-level per verb | ✅ Env-based | Same 3-branch pattern: `is_unavailable()` → `is_deny_all()` → `!is_allowed(fqn)` |
+| MCP `dsl_generate` | `core.rs:1591` | ✅ Via orchestrator | ✅ Env-based | Delegates to `handle_utterance()` — full SessionVerbSurface pipeline |
+| REST `POST /chat` | via orchestrator | ✅ Surface + pre-constraint | ✅ Headers | Full SessionVerbSurface at Stage 2.5 + pre-constrained `HybridVerbSearcher` |
+| REST `execute_session_dsl` | `agent_routes.rs:2775` | ✅ AST-level per verb | ✅ Headers | `resolve_allowed_verbs()` → `ContextEnvelope` → per-verb `is_allowed()` |
+| REST `GET /verb-surface` | `agent_routes.rs:4238` | ✅ FailOpen (read-only) | N/A (viewer) | Returns governed verb set for UI display |
+| `execute_onboarding_dsl` | `agent_dsl_routes.rs:2155` | ✅ AST-level per verb | ✅ Env-based | Same 3-branch pattern as `dsl_execute` |
+| `batch_add_products` | `agent_dsl_routes.rs:2292` | ✅ Template verb gate | ✅ Env-based | Validates `cbu.add-product` against `ContextEnvelope` before batch execution |
+| `handle_utterance_with_forced_verb` | `orchestrator.rs:778` | ✅ TOCTOU recheck | ✅ Env-based | Full `ContextEnvelope` validation + TOCTOU fields populated in `IntentTrace` |
+
+### 9.5 Implementation Change Log (v1.1 → v1.2)
+
+| Component | Change | Files |
+|-----------|--------|-------|
+| SessionVerbSurface type | New 8-step compute pipeline, 13 unit tests | `rust/src/agent/verb_surface.rs` |
+| Orchestrator Stage 2.5 | Surface computed once per turn, pre-filters IntentPipeline | `rust/src/agent/orchestrator.rs` |
+| MCP tool | `session_verb_surface` with domain_filter, include_excluded params | `rust/src/mcp/tools.rs`, `rust/src/mcp/handlers/session_tools.rs` |
+| REST endpoint | `GET /api/session/:id/verb-surface` with real SemReg resolution | `rust/src/api/agent_routes.rs` |
+| ChatResponse enrichment | `surface_fingerprint`, `available_verbs` on every response | `rust/src/api/agent_routes.rs`, `rust/crates/ob-poc-types/src/chat.rs` |
+| VerbBrowser click-to-submit | `onVerbSubmit` prop bypasses chat input, submits directly | `ob-poc-ui-react/src/features/chat/components/VerbBrowser.tsx` |
+| VerbBrowser on SemOsPage | Added to right sidebar below context panel | `ob-poc-ui-react/src/features/semantic-os/SemOsPage.tsx` |
+| Verb population on session load | `getVerbSurface()` API call on session select | `ob-poc-ui-react/src/api/chat.ts`, `ChatPage.tsx`, `SemOsPage.tsx` |
+| Verb push on workflow change | Decision reply returns `available_verbs` in response | `rust/crates/ob-poc-types/src/decision.rs`, `rust/src/api/agent_routes.rs` |
+| Governance bypass: `dsl_execute_submission` | Added 3-branch SemReg check | `rust/src/mcp/handlers/core.rs` |
+| Governance bypass: `batch_add_products` | Added template verb SemReg gate | `rust/src/api/agent_dsl_routes.rs` |
+| Governance bypass: `execute_session_dsl` | Added `resolve_allowed_verbs()` + per-verb check | `rust/src/api/agent_routes.rs` |
+| Governance bypass: `execute_onboarding_dsl` | Added 3-branch SemReg check | `rust/src/api/agent_dsl_routes.rs` |
+| TOCTOU wiring: `handle_utterance_with_forced_verb` | Full ContextEnvelope validation + IntentTrace fields | `rust/src/agent/orchestrator.rs` |

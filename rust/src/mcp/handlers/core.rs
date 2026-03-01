@@ -1215,6 +1215,55 @@ impl ToolHandlers {
         // Parse DSL
         let program = parse_program(source).map_err(|e| anyhow!("Parse error: {:?}", e))?;
 
+        // SemReg verb validation: check all verb FQNs in parsed AST are allowed
+        if let Some(ref client) = self.sem_os_client {
+            use dsl_core::Statement;
+            let actor = crate::policy::ActorResolver::from_env();
+            let envelope = crate::agent::orchestrator::resolve_allowed_verbs(
+                client.as_ref(),
+                &actor,
+                None, // dsl_execute_submission has no session context
+            )
+            .await;
+            if envelope.is_unavailable() {
+                let policy_gate = crate::policy::PolicyGate::from_env();
+                if policy_gate.semreg_fail_closed() {
+                    tracing::warn!(
+                        "dsl_execute_submission: SemReg unavailable in strict mode — blocking"
+                    );
+                    return Err(anyhow!(
+                        "SemReg unavailable — execution blocked in strict mode"
+                    ));
+                }
+                tracing::warn!(
+                    "dsl_execute_submission: SemReg unavailable — proceeding with governance warning"
+                );
+            } else if envelope.is_deny_all() {
+                tracing::warn!("dsl_execute_submission: SemReg DenyAll — blocking execution");
+                return Err(anyhow!("SemReg denied execution: no verbs are allowed"));
+            } else {
+                let mut denied_verbs = Vec::new();
+                for stmt in &program.statements {
+                    if let Statement::VerbCall(vc) = stmt {
+                        let fqn = format!("{}.{}", vc.domain, vc.verb);
+                        if !envelope.is_allowed(&fqn) {
+                            denied_verbs.push(fqn);
+                        }
+                    }
+                }
+                if !denied_verbs.is_empty() {
+                    tracing::warn!(
+                        denied = ?denied_verbs,
+                        "dsl_execute_submission: SemReg denied verbs in DSL"
+                    );
+                    return Err(anyhow!(
+                        "SemReg denied execution: verbs not in allowed set: {}",
+                        denied_verbs.join(", ")
+                    ));
+                }
+            }
+        }
+
         // Build submission
         let mut submission = DslSubmission::new(program.statements);
 
