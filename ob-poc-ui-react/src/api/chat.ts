@@ -214,6 +214,7 @@ export const chatApi = {
       clarification?: unknown;
       error?: string;
       available_verbs?: VerbProfile[];
+      surface_fingerprint?: string;
       // Backend DecisionPacket for client group/deal/verb clarification
       decision?: {
         packet_id: string;
@@ -327,10 +328,19 @@ export const chatApi = {
       }
     }
 
+    // Re-fetch session for SemOs page (best-effort — don't let it break message delivery)
+    let session: ChatSession | undefined;
+    try {
+      session = await chatApi.getSession(sessionId);
+    } catch (e) {
+      console.warn("[chat] Failed to re-fetch session after chat:", e);
+    }
+
     return {
       message: assistantMessage,
-      session: await chatApi.getSession(sessionId),
+      session: session || { id: sessionId, title: "", created_at: new Date().toISOString(), updated_at: new Date().toISOString(), messages: [] },
       available_verbs: response.available_verbs,
+      surface_fingerprint: response.surface_fingerprint,
     };
   },
 

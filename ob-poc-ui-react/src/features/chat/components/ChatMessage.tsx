@@ -3,6 +3,8 @@
  */
 
 import { User, Bot, AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import type { ChatMessage as ChatMessageType, ToolCall } from '../../../types/chat';
 import { cn, formatTime } from '../../../lib/utils';
 import { DecisionCard } from './DecisionCard';
@@ -82,7 +84,13 @@ export function ChatMessage({ message, onDecisionReply }: ChatMessageProps) {
             isSystem && 'bg-[var(--bg-tertiary)] text-[var(--text-muted)] italic'
           )}
         >
-          <p className="whitespace-pre-wrap">{message.content}</p>
+          {isUser ? (
+            <p className="whitespace-pre-wrap">{message.content}</p>
+          ) : (
+            <div className="markdown-body">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
+            </div>
+          )}
         </div>
 
         {/* Tool calls */}

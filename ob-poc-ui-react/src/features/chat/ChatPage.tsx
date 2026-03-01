@@ -63,8 +63,12 @@ export function ChatPage() {
       setStreaming(true);
     },
     onSuccess: (response) => {
-      // Replace temp message with real one and add assistant response
-      setCurrentSession(response.session);
+      // Add the assistant response message to the current session.
+      // We don't call setCurrentSession(response.session) because the backend
+      // may not persist all messages (e.g. /commands) into the session history,
+      // which would overwrite our optimistically-added user message and lose
+      // the assistant response entirely.
+      addMessage(response.message);
       if (response.available_verbs?.length) {
         setAvailableVerbs(
           response.available_verbs,
@@ -75,7 +79,8 @@ export function ChatPage() {
       }
       setStreaming(false);
     },
-    onError: () => {
+    onError: (err) => {
+      console.error("[ChatPage] sendMessage failed:", err);
       setStreaming(false);
     },
   });

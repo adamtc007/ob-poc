@@ -1,12 +1,13 @@
 /**
  * SemOsPage - Semantic OS agent interface
  *
- * Three-column layout reusing chat components for message display and input.
- * Sessions are created with workflow_focus="semantic-os" which triggers a
- * workflow selection decision packet on the backend.
+ * Two-column layout reusing chat components for message display and input.
+ * Auto-creates a session with workflow_focus="semantic-os" on mount,
+ * which triggers a workflow selection decision packet (domain chooser)
+ * on the backend.
  */
 
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useEffect, useRef, useCallback } from "react";
 import { Loader2 } from "lucide-react";
@@ -14,11 +15,12 @@ import { chatApi } from "../../api/chat";
 import { queryKeys, queryClient } from "../../lib/query";
 import { useChatStore } from "../../stores/chat";
 import { ChatMessage, ChatInput } from "../chat/components";
-import { SemOsSidebar, SemOsContextPanel } from "./components";
+import { SemOsContextPanel } from "./components";
 import type { DecisionReply } from "../../types/chat";
 
 export function SemOsPage() {
   const { sessionId } = useParams<{ sessionId?: string }>();
+  const navigate = useNavigate();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const {
     setCurrentSession,
@@ -26,7 +28,26 @@ export function SemOsPage() {
     addMessage,
     isStreaming,
     setStreaming,
+    setAvailableVerbs,
   } = useChatStore();
+
+  // Auto-create session when visiting /semantic-os with no sessionId
+  const createMutation = useMutation({
+    mutationFn: () => chatApi.createSession(undefined, "semantic-os"),
+    onSuccess: (newSession) => {
+      navigate(`/semantic-os/${newSession.id}`, { replace: true });
+    },
+    onError: (err) => {
+      console.error("[SemOsPage] createSession failed:", err);
+    },
+  });
+
+  useEffect(() => {
+    if (!sessionId && !createMutation.isPending && !createMutation.isSuccess) {
+      createMutation.mutate();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionId]);
 
   // Fetch session if ID is provided (reuses chat session endpoints)
   const { data, isLoading, error } = useQuery({
@@ -65,10 +86,24 @@ export function SemOsPage() {
       setStreaming(true);
     },
     onSuccess: (response) => {
-      setCurrentSession(response.session);
+      // Add the assistant response message to the current session.
+      // We don't call setCurrentSession(response.session) because the backend
+      // may not persist all messages (e.g. /commands) into the session history,
+      // which would overwrite our optimistically-added user message and lose
+      // the assistant response entirely.
+      addMessage(response.message);
+      if (response.available_verbs?.length) {
+        setAvailableVerbs(
+          response.available_verbs,
+          response.surface_fingerprint
+            ? { fingerprint: response.surface_fingerprint, totalRegistry: 0, finalCount: response.available_verbs.length }
+            : undefined,
+        );
+      }
       setStreaming(false);
     },
-    onError: () => {
+    onError: (err) => {
+      console.error("[SemOsPage] sendMessage failed:", err);
       setStreaming(false);
     },
   });
@@ -110,14 +145,26 @@ export function SemOsPage() {
 
   return (
     <div className="flex h-full">
-      {/* Left sidebar - Session list */}
-      <SemOsSidebar className="w-64 flex-shrink-0 border-r border-[var(--border-primary)] bg-[var(--bg-secondary)]" />
-
       {/* Main chat area */}
       <div className="flex flex-1 flex-col">
         {/* Messages */}
         <div className="flex-1 overflow-auto p-4">
-          {isLoading ? (
+          {!sessionId || createMutation.isPending ? (
+            <div className="flex h-full items-center justify-center">
+              <div className="text-center">
+                <Loader2 className="mx-auto h-8 w-8 animate-spin text-[var(--accent-blue)]" />
+                <p className="mt-3 text-sm text-[var(--text-secondary)]">
+                  Starting Semantic OS session...
+                </p>
+              </div>
+            </div>
+          ) : createMutation.isError ? (
+            <div className="flex h-full items-center justify-center">
+              <p className="text-[var(--accent-red)]">
+                Failed to create session. Please refresh and try again.
+              </p>
+            </div>
+          ) : isLoading ? (
             <div className="flex h-full items-center justify-center">
               <Loader2 className="h-8 w-8 animate-spin text-[var(--accent-blue)]" />
             </div>
@@ -131,19 +178,7 @@ export function SemOsPage() {
             </div>
           ) : !currentSession ? (
             <div className="flex h-full items-center justify-center">
-              <div className="text-center">
-                <h2 className="text-xl font-semibold text-[var(--text-primary)]">
-                  Semantic OS
-                </h2>
-                <p className="mt-2 text-[var(--text-secondary)]">
-                  Create a new session to start working with the semantic
-                  registry.
-                </p>
-                <p className="mt-1 text-sm text-[var(--text-muted)]">
-                  You&apos;ll choose a workflow focus: Onboarding, KYC, Data
-                  Management, or Stewardship.
-                </p>
-              </div>
+              <Loader2 className="h-8 w-8 animate-spin text-[var(--accent-blue)]" />
             </div>
           ) : (
             <div className="mx-auto max-w-3xl space-y-4">
