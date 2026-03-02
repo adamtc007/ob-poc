@@ -638,6 +638,84 @@ pub(crate) async fn handle_decision_reply(
                             choice.label,
                             choice.label.to_lowercase()
                         )
+                    } else if packet.trace.decision_reason == "journey_selection" {
+                        // Journey-level macro selection (from ScenarioIndex macro_selector route).
+                        // Parse the context_hint JSON to resolve the selected macro FQN,
+                        // then combine with any `then` macros to produce staged DSL.
+                        if let ob_poc_types::ClarificationPayload::Scope(ref scope_payload) =
+                            packet.payload
+                        {
+                            let hint_str = scope_payload.context_hint.as_deref().unwrap_or("{}");
+                            match serde_json::from_str::<serde_json::Value>(hint_str) {
+                                Ok(ctx) => {
+                                    // ctx.options is [[value, macro_fqn], ...], choice.id is 1-indexed
+                                    let idx =
+                                        choice.id.parse::<usize>().unwrap_or(1).saturating_sub(1);
+                                    let options =
+                                        ctx["options"].as_array().cloned().unwrap_or_default();
+                                    let selected_macro = options
+                                        .get(idx)
+                                        .and_then(|arr| arr.get(1))
+                                        .and_then(|v| v.as_str())
+                                        .unwrap_or("");
+                                    let then_macros: Vec<String> = ctx["then"]
+                                        .as_array()
+                                        .map(|arr| {
+                                            arr.iter()
+                                                .filter_map(|v| v.as_str().map(String::from))
+                                                .collect()
+                                        })
+                                        .unwrap_or_default();
+
+                                    if selected_macro.is_empty() {
+                                        format!(
+                                            "Selected: {} (could not resolve macro)",
+                                            choice.label
+                                        )
+                                    } else {
+                                        // Build DSL: selected macro + then macros
+                                        let mut dsl_parts = vec![format!("({})", selected_macro)];
+                                        for m in &then_macros {
+                                            dsl_parts.push(format!("({})", m));
+                                        }
+                                        let dsl = dsl_parts.join("\n");
+
+                                        let scenario_title =
+                                            ctx["scenario_title"].as_str().unwrap_or("Journey");
+
+                                        // Stage in the session's pending DSL
+                                        let ast = crate::dsl_v2::parse_program(&dsl)
+                                            .map(|p| p.statements)
+                                            .unwrap_or_default();
+                                        session.set_pending_dsl(dsl.clone(), ast, None, false);
+
+                                        tracing::info!(
+                                            session_id = %session_id,
+                                            selected_value = %choice.label,
+                                            selected_macro = %selected_macro,
+                                            then_count = then_macros.len(),
+                                            "Journey selection resolved — DSL staged"
+                                        );
+
+                                        format!(
+                                            "**{}** — {} selected\n\n```\n{}\n```\n\nSay 'run' to execute.",
+                                            scenario_title,
+                                            choice.label,
+                                            dsl
+                                        )
+                                    }
+                                }
+                                Err(e) => {
+                                    tracing::warn!(
+                                        error = %e,
+                                        "Failed to parse journey_selection context_hint"
+                                    );
+                                    format!("Selected: {} (context parse error)", choice.label)
+                                }
+                            }
+                        } else {
+                            format!("Selected scope: {}", choice.label)
+                        }
                     } else {
                         format!("Selected scope: {}", choice.label)
                     }

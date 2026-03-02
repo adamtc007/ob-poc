@@ -557,6 +557,79 @@ impl FastCommand {
 }
 
 // ---------------------------------------------------------------------------
+// Journey provenance labels + progress narration
+// ---------------------------------------------------------------------------
+
+/// Well-known label keys for journey/scenario provenance on RunbookEntry.
+pub mod provenance {
+    /// "macro" | "scenario" — how this entry was triggered.
+    pub const ORIGIN_KIND: &str = "origin_kind";
+    /// Fully-qualified macro name, e.g. "struct.lux.ucits.sicav".
+    pub const ORIGIN_MACRO_FQN: &str = "origin_macro_fqn";
+    /// Scenario ID that resolved the intent (only for Tier -2A).
+    pub const ORIGIN_SCENARIO_ID: &str = "origin_scenario_id";
+    /// Human-readable scenario/macro title for progress narration.
+    pub const ORIGIN_TITLE: &str = "origin_title";
+}
+
+/// Stamp journey provenance labels on a RunbookEntry.
+///
+/// Call this when creating entries from Tier -2 journey matches.
+pub fn stamp_journey_provenance(
+    entry: &mut RunbookEntry,
+    macro_fqn: &str,
+    scenario_id: Option<&str>,
+    title: Option<&str>,
+) {
+    let kind = if scenario_id.is_some() {
+        "scenario"
+    } else {
+        "macro"
+    };
+    entry
+        .labels
+        .insert(provenance::ORIGIN_KIND.to_string(), kind.to_string());
+    entry.labels.insert(
+        provenance::ORIGIN_MACRO_FQN.to_string(),
+        macro_fqn.to_string(),
+    );
+    if let Some(sid) = scenario_id {
+        entry
+            .labels
+            .insert(provenance::ORIGIN_SCENARIO_ID.to_string(), sid.to_string());
+    }
+    if let Some(t) = title {
+        entry
+            .labels
+            .insert(provenance::ORIGIN_TITLE.to_string(), t.to_string());
+    }
+}
+
+/// Generate progress narration for a runbook entry with journey provenance.
+///
+/// Returns e.g. "Step 3 of 13: Lux UCITS SICAV Setup" when the entry
+/// has an `origin_title` label, or `None` for regular entries.
+pub fn narrate_progress(entry: &RunbookEntry, total_entries: usize) -> Option<String> {
+    let title = entry.labels.get(provenance::ORIGIN_TITLE)?;
+    Some(format!(
+        "Step {} of {}: {}",
+        entry.sequence, total_entries, title
+    ))
+}
+
+/// Generate a summary narration for a scenario-triggered runbook.
+///
+/// Returns e.g. "Lux UCITS SICAV Setup — 13 steps" when at least one
+/// entry carries an `origin_title` label, or `None` otherwise.
+pub fn narrate_runbook_summary(entries: &[RunbookEntry]) -> Option<String> {
+    // Find the first entry with a title label
+    let title = entries
+        .iter()
+        .find_map(|e| e.labels.get(provenance::ORIGIN_TITLE))?;
+    Some(format!("{} — {} steps", title, entries.len()))
+}
+
+// ---------------------------------------------------------------------------
 // Runbook implementation
 // ---------------------------------------------------------------------------
 
@@ -2052,5 +2125,135 @@ mod tests {
     fn test_narrate_progress_empty() {
         let rb = Runbook::new(Uuid::new_v4());
         assert_eq!(rb.narrate_progress(), "No steps in runbook");
+    }
+
+    // -- Journey provenance + narration tests --
+
+    #[test]
+    fn test_stamp_journey_provenance_macro_only() {
+        let mut entry = sample_entry("cbu.create", "Create Lux SICAV");
+        stamp_journey_provenance(&mut entry, "struct.lux.ucits.sicav", None, None);
+
+        assert_eq!(entry.labels.get(provenance::ORIGIN_KIND).unwrap(), "macro");
+        assert_eq!(
+            entry.labels.get(provenance::ORIGIN_MACRO_FQN).unwrap(),
+            "struct.lux.ucits.sicav"
+        );
+        assert!(entry.labels.get(provenance::ORIGIN_SCENARIO_ID).is_none());
+        assert!(entry.labels.get(provenance::ORIGIN_TITLE).is_none());
+    }
+
+    #[test]
+    fn test_stamp_journey_provenance_scenario_with_title() {
+        let mut entry = sample_entry("cbu.create", "Create Lux SICAV");
+        stamp_journey_provenance(
+            &mut entry,
+            "struct.lux.ucits.sicav",
+            Some("lux-sicav-setup"),
+            Some("Lux UCITS SICAV Setup"),
+        );
+
+        assert_eq!(
+            entry.labels.get(provenance::ORIGIN_KIND).unwrap(),
+            "scenario"
+        );
+        assert_eq!(
+            entry.labels.get(provenance::ORIGIN_MACRO_FQN).unwrap(),
+            "struct.lux.ucits.sicav"
+        );
+        assert_eq!(
+            entry.labels.get(provenance::ORIGIN_SCENARIO_ID).unwrap(),
+            "lux-sicav-setup"
+        );
+        assert_eq!(
+            entry.labels.get(provenance::ORIGIN_TITLE).unwrap(),
+            "Lux UCITS SICAV Setup"
+        );
+    }
+
+    #[test]
+    fn test_narrate_progress_with_title_label() {
+        let mut entry = sample_entry("cbu.create", "Create Lux SICAV");
+        entry.sequence = 4;
+        stamp_journey_provenance(
+            &mut entry,
+            "struct.lux.ucits.sicav",
+            Some("lux-sicav-setup"),
+            Some("Lux UCITS SICAV Setup"),
+        );
+
+        let narration = narrate_progress(&entry, 13);
+        assert_eq!(
+            narration,
+            Some("Step 4 of 13: Lux UCITS SICAV Setup".to_string())
+        );
+    }
+
+    #[test]
+    fn test_narrate_progress_without_title_returns_none() {
+        let entry = sample_entry("cbu.create", "Create fund");
+        assert!(narrate_progress(&entry, 5).is_none());
+    }
+
+    #[test]
+    fn test_narrate_progress_macro_without_title_returns_none() {
+        let mut entry = sample_entry("cbu.create", "Create fund");
+        stamp_journey_provenance(&mut entry, "struct.lux.ucits.sicav", None, None);
+        // No title stamped
+        assert!(narrate_progress(&entry, 5).is_none());
+    }
+
+    #[test]
+    fn test_narrate_runbook_summary_with_journey_entries() {
+        let mut entries = vec![
+            sample_entry("cbu.create", "Create fund"),
+            sample_entry("cbu.assign-product", "Add product"),
+            sample_entry("entity.create", "Create depositary"),
+        ];
+        // Stamp all with journey provenance
+        for e in &mut entries {
+            stamp_journey_provenance(
+                e,
+                "struct.lux.ucits.sicav",
+                Some("lux-sicav-setup"),
+                Some("Lux UCITS SICAV Setup"),
+            );
+        }
+
+        let summary = narrate_runbook_summary(&entries);
+        assert_eq!(summary, Some("Lux UCITS SICAV Setup — 3 steps".to_string()));
+    }
+
+    #[test]
+    fn test_narrate_runbook_summary_mixed_entries() {
+        let mut entries = vec![
+            sample_entry("cbu.create", "Create fund"),
+            sample_entry("session.info", "Check session"), // no provenance
+        ];
+        // Only stamp the first entry
+        stamp_journey_provenance(
+            &mut entries[0],
+            "struct.lux.ucits.sicav",
+            None,
+            Some("Lux UCITS SICAV Setup"),
+        );
+
+        let summary = narrate_runbook_summary(&entries);
+        assert_eq!(summary, Some("Lux UCITS SICAV Setup — 2 steps".to_string()));
+    }
+
+    #[test]
+    fn test_narrate_runbook_summary_no_journey_entries() {
+        let entries = vec![
+            sample_entry("cbu.create", "Create fund"),
+            sample_entry("session.info", "Check session"),
+        ];
+        assert!(narrate_runbook_summary(&entries).is_none());
+    }
+
+    #[test]
+    fn test_narrate_runbook_summary_empty() {
+        let entries: Vec<RunbookEntry> = vec![];
+        assert!(narrate_runbook_summary(&entries).is_none());
     }
 }

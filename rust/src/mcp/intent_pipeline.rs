@@ -601,7 +601,7 @@ impl IntentPipeline {
                 // DO NOT call LLM - return for user clarification
                 return Ok(PipelineResult {
                     intent: StructuredIntent::empty(),
-                    verb_candidates: vec![top.clone(), runner_up.clone()],
+                    verb_candidates: vec![top.clone(), (*runner_up).clone()],
                     dsl: String::new(),
                     dsl_hash: None,
                     valid: false,

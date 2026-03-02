@@ -50,6 +50,13 @@ struct TestCase {
     expected_action: Option<String>,
     #[serde(default)]
     ecir_path: Option<String>,
+    // Tier -2 (Scenario / MacroIndex) fields
+    #[serde(default)]
+    expected_tier: Option<String>,
+    #[serde(default)]
+    expected_scenario_id: Option<String>,
+    #[serde(default)]
+    expected_route_target: Option<String>,
 }
 
 // ============================================================================
@@ -146,6 +153,14 @@ mod tests {
                 "direct" => t.category == "direct",
                 "natural" => t.category == "natural",
                 "indirect" => t.category == "indirect",
+                "scenario" => t.category == "scenario",
+                "macro_match" => t.category == "macro_match",
+                "tier2_blocker" => t.category == "tier2_blocker",
+                "tier2" => {
+                    t.category == "scenario"
+                        || t.category == "macro_match"
+                        || t.category == "tier2_blocker"
+                }
                 _ => true,
             })
             .collect();
@@ -249,6 +264,7 @@ mod tests {
         // Generate report
         print_summary_report(&results);
         print_ecir_report(&results);
+        print_tier2_report(&results);
         print_category_breakdown(&results);
         print_difficulty_breakdown(&results);
         print_domain_breakdown(&results);
@@ -562,6 +578,251 @@ fn print_ecir_report(results: &[TestResult]) {
     println!();
 }
 
+fn print_tier2_report(results: &[TestResult]) {
+    // --- Tier distribution across all results ---
+    let tier2a_count = results
+        .iter()
+        .filter(|r| {
+            r.top_source
+                .as_ref()
+                .map_or(false, |s| s.contains("ScenarioIndex"))
+        })
+        .count();
+    let tier2b_count = results
+        .iter()
+        .filter(|r| r.top_source.as_ref().map_or(false, |s| s == "MacroIndex"))
+        .count();
+    let ecir_count = results
+        .iter()
+        .filter(|r| {
+            r.top_source
+                .as_ref()
+                .map_or(false, |s| s.contains("NounTaxonomy"))
+        })
+        .count();
+    let macro_count = results
+        .iter()
+        .filter(|r| r.top_source.as_ref().map_or(false, |s| s == "Macro"))
+        .count();
+    let other_count = results.len() - tier2a_count - tier2b_count - ecir_count - macro_count;
+
+    println!("  TIER -2 (Scenario-Based Intent Resolution)");
+    println!("  {:-<68}", "");
+    println!("  Resolution tier distribution:");
+    println!(
+        "    Tier -2A (ScenarioIndex):   {:3} ({:.1}%)",
+        tier2a_count,
+        tier2a_count as f64 / results.len() as f64 * 100.0
+    );
+    println!(
+        "    Tier -2B (MacroIndex):      {:3} ({:.1}%)",
+        tier2b_count,
+        tier2b_count as f64 / results.len() as f64 * 100.0
+    );
+    println!(
+        "    Tier -1  (ECIR/NounTax):    {:3} ({:.1}%)",
+        ecir_count,
+        ecir_count as f64 / results.len() as f64 * 100.0
+    );
+    println!(
+        "    Tier  0  (Macro exact):     {:3} ({:.1}%)",
+        macro_count,
+        macro_count as f64 / results.len() as f64 * 100.0
+    );
+    println!(
+        "    Tiers 1+ (Embedding/etc):   {:3} ({:.1}%)",
+        other_count,
+        other_count as f64 / results.len() as f64 * 100.0
+    );
+    println!();
+
+    // --- Scenario match rate (category = "scenario") ---
+    let scenario_cases: Vec<&TestResult> = results
+        .iter()
+        .filter(|r| r.case.category == "scenario")
+        .collect();
+    if !scenario_cases.is_empty() {
+        let scenario_correct = scenario_cases
+            .iter()
+            .filter(|r| r.outcome.is_first_attempt_hit())
+            .count();
+        let scenario_tier_correct = scenario_cases
+            .iter()
+            .filter(|r| {
+                r.top_source
+                    .as_ref()
+                    .map_or(false, |s| s.contains("ScenarioIndex"))
+                    && r.outcome.is_first_attempt_hit()
+            })
+            .count();
+        let scenario_route_correct = scenario_cases
+            .iter()
+            .filter(|r| {
+                if let Some(ref target) = r.case.expected_route_target {
+                    // Check if the journey route matches the expected target
+                    r.selected_verb.as_deref() == Some(target.as_str())
+                        && r.outcome.is_first_attempt_hit()
+                } else {
+                    r.outcome.is_first_attempt_hit()
+                }
+            })
+            .count();
+
+        println!("  Scenario test cases ({} total):", scenario_cases.len());
+        println!(
+            "    Correct verb:              {:3}/{:3} ({:.1}%)  target: >=80%",
+            scenario_correct,
+            scenario_cases.len(),
+            scenario_correct as f64 / scenario_cases.len() as f64 * 100.0
+        );
+        println!(
+            "    Via ScenarioIndex tier:    {:3}/{:3} ({:.1}%)",
+            scenario_tier_correct,
+            scenario_cases.len(),
+            scenario_tier_correct as f64 / scenario_cases.len() as f64 * 100.0
+        );
+        println!(
+            "    Correct route target:      {:3}/{:3} ({:.1}%)  target: >=90%",
+            scenario_route_correct,
+            scenario_cases.len(),
+            scenario_route_correct as f64 / scenario_cases.len() as f64 * 100.0
+        );
+        println!();
+
+        // Individual scenario results
+        println!("  Scenario-resolved utterances:");
+        for r in &scenario_cases {
+            let mark = if r.outcome.is_first_attempt_hit() {
+                "✓"
+            } else {
+                "✗"
+            };
+            let tier = r.top_source.as_deref().unwrap_or("?");
+            println!(
+                "    {} \"{}\" → {} ({:.2}) [{}]",
+                mark,
+                truncate(&r.case.utterance, 42),
+                r.selected_verb.as_deref().unwrap_or("?"),
+                r.selected_score.unwrap_or(0.0),
+                tier,
+            );
+        }
+        println!();
+    }
+
+    // --- MacroIndex match rate (category = "macro_match") ---
+    let macro_match_cases: Vec<&TestResult> = results
+        .iter()
+        .filter(|r| r.case.category == "macro_match")
+        .collect();
+    if !macro_match_cases.is_empty() {
+        let macro_correct = macro_match_cases
+            .iter()
+            .filter(|r| r.outcome.is_first_attempt_hit())
+            .count();
+        let macro_tier_correct = macro_match_cases
+            .iter()
+            .filter(|r| {
+                r.top_source.as_ref().map_or(false, |s| s == "MacroIndex")
+                    && r.outcome.is_first_attempt_hit()
+            })
+            .count();
+
+        println!(
+            "  MacroIndex test cases ({} total):",
+            macro_match_cases.len()
+        );
+        println!(
+            "    Correct verb:              {:3}/{:3} ({:.1}%)  target: >=75%",
+            macro_correct,
+            macro_match_cases.len(),
+            macro_correct as f64 / macro_match_cases.len() as f64 * 100.0
+        );
+        println!(
+            "    Via MacroIndex tier:       {:3}/{:3} ({:.1}%)",
+            macro_tier_correct,
+            macro_match_cases.len(),
+            macro_tier_correct as f64 / macro_match_cases.len() as f64 * 100.0
+        );
+        println!();
+
+        println!("  MacroIndex-resolved utterances:");
+        for r in &macro_match_cases {
+            let mark = if r.outcome.is_first_attempt_hit() {
+                "✓"
+            } else {
+                "✗"
+            };
+            let tier = r.top_source.as_deref().unwrap_or("?");
+            println!(
+                "    {} \"{}\" → {} ({:.2}) [{}]",
+                mark,
+                truncate(&r.case.utterance, 42),
+                r.selected_verb.as_deref().unwrap_or("?"),
+                r.selected_score.unwrap_or(0.0),
+                tier,
+            );
+        }
+        println!();
+    }
+
+    // --- False positive rate (category = "tier2_blocker") ---
+    let blocker_cases: Vec<&TestResult> = results
+        .iter()
+        .filter(|r| r.case.category == "tier2_blocker")
+        .collect();
+    if !blocker_cases.is_empty() {
+        let blocker_intercepted = blocker_cases
+            .iter()
+            .filter(|r| {
+                r.top_source
+                    .as_ref()
+                    .map_or(false, |s| s.contains("ScenarioIndex") || s == "MacroIndex")
+            })
+            .count();
+        let blocker_correct = blocker_cases
+            .iter()
+            .filter(|r| r.outcome.is_first_attempt_hit())
+            .count();
+
+        println!(
+            "  Tier -2 blocker test cases ({} total):",
+            blocker_cases.len()
+        );
+        println!(
+            "    Correct verb (any tier):   {:3}/{:3} ({:.1}%)",
+            blocker_correct,
+            blocker_cases.len(),
+            blocker_correct as f64 / blocker_cases.len() as f64 * 100.0
+        );
+        println!(
+            "    FALSE POSITIVE (Tier -2):  {:3}/{:3} ({:.1}%)  target: <5%",
+            blocker_intercepted,
+            blocker_cases.len(),
+            blocker_intercepted as f64 / blocker_cases.len() as f64 * 100.0
+        );
+        if blocker_intercepted > 0 {
+            println!("    Intercepted utterances:");
+            for r in &blocker_cases {
+                let is_tier2 = r
+                    .top_source
+                    .as_ref()
+                    .map_or(false, |s| s.contains("ScenarioIndex") || s == "MacroIndex");
+                if is_tier2 {
+                    println!(
+                        "      ! \"{}\" → {} ({:.2}) [{}]",
+                        truncate(&r.case.utterance, 42),
+                        r.selected_verb.as_deref().unwrap_or("?"),
+                        r.selected_score.unwrap_or(0.0),
+                        r.top_source.as_deref().unwrap_or("?"),
+                    );
+                }
+            }
+        }
+        println!();
+    }
+}
+
 fn print_category_breakdown(results: &[TestResult]) {
     println!("  BY CATEGORY");
     println!("  {:-<68}", "");
@@ -573,6 +834,9 @@ fn print_category_breakdown(results: &[TestResult]) {
         "contextual",
         "adversarial",
         "multi_intent",
+        "scenario",
+        "macro_match",
+        "tier2_blocker",
     ];
     for cat in categories {
         let subset: Vec<&TestResult> = results.iter().filter(|r| r.case.category == cat).collect();
@@ -776,8 +1040,12 @@ async fn build_test_searcher(pool: &PgPool) -> ob_poc::mcp::verb_search::HybridV
     use ob_poc::agent::learning::embedder::Embedder;
     use ob_poc::agent::learning::warmup::LearningWarmup;
     use ob_poc::database::verb_service::VerbService;
+    use ob_poc::dsl_v2::macros::load_macro_registry_from_dir;
+    use ob_poc::mcp::macro_index::MacroIndex;
     use ob_poc::mcp::noun_index::{NounIndex, VerbContractIndex};
+    use ob_poc::mcp::scenario_index::ScenarioIndex;
     use ob_poc::mcp::verb_search::HybridVerbSearcher;
+    use std::path::Path;
     use std::sync::Arc;
 
     // Env overrides for threshold sweeps
@@ -857,12 +1125,79 @@ async fn build_test_searcher(pool: &PgPool) -> ob_poc::mcp::verb_search::HybridV
         loaded
     };
 
+    // Load MacroRegistry + MacroIndex (Tier -2B)
+    let macro_index = {
+        let macro_dir_paths = [
+            concat!(env!("CARGO_MANIFEST_DIR"), "/config/verb_schemas/macros"),
+            "config/verb_schemas/macros",
+        ];
+        let mut loaded = None;
+        for path in &macro_dir_paths {
+            let dir = Path::new(path);
+            if dir.is_dir() {
+                match load_macro_registry_from_dir(dir) {
+                    Ok(registry) => {
+                        let index = MacroIndex::from_registry(&registry, None);
+                        println!(
+                            "  MacroIndex: built from {} macros ({})",
+                            registry.len(),
+                            path
+                        );
+                        loaded = Some(Arc::new(index));
+                        break;
+                    }
+                    Err(e) => {
+                        eprintln!("  MacroIndex: failed to load registry from {}: {}", path, e);
+                    }
+                }
+            }
+        }
+        if loaded.is_none() {
+            println!("  MacroIndex: not found (Tier -2B disabled in test)");
+        }
+        loaded
+    };
+
+    // Load ScenarioIndex (Tier -2A)
+    let scenario_index = {
+        let yaml_paths = [
+            concat!(env!("CARGO_MANIFEST_DIR"), "/config/scenario_index.yaml"),
+            "config/scenario_index.yaml",
+        ];
+        let mut loaded = None;
+        for path in &yaml_paths {
+            let p = Path::new(path);
+            if p.is_file() {
+                match ScenarioIndex::from_yaml_file(p) {
+                    Ok(si) => {
+                        println!("  ScenarioIndex: loaded from {}", path);
+                        loaded = Some(Arc::new(si));
+                        break;
+                    }
+                    Err(e) => {
+                        eprintln!("  ScenarioIndex: failed to parse {}: {}", path, e);
+                    }
+                }
+            }
+        }
+        if loaded.is_none() {
+            println!("  ScenarioIndex: not found (Tier -2A disabled in test)");
+        }
+        loaded
+    };
+
     // Construct searcher with production-equivalent settings
     let mut searcher =
         HybridVerbSearcher::new(verb_service, Some(learned_data)).with_embedder(dyn_embedder);
 
     if let Some(ni) = noun_index {
         searcher = searcher.with_noun_index(ni);
+    }
+    if let Some(mi) = macro_index {
+        searcher = searcher.with_macro_index(mi);
+    }
+    if let Some(si) = scenario_index {
+        searcher = searcher.with_scenario_index(si);
     }
 
     if let Some(t) = threshold_override {

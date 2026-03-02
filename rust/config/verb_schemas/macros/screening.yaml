@@ -1,0 +1,192 @@
+# Screening Domain Macros
+#
+# Operator vocabulary for KYC screening operations.
+# These macros wrap DSL primitives (screening.*) with business terminology.
+#
+# INVARIANTS:
+# - UI labels NEVER contain: entity_ref
+# - Screening runs against parties within a case context
+
+screening.full:
+  kind: macro
+
+  ui:
+    label: "Run Full Screening"
+    description: "Run PEP, sanctions, and adverse media screening on a party"
+    target-label: "Screening Results"
+
+  routing:
+    mode-tags: [kyc, onboarding]
+    operator-domain: screening
+
+  target:
+    operates-on: party-ref
+    produces: null
+
+  args:
+    style: keyworded
+    required:
+      party:
+        type: party-ref
+        ui-label: "Party"
+        picker: party_picker
+    optional:
+      provider:
+        type: str
+        ui-label: "Screening Provider"
+      sanctions-lists:
+        type: str
+        ui-label: "Sanctions Lists"
+        description: "Comma-separated list codes (e.g., OFAC, EU, UN)"
+      lookback-months:
+        type: str
+        ui-label: "Adverse Media Lookback"
+        description: "Number of months to look back for adverse media"
+        default: "24"
+
+  prereqs:
+    - type: state_exists
+      key: case.exists
+
+  expands-to:
+    - verb: screening.pep
+      args:
+        entity-id: "${arg.party}"
+        provider: "${arg.provider}"
+    - verb: screening.sanctions
+      args:
+        entity-id: "${arg.party}"
+        lists: "${arg.sanctions-lists}"
+    - verb: screening.adverse-media
+      args:
+        entity-id: "${arg.party}"
+        lookback-months: "${arg.lookback-months}"
+
+  sets-state:
+    - key: screening.completed
+      value: true
+
+  unlocks:
+    - case.submit
+
+screening.pep-check:
+  kind: macro
+
+  ui:
+    label: "PEP Check"
+    description: "Check if a party is a Politically Exposed Person"
+    target-label: "PEP Result"
+
+  routing:
+    mode-tags: [kyc, onboarding]
+    operator-domain: screening
+
+  target:
+    operates-on: party-ref
+    produces: null
+
+  args:
+    style: keyworded
+    required:
+      party:
+        type: party-ref
+        ui-label: "Party"
+        picker: party_picker
+    optional:
+      provider:
+        type: str
+        ui-label: "Provider"
+
+  prereqs:
+    - type: state_exists
+      key: case.exists
+
+  expands-to:
+    - verb: screening.pep
+      args:
+        entity-id: "${arg.party}"
+        provider: "${arg.provider}"
+
+  unlocks: []
+
+screening.sanctions-check:
+  kind: macro
+
+  ui:
+    label: "Sanctions Check"
+    description: "Screen a party against sanctions lists"
+    target-label: "Sanctions Result"
+
+  routing:
+    mode-tags: [kyc, onboarding]
+    operator-domain: screening
+
+  target:
+    operates-on: party-ref
+    produces: null
+
+  args:
+    style: keyworded
+    required:
+      party:
+        type: party-ref
+        ui-label: "Party"
+        picker: party_picker
+    optional:
+      lists:
+        type: str
+        ui-label: "Sanctions Lists"
+        description: "Comma-separated list codes (e.g., OFAC, EU, UN)"
+
+  prereqs:
+    - type: state_exists
+      key: case.exists
+
+  expands-to:
+    - verb: screening.sanctions
+      args:
+        entity-id: "${arg.party}"
+        lists: "${arg.lists}"
+
+  unlocks: []
+
+screening.media-check:
+  kind: macro
+
+  ui:
+    label: "Adverse Media Check"
+    description: "Screen a party for negative news coverage"
+    target-label: "Media Result"
+
+  routing:
+    mode-tags: [kyc, onboarding]
+    operator-domain: screening
+
+  target:
+    operates-on: party-ref
+    produces: null
+
+  args:
+    style: keyworded
+    required:
+      party:
+        type: party-ref
+        ui-label: "Party"
+        picker: party_picker
+    optional:
+      lookback-months:
+        type: str
+        ui-label: "Lookback Period (months)"
+        default: "24"
+
+  prereqs:
+    - type: state_exists
+      key: case.exists
+
+  expands-to:
+    - verb: screening.adverse-media
+      args:
+        entity-id: "${arg.party}"
+        lookback-months: "${arg.lookback-months}"
+
+  unlocks: []

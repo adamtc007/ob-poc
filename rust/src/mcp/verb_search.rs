@@ -65,6 +65,67 @@ pub struct VerbSearchResult {
     pub source: VerbSearchSource,
     pub matched_phrase: String,
     pub description: Option<String>,
+    /// Journey metadata for Tier -2 matches (ScenarioIndex / MacroIndex).
+    /// Carries the resolved route so the orchestrator can expand macros
+    /// instead of sending to LLM for arg extraction.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub journey: Option<JourneyMetadata>,
+}
+
+/// Metadata attached to Tier -2 verb search results (ScenarioIndex / MacroIndex).
+/// Enables the orchestrator to expand macros deterministically instead of
+/// falling through to LLM-based arg extraction.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct JourneyMetadata {
+    /// Scenario ID if matched via ScenarioIndex (Tier -2A).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub scenario_id: Option<String>,
+    /// Scenario title for progress narration.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub scenario_title: Option<String>,
+    /// Resolved route: how to expand the matched macro(s).
+    pub route: JourneyRoute,
+}
+
+/// Serializable resolved route for journey-level matches.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum JourneyRoute {
+    /// Expand a single macro.
+    Macro { macro_fqn: String },
+    /// Expand a sequence of macros in order.
+    MacroSequence { macros: Vec<String> },
+    /// Needs user selection (e.g., jurisdiction) before routing.
+    NeedsSelection {
+        select_on: String,
+        options: Vec<(String, String)>,
+        then: Vec<String>,
+    },
+}
+
+impl From<&ResolvedRoute> for JourneyRoute {
+    fn from(route: &ResolvedRoute) -> Self {
+        match route {
+            ResolvedRoute::Macro { macro_fqn } => JourneyRoute::Macro {
+                macro_fqn: macro_fqn.clone(),
+            },
+            ResolvedRoute::MacroSequence { macros } => JourneyRoute::MacroSequence {
+                macros: macros.clone(),
+            },
+            ResolvedRoute::NeedsSelection {
+                select_on,
+                options,
+                then,
+            } => JourneyRoute::NeedsSelection {
+                select_on: select_on.clone(),
+                options: options
+                    .iter()
+                    .map(|o| (o.value.clone(), o.macro_fqn.clone()))
+                    .collect(),
+                then: then.clone(),
+            },
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -113,7 +174,7 @@ pub enum VerbSearchOutcome {
     /// Top candidates too close - need user clarification
     Ambiguous {
         top: VerbSearchResult,
-        runner_up: VerbSearchResult,
+        runner_up: Box<VerbSearchResult>,
         margin: f32,
     },
     /// Low confidence but has suggestions - offer menu for user to select
@@ -188,7 +249,7 @@ pub fn check_ambiguity_with_fallback(
                 if margin < AMBIGUITY_MARGIN {
                     VerbSearchOutcome::Ambiguous {
                         top: top.clone(),
-                        runner_up: runner_up.clone(),
+                        runner_up: Box::new(runner_up.clone()),
                         margin,
                     }
                 } else {
@@ -333,6 +394,12 @@ impl HybridVerbSearcher {
     pub fn with_macro_registry(mut self, registry: Arc<MacroRegistry>) -> Self {
         self.macro_registry = Some(registry);
         self
+    }
+
+    /// Get a reference to the macro registry (if configured).
+    /// Used by the orchestrator for sequence validation and macro expansion.
+    pub fn macro_registry(&self) -> Option<&Arc<MacroRegistry>> {
+        self.macro_registry.as_ref()
     }
 
     /// Add lexicon service for fast lexical search (runs BEFORE semantic embedding)
@@ -522,6 +589,7 @@ impl HybridVerbSearcher {
                                 score: 0.95,
                                 source: VerbSearchSource::NounTaxonomy,
                                 matched_phrase: format!("noun:{}", resolution.noun_key),
+                                journey: None,
                                 description: noun_index
                                     .verb_index
                                     .by_fqn
@@ -591,6 +659,11 @@ impl HybridVerbSearcher {
                                     source: VerbSearchSource::ScenarioIndex,
                                     matched_phrase: m.title.clone(),
                                     description: Some(m.title.clone()),
+                                    journey: Some(JourneyMetadata {
+                                        scenario_id: Some(m.scenario_id.clone()),
+                                        scenario_title: Some(m.title.clone()),
+                                        route: JourneyRoute::from(&m.route),
+                                    }),
                                 });
                                 return Ok(normalize_candidates(results, limit));
                             }
@@ -627,6 +700,11 @@ impl HybridVerbSearcher {
                                         source: VerbSearchSource::ScenarioIndex,
                                         matched_phrase: m.title.clone(),
                                         description: Some(m.title.clone()),
+                                        journey: Some(JourneyMetadata {
+                                            scenario_id: Some(m.scenario_id.clone()),
+                                            scenario_title: Some(m.title.clone()),
+                                            route: JourneyRoute::from(&m.route),
+                                        }),
                                     });
                                 }
                             }
@@ -665,12 +743,20 @@ impl HybridVerbSearcher {
                         );
                         seen_verbs.insert(m.fqn.clone());
                         let entry = macro_idx.get_entry(&m.fqn);
+                        let macro_fqn_clone = m.fqn.clone();
                         results.push(VerbSearchResult {
                             verb: m.fqn,
                             score: 0.96,
                             source: VerbSearchSource::MacroIndex,
                             matched_phrase: entry.map(|e| e.label.clone()).unwrap_or_default(),
                             description: entry.map(|e| e.description.clone()),
+                            journey: Some(JourneyMetadata {
+                                scenario_id: None,
+                                scenario_title: None,
+                                route: JourneyRoute::Macro {
+                                    macro_fqn: macro_fqn_clone,
+                                },
+                            }),
                         });
                         // MacroIndex match at 0.96 — return early (higher than ECIR 0.95)
                         return Ok(normalize_candidates(results, limit));
@@ -689,12 +775,20 @@ impl HybridVerbSearcher {
                         {
                             seen_verbs.insert(m.fqn.clone());
                             let entry = macro_idx.get_entry(&m.fqn);
+                            let macro_fqn_clone = m.fqn.clone();
                             results.push(VerbSearchResult {
                                 verb: m.fqn,
                                 score: 0.96,
                                 source: VerbSearchSource::MacroIndex,
                                 matched_phrase: entry.map(|e| e.label.clone()).unwrap_or_default(),
                                 description: entry.map(|e| e.description.clone()),
+                                journey: Some(JourneyMetadata {
+                                    scenario_id: None,
+                                    scenario_title: None,
+                                    route: JourneyRoute::Macro {
+                                        macro_fqn: macro_fqn_clone,
+                                    },
+                                }),
                             });
                         }
                     }
@@ -767,6 +861,7 @@ impl HybridVerbSearcher {
                         source,
                         matched_phrase: query.to_string(),
                         description,
+                        journey: None,
                     });
                 }
             }
@@ -795,6 +890,7 @@ impl HybridVerbSearcher {
                             source: VerbSearchSource::LearnedExact,
                             matched_phrase: query.to_string(),
                             description,
+                            journey: None,
                         });
                         seen_verbs.insert(verb.to_string());
                     }
@@ -931,6 +1027,7 @@ impl HybridVerbSearcher {
                                 source: VerbSearchSource::Phonetic,
                                 matched_phrase: pm.pattern,
                                 description,
+                                journey: None,
                             });
                             if results.len() >= limit {
                                 break;
@@ -1031,6 +1128,7 @@ impl HybridVerbSearcher {
                     source: VerbSearchSource::UserLearnedExact,
                     matched_phrase: m.phrase,
                     description,
+                    journey: None,
                 }))
             }
             None => Ok(None),
@@ -1071,6 +1169,7 @@ impl HybridVerbSearcher {
                 source: VerbSearchSource::UserLearnedSemantic,
                 matched_phrase: m.phrase,
                 description,
+                journey: None,
             });
         }
         Ok(results)
@@ -1134,6 +1233,7 @@ impl HybridVerbSearcher {
                 source: VerbSearchSource::GlobalLearned,
                 matched_phrase: m.phrase,
                 description: None,
+                journey: None,
             })
             .collect();
 
@@ -1145,6 +1245,7 @@ impl HybridVerbSearcher {
                 source: VerbSearchSource::PatternEmbedding,
                 matched_phrase: m.phrase,
                 description: None,
+                journey: None,
             })
             .collect();
 
@@ -1235,6 +1336,7 @@ impl HybridVerbSearcher {
                 source: VerbSearchSource::Macro,
                 matched_phrase: schema.ui.label.clone(),
                 description: Some(schema.ui.description.clone()),
+                journey: None,
             });
             return results; // Exact FQN is definitive
         }
@@ -1248,6 +1350,7 @@ impl HybridVerbSearcher {
                     source: VerbSearchSource::Macro,
                     matched_phrase: schema.ui.label.clone(),
                     description: Some(schema.ui.description.clone()),
+                    journey: None,
                 });
             }
         }
@@ -1320,6 +1423,7 @@ impl HybridVerbSearcher {
                     source: VerbSearchSource::Macro,
                     matched_phrase: schema.ui.label.clone(),
                     description: Some(schema.ui.description.clone()),
+                    journey: None,
                 });
             }
         }
@@ -1389,6 +1493,7 @@ mod tests {
                 source: VerbSearchSource::GlobalLearned,
                 matched_phrase: "make a cbu".to_string(),
                 description: None,
+                journey: None,
             },
             VerbSearchResult {
                 verb: "cbu.ensure".to_string(),
@@ -1396,6 +1501,7 @@ mod tests {
                 source: VerbSearchSource::PatternEmbedding,
                 matched_phrase: "ensure cbu".to_string(),
                 description: None,
+                journey: None,
             },
             VerbSearchResult {
                 verb: "cbu.create".to_string(),
@@ -1403,6 +1509,7 @@ mod tests {
                 source: VerbSearchSource::PatternEmbedding,
                 matched_phrase: "create cbu".to_string(),
                 description: None,
+                journey: None,
             },
         ];
 
@@ -1435,6 +1542,7 @@ mod tests {
                 source: VerbSearchSource::PatternEmbedding,
                 matched_phrase: "create cbu".to_string(),
                 description: None,
+                journey: None,
             },
             VerbSearchResult {
                 verb: "cbu.ensure".to_string(),
@@ -1442,6 +1550,7 @@ mod tests {
                 source: VerbSearchSource::PatternEmbedding,
                 matched_phrase: "ensure cbu".to_string(),
                 description: None,
+                journey: None,
             },
         ];
 
@@ -1478,6 +1587,7 @@ mod tests {
                 source: VerbSearchSource::PatternEmbedding,
                 matched_phrase: "create cbu".to_string(),
                 description: None,
+                journey: None,
             },
             VerbSearchResult {
                 verb: "cbu.ensure".to_string(),
@@ -1485,6 +1595,7 @@ mod tests {
                 source: VerbSearchSource::PatternEmbedding,
                 matched_phrase: "ensure cbu".to_string(),
                 description: None,
+                journey: None,
             },
         ];
 
@@ -1510,6 +1621,7 @@ mod tests {
             source: VerbSearchSource::PatternEmbedding,
             matched_phrase: "create cbu".to_string(),
             description: None,
+            journey: None,
         }];
 
         let outcome = check_ambiguity(&candidates, threshold);
@@ -1529,6 +1641,7 @@ mod tests {
             source: VerbSearchSource::PatternEmbedding,
             matched_phrase: "create cbu".to_string(),
             description: None,
+            journey: None,
         }];
 
         let outcome = check_ambiguity(&candidates, threshold);
@@ -1556,6 +1669,7 @@ mod tests {
             source: VerbSearchSource::PatternEmbedding,
             matched_phrase: "create cbu".to_string(),
             description: None,
+            journey: None,
         }];
 
         let outcome = check_ambiguity(&candidates, threshold);

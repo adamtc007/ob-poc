@@ -25,9 +25,13 @@ use crate::agent::verb_surface::{
     compute_session_verb_surface, SessionVerbSurface, VerbSurfaceContext, VerbSurfaceFailPolicy,
 };
 use crate::lookup::LookupService;
-use crate::mcp::intent_pipeline::{IntentPipeline, PipelineOutcome, PipelineResult};
+use crate::mcp::intent_pipeline::{
+    IntentPipeline, PipelineOutcome, PipelineResult, StructuredIntent,
+};
 use crate::mcp::scope_resolution::ScopeContext;
-use crate::mcp::verb_search::HybridVerbSearcher;
+use crate::mcp::verb_search::{
+    HybridVerbSearcher, JourneyMetadata, JourneyRoute, VerbSearchResult,
+};
 use crate::policy::{gate::PolicySnapshot, PolicyGate};
 use crate::sem_reg::abac::ActorContext;
 
@@ -90,6 +94,9 @@ pub struct OrchestratorOutcome {
     pub surface: Option<SessionVerbSurface>,
     pub lookup_result: Option<crate::lookup::LookupResult>,
     pub trace: IntentTrace,
+    /// DecisionPacket for journey-level disambiguation (e.g., macro_selector needs
+    /// user to pick jurisdiction before resolving the macro).
+    pub journey_decision: Option<ob_poc_types::DecisionPacket>,
 }
 
 /// Structured audit trace for every utterance processed.
@@ -153,6 +160,10 @@ pub struct IntentTrace {
     pub toctou_new_fingerprint: Option<String>,
     /// SessionVerbSurface fingerprint (format: "vs1:<hex>"), distinct from SemReg fingerprint.
     pub surface_fingerprint: Option<String>,
+    /// Journey metadata when a Tier -2 match was used (ScenarioIndex / MacroIndex).
+    /// Contains scenario_id, scenario_title, and resolved route.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub journey_match: Option<JourneyMetadata>,
 }
 
 /// Returns true for pipeline outcomes that are "early exits" -- scope resolution,
@@ -310,6 +321,7 @@ pub async fn handle_utterance(
             surface: Some(surface),
             lookup_result,
             trace,
+            journey_decision: None,
         };
         emit_telemetry(ctx, utterance, &mut outcome).await;
         return Ok(outcome);
@@ -398,7 +410,8 @@ pub async fn handle_utterance(
     let chosen_verb_post_semreg = filtered_candidates.first().map(|v| v.verb.clone());
 
     // -- Stage B: Select verb + generate DSL --
-    use crate::mcp::intent_pipeline::StructuredIntent;
+    let mut journey_used: Option<JourneyMetadata> = None;
+    let mut journey_decision_out: Option<ob_poc_types::DecisionPacket> = None;
 
     let mut result = if (sem_reg_denied_all || semreg_unavailable) && policy.semreg_fail_closed() {
         PipelineResult {
@@ -426,23 +439,47 @@ pub async fn handle_utterance(
         result
     } else if let Some(top) = filtered_candidates.first().cloned() {
         // We have a post-SemReg winner.
-        // If discovery already generated DSL AND the verb matches, reuse it.
-        // Otherwise re-generate via forced-verb.
-        let discovery_verb_matches = !discovery_result.dsl.is_empty()
-            && discovery_result.intent.verb.as_str() == top.verb.as_str();
-
-        if discovery_verb_matches {
-            let mut result = discovery_result;
-            result.verb_candidates = filtered_candidates;
-            result
+        // Check for Tier -2 journey match first — these produce macro DSL
+        // deterministically without LLM arg extraction.
+        if let Some(journey) = &top.journey {
+            tracing::info!(
+                verb = %top.verb,
+                source = ?top.source,
+                scenario_id = ?journey.scenario_id,
+                scenario_title = ?journey.scenario_title,
+                route = ?journey.route,
+                "Stage B: Tier -2 journey match — bypassing LLM, constructing macro DSL"
+            );
+            journey_used = Some(journey.clone());
+            let (journey_result, j_decision) = build_journey_pipeline_result(
+                &top,
+                journey,
+                &filtered_candidates,
+                &discovery_result,
+                ctx.verb_searcher.macro_registry().map(|r| r.as_ref()),
+                ctx.session_id,
+                utterance,
+            );
+            journey_decision_out = j_decision;
+            journey_result
         } else {
-            let searcher2 = (*ctx.verb_searcher).clone();
-            let pipeline2 = IntentPipeline::with_pool(searcher2, ctx.pool.clone());
-            let mut forced_result = pipeline2
-                .process_with_forced_verb(utterance, &top.verb, ctx.scope.clone())
-                .await?;
-            forced_result.verb_candidates = filtered_candidates;
-            forced_result
+            // Standard path: discovery reuse or LLM arg extraction.
+            let discovery_verb_matches = !discovery_result.dsl.is_empty()
+                && discovery_result.intent.verb.as_str() == top.verb.as_str();
+
+            if discovery_verb_matches {
+                let mut result = discovery_result;
+                result.verb_candidates = filtered_candidates;
+                result
+            } else {
+                let searcher2 = (*ctx.verb_searcher).clone();
+                let pipeline2 = IntentPipeline::with_pool(searcher2, ctx.pool.clone());
+                let mut forced_result = pipeline2
+                    .process_with_forced_verb(utterance, &top.verb, ctx.scope.clone())
+                    .await?;
+                forced_result.verb_candidates = filtered_candidates;
+                forced_result
+            }
         }
     } else {
         let mut result = discovery_result;
@@ -559,6 +596,15 @@ pub async fn handle_utterance(
         trace.selection_source = "semreg".to_string();
         trace.forced_verb = chosen_post.clone();
     }
+    // Stamp journey metadata + selection source when Tier -2 match was used
+    if let Some(journey) = journey_used {
+        trace.selection_source = if journey.scenario_id.is_some() {
+            "scenario".to_string()
+        } else {
+            "macro_index".to_string()
+        };
+        trace.journey_match = Some(journey);
+    }
     // Stamp surface fingerprint into trace
     trace.surface_fingerprint = Some(surface.surface_fingerprint.0.clone());
 
@@ -587,6 +633,7 @@ pub async fn handle_utterance(
         surface: Some(surface),
         lookup_result,
         trace,
+        journey_decision: journey_decision_out,
     };
     emit_telemetry(ctx, utterance, &mut outcome).await;
     Ok(outcome)
@@ -697,6 +744,272 @@ fn build_trace(
         toctou_result,
         toctou_new_fingerprint,
         surface_fingerprint: None, // Set by caller after build_trace()
+        journey_match: None,       // Set by caller when Tier -2 match is used
+    }
+}
+
+/// Build a `PipelineResult` from a Tier -2 journey match, bypassing LLM arg extraction.
+///
+/// For `JourneyRoute::Macro` and `MacroSequence`, constructs DSL with the macro FQN(s)
+/// as bare invocations. The downstream DSL execution pipeline handles macro expansion
+/// and `derive_pending_questions()` drives conversational arg collection.
+///
+/// For `JourneyRoute::MacroSequence`, calls `validate_macro_sequence()` to verify
+/// prereq feasibility. Failed prereqs are surfaced as validation warnings.
+///
+/// For `JourneyRoute::NeedsSelection`, builds a `DecisionPacket` with the selector
+/// options so the user can pick (e.g., jurisdiction) before the macro is resolved.
+///
+/// Returns `(PipelineResult, Option<DecisionPacket>)` — the decision is `Some` only
+/// for `NeedsSelection` routes.
+#[cfg(feature = "database")]
+fn build_journey_pipeline_result(
+    top: &VerbSearchResult,
+    journey: &JourneyMetadata,
+    filtered_candidates: &[VerbSearchResult],
+    discovery_result: &PipelineResult,
+    macro_registry: Option<&crate::dsl_v2::macros::MacroRegistry>,
+    session_id: Option<Uuid>,
+    utterance: &str,
+) -> (PipelineResult, Option<ob_poc_types::DecisionPacket>) {
+    let (dsl, outcome, notes, validation_error, decision) = match &journey.route {
+        JourneyRoute::Macro { macro_fqn } => {
+            let dsl = format!("({})", macro_fqn);
+            let note = format!(
+                "Tier -2 journey → single macro: {}",
+                journey
+                    .scenario_title
+                    .as_deref()
+                    .unwrap_or(macro_fqn.as_str())
+            );
+            (dsl, PipelineOutcome::Ready, vec![note], None, None)
+        }
+        JourneyRoute::MacroSequence { macros } => {
+            let dsl = macros
+                .iter()
+                .map(|m| format!("({})", m))
+                .collect::<Vec<_>>()
+                .join("\n");
+            let mut notes = vec![format!(
+                "Tier -2 journey → macro sequence ({} macros): {}",
+                macros.len(),
+                journey
+                    .scenario_title
+                    .as_deref()
+                    .unwrap_or("unnamed sequence")
+            )];
+
+            // Validate the sequence prereqs if we have a macro registry
+            let mut val_error = None;
+            if let Some(registry) = macro_registry {
+                let empty_state = std::collections::HashSet::new();
+                let result = crate::mcp::sequence_validator::validate_macro_sequence(
+                    macros,
+                    registry,
+                    &empty_state, // fresh session — no state flags yet
+                    &empty_state, // no completed verbs yet
+                );
+
+                if !result.feasible {
+                    // Hard failures — surface as validation error but still return DSL
+                    // so the user can see what was planned
+                    let fail_details: Vec<String> = result
+                        .validations
+                        .iter()
+                        .filter(|v| {
+                            matches!(
+                                v.check,
+                                crate::mcp::sequence_validator::PrereqCheck::Fail { .. }
+                            )
+                        })
+                        .map(|v| {
+                            if let crate::mcp::sequence_validator::PrereqCheck::Fail {
+                                ref missing,
+                                ref satisfied_by,
+                            } = v.check
+                            {
+                                if satisfied_by.is_empty() {
+                                    format!("{}: missing prerequisite '{}'", v.macro_fqn, missing)
+                                } else {
+                                    format!(
+                                        "{}: missing prerequisite '{}' (could be satisfied by: {})",
+                                        v.macro_fqn,
+                                        missing,
+                                        satisfied_by.join(", ")
+                                    )
+                                }
+                            } else {
+                                String::new()
+                            }
+                        })
+                        .filter(|s| !s.is_empty())
+                        .collect();
+                    val_error = Some(format!(
+                        "Sequence validation: {} of {} macros have unmet prerequisites:\n{}",
+                        result.fail_count,
+                        macros.len(),
+                        fail_details.join("\n")
+                    ));
+                    notes.push(format!(
+                        "⚠ Sequence prereq check: {} pass, {} fail, {} deferred",
+                        result.pass_count, result.fail_count, result.deferred_count
+                    ));
+                } else if result.deferred_count > 0 {
+                    notes.push(format!(
+                        "Sequence prereq check: {} pass, {} deferred (will verify at runtime)",
+                        result.pass_count, result.deferred_count
+                    ));
+                } else {
+                    notes.push(format!(
+                        "Sequence prereq check: all {} macros pass",
+                        result.pass_count
+                    ));
+                }
+            }
+
+            (dsl, PipelineOutcome::Ready, notes, val_error, None)
+        }
+        JourneyRoute::NeedsSelection {
+            select_on,
+            options,
+            then,
+        } => {
+            let note = format!(
+                "Tier -2 journey needs selection on '{}': {} options",
+                select_on,
+                options.len()
+            );
+
+            // Build DecisionPacket so the UI renders proper selection choices
+            let decision = build_journey_selection_decision(
+                session_id, utterance, journey, select_on, options, then,
+            );
+
+            (
+                String::new(),
+                PipelineOutcome::NeedsClarification,
+                vec![note],
+                None,
+                Some(decision),
+            )
+        }
+    };
+
+    let result = PipelineResult {
+        intent: StructuredIntent {
+            verb: top.verb.clone(),
+            arguments: vec![],
+            confidence: top.score,
+            notes,
+        },
+        verb_candidates: filtered_candidates.to_vec(),
+        dsl,
+        dsl_hash: None,
+        valid: matches!(outcome, PipelineOutcome::Ready),
+        validation_error,
+        unresolved_refs: vec![],
+        missing_required: vec![],
+        outcome,
+        scope_resolution: discovery_result.scope_resolution.clone(),
+        scope_context: discovery_result.scope_context.clone(),
+    };
+
+    (result, decision)
+}
+
+/// Build a `DecisionPacket` for a `NeedsSelection` journey route.
+///
+/// Constructs choices from the selector options (e.g., jurisdiction → macro FQN mappings)
+/// and wraps them in a `ClarifyScope` decision with a `journey_selection` decision reason
+/// so the reply handler can distinguish it from other scope clarifications.
+#[cfg(feature = "database")]
+fn build_journey_selection_decision(
+    session_id: Option<Uuid>,
+    utterance: &str,
+    journey: &JourneyMetadata,
+    select_on: &str,
+    options: &[(String, String)],
+    then: &[String],
+) -> ob_poc_types::DecisionPacket {
+    use ob_poc_types::{
+        ClarificationPayload, DecisionKind, DecisionPacket, DecisionTrace, ScopeOption,
+        ScopePayload, SessionStateView, UserChoice,
+    };
+
+    let scenario_title = journey
+        .scenario_title
+        .as_deref()
+        .unwrap_or("Journey selection");
+
+    let choices: Vec<UserChoice> = options
+        .iter()
+        .enumerate()
+        .map(|(i, (value, macro_fqn))| UserChoice {
+            id: format!("{}", i + 1),
+            label: value.clone(),
+            description: format!("Route to macro: {}", macro_fqn),
+            is_escape: false,
+        })
+        .collect();
+
+    let scope_options: Vec<ScopeOption> = options
+        .iter()
+        .map(|(value, macro_fqn)| ScopeOption {
+            desc: format!("{} → {}", value, macro_fqn),
+            method: "journey_selection".to_string(),
+            score: 1.0,
+            expect_count: None,
+            sample: vec![],
+            snapshot_id: None,
+        })
+        .collect();
+
+    // Encode the selector metadata as context_hint so the reply handler
+    // can reconstruct the macro resolution without re-running the scenario index.
+    let context_hint = serde_json::to_string(&serde_json::json!({
+        "select_on": select_on,
+        "options": options,
+        "then": then,
+        "scenario_id": journey.scenario_id,
+        "scenario_title": journey.scenario_title,
+    }))
+    .unwrap_or_default();
+
+    DecisionPacket {
+        packet_id: Uuid::new_v4().to_string(),
+        kind: DecisionKind::ClarifyScope,
+        session: SessionStateView {
+            session_id,
+            client_group_anchor: None,
+            client_group_name: None,
+            persona: None,
+            last_confirmed_verb: None,
+        },
+        utterance: utterance.to_string(),
+        payload: ClarificationPayload::Scope(ScopePayload {
+            options: scope_options,
+            context_hint: Some(context_hint),
+        }),
+        prompt: format!(
+            "**{}**\n\nPlease select a {} to continue:",
+            scenario_title, select_on
+        ),
+        choices,
+        best_plan: None,
+        alternatives: vec![],
+        requires_confirm: false,
+        confirm_token: None,
+        trace: DecisionTrace {
+            config_version: "1.0".to_string(),
+            entity_snapshot_hash: None,
+            lexicon_snapshot_hash: None,
+            semantic_lane_enabled: false,
+            embedding_model_id: None,
+            verb_margin: 0.0,
+            scope_margin: 0.0,
+            kind_margin: 0.0,
+            decision_reason: "journey_selection".to_string(),
+        },
     }
 }
 
@@ -908,6 +1221,7 @@ pub async fn handle_utterance_with_forced_verb(
             toctou_result: Some("denied".to_string()),
             toctou_new_fingerprint: Some(envelope.fingerprint_str().to_string()),
             surface_fingerprint: None,
+            journey_match: None,
         };
 
         let mut outcome = OrchestratorOutcome {
@@ -928,6 +1242,7 @@ pub async fn handle_utterance_with_forced_verb(
             surface: None,
             lookup_result,
             trace,
+            journey_decision: None,
         };
         emit_telemetry(ctx, utterance, &mut outcome).await;
         return Ok(outcome);
@@ -981,6 +1296,7 @@ pub async fn handle_utterance_with_forced_verb(
         toctou_result: Some("still_allowed".to_string()),
         toctou_new_fingerprint: None,
         surface_fingerprint: None,
+        journey_match: None,
     };
 
     tracing::info!(
@@ -998,6 +1314,7 @@ pub async fn handle_utterance_with_forced_verb(
         surface: None,
         lookup_result,
         trace,
+        journey_decision: None,
     };
     emit_telemetry(ctx, utterance, &mut outcome).await;
     Ok(outcome)
@@ -1230,6 +1547,7 @@ mod tests {
             toctou_result: None,
             toctou_new_fingerprint: None,
             surface_fingerprint: None,
+            journey_match: None,
         }
     }
 

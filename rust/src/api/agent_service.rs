@@ -814,6 +814,7 @@ impl AgentService {
                                         crate::mcp::verb_search::VerbSearchSource::PatternEmbedding,
                                     matched_phrase: pending_tier.original_input.clone(),
                                     description: None,
+                                    journey: None,
                                 })
                                 .collect();
                         return Ok(self.build_verb_disambiguation_response(
@@ -963,7 +964,14 @@ impl AgentService {
         );
         let orch_outcome =
             crate::agent::orchestrator::handle_utterance(&orch_ctx, &request.message).await;
-        let result = orch_outcome.map(|o| o.pipeline_result);
+        let (result, journey_match, journey_decision) = match orch_outcome {
+            Ok(o) => (
+                Ok(o.pipeline_result),
+                o.trace.journey_match,
+                o.journey_decision,
+            ),
+            Err(e) => (Err(e), None, None),
+        };
 
         match result {
             Ok(r) => {
@@ -1041,9 +1049,43 @@ impl AgentService {
                     }
 
                     // Data mutation - wait for user to say "run"
-                    let msg = format!("Staged: {}\n\nSay 'run' to execute.", r.dsl);
+                    // Enrich message with journey context when Tier -2 matched
+                    let msg = if let Some(ref jm) = journey_match {
+                        let title = jm.scenario_title.as_deref().unwrap_or(&r.intent.verb);
+                        format!(
+                            "**{}**\n\n```\n{}\n```\n\nSay 'run' to execute.",
+                            title, r.dsl
+                        )
+                    } else {
+                        format!("Staged: {}\n\nSay 'run' to execute.", r.dsl)
+                    };
                     session.add_agent_message(msg.clone(), None, Some(r.dsl.clone()));
                     return Ok(self.staged_response(r.dsl, msg));
+                }
+
+                // Journey-level disambiguation (e.g., macro_selector needs jurisdiction pick)
+                // Takes priority over generic verb disambiguation since the journey is already
+                // matched — we just need a parameter to resolve the specific macro.
+                if matches!(r.outcome, PipelineOutcome::NeedsClarification) {
+                    if let Some(jd) = journey_decision {
+                        let msg = jd.prompt.clone();
+                        session.add_agent_message(msg.clone(), None, None);
+                        return Ok(AgentChatResponse {
+                            message: msg,
+                            session_state: SessionState::New,
+                            can_execute: false,
+                            dsl_source: None,
+                            ast: None,
+                            disambiguation: None,
+                            commands: None,
+                            unresolved_refs: None,
+                            current_ref_index: None,
+                            dsl_hash: None,
+                            verb_disambiguation: None,
+                            intent_tier: None,
+                            decision: Some(jd),
+                        });
+                    }
                 }
 
                 // Ambiguous? Check if we should show intent tiers or direct verb disambiguation

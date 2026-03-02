@@ -1,0 +1,164 @@
+# KYC Workflow Macros
+#
+# Composite operator workflows for KYC processes that span multiple domains.
+# These macros orchestrate multi-step KYC activities.
+#
+# INVARIANTS:
+# - UI labels NEVER contain: entity_ref, kyc-case
+# - These macros combine screening, document, and case operations
+
+kyc.collect-documents:
+  kind: macro
+
+  ui:
+    label: "Collect Documents"
+    description: "Request KYC documents from a party and track requirements"
+    target-label: "Document Collection"
+
+  routing:
+    mode-tags: [kyc, onboarding]
+    operator-domain: kyc
+
+  target:
+    operates-on: party-ref
+    produces: null
+
+  args:
+    style: keyworded
+    required:
+      party:
+        type: party-ref
+        ui-label: "Party"
+        picker: party_picker
+      doc-types:
+        type: str
+        ui-label: "Document Types"
+        description: "Comma-separated document types (e.g., passport, proof_of_address)"
+    optional:
+      due-date:
+        type: date
+        ui-label: "Due Date"
+      workflow-instance-id:
+        type: str
+        ui-label: "Workflow Instance"
+        description: "Link to workflow for requirement tracking"
+
+  prereqs:
+    - type: state_exists
+      key: case.exists
+
+  expands-to:
+    - verb: document.solicit-set
+      args:
+        subject-entity-id: "${arg.party}"
+        doc-types: "${arg.doc-types}"
+        due-date: "${arg.due-date}"
+        workflow-instance-id: "${arg.workflow-instance-id}"
+
+  sets-state:
+    - key: documents.requested
+      value: true
+
+  unlocks:
+    - case.submit
+
+kyc.full-review:
+  kind: macro
+
+  ui:
+    label: "Full KYC Review"
+    description: "Run complete KYC review: screening, document collection, and case submission"
+    target-label: "KYC Review"
+
+  routing:
+    mode-tags: [kyc, onboarding]
+    operator-domain: kyc
+
+  target:
+    operates-on: case-ref
+    produces: null
+
+  args:
+    style: keyworded
+    required:
+      case:
+        type: case-ref
+        ui-label: "Case"
+        autofill-from: session.current_case
+      party:
+        type: party-ref
+        ui-label: "Party"
+        picker: party_picker
+    optional:
+      doc-types:
+        type: str
+        ui-label: "Document Types"
+        description: "Document types to request (defaults to passport, proof_of_address)"
+        default: "passport,proof_of_address"
+
+  prereqs:
+    - type: state_exists
+      key: case.exists
+
+  expands-to:
+    - verb: screening.pep
+      args:
+        entity-id: "${arg.party}"
+    - verb: screening.sanctions
+      args:
+        entity-id: "${arg.party}"
+    - verb: screening.adverse-media
+      args:
+        entity-id: "${arg.party}"
+    - verb: document.solicit-set
+      args:
+        subject-entity-id: "${arg.party}"
+        doc-types: "${arg.doc-types}"
+
+  sets-state:
+    - key: screening.completed
+      value: true
+    - key: documents.requested
+      value: true
+
+  unlocks:
+    - case.submit
+
+kyc.check-readiness:
+  kind: macro
+
+  ui:
+    label: "Check Case Readiness"
+    description: "Check if all documents and screening are complete for case submission"
+    target-label: "Readiness Check"
+
+  routing:
+    mode-tags: [kyc]
+    operator-domain: kyc
+
+  target:
+    operates-on: case-ref
+    produces: null
+
+  args:
+    style: keyworded
+    required:
+      party:
+        type: party-ref
+        ui-label: "Party"
+        picker: party_picker
+    optional: {}
+
+  prereqs:
+    - type: state_exists
+      key: case.exists
+
+  expands-to:
+    - verb: document.missing-for-entity
+      args:
+        entity-id: "${arg.party}"
+    - verb: requirement.unsatisfied
+      args:
+        entity-id: "${arg.party}"
+
+  unlocks: []

@@ -129,7 +129,7 @@ pub fn check_ambiguity_with_margin(
                 if actual_margin < margin {
                     VerbSearchOutcome::Ambiguous {
                         top: top.clone(),
-                        runner_up: runner_up.clone(),
+                        runner_up: Box::new(runner_up.clone()),
                         margin: actual_margin,
                     }
                 } else {

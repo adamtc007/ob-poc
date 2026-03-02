@@ -130,23 +130,53 @@ scenarios:
     explain:
       summary: "Fund onboarding — select jurisdiction to determine structure type"
 
-  # ── Full KYC Screening Sequence ────────────────────────────────────────
+  # ── Full KYC Screening ─────────────────────────────────────────────────
   - id: full-screening
     title: "Full KYC Screening"
     modes: [kyc, onboarding]
     requires:
       any_of: [compound_action, multi_noun_workflow]
     signals:
-      actions: [onboard, "run the", "complete the", "do the", configure]
-      nouns_any: [kyc, screening, "due diligence", aml, compliance, case]
-      phrases_any: ["full screening", "complete screening", "run kyc", "kyc screening"]
+      actions: ["run the", "complete the", "do the", "perform", screen]
+      nouns_any: [screening, "due diligence", aml, pep, sanctions, "adverse media"]
+      phrases_any: ["full screening", "complete screening", "run all checks", "screen this party", "kyc screening"]
     routes:
-      kind: macro_sequence
-      macros:
-        - case.open
-        - case.submit
+      kind: macro
+      macro_fqn: screening.full
     explain:
-      summary: "Open KYC case and submit for screening"
+      summary: "Full PEP, sanctions, and adverse media screening"
+
+  # ── Full KYC Review (screening + documents) ──────────────────────────
+  - id: full-kyc-review
+    title: "Full KYC Review"
+    modes: [kyc, onboarding]
+    requires:
+      any_of: [compound_action, multi_noun_workflow]
+    signals:
+      actions: [onboard, "run the", "complete the", "do the", configure, review]
+      nouns_any: [kyc, "due diligence", compliance, review]
+      phrases_any: ["full kyc", "complete kyc", "kyc review", "run kyc", "do kyc"]
+    routes:
+      kind: macro
+      macro_fqn: kyc.full-review
+    explain:
+      summary: "Full KYC review: screening, document collection, and case readiness"
+
+  # ── Document Collection ───────────────────────────────────────────────
+  - id: kyc-doc-collection
+    title: "KYC Document Collection"
+    modes: [kyc, onboarding]
+    requires:
+      any_of: [compound_action, multi_noun_workflow]
+    signals:
+      actions: [collect, request, solicit, gather, "get the"]
+      nouns_any: [document, documents, passport, proof, identity, "proof of address", kyc]
+      phrases_any: ["collect documents", "request documents", "gather kyc documents", "get identity documents"]
+    routes:
+      kind: macro
+      macro_fqn: kyc.collect-documents
+    explain:
+      summary: "Request KYC documents from a party and track requirements"
 
   # ── Cross-Border Hedge Fund ────────────────────────────────────────────
   - id: hedge-cross-border-setup
