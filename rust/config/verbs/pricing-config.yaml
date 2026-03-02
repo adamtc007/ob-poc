@@ -25,6 +25,7 @@ domains:
           source_of_truth: catalog
           scope: cbu
           noun: pricing_config
+          phase_tags: [deal]
         behavior: crud
         crud:
           operation: upsert
@@ -161,6 +162,7 @@ domains:
           source_of_truth: catalog
           scope: cbu
           noun: pricing_config
+          phase_tags: [deal]
         behavior: crud
         crud:
           operation: update
@@ -203,6 +205,7 @@ domains:
           source_of_truth: catalog
           scope: cbu
           noun: pricing_config
+          phase_tags: [deal]
         behavior: crud
         crud:
           operation: list_by_fk
@@ -249,6 +252,7 @@ domains:
           source_of_truth: catalog
           scope: cbu
           noun: pricing_config
+          phase_tags: [deal]
         behavior: crud
         crud:
           operation: delete
@@ -280,6 +284,7 @@ domains:
           source_of_truth: catalog
           scope: cbu
           noun: pricing_config
+          phase_tags: [deal]
         behavior: crud
         crud:
           operation: update
@@ -314,6 +319,7 @@ domains:
           source_of_truth: catalog
           scope: cbu
           noun: pricing_config
+          phase_tags: [deal]
         behavior: plugin
         handler: find_pricing_for_instrument
         args:
@@ -364,6 +370,7 @@ domains:
           source_of_truth: catalog
           scope: cbu
           noun: pricing_config
+          phase_tags: [deal]
         behavior: crud
         crud:
           operation: upsert
@@ -452,6 +459,7 @@ domains:
           source_of_truth: catalog
           scope: cbu
           noun: pricing_config
+          phase_tags: [deal]
         behavior: crud
         crud:
           operation: list_by_fk
@@ -496,6 +504,7 @@ domains:
           source_of_truth: catalog
           scope: cbu
           noun: pricing_config
+          phase_tags: [deal]
         behavior: crud
         crud:
           operation: upsert
@@ -575,6 +584,7 @@ domains:
           source_of_truth: catalog
           scope: cbu
           noun: pricing_config
+          phase_tags: [deal]
         behavior: crud
         crud:
           operation: list_by_fk
@@ -619,6 +629,7 @@ domains:
           source_of_truth: catalog
           scope: cbu
           noun: pricing_config
+          phase_tags: [deal]
         behavior: crud
         crud:
           operation: upsert
@@ -690,6 +701,7 @@ domains:
           source_of_truth: catalog
           scope: cbu
           noun: pricing_config
+          phase_tags: [deal]
         behavior: crud
         crud:
           operation: list_by_fk
@@ -734,6 +746,7 @@ domains:
           source_of_truth: catalog
           scope: cbu
           noun: pricing_config
+          phase_tags: [deal]
         behavior: crud
         crud:
           operation: upsert
@@ -806,6 +819,7 @@ domains:
           source_of_truth: catalog
           scope: cbu
           noun: pricing_config
+          phase_tags: [deal]
         behavior: crud
         crud:
           operation: list_by_fk

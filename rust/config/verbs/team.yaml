@@ -25,6 +25,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: team
+          phase_tags: [administration]
         behavior: crud
         crud:
           operation: insert
@@ -101,6 +102,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: team
+          phase_tags: [administration]
         behavior: crud
         crud:
           operation: select
@@ -137,6 +139,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: team
+          phase_tags: [administration]
         behavior: crud
         crud:
           operation: update
@@ -184,6 +187,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: team
+          phase_tags: [administration]
         behavior: crud
         crud:
           operation: upsert
@@ -247,6 +251,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: team
+          phase_tags: [administration]
         behavior: crud
         crud:
           operation: delete
@@ -297,6 +302,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: team
+          phase_tags: [administration]
         behavior: crud
         crud:
           operation: update
@@ -331,6 +337,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: team
+          phase_tags: [administration]
         behavior: plugin
         handler: team_transfer_member
         args:
@@ -387,6 +394,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: team
+          phase_tags: [administration]
         behavior: crud
         crud:
           operation: upsert
@@ -452,6 +460,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: team
+          phase_tags: [administration]
         behavior: crud
         crud:
           operation: select
@@ -486,6 +495,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: team
+          phase_tags: [administration]
         behavior: crud
         crud:
           operation: upsert
@@ -527,6 +537,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: team
+          phase_tags: [administration]
         behavior: crud
         crud:
           operation: delete
@@ -564,6 +575,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: team
+          phase_tags: [administration]
         behavior: crud
         crud:
           operation: upsert
@@ -614,6 +626,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: team
+          phase_tags: [administration]
         behavior: crud
         crud:
           operation: delete
@@ -657,6 +670,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: team
+          phase_tags: [administration]
         behavior: crud
         crud:
           operation: list_by_fk
@@ -692,6 +706,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: team
+          phase_tags: [administration]
         behavior: crud
         crud:
           operation: list_by_fk
@@ -736,6 +751,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: team
+          phase_tags: [administration]
         behavior: crud
         crud:
           operation: insert
@@ -788,6 +804,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: team
+          phase_tags: [administration]
         behavior: crud
         crud:
           operation: update
@@ -820,6 +837,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: team
+          phase_tags: [administration]
         behavior: crud
         crud:
           operation: update
@@ -852,6 +870,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: team
+          phase_tags: [administration]
         behavior: crud
         crud:
           operation: update
@@ -899,6 +918,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: team
+          phase_tags: [administration]
         behavior: crud
         crud:
           operation: list_by_fk
@@ -928,6 +948,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: team
+          phase_tags: [administration]
         behavior: crud
         crud:
           operation: list_by_fk
@@ -964,6 +985,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: team
+          phase_tags: [administration]
         behavior: crud
         crud:
           operation: select

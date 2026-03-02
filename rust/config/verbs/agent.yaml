@@ -34,6 +34,8 @@ domains:
           category: agent_control
           context: interactive_only
           side_effects: runtime_state
+          subject_kinds: []
+          phase_tags: [navigation]
         behavior: plugin
         handler: AgentStartOp
         invocation_phrases:
@@ -87,6 +89,8 @@ domains:
           category: agent_control
           context: interactive_only
           side_effects: runtime_state
+          subject_kinds: []
+          phase_tags: [navigation]
         behavior: plugin
         handler: AgentPauseOp
         invocation_phrases:
@@ -108,6 +112,8 @@ domains:
           category: agent_control
           context: interactive_only
           side_effects: runtime_state
+          subject_kinds: []
+          phase_tags: [navigation]
         behavior: plugin
         handler: AgentResumeOp
         invocation_phrases:
@@ -129,6 +135,8 @@ domains:
           category: agent_control
           context: interactive_only
           side_effects: runtime_state
+          subject_kinds: []
+          phase_tags: [navigation]
         behavior: plugin
         handler: AgentStopOp
         invocation_phrases:
@@ -153,6 +161,8 @@ domains:
           category: agent_control
           context: interactive_only
           side_effects: runtime_state
+          subject_kinds: []
+          phase_tags: [navigation]
         behavior: plugin
         handler: AgentConfirmOp
         invocation_phrases:
@@ -185,6 +195,8 @@ domains:
           category: agent_control
           context: interactive_only
           side_effects: runtime_state
+          subject_kinds: []
+          phase_tags: [navigation]
         behavior: plugin
         handler: AgentRejectOp
         invocation_phrases:
@@ -215,6 +227,8 @@ domains:
           category: agent_control
           context: interactive_only
           side_effects: runtime_state
+          subject_kinds: []
+          phase_tags: [navigation]
         behavior: plugin
         handler: AgentSelectOp
         invocation_phrases:
@@ -248,6 +262,8 @@ domains:
           category: agent_task
           context: scripted_ok
           side_effects: facts_only
+          subject_kinds: []
+          phase_tags: [navigation]
         behavior: plugin
         handler: AgentStatusOp
         invocation_phrases:
@@ -270,6 +286,8 @@ domains:
           category: agent_task
           context: scripted_ok
           side_effects: facts_only
+          subject_kinds: []
+          phase_tags: [navigation]
         behavior: plugin
         handler: AgentHistoryOp
         invocation_phrases:
@@ -300,6 +318,8 @@ domains:
           category: agent_control
           context: interactive_only
           side_effects: runtime_state
+          subject_kinds: []
+          phase_tags: [navigation]
         invocation_phrases:
           - "set confidence threshold"
           - "adjust auto-proceed threshold"
@@ -333,6 +353,8 @@ domains:
           category: agent_control
           context: interactive_only
           side_effects: runtime_state
+          subject_kinds: []
+          phase_tags: [navigation]
         invocation_phrases:
           - "set agent mode"
           - "switch to agent mode"
@@ -364,6 +386,8 @@ domains:
           category: agent_control
           context: interactive_only
           side_effects: runtime_state
+          subject_kinds: []
+          phase_tags: [navigation]
         behavior: plugin
         handler: AgentSetAuthoringModeOp
         invocation_phrases:
@@ -405,6 +429,8 @@ domains:
           category: agent_task
           context: scripted_ok
           side_effects: facts_only
+          subject_kinds: []
+          phase_tags: [navigation]
         behavior: plugin
         handler: AgentTeachOp
         invocation_phrases:
@@ -440,6 +466,8 @@ domains:
           category: agent_task
           context: scripted_ok
           side_effects: facts_only
+          subject_kinds: []
+          phase_tags: [navigation]
         behavior: plugin
         handler: AgentUnteachOp
         invocation_phrases:
@@ -475,6 +503,8 @@ domains:
           category: agent_task
           context: scripted_ok
           side_effects: facts_only
+          subject_kinds: []
+          phase_tags: [navigation]
         behavior: plugin
         handler: AgentTeachingStatusOp
         invocation_phrases:
@@ -510,6 +540,8 @@ domains:
           category: agent_status
           context: scripted_ok
           side_effects: facts_only
+          subject_kinds: []
+          phase_tags: [navigation]
         behavior: plugin
         handler: AgentGetModeOp
         invocation_phrases:
@@ -534,6 +566,8 @@ domains:
           category: agent_status
           context: scripted_ok
           side_effects: facts_only
+          subject_kinds: []
+          phase_tags: [navigation]
         behavior: plugin
         handler: AgentGetPolicyOp
         invocation_phrases:
@@ -557,6 +591,8 @@ domains:
           category: agent_status
           context: scripted_ok
           side_effects: facts_only
+          subject_kinds: []
+          phase_tags: [navigation]
         behavior: plugin
         handler: AgentListToolsOp
         invocation_phrases:
@@ -584,6 +620,8 @@ domains:
           category: agent_status
           context: scripted_ok
           side_effects: facts_only
+          subject_kinds: []
+          phase_tags: [navigation]
         behavior: plugin
         handler: AgentTelemetrySummaryOp
         invocation_phrases:
@@ -622,6 +660,8 @@ domains:
           category: agent_task
           context: scripted_ok
           side_effects: facts_only
+          subject_kinds: []
+          phase_tags: [navigation]
         behavior: plugin
         handler: AgentLearnOp
         invocation_phrases:

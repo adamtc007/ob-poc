@@ -18,6 +18,11 @@
 #   hard   -- Requires LLM classifier or contextual boost
 #   expert -- Domain expert language, abbreviations, implicit context
 #
+# ECIR Fields (optional):
+#   expected_noun   -- Expected noun extracted by NounIndex
+#   expected_action -- Expected action classification (create/list/get/update/delete/search/none)
+#   ecir_path       -- Expected ECIR resolution path: deterministic | narrow | fallthrough
+#
 # NOTE: All utterances are what a real custody bank onboarding analyst,
 # compliance officer, or relationship manager would actually say.
 # ============================================================================
@@ -32,6 +37,9 @@ expected_verb = "cbu.create"
 category = "direct"
 difficulty = "easy"
 domain_hint = "cbu"
+expected_noun = "cbu"
+expected_action = "create"
+ecir_path = "narrow"
 
 [[test]]
 utterance = "I need to onboard a new client"
@@ -39,12 +47,14 @@ expected_verb = "cbu.create"
 category = "natural"
 difficulty = "medium"
 notes = "Classic natural language - 'onboard' maps to cbu.create"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "set up a fund structure for BlackRock"
 expected_verb = "cbu.create"
 category = "natural"
 difficulty = "medium"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "spin up a CBU"
@@ -52,12 +62,18 @@ expected_verb = "cbu.create"
 category = "natural"
 difficulty = "medium"
 notes = "Informal language"
+expected_noun = "cbu"
+expected_action = "create"
+ecir_path = "narrow"
 
 [[test]]
 utterance = "show me all the CBUs"
 expected_verb = "cbu.list"
 category = "direct"
 difficulty = "easy"
+expected_noun = "cbu"
+expected_action = "list"
+ecir_path = "narrow"
 
 [[test]]
 utterance = "what clients do we have in Germany?"
@@ -65,24 +81,30 @@ expected_verb = "cbu.list"
 category = "indirect"
 difficulty = "hard"
 notes = "Needs to infer 'clients in Germany' = cbu.list with jurisdiction filter"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "how many onboarding cases are open right now?"
 expected_verb = "cbu.list"
 category = "indirect"
 difficulty = "hard"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "update the jurisdiction to Ireland for this CBU"
 expected_verb = "cbu.update"
 category = "direct"
 difficulty = "easy"
+expected_noun = "cbu"
+expected_action = "update"
+ecir_path = "deterministic"
 
 [[test]]
 utterance = "change the fund name"
 expected_verb = "cbu.update"
 category = "natural"
 difficulty = "medium"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "assign Goldman Sachs as custodian for this CBU"
@@ -90,6 +112,9 @@ expected_verb = "cbu.assign-role"
 category = "natural"
 difficulty = "medium"
 notes = "Collision risk: cbu.assign-role vs cbu.role.assign"
+expected_noun = "cbu"
+expected_action = "assign"
+ecir_path = "narrow"
 
 [[test]]
 utterance = "make State Street the transfer agent"
@@ -97,18 +122,21 @@ expected_verb = "cbu.role.assign"
 category = "natural"
 difficulty = "hard"
 notes = "Role assignment - should prefer cbu.role.assign (v2)"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "who are the parties on this CBU?"
 expected_verb = "cbu.parties"
 category = "natural"
 difficulty = "medium"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "add custody services to this client"
 expected_verb = "cbu.add-product"
 category = "natural"
 difficulty = "medium"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "what products does this CBU have?"
@@ -116,12 +144,16 @@ expected_verb = "cbu.read"
 category = "indirect"
 difficulty = "hard"
 alt_verbs = ["cbu.show"]
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "delete the test CBU I just created"
 expected_verb = "cbu.delete"
 category = "direct"
 difficulty = "easy"
+expected_noun = "cbu"
+expected_action = "delete"
+ecir_path = "narrow"
 
 [[test]]
 utterance = "nuke everything under this CBU including all roles"
@@ -129,6 +161,7 @@ expected_verb = "cbu.delete-cascade"
 category = "natural"
 difficulty = "hard"
 notes = "Informal - 'nuke everything' implies cascade delete"
+ecir_path = "fallthrough"
 
 # ============================================================================
 # ENTITY DOMAIN -- Legal Entity Management
@@ -139,12 +172,14 @@ utterance = "create a legal entity for HSBC Holdings plc"
 expected_verb = "entity.create-limited-company"
 category = "direct"
 difficulty = "easy"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "add a new company"
 expected_verb = "entity.create-limited-company"
 category = "natural"
 difficulty = "medium"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "register John Smith as a person"
@@ -152,6 +187,7 @@ expected_verb = "entity.create-proper-person"
 category = "natural"
 difficulty = "medium"
 notes = "Must distinguish company vs person entity type"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "I need to add a trust -- Cayman Islands discretionary trust"
@@ -159,18 +195,23 @@ expected_verb = "entity.create-trust-discretionary"
 category = "natural"
 difficulty = "hard"
 notes = "Must pick trust-discretionary over limited-company"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "add a limited partnership for the GP structure"
 expected_verb = "entity.create-partnership-limited"
 category = "natural"
 difficulty = "hard"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "show me all entities"
 expected_verb = "entity.list"
 category = "direct"
 difficulty = "easy"
+expected_noun = "entity"
+expected_action = "list"
+ecir_path = "narrow"
 
 [[test]]
 utterance = "which entities haven't been verified yet?"
@@ -179,18 +220,23 @@ category = "indirect"
 difficulty = "hard"
 alt_verbs = ["entity.list-ghosts"]
 notes = "Could also be entity.list with filter"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "update the registered address for this entity"
 expected_verb = "entity.update"
 category = "direct"
 difficulty = "easy"
+expected_noun = "entity"
+expected_action = "update"
+ecir_path = "deterministic"
 
 [[test]]
 utterance = "resolve this placeholder to the real entity"
 expected_verb = "entity.resolve-placeholder"
 category = "direct"
 difficulty = "medium"
+ecir_path = "fallthrough"
 
 # ============================================================================
 # SCREENING DOMAIN -- KYC Screening (Sanctions, PEP, Adverse Media)
@@ -201,24 +247,28 @@ utterance = "run sanctions screening on this entity"
 expected_verb = "screening.sanctions"
 category = "direct"
 difficulty = "easy"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "check if they're on any sanctions lists"
 expected_verb = "screening.sanctions"
 category = "natural"
 difficulty = "medium"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "is this person a PEP?"
 expected_verb = "screening.pep"
 category = "natural"
 difficulty = "medium"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "check for politically exposed persons"
 expected_verb = "screening.pep"
 category = "natural"
 difficulty = "medium"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "run a full screening -- sanctions, PEP, and adverse media"
@@ -227,33 +277,41 @@ category = "multi_intent"
 difficulty = "hard"
 alt_verbs = ["screening.pep", "screening.adverse-media"]
 notes = "User wants all three - should at least match the first"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "any negative news about this company?"
 expected_verb = "screening.adverse-media"
 category = "natural"
 difficulty = "medium"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "do the AML checks"
 expected_verb = "screening.sanctions"
 category = "natural"
 difficulty = "hard"
+alt_verbs = ["screening.pep", "screening.adverse-media", "case-screening.run"]
 notes = "'AML checks' is vague - could be sanctions, PEP, or both"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "screen them"
 expected_verb = "screening.sanctions"
 category = "natural"
 difficulty = "hard"
+alt_verbs = ["case-screening.run", "screening.pep", "screening.adverse-media"]
 notes = "Very terse - needs context to disambiguate"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "has anyone flagged this entity before?"
 expected_verb = "screening.adverse-media"
 category = "indirect"
 difficulty = "expert"
+alt_verbs = ["red-flag.list-by-case", "red-flag.list-by-entity", "screening.sanctions"]
 notes = "Requires understanding 'flagged' in screening context"
+ecir_path = "fallthrough"
 
 # ============================================================================
 # UBO DOMAIN -- Beneficial Ownership
@@ -264,39 +322,48 @@ utterance = "who are the beneficial owners?"
 expected_verb = "ubo.list-ubos"
 category = "natural"
 difficulty = "medium"
+alt_verbs = ["control.identify-ubos", "ubo.list-owners"]
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "show me the ownership structure"
 expected_verb = "ubo.list-owners"
 category = "natural"
 difficulty = "medium"
+alt_verbs = ["control.build-graph", "ownership.trace-chain", "ownership.compute"]
 notes = "Collision risk: ubo.list-owners vs ownership.compute vs control.list-controllers"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "add an ownership stake -- Vanguard holds 25% of this entity"
 expected_verb = "ubo.add-ownership"
 category = "natural"
 difficulty = "medium"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "who controls this company?"
 expected_verb = "ubo.list-ubos"
 category = "natural"
 difficulty = "hard"
-alt_verbs = ["ownership.who-controls", "control.list-controllers"]
+alt_verbs = ["ownership.who-controls", "control.list-controllers", "control.identify-ubos", "control.compute-controllers", "control.build-graph"]
 notes = "Major collision point between ubo/ownership/control domains"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "add a control relationship -- board appointment"
 expected_verb = "ubo.add-control"
 category = "natural"
 difficulty = "medium"
+alt_verbs = ["control.add"]
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "calculate the UBOs for this CBU"
 expected_verb = "ubo.calculate"
 category = "direct"
 difficulty = "easy"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "trace the ownership chain from the top entity down"
@@ -304,6 +371,7 @@ expected_verb = "ubo.trace-chains"
 category = "natural"
 difficulty = "medium"
 alt_verbs = ["ownership.trace-chain"]
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "this person died last month"
@@ -311,6 +379,7 @@ expected_verb = "ubo.mark-deceased"
 category = "indirect"
 difficulty = "expert"
 notes = "Implied action from factual statement"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "the settlor appointed a new trustee"
@@ -318,12 +387,14 @@ expected_verb = "ubo.add-trust-role"
 category = "indirect"
 difficulty = "expert"
 notes = "Trust-specific language - must understand settlor/trustee vocabulary"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "waive the ownership verification -- low risk client"
 expected_verb = "ubo.waive-verification"
 category = "natural"
 difficulty = "medium"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "ownership was transferred from Parent Co to New Holdco"
@@ -331,6 +402,7 @@ expected_verb = "ubo.update-ownership"
 category = "indirect"
 difficulty = "hard"
 alt_verbs = ["ubo.convergence-supersede"]
+ecir_path = "fallthrough"
 
 # ============================================================================
 # FUND DOMAIN -- Fund Structures
@@ -341,18 +413,21 @@ utterance = "create an umbrella fund -- UCITS, Luxembourg domiciled"
 expected_verb = "fund.create-umbrella"
 category = "direct"
 difficulty = "easy"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "set up a new subfund under the umbrella"
 expected_verb = "fund.create-subfund"
 category = "natural"
 difficulty = "medium"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "add a share class -- accumulating, EUR denominated"
 expected_verb = "fund.create-share-class"
 category = "natural"
 difficulty = "medium"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "create a master-feeder structure"
@@ -361,24 +436,28 @@ category = "natural"
 difficulty = "hard"
 alt_verbs = ["fund.create-feeder"]
 notes = "Could mean either master or feeder creation"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "link the Cayman feeder to the Irish master"
 expected_verb = "fund.link-feeder"
 category = "natural"
 difficulty = "medium"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "what subfunds are in this umbrella?"
 expected_verb = "fund.list-subfunds"
 category = "natural"
 difficulty = "easy"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "show me all the share classes"
 expected_verb = "fund.list-share-classes"
 category = "natural"
 difficulty = "easy"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "BlackRock fund invests 30% NAV in the Vanguard fund"
@@ -386,18 +465,21 @@ expected_verb = "fund.add-investment"
 category = "indirect"
 difficulty = "expert"
 notes = "Must understand fund-of-funds cross-investment"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "who invests in this fund?"
 expected_verb = "fund.list-investors"
 category = "natural"
 difficulty = "medium"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "create a standalone fund -- AIF, Jersey"
 expected_verb = "fund.create-standalone"
 category = "direct"
 difficulty = "medium"
+ecir_path = "fallthrough"
 
 # ============================================================================
 # DOCUMENT DOMAIN
@@ -408,42 +490,53 @@ utterance = "what documents do we still need from this entity?"
 expected_verb = "document.missing-for-entity"
 category = "natural"
 difficulty = "medium"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "request the certificate of incorporation"
 expected_verb = "document.solicit"
 category = "natural"
 difficulty = "medium"
+expected_noun = "document"
+expected_action = "create"
+ecir_path = "narrow"
 
 [[test]]
 utterance = "upload the passport for John Smith"
 expected_verb = "document.upload-version"
 category = "direct"
 difficulty = "easy"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "verify this document"
 expected_verb = "document.verify"
 category = "direct"
 difficulty = "easy"
+expected_noun = "document"
+expected_action = "update"
+ecir_path = "narrow"
 
 [[test]]
 utterance = "reject the articles of association -- wrong entity name"
 expected_verb = "document.reject"
 category = "natural"
 difficulty = "medium"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "extract the data from this uploaded document"
 expected_verb = "document.extract"
 category = "direct"
 difficulty = "easy"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "what type of documents do we collect for limited companies?"
 expected_verb = "document.catalog"
 category = "indirect"
 difficulty = "hard"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "send out the whole doc pack for this entity"
@@ -451,6 +544,7 @@ expected_verb = "document.solicit-set"
 category = "natural"
 difficulty = "hard"
 notes = "'doc pack' -> solicit-set (batch solicitation)"
+ecir_path = "fallthrough"
 
 # ============================================================================
 # DEAL DOMAIN -- Deal Lifecycle
@@ -461,12 +555,16 @@ utterance = "create a new deal for Allianz"
 expected_verb = "deal.create"
 category = "direct"
 difficulty = "easy"
+expected_noun = "deal"
+expected_action = "create"
+ecir_path = "narrow"
 
 [[test]]
 utterance = "add BlackRock as a participant on this deal"
 expected_verb = "deal.add-participant"
 category = "direct"
 difficulty = "easy"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "what's the status of the deal?"
@@ -474,18 +572,21 @@ expected_verb = "deal.get"
 category = "natural"
 difficulty = "medium"
 alt_verbs = ["deal.summary"]
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "show me the deal timeline"
 expected_verb = "deal.timeline"
 category = "direct"
 difficulty = "easy"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "set up the rate card for custody services"
 expected_verb = "deal.create-rate-card"
 category = "natural"
 difficulty = "medium"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "add a fee line -- 2bps on AUM, quarterly"
@@ -493,36 +594,44 @@ expected_verb = "deal.add-rate-card-line"
 category = "natural"
 difficulty = "hard"
 notes = "Must understand 'bps on AUM' = rate card line"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "propose the rate card to the client"
 expected_verb = "deal.propose-rate-card"
 category = "natural"
 difficulty = "medium"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "the client wants to counter our pricing"
 expected_verb = "deal.counter-rate-card"
 category = "indirect"
 difficulty = "hard"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "move the deal to approved"
 expected_verb = "deal.update-status"
 category = "natural"
 difficulty = "medium"
+expected_noun = "deal"
+expected_action = "update"
+ecir_path = "narrow"
 
 [[test]]
 utterance = "kick off onboarding for this deal's products"
 expected_verb = "deal.request-onboarding"
 category = "natural"
 difficulty = "hard"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "cancel this deal -- client withdrew"
 expected_verb = "deal.cancel"
 category = "direct"
 difficulty = "easy"
+ecir_path = "fallthrough"
 
 # ============================================================================
 # GLEIF DOMAIN -- LEI / Corporate Hierarchy
@@ -533,36 +642,46 @@ utterance = "look up the LEI for HSBC"
 expected_verb = "gleif.search"
 category = "natural"
 difficulty = "medium"
+expected_noun = "gleif"
+expected_action = "search"
+ecir_path = "narrow"
 
 [[test]]
 utterance = "import the corporate hierarchy from GLEIF"
 expected_verb = "gleif.import-tree"
 category = "natural"
 difficulty = "medium"
+expected_noun = "gleif"
+expected_action = "import"
+ecir_path = "narrow"
 
 [[test]]
 utterance = "who is the parent company according to GLEIF?"
 expected_verb = "gleif.get-parent"
 category = "natural"
 difficulty = "medium"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "import all the managed funds for this asset manager"
 expected_verb = "gleif.import-managed-funds"
 category = "natural"
 difficulty = "medium"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "enrich the entity data from GLEIF"
 expected_verb = "gleif.enrich"
 category = "direct"
 difficulty = "easy"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "pull in the LEI hierarchy for this client group"
 expected_verb = "gleif.import-to-client-group"
 category = "natural"
 difficulty = "hard"
+ecir_path = "fallthrough"
 
 # ============================================================================
 # OWNERSHIP / CONTROL DOMAINS
@@ -573,19 +692,23 @@ utterance = "compute the ownership waterfall"
 expected_verb = "ownership.compute"
 category = "natural"
 difficulty = "medium"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "who ultimately controls this entity?"
 expected_verb = "ownership.who-controls"
 category = "natural"
 difficulty = "medium"
+alt_verbs = ["control.build-graph", "control.compute-controllers", "control.identify-ubos", "ubo.list-ubos", "control.list-controllers"]
 notes = "Collision: ownership.who-controls vs ubo.list-ubos vs control.list-controllers"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "reconcile the ownership percentages"
 expected_verb = "ownership.reconcile"
 category = "direct"
 difficulty = "easy"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "trace the chain from Vanguard down to the subfund"
@@ -593,24 +716,28 @@ expected_verb = "ownership.trace-chain"
 category = "natural"
 difficulty = "medium"
 alt_verbs = ["ubo.trace-chains"]
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "are there any gaps in the ownership structure?"
 expected_verb = "ownership.analyze-gaps"
 category = "natural"
 difficulty = "medium"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "who is the board-appointed controller?"
 expected_verb = "control.show-board-controller"
 category = "natural"
 difficulty = "hard"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "import the PSC register data"
 expected_verb = "control.import-psc-register"
 category = "natural"
 difficulty = "medium"
+ecir_path = "fallthrough"
 
 # ============================================================================
 # VIEW / SESSION DOMAIN -- Navigation
@@ -621,61 +748,73 @@ utterance = "show me everything"
 expected_verb = "view.universe"
 category = "natural"
 difficulty = "easy"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "load the Allianz book"
-expected_verb = "view.book"
+expected_verb = "session.load-cluster"
 category = "direct"
 difficulty = "easy"
+alt_verbs = ["view.book", "session.load-galaxy"]
+notes = "session.load-cluster is the canonical verb for loading a client book into scope"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "zoom into this node"
 expected_verb = "view.zoom-in"
 category = "direct"
 difficulty = "easy"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "go back"
 expected_verb = "view.back-to"
 category = "natural"
 difficulty = "easy"
-alt_verbs = ["view.zoom-out"]
+alt_verbs = ["view.zoom-out", "view.surface", "session.undo"]
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "load the Allianz cluster"
 expected_verb = "session.load-cluster"
 category = "direct"
 difficulty = "easy"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "switch to the BlackRock client"
 expected_verb = "session.set-client"
 category = "natural"
 difficulty = "medium"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "filter to UK entities only"
 expected_verb = "session.filter-jurisdiction"
 category = "natural"
 difficulty = "medium"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "load the deal"
 expected_verb = "session.load-deal"
 category = "direct"
 difficulty = "easy"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "show me the galaxy for Germany"
 expected_verb = "session.load-galaxy"
 category = "direct"
 difficulty = "easy"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "I want to work as a compliance officer"
 expected_verb = "session.set-persona"
 category = "indirect"
 difficulty = "hard"
+ecir_path = "fallthrough"
 
 # ============================================================================
 # CLIENT GROUP DOMAIN
@@ -686,36 +825,43 @@ utterance = "discover the entities in this client group"
 expected_verb = "client-group.discover-entities"
 category = "direct"
 difficulty = "easy"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "start the discovery process for this group"
 expected_verb = "client-group.start-discovery"
 category = "natural"
 difficulty = "medium"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "confirm this entity belongs to the group"
 expected_verb = "client-group.confirm-entity"
 category = "natural"
 difficulty = "medium"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "show me the relationships in this group"
 expected_verb = "client-group.list-relationships"
 category = "natural"
 difficulty = "easy"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "who are the parties in this group?"
 expected_verb = "client-group.parties"
 category = "natural"
 difficulty = "medium"
+alt_verbs = ["cbu.parties"]
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "search for entities matching 'Vanguard' in this group"
 expected_verb = "client-group.search"
 category = "natural"
 difficulty = "medium"
+ecir_path = "fallthrough"
 
 # ============================================================================
 # ADVERSARIAL / COLLISION TESTS
@@ -730,6 +876,7 @@ category = "adversarial"
 difficulty = "hard"
 alt_verbs = ["client-group.list-roles"]
 notes = "Ambiguous without entity context -- CBU vs client group roles"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "add a relationship"
@@ -738,6 +885,7 @@ category = "adversarial"
 difficulty = "hard"
 alt_verbs = ["ubo.add-ownership", "ubo.add-control"]
 notes = "Extremely vague -- relationship could be ownership, control, or group"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "verify it"
@@ -746,6 +894,7 @@ category = "adversarial"
 difficulty = "expert"
 alt_verbs = ["entity.verify", "control.reconcile-ownership", "cbu.verify-evidence"]
 notes = "'it' = anaphoric reference requiring session context"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "run the check"
@@ -754,22 +903,25 @@ category = "adversarial"
 difficulty = "expert"
 alt_verbs = ["screening.pep", "ownership.reconcile", "cbu.role.validate"]
 notes = "Extremely vague -- 'check' is overloaded"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "show the structure"
 expected_verb = "ubo.list-owners"
 category = "adversarial"
 difficulty = "hard"
-alt_verbs = ["fund.list-subfunds", "client-group.list-relationships", "ownership.compute"]
+alt_verbs = ["fund.list-subfunds", "client-group.list-relationships", "ownership.compute", "graph.view", "cbu.show", "control.build-graph"]
 notes = "'structure' = ownership? fund? corporate?"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "import the data"
 expected_verb = "gleif.import-tree"
 category = "adversarial"
 difficulty = "expert"
-alt_verbs = ["gleif.enrich", "control.import-psc-register", "bods.sync-from-gleif"]
+alt_verbs = ["gleif.enrich", "control.import-psc-register", "bods.sync-from-gleif", "research.sources.fetch", "bods.import"]
 notes = "'import data' could be any external data source"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "create a new one"
@@ -778,6 +930,7 @@ category = "adversarial"
 difficulty = "expert"
 alt_verbs = ["entity.create-limited-company", "fund.create-umbrella", "deal.create"]
 notes = "Completely ambiguous without context"
+ecir_path = "fallthrough"
 
 # ============================================================================
 # EXPERT DOMAIN LANGUAGE
@@ -791,6 +944,7 @@ expected_verb = "bods.find-by-lei"
 category = "natural"
 difficulty = "expert"
 notes = "BODS = Beneficial Ownership Data Standard"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "run the RBA assessment"
@@ -798,6 +952,7 @@ expected_verb = "screening.sanctions"
 category = "indirect"
 difficulty = "expert"
 notes = "RBA = Risk Based Approach -- implies full screening suite"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "check the PSC register"
@@ -805,6 +960,7 @@ expected_verb = "control.import-psc-register"
 category = "natural"
 difficulty = "expert"
 notes = "PSC = Persons with Significant Control (UK)"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "set up the NAV calc service"
@@ -812,6 +968,7 @@ expected_verb = "cbu.add-product"
 category = "indirect"
 difficulty = "expert"
 notes = "NAV calculation is a product/service -- maps to add-product"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "add the TA and fund accounting"
@@ -819,6 +976,7 @@ expected_verb = "cbu.add-product"
 category = "indirect"
 difficulty = "expert"
 notes = "TA = Transfer Agent -- a product/service"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "compute the 25% threshold test"
@@ -826,13 +984,16 @@ expected_verb = "ubo.calculate"
 category = "indirect"
 difficulty = "expert"
 notes = "25% threshold = UBO determination threshold under 4AMLD/5AMLD"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "flag the circular ownership"
 expected_verb = "ownership.reconcile"
 category = "indirect"
 difficulty = "expert"
+alt_verbs = ["ubo.trace-chains", "ownership.analyze-gaps"]
 notes = "Circular ownership detection is part of reconciliation"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "check for OFAC hits"
@@ -840,6 +1001,7 @@ expected_verb = "screening.sanctions"
 category = "natural"
 difficulty = "expert"
 notes = "OFAC = US sanctions body -- maps to sanctions screening"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "onboard the sub-custodian"
@@ -847,14 +1009,16 @@ expected_verb = "cbu.create"
 category = "natural"
 difficulty = "expert"
 notes = "Sub-custodian is an entity type in custody banking"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "KYC refresh for this entity"
 expected_verb = "screening.sanctions"
 category = "indirect"
 difficulty = "expert"
-alt_verbs = ["screening.pep", "screening.adverse-media", "document.missing-for-entity"]
+alt_verbs = ["screening.pep", "screening.adverse-media", "document.missing-for-entity", "kyc-case.reopen", "fund-investor.update-kyc-status"]
 notes = "KYC refresh = re-run all screenings + check doc currency"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "nominee structure -- need to pierce the veil"
@@ -862,6 +1026,7 @@ expected_verb = "ubo.trace-chains"
 category = "indirect"
 difficulty = "expert"
 notes = "Piercing the veil = looking through nominee to find real UBO"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "where's the CDD pack for this client?"
@@ -869,6 +1034,7 @@ expected_verb = "document.for-entity"
 category = "indirect"
 difficulty = "expert"
 notes = "CDD = Customer Due Diligence pack = document collection for entity"
+ecir_path = "fallthrough"
 
 # ============================================================================
 # AGENT / META COMMANDS
@@ -879,18 +1045,21 @@ utterance = "teach the system that 'spin up' means create CBU"
 expected_verb = "agent.teach"
 category = "direct"
 difficulty = "easy"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "undo"
 expected_verb = "session.undo"
 category = "direct"
 difficulty = "easy"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "what tools do you have?"
 expected_verb = "agent.list-tools"
 category = "natural"
 difficulty = "easy"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "switch to research mode"
@@ -898,18 +1067,22 @@ expected_verb = "agent.set-authoring-mode"
 category = "natural"
 difficulty = "medium"
 alt_verbs = ["agent.set-mode"]
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "confirm"
 expected_verb = "agent.confirm"
 category = "direct"
 difficulty = "easy"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "no, go back"
 expected_verb = "agent.reject"
 category = "natural"
 difficulty = "medium"
+alt_verbs = ["view.surface", "view.back-to", "view.zoom-out", "session.undo"]
+ecir_path = "fallthrough"
 
 # ============================================================================
 # CONTRACT / BILLING DOMAINS
@@ -920,6 +1093,9 @@ utterance = "create a master services agreement"
 expected_verb = "contract.create"
 category = "natural"
 difficulty = "medium"
+expected_noun = "contract"
+expected_action = "create"
+ecir_path = "narrow"
 
 [[test]]
 utterance = "add a billing schedule -- monthly in arrears"
@@ -927,6 +1103,7 @@ expected_verb = "billing.create-period"
 category = "natural"
 difficulty = "medium"
 notes = "billing.create-period is the closest verb for creating billing cycles"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "what's the fee for custody on this product?"
@@ -934,6 +1111,7 @@ expected_verb = "deal.list-rate-card-lines"
 category = "indirect"
 difficulty = "hard"
 notes = "Fee inquiry maps to rate card lines on the deal"
+ecir_path = "fallthrough"
 
 # ============================================================================
 # BOOKING PRINCIPAL DOMAIN
@@ -944,6 +1122,7 @@ utterance = "set up a booking principal for this deal"
 expected_verb = "booking-principal.create"
 category = "direct"
 difficulty = "medium"
+ecir_path = "fallthrough"
 
 [[test]]
 utterance = "which booking entity handles custody for Ireland?"
@@ -951,3 +1130,4 @@ expected_verb = "booking-principal.coverage-matrix"
 category = "natural"
 difficulty = "hard"
 notes = "Query about principal coverage by jurisdiction maps to coverage-matrix"
+ecir_path = "fallthrough"

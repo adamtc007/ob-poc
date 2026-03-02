@@ -25,6 +25,7 @@ domains:
           scope: global
           noun: research_decision
           tags: [write, workflow, audit-trail]
+          phase_tags: [onboarding]
         invocation_phrases:
           - "record research decision"
           - "log entity selection decision"
@@ -108,6 +109,7 @@ domains:
           scope: global
           noun: research_decision
           tags: [write, workflow, user-confirmation]
+          phase_tags: [onboarding]
         behavior: plugin
         handler: WorkflowConfirmDecisionOp
         args:
@@ -136,6 +138,7 @@ domains:
           scope: global
           noun: research_decision
           tags: [write, workflow, user-rejection]
+          phase_tags: [onboarding]
         behavior: plugin
         handler: WorkflowRejectDecisionOp
         args:
@@ -160,6 +163,7 @@ domains:
           scope: global
           noun: research_action
           tags: [write, workflow, audit-trail]
+          phase_tags: [onboarding]
         invocation_phrases:
           - "record research action taken"
           - "log import execution step"
@@ -261,6 +265,7 @@ domains:
           scope: global
           noun: research_correction
           tags: [write, workflow, correction]
+          phase_tags: [onboarding]
         behavior: crud
         crud:
           operation: insert
@@ -316,6 +321,7 @@ domains:
           scope: global
           noun: research_anomaly
           tags: [write, workflow, validation]
+          phase_tags: [onboarding]
         invocation_phrases:
           - "record data anomaly found"
           - "flag validation issue from import"
@@ -372,6 +378,7 @@ domains:
           scope: global
           noun: research_anomaly
           tags: [write, workflow, validation, resolution]
+          phase_tags: [onboarding]
         invocation_phrases:
           - "resolve the data anomaly"
           - "close out validation issue"
@@ -421,6 +428,7 @@ domains:
           scope: global
           noun: research_audit
           tags: [read, query, workflow, audit-trail]
+          phase_tags: [onboarding]
         behavior: plugin
         handler: WorkflowAuditTrailOp
         args:
@@ -472,6 +480,7 @@ domains:
           scope: global
           noun: supersession_trail
           tags: [read, query, workflow, audit-trail, correction, supersession]
+          phase_tags: [onboarding]
         behavior: plugin
         handler: WorkflowSupersessionTrailOp
         args:
@@ -496,6 +505,7 @@ domains:
           scope: global
           noun: research_decision
           tags: [read, query, workflow]
+          phase_tags: [onboarding]
         invocation_phrases:
           - "show pending research decisions"
           - "what decisions need my input"

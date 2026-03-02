@@ -9,6 +9,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: case_type
+          phase_tags: [kyc]
         invocation_phrases:
           - "add a new case type"
           - "register KYC case type"
@@ -61,6 +62,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: case_type
+          phase_tags: [kyc]
         invocation_phrases:
           - "look up case type by code"
           - "get case type details"
@@ -90,6 +92,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: case_type
+          phase_tags: [kyc]
         invocation_phrases:
           - "list all case types"
           - "show available case classifications"
@@ -120,6 +123,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: case_type
+          phase_tags: [kyc]
         invocation_phrases:
           - "deactivate a case type"
           - "disable this case classification"

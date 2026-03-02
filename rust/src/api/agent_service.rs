@@ -468,6 +468,7 @@ impl AgentService {
             self.learned_data.clone(),
             Arc::new(macro_reg),
             self.lexicon.clone(),
+            None, // noun_index not yet wired through AgentService
         )
     }
 

@@ -30,6 +30,7 @@ domains:
           source_of_truth: entity
           scope: cbu
           noun: ownership
+          phase_tags: [kyc]
         behavior: plugin
         plugin:
           handler: OwnershipComputeOp
@@ -84,6 +85,7 @@ domains:
           source_of_truth: entity
           scope: cbu
           noun: ownership
+          phase_tags: [kyc]
         behavior: plugin
         plugin:
           handler: OwnershipSnapshotListOp
@@ -148,6 +150,7 @@ domains:
           source_of_truth: entity
           scope: cbu
           noun: ownership
+          phase_tags: [kyc]
         behavior: crud
         crud:
           operation: select
@@ -184,6 +187,7 @@ domains:
           source_of_truth: entity
           scope: cbu
           noun: ownership
+          phase_tags: [kyc]
         behavior: plugin
         plugin:
           handler: OwnershipControlPositionsOp
@@ -248,6 +252,7 @@ domains:
           source_of_truth: entity
           scope: cbu
           noun: ownership
+          phase_tags: [kyc]
         behavior: plugin
         plugin:
           handler: OwnershipWhoControlsOp
@@ -289,6 +294,7 @@ domains:
           source_of_truth: entity
           scope: cbu
           noun: ownership
+          phase_tags: [kyc]
         behavior: crud
         crud:
           operation: insert
@@ -400,6 +406,7 @@ domains:
           source_of_truth: entity
           scope: cbu
           noun: ownership
+          phase_tags: [kyc]
         behavior: crud
         crud:
           operation: insert
@@ -527,6 +534,7 @@ domains:
           source_of_truth: entity
           scope: cbu
           noun: ownership
+          phase_tags: [kyc]
         behavior: crud
         crud:
           operation: update
@@ -563,6 +571,7 @@ domains:
           source_of_truth: entity
           scope: cbu
           noun: ownership
+          phase_tags: [kyc]
         behavior: crud
         crud:
           operation: list_by_fk
@@ -603,6 +612,7 @@ domains:
           source_of_truth: entity
           scope: cbu
           noun: ownership
+          phase_tags: [kyc]
         behavior: crud
         crud:
           operation: list_by_fk
@@ -647,6 +657,7 @@ domains:
           source_of_truth: entity
           scope: cbu
           noun: ownership
+          phase_tags: [kyc]
         behavior: plugin
         plugin:
           handler: OwnershipReconcileOp
@@ -719,6 +730,7 @@ domains:
           source_of_truth: entity
           scope: cbu
           noun: ownership
+          phase_tags: [kyc]
         behavior: plugin
         plugin:
           handler: OwnershipReconcileFindingsOp
@@ -776,6 +788,7 @@ domains:
           source_of_truth: entity
           scope: cbu
           noun: ownership
+          phase_tags: [kyc]
         behavior: crud
         crud:
           operation: update
@@ -828,6 +841,7 @@ domains:
           source_of_truth: entity
           scope: cbu
           noun: ownership
+          phase_tags: [kyc]
         behavior: crud
         crud:
           operation: list_by_fk
@@ -879,6 +893,7 @@ domains:
           source_of_truth: entity
           scope: cbu
           noun: ownership
+          phase_tags: [kyc]
         behavior: plugin
         plugin:
           handler: OwnershipAnalyzeGapsOp
@@ -925,6 +940,7 @@ domains:
           source_of_truth: entity
           scope: cbu
           noun: ownership
+          phase_tags: [kyc]
         behavior: plugin
         plugin:
           handler: OwnershipTraceChainOp

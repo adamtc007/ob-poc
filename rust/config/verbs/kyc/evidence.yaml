@@ -23,6 +23,7 @@ domains:
           scope: cbu
           noun: evidence
           tags: [evidence, create, kyc]
+          phase_tags: [kyc]
         behavior: plugin
         handler: EvidenceRequireOp
         args:
@@ -73,6 +74,7 @@ domains:
           scope: cbu
           noun: evidence
           tags: [evidence, document, link]
+          phase_tags: [kyc]
         behavior: plugin
         handler: EvidenceLinkOp
         args:
@@ -106,6 +108,7 @@ domains:
           scope: cbu
           noun: evidence
           tags: [evidence, verify, qa]
+          phase_tags: [kyc]
         behavior: plugin
         handler: EvidenceVerifyOp
         args:
@@ -137,6 +140,7 @@ domains:
           scope: cbu
           noun: evidence
           tags: [evidence, reject, qa]
+          phase_tags: [kyc]
         behavior: plugin
         handler: EvidenceRejectOp
         args:
@@ -164,6 +168,7 @@ domains:
           scope: cbu
           noun: evidence
           tags: [evidence, waive, override]
+          phase_tags: [kyc]
         behavior: plugin
         handler: EvidenceWaiveOp
         args:

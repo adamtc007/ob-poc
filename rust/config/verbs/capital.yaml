@@ -27,6 +27,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: capital
+          phase_tags: [onboarding]
         behavior: plugin
         plugin:
           handler: CapitalShareClassCreateOp
@@ -108,6 +109,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: capital
+          phase_tags: [onboarding]
         behavior: crud
         crud:
           operation: insert
@@ -170,6 +172,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: capital
+          phase_tags: [onboarding]
         behavior: crud
         crud:
           operation: list_by_fk
@@ -203,6 +206,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: capital
+          phase_tags: [onboarding]
         behavior: plugin
         plugin:
           handler: CapitalShareClassGetSupplyOp
@@ -239,6 +243,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: capital
+          phase_tags: [onboarding]
         behavior: plugin
         plugin:
           handler: CapitalIssueInitialOp
@@ -284,6 +289,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: capital
+          phase_tags: [onboarding]
         behavior: plugin
         plugin:
           handler: CapitalIssueNewOp
@@ -328,6 +334,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: capital
+          phase_tags: [onboarding]
         behavior: plugin
         plugin:
           handler: CapitalSplitOp
@@ -374,6 +381,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: capital
+          phase_tags: [onboarding]
         behavior: plugin
         plugin:
           handler: CapitalBuybackOp
@@ -415,6 +423,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: capital
+          phase_tags: [onboarding]
         behavior: plugin
         plugin:
           handler: CapitalCancelOp
@@ -460,6 +469,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: capital
+          phase_tags: [onboarding]
         behavior: plugin
         plugin:
           handler: CapitalDilutionGrantOptionsOp
@@ -539,6 +549,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: capital
+          phase_tags: [onboarding]
         behavior: plugin
         plugin:
           handler: CapitalDilutionIssueWarrantOp
@@ -601,6 +612,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: capital
+          phase_tags: [onboarding]
         behavior: plugin
         plugin:
           handler: CapitalDilutionCreateSafeOp
@@ -662,6 +674,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: capital
+          phase_tags: [onboarding]
         behavior: plugin
         plugin:
           handler: CapitalDilutionCreateConvertibleNoteOp
@@ -724,6 +737,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: capital
+          phase_tags: [onboarding]
         behavior: plugin
         plugin:
           handler: CapitalDilutionExerciseOp
@@ -768,6 +782,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: capital
+          phase_tags: [onboarding]
         behavior: plugin
         plugin:
           handler: CapitalDilutionForfeitOp
@@ -802,6 +817,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: capital
+          phase_tags: [onboarding]
         behavior: plugin
         plugin:
           handler: CapitalDilutionListOp
@@ -854,6 +870,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: capital
+          phase_tags: [onboarding]
         behavior: plugin
         plugin:
           handler: CapitalDilutionGetSummaryOp
@@ -886,6 +903,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: capital
+          phase_tags: [onboarding]
         behavior: crud
         crud:
           operation: upsert
@@ -974,6 +992,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: capital
+          phase_tags: [onboarding]
         behavior: crud
         crud:
           operation: select
@@ -1013,6 +1032,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: capital
+          phase_tags: [onboarding]
         behavior: plugin
         plugin:
           handler: CapitalCapTableOp
@@ -1061,6 +1081,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: capital
+          phase_tags: [onboarding]
         behavior: plugin
         plugin:
           handler: CapitalHoldersOp

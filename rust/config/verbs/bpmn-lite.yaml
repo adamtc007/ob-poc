@@ -14,6 +14,7 @@ domains:
         metadata:
           tier: composite
           source_of_truth: external
+          phase_tags: [monitoring]
         invocation_phrases:
           - "compile bpmn model"
           - "compile workflow"
@@ -33,6 +34,7 @@ domains:
         metadata:
           tier: composite
           source_of_truth: external
+          phase_tags: [monitoring]
         invocation_phrases:
           - "start bpmn process"
           - "start workflow instance"
@@ -56,6 +58,7 @@ domains:
         metadata:
           tier: composite
           source_of_truth: external
+          phase_tags: [monitoring]
         invocation_phrases:
           - "signal bpmn process"
           - "send workflow signal"
@@ -82,6 +85,7 @@ domains:
         metadata:
           tier: composite
           source_of_truth: external
+          phase_tags: [monitoring]
         invocation_phrases:
           - "cancel bpmn process"
           - "cancel workflow"
@@ -104,6 +108,7 @@ domains:
         metadata:
           tier: composite
           source_of_truth: external
+          phase_tags: [monitoring]
         invocation_phrases:
           - "inspect bpmn process"
           - "inspect workflow"

@@ -9,6 +9,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: subcustodian
+          phase_tags: [trading]
         invocation_phrases:
           - "add a subcustodian entry"
           - "register subcustodian for market"
@@ -88,6 +89,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: subcustodian
+          phase_tags: [trading]
         invocation_phrases:
           - "list subcustodians for market"
           - "show agent banks by exchange"
@@ -127,6 +129,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: subcustodian
+          phase_tags: [trading]
         invocation_phrases:
           - "find subcustodian for market"
           - "look up agent bank for currency"

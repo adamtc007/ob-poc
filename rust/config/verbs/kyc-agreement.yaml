@@ -12,6 +12,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: kyc_agreement
+          phase_tags: [kyc]
         invocation_phrases:
           - "create KYC service agreement"
           - "set up sponsor agreement"
@@ -89,6 +90,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: kyc_agreement
+          phase_tags: [kyc]
         invocation_phrases:
           - "show KYC agreement details"
           - "get service agreement"
@@ -122,6 +124,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: kyc_agreement
+          phase_tags: [kyc]
         invocation_phrases:
           - "list KYC agreements"
           - "show all service agreements"
@@ -156,6 +159,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: kyc_agreement
+          phase_tags: [kyc]
         invocation_phrases:
           - "update agreement status"
           - "change KYC agreement status"

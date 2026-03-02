@@ -30,6 +30,7 @@ domains:
           scope: global
           noun: outreach_request
           tags: [write, workflow, request-management]
+          phase_tags: [onboarding]
         behavior: crud
         crud:
           operation: insert
@@ -93,6 +94,7 @@ domains:
           scope: global
           noun: outreach_request
           tags: [write, workflow, status-update]
+          phase_tags: [onboarding]
         invocation_phrases:
           - "mark outreach as sent"
           - "flag request as dispatched"
@@ -128,6 +130,7 @@ domains:
           scope: global
           noun: outreach_request
           tags: [write, workflow, status-update]
+          phase_tags: [onboarding]
         invocation_phrases:
           - "send a reminder to counterparty"
           - "chase the client again"
@@ -168,6 +171,7 @@ domains:
           scope: global
           noun: outreach_response
           tags: [write, workflow, response-capture]
+          phase_tags: [onboarding]
         behavior: plugin
         handler: OutreachRecordResponseOp
         args:
@@ -199,6 +203,7 @@ domains:
           scope: global
           noun: outreach_request
           tags: [write, workflow, status-update]
+          phase_tags: [onboarding]
         invocation_phrases:
           - "close the outreach request"
           - "mark request as complete"
@@ -242,6 +247,7 @@ domains:
           scope: global
           noun: outreach_request
           tags: [read, query, workflow]
+          phase_tags: [onboarding]
         invocation_phrases:
           - "show pending outreach requests"
           - "what requests are still open"
@@ -286,6 +292,7 @@ domains:
           scope: global
           noun: outreach_request
           tags: [read, query, workflow, validation]
+          phase_tags: [onboarding]
         behavior: plugin
         handler: OutreachListOverdueOp
         args:
@@ -304,6 +311,7 @@ domains:
           scope: global
           noun: outreach_request
           tags: [read, query, workflow]
+          phase_tags: [onboarding]
         invocation_phrases:
           - "show outreach request details"
           - "get the disclosure request info"
@@ -344,6 +352,7 @@ domains:
           scope: global
           noun: outreach_plan
           tags: [write, workflow, plan-generation]
+          phase_tags: [onboarding]
         behavior: plugin
         plugin:
           handler: OutreachPlanGenerateOp

@@ -14,6 +14,7 @@ domains:
           scope: cbu
           noun: trust
           tags: [kyc]
+          phase_tags: [trading]
         invocation_phrases:
           - "record trust deed provision"
           - "add beneficiary provision to trust"
@@ -147,6 +148,7 @@ domains:
           scope: cbu
           noun: trust
           tags: [kyc]
+          phase_tags: [trading]
         invocation_phrases:
           - "update trust provision details"
           - "change discretion level on provision"
@@ -203,6 +205,7 @@ domains:
           scope: cbu
           noun: trust
           tags: [kyc]
+          phase_tags: [trading]
         invocation_phrases:
           - "revoke trust provision"
           - "end beneficiary entitlement"
@@ -240,6 +243,7 @@ domains:
           scope: cbu
           noun: trust
           tags: [kyc]
+          phase_tags: [trading]
         invocation_phrases:
           - "list trust deed provisions"
           - "show all provisions for trust"
@@ -283,6 +287,7 @@ domains:
           scope: cbu
           noun: trust
           tags: [kyc]
+          phase_tags: [trading]
         invocation_phrases:
           - "list provisions held by entity"
           - "what trust interests does this person hold"
@@ -328,6 +333,7 @@ domains:
           scope: cbu
           noun: trust
           tags: [kyc]
+          phase_tags: [trading]
         invocation_phrases:
           - "analyze trust control vectors"
           - "who controls this trust"
@@ -378,6 +384,7 @@ domains:
           scope: cbu
           noun: trust
           tags: [kyc]
+          phase_tags: [trading]
         invocation_phrases:
           - "identify trust UBOs"
           - "who are the beneficial owners"
@@ -429,6 +436,7 @@ domains:
           scope: cbu
           noun: trust
           tags: [kyc]
+          phase_tags: [trading]
         invocation_phrases:
           - "classify trust type"
           - "what type of trust is this"

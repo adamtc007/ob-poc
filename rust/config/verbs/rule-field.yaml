@@ -16,6 +16,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: rule_field
+          phase_tags: [stewardship]
         invocation_phrases:
           - "register rule field"
           - "add field to dictionary"
@@ -54,6 +55,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: rule_field
+          phase_tags: [stewardship]
         invocation_phrases:
           - "list rule fields"
           - "show field dictionary"

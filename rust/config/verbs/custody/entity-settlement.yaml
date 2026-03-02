@@ -9,6 +9,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: entity_settlement
+          phase_tags: [trading]
         invocation_phrases:
           - "set counterparty BIC code"
           - "assign settlement identity to entity"
@@ -65,6 +66,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: entity_settlement
+          phase_tags: [trading]
         invocation_phrases:
           - "add counterparty SSI"
           - "register settlement instruction for entity"
@@ -165,6 +167,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: entity_settlement
+          phase_tags: [trading]
         invocation_phrases:
           - "remove counterparty SSI"
           - "delete settlement instruction for entity"

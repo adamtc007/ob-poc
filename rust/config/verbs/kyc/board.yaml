@@ -15,6 +15,7 @@ domains:
           noun: board_member
           tags: [kyc]
           subject_kinds: [cbu, company]
+          phase_tags: [kyc]
         invocation_phrases:
           - "appoint director to board"
           - "add board member"
@@ -134,6 +135,7 @@ domains:
           noun: board_member
           tags: [kyc]
           subject_kinds: [cbu, company]
+          phase_tags: [kyc]
         invocation_phrases:
           - "remove director from board"
           - "record board resignation"
@@ -176,6 +178,7 @@ domains:
           noun: board_member
           tags: [kyc]
           subject_kinds: [cbu, company]
+          phase_tags: [kyc]
         invocation_phrases:
           - "show board composition"
           - "who sits on the board"
@@ -217,6 +220,7 @@ domains:
           noun: board_member
           tags: [kyc]
           subject_kinds: [cbu, company]
+          phase_tags: [kyc]
         invocation_phrases:
           - "where does this person sit"
           - "list board positions for person"
@@ -258,6 +262,7 @@ domains:
           noun: board_member
           tags: [kyc]
           subject_kinds: [cbu, company]
+          phase_tags: [kyc]
         invocation_phrases:
           - "grant board appointment right"
           - "record appointment power from SHA"
@@ -382,6 +387,7 @@ domains:
           noun: board_member
           tags: [kyc]
           subject_kinds: [cbu, company]
+          phase_tags: [kyc]
         invocation_phrases:
           - "revoke board appointment right"
           - "remove director nomination power"
@@ -424,6 +430,7 @@ domains:
           noun: board_member
           tags: [kyc]
           subject_kinds: [cbu, company]
+          phase_tags: [kyc]
         invocation_phrases:
           - "who has appointment rights"
           - "show board nomination powers"
@@ -465,6 +472,7 @@ domains:
           noun: board_member
           tags: [kyc]
           subject_kinds: [cbu, company]
+          phase_tags: [kyc]
         invocation_phrases:
           - "show rights held by entity"
           - "what appointment powers does it hold"
@@ -510,6 +518,7 @@ domains:
           noun: board_member
           tags: [kyc]
           subject_kinds: [cbu, company]
+          phase_tags: [kyc]
         invocation_phrases:
           - "analyze board control structure"
           - "who controls the board"

@@ -1,0 +1,607 @@
+# Noun Index — ECIR (Entity-Centric Intent Resolution)
+#
+# Maps domain nouns to verb candidates via three resolution paths:
+#   1. ExplicitMapping: action_verbs[action] → specific verb FQNs
+#   2. NounKeyMatch: noun_keys → verbs with matching metadata.noun
+#   3. SubjectKindMatch: entity_type_fqn → verbs with matching subject_kinds
+#
+# Each noun entry has:
+#   aliases          — exact-match canonical aliases (longest-match-first scanning)
+#   natural_aliases  — softer/fuzzy matches (broader recall, lower precision)
+#   entity_type_fqn  — entity type for subject_kinds fallback (optional)
+#   noun_keys        — maps to metadata.noun values on verbs
+#   action_verbs     — explicit action→verb FQN mappings (optional, highest priority)
+
+version: "1.0"
+
+nouns:
+  # =========================================================================
+  # CORE STRUCTURE
+  # =========================================================================
+
+  cbu:
+    aliases:
+      - cbu
+      - client business unit
+      - trading unit
+    natural_aliases:
+      - fund structure
+      - client unit
+      - business unit
+    entity_type_fqn: cbu
+    noun_keys:
+      - cbu
+      - cbu_role
+    action_verbs:
+      create: [cbu.create, cbu.ensure, cbu.create-from-client-group]
+      list: [cbu.list, cbu.show, cbu.list-evidence]
+      delete: [cbu.delete, cbu.delete-cascade]
+      update: [cbu.update]
+      assign: [cbu.assign-role, cbu.assign-entity-role]
+
+  entity:
+    aliases:
+      - entity
+      - company
+      - person
+      - organization
+      - legal entity
+    natural_aliases:
+      - corporate entity
+      - individual
+      - natural person
+      - legal person
+      - org
+      - firm
+      - party
+    entity_type_fqn: entity
+    noun_keys:
+      - entity
+    action_verbs:
+      create: [entity.create-limited-company, entity.create-proper-person, entity.create-trust-discretionary, entity.create-partnership-limited, entity.ensure-limited-company, entity.ensure-proper-person, entity.ensure-trust-discretionary, entity.ensure-partnership-limited]
+      list: [entity.list, entity.list-ghosts, entity.list-placeholders, entity.placeholder-summary]
+      search: [entity.search, entity.query, entity.identify]
+      update: [entity.update]
+      delete: [entity.delete]
+
+  fund:
+    aliases:
+      - fund
+      - umbrella
+      - subfund
+      - share class
+      - feeder fund
+      - master fund
+      - compartment
+    natural_aliases:
+      - investment fund
+      - fund vehicle
+      - sicav
+      - ucits
+      - pe fund
+      - hedge fund
+    entity_type_fqn: fund
+    noun_keys:
+      - fund
+      - share_class
+    action_verbs:
+      create: [fund.create-umbrella, fund.create-subfund, fund.create-share-class, fund.create-standalone, fund.ensure-umbrella, fund.ensure-subfund, fund.ensure-share-class, fund.create-master, fund.create-feeder]
+      list: [fund.list-subfunds, fund.list-share-classes, fund.list-feeders, fund.list-investments, fund.list-investors]
+
+  client-group:
+    aliases:
+      - client group
+      - book
+      - client book
+    natural_aliases:
+      - commercial client
+      - client portfolio
+      - client
+      - group
+    entity_type_fqn: client-group
+    noun_keys:
+      - client_group
+    action_verbs:
+      create: [client-group.entity-add, client-group.start-discovery]
+      list: [client-group.entity-list, client-group.tag-list, client-group.list-roles, client-group.list-relationships, client-group.list-unverified, client-group.list-discrepancies]
+      search: [client-group.search, client-group.discover-entities]
+
+  # =========================================================================
+  # KYC / COMPLIANCE
+  # =========================================================================
+
+  ubo:
+    aliases:
+      - ubo
+      - beneficial owner
+      - ultimate beneficial owner
+    natural_aliases:
+      - ownership structure
+      - who owns
+      - beneficial ownership
+      - owner
+    entity_type_fqn: entity
+    noun_keys:
+      - ubo
+    action_verbs:
+      create: [ubo.add-ownership, ubo.add-control, ubo.add-trust-role]
+      search: [ubo.calculate, ubo.trace-chains, ubo.compute-chains]
+      list: [ubo.list-owners, ubo.list-owned, ubo.list-ubos, ubo.list-by-subject]
+      delete: [ubo.end-ownership, ubo.end-control, ubo.end-trust-role, ubo.delete-ownership, ubo.delete-control, ubo.delete-trust-role]
+
+  kyc-case:
+    aliases:
+      - kyc case
+      - kyc
+      - compliance case
+    natural_aliases:
+      - know your customer
+      - due diligence
+      - aml case
+      - screening case
+    entity_type_fqn: kyc_case
+    noun_keys:
+      - kyc_case
+    action_verbs:
+      create: [kyc-case.create]
+      list: [kyc-case.list-by-cbu, kyc-case.read, kyc-case.state]
+      update: [kyc-case.update-status, kyc-case.escalate, kyc-case.assign, kyc-case.set-risk-rating, kyc-case.close, kyc-case.reopen]
+
+  screening:
+    aliases:
+      - screening
+      - sanctions screening
+      - sanctions
+    natural_aliases:
+      - ofac
+      - pep screening
+      - adverse media
+      - sanctions check
+      - watchlist
+    entity_type_fqn: entity
+    noun_keys:
+      - screening
+    action_verbs:
+      compute: [screening.pep, screening.sanctions, screening.adverse-media]
+
+  control:
+    aliases:
+      - control
+      - control chain
+      - control structure
+    natural_aliases:
+      - voting control
+      - control ownership
+      - chain of control
+    entity_type_fqn: control
+    noun_keys:
+      - control
+      - board_controller
+    action_verbs:
+      create: [control.add, control.build-graph, control.import-psc-register, control.import-gleif-control]
+      list: [control.list-controllers, control.list-controlled]
+      compute: [control.analyze, control.identify-ubos, control.trace-chain, control.reconcile-ownership, control.compute-controllers]
+
+  ownership:
+    aliases:
+      - ownership
+      - ownership chain
+      - ownership graph
+    natural_aliases:
+      - who owns what
+      - corporate ownership
+      - ownership structure
+      - ownership hierarchy
+    entity_type_fqn: ownership
+    noun_keys:
+      - ownership
+    action_verbs:
+      compute: [ownership.compute, ownership.reconcile, ownership.analyze-gaps, ownership.trace-chain, ownership.refresh]
+
+  # =========================================================================
+  # DEAL / COMMERCIAL
+  # =========================================================================
+
+  deal:
+    aliases:
+      - deal
+      - deal record
+      - commercial deal
+    natural_aliases:
+      - sales deal
+      - client deal
+      - engagement
+      - mandate deal
+    entity_type_fqn: deal
+    noun_keys:
+      - deal
+    action_verbs:
+      create: [deal.create, deal.create-rate-card]
+      list: [deal.list, deal.list-participants, deal.list-products, deal.list-contracts, deal.list-rate-cards, deal.list-slas, deal.list-documents, deal.list-onboarding-requests, deal.timeline]
+      update: [deal.update, deal.update-status]
+      search: [deal.search, deal.get, deal.summary]
+
+  contract:
+    aliases:
+      - contract
+      - legal contract
+      - agreement
+    natural_aliases:
+      - master agreement
+      - service agreement
+      - legal agreement
+      - msa
+    entity_type_fqn: contract
+    noun_keys:
+      - contract
+    action_verbs:
+      create: [contract.create, contract.create-rate-card, contract.add-product, contract.subscribe]
+      list: [contract.list, contract.list-products, contract.list-rate-cards, contract.list-subscriptions, contract.for-client]
+      update: [contract.update, contract.terminate]
+      delete: [contract.remove-product, contract.unsubscribe]
+
+  billing:
+    aliases:
+      - billing
+      - billing profile
+      - fee billing
+      - invoice
+    natural_aliases:
+      - fees
+      - charges
+      - billing period
+      - revenue
+    entity_type_fqn: billing-profile
+    noun_keys:
+      - billing_profile
+      - billing_period
+      - billing_account_target
+      - billing_revenue
+    action_verbs:
+      create: [billing.create-profile, billing.create-period]
+      list: [billing.list-profiles, billing.list-account-targets]
+      compute: [billing.calculate-period, billing.revenue-summary, billing.period-summary]
+
+  sla:
+    aliases:
+      - sla
+      - service level agreement
+      - service level
+    natural_aliases:
+      - service commitment
+      - performance target
+      - sla metric
+    entity_type_fqn: sla
+    noun_keys:
+      - sla
+    action_verbs:
+      create: [sla.commit, sla.bind-to-profile, sla.bind-to-service, sla.bind-to-resource, sla.bind-to-isda, sla.bind-to-csa]
+      list: [sla.list-templates, sla.list-commitments, sla.list-measurements, sla.list-open-breaches]
+
+  pricing-config:
+    aliases:
+      - pricing
+      - pricing config
+      - rate card
+      - fee schedule
+    natural_aliases:
+      - pricing model
+      - fee structure
+      - rate configuration
+      - pricing rule
+    entity_type_fqn: pricing-config
+    noun_keys:
+      - pricing_config
+    action_verbs:
+      create: [pricing-config.set, pricing-config.set-valuation-schedule, pricing-config.set-fallback-chain, pricing-config.set-stale-policy, pricing-config.set-nav-threshold]
+      list: [pricing-config.list, pricing-config.list-valuation-schedules, pricing-config.list-fallback-chains, pricing-config.list-stale-policies, pricing-config.list-nav-thresholds]
+
+  # =========================================================================
+  # TRADING / CUSTODY
+  # =========================================================================
+
+  trading-profile:
+    aliases:
+      - trading profile
+      - mandate
+      - trading mandate
+    natural_aliases:
+      - trading setup
+      - investment mandate
+      - trading configuration
+    entity_type_fqn: trading-profile
+    noun_keys:
+      - trading_matrix
+      - matrix_overlay
+      - trade_gateway
+    action_verbs:
+      create: [trading-profile.create, trading-profile.import]
+      list: [trading-profile.list, trading-profile.get]
+      update: [trading-profile.update]
+
+  isda:
+    aliases:
+      - isda
+      - isda agreement
+      - otc agreement
+    natural_aliases:
+      - isda master agreement
+      - derivatives agreement
+      - otc contract
+    entity_type_fqn: isda
+    noun_keys:
+      - isda
+    action_verbs:
+      create: [isda.create, isda.add-coverage, isda.add-csa]
+      list: [isda.list]
+      delete: [isda.remove-coverage, isda.remove-csa]
+
+  settlement:
+    aliases:
+      - settlement
+      - settlement chain
+      - ssi
+    natural_aliases:
+      - settlement instruction
+      - settlement route
+      - standard settlement
+    entity_type_fqn: settlement-chain
+    noun_keys:
+      - settlement_chain
+    action_verbs:
+      create: [settlement-chain.define-location, settlement-chain.create-chain, settlement-chain.add-hop, settlement-chain.set-location-preference, settlement-chain.set-cross-border]
+      list: [settlement-chain.list-locations, settlement-chain.list-chains, settlement-chain.list-hops, settlement-chain.list-location-preferences, settlement-chain.list-cross-border]
+      delete: [settlement-chain.deactivate-chain, settlement-chain.remove-hop, settlement-chain.deactivate-cross-border]
+
+  investor:
+    aliases:
+      - investor
+      - investor register
+      - shareholder
+    natural_aliases:
+      - investor record
+      - fund investor
+      - subscriber
+      - unitholder
+    entity_type_fqn: investor
+    noun_keys:
+      - investor
+      - investor_role_profile
+      - holding
+    action_verbs:
+      create: [investor.create, investor.ensure, investor.record-subscription]
+      list: [investor.list-by-cbu, investor.list-by-entity, investor.get-lifecycle-history, investor.count-by-state]
+
+  # =========================================================================
+  # RESEARCH
+  # =========================================================================
+
+  gleif:
+    aliases:
+      - gleif
+      - lei
+      - legal entity identifier
+    natural_aliases:
+      - lei lookup
+      - gleif lookup
+      - lei search
+      - gleif hierarchy
+    entity_type_fqn: entity
+    noun_keys:
+      - lei
+    action_verbs:
+      search: [gleif.lookup, gleif.search, gleif.enrich, gleif.resolve-successor]
+      import: [gleif.import-tree, gleif.import-managed-funds, gleif.import-to-client-group]
+
+  # =========================================================================
+  # DOCUMENTS & EVIDENCE
+  # =========================================================================
+
+  document:
+    aliases:
+      - document
+      - passport
+      - proof
+      - certificate
+    natural_aliases:
+      - evidence document
+      - identity document
+      - supporting document
+      - uploaded document
+    entity_type_fqn: document
+    noun_keys:
+      - document
+      - requirement
+    action_verbs:
+      create: [document.solicit, document.solicit-set, document.create]
+      list: [document.catalog, document.list-versions, document.for-entity, document.missing-for-entity]
+      update: [document.verify, document.reject, document.start-qa, document.upload-version]
+
+  # =========================================================================
+  # LIFECYCLE / MONITORING
+  # =========================================================================
+
+  lifecycle:
+    aliases:
+      - lifecycle
+      - lifecycle event
+    natural_aliases:
+      - lifecycle status
+      - event timeline
+      - status history
+    entity_type_fqn: lifecycle
+    noun_keys:
+      - lifecycle
+    action_verbs:
+      list: [lifecycle.list, lifecycle.list-by-instrument, lifecycle.read]
+      create: [lifecycle.provision, lifecycle.activate, lifecycle.suspend, lifecycle.close, lifecycle.reopen]
+
+  # =========================================================================
+  # ADMINISTRATION
+  # =========================================================================
+
+  team:
+    aliases:
+      - team
+      - team member
+      - membership
+    natural_aliases:
+      - user team
+      - group membership
+      - team assignment
+    entity_type_fqn: team
+    noun_keys:
+      - team
+    action_verbs:
+      create: [team.create, team.add-governance-member]
+      list: [team.list-members, team.list-cbus]
+      assign: [team.add-member, team.add-cbu-access, team.grant-service]
+      delete: [team.remove-member, team.remove-cbu-access, team.revoke-service, team.archive]
+
+  role:
+    aliases:
+      - role
+      - assignment
+      - role assignment
+    natural_aliases:
+      - entity role
+      - cbu role
+      - position
+    entity_type_fqn: cbu.role
+    noun_keys:
+      - cbu_role
+    action_verbs:
+      assign: [cbu.assign-role, cbu-role.assign, cbu-role.assign-ownership, cbu-role.assign-control, cbu-role.assign-fund-role, cbu-role.assign-service-provider, cbu-role.assign-signatory]
+      list: [cbu-role.list, cbu-role.validate]
+      delete: [cbu-role.remove]
+
+  # =========================================================================
+  # STEWARDSHIP / REGISTRY
+  # =========================================================================
+
+  attribute:
+    aliases:
+      - attribute
+      - field
+      - data attribute
+    natural_aliases:
+      - attribute definition
+      - data field
+      - column
+      - property
+    entity_type_fqn: attribute
+    noun_keys:
+      - attribute
+    action_verbs:
+      create: [registry.create-attribute]
+      list: [registry.list-attributes]
+      search: [registry.search]
+
+  graph:
+    aliases:
+      - graph
+      - entity graph
+      - relationship graph
+    natural_aliases:
+      - knowledge graph
+      - semantic graph
+      - network graph
+    entity_type_fqn: graph
+    noun_keys:
+      - graph
+    action_verbs:
+      list: [graph.list-edges]
+
+  # =========================================================================
+  # NAVIGATION / SESSION
+  # =========================================================================
+
+  session:
+    aliases:
+      - session
+    natural_aliases:
+      - current session
+      - active session
+      - working session
+    noun_keys:
+      - agent_session
+    action_verbs:
+      create: [session.create]
+      list: [session.list]
+
+  view:
+    aliases:
+      - view
+      - layout
+      - visualization
+    natural_aliases:
+      - current view
+      - display
+      - viewport
+    noun_keys:
+      - view_state
+    action_verbs:
+      list: [view.status]
+      update: [view.layout]
+
+  # =========================================================================
+  # CAPITAL / SHARE CLASSES
+  # =========================================================================
+
+  capital:
+    aliases:
+      - capital
+      - capital structure
+      - share capital
+    natural_aliases:
+      - equity capital
+      - authorized capital
+      - share issuance
+      - dilution
+    entity_type_fqn: capital
+    noun_keys:
+      - capital
+    action_verbs:
+      create: [capital.share-class-create, capital.issue-initial, capital.issue-new, capital.dilution-grant-options, capital.dilution-create-safe, capital.dilution-create-convertible-note]
+      list: [capital.share-class-list, capital.dilution-list, capital.cap-table, capital.holders]
+
+  # =========================================================================
+  # WORKFLOW / PROCESS
+  # =========================================================================
+
+  tollgate:
+    aliases:
+      - tollgate
+      - approval gate
+    natural_aliases:
+      - quality gate
+      - checkpoint
+      - milestone
+    entity_type_fqn: tollgate
+    noun_keys:
+      - tollgate
+    action_verbs:
+      compute: [tollgate.evaluate, tollgate.evaluate-gate, tollgate.get-decision-readiness, tollgate.get-metrics]
+      list: [tollgate.list-evaluations, tollgate.list-thresholds, tollgate.list-overrides]
+      update: [tollgate.set-threshold, tollgate.override, tollgate.expire-override]
+
+  # =========================================================================
+  # TAX & COMPLIANCE CONFIG
+  # =========================================================================
+
+  tax:
+    aliases:
+      - tax
+      - tax config
+      - tax configuration
+    natural_aliases:
+      - tax setup
+      - withholding tax
+      - tax rules
+    entity_type_fqn: tax-config
+    noun_keys:
+      - tax_config
+    action_verbs:
+      create: [tax-config.define-jurisdiction, tax-config.set-treaty-rate, tax-config.set-tax-status, tax-config.set-reclaim-config, tax-config.set-reporting]
+      list: [tax-config.list-jurisdictions, tax-config.list-treaty-rates, tax-config.list-tax-status, tax-config.list-reclaim-configs, tax-config.list-reporting]
+      delete: [tax-config.deactivate-reclaim]

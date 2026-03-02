@@ -9,6 +9,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: jurisdiction
+          phase_tags: [stewardship]
         invocation_phrases:
           - "add a new jurisdiction"
           - "register jurisdiction code"
@@ -73,6 +74,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: jurisdiction
+          phase_tags: [stewardship]
         invocation_phrases:
           - "look up jurisdiction by code"
           - "get jurisdiction details"
@@ -102,6 +104,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: jurisdiction
+          phase_tags: [stewardship]
         invocation_phrases:
           - "list all jurisdictions"
           - "show available jurisdictions"
@@ -136,6 +139,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: jurisdiction
+          phase_tags: [stewardship]
         invocation_phrases:
           - "delete a jurisdiction"
           - "remove jurisdiction record"

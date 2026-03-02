@@ -9,6 +9,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: client_type
+          phase_tags: [onboarding]
         invocation_phrases:
           - "add a new client type"
           - "register client classification"
@@ -61,6 +62,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: client_type
+          phase_tags: [onboarding]
         invocation_phrases:
           - "look up client type by code"
           - "get client type details"
@@ -90,6 +92,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: client_type
+          phase_tags: [onboarding]
         invocation_phrases:
           - "list all client types"
           - "show available client categories"
@@ -120,6 +123,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: client_type
+          phase_tags: [onboarding]
         invocation_phrases:
           - "deactivate a client type"
           - "disable this client classification"

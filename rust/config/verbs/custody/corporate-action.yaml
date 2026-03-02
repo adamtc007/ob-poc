@@ -18,6 +18,7 @@ domains:
           scope: global
           noun: ca_event_type
           tags: [reference-data, seeding]
+          phase_tags: [trading]
         invocation_phrases:
           - "define a corporate action type"
           - "add new CA event category"
@@ -79,6 +80,7 @@ domains:
           scope: global
           noun: ca_event_type
           tags: [read, reference-data]
+          phase_tags: [trading]
         invocation_phrases:
           - "list corporate action event types"
           - "show all CA categories"
@@ -125,6 +127,7 @@ domains:
           noun: ca_preference
           internal: true
           tags: [projection, materialize-target]
+          phase_tags: [trading]
         invocation_phrases:
           - "set CA processing preferences"
           - "configure corporate action elections"
@@ -215,6 +218,7 @@ domains:
           scope: cbu
           noun: ca_preference
           tags: [read, operational-state]
+          phase_tags: [trading]
         invocation_phrases:
           - "show CA preferences for CBU"
           - "list corporate action settings"
@@ -259,6 +263,7 @@ domains:
           noun: ca_preference
           internal: true
           tags: [projection, materialize-target]
+          phase_tags: [trading]
         invocation_phrases:
           - "remove CA preference"
           - "delete corporate action setting"
@@ -295,6 +300,7 @@ domains:
           noun: instruction_window
           internal: true
           tags: [projection, materialize-target]
+          phase_tags: [trading]
         invocation_phrases:
           - "set CA instruction deadline"
           - "configure election cutoff window"
@@ -383,6 +389,7 @@ domains:
           scope: cbu
           noun: instruction_window
           tags: [read, operational-state]
+          phase_tags: [trading]
         invocation_phrases:
           - "show CA instruction windows"
           - "list election deadline rules"
@@ -428,6 +435,7 @@ domains:
           noun: ca_ssi_mapping
           internal: true
           tags: [projection, materialize-target]
+          phase_tags: [trading]
         invocation_phrases:
           - "link SSI to corporate action"
           - "map CA payment to settlement route"
@@ -500,6 +508,7 @@ domains:
           scope: cbu
           noun: ca_ssi_mapping
           tags: [read, operational-state]
+          phase_tags: [trading]
         invocation_phrases:
           - "show CA SSI mappings"
           - "list corporate action settlement links"

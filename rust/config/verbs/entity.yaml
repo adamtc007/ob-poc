@@ -54,6 +54,7 @@ domains:
           scope: global
           noun: entity
           tags: [lifecycle, creation, onboarding]
+          phase_tags: [onboarding]
         produces:
           type: entity
           subtype: limited_company
@@ -111,6 +112,7 @@ domains:
           scope: global
           noun: entity
           tags: [lifecycle, creation, onboarding]
+          phase_tags: [onboarding]
         produces:
           type: entity
           subtype: proper_person
@@ -172,6 +174,7 @@ domains:
           scope: global
           noun: entity
           tags: [lifecycle, creation, onboarding]
+          phase_tags: [onboarding]
         produces:
           type: entity
           subtype: trust
@@ -233,6 +236,7 @@ domains:
           scope: global
           noun: entity
           tags: [lifecycle, creation, onboarding]
+          phase_tags: [onboarding]
         produces:
           type: entity
           subtype: partnership
@@ -295,6 +299,7 @@ domains:
           scope: global
           noun: entity
           tags: [lifecycle, upsert, onboarding]
+          phase_tags: [onboarding]
         produces:
           type: entity
           subtype: limited_company
@@ -358,6 +363,7 @@ domains:
           scope: global
           noun: entity
           tags: [lifecycle, upsert, onboarding]
+          phase_tags: [onboarding]
         produces:
           type: entity
           subtype: proper_person
@@ -420,6 +426,7 @@ domains:
           scope: global
           noun: entity
           tags: [lifecycle, upsert, onboarding]
+          phase_tags: [onboarding]
         produces:
           type: entity
           subtype: trust
@@ -482,6 +489,7 @@ domains:
           scope: global
           noun: entity
           tags: [lifecycle, upsert, onboarding]
+          phase_tags: [onboarding]
         produces:
           type: entity
           subtype: partnership
@@ -539,6 +547,7 @@ domains:
           source_of_truth: entity
           noun: entity
           tags: [query, onboarding]
+          phase_tags: [onboarding]
         crud:
           operation: select
           table: entities
@@ -576,6 +585,7 @@ domains:
           scope: global
           noun: entity
           tags: [lifecycle, modification, onboarding]
+          phase_tags: [onboarding]
         crud:
           operation: update
           table: entities
@@ -626,6 +636,7 @@ domains:
           scope: global
           noun: entity
           tags: [lifecycle, deletion, onboarding]
+          phase_tags: [onboarding]
         crud:
           operation: delete
           table: entities
@@ -663,6 +674,7 @@ domains:
           source_of_truth: entity
           noun: entity
           tags: [query, listing, onboarding]
+          phase_tags: [onboarding]
         crud:
           operation: select
           table: entities
@@ -709,6 +721,7 @@ domains:
           source_of_truth: entity
           noun: entity
           tags: [query, batch, onboarding]
+          phase_tags: [onboarding]
         plugin:
           handler: entity_query
         args:
@@ -758,6 +771,7 @@ domains:
           scope: global
           noun: entity
           tags: [lifecycle, ghost, creation, onboarding]
+          phase_tags: [onboarding]
         plugin:
           handler: entity_ghost
         produces:
@@ -806,6 +820,7 @@ domains:
           scope: global
           noun: entity
           tags: [lifecycle, ghost, identification, onboarding]
+          phase_tags: [onboarding]
         plugin:
           handler: entity_identify
         args:
@@ -867,6 +882,7 @@ domains:
           scope: global
           noun: entity
           tags: [lifecycle, ghost, verification, onboarding]
+          phase_tags: [onboarding]
         crud:
           operation: update
           table: entity_proper_persons
@@ -908,6 +924,7 @@ domains:
           source_of_truth: entity
           noun: entity
           tags: [query, ghost, listing, onboarding]
+          phase_tags: [onboarding]
         crud:
           operation: select
           table: entity_proper_persons
@@ -949,6 +966,7 @@ domains:
           scope: global
           noun: entity
           tags: [lifecycle, placeholder, macro, onboarding]
+          phase_tags: [onboarding]
         plugin:
           handler: entity_ensure_or_placeholder
         args:
@@ -1024,6 +1042,7 @@ domains:
           scope: global
           noun: entity
           tags: [lifecycle, placeholder, resolution, onboarding]
+          phase_tags: [onboarding]
         plugin:
           handler: entity_resolve_placeholder
         args:
@@ -1083,6 +1102,7 @@ domains:
           source_of_truth: entity
           noun: entity
           tags: [query, placeholder, listing, onboarding]
+          phase_tags: [onboarding]
         plugin:
           handler: entity_list_placeholders
         args:
@@ -1118,6 +1138,7 @@ domains:
           source_of_truth: entity
           noun: entity
           tags: [query, placeholder, stats, onboarding]
+          phase_tags: [onboarding]
         plugin:
           handler: entity_placeholder_summary
         args:

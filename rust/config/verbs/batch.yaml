@@ -9,6 +9,8 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: batch
+          subject_kinds: []
+          phase_tags: [administration]
         invocation_phrases:
           - "pause the batch"
           - "hold batch processing"
@@ -33,6 +35,8 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: batch
+          subject_kinds: []
+          phase_tags: [administration]
         invocation_phrases:
           - "resume the batch"
           - "continue batch processing"
@@ -57,6 +61,8 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: batch
+          subject_kinds: []
+          phase_tags: [administration]
         invocation_phrases:
           - "continue batch for more items"
           - "process next batch items"
@@ -86,6 +92,8 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: batch
+          subject_kinds: []
+          phase_tags: [administration]
         invocation_phrases:
           - "skip this batch item"
           - "skip current item"
@@ -114,6 +122,8 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: batch
+          subject_kinds: []
+          phase_tags: [administration]
         invocation_phrases:
           - "abort the batch"
           - "cancel batch processing"
@@ -142,6 +152,8 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: batch
+          subject_kinds: []
+          phase_tags: [administration]
         invocation_phrases:
           - "batch status"
           - "how is the batch doing"
@@ -166,6 +178,8 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: batch
+          subject_kinds: []
+          phase_tags: [administration]
         invocation_phrases:
           - "bulk add products to CBUs"
           - "add products to multiple structures"

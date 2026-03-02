@@ -78,6 +78,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: investor_role_profile
+          phase_tags: [trading]
         invocation_phrases:
           - "set investor role"
           - "classify holder"
@@ -245,6 +246,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: investor_role_profile
+          phase_tags: [trading]
         invocation_phrases:
           - "get investor role"
           - "check holder classification"
@@ -299,6 +301,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: investor_role_profile
+          phase_tags: [trading]
         invocation_phrases:
           - "historical investor role"
           - "investor role as of date"
@@ -349,6 +352,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: investor_role_profile
+          phase_tags: [trading]
         invocation_phrases:
           - "list investor roles for fund"
           - "show holder classifications"
@@ -399,6 +403,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: investor_role_profile
+          phase_tags: [trading]
         invocation_phrases:
           - "list roles for investor"
           - "how is holder classified everywhere"
@@ -439,6 +444,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: investor_role_profile
+          phase_tags: [trading]
         invocation_phrases:
           - "role profile history"
           - "classification changes"
@@ -497,6 +503,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: investor_role_profile
+          phase_tags: [trading]
         invocation_phrases:
           - "mark as nominee"
           - "classify as nominee"
@@ -560,6 +567,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: investor_role_profile
+          phase_tags: [trading]
         invocation_phrases:
           - "mark as fund of funds"
           - "mark as FoF"
@@ -626,6 +634,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: investor_role_profile
+          phase_tags: [trading]
         invocation_phrases:
           - "mark as master fund"
           - "mark as master pool"
@@ -698,6 +707,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: investor_role_profile
+          phase_tags: [trading]
         invocation_phrases:
           - "mark as end investor"
           - "terminal investor"

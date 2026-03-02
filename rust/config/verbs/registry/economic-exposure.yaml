@@ -87,6 +87,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: economic_exposure
+          phase_tags: [trading]
         invocation_phrases:
           - "compute economic exposure"
           - "calculate look-through"
@@ -175,6 +176,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: economic_exposure
+          phase_tags: [trading]
         invocation_phrases:
           - "economic exposure summary"
           - "ownership summary"
@@ -265,6 +267,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: issuer_control_config
+          phase_tags: [trading]
         invocation_phrases:
           - "set control thresholds"
           - "configure disclosure threshold"
@@ -360,6 +363,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: issuer_control_config
+          phase_tags: [trading]
         invocation_phrases:
           - "get control thresholds"
           - "read issuer config"

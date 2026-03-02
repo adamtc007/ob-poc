@@ -14,6 +14,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: cash_sweep
+          phase_tags: [trading]
         invocation_phrases:
           - "configure cash sweep"
           - "set up cash sweep"
@@ -125,6 +126,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: cash_sweep
+          phase_tags: [trading]
         invocation_phrases:
           - "link sweep to resource"
           - "connect sweep to cash resource"
@@ -165,6 +167,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: cash_sweep
+          phase_tags: [trading]
         invocation_phrases:
           - "list cash sweeps"
           - "show sweep configurations"
@@ -205,6 +208,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: cash_sweep
+          phase_tags: [trading]
         invocation_phrases:
           - "update sweep threshold"
           - "change cash sweep amount"
@@ -239,6 +243,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: cash_sweep
+          phase_tags: [trading]
         invocation_phrases:
           - "update sweep timing"
           - "change sweep schedule"
@@ -286,6 +291,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: cash_sweep
+          phase_tags: [trading]
         invocation_phrases:
           - "change sweep vehicle"
           - "switch to different STIF"
@@ -335,6 +341,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: cash_sweep
+          phase_tags: [trading]
         invocation_phrases:
           - "suspend cash sweep"
           - "pause sweep"
@@ -367,6 +374,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: cash_sweep
+          phase_tags: [trading]
         invocation_phrases:
           - "reactivate cash sweep"
           - "turn sweep back on"
@@ -399,6 +407,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: cash_sweep
+          phase_tags: [trading]
         invocation_phrases:
           - "remove cash sweep"
           - "delete sweep configuration"

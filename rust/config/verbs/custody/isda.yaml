@@ -10,6 +10,7 @@ domains:
           scope: cbu
           noun: isda
           internal: true
+          phase_tags: [trading]
         invocation_phrases:
           - "create ISDA master agreement"
           - "set up ISDA with counterparty"
@@ -74,6 +75,7 @@ domains:
           scope: cbu
           noun: isda
           internal: true
+          phase_tags: [trading]
         invocation_phrases:
           - "add product coverage to ISDA"
           - "extend ISDA to cover IRS"
@@ -133,6 +135,7 @@ domains:
           scope: cbu
           noun: isda
           internal: true
+          phase_tags: [trading]
         invocation_phrases:
           - "add CSA to ISDA agreement"
           - "attach credit support annex"
@@ -199,6 +202,7 @@ domains:
           scope: cbu
           noun: isda
           internal: true
+          phase_tags: [trading]
         invocation_phrases:
           - "remove product from ISDA"
           - "drop instrument class coverage"
@@ -228,6 +232,7 @@ domains:
           scope: cbu
           noun: isda
           internal: true
+          phase_tags: [trading]
         invocation_phrases:
           - "remove CSA from ISDA"
           - "detach credit support annex"
@@ -256,6 +261,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: isda
+          phase_tags: [trading]
         invocation_phrases:
           - "list ISDA agreements for CBU"
           - "show OTC master agreements"

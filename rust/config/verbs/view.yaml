@@ -51,6 +51,8 @@ domains:
           scope: global
           noun: view_state
           tags: [navigation, universe, filtering, data-management]
+          subject_kinds: []
+          phase_tags: [navigation]
         args:
           - name: client
             type: uuid
@@ -111,6 +113,8 @@ domains:
           scope: cbu
           noun: view_state
           tags: [navigation, book, client, data-management]
+          subject_kinds: []
+          phase_tags: [navigation]
         args:
           - name: client
             type: uuid
@@ -149,6 +153,8 @@ domains:
           scope: cbu
           noun: view_state
           tags: [navigation, focus, cbu, data-management]
+          subject_kinds: []
+          phase_tags: [navigation]
         args:
           - name: cbu-id
             type: uuid
@@ -195,6 +201,8 @@ domains:
           scope: global
           noun: view_state
           tags: [navigation, entity, filtering, data-management]
+          subject_kinds: []
+          phase_tags: [navigation]
         args:
           - name: entity-type
             type: string_list
@@ -239,6 +247,8 @@ domains:
           scope: global
           noun: view_state
           tags: [refinement, filtering, data-management]
+          subject_kinds: []
+          phase_tags: [navigation]
         args:
           - name: include
             type: object
@@ -282,6 +292,8 @@ domains:
           scope: global
           noun: view_state
           tags: [refinement, reset, data-management]
+          subject_kinds: []
+          phase_tags: [navigation]
         args: []
         returns:
           type: view_state
@@ -313,6 +325,8 @@ domains:
           scope: global
           noun: view_state
           tags: [selection, data-management]
+          subject_kinds: []
+          phase_tags: [navigation]
         args:
           - name: ids
             type: uuid_list
@@ -357,6 +371,8 @@ domains:
           scope: global
           noun: view_state
           tags: [visualization, layout, data-management]
+          subject_kinds: []
+          phase_tags: [navigation]
         args:
           - name: mode
             type: string
@@ -418,6 +434,8 @@ domains:
           scope: global
           noun: view_state
           tags: [navigation, fractal, zoom, data-management]
+          subject_kinds: []
+          phase_tags: [navigation]
         args:
           - name: node-id
             type: uuid
@@ -451,6 +469,8 @@ domains:
           scope: global
           noun: view_state
           tags: [navigation, fractal, zoom, data-management]
+          subject_kinds: []
+          phase_tags: [navigation]
         args: []
         returns:
           type: view_state
@@ -479,6 +499,8 @@ domains:
           scope: global
           noun: view_state
           tags: [navigation, fractal, breadcrumbs, data-management]
+          subject_kinds: []
+          phase_tags: [navigation]
         args:
           - name: depth
             type: integer
@@ -515,6 +537,8 @@ domains:
           scope: global
           noun: view_state
           tags: [navigation, fractal, breadcrumbs, introspection, data-management]
+          subject_kinds: []
+          phase_tags: [navigation]
         args: []
         returns:
           type: object
@@ -543,6 +567,8 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: view
+          subject_kinds: []
+          phase_tags: [navigation]
         behavior: plugin
         plugin:
           handler: ViewStatusOp
@@ -569,6 +595,8 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: view
+          subject_kinds: []
+          phase_tags: [navigation]
         behavior: plugin
         plugin:
           handler: ViewSelectionInfoOp

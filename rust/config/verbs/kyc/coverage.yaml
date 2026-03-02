@@ -28,6 +28,8 @@ domains:
           scope: global
           noun: coverage
           tags: [kyc]
+          subject_kinds: []
+          phase_tags: [stewardship]
         behavior: plugin
         plugin:
           handler: CoverageComputeOp

@@ -20,6 +20,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: service_availability
+          phase_tags: [trading]
         invocation_phrases:
           - "set service availability"
           - "configure availability"
@@ -66,6 +67,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: service_availability
+          phase_tags: [trading]
         invocation_phrases:
           - "list service availability"
           - "show availability"
@@ -87,6 +89,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: service_availability
+          phase_tags: [trading]
         invocation_phrases:
           - "availability by principal"
           - "principal service availability"

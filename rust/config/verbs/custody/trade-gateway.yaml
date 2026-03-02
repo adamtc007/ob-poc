@@ -14,6 +14,7 @@ domains:
           source_of_truth: matrix
           scope: cbu
           noun: trade_gateway
+          phase_tags: [trading]
         invocation_phrases:
           - "define a new trade gateway"
           - "register SWIFT FIN connectivity"
@@ -81,6 +82,7 @@ domains:
           source_of_truth: matrix
           scope: cbu
           noun: trade_gateway
+          phase_tags: [trading]
         invocation_phrases:
           - "show gateway definition details"
           - "read trade gateway configuration"
@@ -117,6 +119,7 @@ domains:
           source_of_truth: matrix
           scope: cbu
           noun: trade_gateway
+          phase_tags: [trading]
         invocation_phrases:
           - "list available trade gateways"
           - "show all configured gateways"
@@ -157,6 +160,7 @@ domains:
           source_of_truth: matrix
           scope: cbu
           noun: trade_gateway
+          phase_tags: [trading]
         invocation_phrases:
           - "enable gateway for this CBU"
           - "connect fund to SWIFT gateway"
@@ -245,6 +249,7 @@ domains:
           source_of_truth: matrix
           scope: cbu
           noun: trade_gateway
+          phase_tags: [trading]
         invocation_phrases:
           - "activate gateway connectivity"
           - "go live on trade gateway"
@@ -283,6 +288,7 @@ domains:
           source_of_truth: matrix
           scope: cbu
           noun: trade_gateway
+          phase_tags: [trading]
         invocation_phrases:
           - "suspend gateway connectivity"
           - "pause trade routing via gateway"
@@ -324,6 +330,7 @@ domains:
           source_of_truth: matrix
           scope: cbu
           noun: trade_gateway
+          phase_tags: [trading]
         invocation_phrases:
           - "list gateway connections for CBU"
           - "show CBU trade connectivity status"
@@ -370,6 +377,7 @@ domains:
           source_of_truth: matrix
           scope: cbu
           noun: trade_gateway
+          phase_tags: [trading]
         invocation_phrases:
           - "add trade routing rule for CBU"
           - "route equity trades through SWIFT gateway"
@@ -475,6 +483,7 @@ domains:
           source_of_truth: matrix
           scope: cbu
           noun: trade_gateway
+          phase_tags: [trading]
         invocation_phrases:
           - "list trade routing rules for CBU"
           - "show settlement routing configuration"
@@ -522,6 +531,7 @@ domains:
           source_of_truth: matrix
           scope: cbu
           noun: trade_gateway
+          phase_tags: [trading]
         invocation_phrases:
           - "remove trade routing rule"
           - "delete gateway routing entry"
@@ -555,6 +565,7 @@ domains:
           source_of_truth: matrix
           scope: cbu
           noun: trade_gateway
+          phase_tags: [trading]
         invocation_phrases:
           - "set fallback gateway for CBU"
           - "configure backup settlement route"
@@ -636,6 +647,7 @@ domains:
           source_of_truth: matrix
           scope: cbu
           noun: trade_gateway
+          phase_tags: [trading]
         invocation_phrases:
           - "list fallback gateway configurations"
           - "show backup settlement routes for CBU"

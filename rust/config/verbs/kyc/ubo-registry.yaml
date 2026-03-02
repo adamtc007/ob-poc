@@ -23,6 +23,7 @@ domains:
           scope: cbu
           noun: ubo_registry
           tags: [ubo, registry, lifecycle, kyc]
+          phase_tags: [kyc]
         behavior: plugin
         handler: UboRegistryPromoteOp
         args:
@@ -50,6 +51,7 @@ domains:
           scope: cbu
           noun: ubo_registry
           tags: [ubo, registry, lifecycle, kyc]
+          phase_tags: [kyc]
         behavior: plugin
         handler: UboRegistryAdvanceOp
         args:
@@ -87,6 +89,7 @@ domains:
           scope: cbu
           noun: ubo_registry
           tags: [ubo, registry, waiver]
+          phase_tags: [kyc]
         behavior: plugin
         handler: UboRegistryWaiveOp
         args:
@@ -118,6 +121,7 @@ domains:
           scope: cbu
           noun: ubo_registry
           tags: [ubo, registry, terminal]
+          phase_tags: [kyc]
         behavior: plugin
         handler: UboRegistryRejectOp
         args:
@@ -144,6 +148,7 @@ domains:
           scope: cbu
           noun: ubo_registry
           tags: [ubo, registry, terminal]
+          phase_tags: [kyc]
         behavior: plugin
         handler: UboRegistryExpireOp
         args:

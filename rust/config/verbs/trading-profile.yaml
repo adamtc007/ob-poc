@@ -32,6 +32,7 @@ domains:
           scope: cbu
           noun: trading_matrix
           tags: [lifecycle, authoring]
+          phase_tags: [trading]
         args:
           - name: cbu-id
             type: uuid
@@ -96,6 +97,7 @@ domains:
           scope: cbu
           noun: trading_matrix
           tags: [read]
+          phase_tags: [trading]
         crud:
           operation: select
           table: cbu_trading_profiles
@@ -129,6 +131,7 @@ domains:
           scope: cbu
           noun: trading_matrix
           tags: [read, lookup]
+          phase_tags: [trading]
         args:
           - name: cbu-id
             type: uuid
@@ -162,6 +165,7 @@ domains:
           scope: cbu
           noun: trading_matrix
           tags: [read, versioning]
+          phase_tags: [trading]
         crud:
           operation: list_by_fk
           table: cbu_trading_profiles
@@ -202,6 +206,7 @@ domains:
           scope: cbu
           noun: trading_matrix
           tags: [lifecycle, activation]
+          phase_tags: [trading]
         args:
           - name: profile-id
             type: uuid
@@ -236,6 +241,7 @@ domains:
           writes_operational: true
           noun: trading_matrix
           tags: [projection, sync, critical]
+          phase_tags: [trading]
         lifecycle:
           writes_tables:
             - custody.cbu_instrument_universe
@@ -287,6 +293,7 @@ domains:
           scope: cbu
           noun: trading_matrix
           tags: [read, versioning, comparison]
+          phase_tags: [trading]
         args:
           - name: profile-id-1
             type: uuid
@@ -326,6 +333,7 @@ domains:
           scope: cbu
           noun: trading_matrix
           tags: [lifecycle, authoring]
+          phase_tags: [trading]
         args:
           - name: cbu-id
             type: uuid
@@ -366,6 +374,7 @@ domains:
           scope: cbu
           noun: trading_matrix
           tags: [lifecycle, authoring, cloning]
+          phase_tags: [trading]
         args:
           - name: profile-id
             type: uuid
@@ -424,6 +433,7 @@ domains:
           scope: cbu
           noun: trading_matrix
           tags: [lifecycle, authoring, versioning]
+          phase_tags: [trading]
         args:
           - name: cbu-id
             type: uuid
@@ -478,6 +488,7 @@ domains:
           scope: cbu
           noun: universe
           tags: [authoring, universe]
+          phase_tags: [trading]
         args:
           - name: profile-id
             type: uuid
@@ -529,6 +540,7 @@ domains:
           scope: cbu
           noun: universe
           tags: [authoring, universe]
+          phase_tags: [trading]
         args:
           - name: profile-id
             type: uuid
@@ -562,6 +574,7 @@ domains:
           scope: cbu
           noun: universe
           tags: [authoring, universe, market]
+          phase_tags: [trading]
         args:
           - name: profile-id
             type: uuid
@@ -607,6 +620,7 @@ domains:
           scope: cbu
           noun: universe
           tags: [authoring, universe, market]
+          phase_tags: [trading]
         args:
           - name: profile-id
             type: uuid
@@ -644,6 +658,7 @@ domains:
           scope: cbu
           noun: trading_matrix
           tags: [authoring, currency]
+          phase_tags: [trading]
         args:
           - name: profile-id
             type: uuid
@@ -675,6 +690,7 @@ domains:
           scope: cbu
           noun: trading_matrix
           tags: [authoring, currency]
+          phase_tags: [trading]
         args:
           - name: profile-id
             type: uuid
@@ -708,6 +724,7 @@ domains:
           scope: cbu
           noun: ssi
           tags: [authoring, ssi]
+          phase_tags: [trading]
         args:
           - name: profile-id
             type: uuid
@@ -769,6 +786,7 @@ domains:
           scope: cbu
           noun: ssi
           tags: [authoring, ssi]
+          phase_tags: [trading]
         args:
           - name: profile-id
             type: uuid
@@ -804,6 +822,7 @@ domains:
           scope: cbu
           noun: booking_rule
           tags: [authoring, booking-rules]
+          phase_tags: [trading]
         args:
           - name: profile-id
             type: uuid
@@ -868,6 +887,7 @@ domains:
           scope: cbu
           noun: booking_rule
           tags: [authoring, booking-rules]
+          phase_tags: [trading]
         args:
           - name: profile-id
             type: uuid
@@ -909,6 +929,7 @@ domains:
           scope: cbu
           noun: isda
           tags: [authoring, isda, otc]
+          phase_tags: [trading]
         args:
           - name: profile-id
             type: uuid
@@ -960,6 +981,7 @@ domains:
           scope: cbu
           noun: isda
           tags: [authoring, isda, otc]
+          phase_tags: [trading]
         args:
           - name: profile-id
             type: uuid
@@ -1003,6 +1025,7 @@ domains:
           scope: cbu
           noun: csa
           tags: [authoring, csa, otc, collateral]
+          phase_tags: [trading]
         args:
           - name: profile-id
             type: uuid
@@ -1058,6 +1081,7 @@ domains:
           scope: cbu
           noun: csa
           tags: [authoring, csa, collateral]
+          phase_tags: [trading]
         args:
           - name: profile-id
             type: uuid
@@ -1108,6 +1132,7 @@ domains:
           scope: cbu
           noun: csa
           tags: [authoring, csa, ssi, collateral]
+          phase_tags: [trading]
         args:
           - name: profile-id
             type: uuid
@@ -1143,6 +1168,7 @@ domains:
           scope: cbu
           noun: isda
           tags: [authoring, isda, otc]
+          phase_tags: [trading]
         args:
           - name: profile-id
             type: uuid
@@ -1177,6 +1203,7 @@ domains:
           scope: cbu
           noun: csa
           tags: [authoring, csa, otc]
+          phase_tags: [trading]
         args:
           - name: profile-id
             type: uuid
@@ -1218,6 +1245,7 @@ domains:
           scope: cbu
           noun: im_mandate
           tags: [authoring, investment-manager]
+          phase_tags: [trading]
         args:
           - name: profile-id
             type: uuid
@@ -1286,6 +1314,7 @@ domains:
           scope: cbu
           noun: im_mandate
           tags: [authoring, investment-manager]
+          phase_tags: [trading]
         args:
           - name: profile-id
             type: uuid
@@ -1326,6 +1355,7 @@ domains:
           scope: cbu
           noun: im_mandate
           tags: [authoring, investment-manager]
+          phase_tags: [trading]
         args:
           - name: profile-id
             type: uuid
@@ -1359,6 +1389,7 @@ domains:
           scope: cbu
           noun: trading_matrix
           tags: [validation, readiness-check]
+          phase_tags: [trading]
         args:
           - name: profile-id
             type: uuid
@@ -1393,6 +1424,7 @@ domains:
           scope: cbu
           noun: universe
           tags: [validation, coverage-check]
+          phase_tags: [trading]
         args:
           - name: profile-id
             type: uuid
@@ -1433,6 +1465,7 @@ domains:
           scope: cbu
           noun: trading_matrix
           tags: [lifecycle, state-transition]
+          phase_tags: [trading]
         args:
           - name: profile-id
             type: uuid
@@ -1470,6 +1503,7 @@ domains:
           scope: cbu
           noun: trading_matrix
           tags: [lifecycle, state-transition, activation]
+          phase_tags: [trading]
         args:
           - name: profile-id
             type: uuid
@@ -1507,6 +1541,7 @@ domains:
           scope: cbu
           noun: trading_matrix
           tags: [lifecycle, state-transition]
+          phase_tags: [trading]
         args:
           - name: profile-id
             type: uuid
@@ -1544,6 +1579,7 @@ domains:
           scope: cbu
           noun: trading_matrix
           tags: [lifecycle, state-transition, soft-delete]
+          phase_tags: [trading]
         args:
           - name: profile-id
             type: uuid
@@ -1585,6 +1621,7 @@ domains:
           scope: cbu
           noun: corporate_actions
           tags: [authoring, ca-policy]
+          phase_tags: [trading]
         args:
           - name: profile-id
             type: uuid
@@ -1621,6 +1658,7 @@ domains:
           scope: cbu
           noun: corporate_actions
           tags: [authoring, ca-policy]
+          phase_tags: [trading]
         args:
           - name: profile-id
             type: uuid
@@ -1653,6 +1691,7 @@ domains:
           scope: cbu
           noun: corporate_actions
           tags: [authoring, ca-policy]
+          phase_tags: [trading]
         args:
           - name: profile-id
             type: uuid
@@ -1694,6 +1733,7 @@ domains:
           scope: cbu
           noun: corporate_actions
           tags: [authoring, ca-policy]
+          phase_tags: [trading]
         args:
           - name: profile-id
             type: uuid
@@ -1739,6 +1779,7 @@ domains:
           scope: cbu
           noun: corporate_actions
           tags: [authoring, ca-policy]
+          phase_tags: [trading]
         args:
           - name: profile-id
             type: uuid
@@ -1781,6 +1822,7 @@ domains:
           scope: cbu
           noun: corporate_actions
           tags: [authoring, ca-policy]
+          phase_tags: [trading]
         args:
           - name: profile-id
             type: uuid
@@ -1812,6 +1854,7 @@ domains:
           scope: cbu
           noun: corporate_actions
           tags: [authoring, ca-policy]
+          phase_tags: [trading]
         args:
           - name: profile-id
             type: uuid
@@ -1866,6 +1909,7 @@ domains:
           scope: cbu
           noun: corporate_actions
           tags: [authoring, ca-policy]
+          phase_tags: [trading]
         args:
           - name: profile-id
             type: uuid
@@ -1900,6 +1944,7 @@ domains:
           scope: cbu
           noun: corporate_actions
           tags: [authoring, ca-policy, ssi]
+          phase_tags: [trading]
         args:
           - name: profile-id
             type: uuid
@@ -1943,6 +1988,7 @@ domains:
           scope: cbu
           noun: corporate_actions
           tags: [authoring, ca-policy, ssi]
+          phase_tags: [trading]
         args:
           - name: profile-id
             type: uuid
@@ -1980,6 +2026,7 @@ domains:
           scope: cbu
           noun: corporate_actions
           tags: [read, ca-policy]
+          phase_tags: [trading]
         args:
           - name: profile-id
             type: uuid

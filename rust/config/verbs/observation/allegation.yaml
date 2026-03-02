@@ -9,6 +9,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: allegation
+          phase_tags: [kyc]
         invocation_phrases:
           - "record client allegation"
           - "log new allegation for entity"
@@ -102,6 +103,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: allegation
+          phase_tags: [kyc]
         invocation_phrases:
           - "verify client allegation"
           - "confirm allegation with evidence"
@@ -158,6 +160,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: allegation
+          phase_tags: [kyc]
         invocation_phrases:
           - "contradict client allegation"
           - "mark allegation as false"
@@ -214,6 +217,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: allegation
+          phase_tags: [kyc]
         invocation_phrases:
           - "partially verify allegation"
           - "mark allegation as partial"
@@ -266,6 +270,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: allegation
+          phase_tags: [kyc]
         invocation_phrases:
           - "list allegations for entity"
           - "show entity allegations"
@@ -304,6 +309,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: allegation
+          phase_tags: [kyc]
         invocation_phrases:
           - "list pending allegations"
           - "show unverified allegations"

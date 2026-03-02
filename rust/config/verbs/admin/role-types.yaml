@@ -12,6 +12,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: role_types
+          phase_tags: [administration]
         invocation_phrases:
           - "list role types"
           - "show all role types"
@@ -47,6 +48,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: role_types
+          phase_tags: [administration]
         invocation_phrases:
           - "get role type details"
           - "show role type by code"
@@ -76,6 +78,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: role_types
+          phase_tags: [administration]
         invocation_phrases:
           - "create a role type"
           - "add new role type"
@@ -150,6 +153,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: role_types
+          phase_tags: [administration]
         invocation_phrases:
           - "update role type"
           - "modify role type settings"
@@ -199,6 +203,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: role_types
+          phase_tags: [administration]
         invocation_phrases:
           - "deactivate role type"
           - "disable a role type"

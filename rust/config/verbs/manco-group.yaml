@@ -28,6 +28,7 @@ domains:
           scope: global
           noun: cbu_group
           tags: [governance, compute, batch]
+          phase_tags: [onboarding]
         args:
           - name: as-of
             type: date
@@ -58,6 +59,7 @@ domains:
           scope: global
           noun: cbu_group
           tags: [read, query]
+          phase_tags: [onboarding]
         crud:
           operation: select
           table: v_manco_group_summary
@@ -103,6 +105,7 @@ domains:
           scope: global
           noun: cbu
           tags: [read, query]
+          phase_tags: [onboarding]
         args:
           - name: manco-entity-id
             type: uuid
@@ -133,6 +136,7 @@ domains:
           scope: global
           noun: cbu_group
           tags: [read, query]
+          phase_tags: [onboarding]
         args:
           - name: cbu-id
             type: uuid
@@ -167,6 +171,7 @@ domains:
           scope: global
           noun: governance_controller
           tags: [read, query, control]
+          phase_tags: [onboarding]
         args:
           - name: issuer-entity-id
             type: uuid
@@ -219,6 +224,7 @@ domains:
           scope: global
           noun: control_chain
           tags: [read, query, ubo]
+          phase_tags: [onboarding]
         args:
           - name: manco-entity-id
             type: uuid
@@ -257,6 +263,7 @@ domains:
           scope: global
           noun: cbu_group
           tags: [lifecycle, write]
+          phase_tags: [onboarding]
         crud:
           operation: insert
           table: cbu_groups
@@ -332,6 +339,7 @@ domains:
           scope: global
           noun: group_membership
           tags: [lifecycle, write]
+          phase_tags: [onboarding]
         crud:
           operation: upsert
           table: cbu_group_members
@@ -389,6 +397,7 @@ domains:
           scope: global
           noun: group_membership
           tags: [lifecycle, write]
+          phase_tags: [onboarding]
         crud:
           operation: update
           table: cbu_group_members
@@ -430,6 +439,7 @@ domains:
           scope: global
           noun: book_summary
           tags: [read, composite]
+          phase_tags: [onboarding]
         args:
           - name: manco-entity-id
             type: uuid
@@ -473,6 +483,7 @@ domains:
           scope: global
           noun: holding_control_link
           tags: [compute, batch]
+          phase_tags: [kyc]
         args:
           - name: issuer-entity-id
             type: uuid
@@ -509,6 +520,7 @@ domains:
           scope: global
           noun: holding_control_link
           tags: [read, query]
+          phase_tags: [kyc]
         crud:
           operation: select
           table: holding_control_links
@@ -572,6 +584,7 @@ domains:
           scope: global
           noun: special_right
           tags: [bridge, batch]
+          phase_tags: [kyc]
         args:
           - name: as-of
             type: date
@@ -600,6 +613,7 @@ domains:
           scope: global
           noun: special_right
           tags: [bridge, batch, gleif]
+          phase_tags: [kyc]
         args:
           - name: as-of
             type: date
@@ -628,6 +642,7 @@ domains:
           scope: global
           noun: holding
           tags: [bridge, batch, bods]
+          phase_tags: [kyc]
         args:
           - name: as-of
             type: date
@@ -671,6 +686,7 @@ domains:
           scope: global
           noun: governance
           tags: [macro, pipeline, batch]
+          phase_tags: [kyc]
         args:
           - name: as-of
             type: date

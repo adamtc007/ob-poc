@@ -14,6 +14,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: tax_config
+          phase_tags: [trading]
         invocation_phrases:
           - "define tax jurisdiction and rates"
           - "add withholding tax country"
@@ -86,6 +87,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: tax_config
+          phase_tags: [trading]
         invocation_phrases:
           - "list available tax jurisdictions"
           - "show countries with withholding tax"
@@ -126,6 +128,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: tax_config
+          phase_tags: [trading]
         invocation_phrases:
           - "set bilateral treaty withholding rate"
           - "configure double taxation agreement"
@@ -230,6 +233,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: tax_config
+          phase_tags: [trading]
         invocation_phrases:
           - "show treaty rates between jurisdictions"
           - "list DTA withholding rates"
@@ -272,6 +276,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: tax_config
+          phase_tags: [trading]
         invocation_phrases:
           - "set tax status for this fund"
           - "configure CBU investor type for tax"
@@ -389,6 +394,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: tax_config
+          phase_tags: [trading]
         invocation_phrases:
           - "show tax status for this CBU"
           - "list fund tax classifications"
@@ -431,6 +437,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: tax_config
+          phase_tags: [trading]
         invocation_phrases:
           - "configure tax reclaim for jurisdiction"
           - "set up withholding tax recovery"
@@ -533,6 +540,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: tax_config
+          phase_tags: [trading]
         invocation_phrases:
           - "list reclaim configurations for CBU"
           - "show tax recovery setup by jurisdiction"
@@ -575,6 +583,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: tax_config
+          phase_tags: [trading]
         invocation_phrases:
           - "deactivate tax reclaim processing"
           - "stop reclaim for this jurisdiction"
@@ -616,6 +625,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: tax_config
+          phase_tags: [trading]
         invocation_phrases:
           - "set tax reporting obligation"
           - "configure FATCA reporting for fund"
@@ -728,6 +738,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: tax_config
+          phase_tags: [trading]
         invocation_phrases:
           - "list tax reporting obligations for CBU"
           - "show FATCA and CRS registrations"

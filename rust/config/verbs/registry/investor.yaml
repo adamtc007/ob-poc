@@ -15,6 +15,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: investor
+          phase_tags: [trading]
         invocation_phrases:
           - "create new investor record"
           - "register incoming investor enquiry"
@@ -95,6 +96,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: investor
+          phase_tags: [trading]
         invocation_phrases:
           - "ensure investor record exists"
           - "upsert investor by entity"
@@ -177,6 +179,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: investor
+          phase_tags: [trading]
         invocation_phrases:
           - "show investor details"
           - "look up this investor"
@@ -212,6 +215,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: investor
+          phase_tags: [trading]
         invocation_phrases:
           - "list investors for this fund"
           - "show all investors in CBU"
@@ -251,6 +255,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: investor
+          phase_tags: [trading]
         invocation_phrases:
           - "list investor records for entity"
           - "show funds entity invests in"
@@ -290,6 +295,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: investor
+          phase_tags: [trading]
         invocation_phrases:
           - "request documents from investor"
           - "solicit KYC docs for investor"
@@ -326,6 +332,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: investor
+          phase_tags: [trading]
         invocation_phrases:
           - "start KYC for investor"
           - "begin investor due diligence"
@@ -369,6 +376,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: investor
+          phase_tags: [trading]
         invocation_phrases:
           - "approve investor KYC"
           - "clear investor due diligence"
@@ -418,6 +426,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: investor
+          phase_tags: [trading]
         invocation_phrases:
           - "reject investor KYC"
           - "fail investor due diligence"
@@ -456,6 +465,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: investor
+          phase_tags: [trading]
         invocation_phrases:
           - "mark investor as eligible"
           - "approve investor for subscription"
@@ -492,6 +502,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: investor
+          phase_tags: [trading]
         invocation_phrases:
           - "record investor subscription"
           - "book subscription for LP"
@@ -535,6 +546,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: investor
+          phase_tags: [trading]
         invocation_phrases:
           - "activate investor holding"
           - "move investor to active status"
@@ -567,6 +579,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: investor
+          phase_tags: [trading]
         invocation_phrases:
           - "start investor redemption"
           - "begin redemption process"
@@ -604,6 +617,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: investor
+          phase_tags: [trading]
         invocation_phrases:
           - "complete investor redemption"
           - "finalize redemption settlement"
@@ -640,6 +654,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: investor
+          phase_tags: [trading]
         invocation_phrases:
           - "offboard this investor"
           - "remove investor from fund"
@@ -685,6 +700,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: investor
+          phase_tags: [trading]
         invocation_phrases:
           - "suspend this investor"
           - "freeze investor account"
@@ -730,6 +746,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: investor
+          phase_tags: [trading]
         invocation_phrases:
           - "reinstate suspended investor"
           - "lift investor suspension"
@@ -780,6 +797,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: investor
+          phase_tags: [trading]
         invocation_phrases:
           - "schedule investor KYC review"
           - "set next review date"
@@ -823,6 +841,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: investor
+          phase_tags: [trading]
         invocation_phrases:
           - "show investor lifecycle history"
           - "get state change audit trail"
@@ -859,6 +878,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: investor
+          phase_tags: [trading]
         invocation_phrases:
           - "count investors by state"
           - "how many investors per status"

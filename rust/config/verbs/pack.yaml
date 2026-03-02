@@ -26,6 +26,8 @@ domains:
           source_of_truth: session
           noun: pack
           tags: [pack, select, journey]
+          subject_kinds: []
+          phase_tags: [administration]
         args:
           - name: pack-id
             type: string
@@ -59,6 +61,8 @@ domains:
           source_of_truth: session
           noun: pack_answer
           tags: [pack, answer, question]
+          subject_kinds: []
+          phase_tags: [administration]
         args:
           - name: field
             type: string

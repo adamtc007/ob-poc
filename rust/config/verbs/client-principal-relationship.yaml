@@ -21,6 +21,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: client_principal_relationship
+          phase_tags: [trading]
         invocation_phrases:
           - "record relationship"
           - "create booking relationship"
@@ -64,6 +65,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: client_principal_relationship
+          phase_tags: [trading]
         invocation_phrases:
           - "terminate relationship"
           - "end booking relationship"
@@ -85,6 +87,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: client_principal_relationship
+          phase_tags: [trading]
         invocation_phrases:
           - "list relationships"
           - "show client relationships"
@@ -121,6 +124,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: cross_sell
+          phase_tags: [trading]
         invocation_phrases:
           - "cross sell check"
           - "cross sell opportunities"

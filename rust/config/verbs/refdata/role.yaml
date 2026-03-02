@@ -9,6 +9,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: role
+          phase_tags: [stewardship]
         invocation_phrases:
           - "add a new entity role"
           - "register role definition"
@@ -47,6 +48,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: role
+          phase_tags: [stewardship]
         invocation_phrases:
           - "look up role by name"
           - "get role details"
@@ -76,6 +78,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: role
+          phase_tags: [stewardship]
         invocation_phrases:
           - "list all entity roles"
           - "show available roles"
@@ -102,6 +105,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: role
+          phase_tags: [stewardship]
         invocation_phrases:
           - "delete a role"
           - "remove role definition"

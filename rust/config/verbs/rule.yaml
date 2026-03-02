@@ -20,6 +20,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: rule
+          phase_tags: [stewardship]
         invocation_phrases:
           - "add rule"
           - "create rule"
@@ -73,6 +74,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: rule
+          phase_tags: [stewardship]
         invocation_phrases:
           - "update rule"
           - "modify rule"
@@ -110,6 +112,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: rule
+          phase_tags: [stewardship]
         invocation_phrases:
           - "disable rule"
           - "deactivate rule"

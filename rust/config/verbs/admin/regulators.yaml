@@ -12,6 +12,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: regulators
+          phase_tags: [administration]
         invocation_phrases:
           - "list regulators"
           - "show all regulators"
@@ -51,6 +52,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: regulators
+          phase_tags: [administration]
         invocation_phrases:
           - "get regulator details"
           - "look up regulator by code"
@@ -80,6 +82,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: regulators
+          phase_tags: [administration]
         invocation_phrases:
           - "add a regulator"
           - "create new regulator"
@@ -134,6 +137,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: regulators
+          phase_tags: [administration]
         invocation_phrases:
           - "update regulator"
           - "change regulator details"
@@ -175,6 +179,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: regulators
+          phase_tags: [administration]
         invocation_phrases:
           - "deactivate regulator"
           - "disable regulator"
@@ -210,6 +215,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: regulators
+          phase_tags: [administration]
         invocation_phrases:
           - "list regulatory tiers"
           - "show regulatory tiers"
@@ -236,6 +242,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: regulators
+          phase_tags: [administration]
         invocation_phrases:
           - "get regulatory tier"
           - "look up tier by code"

@@ -11,6 +11,7 @@ domains:
           scope: cbu
           noun: share_class
           tags: [fund, share_class, creation]
+          phase_tags: [onboarding]
         invocation_phrases:
           - "create new share class for fund"
           - "add share class to this CBU"
@@ -155,6 +156,7 @@ domains:
           scope: cbu
           noun: share_class
           tags: [fund, share_class, upsert, isin]
+          phase_tags: [onboarding]
         invocation_phrases:
           - "ensure share class exists by ISIN"
           - "upsert share class for fund"
@@ -298,6 +300,7 @@ domains:
           scope: cbu
           noun: share_class
           tags: [fund, share_class, nav, update]
+          phase_tags: [onboarding]
         invocation_phrases:
           - "update NAV for share class"
           - "set new NAV per share"
@@ -342,6 +345,7 @@ domains:
           scope: cbu
           noun: share_class
           tags: [fund, share_class, query]
+          phase_tags: [onboarding]
         invocation_phrases:
           - "show share class details"
           - "look up this share class"
@@ -377,6 +381,7 @@ domains:
           scope: cbu
           noun: share_class
           tags: [fund, share_class, query, list]
+          phase_tags: [onboarding]
         invocation_phrases:
           - "list share classes for fund"
           - "show all classes in this CBU"
@@ -416,6 +421,7 @@ domains:
           scope: cbu
           noun: share_class
           tags: [fund, share_class, lifecycle, close]
+          phase_tags: [onboarding]
         invocation_phrases:
           - "close share class to subscriptions"
           - "shut down share class"

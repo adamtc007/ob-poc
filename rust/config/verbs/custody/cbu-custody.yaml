@@ -17,6 +17,7 @@ domains:
           scope: cbu
           noun: universe
           tags: [read, operational-state]
+          phase_tags: [trading]
         invocation_phrases:
           - "show traded universe for CBU"
           - "what instruments does this fund trade"
@@ -53,6 +54,7 @@ domains:
           scope: cbu
           noun: ssi
           tags: [read, operational-state]
+          phase_tags: [trading]
         invocation_phrases:
           - "show settlement instructions for CBU"
           - "list SSIs for this fund"
@@ -97,6 +99,7 @@ domains:
           scope: cbu
           noun: booking_rule
           tags: [read, operational-state]
+          phase_tags: [trading]
         invocation_phrases:
           - "show booking rules for this CBU"
           - "what are the settlement routing rules"
@@ -138,6 +141,7 @@ domains:
           scope: cbu
           noun: agent_override
           tags: [read, operational-state]
+          phase_tags: [trading]
         invocation_phrases:
           - "show agent overrides for SSI"
           - "list settlement agent exceptions"
@@ -181,6 +185,7 @@ domains:
           scope: cbu
           noun: coverage_gap
           tags: [read, validation, gap-analysis]
+          phase_tags: [trading]
         invocation_phrases:
           - "find SSI coverage gaps"
           - "which instruments lack booking rules"
@@ -213,6 +218,7 @@ domains:
           scope: cbu
           noun: coverage_validation
           tags: [read, validation, coverage-check]
+          phase_tags: [trading]
         invocation_phrases:
           - "validate settlement coverage"
           - "is the booking setup complete"
@@ -250,6 +256,7 @@ domains:
           scope: cbu
           noun: ssi_lookup
           tags: [read, routing, alert-simulation]
+          phase_tags: [trading]
         invocation_phrases:
           - "find SSI for this trade"
           - "which SSI matches these characteristics"
@@ -309,6 +316,7 @@ domains:
           writes_operational: true
           noun: ssi_setup
           tags: [bulk-import, document-driven]
+          phase_tags: [trading]
         invocation_phrases:
           - "bulk import SSIs from document"
           - "load settlement instructions from file"

@@ -34,6 +34,8 @@ domains:
           context: scripted_ok
           side_effects: facts_only
           tags: [stewardship]
+          subject_kinds: []
+          phase_tags: [stewardship]
         behavior: plugin
         handler: FocusGetOp
         invocation_phrases:
@@ -57,6 +59,8 @@ domains:
           context: scripted_ok
           side_effects: state_write
           tags: [stewardship]
+          subject_kinds: []
+          phase_tags: [stewardship]
         behavior: plugin
         handler: FocusSetOp
         invocation_phrases:
@@ -91,6 +95,8 @@ domains:
           context: scripted_ok
           side_effects: facts_only
           tags: [stewardship]
+          subject_kinds: []
+          phase_tags: [stewardship]
         behavior: plugin
         handler: FocusRenderOp
         invocation_phrases:
@@ -114,6 +120,8 @@ domains:
           context: scripted_ok
           side_effects: facts_only
           tags: [stewardship]
+          subject_kinds: []
+          phase_tags: [stewardship]
         behavior: plugin
         handler: FocusViewportOp
         invocation_phrases:
@@ -147,6 +155,8 @@ domains:
           context: scripted_ok
           side_effects: facts_only
           tags: [stewardship]
+          subject_kinds: []
+          phase_tags: [stewardship]
         behavior: plugin
         handler: FocusDiffOp
         invocation_phrases:
@@ -177,6 +187,8 @@ domains:
           context: scripted_ok
           side_effects: state_write
           tags: [stewardship]
+          subject_kinds: []
+          phase_tags: [stewardship]
         behavior: plugin
         handler: FocusCaptureManifestOp
         invocation_phrases:

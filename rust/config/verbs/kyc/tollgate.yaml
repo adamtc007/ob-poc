@@ -22,6 +22,7 @@ domains:
           scope: cbu
           noun: tollgate
           tags: [kyc]
+          phase_tags: [kyc]
         invocation_phrases:
           - "run tollgate evaluation for case"
           - "evaluate kyc tollgate checkpoint"
@@ -86,6 +87,7 @@ domains:
           scope: cbu
           noun: tollgate
           tags: [kyc]
+          phase_tags: [kyc]
         invocation_phrases:
           - "get current tollgate metrics"
           - "compute kyc metrics without recording"
@@ -143,6 +145,7 @@ domains:
           scope: cbu
           noun: tollgate
           tags: [kyc]
+          phase_tags: [kyc]
         invocation_phrases:
           - "set tollgate threshold value"
           - "update compliance gate threshold"
@@ -215,6 +218,7 @@ domains:
           scope: cbu
           noun: tollgate
           tags: [kyc]
+          phase_tags: [kyc]
         invocation_phrases:
           - "override tollgate failure"
           - "record management override for gate"
@@ -273,6 +277,7 @@ domains:
           scope: cbu
           noun: tollgate
           tags: [kyc]
+          phase_tags: [kyc]
         invocation_phrases:
           - "list tollgate evaluations for case"
           - "show evaluation history for case"
@@ -318,6 +323,7 @@ domains:
           scope: cbu
           noun: tollgate
           tags: [kyc]
+          phase_tags: [kyc]
         invocation_phrases:
           - "list all tollgate thresholds"
           - "show configured compliance gate thresholds"
@@ -356,6 +362,7 @@ domains:
           scope: cbu
           noun: tollgate
           tags: [kyc]
+          phase_tags: [kyc]
         invocation_phrases:
           - "check decision readiness for case"
           - "is the case ready for decision"
@@ -401,6 +408,7 @@ domains:
           scope: cbu
           noun: tollgate
           tags: [kyc]
+          phase_tags: [kyc]
         invocation_phrases:
           - "list tollgate overrides"
           - "show active gate waivers"
@@ -435,6 +443,7 @@ domains:
           scope: cbu
           noun: tollgate
           tags: [kyc]
+          phase_tags: [kyc]
         invocation_phrases:
           - "expire tollgate override"
           - "revoke gate waiver early"
@@ -487,6 +496,7 @@ domains:
           scope: global
           noun: tollgate
           tags: [kyc]
+          phase_tags: [kyc]
         behavior: plugin
         plugin:
           handler: TollgateEvaluateGateOp

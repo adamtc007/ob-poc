@@ -14,6 +14,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: investment_manager
+          phase_tags: [trading]
         invocation_phrases:
           - "assign investment manager"
           - "add IM to structure"
@@ -153,6 +154,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: investment_manager
+          phase_tags: [trading]
         invocation_phrases:
           - "set IM trading scope"
           - "update manager scope"
@@ -203,6 +205,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: investment_manager
+          phase_tags: [trading]
         invocation_phrases:
           - "link IM to SWIFT connection"
           - "set instruction delivery"
@@ -243,6 +246,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: investment_manager
+          phase_tags: [trading]
         invocation_phrases:
           - "list investment managers"
           - "show IM assignments"
@@ -283,6 +287,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: investment_manager
+          phase_tags: [trading]
         invocation_phrases:
           - "suspend investment manager"
           - "pause IM assignment"
@@ -315,6 +320,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: investment_manager
+          phase_tags: [trading]
         invocation_phrases:
           - "terminate investment manager"
           - "end IM assignment"
@@ -351,6 +357,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: investment_manager
+          phase_tags: [trading]
         invocation_phrases:
           - "find manager for trade"
           - "which IM handles this market"

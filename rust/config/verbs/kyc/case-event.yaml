@@ -10,6 +10,7 @@ domains:
           scope: cbu
           noun: case_event
           tags: [kyc]
+          phase_tags: [kyc]
         invocation_phrases:
           - "log event on KYC case"
           - "record case activity"
@@ -90,6 +91,7 @@ domains:
           scope: cbu
           noun: case_event
           tags: [kyc]
+          phase_tags: [kyc]
         invocation_phrases:
           - "show case event history"
           - "list KYC case events"

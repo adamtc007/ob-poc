@@ -9,6 +9,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: security_type
+          phase_tags: [stewardship]
         invocation_phrases:
           - "add a security type"
           - "register ALERT security type code"
@@ -60,6 +61,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: security_type
+          phase_tags: [stewardship]
         invocation_phrases:
           - "list security types for class"
           - "show security types by asset class"

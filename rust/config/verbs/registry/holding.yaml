@@ -9,6 +9,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: holding
+          phase_tags: [trading]
         invocation_phrases:
           - "create holding in share class"
           - "register new investor position"
@@ -73,6 +74,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: holding
+          phase_tags: [trading]
         invocation_phrases:
           - "create holding for investor record"
           - "link holding to TA investor"
@@ -169,6 +171,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: holding
+          phase_tags: [trading]
         invocation_phrases:
           - "ensure holding exists for investor"
           - "upsert investor position record"
@@ -271,6 +274,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: holding
+          phase_tags: [trading]
         invocation_phrases:
           - "update units on this holding"
           - "adjust position size"
@@ -315,6 +319,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: holding
+          phase_tags: [trading]
         invocation_phrases:
           - "change holding status"
           - "update position lifecycle state"
@@ -363,6 +368,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: holding
+          phase_tags: [trading]
         invocation_phrases:
           - "show holding details"
           - "get investor position info"
@@ -398,6 +404,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: holding
+          phase_tags: [trading]
         invocation_phrases:
           - "list holdings in share class"
           - "show investors in this class"
@@ -441,6 +448,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: holding
+          phase_tags: [trading]
         invocation_phrases:
           - "list all holdings for investor"
           - "show positions across share classes"
@@ -476,6 +484,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: holding
+          phase_tags: [trading]
         invocation_phrases:
           - "list holdings for investor record"
           - "show TA positions for investor"
@@ -511,6 +520,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: holding
+          phase_tags: [trading]
         invocation_phrases:
           - "close this investor holding"
           - "mark position as closed"

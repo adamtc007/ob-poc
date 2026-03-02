@@ -19,6 +19,7 @@ domains:
           source_of_truth: external
           scope: cbu
           noun: screening
+          phase_tags: [kyc]
         behavior: plugin
         args:
         - name: entity-id
@@ -54,6 +55,7 @@ domains:
           source_of_truth: external
           scope: cbu
           noun: screening
+          phase_tags: [kyc]
         behavior: plugin
         args:
         - name: entity-id
@@ -89,6 +91,7 @@ domains:
           source_of_truth: external
           scope: cbu
           noun: screening
+          phase_tags: [kyc]
         behavior: plugin
         args:
         - name: entity-id

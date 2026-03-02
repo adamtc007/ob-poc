@@ -14,6 +14,7 @@ domains:
           scope: cbu
           noun: request
           tags: [kyc]
+          phase_tags: [kyc]
         invocation_phrases:
           - "create outstanding request"
           - "raise new KYC request"
@@ -100,6 +101,7 @@ domains:
           scope: cbu
           noun: request
           tags: [kyc]
+          phase_tags: [kyc]
         invocation_phrases:
           - "list outstanding requests"
           - "show pending KYC requests"
@@ -162,6 +164,7 @@ domains:
           scope: cbu
           noun: request
           tags: [kyc]
+          phase_tags: [kyc]
         invocation_phrases:
           - "show overdue requests"
           - "which requests are past due"
@@ -212,6 +215,7 @@ domains:
           scope: cbu
           noun: request
           tags: [kyc]
+          phase_tags: [kyc]
         invocation_phrases:
           - "fulfill outstanding request"
           - "mark request as received"
@@ -265,6 +269,7 @@ domains:
           scope: cbu
           noun: request
           tags: [kyc]
+          phase_tags: [kyc]
         invocation_phrases:
           - "cancel outstanding request"
           - "withdraw pending request"
@@ -302,6 +307,7 @@ domains:
           scope: cbu
           noun: request
           tags: [kyc]
+          phase_tags: [kyc]
         invocation_phrases:
           - "extend request due date"
           - "grant deadline extension"
@@ -344,6 +350,7 @@ domains:
           scope: cbu
           noun: request
           tags: [kyc]
+          phase_tags: [kyc]
         invocation_phrases:
           - "send request reminder"
           - "remind client about request"
@@ -388,6 +395,7 @@ domains:
           scope: cbu
           noun: request
           tags: [kyc]
+          phase_tags: [kyc]
         invocation_phrases:
           - "escalate overdue request"
           - "escalate outstanding KYC request"
@@ -429,6 +437,7 @@ domains:
           scope: cbu
           noun: request
           tags: [kyc]
+          phase_tags: [kyc]
         invocation_phrases:
           - "waive request requirement"
           - "grant waiver on KYC request"

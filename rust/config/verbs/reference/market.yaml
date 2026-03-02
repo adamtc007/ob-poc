@@ -9,6 +9,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: market
+          phase_tags: [stewardship]
         invocation_phrases:
           - "add a new market"
           - "register exchange by MIC code"
@@ -62,6 +63,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: market
+          phase_tags: [stewardship]
         invocation_phrases:
           - "look up market by MIC"
           - "get market details"
@@ -90,6 +92,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: market
+          phase_tags: [stewardship]
         invocation_phrases:
           - "list all markets"
           - "show available exchanges"

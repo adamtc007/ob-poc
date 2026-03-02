@@ -28,6 +28,7 @@ domains:
           scope: cbu
           noun: document_bundle
           tags: [setup, write, macro-support]
+          phase_tags: [kyc]
         args:
           - name: cbu-id
             type: uuid
@@ -99,6 +100,7 @@ domains:
           scope: cbu
           noun: document_bundle
           tags: [query, read]
+          phase_tags: [kyc]
         args:
           - name: cbu-id
             type: uuid
@@ -135,6 +137,7 @@ domains:
           scope: global
           noun: document_bundle
           tags: [query, read, reference]
+          phase_tags: [kyc]
         args: []
         returns:
           type: record_set

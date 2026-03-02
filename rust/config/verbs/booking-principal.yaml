@@ -21,6 +21,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: booking_principal
+          phase_tags: [trading]
         invocation_phrases:
           - "create booking principal"
           - "new booking principal"
@@ -59,6 +60,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: booking_principal
+          phase_tags: [trading]
         invocation_phrases:
           - "update booking principal"
           - "modify booking principal"
@@ -89,6 +91,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: booking_principal
+          phase_tags: [trading]
         invocation_phrases:
           - "retire booking principal"
           - "deactivate booking principal"
@@ -118,6 +121,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: eligibility_evaluation
+          phase_tags: [trading]
         invocation_phrases:
           - "evaluate booking principal"
           - "check eligibility"
@@ -177,6 +181,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: principal_selection
+          phase_tags: [trading]
         invocation_phrases:
           - "select booking principal"
           - "choose principal"
@@ -204,6 +209,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: evaluation_explain
+          phase_tags: [trading]
         invocation_phrases:
           - "explain evaluation"
           - "show evaluation details"
@@ -226,6 +232,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: coverage_matrix
+          phase_tags: [trading]
         invocation_phrases:
           - "coverage matrix"
           - "show coverage"
@@ -243,6 +250,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: gap_report
+          phase_tags: [trading]
         invocation_phrases:
           - "gap report"
           - "coverage gaps"
@@ -260,6 +268,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: impact_analysis
+          phase_tags: [trading]
         invocation_phrases:
           - "impact analysis"
           - "retirement impact"

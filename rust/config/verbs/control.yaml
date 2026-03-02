@@ -21,6 +21,7 @@ domains:
           scope: cbu
           noun: control
           tags: [data-management]
+          phase_tags: [kyc]
         behavior: crud
         crud:
           operation: upsert
@@ -113,6 +114,7 @@ domains:
           scope: cbu
           noun: control
           tags: [data-management]
+          phase_tags: [kyc]
         behavior: crud
         crud:
           operation: update
@@ -155,6 +157,7 @@ domains:
           scope: cbu
           noun: control
           tags: [data-management]
+          phase_tags: [kyc]
         behavior: crud
         crud:
           operation: list_by_fk
@@ -196,6 +199,7 @@ domains:
           scope: cbu
           noun: control
           tags: [data-management]
+          phase_tags: [kyc]
         behavior: crud
         crud:
           operation: list_by_fk
@@ -245,6 +249,7 @@ domains:
           scope: cbu
           noun: control
           tags: [data-management]
+          phase_tags: [kyc]
         behavior: plugin
         plugin:
           handler: ControlAnalyzeOp
@@ -308,6 +313,7 @@ domains:
           scope: cbu
           noun: control
           tags: [data-management]
+          phase_tags: [kyc]
         behavior: plugin
         plugin:
           handler: ControlBuildGraphOp
@@ -375,6 +381,7 @@ domains:
           scope: cbu
           noun: control
           tags: [data-management]
+          phase_tags: [kyc]
         behavior: plugin
         plugin:
           handler: ControlIdentifyUbosOp
@@ -438,6 +445,7 @@ domains:
           scope: cbu
           noun: control
           tags: [data-management]
+          phase_tags: [kyc]
         behavior: plugin
         plugin:
           handler: ControlTraceChainOp
@@ -503,6 +511,7 @@ domains:
           scope: cbu
           noun: control
           tags: [data-management]
+          phase_tags: [kyc]
         behavior: plugin
         plugin:
           handler: ControlReconcileOwnershipOp
@@ -564,6 +573,7 @@ domains:
           scope: cbu
           noun: board_controller
           tags: [data-management]
+          phase_tags: [kyc]
         behavior: plugin
         plugin:
           handler: ShowBoardControllerOp
@@ -631,6 +641,7 @@ domains:
           scope: cbu
           noun: board_controller
           tags: [data-management]
+          phase_tags: [kyc]
         behavior: plugin
         plugin:
           handler: RecomputeBoardControllerOp
@@ -692,6 +703,7 @@ domains:
           scope: cbu
           noun: board_controller
           tags: [data-management]
+          phase_tags: [kyc]
         behavior: plugin
         plugin:
           handler: SetBoardControllerOp
@@ -760,6 +772,7 @@ domains:
           scope: cbu
           noun: board_controller
           tags: [data-management]
+          phase_tags: [kyc]
         behavior: plugin
         plugin:
           handler: ClearBoardControllerOverrideOp
@@ -805,6 +818,7 @@ domains:
           scope: cbu
           noun: board_controller
           tags: [data-management]
+          phase_tags: [kyc]
         behavior: plugin
         plugin:
           handler: ImportPscRegisterOp
@@ -871,6 +885,7 @@ domains:
           scope: cbu
           noun: control
           tags: [data-management]
+          phase_tags: [kyc]
         behavior: plugin
         plugin:
           handler: ControlComputeControllersOp
@@ -926,6 +941,7 @@ domains:
           scope: cbu
           noun: board_controller
           tags: [data-management]
+          phase_tags: [kyc]
         behavior: plugin
         plugin:
           handler: ImportGleifControlOp

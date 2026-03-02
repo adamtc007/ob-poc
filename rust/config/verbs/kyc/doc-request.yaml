@@ -10,6 +10,7 @@ domains:
           scope: cbu
           noun: doc_request
           tags: [kyc]
+          phase_tags: [kyc]
         invocation_phrases:
           - "create document request"
           - "request KYC document from client"
@@ -98,6 +99,7 @@ domains:
           scope: cbu
           noun: doc_request
           tags: [kyc]
+          phase_tags: [kyc]
         invocation_phrases:
           - "mark document as requested"
           - "confirm document request sent"
@@ -138,6 +140,7 @@ domains:
           scope: cbu
           noun: doc_request
           tags: [kyc]
+          phase_tags: [kyc]
         invocation_phrases:
           - "record document received"
           - "mark document as received"
@@ -188,6 +191,7 @@ domains:
           scope: cbu
           noun: doc_request
           tags: [kyc]
+          phase_tags: [kyc]
         invocation_phrases:
           - "verify KYC document"
           - "approve document as valid"
@@ -232,6 +236,7 @@ domains:
           scope: cbu
           noun: doc_request
           tags: [kyc]
+          phase_tags: [kyc]
         invocation_phrases:
           - "reject KYC document"
           - "document failed quality check"
@@ -275,6 +280,7 @@ domains:
           scope: cbu
           noun: doc_request
           tags: [kyc]
+          phase_tags: [kyc]
         invocation_phrases:
           - "waive document requirement"
           - "skip this document request"
@@ -318,6 +324,7 @@ domains:
           scope: cbu
           noun: doc_request
           tags: [kyc]
+          phase_tags: [kyc]
         invocation_phrases:
           - "list document requests for workstream"
           - "show outstanding document requests"

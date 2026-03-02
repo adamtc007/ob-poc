@@ -10,6 +10,7 @@ domains:
           source_of_truth: catalog
           scope: cbu
           noun: service_resource
+          phase_tags: [stewardship]
         invocation_phrases:
           - "read service resource type"
           - "get resource type details"
@@ -49,6 +50,7 @@ domains:
           source_of_truth: catalog
           scope: cbu
           noun: service_resource
+          phase_tags: [stewardship]
         invocation_phrases:
           - "list service resource types"
           - "show all resource types"
@@ -95,6 +97,7 @@ domains:
           source_of_truth: catalog
           scope: cbu
           noun: service_resource
+          phase_tags: [stewardship]
         invocation_phrases:
           - "list resources for a service"
           - "show resource types under this service"
@@ -133,6 +136,7 @@ domains:
           source_of_truth: catalog
           scope: cbu
           noun: service_resource
+          phase_tags: [stewardship]
         invocation_phrases:
           - "list attribute requirements for resource"
           - "show required attributes for resource type"
@@ -172,6 +176,7 @@ domains:
           source_of_truth: catalog
           scope: cbu
           noun: service_resource
+          phase_tags: [stewardship]
         invocation_phrases:
           - "provision a resource instance"
           - "create resource instance for CBU"
@@ -268,6 +273,7 @@ domains:
           source_of_truth: catalog
           scope: cbu
           noun: service_resource
+          phase_tags: [stewardship]
         invocation_phrases:
           - "set attribute on resource instance"
           - "update resource instance attribute"
@@ -314,6 +320,7 @@ domains:
           source_of_truth: catalog
           scope: cbu
           noun: service_resource
+          phase_tags: [stewardship]
         invocation_phrases:
           - "activate resource instance"
           - "enable service resource"
@@ -337,6 +344,7 @@ domains:
           source_of_truth: catalog
           scope: cbu
           noun: service_resource
+          phase_tags: [stewardship]
         invocation_phrases:
           - "suspend resource instance"
           - "pause service resource"
@@ -369,6 +377,7 @@ domains:
           source_of_truth: catalog
           scope: cbu
           noun: service_resource
+          phase_tags: [stewardship]
         invocation_phrases:
           - "decommission resource instance"
           - "retire service resource"
@@ -401,6 +410,7 @@ domains:
           source_of_truth: catalog
           scope: cbu
           noun: service_resource
+          phase_tags: [stewardship]
         invocation_phrases:
           - "validate resource instance attributes"
           - "check required attributes are set"

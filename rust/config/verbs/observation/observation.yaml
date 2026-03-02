@@ -9,6 +9,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: observation
+          phase_tags: [kyc]
         invocation_phrases:
           - "record attribute observation"
           - "log observed value for entity"
@@ -102,6 +103,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: observation
+          phase_tags: [kyc]
         invocation_phrases:
           - "extract observation from document"
           - "record data from document"
@@ -155,6 +157,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: observation
+          phase_tags: [kyc]
         invocation_phrases:
           - "supersede old observation"
           - "replace outdated observation"
@@ -197,6 +200,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: observation
+          phase_tags: [kyc]
         invocation_phrases:
           - "list observations for entity"
           - "show all entity observations"
@@ -235,6 +239,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: observation
+          phase_tags: [kyc]
         invocation_phrases:
           - "list observations for attribute"
           - "show attribute observation history"
@@ -283,6 +288,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: observation
+          phase_tags: [kyc]
         invocation_phrases:
           - "get current observation"
           - "what is the latest value"
@@ -316,6 +322,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: observation
+          phase_tags: [kyc]
         invocation_phrases:
           - "reconcile observations for entity"
           - "compare attribute observations"
@@ -362,6 +369,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: observation
+          phase_tags: [kyc]
         invocation_phrases:
           - "verify allegations against observations"
           - "batch check allegations"

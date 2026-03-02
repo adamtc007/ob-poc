@@ -23,6 +23,7 @@ domains:
           scope: global
           noun: research_source
           tags: [read, meta, source-discovery]
+          phase_tags: [onboarding]
         behavior: plugin
         handler: SourceListOp
         returns:
@@ -40,6 +41,7 @@ domains:
           scope: global
           noun: research_source
           tags: [read, meta, source-info]
+          phase_tags: [onboarding]
         behavior: plugin
         handler: SourceInfoOp
         args:
@@ -66,6 +68,7 @@ domains:
           scope: global
           noun: entity_search_result
           tags: [read, external-source, registry-lookup]
+          phase_tags: [onboarding]
         behavior: plugin
         handler: SourceSearchOp
         args:
@@ -106,6 +109,7 @@ domains:
           scope: global
           noun: entity_data
           tags: [read, external-source, registry-fetch]
+          phase_tags: [onboarding]
         behavior: plugin
         handler: SourceFetchOp
         args:
@@ -141,6 +145,7 @@ domains:
           scope: global
           noun: research_source
           tags: [read, meta, source-routing]
+          phase_tags: [onboarding]
         behavior: plugin
         handler: SourceFindForJurisdictionOp
         args:

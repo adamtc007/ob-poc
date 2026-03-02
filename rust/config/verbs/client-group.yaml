@@ -45,6 +45,7 @@ domains:
           internal: false
           noun: client_group_entity
           tags: [membership, crud]
+          phase_tags: [onboarding]
         args:
           - name: group-id
             type: uuid
@@ -97,6 +98,7 @@ domains:
           internal: false
           noun: client_group_entity
           tags: [membership, crud]
+          phase_tags: [onboarding]
         args:
           - name: group-id
             type: uuid
@@ -138,6 +140,7 @@ domains:
           internal: false
           noun: client_group_entity
           tags: [membership, read]
+          phase_tags: [onboarding]
         args:
           - name: group-id
             type: uuid
@@ -188,6 +191,7 @@ domains:
           internal: false
           noun: entity_tag
           tags: [tag, crud, learning]
+          phase_tags: [onboarding]
         args:
           - name: group-id
             type: uuid
@@ -240,6 +244,7 @@ domains:
           internal: false
           noun: entity_tag
           tags: [tag, crud]
+          phase_tags: [onboarding]
         args:
           - name: tag-id
             type: uuid
@@ -262,6 +267,7 @@ domains:
           internal: false
           noun: entity_tag
           tags: [tag, read]
+          phase_tags: [onboarding]
         args:
           - name: group-id
             type: uuid
@@ -310,6 +316,7 @@ domains:
           internal: false
           noun: entity_search
           tags: [search, semantic, candle]
+          phase_tags: [onboarding]
         args:
           - name: group-id
             type: uuid
@@ -359,6 +366,7 @@ domains:
           internal: false
           noun: discovery
           tags: [onboarding, discovery, bulk]
+          phase_tags: [onboarding]
         args:
           - name: group-id
             type: uuid
@@ -404,6 +412,7 @@ domains:
           internal: false
           noun: membership
           tags: [onboarding, confirmation]
+          phase_tags: [onboarding]
         args:
           - name: group-id
             type: uuid
@@ -450,6 +459,7 @@ domains:
           internal: false
           noun: membership
           tags: [onboarding, rejection]
+          phase_tags: [onboarding]
         args:
           - name: group-id
             type: uuid
@@ -496,6 +506,7 @@ domains:
           internal: false
           noun: client_group_entity_role
           tags: [role, crud]
+          phase_tags: [onboarding]
         args:
           - name: group-id
             type: uuid
@@ -574,6 +585,7 @@ domains:
           internal: false
           noun: client_group_entity_role
           tags: [role, crud]
+          phase_tags: [onboarding]
         args:
           - name: role-assignment-id
             type: uuid
@@ -598,6 +610,7 @@ domains:
           internal: false
           noun: client_group_entity_role
           tags: [role, read]
+          phase_tags: [onboarding]
         args:
           - name: group-id
             type: uuid
@@ -657,6 +670,7 @@ domains:
           internal: false
           noun: client_group_parties
           tags: [role, read, overview]
+          phase_tags: [onboarding]
         args:
           - name: group-id
             type: uuid
@@ -700,6 +714,7 @@ domains:
           internal: false
           noun: client_group_relationship
           tags: [ownership, crud]
+          phase_tags: [onboarding]
         args:
           - name: group-id
             type: uuid
@@ -756,6 +771,7 @@ domains:
           internal: false
           noun: client_group_relationship
           tags: [ownership, read]
+          phase_tags: [onboarding]
         args:
           - name: group-id
             type: uuid
@@ -813,6 +829,7 @@ domains:
           internal: false
           noun: client_group_relationship_source
           tags: [ownership, source, crud]
+          phase_tags: [onboarding]
         args:
           - name: relationship-id
             type: uuid
@@ -878,6 +895,7 @@ domains:
           internal: false
           noun: client_group_relationship_source
           tags: [ownership, verification]
+          phase_tags: [onboarding]
         args:
           - name: source-id
             type: uuid
@@ -907,6 +925,7 @@ domains:
           internal: false
           noun: client_group_relationship_source
           tags: [ownership, canonical]
+          phase_tags: [onboarding]
         args:
           - name: source-id
             type: uuid
@@ -938,6 +957,7 @@ domains:
           internal: false
           noun: ownership_review
           tags: [ownership, review, kyc]
+          phase_tags: [onboarding]
         args:
           - name: group-id
             type: uuid
@@ -979,6 +999,7 @@ domains:
           internal: false
           noun: ownership_review
           tags: [ownership, review, reconciliation]
+          phase_tags: [onboarding]
         args:
           - name: group-id
             type: uuid
@@ -1026,6 +1047,7 @@ domains:
           internal: false
           noun: client_group
           tags: [discovery, workflow]
+          phase_tags: [onboarding]
         args:
           - name: group-id
             type: uuid
@@ -1064,6 +1086,7 @@ domains:
           internal: false
           noun: client_group
           tags: [discovery, workflow]
+          phase_tags: [onboarding]
         args:
           - name: group-id
             type: uuid

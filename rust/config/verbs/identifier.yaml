@@ -16,6 +16,7 @@ domains:
           source_of_truth: entity
           scope: cbu
           noun: identifier
+          phase_tags: [stewardship]
         invocation_phrases:
           - "attach identifier to entity"
           - "add external ID"
@@ -111,6 +112,7 @@ domains:
           source_of_truth: entity
           scope: cbu
           noun: identifier
+          phase_tags: [stewardship]
         invocation_phrases:
           - "attach LEI to entity"
           - "add LEI code"
@@ -191,6 +193,7 @@ domains:
           source_of_truth: entity
           scope: cbu
           noun: identifier
+          phase_tags: [stewardship]
         invocation_phrases:
           - "attach Clearstream reference"
           - "add Clearstream KV number"
@@ -258,6 +261,7 @@ domains:
           source_of_truth: entity
           scope: cbu
           noun: identifier
+          phase_tags: [stewardship]
         invocation_phrases:
           - "validate this identifier"
           - "mark identifier as verified"
@@ -296,6 +300,7 @@ domains:
           source_of_truth: entity
           scope: cbu
           noun: identifier
+          phase_tags: [stewardship]
         invocation_phrases:
           - "invalidate this identifier"
           - "mark identifier as expired"
@@ -333,6 +338,7 @@ domains:
           source_of_truth: entity
           scope: cbu
           noun: identifier
+          phase_tags: [stewardship]
         invocation_phrases:
           - "remove identifier from entity"
           - "delete external ID"
@@ -363,6 +369,7 @@ domains:
           source_of_truth: entity
           scope: cbu
           noun: identifier
+          phase_tags: [stewardship]
         invocation_phrases:
           - "list identifiers for entity"
           - "show all IDs for company"
@@ -403,6 +410,7 @@ domains:
           source_of_truth: entity
           scope: cbu
           noun: identifier
+          phase_tags: [stewardship]
         invocation_phrases:
           - "find entity by LEI"
           - "look up LEI code"
@@ -434,6 +442,7 @@ domains:
           source_of_truth: entity
           scope: cbu
           noun: identifier
+          phase_tags: [stewardship]
         invocation_phrases:
           - "find by Clearstream reference"
           - "look up Clearstream KV"
@@ -468,6 +477,7 @@ domains:
           source_of_truth: entity
           scope: cbu
           noun: identifier
+          phase_tags: [stewardship]
         invocation_phrases:
           - "find by ISIN"
           - "look up ISIN code"
@@ -499,6 +509,7 @@ domains:
           source_of_truth: entity
           scope: cbu
           noun: identifier
+          phase_tags: [stewardship]
         invocation_phrases:
           - "update LEI status"
           - "refresh LEI from GLEIF"

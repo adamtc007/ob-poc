@@ -12,6 +12,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: bulk_load
+          phase_tags: [stewardship]
         invocation_phrases:
           - "load market reference data"
           - "import markets from file"
@@ -44,6 +45,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: bulk_load
+          phase_tags: [stewardship]
         invocation_phrases:
           - "load instrument class taxonomy"
           - "import instrument classes from file"
@@ -75,6 +77,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: bulk_load
+          phase_tags: [stewardship]
         invocation_phrases:
           - "load subcustodian network data"
           - "import subcustodians from file"
@@ -106,6 +109,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: bulk_load
+          phase_tags: [stewardship]
         invocation_phrases:
           - "load SLA templates from file"
           - "import service level agreements"
@@ -137,6 +141,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: bulk_load
+          phase_tags: [stewardship]
         invocation_phrases:
           - "load all reference data"
           - "import all refdata from directory"

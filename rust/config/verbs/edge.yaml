@@ -16,6 +16,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: entity_relationship
+          phase_tags: [stewardship]
         behavior: plugin
         handler: EdgeUpsertOp
         args:

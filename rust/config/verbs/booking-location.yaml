@@ -16,6 +16,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: booking_location
+          phase_tags: [trading]
         invocation_phrases:
           - "create booking location"
           - "new booking location"
@@ -54,6 +55,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: booking_location
+          phase_tags: [trading]
         invocation_phrases:
           - "update booking location"
           - "modify booking location"
@@ -82,6 +84,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: booking_location
+          phase_tags: [trading]
         invocation_phrases:
           - "list booking locations"
           - "show booking locations"

@@ -205,6 +205,8 @@ pub struct ToolHandlers {
     pub(super) macro_registry: Option<Arc<MacroRegistry>>,
     /// Lexicon service for fast in-memory lexical verb search (Phase A of 072)
     pub(super) lexicon: Option<crate::mcp::verb_search::SharedLexicon>,
+    /// Noun taxonomy index for deterministic Tier -1 ECIR resolution
+    pub(super) noun_index: Option<Arc<crate::mcp::noun_index::NounIndex>>,
     /// Semantic OS client — routes sem_reg_* tool calls through the DI boundary
     pub(super) sem_os_client: Option<Arc<dyn SemOsClient>>,
     /// Authoring pipeline mode (Research vs Governed) — controls db_introspect surface.
@@ -229,6 +231,7 @@ impl ToolHandlers {
             feedback_service: None,
             macro_registry: None,
             lexicon: None,
+            noun_index: None,
             sem_os_client: None,
             agent_mode: sem_os_core::authoring::agent_mode::AgentMode::default(),
         }
@@ -243,6 +246,12 @@ impl ToolHandlers {
     /// Set the lexicon service for fast in-memory lexical verb search
     pub fn with_lexicon(mut self, lexicon: crate::mcp::verb_search::SharedLexicon) -> Self {
         self.lexicon = Some(lexicon);
+        self
+    }
+
+    /// Set the noun taxonomy index for deterministic Tier -1 ECIR resolution
+    pub fn with_noun_index(mut self, noun_index: Arc<crate::mcp::noun_index::NounIndex>) -> Self {
+        self.noun_index = Some(noun_index);
         self
     }
 
@@ -304,6 +313,7 @@ impl ToolHandlers {
                 self.learned_data.clone(),
                 macro_registry.clone(),
                 self.lexicon.clone(),
+                self.noun_index.clone(),
             )
         } else {
             // Fallback without macro registry (should be rare)
@@ -313,6 +323,7 @@ impl ToolHandlers {
                 self.learned_data.clone(),
                 Arc::new(MacroRegistry::new()),
                 self.lexicon.clone(),
+                self.noun_index.clone(),
             )
         };
 

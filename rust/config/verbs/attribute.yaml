@@ -14,6 +14,7 @@ domains:
           scope: global
           noun: attribute
           tags: [data-management]
+          phase_tags: [stewardship]
         invocation_phrases:
           - "define a new attribute"
           - "add attribute to registry"
@@ -114,6 +115,7 @@ domains:
           scope: global
           noun: attribute
           tags: [data-management]
+          phase_tags: [stewardship]
         invocation_phrases:
           - "update attribute definition"
           - "modify attribute"
@@ -159,6 +161,7 @@ domains:
           scope: global
           noun: attribute
           tags: [data-management]
+          phase_tags: [stewardship]
         invocation_phrases:
           - "get attribute details"
           - "show attribute definition"
@@ -188,6 +191,7 @@ domains:
           scope: global
           noun: attribute
           tags: [data-management]
+          phase_tags: [stewardship]
         invocation_phrases:
           - "list all attributes"
           - "show attribute catalogue"
@@ -220,6 +224,7 @@ domains:
           scope: global
           noun: attribute
           tags: [data-management]
+          phase_tags: [stewardship]
         invocation_phrases:
           - "map attribute to document"
           - "link attribute to document type"
@@ -302,6 +307,7 @@ domains:
           scope: global
           noun: attribute
           tags: [data-management]
+          phase_tags: [stewardship]
         invocation_phrases:
           - "unmap attribute from document"
           - "remove attribute document link"
@@ -346,6 +352,7 @@ domains:
           scope: global
           noun: attribute
           tags: [data-management]
+          phase_tags: [stewardship]
         invocation_phrases:
           - "list attribute sources"
           - "which documents provide this attribute"
@@ -371,6 +378,7 @@ domains:
           scope: global
           noun: attribute
           tags: [data-management]
+          phase_tags: [stewardship]
         invocation_phrases:
           - "list attribute sinks"
           - "which documents need this attribute"
@@ -396,6 +404,7 @@ domains:
           scope: global
           noun: attribute
           tags: [data-management]
+          phase_tags: [stewardship]
         invocation_phrases:
           - "trace attribute lineage"
           - "show attribute data flow"
@@ -421,6 +430,7 @@ domains:
           scope: global
           noun: attribute
           tags: [data-management]
+          phase_tags: [stewardship]
         invocation_phrases:
           - "list attributes for document type"
           - "show document attributes"
@@ -451,6 +461,7 @@ domains:
           scope: global
           noun: attribute
           tags: [data-management]
+          phase_tags: [stewardship]
         invocation_phrases:
           - "check attribute coverage"
           - "what attributes are missing"

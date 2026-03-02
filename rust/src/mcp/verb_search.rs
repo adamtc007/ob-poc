@@ -49,6 +49,7 @@ use crate::agent::learning::warmup::SharedLearnedData;
 use crate::database::VerbService;
 use crate::dsl_v2::macros::MacroRegistry;
 use crate::lexicon::LexiconService;
+use crate::mcp::noun_index::NounIndex;
 
 /// Shared lexicon service type alias
 pub type SharedLexicon = Arc<dyn LexiconService>;
@@ -85,6 +86,8 @@ pub enum VerbSearchSource {
     LexiconExact,
     /// Lexicon token overlap match (lexical search lane)
     LexiconToken,
+    /// Noun taxonomy deterministic match (Tier -1, ECIR - highest priority)
+    NounTaxonomy,
 }
 
 // ============================================================================
@@ -237,6 +240,8 @@ pub struct HybridVerbSearcher {
     macro_registry: Option<Arc<MacroRegistry>>,
     /// Lexicon service for fast lexical search (runs BEFORE semantic embedding)
     lexicon: Option<SharedLexicon>,
+    /// Noun taxonomy index for deterministic Tier -1 ECIR resolution
+    noun_index: Option<Arc<NounIndex>>,
     /// Similarity threshold for learned semantic matches (high confidence, 0.80)
     semantic_threshold: f32,
     /// Similarity threshold for cold start / fallback semantic matches (0.65)
@@ -253,6 +258,7 @@ impl Clone for HybridVerbSearcher {
             embedder: self.embedder.clone(),
             macro_registry: self.macro_registry.clone(),
             lexicon: self.lexicon.clone(),
+            noun_index: self.noun_index.clone(),
             semantic_threshold: self.semantic_threshold,
             fallback_threshold: self.fallback_threshold,
             blocklist_threshold: self.blocklist_threshold,
@@ -276,6 +282,7 @@ impl HybridVerbSearcher {
             embedder: None,       // Embedder added separately via with_embedder
             macro_registry: None, // Macro registry added separately via with_macro_registry
             lexicon: None,        // Lexicon added separately via with_lexicon
+            noun_index: None,     // Noun index added separately via with_noun_index
             // BGE asymmetric mode thresholds (query→target is lower than target→target)
             semantic_threshold: 0.65,  // Decision gate for accepting match
             fallback_threshold: 0.55,  // Retrieval cutoff for DB queries
@@ -291,6 +298,7 @@ impl HybridVerbSearcher {
             embedder: None,
             macro_registry: None,
             lexicon: None,
+            noun_index: None,
             // BGE asymmetric mode thresholds
             semantic_threshold: 0.65,
             fallback_threshold: 0.55,
@@ -313,6 +321,12 @@ impl HybridVerbSearcher {
     /// Add lexicon service for fast lexical search (runs BEFORE semantic embedding)
     pub fn with_lexicon(mut self, lexicon: SharedLexicon) -> Self {
         self.lexicon = Some(lexicon);
+        self
+    }
+
+    /// Add noun taxonomy index for deterministic Tier -1 ECIR resolution
+    pub fn with_noun_index(mut self, noun_index: Arc<NounIndex>) -> Self {
+        self.noun_index = Some(noun_index);
         self
     }
 
@@ -415,6 +429,75 @@ impl HybridVerbSearcher {
             );
             None
         };
+
+        // ── Tier -1: ECIR Noun Taxonomy (deterministic, before all embedding tiers) ──
+        // For narrow/large candidate sets, ECIR candidates are saved for post-boost
+        // after embedding tiers run (domain knowledge helps break ties without
+        // overriding embedding verb selection).
+        let mut ecir_boost_set: HashSet<String> = HashSet::new();
+        if let Some(ref noun_index) = self.noun_index {
+            let nouns = noun_index.extract(&normalized);
+            if !nouns.is_empty() {
+                let action = NounIndex::classify_action(&normalized);
+                let resolution = noun_index.resolve(&nouns, action);
+
+                match resolution.candidates.len() {
+                    0 => {
+                        // No verb candidates from noun — fall through to embedding
+                        tracing::debug!(
+                            noun = %resolution.noun_key,
+                            "ECIR: noun matched but no verb candidates, falling through"
+                        );
+                    }
+                    1 => {
+                        // Deterministic single-verb resolution — skip ALL embedding tiers
+                        let fqn = &resolution.candidates[0];
+                        if self.matches_domain(fqn, domain_filter)
+                            && allowed_verbs.is_none_or(|av| av.contains(fqn))
+                            && !seen_verbs.contains(fqn)
+                        {
+                            tracing::info!(
+                                verb = %fqn,
+                                noun = %resolution.noun_key,
+                                path = ?resolution.resolution_path,
+                                "ECIR: deterministic single-verb resolution"
+                            );
+                            seen_verbs.insert(fqn.clone());
+                            results.push(VerbSearchResult {
+                                verb: fqn.clone(),
+                                score: 0.95,
+                                source: VerbSearchSource::NounTaxonomy,
+                                matched_phrase: format!("noun:{}", resolution.noun_key),
+                                description: noun_index
+                                    .verb_index
+                                    .by_fqn
+                                    .get(fqn)
+                                    .map(|s| s.description.clone()),
+                            });
+                            // SHORT-CIRCUIT: return immediately, skip all embedding tiers
+                            return Ok(normalize_candidates(results, limit));
+                        }
+                    }
+                    _ => {
+                        // 2+ candidates — ECIR identified the domain but can't pick
+                        // the specific verb. Save candidates for post-boost after
+                        // embedding tiers run. This uses ECIR's domain knowledge
+                        // to boost relevant embedding results without overriding them.
+                        tracing::debug!(
+                            candidates = resolution.candidates.len(),
+                            noun = %resolution.noun_key,
+                            action = ?resolution.action,
+                            "ECIR: multi-candidate set, saving for post-boost"
+                        );
+                        for fqn in &resolution.candidates {
+                            if allowed_verbs.is_none_or(|av| av.contains(fqn)) {
+                                ecir_boost_set.insert(fqn.clone());
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
         // 0. Operator macro search (business vocabulary layer - HIGHEST PRIORITY)
         // Macros are the PRIMARY UI mechanism (verb picker). If a macro matches,
@@ -654,6 +737,29 @@ impl HybridVerbSearcher {
                         tracing::warn!(error = %e, "VerbSearch: phonetic search failed");
                     }
                 }
+            }
+        }
+
+        // ── ECIR Post-Boost: boost embedding results that match ECIR candidates ──
+        // When ECIR identified a domain (noun) but had multiple verb candidates,
+        // boost any embedding results that match those candidates. This helps
+        // break ties in favor of domain-relevant verbs without overriding
+        // embedding verb selection (unlike the old 0.80 narrow score approach).
+        if !ecir_boost_set.is_empty() {
+            let boost = 0.05_f32;
+            let mut boosted_count = 0u32;
+            for result in &mut results {
+                if ecir_boost_set.contains(&result.verb) {
+                    result.score = (result.score + boost).min(0.95);
+                    boosted_count += 1;
+                }
+            }
+            if boosted_count > 0 {
+                tracing::debug!(
+                    boosted = boosted_count,
+                    ecir_candidates = ecir_boost_set.len(),
+                    "ECIR: post-boosted embedding results matching noun candidates"
+                );
             }
         }
 

@@ -9,6 +9,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: screening_type
+          phase_tags: [stewardship]
         invocation_phrases:
           - "add a new screening type"
           - "register screening classification"
@@ -61,6 +62,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: screening_type
+          phase_tags: [stewardship]
         invocation_phrases:
           - "look up screening type by code"
           - "get screening type details"
@@ -90,6 +92,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: screening_type
+          phase_tags: [stewardship]
         invocation_phrases:
           - "list all screening types"
           - "show available screening categories"
@@ -120,6 +123,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: screening_type
+          phase_tags: [stewardship]
         invocation_phrases:
           - "deactivate a screening type"
           - "disable this screening classification"

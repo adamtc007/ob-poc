@@ -42,6 +42,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: cbu_role
+          phase_tags: [onboarding]
         behavior: plugin
         custom_handler: cbu_role_assign
 
@@ -108,6 +109,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: cbu_role
+          phase_tags: [onboarding]
         invocation_phrases:
           - "assign ownership stake"
           - "add shareholder to structure"
@@ -186,6 +188,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: cbu_role
+          phase_tags: [onboarding]
         invocation_phrases:
           - "appoint director to board"
           - "assign conducting officer"
@@ -264,6 +267,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: cbu_role
+          phase_tags: [onboarding]
         invocation_phrases:
           - "assign trustee role"
           - "add settlor to trust"
@@ -346,6 +350,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: cbu_role
+          phase_tags: [onboarding]
         invocation_phrases:
           - "assign ManCo to fund"
           - "set investment manager for SICAV"
@@ -432,6 +437,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: cbu_role
+          phase_tags: [onboarding]
         invocation_phrases:
           - "assign custodian to structure"
           - "add transfer agent"
@@ -504,6 +510,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: cbu_role
+          phase_tags: [onboarding]
         invocation_phrases:
           - "add authorized signatory"
           - "register authorized trader"
@@ -573,6 +580,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: cbu_role
+          phase_tags: [onboarding]
         invocation_phrases:
           - "remove role from entity"
           - "revoke director appointment"
@@ -615,6 +623,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: cbu_role
+          phase_tags: [onboarding]
         invocation_phrases:
           - "list all roles for structure"
           - "show entity roles in CBU"
@@ -660,6 +669,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: cbu_role
+          phase_tags: [onboarding]
         behavior: plugin
         custom_handler: cbu_role_validate_all
 

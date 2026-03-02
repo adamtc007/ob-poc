@@ -24,6 +24,7 @@ domains:
           scope: cbu
           noun: document_requirement
           tags: [workflow, write]
+          phase_tags: [kyc]
         crud:
           operation: insert
           table: document_requirements
@@ -107,6 +108,7 @@ domains:
           scope: cbu
           noun: document_requirements
           tags: [workflow, write, batch]
+          phase_tags: [kyc]
         args:
           - name: subject-entity-id
             type: uuid
@@ -160,6 +162,7 @@ domains:
           scope: cbu
           noun: requirement_waiver
           tags: [workflow, write, override]
+          phase_tags: [kyc]
         crud:
           operation: update
           table: document_requirements
@@ -201,6 +204,7 @@ domains:
           scope: cbu
           noun: requirement_expiry
           tags: [workflow, write]
+          phase_tags: [kyc]
         crud:
           operation: update
           table: document_requirements
@@ -233,6 +237,7 @@ domains:
           scope: cbu
           noun: requirement_reset
           tags: [workflow, write]
+          phase_tags: [kyc]
         crud:
           operation: update
           table: document_requirements
@@ -279,6 +284,7 @@ domains:
           scope: cbu
           noun: document_requirement
           tags: [read]
+          phase_tags: [kyc]
         crud:
           operation: select
           table: document_requirements
@@ -304,6 +310,7 @@ domains:
           scope: cbu
           noun: entity_requirements
           tags: [read, query]
+          phase_tags: [kyc]
         crud:
           operation: select
           table: document_requirements
@@ -335,6 +342,7 @@ domains:
           scope: cbu
           noun: workflow_requirements
           tags: [read, query]
+          phase_tags: [kyc]
         crud:
           operation: select
           table: document_requirements
@@ -361,6 +369,7 @@ domains:
           scope: cbu
           noun: unsatisfied_requirements
           tags: [read, query, workflow]
+          phase_tags: [kyc]
         args:
           - name: workflow-instance-id
             type: uuid
@@ -396,6 +405,7 @@ domains:
           scope: cbu
           noun: requirements_with_status
           tags: [read, query]
+          phase_tags: [kyc]
         crud:
           operation: select
           table: v_requirements_with_latest_version

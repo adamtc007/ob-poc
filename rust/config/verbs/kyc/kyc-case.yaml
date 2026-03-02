@@ -24,6 +24,7 @@ domains:
           scope: cbu
           noun: kyc_case
           tags: [kyc]
+          phase_tags: [kyc]
         behavior: plugin
         handler: KycCaseCreateOp
         produces:
@@ -119,6 +120,7 @@ domains:
           scope: cbu
           noun: kyc_case
           tags: [kyc]
+          phase_tags: [kyc]
         behavior: plugin
         handler: KycCaseUpdateStatusOp
         emits_event: case.status-changed
@@ -169,6 +171,7 @@ domains:
           scope: cbu
           noun: kyc_case
           tags: [kyc]
+          phase_tags: [kyc]
         behavior: crud
         crud:
           operation: update
@@ -217,6 +220,7 @@ domains:
           scope: cbu
           noun: kyc_case
           tags: [kyc]
+          phase_tags: [kyc]
         behavior: crud
         crud:
           operation: update
@@ -276,6 +280,7 @@ domains:
           scope: cbu
           noun: kyc_case
           tags: [kyc]
+          phase_tags: [kyc]
         behavior: crud
         crud:
           operation: update
@@ -325,6 +330,7 @@ domains:
           scope: cbu
           noun: kyc_case
           tags: [kyc]
+          phase_tags: [kyc]
         behavior: plugin
         handler: KycCaseCloseOp
         emits_event: case.closed
@@ -376,6 +382,7 @@ domains:
           scope: cbu
           noun: kyc_case
           tags: [kyc]
+          phase_tags: [kyc]
         behavior: crud
         crud:
           operation: select
@@ -413,6 +420,7 @@ domains:
           scope: cbu
           noun: kyc_case
           tags: [kyc]
+          phase_tags: [kyc]
         behavior: crud
         crud:
           operation: list_by_fk
@@ -454,6 +462,7 @@ domains:
           scope: cbu
           noun: kyc_case
           tags: [kyc]
+          phase_tags: [kyc]
         behavior: crud
         crud:
           operation: update
@@ -516,6 +525,7 @@ domains:
           scope: cbu
           noun: kyc_case
           tags: [kyc]
+          phase_tags: [kyc]
         behavior: plugin
         handler: KycCaseStateOp
         args:

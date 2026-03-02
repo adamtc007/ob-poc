@@ -22,6 +22,8 @@ domains:
           source_of_truth: entity
           scope: cbu
           noun: graph
+          subject_kinds: []
+          phase_tags: [stewardship]
         invocation_phrases:
           - "show the graph"
           - "display entity graph for CBU"
@@ -74,6 +76,8 @@ domains:
           source_of_truth: entity
           scope: cbu
           noun: graph
+          subject_kinds: []
+          phase_tags: [stewardship]
         invocation_phrases:
           - "focus on this entity"
           - "zoom into node"
@@ -131,6 +135,8 @@ domains:
           source_of_truth: entity
           scope: cbu
           noun: graph
+          subject_kinds: []
+          phase_tags: [stewardship]
         invocation_phrases:
           - "filter the graph"
           - "show only entities by role"
@@ -211,6 +217,8 @@ domains:
           source_of_truth: entity
           scope: cbu
           noun: graph
+          subject_kinds: []
+          phase_tags: [stewardship]
         behavior: graph_query
         graph_query:
           operation: group_by
@@ -261,6 +269,8 @@ domains:
           source_of_truth: entity
           scope: cbu
           noun: graph
+          subject_kinds: []
+          phase_tags: [stewardship]
         behavior: graph_query
         graph_query:
           operation: path
@@ -313,6 +323,8 @@ domains:
           source_of_truth: entity
           scope: cbu
           noun: graph
+          subject_kinds: []
+          phase_tags: [stewardship]
         invocation_phrases:
           - "find connected entities"
           - "show all linked nodes"
@@ -369,6 +381,8 @@ domains:
           source_of_truth: entity
           scope: cbu
           noun: graph
+          subject_kinds: []
+          phase_tags: [stewardship]
         invocation_phrases:
           - "show parent entities"
           - "who owns this entity"
@@ -413,6 +427,8 @@ domains:
           source_of_truth: entity
           scope: cbu
           noun: graph
+          subject_kinds: []
+          phase_tags: [stewardship]
         invocation_phrases:
           - "show subsidiaries"
           - "what does this entity own"
@@ -472,6 +488,8 @@ domains:
           source_of_truth: operational
           scope: global
           noun: graph
+          subject_kinds: []
+          phase_tags: [stewardship]
         behavior: plugin
         plugin:
           handler: GraphValidateOp
@@ -508,6 +526,8 @@ domains:
           source_of_truth: entity
           scope: cbu
           noun: graph
+          subject_kinds: []
+          phase_tags: [stewardship]
         invocation_phrases:
           - "compare graph snapshots"
           - "what changed in the graph"

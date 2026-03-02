@@ -30,6 +30,7 @@ domains:
           scope: global
           noun: cbu
           tags: [lifecycle, write, onboarding]
+          phase_tags: [onboarding]
         produces:
           type: cbu
           resolved: false
@@ -129,6 +130,7 @@ domains:
           scope: global
           noun: cbu
           tags: [read, query, onboarding]
+          phase_tags: [onboarding]
         crud:
           operation: select
           table: cbus
@@ -168,6 +170,7 @@ domains:
           scope: global
           noun: cbu
           tags: [lifecycle, write, onboarding]
+          phase_tags: [onboarding]
         crud:
           operation: update
           table: cbus
@@ -232,6 +235,7 @@ domains:
           scope: global
           noun: cbu
           tags: [lifecycle, write, destructive, onboarding]
+          phase_tags: [onboarding]
         crud:
           operation: delete
           table: cbus
@@ -271,6 +275,7 @@ domains:
           scope: global
           noun: cbu
           tags: [lifecycle, write, destructive, cascade, onboarding]
+          phase_tags: [onboarding]
         plugin:
           handler: CbuDeleteCascadeOp
         args:
@@ -317,6 +322,7 @@ domains:
           scope: global
           noun: cbu
           tags: [read, query, list, onboarding]
+          phase_tags: [onboarding]
         crud:
           operation: select
           table: cbus
@@ -364,6 +370,7 @@ domains:
           scope: global
           noun: cbu
           tags: [lifecycle, write, idempotent, onboarding]
+          phase_tags: [onboarding]
         produces:
           type: cbu
           resolved: false
@@ -436,6 +443,7 @@ domains:
           scope: global
           noun: cbu
           tags: [relationship, write, role, onboarding]
+          phase_tags: [onboarding]
         consumes:
           - arg: cbu-id
             type: cbu
@@ -514,6 +522,7 @@ domains:
           scope: global
           noun: cbu
           tags: [relationship, write, role, onboarding]
+          phase_tags: [onboarding]
         crud:
           operation: role_unlink
           junction: cbu_entity_roles
@@ -571,6 +580,7 @@ domains:
           scope: global
           noun: cbu
           tags: [read, query, relationship, onboarding]
+          phase_tags: [onboarding]
         crud:
           operation: list_parties
           junction: cbu_entity_roles
@@ -612,6 +622,7 @@ domains:
           scope: global
           noun: cbu
           tags: [lifecycle, write, classification, onboarding]
+          phase_tags: [onboarding]
         crud:
           operation: update
           table: cbus
@@ -663,6 +674,7 @@ domains:
           scope: global
           noun: cbu
           tags: [read, query, detailed, onboarding]
+          phase_tags: [onboarding]
         plugin:
           handler: CbuShowOp
         args:
@@ -704,6 +716,7 @@ domains:
           scope: global
           noun: cbu
           tags: [relationship, write, product, onboarding]
+          phase_tags: [onboarding]
         plugin:
           handler: CbuAddProductOp
         args:
@@ -750,6 +763,7 @@ domains:
           scope: global
           noun: cbu
           tags: [relationship, write, product, onboarding]
+          phase_tags: [onboarding]
         crud:
           operation: delete
           table: service_delivery_map
@@ -800,6 +814,7 @@ domains:
           scope: global
           noun: cbu
           tags: [lifecycle, write, decision, kyc, onboarding]
+          phase_tags: [onboarding]
         plugin:
           handler: CbuDecideOp
         consumes:
@@ -881,6 +896,7 @@ domains:
           scope: global
           noun: cbu
           tags: [evidence, write, kyc, onboarding]
+          phase_tags: [onboarding]
         crud:
           operation: insert
           table: cbu_evidence
@@ -957,6 +973,7 @@ domains:
           scope: global
           noun: cbu
           tags: [evidence, write, kyc, verification, onboarding]
+          phase_tags: [onboarding]
         crud:
           operation: update
           table: cbu_evidence
@@ -1008,6 +1025,7 @@ domains:
           scope: global
           noun: cbu
           tags: [evidence, read, query, kyc, onboarding]
+          phase_tags: [onboarding]
         crud:
           operation: list_by_fk
           table: cbu_evidence
@@ -1056,6 +1074,7 @@ domains:
           scope: global
           noun: cbu
           tags: [bulk, lifecycle, write, client-group, onboarding, gleif, macro]
+          phase_tags: [onboarding]
         args:
           - name: group-id
             type: uuid

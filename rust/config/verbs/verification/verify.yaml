@@ -12,6 +12,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: verify
+          phase_tags: [kyc]
         invocation_phrases:
           - "detect suspicious patterns"
           - "run pattern detection"
@@ -52,6 +53,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: verify
+          phase_tags: [kyc]
         invocation_phrases:
           - "detect evasion signals"
           - "check for document avoidance"
@@ -86,6 +88,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: verify
+          phase_tags: [kyc]
         invocation_phrases:
           - "raise verification challenge"
           - "challenge client on inconsistency"
@@ -194,6 +197,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: verify
+          phase_tags: [kyc]
         invocation_phrases:
           - "record challenge response"
           - "client responded to challenge"
@@ -242,6 +246,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: verify
+          phase_tags: [kyc]
         invocation_phrases:
           - "resolve verification challenge"
           - "close challenge as accepted"
@@ -305,6 +310,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: verify
+          phase_tags: [kyc]
         invocation_phrases:
           - "list verification challenges"
           - "show open challenges for CBU"
@@ -356,6 +362,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: verify
+          phase_tags: [kyc]
         invocation_phrases:
           - "escalate verification issue"
           - "refer to compliance officer"
@@ -436,6 +443,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: verify
+          phase_tags: [kyc]
         invocation_phrases:
           - "record escalation decision"
           - "resolve escalation outcome"
@@ -493,6 +501,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: verify
+          phase_tags: [kyc]
         invocation_phrases:
           - "list verification escalations"
           - "show escalation queue for CBU"
@@ -543,6 +552,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: verify
+          phase_tags: [kyc]
         invocation_phrases:
           - "calculate confidence score"
           - "what is the confidence level"
@@ -578,6 +588,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: verify
+          phase_tags: [kyc]
         invocation_phrases:
           - "get verification status"
           - "show KYC verification progress"
@@ -609,6 +620,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: verify
+          phase_tags: [kyc]
         invocation_phrases:
           - "verify entity against GLEIF"
           - "check Companies House registry"
@@ -648,6 +660,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: verify
+          phase_tags: [kyc]
         invocation_phrases:
           - "assert minimum confidence threshold"
           - "enforce verification gate"
@@ -704,6 +717,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: verify
+          phase_tags: [kyc]
         invocation_phrases:
           - "record detected pattern manually"
           - "log suspicious ownership pattern"
@@ -787,6 +801,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: verify
+          phase_tags: [kyc]
         invocation_phrases:
           - "resolve detected pattern"
           - "dismiss pattern as false positive"
@@ -840,6 +855,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: verify
+          phase_tags: [kyc]
         invocation_phrases:
           - "list detected patterns"
           - "show flagged patterns for CBU"

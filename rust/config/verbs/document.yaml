@@ -37,6 +37,7 @@ domains:
           scope: cbu
           noun: document_request
           tags: [workflow, outbound, write, durable]
+          phase_tags: [kyc]
         lifecycle:
           requires_scope: cbu
         args:
@@ -120,6 +121,7 @@ domains:
           scope: cbu
           noun: document_request_set
           tags: [workflow, outbound, write, batch, durable]
+          phase_tags: [kyc]
         lifecycle:
           requires_scope: cbu
         args:
@@ -178,6 +180,7 @@ domains:
           scope: cbu
           noun: document_catalog
           tags: [write, legacy]
+          phase_tags: [kyc]
         args:
           - name: doc-type
             type: string
@@ -223,6 +226,7 @@ domains:
           scope: cbu
           noun: document_extraction
           tags: [write, ai]
+          phase_tags: [kyc]
         args:
           - name: document-id
             type: uuid
@@ -247,6 +251,7 @@ domains:
           scope: cbu
           noun: document
           tags: [write]
+          phase_tags: [kyc]
         crud:
           operation: insert
           table: documents
@@ -310,6 +315,7 @@ domains:
           scope: cbu
           noun: document_version
           tags: [write]
+          phase_tags: [kyc]
         args:
           - name: document-id
             type: uuid
@@ -359,6 +365,7 @@ domains:
           scope: cbu
           noun: document_verification
           tags: [workflow, qa, write]
+          phase_tags: [kyc]
         args:
           - name: version-id
             type: uuid
@@ -385,6 +392,7 @@ domains:
           scope: cbu
           noun: document_rejection
           tags: [workflow, qa, write]
+          phase_tags: [kyc]
         args:
           - name: version-id
             type: uuid
@@ -437,6 +445,7 @@ domains:
           scope: cbu
           noun: document_qa
           tags: [workflow, write]
+          phase_tags: [kyc]
         crud:
           operation: update
           table: document_versions
@@ -473,6 +482,7 @@ domains:
           scope: cbu
           noun: document
           tags: [read]
+          phase_tags: [kyc]
         crud:
           operation: select
           table: v_documents_with_status
@@ -503,6 +513,7 @@ domains:
           scope: cbu
           noun: document_versions
           tags: [read]
+          phase_tags: [kyc]
         crud:
           operation: select
           table: document_versions
@@ -528,6 +539,7 @@ domains:
           scope: cbu
           noun: entity_documents
           tags: [read, query]
+          phase_tags: [kyc]
         crud:
           operation: select
           table: v_documents_with_status
@@ -560,6 +572,7 @@ domains:
           scope: cbu
           noun: missing_documents
           tags: [read, query, workflow]
+          phase_tags: [kyc]
         args:
           - name: entity-id
             type: uuid

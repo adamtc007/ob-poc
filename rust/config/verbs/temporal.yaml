@@ -21,6 +21,8 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: temporal
+          subject_kinds: []
+          phase_tags: [monitoring]
         invocation_phrases:
           - "ownership as of date"
           - "who owned entity on date"
@@ -60,6 +62,8 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: temporal
+          subject_kinds: []
+          phase_tags: [monitoring]
         invocation_phrases:
           - "UBO chain as of date"
           - "who were the UBOs on date"
@@ -108,6 +112,8 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: temporal
+          subject_kinds: []
+          phase_tags: [monitoring]
         invocation_phrases:
           - "CBU relationships as of date"
           - "structure relationships at date"
@@ -147,6 +153,8 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: temporal
+          subject_kinds: []
+          phase_tags: [monitoring]
         invocation_phrases:
           - "CBU roles as of date"
           - "who held which roles on date"
@@ -186,6 +194,8 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: temporal
+          subject_kinds: []
+          phase_tags: [monitoring]
         invocation_phrases:
           - "state at KYC approval"
           - "CBU snapshot at approval"
@@ -224,6 +234,8 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: temporal
+          subject_kinds: []
+          phase_tags: [monitoring]
         invocation_phrases:
           - "relationship change history"
           - "audit trail for relationship"
@@ -257,6 +269,8 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: temporal
+          subject_kinds: []
+          phase_tags: [monitoring]
         invocation_phrases:
           - "entity change history"
           - "all changes for entity"
@@ -308,6 +322,8 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: temporal
+          subject_kinds: []
+          phase_tags: [monitoring]
         invocation_phrases:
           - "compare ownership between dates"
           - "ownership diff across dates"

@@ -43,6 +43,13 @@ struct TestCase {
     alt_verbs: Vec<String>,
     #[serde(default)]
     notes: Option<String>,
+    // ECIR (Entity-Centric Intent Resolution) fields
+    #[serde(default)]
+    expected_noun: Option<String>,
+    #[serde(default)]
+    expected_action: Option<String>,
+    #[serde(default)]
+    ecir_path: Option<String>,
 }
 
 // ============================================================================
@@ -58,6 +65,8 @@ struct TestResult {
     top_candidates: Vec<(String, f32)>,
     latency: Duration,
     pipeline_outcome: String, // Ready, NeedsClarification, NoMatch, etc.
+    /// Source of the top candidate (e.g., "NounTaxonomy", "GlobalSemantic", etc.)
+    top_source: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -184,6 +193,10 @@ mod tests {
                         .map(|c| (c.verb.clone(), c.score))
                         .collect();
 
+                    let top_source = candidates
+                        .first()
+                        .map(|c| format!("{:?}", c.source));
+
                     // Check ambiguity (same logic as production pipeline)
                     let threshold = searcher.semantic_threshold();
                     let ambiguity =
@@ -206,6 +219,7 @@ mod tests {
                         top_candidates,
                         latency,
                         pipeline_outcome,
+                        top_source,
                     }
                 }
                 Err(e) => TestResult {
@@ -216,6 +230,7 @@ mod tests {
                     top_candidates: vec![],
                     latency,
                     pipeline_outcome: "Error".into(),
+                    top_source: None,
                 },
             };
 
@@ -235,6 +250,7 @@ mod tests {
 
         // Generate report
         print_summary_report(&results);
+        print_ecir_report(&results);
         print_category_breakdown(&results);
         print_difficulty_breakdown(&results);
         print_domain_breakdown(&results);
@@ -419,6 +435,135 @@ fn print_summary_report(results: &[TestResult]) {
     println!("  Wrong verb selected:       {}", misses);
     println!("  No match at all:           {}", no_matches);
     println!("  Errors:                    {}", errors);
+    println!();
+}
+
+fn print_ecir_report(results: &[TestResult]) {
+    // Count ECIR-sourced results (NounTaxonomy tier)
+    let ecir_hits: Vec<&TestResult> = results
+        .iter()
+        .filter(|r| {
+            r.top_source
+                .as_ref()
+                .map_or(false, |s| s.contains("NounTaxonomy"))
+        })
+        .collect();
+
+    let deterministic = ecir_hits
+        .iter()
+        .filter(|r| r.selected_score == Some(0.95))
+        .count();
+    let narrow = ecir_hits
+        .iter()
+        .filter(|r| r.selected_score == Some(0.80))
+        .count();
+
+    // Count annotated test cases
+    let annotated_total = results
+        .iter()
+        .filter(|r| r.case.ecir_path.is_some())
+        .count();
+    let annotated_deterministic = results
+        .iter()
+        .filter(|r| r.case.ecir_path.as_deref() == Some("deterministic"))
+        .count();
+    let annotated_narrow = results
+        .iter()
+        .filter(|r| r.case.ecir_path.as_deref() == Some("narrow"))
+        .count();
+    let annotated_fallthrough = results
+        .iter()
+        .filter(|r| r.case.ecir_path.as_deref() == Some("fallthrough"))
+        .count();
+
+    // ECIR accuracy on annotated cases
+    let ecir_correct = results
+        .iter()
+        .filter(|r| {
+            let is_ecir = r
+                .top_source
+                .as_ref()
+                .map_or(false, |s| s.contains("NounTaxonomy"));
+            let expected_ecir = matches!(
+                r.case.ecir_path.as_deref(),
+                Some("deterministic") | Some("narrow")
+            );
+            // Correct if: ECIR fired AND expected to fire AND got right verb
+            is_ecir && expected_ecir && r.outcome.is_first_attempt_hit()
+        })
+        .count();
+    let ecir_expected = annotated_deterministic + annotated_narrow;
+
+    // ECIR false positives (fired but wasn't expected)
+    let ecir_false_pos = results
+        .iter()
+        .filter(|r| {
+            let is_ecir = r
+                .top_source
+                .as_ref()
+                .map_or(false, |s| s.contains("NounTaxonomy"));
+            let expected_fallthrough = r.case.ecir_path.as_deref() == Some("fallthrough");
+            is_ecir && expected_fallthrough
+        })
+        .count();
+
+    println!("  ECIR (Entity-Centric Intent Resolution)");
+    println!("  {:-<68}", "");
+    println!(
+        "  Total ECIR resolutions:    {} / {} ({:.1}%)",
+        ecir_hits.len(),
+        results.len(),
+        ecir_hits.len() as f64 / results.len() as f64 * 100.0
+    );
+    println!("    Deterministic (0.95):    {}", deterministic);
+    println!("    Narrow set (0.80):       {}", narrow);
+    println!();
+    println!(
+        "  Annotated test cases:      {} / {}",
+        annotated_total,
+        results.len()
+    );
+    println!(
+        "    deterministic:           {}",
+        annotated_deterministic
+    );
+    println!("    narrow:                  {}", annotated_narrow);
+    println!("    fallthrough:             {}", annotated_fallthrough);
+    println!();
+    if ecir_expected > 0 {
+        println!(
+            "  ECIR accuracy (annotated): {} / {} ({:.1}%)",
+            ecir_correct,
+            ecir_expected,
+            ecir_correct as f64 / ecir_expected as f64 * 100.0
+        );
+    }
+    if ecir_false_pos > 0 {
+        println!(
+            "  ECIR false positives:      {} (fired on fallthrough cases)",
+            ecir_false_pos
+        );
+    }
+
+    // Show individual ECIR-resolved cases
+    if !ecir_hits.is_empty() {
+        println!();
+        println!("  ECIR-resolved utterances:");
+        for r in &ecir_hits {
+            let mark = if r.outcome.is_first_attempt_hit() {
+                "✓"
+            } else {
+                "✗"
+            };
+            println!(
+                "    {} \"{}\" → {} ({:.2})",
+                mark,
+                truncate(&r.case.utterance, 45),
+                r.selected_verb.as_deref().unwrap_or("?"),
+                r.selected_score.unwrap_or(0.0),
+            );
+        }
+    }
     println!();
 }
 
@@ -635,7 +780,9 @@ async fn build_test_searcher(pool: &PgPool) -> ob_poc::mcp::verb_search::HybridV
     use ob_poc::agent::learning::embedder::Embedder;
     use ob_poc::agent::learning::warmup::LearningWarmup;
     use ob_poc::database::verb_service::VerbService;
+    use ob_poc::mcp::noun_index::{NounIndex, VerbContractIndex};
     use ob_poc::mcp::verb_search::HybridVerbSearcher;
+    use dsl_core::config::ConfigLoader;
     use std::sync::Arc;
 
     // Env overrides for threshold sweeps
@@ -665,9 +812,59 @@ async fn build_test_searcher(pool: &PgPool) -> ob_poc::mcp::verb_search::HybridV
         stats.invocation_phrases_loaded, stats.entity_aliases_loaded
     );
 
+    // Build VerbContractIndex from verb YAML config (needed for NounIndex ECIR)
+    let verb_contract_index = {
+        let config_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/config");
+        let loader = ConfigLoader::new(config_dir);
+        match loader.load_verbs() {
+            Ok(verbs_config) => {
+                let vci = VerbContractIndex::from_verbs_config(&verbs_config);
+                println!("  VerbContractIndex: {} verbs indexed", vci.len());
+                Some(vci)
+            }
+            Err(e) => {
+                eprintln!("  VerbContractIndex: failed to load verbs config: {}", e);
+                None
+            }
+        }
+    };
+
+    // Load NounIndex for ECIR (Tier -1 deterministic resolution)
+    let noun_index = {
+        let yaml_paths = [
+            concat!(env!("CARGO_MANIFEST_DIR"), "/config/noun_index.yaml"),
+            "config/noun_index.yaml",
+        ];
+        let mut loaded = None;
+        if let Some(vci) = verb_contract_index {
+            for path in &yaml_paths {
+                if let Ok(content) = std::fs::read_to_string(path) {
+                    match NounIndex::from_yaml(&content, vci.clone()) {
+                        Ok(ni) => {
+                            println!("  NounIndex: loaded {} nouns from {}", ni.canonical_count(), path);
+                            loaded = Some(Arc::new(ni));
+                            break;
+                        }
+                        Err(e) => {
+                            eprintln!("  NounIndex: failed to parse {}: {}", path, e);
+                        }
+                    }
+                }
+            }
+        }
+        if loaded.is_none() {
+            println!("  NounIndex: not found (ECIR disabled in test)");
+        }
+        loaded
+    };
+
     // Construct searcher with production-equivalent settings
     let mut searcher =
         HybridVerbSearcher::new(verb_service, Some(learned_data)).with_embedder(dyn_embedder);
+
+    if let Some(ni) = noun_index {
+        searcher = searcher.with_noun_index(ni);
+    }
 
     if let Some(t) = threshold_override {
         println!("  Overriding semantic_threshold to {:.2}", t);

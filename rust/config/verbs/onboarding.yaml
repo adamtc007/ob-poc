@@ -11,6 +11,7 @@ domains:
           noun: onboarding
           tags: [onboarding]
           subject_kinds: [cbu]
+          phase_tags: [onboarding]
         invocation_phrases:
           - "auto-complete onboarding"
           - "finish onboarding automatically"

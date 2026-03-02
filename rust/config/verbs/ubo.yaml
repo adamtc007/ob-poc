@@ -22,6 +22,7 @@ domains:
           scope: global
           noun: ubo
           tags: [ownership, relationship, create, kyc]
+          phase_tags: [kyc]
         crud:
           operation: upsert
           table: entity_relationships
@@ -132,6 +133,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: ubo
+          phase_tags: [kyc]
         behavior: plugin
         plugin:
           handler: UboSnapshotCaptureOp
@@ -173,6 +175,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: ubo
+          phase_tags: [kyc]
         behavior: plugin
         plugin:
           handler: UboSnapshotDiffOp
@@ -217,6 +220,7 @@ domains:
           scope: global
           noun: ubo
           tags: [ownership, relationship, update, kyc]
+          phase_tags: [kyc]
         crud:
           operation: update
           table: entity_relationships
@@ -263,6 +267,7 @@ domains:
           scope: global
           noun: ubo
           tags: [ownership, relationship, lifecycle, kyc]
+          phase_tags: [kyc]
         crud:
           operation: update
           table: entity_relationships
@@ -301,6 +306,7 @@ domains:
           scope: global
           noun: ubo
           tags: [ownership, relationship, delete, kyc]
+          phase_tags: [kyc]
         crud:
           operation: delete
           table: entity_relationships
@@ -338,6 +344,7 @@ domains:
           scope: global
           noun: ubo
           tags: [control, relationship, create, kyc]
+          phase_tags: [kyc]
         crud:
           operation: upsert
           table: entity_relationships
@@ -411,6 +418,7 @@ domains:
           scope: global
           noun: ubo
           tags: [control, relationship, lifecycle, kyc]
+          phase_tags: [kyc]
         crud:
           operation: update
           table: entity_relationships
@@ -449,6 +457,7 @@ domains:
           scope: global
           noun: ubo
           tags: [control, relationship, delete, kyc]
+          phase_tags: [kyc]
         crud:
           operation: delete
           table: entity_relationships
@@ -486,6 +495,7 @@ domains:
           scope: global
           noun: ubo
           tags: [trust, relationship, create, kyc]
+          phase_tags: [kyc]
         crud:
           operation: upsert
           table: entity_relationships
@@ -567,6 +577,7 @@ domains:
           scope: global
           noun: ubo
           tags: [trust, relationship, lifecycle, kyc]
+          phase_tags: [kyc]
         crud:
           operation: update
           table: entity_relationships
@@ -604,6 +615,7 @@ domains:
           scope: global
           noun: ubo
           tags: [trust, relationship, delete, kyc]
+          phase_tags: [kyc]
         crud:
           operation: delete
           table: entity_relationships
@@ -638,6 +650,7 @@ domains:
           scope: global
           noun: ubo
           tags: [relationship, delete, generic, kyc]
+          phase_tags: [kyc]
         crud:
           operation: delete
           table: entity_relationships
@@ -674,6 +687,7 @@ domains:
           scope: global
           noun: ubo
           tags: [ownership, query, temporal, kyc]
+          phase_tags: [kyc]
         args:
           - name: entity-id
             type: uuid
@@ -707,6 +721,7 @@ domains:
           scope: global
           noun: ubo
           tags: [ownership, query, kyc]
+          phase_tags: [kyc]
         crud:
           operation: list_by_fk
           table: entity_relationships_current
@@ -745,6 +760,7 @@ domains:
           scope: cbu
           noun: ubo
           tags: [query, ubo-candidates, kyc]
+          phase_tags: [kyc]
         crud:
           operation: list_by_fk
           table: v_ubo_candidates
@@ -777,6 +793,7 @@ domains:
           scope: global
           noun: ubo
           tags: [ownership, query, reverse-lookup, kyc]
+          phase_tags: [kyc]
         crud:
           operation: list_by_fk
           table: entity_relationships_current
@@ -815,6 +832,7 @@ domains:
           scope: cbu
           noun: ubo
           tags: [computation, ownership, graph-traversal, kyc]
+          phase_tags: [kyc]
         args:
           - name: cbu-id
             type: uuid
@@ -857,6 +875,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: ubo
+          phase_tags: [kyc]
         behavior: plugin
         args:
           # Primary: client nickname for group-level tracing
@@ -923,6 +942,7 @@ domains:
           scope: global
           noun: ubo
           tags: [computation, ownership, graph-traversal, chain, kyc]
+          phase_tags: [kyc]
         args:
           - name: case-id
             type: uuid
@@ -969,6 +989,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: ubo
+          phase_tags: [kyc]
         behavior: plugin
         args:
           - name: entity-id
@@ -1007,6 +1028,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: ubo
+          phase_tags: [kyc]
         behavior: plugin
         args:
           - name: cbu-id
@@ -1067,6 +1089,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: ubo
+          phase_tags: [kyc]
         behavior: plugin
         args:
           - name: cbu-id
@@ -1145,6 +1168,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: ubo
+          phase_tags: [kyc]
         behavior: plugin
         args:
           - name: cbu-id
@@ -1207,6 +1231,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: ubo
+          phase_tags: [kyc]
         behavior: crud
         crud:
           operation: upsert

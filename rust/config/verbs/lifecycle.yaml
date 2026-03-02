@@ -31,6 +31,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: lifecycle
+          phase_tags: [monitoring]
         behavior: crud
         crud:
           operation: select
@@ -66,6 +67,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: lifecycle
+          phase_tags: [monitoring]
         behavior: crud
         crud:
           operation: select
@@ -113,6 +115,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: lifecycle
+          phase_tags: [monitoring]
         behavior: crud
         crud:
           operation: select_with_join
@@ -159,6 +162,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: lifecycle
+          phase_tags: [monitoring]
         behavior: crud
         crud:
           operation: select
@@ -194,6 +198,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: lifecycle
+          phase_tags: [monitoring]
         behavior: crud
         crud:
           operation: select
@@ -237,6 +242,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: lifecycle
+          phase_tags: [monitoring]
         behavior: crud
         crud:
           operation: select_with_join
@@ -283,6 +289,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: lifecycle
+          phase_tags: [monitoring]
         behavior: plugin
         plugin:
           handler: LifecycleProvisionOp
@@ -380,6 +387,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: lifecycle
+          phase_tags: [monitoring]
         behavior: crud
         crud:
           operation: update
@@ -415,6 +423,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: lifecycle
+          phase_tags: [monitoring]
         behavior: crud
         crud:
           operation: update
@@ -453,6 +462,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: lifecycle
+          phase_tags: [monitoring]
         behavior: crud
         crud:
           operation: update
@@ -491,6 +501,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: lifecycle
+          phase_tags: [monitoring]
         behavior: crud
         crud:
           operation: list_by_fk
@@ -540,6 +551,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: lifecycle
+          phase_tags: [monitoring]
         behavior: plugin
         plugin:
           handler: LifecycleAnalyzeGapsOp
@@ -595,6 +607,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: lifecycle
+          phase_tags: [monitoring]
         behavior: plugin
         plugin:
           handler: LifecycleCheckReadinessOp
@@ -661,6 +674,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: lifecycle
+          phase_tags: [monitoring]
         behavior: plugin
         plugin:
           handler: LifecycleGeneratePlanOp
@@ -705,6 +719,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: lifecycle
+          phase_tags: [monitoring]
         behavior: plugin
         plugin:
           handler: LifecycleExecutePlanOp
@@ -750,6 +765,7 @@ domains:
           source_of_truth: workflow
           scope: cbu
           noun: lifecycle
+          phase_tags: [monitoring]
         behavior: plugin
         plugin:
           handler: LifecycleDiscoverOp

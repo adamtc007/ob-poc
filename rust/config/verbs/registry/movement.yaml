@@ -9,6 +9,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: movement
+          phase_tags: [trading]
         invocation_phrases:
           - "record investor subscription order"
           - "book subscription into fund"
@@ -86,6 +87,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: movement
+          phase_tags: [trading]
         invocation_phrases:
           - "record investor redemption"
           - "process redemption from fund"
@@ -163,6 +165,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: movement
+          phase_tags: [trading]
         invocation_phrases:
           - "record incoming transfer of units"
           - "book transfer in from another TA"
@@ -227,6 +230,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: movement
+          phase_tags: [trading]
         invocation_phrases:
           - "record outgoing transfer of units"
           - "transfer units out to another TA"
@@ -292,6 +296,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: movement
+          phase_tags: [trading]
         invocation_phrases:
           - "record LP commitment to fund"
           - "book investor capital commitment"
@@ -364,6 +369,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: movement
+          phase_tags: [trading]
         invocation_phrases:
           - "record capital call from LP"
           - "issue drawdown notice to investors"
@@ -441,6 +447,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: movement
+          phase_tags: [trading]
         invocation_phrases:
           - "record distribution to LP"
           - "pay out profit distribution"
@@ -529,6 +536,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: movement
+          phase_tags: [trading]
         invocation_phrases:
           - "record recallable distribution"
           - "issue distribution with recall option"
@@ -600,6 +608,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: movement
+          phase_tags: [trading]
         invocation_phrases:
           - "confirm pending movement"
           - "approve movement for settlement"
@@ -638,6 +647,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: movement
+          phase_tags: [trading]
         invocation_phrases:
           - "settle movement in register"
           - "mark movement as settled"
@@ -680,6 +690,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: movement
+          phase_tags: [trading]
         invocation_phrases:
           - "cancel pending movement"
           - "void this subscription order"
@@ -722,6 +733,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: movement
+          phase_tags: [trading]
         invocation_phrases:
           - "mark movement as failed"
           - "fail this trade movement"
@@ -768,6 +780,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: movement
+          phase_tags: [trading]
         invocation_phrases:
           - "list movements for this holding"
           - "show transaction history for holding"
@@ -811,6 +824,7 @@ domains:
           source_of_truth: register
           scope: cbu
           noun: movement
+          phase_tags: [trading]
         invocation_phrases:
           - "show movement details"
           - "look up this movement"

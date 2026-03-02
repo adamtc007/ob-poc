@@ -440,7 +440,7 @@ These are **UI zoom levels using CBU and group structures**, not session scope c
 
 | When working on... | Read this annex | Contains |
 |--------------------|-----------------|----------|
-| **Semantic pipeline** | `docs/agent-semantic-pipeline.md` | Candle embeddings, 7-tier search, latency analysis |
+| **Semantic pipeline** | `docs/agent-semantic-pipeline.md` | Candle embeddings, tiered search (ECIR + embedding), latency analysis |
 | **Agent/MCP pipeline** | `docs/agent-architecture.md` | Intent extraction, MCP tools, learning loop |
 | **Session & navigation** | `docs/session-visualization-architecture.md` | Scopes, filters, ESPER verbs, history |
 | **Data model (CBU/Entity/UBO)** | `docs/strategy-patterns.md` §1 | Why CBU is a lens, UBO discovery, holdings |
@@ -483,15 +483,17 @@ User says: "spin up a fund for Acme"
                     ↓
             verb_search tool
                     ↓
-    ┌───────────────┴───────────────┐
-    │     Search Priority (6-tier)   │
-    │  1. User learned (exact)       │
-    │  2. Global learned (exact)     │
-    │  3. User semantic (pgvector)   │
-    │  4. Global semantic (pgvector) │
-    │  5. Blocklist check            │
-    │  6. Global semantic fallback   │
-    └───────────────┬───────────────┘
+    ┌───────────────┴───────────────────┐
+    │     Search Priority (8-tier)       │
+    │ -1. ECIR noun taxonomy (deterministic) │
+    │  0. Operator macros (business vocab)│
+    │  1. User learned (exact)           │
+    │  2. Global learned (exact)         │
+    │  3. Semantic (pgvector)            │
+    │  5. Blocklist check                │
+    │  6. Global semantic fallback       │
+    │  7. Phonetic fallback              │
+    └───────────────┬───────────────────┘
                     ↓
             Top match: cbu.create
                     ↓
@@ -609,14 +611,17 @@ User says: "spin up a fund for Acme"
 **Search Priority (Updated):**
 
 ```
-1. User-specific learned (exact) - score 1.0
-2. Global learned (exact) - score 1.0
-3. User-specific learned (semantic, top-k=3)
-4. [REMOVED] - merged into step 6
-5. Blocklist filter
-6. Global semantic - UNION of learned + cold-start patterns (top-k)
-   → normalize_candidates(): dedupe by verb, sort desc, truncate
-   → Final blocklist filter across all candidates
+-1. ECIR noun taxonomy (deterministic) - score 0.95 single-verb, +0.05 post-boost multi-verb
+ 0. Operator macros (business vocabulary) - score 1.0 exact, 0.95 fuzzy
+ 1. User-specific learned (exact) - score 1.0
+ 2. Global learned (exact) - score 1.0
+ 3. User-specific learned (semantic, top-k=3)
+ 4. [REMOVED] - merged into step 6
+ 5. Blocklist filter
+ 6. Global semantic - UNION of learned + cold-start patterns (top-k)
+    → normalize_candidates(): dedupe by verb, sort desc, truncate
+    → Final blocklist filter across all candidates
+ 7. Phonetic fallback (typo handling) - score 0.80
 ```
 
 **Ambiguity Detection:**
@@ -728,6 +733,8 @@ embedder.embed_target("load galaxy by apex name")
 |------|---------|
 | `rust/src/database/verb_service.rs` | `VerbService` - centralized verb DB access |
 | `rust/src/mcp/verb_search.rs` | `HybridVerbSearcher` - semantic search (uses VerbService) |
+| `rust/src/mcp/noun_index.rs` | `NounIndex` + `VerbContractIndex` - ECIR deterministic Tier -1 noun→verb resolution |
+| `rust/config/noun_index.yaml` | 99-noun taxonomy mapping domain nouns to verb candidates |
 | `rust/src/session/verb_sync.rs` | `VerbSyncService` - syncs YAML to DB |
 | `rust/crates/ob-semantic-matcher/src/bin/populate_embeddings.rs` | Populates verb_pattern_embeddings |
 | `rust/crates/ob-semantic-matcher/src/feedback/learner.rs` | Learning loop |
@@ -784,12 +791,15 @@ After teaching new phrases, just run `populate_embeddings` without `--force` to 
 
 All DB access goes through `VerbService` (no direct sqlx calls).
 
+-1. **ECIR noun taxonomy** → deterministic noun→verb resolution (score 0.95 single-verb short-circuit, +0.05 post-boost for multi-verb)
+0. Operator macros → business vocabulary (score 1.0 exact, 0.95 fuzzy)
 1. User learned exact → `agent.user_learned_phrases`
 2. Global learned exact → In-memory LearnedData
 3. User semantic → pgvector on user_learned_phrases
 4. Global semantic → pgvector on `verb_pattern_embeddings`
 5. Blocklist check → Filter blocked verbs
 6. **Global semantic fallback** ← Lower threshold, wider net
+7. Phonetic fallback → typo handling (score 0.80)
 
 **Pattern Sources (v_verb_intent_patterns view):**
 - `yaml_intent_patterns` - YAML invocation_phrases, overwritten on startup
@@ -1660,7 +1670,8 @@ New primitive verbs for macro expansion targets:
 ### Verb Search Priority (Updated)
 
 ```
-0. Operator macros (business vocabulary) - score 1.0 exact, 0.95 fuzzy  ← NEW
+-1. ECIR noun taxonomy (deterministic) - score 0.95 single-verb, +0.05 post-boost multi-verb
+0. Operator macros (business vocabulary) - score 1.0 exact, 0.95 fuzzy
 1. User-specific learned (exact) - score 1.0
 2. Global learned (exact) - score 1.0
 3. User-specific learned (semantic) - score 0.8-0.99
@@ -3370,6 +3381,8 @@ IntentPipeline.process()
 |------|---------|
 | `rust/src/mcp/intent_pipeline.rs` | Unified intent processing |
 | `rust/src/mcp/verb_search.rs` | `HybridVerbSearcher` - semantic + exact match |
+| `rust/src/mcp/noun_index.rs` | `NounIndex` + `VerbContractIndex` - ECIR Tier -1 noun→verb |
+| `rust/config/noun_index.yaml` | 99-noun taxonomy for deterministic verb resolution |
 | `rust/src/api/agent_service.rs` | `AgentService.process_chat()` entry point |
 | `rust/config/verbs/view.yaml` | Navigation verbs (view.drill, view.surface, etc.) |
 | `rust/config/verbs/session.yaml` | Session verbs (session.load-galaxy, etc.) |
@@ -3960,7 +3973,9 @@ Every user utterance flows through **three sequential stages** that progressivel
 │  ┌─────────────────────────────────────────────────────────────────────┐    │
 │  │  PRONG 1: RAW SEMANTIC SEARCH (VerbSearchIntentMatcher)             │    │
 │  │                                                                     │    │
-│  │  HybridVerbSearcher.search() — 10-tier priority:                   │    │
+│  │  HybridVerbSearcher.search() — tiered priority:                    │    │
+│  │    T-1: ECIR noun taxonomy (deterministic noun→verb)     0.95      │    │
+│  │         1 candidate → short-circuit, 2+ → post-boost (+0.05)      │    │
 │  │    T0: Operator macros (exact/fuzzy label match)         score 1.0  │    │
 │  │    T1: User learned exact                                score 1.0  │    │
 │  │    T2: Global learned exact                              score 1.0  │    │
@@ -5751,6 +5766,7 @@ When you see these in a task, read the corresponding annex first:
 | "sem-reg propose", "sem-reg authoring-list", "sem-reg authoring-status" | CLAUDE.md §Governed Registry Authoring §CLI |
 | "ContextEnvelope", "context_envelope", "CCIR", "PruneReason", "AllowedVerbSetFingerprint", "TOCTOU recheck" | CLAUDE.md §Agent Intent Pipeline Hardening §CCIR |
 | "SessionVerbSurface", "verb surface", "VerbSurfaceFailPolicy", "FailClosed", "safe-harbor", "SurfaceFingerprint", "PruneLayer", "compute_session_verb_surface" | CLAUDE.md §SessionVerbSurface |
+| "ECIR", "NounIndex", "noun_index", "VerbContractIndex", "noun taxonomy", "entity-centric intent" | CLAUDE.md §Navigation §Verb Search Thresholds, `rust/src/mcp/noun_index.rs`, `rust/config/noun_index.yaml` |
 | "ownership.refresh", "OwnershipRefreshOp", "bridge ManCo", "derive CBU groups" | `rust/src/domain_ops/manco_ops.rs` |
 
 ---

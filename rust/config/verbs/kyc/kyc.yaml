@@ -33,6 +33,7 @@ domains:
           scope: cbu
           noun: kyc_case
           tags: [kyc]
+          phase_tags: [kyc]
         lifecycle:
           requires_scope: cbu
         invocation_phrases:

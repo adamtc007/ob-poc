@@ -12,6 +12,7 @@ domains:
           source_of_truth: external
           scope: cbu
           noun: regulatory
+          phase_tags: [kyc]
         invocation_phrases:
           - "add regulatory registration"
           - "register entity with regulator"
@@ -85,6 +86,7 @@ domains:
           source_of_truth: external
           scope: cbu
           noun: regulatory
+          phase_tags: [kyc]
         invocation_phrases:
           - "list regulatory registrations"
           - "show entity regulators"
@@ -120,6 +122,7 @@ domains:
           source_of_truth: external
           scope: cbu
           noun: regulatory
+          phase_tags: [kyc]
         invocation_phrases:
           - "verify regulatory registration"
           - "confirm regulator status"
@@ -168,6 +171,7 @@ domains:
           source_of_truth: external
           scope: cbu
           noun: regulatory
+          phase_tags: [kyc]
         invocation_phrases:
           - "remove regulatory registration"
           - "withdraw registration"
@@ -209,6 +213,7 @@ domains:
           source_of_truth: external
           scope: cbu
           noun: regulatory
+          phase_tags: [kyc]
         invocation_phrases:
           - "check regulatory status"
           - "is entity regulated"

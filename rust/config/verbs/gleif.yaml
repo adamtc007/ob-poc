@@ -31,6 +31,7 @@ domains:
           noun: lei
           subject_kinds: [company, legal_entity]
           tags: [gleif, external-api, enrichment, onboarding]
+          phase_tags: [onboarding, kyc]
         args:
           - name: lei
             type: string
@@ -70,6 +71,7 @@ domains:
           noun: lei
           subject_kinds: [company, legal_entity]
           tags: [gleif, external-api, search, onboarding]
+          phase_tags: [onboarding, kyc]
         args:
           - name: name
             type: string
@@ -119,6 +121,7 @@ domains:
           noun: lei
           subject_kinds: [company, legal_entity]
           tags: [gleif, external-api, import, hierarchy, onboarding]
+          phase_tags: [onboarding, kyc]
         args:
           - name: root-lei
             type: string
@@ -165,6 +168,7 @@ domains:
           noun: lei
           subject_kinds: [company, legal_entity]
           tags: [gleif, external-api, import, funds, onboarding]
+          phase_tags: [onboarding, kyc]
         args:
           - name: manager-lei
             type: string
@@ -204,6 +208,7 @@ domains:
           noun: lei
           subject_kinds: [company, legal_entity]
           tags: [gleif, external-api, refresh, onboarding]
+          phase_tags: [onboarding, kyc]
         invocation_phrases:
           - "refresh GLEIF data for entity"
           - "update stale LEI records"
@@ -247,6 +252,7 @@ domains:
           noun: lei
           subject_kinds: [company, legal_entity]
           tags: [gleif, external-api, lookup, onboarding]
+          phase_tags: [onboarding, kyc]
         invocation_phrases:
           - "fetch raw GLEIF record"
           - "get LEI details from GLEIF"
@@ -274,6 +280,7 @@ domains:
           noun: lei
           subject_kinds: [company, legal_entity]
           tags: [gleif, external-api, lookup, relationship, onboarding]
+          phase_tags: [onboarding, kyc]
         invocation_phrases:
           - "get parent entity from GLEIF"
           - "who is the direct parent"
@@ -301,6 +308,7 @@ domains:
           noun: lei
           subject_kinds: [company, legal_entity]
           tags: [gleif, external-api, lookup, relationship, onboarding]
+          phase_tags: [onboarding, kyc]
         invocation_phrases:
           - "get subsidiary entities from GLEIF"
           - "list children for this LEI"
@@ -339,6 +347,7 @@ domains:
           noun: lei
           subject_kinds: [company, legal_entity]
           tags: [gleif, external-api, trace, ownership, onboarding]
+          phase_tags: [onboarding, kyc]
         args:
           - name: lei
             type: string
@@ -368,6 +377,7 @@ domains:
           noun: lei
           subject_kinds: [company, legal_entity]
           tags: [gleif, external-api, lookup, funds, onboarding]
+          phase_tags: [onboarding, kyc]
         invocation_phrases:
           - "get funds managed by this entity"
           - "list managed funds from GLEIF"
@@ -406,6 +416,7 @@ domains:
           noun: lei
           subject_kinds: [company, legal_entity]
           tags: [gleif, external-api, lookup, successor, onboarding]
+          phase_tags: [onboarding, kyc]
         invocation_phrases:
           - "resolve successor for merged LEI"
           - "find current entity for inactive LEI"
@@ -440,6 +451,7 @@ domains:
           noun: lei
           subject_kinds: [company, legal_entity]
           tags: [gleif, external-api, lookup, relationship, funds, onboarding]
+          phase_tags: [onboarding, kyc]
         invocation_phrases:
           - "get umbrella fund from GLEIF"
           - "find parent SICAV for sub-fund"
@@ -479,6 +491,7 @@ domains:
           noun: lei
           subject_kinds: [company, legal_entity]
           tags: [gleif, external-api, lookup, relationship, funds, onboarding]
+          phase_tags: [onboarding, kyc]
         invocation_phrases:
           - "get fund manager from GLEIF"
           - "who manages this fund"
@@ -518,6 +531,7 @@ domains:
           noun: lei
           subject_kinds: [company, legal_entity]
           tags: [gleif, external-api, lookup, relationship, funds, onboarding]
+          phase_tags: [onboarding, kyc]
         invocation_phrases:
           - "get master fund for feeder"
           - "find master fund via GLEIF"
@@ -557,6 +571,7 @@ domains:
           noun: lei
           subject_kinds: [company, legal_entity]
           tags: [gleif, external-api, lookup, isin, onboarding]
+          phase_tags: [onboarding, kyc]
         invocation_phrases:
           - "find LEI by ISIN code"
           - "look up issuer for this ISIN"
@@ -598,6 +613,7 @@ domains:
           scope: global
           noun: client_group
           tags: [gleif, external-api, import, client-group, discovery, funds, onboarding]
+          phase_tags: [onboarding, kyc]
         args:
           - name: group-id
             type: uuid

@@ -10,6 +10,7 @@ domains:
           scope: cbu
           noun: red_flag
           tags: [kyc]
+          phase_tags: [kyc]
         invocation_phrases:
           - "raise a red flag"
           - "flag compliance risk on case"
@@ -108,6 +109,7 @@ domains:
           scope: cbu
           noun: red_flag
           tags: [kyc]
+          phase_tags: [kyc]
         invocation_phrases:
           - "mitigate red flag"
           - "resolve compliance concern"
@@ -153,6 +155,7 @@ domains:
           scope: cbu
           noun: red_flag
           tags: [kyc]
+          phase_tags: [kyc]
         invocation_phrases:
           - "waive red flag with justification"
           - "approve red flag waiver"
@@ -202,6 +205,7 @@ domains:
           scope: cbu
           noun: red_flag
           tags: [kyc]
+          phase_tags: [kyc]
         invocation_phrases:
           - "dismiss red flag as false positive"
           - "close red flag not confirmed"
@@ -247,6 +251,7 @@ domains:
           scope: cbu
           noun: red_flag
           tags: [kyc]
+          phase_tags: [kyc]
         invocation_phrases:
           - "set red flag as blocking"
           - "block case on red flag"
@@ -286,6 +291,7 @@ domains:
           scope: cbu
           noun: red_flag
           tags: [kyc]
+          phase_tags: [kyc]
         invocation_phrases:
           - "list red flags for case"
           - "show all risk indicators"
@@ -329,6 +335,7 @@ domains:
           scope: cbu
           noun: red_flag
           tags: [kyc]
+          phase_tags: [kyc]
         invocation_phrases:
           - "list red flags for workstream"
           - "show entity-level risk flags"

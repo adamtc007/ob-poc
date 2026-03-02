@@ -17,6 +17,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: ruleset
+          phase_tags: [stewardship]
         invocation_phrases:
           - "create ruleset"
           - "new ruleset"
@@ -58,6 +59,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: ruleset
+          phase_tags: [stewardship]
         invocation_phrases:
           - "publish ruleset"
           - "activate ruleset"
@@ -80,6 +82,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: ruleset
+          phase_tags: [stewardship]
         invocation_phrases:
           - "retire ruleset"
           - "deactivate ruleset"

@@ -37,6 +37,8 @@ domains:
           context: scripted_ok
           side_effects: facts_only
           tags: [stewardship]
+          subject_kinds: []
+          phase_tags: [stewardship]
         behavior: plugin
         handler: SchemaIntrospectOp
         invocation_phrases:
@@ -77,6 +79,8 @@ domains:
           context: scripted_ok
           side_effects: facts_only
           tags: [stewardship]
+          subject_kinds: []
+          phase_tags: [stewardship]
         behavior: plugin
         handler: SchemaExtractAttributesOp
         invocation_phrases:
@@ -111,6 +115,8 @@ domains:
           context: scripted_ok
           side_effects: facts_only
           tags: [stewardship]
+          subject_kinds: []
+          phase_tags: [stewardship]
         behavior: plugin
         handler: SchemaExtractVerbsOp
         invocation_phrases:
@@ -147,6 +153,8 @@ domains:
           context: scripted_ok
           side_effects: facts_only
           tags: [stewardship]
+          subject_kinds: []
+          phase_tags: [stewardship]
         behavior: plugin
         handler: SchemaExtractEntitiesOp
         invocation_phrases:
@@ -177,6 +185,8 @@ domains:
           context: scripted_ok
           side_effects: facts_only
           tags: [stewardship]
+          subject_kinds: []
+          phase_tags: [stewardship]
         behavior: plugin
         handler: SchemaCrossReferenceOp
         invocation_phrases:

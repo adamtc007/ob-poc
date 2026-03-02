@@ -16,6 +16,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: contract_pack
+          phase_tags: [deal]
         invocation_phrases:
           - "create contract pack"
           - "new contract pack"
@@ -51,6 +52,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: contract_template
+          phase_tags: [deal]
         invocation_phrases:
           - "add contract template"
           - "add template to pack"

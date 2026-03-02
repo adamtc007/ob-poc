@@ -26,6 +26,7 @@ use crate::agent::learning::embedder::SharedEmbedder;
 use crate::agent::learning::warmup::SharedLearnedData;
 use crate::database::VerbService;
 use crate::dsl_v2::macros::MacroRegistry;
+use crate::mcp::noun_index::NounIndex;
 use crate::mcp::verb_search::{HybridVerbSearcher, SharedLexicon};
 
 /// Factory for creating properly-configured `HybridVerbSearcher` instances.
@@ -44,11 +45,12 @@ impl VerbSearcherFactory {
     /// * `learned_data` - In-memory cache of learned invocation phrases (from warmup)
     /// * `macro_registry` - Operator macro registry for business vocabulary
     /// * `lexicon` - Optional lexicon service for fast lexical matching (runs before semantic)
+    /// * `noun_index` - Optional noun taxonomy index for deterministic Tier -1 ECIR resolution
     ///
     /// # Returns
     ///
     /// A `HybridVerbSearcher` with:
-    /// - All search channels enabled (lexicon, macro, learned exact/semantic, pattern embedding, phonetic)
+    /// - All search channels enabled (noun taxonomy, lexicon, macro, learned exact/semantic, pattern embedding, phonetic)
     /// - Proper threshold configuration for BGE asymmetric mode
     /// - user_id support for per-user learned phrases
     pub fn build(
@@ -57,6 +59,7 @@ impl VerbSearcherFactory {
         learned_data: Option<SharedLearnedData>,
         macro_registry: Arc<MacroRegistry>,
         lexicon: Option<SharedLexicon>,
+        noun_index: Option<Arc<NounIndex>>,
     ) -> HybridVerbSearcher {
         let verb_service = Arc::new(VerbService::new(pool.clone()));
 
@@ -66,6 +69,10 @@ impl VerbSearcherFactory {
 
         if let Some(lex) = lexicon {
             searcher = searcher.with_lexicon(lex);
+        }
+
+        if let Some(ni) = noun_index {
+            searcher = searcher.with_noun_index(ni);
         }
 
         searcher
@@ -89,6 +96,7 @@ mod tests {
             _learned_data: Option<SharedLearnedData>,
             _macro_registry: Arc<MacroRegistry>,
             _lexicon: Option<SharedLexicon>,
+            _noun_index: Option<Arc<NounIndex>>,
         ) -> HybridVerbSearcher {
             unimplemented!("type check only")
         }

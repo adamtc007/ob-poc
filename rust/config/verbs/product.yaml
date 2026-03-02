@@ -9,6 +9,7 @@ domains:
           source_of_truth: catalog
           scope: global
           noun: product
+          phase_tags: [onboarding]
         invocation_phrases:
           - "show product details"
           - "get product by code"
@@ -48,6 +49,7 @@ domains:
           source_of_truth: catalog
           scope: global
           noun: product
+          phase_tags: [onboarding]
         invocation_phrases:
           - "list available products"
           - "show product catalog"

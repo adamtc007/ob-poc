@@ -27,6 +27,7 @@ domains:
           scope: global
           noun: company_search_result
           tags: [read, external-source, registry-lookup]
+          phase_tags: [onboarding]
         behavior: plugin
         handler: SecSearchOp
         args:
@@ -54,6 +55,7 @@ domains:
           scope: global
           noun: company_profile
           tags: [read, external-source, registry-fetch]
+          phase_tags: [onboarding]
         behavior: plugin
         handler: SecFetchCompanyOp
         args:
@@ -81,6 +83,7 @@ domains:
           scope: global
           noun: beneficial_owner
           tags: [read, external-source, registry-fetch, ownership]
+          phase_tags: [onboarding]
         behavior: plugin
         handler: SecFetchBeneficialOwnersOp
         args:
@@ -121,6 +124,7 @@ domains:
           scope: global
           noun: filing
           tags: [read, external-source, registry-fetch]
+          phase_tags: [onboarding]
         behavior: plugin
         handler: SecFetchFilingsOp
         args:
@@ -152,6 +156,7 @@ domains:
           scope: global
           noun: entity
           tags: [write, import, registry-import]
+          phase_tags: [onboarding]
         behavior: plugin
         handler: SecImportCompanyOp
         args:

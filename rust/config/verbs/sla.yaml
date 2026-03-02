@@ -26,6 +26,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: sla
+          phase_tags: [deal]
         behavior: crud
         crud:
           operation: select
@@ -72,6 +73,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: sla
+          phase_tags: [deal]
         behavior: crud
         crud:
           operation: select
@@ -104,6 +106,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: sla
+          phase_tags: [deal]
         behavior: crud
         crud:
           operation: upsert
@@ -203,6 +206,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: sla
+          phase_tags: [deal]
         behavior: crud
         crud:
           operation: update
@@ -244,6 +248,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: sla
+          phase_tags: [deal]
         behavior: crud
         crud:
           operation: update
@@ -286,6 +291,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: sla
+          phase_tags: [deal]
         behavior: crud
         crud:
           operation: update
@@ -328,6 +334,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: sla
+          phase_tags: [deal]
         behavior: crud
         crud:
           operation: update
@@ -364,6 +371,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: sla
+          phase_tags: [deal]
         behavior: crud
         crud:
           operation: update
@@ -400,6 +408,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: sla
+          phase_tags: [deal]
         behavior: crud
         crud:
           operation: list_by_fk
@@ -441,6 +450,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: sla
+          phase_tags: [deal]
         behavior: crud
         crud:
           operation: update
@@ -476,6 +486,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: sla
+          phase_tags: [deal]
         behavior: crud
         crud:
           operation: insert
@@ -551,6 +562,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: sla
+          phase_tags: [deal]
         behavior: crud
         crud:
           operation: list_by_fk
@@ -593,6 +605,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: sla
+          phase_tags: [deal]
         behavior: crud
         crud:
           operation: insert
@@ -667,6 +680,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: sla
+          phase_tags: [deal]
         behavior: crud
         crud:
           operation: update
@@ -717,6 +731,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: sla
+          phase_tags: [deal]
         behavior: crud
         crud:
           operation: update
@@ -751,6 +766,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: sla
+          phase_tags: [deal]
         behavior: crud
         crud:
           operation: update
@@ -787,6 +803,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: sla
+          phase_tags: [deal]
         behavior: plugin
         handler: list_open_sla_breaches
         args:

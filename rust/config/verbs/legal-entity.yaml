@@ -16,6 +16,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: legal_entity
+          phase_tags: [onboarding]
         invocation_phrases:
           - "create legal entity"
           - "new legal entity"
@@ -54,6 +55,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: legal_entity
+          phase_tags: [onboarding]
         invocation_phrases:
           - "update legal entity"
           - "modify legal entity"
@@ -87,6 +89,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: legal_entity
+          phase_tags: [onboarding]
         invocation_phrases:
           - "list legal entities"
           - "show legal entities"

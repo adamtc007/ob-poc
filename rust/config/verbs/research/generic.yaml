@@ -24,6 +24,7 @@ domains:
           source_of_truth: external
           scope: global
           noun: research
+          phase_tags: [onboarding]
         behavior: plugin
         plugin:
           handler: ResearchGenericNormalizeOp

@@ -19,6 +19,7 @@ domains:
           scope: cbu
           noun: partnership
           tags: [kyc]
+          phase_tags: [onboarding]
         invocation_phrases:
           - "add partner to partnership"
           - "register new GP or LP"
@@ -122,6 +123,7 @@ domains:
           scope: cbu
           noun: partnership
           tags: [kyc]
+          phase_tags: [onboarding]
         invocation_phrases:
           - "record capital contribution"
           - "log partner drawdown payment"
@@ -174,6 +176,7 @@ domains:
           scope: cbu
           noun: partnership
           tags: [kyc]
+          phase_tags: [onboarding]
         invocation_phrases:
           - "record distribution to partner"
           - "log profit distribution"
@@ -226,6 +229,7 @@ domains:
           scope: cbu
           noun: partnership
           tags: [kyc]
+          phase_tags: [onboarding]
         invocation_phrases:
           - "withdraw partner from partnership"
           - "record partner exit"
@@ -274,6 +278,7 @@ domains:
           scope: cbu
           noun: partnership
           tags: [kyc]
+          phase_tags: [onboarding]
         invocation_phrases:
           - "list partners in partnership"
           - "show all GPs and LPs"
@@ -322,6 +327,7 @@ domains:
           scope: cbu
           noun: partnership
           tags: [kyc]
+          phase_tags: [onboarding]
         invocation_phrases:
           - "reconcile partnership capital"
           - "verify profit shares sum correctly"
@@ -380,6 +386,7 @@ domains:
           scope: cbu
           noun: partnership
           tags: [kyc]
+          phase_tags: [onboarding]
         invocation_phrases:
           - "analyze partnership control structure"
           - "who controls this partnership"

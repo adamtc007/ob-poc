@@ -17,6 +17,7 @@ domains:
           scope: cbu
           noun: skeleton_build
           tags: [kyc]
+          phase_tags: [kyc]
         behavior: plugin
         plugin:
           handler: SkeletonBuildOp

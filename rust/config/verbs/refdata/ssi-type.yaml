@@ -9,6 +9,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: ssi_type
+          phase_tags: [trading]
         invocation_phrases:
           - "add a new SSI type"
           - "register SSI classification"
@@ -61,6 +62,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: ssi_type
+          phase_tags: [trading]
         invocation_phrases:
           - "look up SSI type by code"
           - "get SSI type details"
@@ -90,6 +92,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: ssi_type
+          phase_tags: [trading]
         invocation_phrases:
           - "list all SSI types"
           - "show available SSI categories"
@@ -120,6 +123,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: ssi_type
+          phase_tags: [trading]
         invocation_phrases:
           - "deactivate an SSI type"
           - "disable this SSI classification"

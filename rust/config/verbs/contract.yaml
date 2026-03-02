@@ -26,6 +26,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: contract
+          phase_tags: [deal]
         invocation_phrases:
           - "create contract"
           - "new contract"
@@ -71,6 +72,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: contract
+          phase_tags: [deal]
         invocation_phrases:
           - "get contract"
           - "show contract"
@@ -95,6 +97,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: contract
+          phase_tags: [deal]
         invocation_phrases:
           - "list contracts"
           - "show contracts"
@@ -127,6 +130,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: contract
+          phase_tags: [deal]
         invocation_phrases:
           - "update contract"
           - "modify contract"
@@ -163,6 +167,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: contract
+          phase_tags: [deal]
         invocation_phrases:
           - "terminate contract"
           - "end contract"
@@ -195,6 +200,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: contract_product
+          phase_tags: [deal]
         invocation_phrases:
           - "add product to contract"
           - "add contract product"
@@ -234,6 +240,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: contract_product
+          phase_tags: [deal]
         invocation_phrases:
           - "remove product from contract"
           - "remove contract product"
@@ -262,6 +269,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: contract_product
+          phase_tags: [deal]
         invocation_phrases:
           - "list contract products"
           - "show products for contract"
@@ -291,6 +299,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: rate_card
+          phase_tags: [deal]
         invocation_phrases:
           - "create rate card"
           - "new rate card"
@@ -330,6 +339,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: rate_card
+          phase_tags: [deal]
         invocation_phrases:
           - "list rate cards"
           - "show rate cards"
@@ -354,6 +364,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: subscription
+          phase_tags: [deal]
         invocation_phrases:
           - "subscribe cbu to product"
           - "onboard cbu to product"
@@ -394,6 +405,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: subscription
+          phase_tags: [deal]
         invocation_phrases:
           - "unsubscribe cbu from product"
           - "remove cbu from contract product"
@@ -426,6 +438,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: subscription
+          phase_tags: [deal]
         invocation_phrases:
           - "list subscriptions"
           - "show cbu subscriptions"
@@ -463,6 +476,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: contract
+          phase_tags: [deal]
         invocation_phrases:
           - "contract for client"
           - "allianz contract"

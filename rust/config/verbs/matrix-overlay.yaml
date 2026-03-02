@@ -20,6 +20,7 @@ domains:
           source_of_truth: matrix
           scope: cbu
           noun: matrix_overlay
+          phase_tags: [onboarding]
         invocation_phrases:
           - "subscribe CBU to product"
           - "add product subscription"
@@ -79,6 +80,7 @@ domains:
           source_of_truth: matrix
           scope: cbu
           noun: matrix_overlay
+          phase_tags: [onboarding]
         invocation_phrases:
           - "unsubscribe from product"
           - "cancel product subscription"
@@ -112,6 +114,7 @@ domains:
           source_of_truth: matrix
           scope: cbu
           noun: matrix_overlay
+          phase_tags: [onboarding]
         invocation_phrases:
           - "suspend product subscription"
           - "pause subscription temporarily"
@@ -144,6 +147,7 @@ domains:
           source_of_truth: matrix
           scope: cbu
           noun: matrix_overlay
+          phase_tags: [onboarding]
         invocation_phrases:
           - "reactivate subscription"
           - "resume suspended product"
@@ -176,6 +180,7 @@ domains:
           source_of_truth: matrix
           scope: cbu
           noun: matrix_overlay
+          phase_tags: [onboarding]
         invocation_phrases:
           - "list product subscriptions"
           - "show products for CBU"
@@ -228,6 +233,7 @@ domains:
           source_of_truth: matrix
           scope: cbu
           noun: matrix_overlay
+          phase_tags: [trading]
         invocation_phrases:
           - "add product overlay"
           - "apply overlay to matrix"
@@ -332,6 +338,7 @@ domains:
           source_of_truth: matrix
           scope: cbu
           noun: matrix_overlay
+          phase_tags: [trading]
         invocation_phrases:
           - "remove product overlay"
           - "delete overlay from matrix"
@@ -362,6 +369,7 @@ domains:
           source_of_truth: matrix
           scope: cbu
           noun: matrix_overlay
+          phase_tags: [trading]
         invocation_phrases:
           - "suspend matrix overlay"
           - "pause product overlay"
@@ -394,6 +402,7 @@ domains:
           source_of_truth: matrix
           scope: cbu
           noun: matrix_overlay
+          phase_tags: [trading]
         invocation_phrases:
           - "activate matrix overlay"
           - "resume suspended overlay"
@@ -426,6 +435,7 @@ domains:
           source_of_truth: matrix
           scope: cbu
           noun: matrix_overlay
+          phase_tags: [trading]
         invocation_phrases:
           - "list matrix overlays"
           - "show product overlays for CBU"
@@ -469,6 +479,7 @@ domains:
           source_of_truth: matrix
           scope: cbu
           noun: matrix_overlay
+          phase_tags: [trading]
         invocation_phrases:
           - "list overlays for subscription"
           - "show overlays by product"
@@ -503,6 +514,7 @@ domains:
           source_of_truth: matrix
           scope: cbu
           noun: matrix_overlay
+          phase_tags: [trading]
         invocation_phrases:
           - "show effective trading matrix"
           - "get combined matrix view"
@@ -564,6 +576,7 @@ domains:
           source_of_truth: matrix
           scope: cbu
           noun: matrix_overlay
+          phase_tags: [trading]
         invocation_phrases:
           - "show matrix gaps"
           - "find missing resources"
@@ -610,6 +623,7 @@ domains:
           source_of_truth: matrix
           scope: cbu
           noun: matrix_overlay
+          phase_tags: [trading]
         invocation_phrases:
           - "compare product offerings"
           - "diff products on matrix"

@@ -14,6 +14,7 @@ domains:
           scope: cbu
           noun: capital
           tags: [kyc]
+          phase_tags: [onboarding]
         invocation_phrases:
           - "define share class for company"
           - "create new share class"
@@ -129,6 +130,7 @@ domains:
           scope: cbu
           noun: capital
           tags: [kyc]
+          phase_tags: [onboarding]
         invocation_phrases:
           - "allocate shares to shareholder"
           - "assign share holding"
@@ -195,6 +197,7 @@ domains:
           scope: cbu
           noun: capital
           tags: [kyc]
+          phase_tags: [onboarding]
         invocation_phrases:
           - "transfer shares between holders"
           - "record share transfer"
@@ -263,6 +266,7 @@ domains:
           scope: cbu
           noun: capital
           tags: [kyc]
+          phase_tags: [onboarding]
         invocation_phrases:
           - "reconcile capital structure"
           - "verify shareholding totals"
@@ -310,6 +314,7 @@ domains:
           scope: cbu
           noun: capital
           tags: [kyc]
+          phase_tags: [onboarding]
         invocation_phrases:
           - "trace ownership chain upward"
           - "get UBO ownership path"
@@ -349,6 +354,7 @@ domains:
           scope: cbu
           noun: capital
           tags: [kyc]
+          phase_tags: [onboarding]
         invocation_phrases:
           - "issue new shares"
           - "increase issued share capital"
@@ -391,6 +397,7 @@ domains:
           scope: cbu
           noun: capital
           tags: [kyc]
+          phase_tags: [onboarding]
         invocation_phrases:
           - "cancel shares from register"
           - "record share buyback"
@@ -433,6 +440,7 @@ domains:
           scope: cbu
           noun: capital
           tags: [kyc]
+          phase_tags: [onboarding]
         invocation_phrases:
           - "list share classes for issuer"
           - "show capital structure"
@@ -469,6 +477,7 @@ domains:
           scope: cbu
           noun: capital
           tags: [kyc]
+          phase_tags: [onboarding]
         invocation_phrases:
           - "list shareholders for class"
           - "show PSC register entries"

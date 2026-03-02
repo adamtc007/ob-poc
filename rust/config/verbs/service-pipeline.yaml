@@ -20,6 +20,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: service_intent
+          phase_tags: [stewardship]
         invocation_phrases:
           - "create a service intent"
           - "declare service intent for CBU"
@@ -75,6 +76,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: service_intent
+          phase_tags: [stewardship]
         invocation_phrases:
           - "list service intents for CBU"
           - "show all service subscriptions"
@@ -106,6 +108,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: service_intent
+          phase_tags: [stewardship]
         invocation_phrases:
           - "supersede service intent"
           - "replace existing service intent"
@@ -139,6 +142,8 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: discovery
+          subject_kinds: []
+          phase_tags: [stewardship]
         invocation_phrases:
           - "run resource discovery"
           - "discover required resources for CBU"
@@ -170,6 +175,8 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: discovery
+          subject_kinds: []
+          phase_tags: [stewardship]
         invocation_phrases:
           - "explain resource discovery results"
           - "why was this SRDEF discovered"
@@ -204,6 +211,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: attribute_requirements
+          phase_tags: [stewardship]
         invocation_phrases:
           - "roll up attribute requirements"
           - "merge attribute needs from SRDEFs"
@@ -235,6 +243,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: attribute_values
+          phase_tags: [stewardship]
         invocation_phrases:
           - "populate attribute values automatically"
           - "auto-fill attribute values from sources"
@@ -270,6 +279,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: attribute_gaps
+          phase_tags: [stewardship]
         invocation_phrases:
           - "show attribute gaps"
           - "what attributes are still missing"
@@ -305,6 +315,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: attribute_value
+          phase_tags: [stewardship]
         invocation_phrases:
           - "set attribute value manually"
           - "enter attribute value for resource"
@@ -350,6 +361,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: provisioning
+          phase_tags: [trading]
         invocation_phrases:
           - "run provisioning for CBU"
           - "provision service resources"
@@ -385,6 +397,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: provisioning_status
+          phase_tags: [trading]
         invocation_phrases:
           - "check provisioning request status"
           - "what is the provisioning status"
@@ -415,6 +428,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: readiness
+          phase_tags: [kyc]
         invocation_phrases:
           - "compute service readiness"
           - "check if CBU is ready to transact"
@@ -446,6 +460,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: blocking_reasons
+          phase_tags: [kyc]
         invocation_phrases:
           - "explain readiness blockers"
           - "why is this service not ready"
@@ -490,6 +505,8 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: pipeline
+          subject_kinds: []
+          phase_tags: [administration]
         invocation_phrases:
           - "run the full service pipeline"
           - "execute end-to-end provisioning pipeline"

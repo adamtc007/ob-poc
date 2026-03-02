@@ -9,6 +9,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: settlement_type
+          phase_tags: [trading]
         invocation_phrases:
           - "add a new settlement type"
           - "register settlement method"
@@ -61,6 +62,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: settlement_type
+          phase_tags: [trading]
         invocation_phrases:
           - "look up settlement type by code"
           - "get settlement type details"
@@ -90,6 +92,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: settlement_type
+          phase_tags: [trading]
         invocation_phrases:
           - "list all settlement types"
           - "show available settlement methods"
@@ -120,6 +123,7 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: settlement_type
+          phase_tags: [trading]
         invocation_phrases:
           - "deactivate a settlement type"
           - "disable this settlement method"

@@ -15,6 +15,7 @@ domains:
           scope: cbu
           noun: entity_workstream
           tags: [kyc]
+          phase_tags: [kyc]
         behavior: crud
         produces:
           type: workstream
@@ -101,6 +102,7 @@ domains:
           scope: cbu
           noun: entity_workstream
           tags: [kyc]
+          phase_tags: [kyc]
         behavior: crud
         crud:
           operation: update
@@ -146,6 +148,7 @@ domains:
           scope: cbu
           noun: entity_workstream
           tags: [kyc]
+          phase_tags: [kyc]
         behavior: crud
         crud:
           operation: update
@@ -186,6 +189,7 @@ domains:
           scope: cbu
           noun: entity_workstream
           tags: [kyc]
+          phase_tags: [kyc]
         behavior: crud
         crud:
           operation: update
@@ -231,6 +235,7 @@ domains:
           scope: cbu
           noun: entity_workstream
           tags: [kyc]
+          phase_tags: [kyc]
         behavior: crud
         crud:
           operation: update
@@ -267,6 +272,7 @@ domains:
           scope: cbu
           noun: entity_workstream
           tags: [kyc]
+          phase_tags: [kyc]
         behavior: crud
         crud:
           operation: update
@@ -306,6 +312,7 @@ domains:
           scope: cbu
           noun: entity_workstream
           tags: [kyc]
+          phase_tags: [kyc]
         behavior: crud
         crud:
           operation: list_by_fk
@@ -341,6 +348,7 @@ domains:
           scope: cbu
           noun: entity_workstream
           tags: [kyc]
+          phase_tags: [kyc]
         behavior: crud
         crud:
           operation: select
@@ -372,6 +380,7 @@ domains:
           scope: cbu
           noun: entity_workstream
           tags: [kyc]
+          phase_tags: [kyc]
         behavior: plugin
         handler: WorkstreamStateOp
         args:

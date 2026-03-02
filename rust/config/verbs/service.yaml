@@ -9,6 +9,7 @@ domains:
           source_of_truth: catalog
           scope: global
           noun: service
+          phase_tags: [stewardship]
         invocation_phrases:
           - "read service details"
           - "get service by code"
@@ -48,6 +49,7 @@ domains:
           source_of_truth: catalog
           scope: global
           noun: service
+          phase_tags: [stewardship]
         invocation_phrases:
           - "list available services"
           - "show all services in catalog"
@@ -89,6 +91,7 @@ domains:
           source_of_truth: catalog
           scope: global
           noun: service
+          phase_tags: [stewardship]
         invocation_phrases:
           - "list services for a product"
           - "show services under this product"
