@@ -41,15 +41,19 @@
 //! DATABASE_URL=postgresql://localhost/ob-poc ./target/debug/dsl_mcp
 //! ```
 
+pub mod compound_intent;
 pub mod enrichment;
 pub mod handlers;
 pub mod intent_pipeline;
+pub mod macro_index;
 pub mod macro_integration;
 pub mod noun_index;
 pub mod protocol;
 pub mod resolution;
 pub mod resources_sem_reg;
+pub mod scenario_index;
 pub mod scope_resolution;
+pub mod sequence_validator;
 pub mod server;
 pub mod tools;
 pub mod tools_sem_reg;

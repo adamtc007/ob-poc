@@ -63,6 +63,7 @@
 > **CCIR — Context-Constrained Intent Resolution (Migration 103):** ✅ Complete - ContextEnvelope replaces SemRegVerbPolicy, structured PruneReason (7 variants), deterministic AllowedVerbSetFingerprint (SHA-256), TOCTOU recheck, pre-constrained verb search (allowed verbs threaded into HybridVerbSearcher), SemReg enforcement at dsl_execute, legacy V1 module cleanup (4 modules deleted: ~2,700 LOC), 16 unit tests
 > **SessionVerbSurface:** ✅ Complete - Consolidated governance layer composition (SemReg CCIR + AgentMode + workflow phase + lifecycle + actor gating), 8-step compute pipeline, dual fingerprints (surface `vs1:` + SemReg `v1:`), FailClosed safe-harbor (~30 verbs), MCP tool `session_verb_surface`, REST endpoint `GET /api/session/:id/verb-surface`, ChatResponse enrichment, React VerbBrowser governance badges, 13 unit tests
 > **Semantic OS Tab:** ✅ Complete - Agent-driven workflow selection UI (`/semantic-os`), goals→phase_tags verb scoping in SemReg, DecisionPacket workflow prompt (Onboarding/KYC/Data Management/Stewardship), session sidebar + registry context panel, `GET /api/sem-os/context` endpoint
+> **Scenario-Based Intent Resolution (Phases 0.5-1):** ✅ Complete — MacroIndex (Tier -2B) + ScenarioIndex (Tier -2A) + CompoundSignals + SequenceValidator; deterministic scoring ledger, 10 YAML scenarios, ECIR short-circuit gating
 
 This is the root project guide for Claude Code. Domain-specific details are in annexes.
 
@@ -484,7 +485,9 @@ User says: "spin up a fund for Acme"
             verb_search tool
                     ↓
     ┌───────────────┴───────────────────┐
-    │     Search Priority (8-tier)       │
+    │     Search Priority (10-tier)      │
+    │ -2A. ScenarioIndex (journey-level) │
+    │ -2B. MacroIndex (macro search parity)│
     │ -1. ECIR noun taxonomy (deterministic) │
     │  0. Operator macros (business vocab)│
     │  1. User learned (exact)           │
@@ -611,6 +614,8 @@ User says: "spin up a fund for Acme"
 **Search Priority (Updated):**
 
 ```
+-2A. ScenarioIndex (journey-level) — compound utterances → macro/sequence/selector (score 0.97)
+-2B. MacroIndex (macro search parity) — single-macro utterances → macro match (score 0.96)
 -1. ECIR noun taxonomy (deterministic) - score 0.95 single-verb, +0.05 post-boost multi-verb
  0. Operator macros (business vocabulary) - score 1.0 exact, 0.95 fuzzy
  1. User-specific learned (exact) - score 1.0
@@ -735,6 +740,11 @@ embedder.embed_target("load galaxy by apex name")
 | `rust/src/mcp/verb_search.rs` | `HybridVerbSearcher` - semantic search (uses VerbService) |
 | `rust/src/mcp/noun_index.rs` | `NounIndex` + `VerbContractIndex` - ECIR deterministic Tier -1 noun→verb resolution |
 | `rust/config/noun_index.yaml` | 99-noun taxonomy mapping domain nouns to verb candidates |
+| `rust/src/mcp/scenario_index.rs` | `ScenarioIndex` - Tier -2A journey-level scenario resolution |
+| `rust/src/mcp/compound_intent.rs` | `CompoundSignals` - shared compound signal extraction |
+| `rust/src/mcp/sequence_validator.rs` | Macro sequence prereq validation |
+| `rust/config/scenario_index.yaml` | 10 journey scenario definitions |
+| `rust/config/macro_search_overrides.yaml` | Curated macro search aliases |
 | `rust/src/session/verb_sync.rs` | `VerbSyncService` - syncs YAML to DB |
 | `rust/crates/ob-semantic-matcher/src/bin/populate_embeddings.rs` | Populates verb_pattern_embeddings |
 | `rust/crates/ob-semantic-matcher/src/feedback/learner.rs` | Learning loop |
@@ -791,6 +801,8 @@ After teaching new phrases, just run `populate_embeddings` without `--force` to 
 
 All DB access goes through `VerbService` (no direct sqlx calls).
 
+-2A. **ScenarioIndex** → journey-level compound intent → macro/sequence/selector (score 0.97)
+-2B. **MacroIndex** → deterministic macro search parity (score 0.96)
 -1. **ECIR noun taxonomy** → deterministic noun→verb resolution (score 0.95 single-verb short-circuit, +0.05 post-boost for multi-verb)
 0. Operator macros → business vocabulary (score 1.0 exact, 0.95 fuzzy)
 1. User learned exact → `agent.user_learned_phrases`
@@ -1670,6 +1682,8 @@ New primitive verbs for macro expansion targets:
 ### Verb Search Priority (Updated)
 
 ```
+-2A. ScenarioIndex (journey-level) — compound utterances → macro/sequence/selector (score 0.97)
+-2B. MacroIndex (macro search parity) — single-macro utterances → macro match (score 0.96)
 -1. ECIR noun taxonomy (deterministic) - score 0.95 single-verb, +0.05 post-boost multi-verb
 0. Operator macros (business vocabulary) - score 1.0 exact, 0.95 fuzzy
 1. User-specific learned (exact) - score 1.0
@@ -3383,6 +3397,11 @@ IntentPipeline.process()
 | `rust/src/mcp/verb_search.rs` | `HybridVerbSearcher` - semantic + exact match |
 | `rust/src/mcp/noun_index.rs` | `NounIndex` + `VerbContractIndex` - ECIR Tier -1 noun→verb |
 | `rust/config/noun_index.yaml` | 99-noun taxonomy for deterministic verb resolution |
+| `rust/src/mcp/scenario_index.rs` | `ScenarioIndex` - Tier -2A journey-level scenario resolution |
+| `rust/src/mcp/compound_intent.rs` | `CompoundSignals` - shared compound signal extraction |
+| `rust/src/mcp/sequence_validator.rs` | Macro sequence prereq validation |
+| `rust/config/scenario_index.yaml` | 10 journey scenario definitions |
+| `rust/config/macro_search_overrides.yaml` | Curated macro search aliases |
 | `rust/src/api/agent_service.rs` | `AgentService.process_chat()` entry point |
 | `rust/config/verbs/view.yaml` | Navigation verbs (view.drill, view.surface, etc.) |
 | `rust/config/verbs/session.yaml` | Session verbs (session.load-galaxy, etc.) |
@@ -3974,6 +3993,8 @@ Every user utterance flows through **three sequential stages** that progressivel
 │  │  PRONG 1: RAW SEMANTIC SEARCH (VerbSearchIntentMatcher)             │    │
 │  │                                                                     │    │
 │  │  HybridVerbSearcher.search() — tiered priority:                    │    │
+│  │    T-2A: ScenarioIndex (journey-level compound)     0.97      │    │
+│  │    T-2B: MacroIndex (macro search parity)            0.96      │    │
 │  │    T-1: ECIR noun taxonomy (deterministic noun→verb)     0.95      │    │
 │  │         1 candidate → short-circuit, 2+ → post-boost (+0.05)      │    │
 │  │    T0: Operator macros (exact/fuzzy label match)         score 1.0  │    │
@@ -5767,6 +5788,10 @@ When you see these in a task, read the corresponding annex first:
 | "ContextEnvelope", "context_envelope", "CCIR", "PruneReason", "AllowedVerbSetFingerprint", "TOCTOU recheck" | CLAUDE.md §Agent Intent Pipeline Hardening §CCIR |
 | "SessionVerbSurface", "verb surface", "VerbSurfaceFailPolicy", "FailClosed", "safe-harbor", "SurfaceFingerprint", "PruneLayer", "compute_session_verb_surface" | CLAUDE.md §SessionVerbSurface |
 | "ECIR", "NounIndex", "noun_index", "VerbContractIndex", "noun taxonomy", "entity-centric intent" | CLAUDE.md §Navigation §Verb Search Thresholds, `rust/src/mcp/noun_index.rs`, `rust/config/noun_index.yaml` |
+| "ScenarioIndex", "scenario_index", "Tier -2A", "compound intent", "scenario-based", "journey-level intent" | CLAUDE.md §Scenario-Based Intent Resolution, `rust/src/mcp/scenario_index.rs`, `rust/src/mcp/compound_intent.rs`, `rust/config/scenario_index.yaml` |
+| "MacroIndex", "macro_index", "Tier -2B", "macro search parity" | CLAUDE.md §MacroIndex, `rust/src/mcp/macro_index.rs`, `rust/config/macro_search_overrides.yaml` |
+| "CompoundSignals", "compound_intent", "compound signals", "compound action", "jurisdiction extraction" | `rust/src/mcp/compound_intent.rs` |
+| "SequenceValidator", "sequence_validator", "macro sequence", "prereq validation" | `rust/src/mcp/sequence_validator.rs` |
 | "ownership.refresh", "OwnershipRefreshOp", "bridge ManCo", "derive CBU groups" | `rust/src/domain_ops/manco_ops.rs` |
 
 ---

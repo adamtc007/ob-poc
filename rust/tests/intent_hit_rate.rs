@@ -193,9 +193,7 @@ mod tests {
                         .map(|c| (c.verb.clone(), c.score))
                         .collect();
 
-                    let top_source = candidates
-                        .first()
-                        .map(|c| format!("{:?}", c.source));
+                    let top_source = candidates.first().map(|c| format!("{:?}", c.source));
 
                     // Check ambiguity (same logic as production pipeline)
                     let threshold = searcher.semantic_threshold();
@@ -523,10 +521,7 @@ fn print_ecir_report(results: &[TestResult]) {
         annotated_total,
         results.len()
     );
-    println!(
-        "    deterministic:           {}",
-        annotated_deterministic
-    );
+    println!("    deterministic:           {}", annotated_deterministic);
     println!("    narrow:                  {}", annotated_narrow);
     println!("    fallthrough:             {}", annotated_fallthrough);
     println!();
@@ -776,13 +771,13 @@ fn truncate(s: &str, max: usize) -> String {
 // ============================================================================
 
 async fn build_test_searcher(pool: &PgPool) -> ob_poc::mcp::verb_search::HybridVerbSearcher {
+    use dsl_core::config::ConfigLoader;
     use ob_poc::agent::learning::embedder::CandleEmbedder;
     use ob_poc::agent::learning::embedder::Embedder;
     use ob_poc::agent::learning::warmup::LearningWarmup;
     use ob_poc::database::verb_service::VerbService;
     use ob_poc::mcp::noun_index::{NounIndex, VerbContractIndex};
     use ob_poc::mcp::verb_search::HybridVerbSearcher;
-    use dsl_core::config::ConfigLoader;
     use std::sync::Arc;
 
     // Env overrides for threshold sweeps
@@ -841,7 +836,11 @@ async fn build_test_searcher(pool: &PgPool) -> ob_poc::mcp::verb_search::HybridV
                 if let Ok(content) = std::fs::read_to_string(path) {
                     match NounIndex::from_yaml(&content, vci.clone()) {
                         Ok(ni) => {
-                            println!("  NounIndex: loaded {} nouns from {}", ni.canonical_count(), path);
+                            println!(
+                                "  NounIndex: loaded {} nouns from {}",
+                                ni.canonical_count(),
+                                path
+                            );
                             loaded = Some(Arc::new(ni));
                             break;
                         }

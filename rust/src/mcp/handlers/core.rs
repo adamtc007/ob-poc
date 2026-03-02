@@ -207,6 +207,10 @@ pub struct ToolHandlers {
     pub(super) lexicon: Option<crate::mcp::verb_search::SharedLexicon>,
     /// Noun taxonomy index for deterministic Tier -1 ECIR resolution
     pub(super) noun_index: Option<Arc<crate::mcp::noun_index::NounIndex>>,
+    /// Macro index for deterministic Tier -2B macro search
+    pub(super) macro_index: Option<Arc<crate::mcp::macro_index::MacroIndex>>,
+    /// Scenario index for journey-level Tier -2A resolution
+    pub(super) scenario_index: Option<Arc<crate::mcp::scenario_index::ScenarioIndex>>,
     /// Semantic OS client — routes sem_reg_* tool calls through the DI boundary
     pub(super) sem_os_client: Option<Arc<dyn SemOsClient>>,
     /// Authoring pipeline mode (Research vs Governed) — controls db_introspect surface.
@@ -232,6 +236,8 @@ impl ToolHandlers {
             macro_registry: None,
             lexicon: None,
             noun_index: None,
+            macro_index: None,
+            scenario_index: None,
             sem_os_client: None,
             agent_mode: sem_os_core::authoring::agent_mode::AgentMode::default(),
         }
@@ -252,6 +258,24 @@ impl ToolHandlers {
     /// Set the noun taxonomy index for deterministic Tier -1 ECIR resolution
     pub fn with_noun_index(mut self, noun_index: Arc<crate::mcp::noun_index::NounIndex>) -> Self {
         self.noun_index = Some(noun_index);
+        self
+    }
+
+    /// Set the macro index for deterministic Tier -2B macro search
+    pub fn with_macro_index(
+        mut self,
+        macro_index: Arc<crate::mcp::macro_index::MacroIndex>,
+    ) -> Self {
+        self.macro_index = Some(macro_index);
+        self
+    }
+
+    /// Set the scenario index for journey-level Tier -2A resolution
+    pub fn with_scenario_index(
+        mut self,
+        scenario_index: Arc<crate::mcp::scenario_index::ScenarioIndex>,
+    ) -> Self {
+        self.scenario_index = Some(scenario_index);
         self
     }
 
@@ -314,6 +338,8 @@ impl ToolHandlers {
                 macro_registry.clone(),
                 self.lexicon.clone(),
                 self.noun_index.clone(),
+                self.macro_index.clone(),
+                self.scenario_index.clone(),
             )
         } else {
             // Fallback without macro registry (should be rare)
@@ -324,6 +350,8 @@ impl ToolHandlers {
                 Arc::new(MacroRegistry::new()),
                 self.lexicon.clone(),
                 self.noun_index.clone(),
+                None,
+                None,
             )
         };
 

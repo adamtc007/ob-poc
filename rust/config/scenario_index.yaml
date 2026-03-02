@@ -1,0 +1,181 @@
+# Scenario Index — Journey-level intent resolution (Tier -2A)
+#
+# Each scenario maps compound utterances (e.g., "Onboard a Luxembourg SICAV")
+# to macro routes (single macro, macro sequence, or jurisdiction selector).
+#
+# Scoring ledger:
+#   compound action: +4, jurisdiction: +4, structure noun: +3,
+#   phase noun: +2, quantifier: +2, macro metadata: +3, single-verb cue: -6
+#
+# Hard gates: G1 (compound signal), G2 (mode compat), G3 (score >= 8)
+
+scenarios:
+  # ── Luxembourg UCITS SICAV ─────────────────────────────────────────────
+  - id: lux-sicav-setup
+    title: "Luxembourg UCITS SICAV Setup"
+    modes: [onboarding, structure]
+    requires:
+      all_of: [compound_action, jurisdiction]
+    signals:
+      actions: [onboard, "set up", establish, launch, configure]
+      jurisdictions: [LU]
+      nouns_any: [sicav, ucits, fund, umbrella, compartment, sub-fund]
+    routes:
+      kind: macro
+      macro_fqn: struct.lux.ucits.sicav
+    explain:
+      summary: "Full Luxembourg UCITS SICAV structure setup (13 steps)"
+
+  # ── Luxembourg AIF RAIF ────────────────────────────────────────────────
+  - id: lux-raif-setup
+    title: "Luxembourg AIF RAIF Setup"
+    modes: [onboarding, structure]
+    requires:
+      all_of: [compound_action, jurisdiction]
+    signals:
+      actions: [onboard, "set up", establish, launch, configure]
+      jurisdictions: [LU]
+      nouns_any: [raif, aif]
+    routes:
+      kind: macro
+      macro_fqn: struct.lux.aif.raif
+    explain:
+      summary: "Luxembourg Reserved Alternative Investment Fund setup"
+
+  # ── Luxembourg PE SCSp ─────────────────────────────────────────────────
+  - id: lux-pe-setup
+    title: "Luxembourg PE SCSp Setup"
+    modes: [onboarding, structure]
+    requires:
+      all_of: [compound_action, jurisdiction]
+    signals:
+      actions: [onboard, "set up", establish, launch, configure]
+      jurisdictions: [LU]
+      nouns_any: [scsp, slp, lp, "private equity", pe]
+    routes:
+      kind: macro
+      macro_fqn: struct.lux.pe.scsp
+    explain:
+      summary: "Luxembourg Special Limited Partnership (SCSp) for private equity"
+
+  # ── Ireland UCITS ICAV ─────────────────────────────────────────────────
+  - id: ie-icav-setup
+    title: "Ireland UCITS ICAV Setup"
+    modes: [onboarding, structure]
+    requires:
+      all_of: [compound_action, jurisdiction]
+    signals:
+      actions: [onboard, "set up", establish, launch, configure]
+      jurisdictions: [IE]
+      nouns_any: [icav, ucits, fund]
+    routes:
+      kind: macro
+      macro_fqn: struct.ie.ucits.icav
+    explain:
+      summary: "Irish Collective Asset-management Vehicle (ICAV) UCITS setup"
+
+  # ── UK Authorised OEIC ─────────────────────────────────────────────────
+  - id: uk-oeic-setup
+    title: "UK Authorised OEIC Setup"
+    modes: [onboarding, structure]
+    requires:
+      all_of: [compound_action, jurisdiction]
+    signals:
+      actions: [onboard, "set up", establish, launch, configure]
+      jurisdictions: [UK]
+      nouns_any: [oeic, fund, ucits]
+    routes:
+      kind: macro
+      macro_fqn: struct.uk.authorised.oeic
+    explain:
+      summary: "UK Open-Ended Investment Company (OEIC) setup"
+
+  # ── US 40-Act Open-End Fund ────────────────────────────────────────────
+  - id: us-40act-setup
+    title: "US 40-Act Open-End Fund Setup"
+    modes: [onboarding, structure]
+    requires:
+      all_of: [compound_action, jurisdiction]
+    signals:
+      actions: [onboard, "set up", establish, launch, configure]
+      jurisdictions: [US]
+      nouns_any: [fund, "open-end", "mutual fund", "40-act", "40 act"]
+    routes:
+      kind: macro
+      macro_fqn: struct.us.40act.open-end
+    explain:
+      summary: "US Investment Company Act of 1940 open-end fund setup"
+
+  # ── Jurisdiction Selector (generic onboarding) ─────────────────────────
+  - id: generic-fund-onboarding
+    title: "Fund Structure Onboarding (by jurisdiction)"
+    modes: [onboarding, structure]
+    requires:
+      any_of: [compound_action]
+    signals:
+      actions: [onboard, "set up", establish, launch, configure, prepare, initiate]
+      nouns_any: [fund, structure, vehicle, ucits, sicav, icav, oeic]
+    routes:
+      kind: macro_selector
+      select_on: jurisdiction
+      options:
+        - value: LU
+          macro_fqn: struct.lux.ucits.sicav
+        - value: IE
+          macro_fqn: struct.ie.ucits.icav
+        - value: UK
+          macro_fqn: struct.uk.authorised.oeic
+        - value: US
+          macro_fqn: struct.us.40act.open-end
+    explain:
+      summary: "Fund onboarding — select jurisdiction to determine structure type"
+
+  # ── Full KYC Screening Sequence ────────────────────────────────────────
+  - id: full-screening
+    title: "Full KYC Screening"
+    modes: [kyc, onboarding]
+    requires:
+      any_of: [compound_action, multi_noun_workflow]
+    signals:
+      actions: [onboard, "run the", "complete the", "do the", configure]
+      nouns_any: [kyc, screening, "due diligence", aml, compliance, case]
+      phrases_any: ["full screening", "complete screening", "run kyc", "kyc screening"]
+    routes:
+      kind: macro_sequence
+      macros:
+        - case.open
+        - case.submit
+    explain:
+      summary: "Open KYC case and submit for screening"
+
+  # ── Cross-Border Hedge Fund ────────────────────────────────────────────
+  - id: hedge-cross-border-setup
+    title: "Cross-Border Hedge Fund Setup"
+    modes: [onboarding, structure]
+    requires:
+      all_of: [compound_action]
+    signals:
+      actions: [onboard, "set up", establish, launch]
+      nouns_any: [hedge, "hedge fund", "cross-border"]
+      phrases_any: ["cross-border hedge", "hedge fund setup"]
+    routes:
+      kind: macro
+      macro_fqn: struct.hedge.cross-border
+    explain:
+      summary: "Cross-border hedge fund structure with master-feeder"
+
+  # ── Cross-Border PE Fund ───────────────────────────────────────────────
+  - id: pe-cross-border-setup
+    title: "Cross-Border PE Fund Setup"
+    modes: [onboarding, structure]
+    requires:
+      all_of: [compound_action]
+    signals:
+      actions: [onboard, "set up", establish, launch]
+      nouns_any: ["private equity", pe, "cross-border"]
+      phrases_any: ["cross-border pe", "pe fund setup", "private equity setup"]
+    routes:
+      kind: macro
+      macro_fqn: struct.pe.cross-border
+    explain:
+      summary: "Cross-border private equity fund structure"

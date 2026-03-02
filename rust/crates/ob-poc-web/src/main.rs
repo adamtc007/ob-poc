@@ -677,6 +677,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             use ob_poc::agent::learning::warmup::LearningWarmup;
             use ob_poc::dsl_v2::macros::{load_macro_registry_from_dir, MacroRegistry};
             use ob_poc::dsl_v2::ConfigLoader;
+            use ob_poc::mcp::macro_index::MacroIndex;
+            use ob_poc::mcp::scenario_index::ScenarioIndex;
             use ob_poc::mcp::verb_search_factory::VerbSearcherFactory;
             use ob_poc::mcp::verb_search_intent_matcher::VerbSearchIntentMatcher;
             use ob_poc::repl::intent_service::IntentService;
@@ -764,7 +766,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         let config_loader_for_ni = ConfigLoader::from_env();
                         match config_loader_for_ni.load_verbs() {
                             Ok(verbs_cfg) => {
-                                let vi = ob_poc::mcp::noun_index::VerbContractIndex::from_verbs_config(&verbs_cfg);
+                                let vi =
+                                    ob_poc::mcp::noun_index::VerbContractIndex::from_verbs_config(
+                                        &verbs_cfg,
+                                    );
                                 let yaml_paths = [
                                     std::path::Path::new("rust/config/noun_index.yaml"),
                                     std::path::Path::new("config/noun_index.yaml"),
@@ -773,7 +778,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 let mut loaded = None;
                                 for path in &yaml_paths {
                                     if path.exists() {
-                                        match ob_poc::mcp::noun_index::NounIndex::load(path, vi.clone()) {
+                                        match ob_poc::mcp::noun_index::NounIndex::load(
+                                            path,
+                                            vi.clone(),
+                                        ) {
                                             Ok(ni) => {
                                                 tracing::info!(
                                                     "NounIndex loaded: {} canonical aliases, {} verb summaries",
@@ -784,7 +792,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                                 break;
                                             }
                                             Err(e) => {
-                                                tracing::warn!("Failed to load noun_index.yaml from {}: {}", path.display(), e);
+                                                tracing::warn!(
+                                                    "Failed to load noun_index.yaml from {}: {}",
+                                                    path.display(),
+                                                    e
+                                                );
                                             }
                                         }
                                     }
@@ -795,10 +807,57 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 loaded
                             }
                             Err(e) => {
-                                tracing::warn!("Failed to load verbs config for NounIndex: {}. ECIR disabled.", e);
+                                tracing::warn!(
+                                    "Failed to load verbs config for NounIndex: {}. ECIR disabled.",
+                                    e
+                                );
                                 None
                             }
                         }
+                    };
+
+                    // 5c. Build MacroIndex for deterministic Tier -2B macro search
+                    let macro_index: Option<Arc<MacroIndex>> = {
+                        let mi = MacroIndex::from_registry(&macro_reg, None);
+                        tracing::info!("MacroIndex built: {} entries from MacroRegistry", mi.len());
+                        Some(Arc::new(mi))
+                    };
+
+                    // 5d. Load ScenarioIndex for journey-level Tier -2A resolution
+                    let scenario_index: Option<Arc<ScenarioIndex>> = {
+                        let search_paths = [
+                            "rust/config/scenario_index.yaml",
+                            "config/scenario_index.yaml",
+                            "../rust/config/scenario_index.yaml",
+                        ];
+                        let mut loaded = None;
+                        for rel in &search_paths {
+                            let path = std::path::Path::new(rel);
+                            if path.exists() {
+                                match ScenarioIndex::from_yaml_file(path) {
+                                    Ok(si) => {
+                                        tracing::info!(
+                                            "ScenarioIndex loaded: {} scenarios from {}",
+                                            si.len(),
+                                            path.display()
+                                        );
+                                        loaded = Some(Arc::new(si));
+                                        break;
+                                    }
+                                    Err(e) => {
+                                        tracing::warn!(
+                                            "Failed to load scenario_index.yaml from {}: {}",
+                                            path.display(),
+                                            e
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                        if loaded.is_none() {
+                            tracing::info!("ScenarioIndex not found (Tier -2A disabled). Looked in: rust/config/, config/, ../rust/config/");
+                        }
+                        loaded
                     };
 
                     // 6. Build HybridVerbSearcher via factory
@@ -810,6 +869,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         macro_reg,
                         lexicon,
                         noun_index.clone(),
+                        macro_index,
+                        scenario_index,
                     ));
 
                     // 7. Wrap in IntentMatcher → IntentService

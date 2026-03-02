@@ -1,0 +1,19 @@
+# Macro Search Overrides
+#
+# Curated aliases and search phrases for macros that can't be derived
+# from macro metadata alone. These are merged into MacroIndex at startup.
+#
+# Format:
+#   <macro_fqn>:
+#     aliases:
+#       - "phrase one"
+#       - "phrase two"
+#
+# Example:
+#   struct.lux.ucits.sicav:
+#     aliases:
+#       - "lux ucits"
+#       - "luxembourg sicav fund"
+#
+# Initially empty — MacroIndex derives all search terms from macro metadata.
+# Add curated overrides here when auto-derived terms are insufficient.

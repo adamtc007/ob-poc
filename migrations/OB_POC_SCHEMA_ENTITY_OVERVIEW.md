@@ -1,6 +1,6 @@
 # OB-POC — Schema Entity Overview
 
-> **Last reconciled:** 2026-02-25 — against 98 migrations, 58 DSL verb domains, CLAUDE.md
+> **Last reconciled:** 2026-03-02 — against 103 migrations, 58 DSL verb domains, CLAUDE.md
 > **Scope:** `"ob-poc"` schema (206 tables) + `"kyc"` schema (37 tables + 10 views) + `"sem_reg"` schema (16 tables + 14 views) + `"sem_reg_pub"` schema (4 tables) + `"stewardship"` schema (9 tables) + `"ob_ref"` tollgate definitions. External schemas (`custody`, `agent`, `teams`) referenced but not detailed.
 > **Method:** SQL DDL cross-referenced with DSL verb YAML (`rust/config/verbs/*.yaml`) to validate domain groupings.
 > **Mermaid ER diagrams** render in GitHub, VS Code, and any CommonMark renderer with mermaid support.
@@ -1238,7 +1238,7 @@ The registry is split across **two PostgreSQL schemas**:
 - **`sem_reg`** — Source of truth: immutable snapshots, agent plans, projections, outbox, changesets (16 tables, 14 views, 2 functions)
 - **`sem_reg_pub`** — Read-only projections: flattened active snapshots for ob-poc consumption (4 tables)
 
-**Migrations:** 078 (Phase 0), 079 (Phase 1), 081 (Phase 2), 082 (Phase 3), 083 (Phases 4-5), 084 (Phase 7), 085 (Phase 8), 086 (Phase 9), 090 (Evidence instances), 091 (Evidence fixes), 092 (Outbox), 093 (Bootstrap audit), 094 (sem_reg_pub projections), 095 (Changesets)
+**Migrations:** 078 (Phase 0), 079 (Phase 1), 081 (Phase 2), 082 (Phase 3), 083 (Phases 4-5), 084 (Phase 7), 085 (Phase 8), 086 (Phase 9), 090 (Evidence instances), 091 (Evidence fixes), 092 (Outbox), 093 (Bootstrap audit), 094 (sem_reg_pub projections), 095 (Changesets), 101 (Changesets status CHECK fix)
 
 ### Enums
 
@@ -1815,7 +1815,7 @@ stewardship.idempotency_keys (tool invocation dedup)
 
 The `sem_reg_authoring` schema supports the **Governed Registry Authoring Pipeline** — a two-plane model where research produces immutable ChangeSets and the governed plane validates and publishes them atomically into the active snapshot set. This schema provides validation report storage, governance audit logging, batch publish tracking, artifact storage, and retention/archival.
 
-**Migrations:** 099 (core authoring tables + `sem_reg.changesets` extensions), 100 (archive tables)
+**Migrations:** 099 (core authoring tables + `sem_reg.changesets` extensions), 100 (archive tables), 101 (changesets status CHECK fix — adds `in_review` alongside `under_review`), 102 (archive column fix — `owner_id` → `owner_actor_id` TEXT + `updated_at`)
 
 ### Extended Tables (in `sem_reg` schema, by M099)
 
@@ -1835,7 +1835,7 @@ Migration 099 extends the existing `sem_reg.changesets` and `sem_reg.changeset_e
 | `depends_on` | UUID[] | Dependency ordering for batch publish |
 | `evaluated_against_snapshot_set_id` | UUID | Snapshot set at dry-run time (drift detection) |
 
-**New status values:** `validated`, `dry_run_passed`, `dry_run_failed`, `superseded` (added to CHECK constraint alongside existing draft/under_review/approved/published/rejected).
+**New status values:** `validated`, `dry_run_passed`, `dry_run_failed`, `superseded` (added to CHECK constraint alongside existing draft/under_review/approved/published/rejected). Migration 101 further extends the CHECK to also allow `in_review` (transitional synonym for `under_review`). Full allowed set: `draft`, `under_review`, `in_review`, `approved`, `rejected`, `published`, `validated`, `dry_run_passed`, `dry_run_failed`, `superseded`.
 
 **New index:** `uq_changeset_content_hash` — UNIQUE on `(hash_version, content_hash)` WHERE `content_hash IS NOT NULL AND status NOT IN ('rejected', 'superseded')`. Enables content-addressed idempotent propose.
 
@@ -1857,7 +1857,7 @@ Migration 099 extends the existing `sem_reg.changesets` and `sem_reg.changeset_e
 | `sem_reg_authoring.governance_audit_log` | Permanent append-only audit trail for all 7 governance verbs (propose/validate/dry_run/plan_publish/publish/rollback/diff). Records `verb`, `agent_session_id`, `agent_mode` (Research/Governed), `change_set_id`, `snapshot_set_id`, `active_snapshot_set_id`, `result` JSONB, `duration_ms`, `metadata` JSONB. Indexed by `ts DESC` and `change_set_id`. | INSERT-only (append) |
 | `sem_reg_authoring.publish_batches` | Tracks atomic batch publishes. `change_set_ids UUID[]` lists all changesets published together (topologically sorted). `snapshot_set_id` is the target set. `publisher` identifies the actor. | INSERT-only (append) |
 | `sem_reg_authoring.change_set_artifacts` | Stored artifacts (SQL migrations, YAML defs, JSON schemas) associated with changesets. `artifact_type`, `ordinal` for ordering, `content` (full text), `content_hash` (SHA-256), `path` (file path in bundle), `metadata` JSONB. FK to `sem_reg.changesets`. Indexed by `(change_set_id, ordinal)`. | INSERT-only per changeset |
-| `sem_reg_authoring.change_sets_archive` | Archive destination for expired/orphan changesets (rejected > 90 days, orphan drafts > 30 days). Mirrors `sem_reg.changesets` structure including all v0.4 extended columns. `archived_at` timestamp added. Indexed by `status` and `archived_at DESC`. | INSERT-only (retention job) |
+| `sem_reg_authoring.change_sets_archive` | Archive destination for expired/orphan changesets (rejected > 90 days, orphan drafts > 30 days). Mirrors `sem_reg.changesets` structure including all v0.4 extended columns. `archived_at` timestamp added. Indexed by `status` and `archived_at DESC`. Migration 102 fixed column type: `owner_id UUID` renamed to `owner_actor_id TEXT` to match live `sem_reg.changesets`, and added `updated_at TIMESTAMPTZ`. | INSERT-only (retention job) |
 | `sem_reg_authoring.change_set_artifacts_archive` | Archive destination for artifacts belonging to archived changesets. Mirrors `change_set_artifacts` structure. `archived_at` timestamp added. Indexed by `change_set_id`. | INSERT-only (retention job) |
 
 ### ER Diagram
@@ -1928,6 +1928,8 @@ erDiagram
         uuid changeset_id PK
         text status
         text content_hash
+        text owner_actor_id
+        timestamptz updated_at
         timestamptz archived_at
     }
 
@@ -1992,8 +1994,8 @@ Retention Job (background)
 | Tables in this document | ~220 (essential to data model) |
 | Tables omitted (DSL engine, REPL, semantic search, layout cache) | ~70 |
 | DSL verb domains | 58 |
-| Total verb count | ~1,083 |
-| Migrations | 100 SQL files (001–077 + 072b + 078–079, 081–086, 090–100) |
+| Total verb count | ~1,263 |
+| Migrations | 103 SQL files (001–077 + 072b + 078–079, 081–086, 090–103) |
 | Sections in this document | 18 |
 
 **Omitted infrastructure tables** (no verb domains, not essential to data model):
@@ -2003,3 +2005,4 @@ Retention Job (background)
 - BPMN integration: `bpmn_correlations`, `bpmn_job_frames`, `bpmn_parked_tokens`, `bpmn_pending_dispatches`, `expansion_reports`
 - Session/layout: `sessions`, `session_scopes`, `session_scope_history`, `session_bookmarks`, `layout_cache`, `layout_config`
 - Audit: `sheet_execution_audit`, `cbu_board_controller`, `board_control_evidence`, `cbu_control_anchors`
+- Agent telemetry (`agent` schema): `intent_events` (M087 base + M103 CCIR columns: `allowed_verbs_fingerprint`, `pruned_verbs_count`, `toctou_recheck_performed`, `toctou_result`, `toctou_new_fingerprint`), `learning_candidates`, `learning_audit`, `user_learned_phrases`, `phrase_blocklist`, `stopwords`, `teaching_audit`

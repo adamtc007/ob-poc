@@ -377,10 +377,8 @@ impl NounIndex {
                 let end = start + alias.len();
 
                 // Check word boundaries
-                let left_ok = start == 0
-                    || !lower.as_bytes()[start - 1].is_ascii_alphanumeric();
-                let right_ok = end == lower.len()
-                    || !lower.as_bytes()[end].is_ascii_alphanumeric();
+                let left_ok = start == 0 || !lower.as_bytes()[start - 1].is_ascii_alphanumeric();
+                let right_ok = end == lower.len() || !lower.as_bytes()[end].is_ascii_alphanumeric();
 
                 if left_ok && right_ok {
                     // Check for overlap with already-matched spans
@@ -478,11 +476,7 @@ impl NounIndex {
     /// 2. If noun has `noun_keys` → find all verbs whose `metadata.noun` is in noun_keys (NounKeyMatch)
     /// 3. If noun has `entity_type_fqn` → find all verbs whose `subject_kinds` contains it (SubjectKindMatch)
     /// 4. No match → return empty (NoMatch)
-    pub fn resolve(
-        &self,
-        nouns: &[NounMatch],
-        action: Option<ActionCategory>,
-    ) -> NounResolution {
+    pub fn resolve(&self, nouns: &[NounMatch], action: Option<ActionCategory>) -> NounResolution {
         if nouns.is_empty() {
             return NounResolution {
                 candidates: vec![],
@@ -655,19 +649,110 @@ nouns:
 
         // Add some test verbs
         let verbs = vec![
-            ("cbu.create", "cbu", "create", "Create a CBU", Some("cbu"), vec!["cbu"]),
-            ("cbu.list", "cbu", "list", "List CBUs", Some("cbu"), vec!["cbu"]),
-            ("cbu.delete", "cbu", "delete", "Delete a CBU", Some("cbu"), vec!["cbu"]),
-            ("cbu.assign-role", "cbu", "assign-role", "Assign role to CBU", Some("cbu_role"), vec!["cbu"]),
-            ("ubo.discover", "ubo", "discover", "Discover UBOs", Some("ubo"), vec!["entity"]),
-            ("ubo.list-beneficiaries", "ubo", "list-beneficiaries", "List beneficiaries", Some("ubo"), vec!["entity"]),
-            ("screening.run", "screening", "run", "Run screening", Some("screening"), vec!["entity"]),
-            ("screening.list", "screening", "list", "List screenings", Some("screening"), vec!["entity"]),
-            ("fund.create-share-class", "fund", "create-share-class", "Create share class", Some("fund"), vec!["fund"]),
-            ("fund.list-share-classes", "fund", "list-share-classes", "List share classes", Some("fund"), vec!["fund"]),
-            ("capital.share-class.create", "capital", "share-class.create", "Create share class", Some("capital"), vec!["capital"]),
-            ("session.create", "session", "create", "Create session", Some("agent_session"), vec!["session"]),
-            ("session.list", "session", "list", "List sessions", Some("agent_session"), vec!["session"]),
+            (
+                "cbu.create",
+                "cbu",
+                "create",
+                "Create a CBU",
+                Some("cbu"),
+                vec!["cbu"],
+            ),
+            (
+                "cbu.list",
+                "cbu",
+                "list",
+                "List CBUs",
+                Some("cbu"),
+                vec!["cbu"],
+            ),
+            (
+                "cbu.delete",
+                "cbu",
+                "delete",
+                "Delete a CBU",
+                Some("cbu"),
+                vec!["cbu"],
+            ),
+            (
+                "cbu.assign-role",
+                "cbu",
+                "assign-role",
+                "Assign role to CBU",
+                Some("cbu_role"),
+                vec!["cbu"],
+            ),
+            (
+                "ubo.discover",
+                "ubo",
+                "discover",
+                "Discover UBOs",
+                Some("ubo"),
+                vec!["entity"],
+            ),
+            (
+                "ubo.list-beneficiaries",
+                "ubo",
+                "list-beneficiaries",
+                "List beneficiaries",
+                Some("ubo"),
+                vec!["entity"],
+            ),
+            (
+                "screening.run",
+                "screening",
+                "run",
+                "Run screening",
+                Some("screening"),
+                vec!["entity"],
+            ),
+            (
+                "screening.list",
+                "screening",
+                "list",
+                "List screenings",
+                Some("screening"),
+                vec!["entity"],
+            ),
+            (
+                "fund.create-share-class",
+                "fund",
+                "create-share-class",
+                "Create share class",
+                Some("fund"),
+                vec!["fund"],
+            ),
+            (
+                "fund.list-share-classes",
+                "fund",
+                "list-share-classes",
+                "List share classes",
+                Some("fund"),
+                vec!["fund"],
+            ),
+            (
+                "capital.share-class.create",
+                "capital",
+                "share-class.create",
+                "Create share class",
+                Some("capital"),
+                vec!["capital"],
+            ),
+            (
+                "session.create",
+                "session",
+                "create",
+                "Create session",
+                Some("agent_session"),
+                vec!["session"],
+            ),
+            (
+                "session.list",
+                "session",
+                "list",
+                "List sessions",
+                Some("agent_session"),
+                vec!["session"],
+            ),
         ];
 
         for (fqn, domain, action, desc, noun, sks) in verbs {
@@ -684,7 +769,10 @@ nouns:
                 by_noun.entry(n.clone()).or_default().push(fqn.to_string());
             }
             for sk in &summary.subject_kinds {
-                by_subject_kind.entry(sk.clone()).or_default().push(fqn.to_string());
+                by_subject_kind
+                    .entry(sk.clone())
+                    .or_default()
+                    .push(fqn.to_string());
             }
             by_fqn.insert(fqn.to_string(), summary);
         }
@@ -724,7 +812,10 @@ nouns:
         let matches = idx.extract("who is the beneficial owner?");
         assert!(!matches.is_empty());
         let ubo_match = matches.iter().find(|m| m.noun.key == "ubo");
-        assert!(ubo_match.is_some(), "Should extract 'beneficial owner' → ubo");
+        assert!(
+            ubo_match.is_some(),
+            "Should extract 'beneficial owner' → ubo"
+        );
     }
 
     #[test]
@@ -802,8 +893,12 @@ nouns:
 
         assert_eq!(resolution.resolution_path, ResolutionPath::ExplicitMapping);
         assert_eq!(resolution.candidates.len(), 2);
-        assert!(resolution.candidates.contains(&"fund.create-share-class".to_string()));
-        assert!(resolution.candidates.contains(&"capital.share-class.create".to_string()));
+        assert!(resolution
+            .candidates
+            .contains(&"fund.create-share-class".to_string()));
+        assert!(resolution
+            .candidates
+            .contains(&"capital.share-class.create".to_string()));
     }
 
     #[test]
@@ -847,24 +942,38 @@ nouns:
         // "ultimate beneficial owner" (3 words) should match before "beneficial owner" (2 words)
         let ubo_match = matches.iter().find(|m| m.noun.key == "ubo");
         assert!(ubo_match.is_some());
-        assert_eq!(ubo_match.unwrap().matched_alias, "ultimate beneficial owner");
+        assert_eq!(
+            ubo_match.unwrap().matched_alias,
+            "ultimate beneficial owner"
+        );
     }
 
     #[test]
     fn test_load_real_noun_index_yaml() {
         // Test that the actual noun_index.yaml parses without error
-        let yaml_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("config/noun_index.yaml");
+        let yaml_path =
+            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("config/noun_index.yaml");
         if yaml_path.exists() {
             let content = std::fs::read_to_string(&yaml_path).unwrap();
-            let result = NounIndex::from_yaml(&content, VerbContractIndex {
-                by_noun: HashMap::new(),
-                by_subject_kind: HashMap::new(),
-                by_fqn: HashMap::new(),
-            });
-            assert!(result.is_ok(), "Failed to parse noun_index.yaml: {:?}", result.err());
+            let result = NounIndex::from_yaml(
+                &content,
+                VerbContractIndex {
+                    by_noun: HashMap::new(),
+                    by_subject_kind: HashMap::new(),
+                    by_fqn: HashMap::new(),
+                },
+            );
+            assert!(
+                result.is_ok(),
+                "Failed to parse noun_index.yaml: {:?}",
+                result.err()
+            );
             let idx = result.unwrap();
-            assert!(idx.canonical.len() >= 20, "Expected at least 20 canonical aliases, got {}", idx.canonical.len());
+            assert!(
+                idx.canonical.len() >= 20,
+                "Expected at least 20 canonical aliases, got {}",
+                idx.canonical.len()
+            );
         }
     }
 }

@@ -469,6 +469,8 @@ impl AgentService {
             Arc::new(macro_reg),
             self.lexicon.clone(),
             None, // noun_index not yet wired through AgentService
+            None, // macro_index not yet wired through AgentService
+            None, // scenario_index not yet wired through AgentService
         )
     }
 

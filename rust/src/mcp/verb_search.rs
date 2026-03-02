@@ -49,7 +49,10 @@ use crate::agent::learning::warmup::SharedLearnedData;
 use crate::database::VerbService;
 use crate::dsl_v2::macros::MacroRegistry;
 use crate::lexicon::LexiconService;
+use crate::mcp::compound_intent::extract_compound_signals;
+use crate::mcp::macro_index::{MacroIndex, MacroResolveOutcome};
 use crate::mcp::noun_index::NounIndex;
+use crate::mcp::scenario_index::{ResolvedRoute, ScenarioIndex, ScenarioResolveOutcome};
 
 /// Shared lexicon service type alias
 pub type SharedLexicon = Arc<dyn LexiconService>;
@@ -88,6 +91,10 @@ pub enum VerbSearchSource {
     LexiconToken,
     /// Noun taxonomy deterministic match (Tier -1, ECIR - highest priority)
     NounTaxonomy,
+    /// MacroIndex deterministic scored match (Tier -2B)
+    MacroIndex,
+    /// ScenarioIndex journey-level match (Tier -2A)
+    ScenarioIndex,
 }
 
 // ============================================================================
@@ -242,6 +249,10 @@ pub struct HybridVerbSearcher {
     lexicon: Option<SharedLexicon>,
     /// Noun taxonomy index for deterministic Tier -1 ECIR resolution
     noun_index: Option<Arc<NounIndex>>,
+    /// Macro index for deterministic Tier -2B macro search (replaces search_macros)
+    macro_index: Option<Arc<MacroIndex>>,
+    /// Scenario index for journey-level Tier -2A resolution
+    scenario_index: Option<Arc<ScenarioIndex>>,
     /// Similarity threshold for learned semantic matches (high confidence, 0.80)
     semantic_threshold: f32,
     /// Similarity threshold for cold start / fallback semantic matches (0.65)
@@ -259,6 +270,8 @@ impl Clone for HybridVerbSearcher {
             macro_registry: self.macro_registry.clone(),
             lexicon: self.lexicon.clone(),
             noun_index: self.noun_index.clone(),
+            macro_index: self.macro_index.clone(),
+            scenario_index: self.scenario_index.clone(),
             semantic_threshold: self.semantic_threshold,
             fallback_threshold: self.fallback_threshold,
             blocklist_threshold: self.blocklist_threshold,
@@ -283,6 +296,8 @@ impl HybridVerbSearcher {
             macro_registry: None, // Macro registry added separately via with_macro_registry
             lexicon: None,        // Lexicon added separately via with_lexicon
             noun_index: None,     // Noun index added separately via with_noun_index
+            macro_index: None,    // Macro index added separately via with_macro_index
+            scenario_index: None, // Scenario index added separately via with_scenario_index
             // BGE asymmetric mode thresholds (query→target is lower than target→target)
             semantic_threshold: 0.65,  // Decision gate for accepting match
             fallback_threshold: 0.55,  // Retrieval cutoff for DB queries
@@ -299,6 +314,8 @@ impl HybridVerbSearcher {
             macro_registry: None,
             lexicon: None,
             noun_index: None,
+            macro_index: None,
+            scenario_index: None,
             // BGE asymmetric mode thresholds
             semantic_threshold: 0.65,
             fallback_threshold: 0.55,
@@ -327,6 +344,18 @@ impl HybridVerbSearcher {
     /// Add noun taxonomy index for deterministic Tier -1 ECIR resolution
     pub fn with_noun_index(mut self, noun_index: Arc<NounIndex>) -> Self {
         self.noun_index = Some(noun_index);
+        self
+    }
+
+    /// Add macro index for deterministic Tier -2B macro search
+    pub fn with_macro_index(mut self, macro_index: Arc<MacroIndex>) -> Self {
+        self.macro_index = Some(macro_index);
+        self
+    }
+
+    /// Add scenario index for journey-level Tier -2A resolution
+    pub fn with_scenario_index(mut self, scenario_index: Arc<ScenarioIndex>) -> Self {
+        self.scenario_index = Some(scenario_index);
         self
     }
 
@@ -430,6 +459,19 @@ impl HybridVerbSearcher {
             None
         };
 
+        // ── Feature extraction: compound signals (shared by Tier -2A and ECIR gate) ──
+        let compound_signals = extract_compound_signals(&normalized);
+        let has_compound = compound_signals.has_any();
+        if has_compound {
+            tracing::debug!(
+                strength = compound_signals.strength(),
+                action = ?compound_signals.compound_action,
+                jurisdiction = ?compound_signals.jurisdiction,
+                structure_nouns = ?compound_signals.structure_nouns,
+                "Compound signals detected — Tier -2A eligible, ECIR short-circuit suppressed"
+            );
+        }
+
         // ── Tier -1: ECIR Noun Taxonomy (deterministic, before all embedding tiers) ──
         // For narrow/large candidate sets, ECIR candidates are saved for post-boost
         // after embedding tiers run (domain knowledge helps break ties without
@@ -450,12 +492,24 @@ impl HybridVerbSearcher {
                         );
                     }
                     1 => {
-                        // Deterministic single-verb resolution — skip ALL embedding tiers
                         let fqn = &resolution.candidates[0];
-                        if self.matches_domain(fqn, domain_filter)
+                        if has_compound {
+                            // Compound signals present — suppress ECIR short-circuit.
+                            // Save the single candidate for post-boost and let Tier -2A/B
+                            // attempt journey-level resolution first.
+                            tracing::info!(
+                                verb = %fqn,
+                                noun = %resolution.noun_key,
+                                "ECIR: single candidate BUT compound signals present — suppressing short-circuit, deferring to Tier -2A"
+                            );
+                            if allowed_verbs.is_none_or(|av| av.contains(fqn)) {
+                                ecir_boost_set.insert(fqn.clone());
+                            }
+                        } else if self.matches_domain(fqn, domain_filter)
                             && allowed_verbs.is_none_or(|av| av.contains(fqn))
                             && !seen_verbs.contains(fqn)
                         {
+                            // No compound signals — deterministic single-verb resolution
                             tracing::info!(
                                 verb = %fqn,
                                 noun = %resolution.noun_key,
@@ -499,10 +553,161 @@ impl HybridVerbSearcher {
             }
         }
 
-        // 0. Operator macro search (business vocabulary layer - HIGHEST PRIORITY)
-        // Macros are the PRIMARY UI mechanism (verb picker). If a macro matches,
-        // it takes precedence over verb patterns.
-        {
+        // ── Tier -2A: ScenarioIndex journey-level resolution ─────────────────
+        // Only fires when compound signals are present (gate G1). Evaluates
+        // utterance against scenario definitions with scoring ledger + hard gates.
+        // Score 0.97 — higher than MacroIndex (0.96) and ECIR (0.95).
+        if has_compound {
+            if let Some(ref scenario_idx) = self.scenario_index {
+                let outcome = scenario_idx.resolve(
+                    &normalized,
+                    None, // active_mode — TODO: thread session mode when available
+                    self.macro_index.as_deref(),
+                );
+                match outcome {
+                    ScenarioResolveOutcome::Matched(m) => {
+                        let route_fqn = match &m.route {
+                            ResolvedRoute::Macro { macro_fqn } => Some(macro_fqn.clone()),
+                            ResolvedRoute::MacroSequence { macros } => macros.first().cloned(),
+                            ResolvedRoute::NeedsSelection { .. } => None,
+                        };
+                        if let Some(fqn) = route_fqn {
+                            if self.matches_domain(&fqn, domain_filter)
+                                && allowed_verbs.is_none_or(|av| av.contains(&fqn))
+                                && !seen_verbs.contains(&fqn)
+                            {
+                                tracing::info!(
+                                    scenario = %m.scenario_id,
+                                    title = %m.title,
+                                    verb = %fqn,
+                                    score = m.score,
+                                    tier = "Tier2A_ScenarioIndex",
+                                    "ScenarioIndex: matched journey scenario"
+                                );
+                                seen_verbs.insert(fqn.clone());
+                                results.push(VerbSearchResult {
+                                    verb: fqn,
+                                    score: 0.97,
+                                    source: VerbSearchSource::ScenarioIndex,
+                                    matched_phrase: m.title.clone(),
+                                    description: Some(m.title.clone()),
+                                });
+                                return Ok(normalize_candidates(results, limit));
+                            }
+                        } else {
+                            // NeedsSelection — return as ambiguous for DecisionPacket
+                            tracing::info!(
+                                scenario = %m.scenario_id,
+                                tier = "Tier2A_ScenarioIndex",
+                                "ScenarioIndex: needs jurisdiction selection"
+                            );
+                        }
+                    }
+                    ScenarioResolveOutcome::Ambiguous(candidates) => {
+                        tracing::debug!(
+                            count = candidates.len(),
+                            tier = "Tier2A_ScenarioIndex",
+                            "ScenarioIndex: ambiguous, returning multiple candidates"
+                        );
+                        for m in candidates {
+                            let route_fqn = match &m.route {
+                                ResolvedRoute::Macro { macro_fqn } => Some(macro_fqn.clone()),
+                                ResolvedRoute::MacroSequence { macros } => macros.first().cloned(),
+                                ResolvedRoute::NeedsSelection { .. } => None,
+                            };
+                            if let Some(fqn) = route_fqn {
+                                if self.matches_domain(&fqn, domain_filter)
+                                    && allowed_verbs.is_none_or(|av| av.contains(&fqn))
+                                    && !seen_verbs.contains(&fqn)
+                                {
+                                    seen_verbs.insert(fqn.clone());
+                                    results.push(VerbSearchResult {
+                                        verb: fqn,
+                                        score: 0.97,
+                                        source: VerbSearchSource::ScenarioIndex,
+                                        matched_phrase: m.title.clone(),
+                                        description: Some(m.title.clone()),
+                                    });
+                                }
+                            }
+                        }
+                        if !results.is_empty() {
+                            return Ok(normalize_candidates(results, limit));
+                        }
+                    }
+                    ScenarioResolveOutcome::NoMatch => {
+                        tracing::debug!(
+                            "ScenarioIndex: no scenario matched, falling through to Tier -2B"
+                        );
+                    }
+                }
+            }
+        }
+
+        // ── Tier -2B: MacroIndex deterministic scoring ────────────────────────
+        // Replaces old Tier 0 search_macros() with multi-signal deterministic
+        // scoring. When MacroIndex is available, uses it; falls back to old
+        // search_macros() if only macro_registry is present.
+        if let Some(ref macro_idx) = self.macro_index {
+            let outcome = macro_idx.resolve(query, None, None);
+            match outcome {
+                MacroResolveOutcome::Matched(m) => {
+                    if self.matches_domain(&m.fqn, domain_filter)
+                        && allowed_verbs.is_none_or(|av| av.contains(&m.fqn))
+                        && !seen_verbs.contains(&m.fqn)
+                    {
+                        tracing::info!(
+                            verb = %m.fqn,
+                            score = m.score,
+                            tier = "Tier2B_MacroIndex",
+                            signals = ?m.explain.matched_signals.iter().map(|s| &s.signal).collect::<Vec<_>>(),
+                            "MacroIndex: matched"
+                        );
+                        seen_verbs.insert(m.fqn.clone());
+                        let entry = macro_idx.get_entry(&m.fqn);
+                        results.push(VerbSearchResult {
+                            verb: m.fqn,
+                            score: 0.96,
+                            source: VerbSearchSource::MacroIndex,
+                            matched_phrase: entry.map(|e| e.label.clone()).unwrap_or_default(),
+                            description: entry.map(|e| e.description.clone()),
+                        });
+                        // MacroIndex match at 0.96 — return early (higher than ECIR 0.95)
+                        return Ok(normalize_candidates(results, limit));
+                    }
+                }
+                MacroResolveOutcome::Ambiguous(candidates) => {
+                    tracing::debug!(
+                        count = candidates.len(),
+                        tier = "Tier2B_MacroIndex",
+                        "MacroIndex: ambiguous, returning multiple candidates"
+                    );
+                    for m in candidates {
+                        if self.matches_domain(&m.fqn, domain_filter)
+                            && allowed_verbs.is_none_or(|av| av.contains(&m.fqn))
+                            && !seen_verbs.contains(&m.fqn)
+                        {
+                            seen_verbs.insert(m.fqn.clone());
+                            let entry = macro_idx.get_entry(&m.fqn);
+                            results.push(VerbSearchResult {
+                                verb: m.fqn,
+                                score: 0.96,
+                                source: VerbSearchSource::MacroIndex,
+                                matched_phrase: entry.map(|e| e.label.clone()).unwrap_or_default(),
+                                description: entry.map(|e| e.description.clone()),
+                            });
+                        }
+                    }
+                    if !results.is_empty() {
+                        return Ok(normalize_candidates(results, limit));
+                    }
+                }
+                MacroResolveOutcome::NoMatch => {
+                    // Fall through to lower tiers
+                }
+            }
+        } else {
+            // Fallback: old search_macros() when MacroIndex is not wired
             let macro_results = self.search_macros(query, limit);
             for result in macro_results {
                 if self.matches_domain(&result.verb, domain_filter)
@@ -512,21 +717,20 @@ impl HybridVerbSearcher {
                         verb = %result.verb,
                         score = result.score,
                         label = %result.matched_phrase,
-                        "VerbSearch: macro match"
+                        "VerbSearch: legacy macro match"
                     );
                     seen_verbs.insert(result.verb.clone());
                     results.push(result);
                 }
             }
-        }
-
-        // If we got a high-confidence macro match (exact label/FQN), return early
-        if !results.is_empty() && results[0].score >= 1.0 {
-            tracing::debug!(
-                verb = %results[0].verb,
-                "VerbSearch: returning early with exact macro match"
-            );
-            return Ok(results);
+            // If we got a high-confidence legacy macro match (exact label/FQN), return early
+            if !results.is_empty() && results[0].score >= 1.0 {
+                tracing::debug!(
+                    verb = %results[0].verb,
+                    "VerbSearch: returning early with exact legacy macro match"
+                );
+                return Ok(results);
+            }
         }
 
         // 0.5. Lexicon search (fast in-memory lexical matching - Phase C of 072)
