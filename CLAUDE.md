@@ -63,7 +63,7 @@
 > **CCIR — Context-Constrained Intent Resolution (Migration 103):** ✅ Complete - ContextEnvelope replaces SemRegVerbPolicy, structured PruneReason (7 variants), deterministic AllowedVerbSetFingerprint (SHA-256), TOCTOU recheck, pre-constrained verb search (allowed verbs threaded into HybridVerbSearcher), SemReg enforcement at dsl_execute, legacy V1 module cleanup (4 modules deleted: ~2,700 LOC), 16 unit tests
 > **SessionVerbSurface:** ✅ Complete - Consolidated governance layer composition (SemReg CCIR + AgentMode + workflow phase + lifecycle + actor gating), 8-step compute pipeline, dual fingerprints (surface `vs1:` + SemReg `v1:`), FailClosed safe-harbor (~30 verbs), MCP tool `session_verb_surface`, REST endpoint `GET /api/session/:id/verb-surface`, ChatResponse enrichment, React VerbBrowser governance badges, 13 unit tests
 > **Semantic OS Tab:** ✅ Complete - Agent-driven workflow selection UI (`/semantic-os`), goals→phase_tags verb scoping in SemReg, DecisionPacket workflow prompt (Onboarding/KYC/Data Management/Stewardship), session sidebar + registry context panel, `GET /api/sem-os/context` endpoint
-> **Scenario-Based Intent Resolution (Phases 0.5-1):** ✅ Complete — MacroIndex (Tier -2B) + ScenarioIndex (Tier -2A) + CompoundSignals + SequenceValidator; deterministic scoring ledger, 10 YAML scenarios, ECIR short-circuit gating
+> **Scenario-Based Intent Resolution (Phases 0.5-5):** ✅ Complete — MacroIndex (Tier -2B) + ScenarioIndex (Tier -2A) + CompoundSignals + SequenceValidator; deterministic scoring ledger, 16 YAML scenarios (incl. 3 macro_sequence KYC workflows), ECIR short-circuit gating, provenance labels on macro expansion, progress narration ("Step 4 of 13: Lux UCITS SICAV Setup"), 43 Tier-2 test cases with 5 hard threshold assertions (spec §11)
 
 This is the root project guide for Claude Code. Domain-specific details are in annexes.
 
@@ -743,7 +743,8 @@ embedder.embed_target("load galaxy by apex name")
 | `rust/src/mcp/scenario_index.rs` | `ScenarioIndex` - Tier -2A journey-level scenario resolution |
 | `rust/src/mcp/compound_intent.rs` | `CompoundSignals` - shared compound signal extraction |
 | `rust/src/mcp/sequence_validator.rs` | Macro sequence prereq validation |
-| `rust/config/scenario_index.yaml` | 10 journey scenario definitions |
+| `rust/src/mcp/macro_index.rs` | `MacroIndex` - Tier -2B deterministic macro search |
+| `rust/config/scenario_index.yaml` | 16 journey scenario definitions (incl. 3 macro_sequence) |
 | `rust/config/macro_search_overrides.yaml` | Curated macro search aliases |
 | `rust/src/session/verb_sync.rs` | `VerbSyncService` - syncs YAML to DB |
 | `rust/crates/ob-semantic-matcher/src/bin/populate_embeddings.rs` | Populates verb_pattern_embeddings |
@@ -3400,7 +3401,8 @@ IntentPipeline.process()
 | `rust/src/mcp/scenario_index.rs` | `ScenarioIndex` - Tier -2A journey-level scenario resolution |
 | `rust/src/mcp/compound_intent.rs` | `CompoundSignals` - shared compound signal extraction |
 | `rust/src/mcp/sequence_validator.rs` | Macro sequence prereq validation |
-| `rust/config/scenario_index.yaml` | 10 journey scenario definitions |
+| `rust/src/mcp/macro_index.rs` | `MacroIndex` - Tier -2B deterministic macro search |
+| `rust/config/scenario_index.yaml` | 16 journey scenario definitions (incl. 3 macro_sequence) |
 | `rust/config/macro_search_overrides.yaml` | Curated macro search aliases |
 | `rust/src/api/agent_service.rs` | `AgentService.process_chat()` entry point |
 | `rust/config/verbs/view.yaml` | Navigation verbs (view.drill, view.surface, etc.) |
@@ -3453,6 +3455,155 @@ drill:
 DATABASE_URL="postgresql:///data_designer" \
   cargo run --release --package ob-semantic-matcher --bin populate_embeddings
 ```
+
+---
+
+## Scenario-Based Intent Resolution (Phases 0.5-5)
+
+> ✅ **IMPLEMENTED (2026-03-02)**: Two new intent tiers giving macros search parity and enabling compound intent recognition, while maintaining determinism and zero regression on single-verb hit rates.
+
+**Problem Solved:** Macros (54 total, 18 multi-verb) only got exact label/FQN matching in Tier 0, while DSL verbs (1,263) benefited from 10 tiers of search. This asymmetry caused the pipeline to miss composite intents like "Onboard a Luxembourg SICAV" — falling through to a single verb (`fund.create-umbrella` at 0.80) instead of the correct macro (`struct.lux.ucits.sicav` — 13 verbs producing a full runbook).
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  COMPOUND INTENT RESOLUTION PIPELINE                                         │
+│                                                                              │
+│  User: "Onboard a Luxembourg SICAV with three sub-funds"                    │
+│         │                                                                    │
+│         ▼                                                                    │
+│  1. Extract CompoundSignals ONCE                                            │
+│     compound_action: "onboard", jurisdiction: "LU",                         │
+│     structure_nouns: ["sicav"], has_quantifier: true                         │
+│         │                                                                    │
+│         ▼                                                                    │
+│  2. ECIR Tier -1 probe (existing)                                           │
+│     IF 1 candidate AND no compound signals → short-circuit (existing)       │
+│     IF compound signals present → suppress short-circuit, continue          │
+│         │                                                                    │
+│         ▼                                                                    │
+│  3. Tier -2A: ScenarioIndex.resolve() — score 0.97                         │
+│     Scoring ledger: action(+4) + jurisdiction(+4) + noun(+3) = 11 ≥ 8     │
+│     → Match: lux-sicav-setup → struct.lux.ucits.sicav                      │
+│         │                                                                    │
+│         ▼                                                                    │
+│  4. Tier -2B: MacroIndex.resolve() — score 0.96 (fallback if no scenario)  │
+│     Deterministic index: FQN(+10), label(+8), alias(+6), jurisdiction(+3)  │
+│         │                                                                    │
+│         ▼                                                                    │
+│  5. Tiers -1 through 7 (existing verb pipeline, unchanged)                  │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Phase Summary
+
+| Phase | What | Key Deliverable |
+|-------|------|-----------------|
+| **0.5** | MacroIndex (Tier -2B) | Deterministic searchable index over ~54 macros, 7 lookup maps, scoring with gates |
+| **1** | ScenarioIndex (Tier -2A) | Journey-level compound utterance resolution, scoring ledger, 3 hard gates (G1-G3) |
+| **1B** | SequenceValidator | Three-valued prereq validation for `macro_sequence` routes (Pass/Fail/Deferred) |
+| **2** | Guided Runbook Building | Provenance labels (`origin_scenario_id`, `origin_macro_fqn`) on expanded entries, progress narration |
+| **3** | Macro Sequence Orchestration | `macro_sequence` + `macro_selector` route types, DecisionPacket for disambiguation |
+| **4** | Macro Gap Filling | 7 new macros (screening.full, kyc.collect-documents, kyc.full-review, etc.), 4 new scenarios |
+| **5** | Measurement + Tuning | 43 Tier-2 test cases, 5 hard threshold assertions matching spec §11 success criteria |
+
+### ScenarioIndex Scoring Ledger
+
+| Signal Bucket | Score |
+|---------------|-------|
+| Compound outcome verb (onboard, set up, establish) | +4 |
+| Jurisdiction found (LU, IE, UK, US) | +4 |
+| Structure noun (sicav, icav, LP) | +3 |
+| Phase noun (KYC, screening, mandate) | +2 |
+| Quantifier ("three sub-funds") | +2 |
+| Macro metadata match | +3 |
+| Negative: single-verb cue | −6 |
+
+**Hard gates:** G1 (compound signal required), G2 (mode compatibility), G3 (min score ≥ 8)
+
+### MacroIndex Scoring
+
+| Signal | Score |
+|--------|-------|
+| Exact FQN match | +10 |
+| Exact label match | +8 |
+| Alias/phrase match | +6 |
+| Jurisdiction match | +3 |
+| Mode match | +2 |
+| Noun overlap | +2 |
+| Target kind match | +2 |
+| Mismatch penalty | −999 (hard exclude) |
+
+**Hard gates:** M1 (mode compatibility), M2 (min score ≥ 6), M3 (disambiguation band Δ ≤ 2 → DecisionPacket)
+
+### Scenario Route Types
+
+| Route Kind | Description | Example |
+|------------|-------------|---------|
+| `macro` | Single macro FQN | `struct.lux.ucits.sicav` |
+| `macro_sequence` | Ordered list of macros | `[case.open, screening.full, kyc.collect-documents]` |
+| `macro_selector` | Jurisdiction-dependent selection | LU→sicav, IE→icav, UK→oeic |
+
+### Provenance Labels
+
+When macro expansion creates RunbookEntries, provenance labels are threaded through:
+
+```rust
+entry.labels.insert("origin_kind".into(), "macro".into());
+entry.labels.insert("origin_macro_fqn".into(), macro_fqn.into());
+entry.labels.insert("origin_scenario_id".into(), scenario_id.into());
+```
+
+Progress narration uses these labels: "Step 4 of 13: Luxembourg UCITS SICAV Setup"
+
+### Success Criteria (spec §11)
+
+| Metric | Target | Assertion |
+|--------|--------|-----------|
+| Compound intent → correct scenario | ≥80% | `assert!(scenario_verb_rate >= 80.0)` |
+| Scenario → correct macro/sequence | ≥90% | `assert!(scenario_route_rate >= 90.0)` |
+| MacroIndex → correct macro | ≥75% | `assert!(macro_rate >= 75.0)` |
+| Single-verb NOT intercepted by Tier -2 | ≥95% (<5% FP) | `assert!(fp_rate < 5.0)` |
+| No regression in single-verb hit rate | ≥35% baseline | `assert!(sv_rate >= 35.0)` |
+
+### 16 Journey Scenarios
+
+| ID | Route Kind | Target |
+|----|-----------|--------|
+| `lux-sicav-setup` | macro | `struct.lux.ucits.sicav` |
+| `lux-raif-setup` | macro | `struct.lux.aif.raif` |
+| `lux-pe-setup` | macro | `struct.lux.pe.scsp` |
+| `ie-icav-setup` | macro | `struct.ie.ucits.icav` |
+| `uk-oeic-setup` | macro | `struct.uk.authorised.oeic` |
+| `us-40act-setup` | macro | `struct.us.40act.open-end` |
+| `generic-fund-onboarding` | macro_selector | By jurisdiction |
+| `full-screening` | macro | `screening.full` |
+| `full-kyc-review` | macro | `kyc.full-review` |
+| `kyc-doc-collection` | macro | `kyc.collect-documents` |
+| `full-kyc-onboarding` | macro_sequence | case.open → screening.full → kyc.collect-documents |
+| `kyc-case-screening` | macro_sequence | case.open → screening.full |
+| `kyc-case-documents` | macro_sequence | case.open → kyc.collect-documents |
+| `hedge-cross-border-setup` | macro | `struct.hedge.cross-border` |
+| `pe-cross-border-setup` | macro | `struct.pe.cross-border` |
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `rust/src/mcp/scenario_index.rs` | ScenarioIndex: YAML loader, scoring ledger, hard gates, resolver |
+| `rust/src/mcp/compound_intent.rs` | CompoundSignals extraction, jurisdiction detection, action classification |
+| `rust/src/mcp/sequence_validator.rs` | Three-valued macro sequence prereq validation |
+| `rust/src/mcp/macro_index.rs` | MacroIndex: 7 lookup maps, scoring, hard gates, resolver |
+| `rust/config/scenario_index.yaml` | 16 journey scenario definitions |
+| `rust/config/macro_search_overrides.yaml` | Curated macro search aliases (optional) |
+| `rust/src/mcp/verb_search.rs` | Tier -2A/B integration in `HybridVerbSearcher.search()` |
+| `rust/src/mcp/verb_search_factory.rs` | Factory wiring for ScenarioIndex + MacroIndex |
+| `rust/src/dsl_v2/macros/expander.rs` | Provenance label threading in `expand_macro()` |
+| `rust/src/repl/runbook.rs` | Progress narration using `origin_scenario_id` label |
+| `rust/tests/intent_hit_rate.rs` | Tier-2 test harness with 5 hard threshold assertions |
+| `rust/tests/fixtures/intent_test_utterances.toml` | 43 Tier-2 test cases (17 scenario + 14 macro_match + 5 blocker + 7 sequence) |
+| `docs/todo/Scenario-Based Intent Resolution.md` | Source spec (v0.3) |
 
 ---
 
@@ -5788,10 +5939,11 @@ When you see these in a task, read the corresponding annex first:
 | "ContextEnvelope", "context_envelope", "CCIR", "PruneReason", "AllowedVerbSetFingerprint", "TOCTOU recheck" | CLAUDE.md §Agent Intent Pipeline Hardening §CCIR |
 | "SessionVerbSurface", "verb surface", "VerbSurfaceFailPolicy", "FailClosed", "safe-harbor", "SurfaceFingerprint", "PruneLayer", "compute_session_verb_surface" | CLAUDE.md §SessionVerbSurface |
 | "ECIR", "NounIndex", "noun_index", "VerbContractIndex", "noun taxonomy", "entity-centric intent" | CLAUDE.md §Navigation §Verb Search Thresholds, `rust/src/mcp/noun_index.rs`, `rust/config/noun_index.yaml` |
-| "ScenarioIndex", "scenario_index", "Tier -2A", "compound intent", "scenario-based", "journey-level intent" | CLAUDE.md §Scenario-Based Intent Resolution, `rust/src/mcp/scenario_index.rs`, `rust/src/mcp/compound_intent.rs`, `rust/config/scenario_index.yaml` |
-| "MacroIndex", "macro_index", "Tier -2B", "macro search parity" | CLAUDE.md §MacroIndex, `rust/src/mcp/macro_index.rs`, `rust/config/macro_search_overrides.yaml` |
-| "CompoundSignals", "compound_intent", "compound signals", "compound action", "jurisdiction extraction" | `rust/src/mcp/compound_intent.rs` |
-| "SequenceValidator", "sequence_validator", "macro sequence", "prereq validation" | `rust/src/mcp/sequence_validator.rs` |
+| "ScenarioIndex", "scenario_index", "Tier -2A", "compound intent", "scenario-based", "journey-level intent" | CLAUDE.md §Scenario-Based Intent Resolution (Phases 0.5-5), `rust/src/mcp/scenario_index.rs`, `rust/src/mcp/compound_intent.rs`, `rust/config/scenario_index.yaml` |
+| "MacroIndex", "macro_index", "Tier -2B", "macro search parity" | CLAUDE.md §Scenario-Based Intent Resolution (Phases 0.5-5), `rust/src/mcp/macro_index.rs`, `rust/config/macro_search_overrides.yaml` |
+| "CompoundSignals", "compound_intent", "compound signals", "compound action", "jurisdiction extraction" | CLAUDE.md §Scenario-Based Intent Resolution §ScenarioIndex Scoring Ledger, `rust/src/mcp/compound_intent.rs` |
+| "SequenceValidator", "sequence_validator", "macro sequence", "prereq validation", "macro_sequence" | CLAUDE.md §Scenario-Based Intent Resolution §Scenario Route Types, `rust/src/mcp/sequence_validator.rs` |
+| "provenance labels", "origin_scenario_id", "origin_macro_fqn", "progress narration" | CLAUDE.md §Scenario-Based Intent Resolution §Provenance Labels |
 | "ownership.refresh", "OwnershipRefreshOp", "bridge ManCo", "derive CBU groups" | `rust/src/domain_ops/manco_ops.rs` |
 
 ---
