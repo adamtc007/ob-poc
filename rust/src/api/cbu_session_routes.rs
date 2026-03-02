@@ -697,6 +697,7 @@ async fn generate_sheet(
             dag_depth: 0, // Will be computed after DAG analysis
             dependencies: vec![],
             validation_errors: vec![],
+            labels: HashMap::new(),
         });
     }
 

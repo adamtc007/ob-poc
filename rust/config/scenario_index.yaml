@@ -178,6 +178,61 @@ scenarios:
     explain:
       summary: "Request KYC documents from a party and track requirements"
 
+  # ── Full KYC Onboarding (case + screening + documents) ────────────────
+  - id: full-kyc-onboarding
+    title: "Full KYC Onboarding Workflow"
+    modes: [kyc, onboarding]
+    requires:
+      all_of: [compound_action, multi_noun_workflow]
+    signals:
+      actions: [onboard, "run the", "complete the", "do the", "set up"]
+      nouns_any: [kyc, onboarding, case, screening, documents, compliance]
+      phrases_any: ["full kyc onboarding", "complete kyc process", "onboard with kyc", "run full kyc process", "kyc case and screening"]
+    routes:
+      kind: macro_sequence
+      macros:
+        - case.open
+        - screening.full
+        - kyc.collect-documents
+    explain:
+      summary: "Full KYC onboarding: open case, run screening, collect documents"
+
+  # ── KYC Case with Screening ──────────────────────────────────────────
+  - id: kyc-case-screening
+    title: "KYC Case with Screening"
+    modes: [kyc, onboarding]
+    requires:
+      any_of: [compound_action, multi_noun_workflow]
+    signals:
+      actions: ["open and screen", "create and screen", "set up", "run the"]
+      nouns_any: [case, screening, kyc, compliance]
+      phrases_any: ["open case and screen", "case with screening", "kyc case and screening", "new case with full screening"]
+    routes:
+      kind: macro_sequence
+      macros:
+        - case.open
+        - screening.full
+    explain:
+      summary: "Open KYC case and run full screening (PEP, sanctions, adverse media)"
+
+  # ── KYC Case with Document Collection ────────────────────────────────
+  - id: kyc-case-documents
+    title: "KYC Case with Document Collection"
+    modes: [kyc, onboarding]
+    requires:
+      any_of: [compound_action, multi_noun_workflow]
+    signals:
+      actions: ["open and collect", "create and request", "set up"]
+      nouns_any: [case, documents, kyc, identity]
+      phrases_any: ["open case and collect documents", "case with document collection", "new case and request documents"]
+    routes:
+      kind: macro_sequence
+      macros:
+        - case.open
+        - kyc.collect-documents
+    explain:
+      summary: "Open KYC case and request KYC documents from party"
+
   # ── Cross-Border Hedge Fund ────────────────────────────────────────────
   - id: hedge-cross-border-setup
     title: "Cross-Border Hedge Fund Setup"

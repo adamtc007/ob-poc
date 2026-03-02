@@ -528,18 +528,12 @@ impl MacroIndex {
         // --- Signal: Label substring match (+5) ---
         // Query contains the full label as a substring (but isn't an exact match)
         let label_words: Vec<&str> = label_norm.split_whitespace().collect();
-        if label_words.len() >= 2
-            && query_norm != label_norm
-            && query_norm.contains(&label_norm)
-        {
+        if label_words.len() >= 2 && query_norm != label_norm && query_norm.contains(&label_norm) {
             score += 5;
             signals.push(MatchedSignal {
                 signal: "label_substring".to_string(),
                 score: 5,
-                detail: format!(
-                    "Query contains label '{}' as substring",
-                    entry.label
-                ),
+                detail: format!("Query contains label '{}' as substring", entry.label),
             });
         }
 

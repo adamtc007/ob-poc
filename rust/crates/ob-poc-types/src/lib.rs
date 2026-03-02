@@ -510,6 +510,9 @@ pub struct RunSheetEntry {
     /// Error message if failed
     #[serde(default)]
     pub error: Option<String>,
+    /// Provenance labels (e.g. journey/scenario metadata)
+    #[serde(default)]
+    pub labels: std::collections::HashMap<String, String>,
 }
 
 /// Run sheet entry status

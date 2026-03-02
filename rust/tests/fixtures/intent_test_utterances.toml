@@ -1511,3 +1511,84 @@ notes = "Single-verb query — not a case management scenario"
 expected_noun = "kyc"
 expected_action = "check"
 ecir_path = "narrow"
+
+# ============================================================================
+# MACRO SEQUENCE SCENARIOS — Multi-macro KYC workflows
+# ============================================================================
+
+[[test]]
+utterance = "Run the full KYC onboarding process with screening and documents"
+expected_verb = "case.open"
+category = "scenario"
+difficulty = "hard"
+expected_tier = "scenario"
+expected_scenario_id = "full-kyc-onboarding"
+expected_route_target = "case.open"
+notes = "Full KYC onboarding sequence: case.open + screening.full + kyc.collect-documents"
+ecir_path = "fallthrough"
+
+[[test]]
+utterance = "Complete the KYC process including case screening and document collection"
+expected_verb = "case.open"
+category = "scenario"
+difficulty = "hard"
+expected_tier = "scenario"
+expected_scenario_id = "full-kyc-onboarding"
+expected_route_target = "case.open"
+notes = "Alternative phrasing for full KYC onboarding sequence"
+ecir_path = "fallthrough"
+
+[[test]]
+utterance = "Do the full KYC onboarding for this client"
+expected_verb = "case.open"
+category = "scenario"
+difficulty = "hard"
+expected_tier = "scenario"
+expected_scenario_id = "full-kyc-onboarding"
+expected_route_target = "case.open"
+notes = "Concise phrasing for full KYC onboarding"
+ecir_path = "fallthrough"
+
+[[test]]
+utterance = "Open a KYC case and run full screening"
+expected_verb = "case.open"
+category = "scenario"
+difficulty = "medium"
+expected_tier = "scenario"
+expected_scenario_id = "kyc-case-screening"
+expected_route_target = "case.open"
+notes = "Case + screening sequence (no documents)"
+ecir_path = "fallthrough"
+
+[[test]]
+utterance = "Create a new KYC case with screening for this party"
+expected_verb = "case.open"
+category = "scenario"
+difficulty = "medium"
+expected_tier = "scenario"
+expected_scenario_id = "kyc-case-screening"
+expected_route_target = "case.open"
+notes = "Alternative phrasing for case + screening sequence"
+ecir_path = "fallthrough"
+
+[[test]]
+utterance = "Open a case and collect the KYC documents"
+expected_verb = "case.open"
+category = "scenario"
+difficulty = "medium"
+expected_tier = "scenario"
+expected_scenario_id = "kyc-case-documents"
+expected_route_target = "case.open"
+notes = "Case + document collection sequence"
+ecir_path = "fallthrough"
+
+[[test]]
+utterance = "Set up a new case and request identity documents"
+expected_verb = "case.open"
+category = "scenario"
+difficulty = "medium"
+expected_tier = "scenario"
+expected_scenario_id = "kyc-case-documents"
+expected_route_target = "case.open"
+notes = "Alternative phrasing for case + document collection"
+ecir_path = "fallthrough"

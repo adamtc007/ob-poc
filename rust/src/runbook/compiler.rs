@@ -586,8 +586,14 @@ mod tests {
                     verb: "cbu.create".to_string(),
                     args: {
                         let mut m = HashMap::new();
-                        m.insert("name".to_string(), serde_json::Value::String("${arg.name}".to_string()));
-                        m.insert("client-id".to_string(), serde_json::Value::String("${scope.client_id}".to_string()));
+                        m.insert(
+                            "name".to_string(),
+                            serde_json::Value::String("${arg.name}".to_string()),
+                        );
+                        m.insert(
+                            "client-id".to_string(),
+                            serde_json::Value::String("${scope.client_id}".to_string()),
+                        );
                         m
                     },
                     bind_as: None,

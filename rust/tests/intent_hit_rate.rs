@@ -301,6 +301,155 @@ mod tests {
             "First-attempt hit rate {:.1}% is below minimum 25%",
             first_rate
         );
+
+        // ====================================================================
+        // Tier -2 success criteria assertions (spec §11)
+        // ====================================================================
+
+        // --- Scenario match rate (category = "scenario") ---
+        let scenario_results: Vec<&TestResult> = results
+            .iter()
+            .filter(|r| r.case.category == "scenario")
+            .collect();
+        if !scenario_results.is_empty() {
+            let scenario_total = scenario_results.len();
+            let scenario_correct_verb = scenario_results
+                .iter()
+                .filter(|r| r.outcome.is_first_attempt_hit())
+                .count();
+            let scenario_correct_route = scenario_results
+                .iter()
+                .filter(|r| {
+                    if let Some(ref target) = r.case.expected_route_target {
+                        r.selected_verb.as_deref() == Some(target.as_str())
+                            && r.outcome.is_first_attempt_hit()
+                    } else {
+                        r.outcome.is_first_attempt_hit()
+                    }
+                })
+                .count();
+
+            let scenario_verb_rate = scenario_correct_verb as f64 / scenario_total as f64 * 100.0;
+            let scenario_route_rate = scenario_correct_route as f64 / scenario_total as f64 * 100.0;
+
+            println!(
+                "  Scenario verb rate:   {:.1}% ({}/{}) target: >=80%",
+                scenario_verb_rate, scenario_correct_verb, scenario_total
+            );
+            println!(
+                "  Scenario route rate:  {:.1}% ({}/{}) target: >=90%",
+                scenario_route_rate, scenario_correct_route, scenario_total
+            );
+
+            assert!(
+                scenario_verb_rate >= 80.0,
+                "Scenario correct verb rate {:.1}% is below 80% target ({}/{})",
+                scenario_verb_rate,
+                scenario_correct_verb,
+                scenario_total
+            );
+            assert!(
+                scenario_route_rate >= 90.0,
+                "Scenario correct route target rate {:.1}% is below 90% target ({}/{})",
+                scenario_route_rate,
+                scenario_correct_route,
+                scenario_total
+            );
+        }
+
+        // --- MacroIndex match rate (category = "macro_match") ---
+        let macro_match_results: Vec<&TestResult> = results
+            .iter()
+            .filter(|r| r.case.category == "macro_match")
+            .collect();
+        if !macro_match_results.is_empty() {
+            let macro_total = macro_match_results.len();
+            let macro_correct = macro_match_results
+                .iter()
+                .filter(|r| r.outcome.is_first_attempt_hit())
+                .count();
+            let macro_rate = macro_correct as f64 / macro_total as f64 * 100.0;
+
+            println!(
+                "  MacroIndex rate:      {:.1}% ({}/{}) target: >=75%",
+                macro_rate, macro_correct, macro_total
+            );
+
+            assert!(
+                macro_rate >= 75.0,
+                "MacroIndex correct rate {:.1}% is below 75% target ({}/{})",
+                macro_rate,
+                macro_correct,
+                macro_total
+            );
+        }
+
+        // --- Tier-2 blocker false positive rate (category = "tier2_blocker") ---
+        let blocker_results: Vec<&TestResult> = results
+            .iter()
+            .filter(|r| r.case.category == "tier2_blocker")
+            .collect();
+        if !blocker_results.is_empty() {
+            let blocker_total = blocker_results.len();
+            let blocker_intercepted = blocker_results
+                .iter()
+                .filter(|r| {
+                    r.top_source
+                        .as_ref()
+                        .map_or(false, |s| s.contains("ScenarioIndex") || s == "MacroIndex")
+                })
+                .count();
+            let fp_rate = blocker_intercepted as f64 / blocker_total as f64 * 100.0;
+
+            println!(
+                "  Blocker FP rate:      {:.1}% ({}/{}) target: <5%",
+                fp_rate, blocker_intercepted, blocker_total
+            );
+
+            assert!(
+                fp_rate < 5.0,
+                "Tier-2 blocker false positive rate {:.1}% exceeds 5% target ({}/{})",
+                fp_rate,
+                blocker_intercepted,
+                blocker_total
+            );
+        }
+
+        // --- Single-verb non-regression (non-Tier-2 categories) ---
+        let single_verb_results: Vec<&TestResult> = results
+            .iter()
+            .filter(|r| {
+                !matches!(
+                    r.case.category.as_str(),
+                    "scenario" | "macro_match" | "tier2_blocker"
+                )
+            })
+            .collect();
+        if !single_verb_results.is_empty() {
+            let sv_total = single_verb_results.len();
+            let sv_first = single_verb_results
+                .iter()
+                .filter(|r| r.outcome.is_first_attempt_hit())
+                .count();
+            let sv_rate = sv_first as f64 / sv_total as f64 * 100.0;
+
+            println!(
+                "  Single-verb rate:     {:.1}% ({}/{}) target: >=35% (non-regression)",
+                sv_rate, sv_first, sv_total
+            );
+
+            // Baseline from ECIR: 36.8% first-attempt on 133 cases
+            // Use 35% as the non-regression floor
+            assert!(
+                sv_rate >= 35.0,
+                "Single-verb hit rate {:.1}% regressed below 35% baseline ({}/{})",
+                sv_rate,
+                sv_first,
+                sv_total
+            );
+        }
+
+        println!("=======================================================================");
     }
 }
 

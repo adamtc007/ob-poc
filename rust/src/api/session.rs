@@ -712,6 +712,7 @@ impl ServerRunSheet {
             affected_entities: Vec::new(),
             bindings: HashMap::new(),
             error: None,
+            labels: HashMap::new(),
         });
         self.cursor = self.entries.len() - 1;
         id
@@ -878,6 +879,9 @@ pub struct ServerRunSheetEntry {
     pub bindings: HashMap<String, BoundEntity>,
     /// Error message if failed
     pub error: Option<String>,
+    /// Provenance labels (e.g. journey/scenario metadata)
+    #[serde(default)]
+    pub labels: HashMap<String, String>,
 }
 
 impl ServerRunSheetEntry {
@@ -916,6 +920,7 @@ impl ServerRunSheetEntry {
                 })
                 .collect(),
             error: self.error.clone(),
+            labels: self.labels.clone(),
         }
     }
 }
@@ -1274,11 +1279,26 @@ impl AgentSession {
         plan: Option<crate::dsl_v2::execution_plan::ExecutionPlan>,
         _was_reordered: bool,
     ) {
+        self.set_pending_dsl_with_labels(source, ast, plan, _was_reordered, HashMap::new());
+    }
+
+    /// Set pending DSL with provenance labels (journey/scenario metadata).
+    pub fn set_pending_dsl_with_labels(
+        &mut self,
+        source: String,
+        ast: Vec<Statement>,
+        plan: Option<crate::dsl_v2::execution_plan::ExecutionPlan>,
+        _was_reordered: bool,
+        labels: HashMap<String, String>,
+    ) {
         // Add to run sheet as draft entry
         let id = self.run_sheet.add_draft(source, ast);
-        // Set plan on the entry
+        // Set plan and labels on the entry
         if let Some(entry) = self.run_sheet.get_mut(id) {
             entry.plan = plan;
+            if !labels.is_empty() {
+                entry.labels = labels;
+            }
         }
         self.transition(SessionEvent::DslReady);
     }

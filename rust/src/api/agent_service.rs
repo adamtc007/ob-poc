@@ -1036,7 +1036,9 @@ impl AgentService {
                         .map(|p| p.statements)
                         .unwrap_or_default();
 
-                    session.set_pending_dsl(r.dsl.clone(), ast, None, false);
+                    // Build provenance labels from journey metadata (Tier -2 match)
+                    let labels = Self::build_journey_labels(&journey_match, &r.intent.verb);
+                    session.set_pending_dsl_with_labels(r.dsl.clone(), ast, None, false, labels);
 
                     // Check if this is a session/view verb (navigation)
                     let verb = &r.intent.verb;
@@ -1145,6 +1147,86 @@ impl AgentService {
             return true;
         }
         false
+    }
+
+    /// Build provenance labels from journey metadata (Tier -2 match).
+    ///
+    /// Returns an empty map when no journey match is present, so the caller
+    /// can unconditionally pass labels to `set_pending_dsl_with_labels`.
+    fn build_journey_labels(
+        journey_match: &Option<crate::mcp::verb_search::JourneyMetadata>,
+        verb_fqn: &str,
+    ) -> std::collections::HashMap<String, String> {
+        use crate::mcp::verb_search::JourneyRoute;
+
+        let jm = match journey_match {
+            Some(jm) => jm,
+            None => return std::collections::HashMap::new(),
+        };
+
+        let mut labels = std::collections::HashMap::new();
+
+        // origin_kind: "scenario" if scenario-triggered, "macro" otherwise
+        let kind = if jm.scenario_id.is_some() {
+            "scenario"
+        } else {
+            "macro"
+        };
+        labels.insert("origin_kind".to_string(), kind.to_string());
+
+        // origin_macro_fqn: the primary macro FQN from the route
+        let macro_fqn = match &jm.route {
+            JourneyRoute::Macro { macro_fqn } => macro_fqn.clone(),
+            JourneyRoute::MacroSequence { macros } => macros
+                .first()
+                .cloned()
+                .unwrap_or_else(|| verb_fqn.to_string()),
+            JourneyRoute::NeedsSelection { .. } => verb_fqn.to_string(),
+        };
+        labels.insert("origin_macro_fqn".to_string(), macro_fqn);
+
+        // origin_scenario_id (only for Tier -2A scenario matches)
+        if let Some(ref sid) = jm.scenario_id {
+            labels.insert("origin_scenario_id".to_string(), sid.clone());
+        }
+
+        // origin_title (for progress narration)
+        if let Some(ref title) = jm.scenario_title {
+            labels.insert("origin_title".to_string(), title.clone());
+        }
+
+        labels
+    }
+
+    /// Build an execution result message enriched with journey narration.
+    ///
+    /// When the run sheet entries carry `origin_title` labels (from Tier -2
+    /// journey matches), the message includes the journey title:
+    ///   "Lux UCITS SICAV Setup — Executed 13 statement(s). 50 CBUs in scope."
+    ///
+    /// Falls back to the plain "Executed N statement(s)." format otherwise.
+    fn narrate_execution(
+        run_sheet: &crate::session::unified::RunSheet,
+        executed_count: usize,
+        cbu_count: usize,
+    ) -> String {
+        // Look for a journey title on the most recent executed entry
+        let title = run_sheet
+            .entries
+            .iter()
+            .rev()
+            .find_map(|e| e.labels.get("origin_title"));
+
+        match title {
+            Some(t) => format!(
+                "**{}** — Executed {} statement(s). {} CBUs in scope.",
+                t, executed_count, cbu_count
+            ),
+            None => format!(
+                "Executed {} statement(s). {} CBUs in scope.",
+                executed_count, cbu_count
+            ),
+        }
     }
 
     /// Check session context and prompt for client group or deal if needed
@@ -1774,10 +1856,10 @@ impl AgentService {
                 session.run_sheet.mark_all_executed();
                 self.sync_scope_from_exec_ctx(session, &mut exec_ctx);
 
-                let msg = format!(
-                    "Executed {} statement(s). {} CBUs in scope.",
+                let msg = Self::narrate_execution(
+                    &session.run_sheet,
                     results.len(),
-                    session.context.cbu_ids.len()
+                    session.context.cbu_ids.len(),
                 );
                 session.add_agent_message(msg.clone(), None, None);
                 Ok(AgentChatResponse {
@@ -1911,10 +1993,10 @@ impl AgentService {
         // Mark as executed
         session.run_sheet.mark_all_executed();
 
-        let msg = format!(
-            "Executed {} statement(s) via runbook gate. {} CBUs in scope.",
+        let msg = Self::narrate_execution(
+            &session.run_sheet,
             executed_count,
-            session.context.cbu_ids.len()
+            session.context.cbu_ids.len(),
         );
         session.add_agent_message(msg.clone(), None, None);
         Ok(AgentChatResponse {

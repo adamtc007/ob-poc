@@ -403,6 +403,7 @@ impl RunSheet {
                     created_at: None,
                     executed_at: e.executed_at.map(|dt| dt.to_rfc3339()),
                     bindings: std::collections::HashMap::new(),
+                    labels: e.labels.clone(),
                 })
                 .collect(),
             cursor: self.cursor,
@@ -431,6 +432,9 @@ pub struct RunSheetEntry {
     /// Validation errors (blocking execution)
     #[serde(default)]
     pub validation_errors: Vec<ValidationError>,
+    /// Provenance labels (e.g. journey/scenario metadata)
+    #[serde(default)]
+    pub labels: HashMap<String, String>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
@@ -1784,8 +1788,26 @@ impl UnifiedSession {
         _plan: Option<crate::dsl_v2::execution_plan::ExecutionPlan>,
         _was_reordered: bool,
     ) {
+        self.set_pending_dsl_with_labels(source, ast, _plan, _was_reordered, HashMap::new());
+    }
+
+    /// Set pending DSL with provenance labels (journey/scenario metadata).
+    pub fn set_pending_dsl_with_labels(
+        &mut self,
+        source: String,
+        ast: Vec<crate::dsl_v2::ast::Statement>,
+        _plan: Option<crate::dsl_v2::execution_plan::ExecutionPlan>,
+        _was_reordered: bool,
+        labels: HashMap<String, String>,
+    ) {
         // Add to run sheet as draft entry
-        self.add_dsl(source, "".to_string());
+        let id = self.add_dsl(source, "".to_string());
+        // Stamp provenance labels on the entry
+        if !labels.is_empty() {
+            if let Some(entry) = self.run_sheet.entries.iter_mut().find(|e| e.id == id) {
+                entry.labels = labels;
+            }
+        }
         // Store AST in context for execution
         self.context.ast = ast;
         self.transition(SessionEvent::DslReady);
@@ -1905,6 +1927,7 @@ impl UnifiedSession {
             dag_depth: 0,
             dependencies: Vec::new(),
             validation_errors: Vec::new(),
+            labels: HashMap::new(),
         });
         self.run_sheet.cursor = self.run_sheet.entries.len() - 1;
         self.updated_at = Utc::now();
@@ -1932,6 +1955,7 @@ impl UnifiedSession {
             dag_depth,
             dependencies,
             validation_errors: Vec::new(),
+            labels: HashMap::new(),
         });
         self.run_sheet.cursor = self.run_sheet.entries.len() - 1;
         self.updated_at = Utc::now();
@@ -3159,6 +3183,7 @@ mod tests {
             dag_depth: 0,
             dependencies: vec![],
             validation_errors: vec![],
+            labels: HashMap::new(),
         });
 
         sheet.entries.push(RunSheetEntry {
@@ -3173,6 +3198,7 @@ mod tests {
             dag_depth: 1,
             dependencies: vec![id1],
             validation_errors: vec![],
+            labels: HashMap::new(),
         });
 
         sheet.entries.push(RunSheetEntry {
@@ -3187,6 +3213,7 @@ mod tests {
             dag_depth: 2,
             dependencies: vec![id2],
             validation_errors: vec![],
+            labels: HashMap::new(),
         });
 
         // Cascade skip from id1

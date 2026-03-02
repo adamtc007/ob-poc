@@ -1263,23 +1263,35 @@ impl Runbook {
         if m.total == 0 {
             return "No steps in runbook".to_string();
         }
-        if m.completed == m.total {
-            return format!("All {} steps completed", m.total);
+
+        let base = if m.completed == m.total {
+            format!("All {} steps completed", m.total)
+        } else {
+            let mut parts = vec![format!("{} of {} steps completed", m.completed, m.total)];
+            if m.confirmed > 0 {
+                parts.push(format!("{} confirmed", m.confirmed));
+            }
+            if m.pending_resolution > 0 {
+                parts.push(format!("{} pending resolution", m.pending_resolution));
+            }
+            if m.failed > 0 {
+                parts.push(format!("{} failed", m.failed));
+            }
+            if m.parked > 0 {
+                parts.push(format!("{} parked", m.parked));
+            }
+            parts.join(", ")
+        };
+
+        // Prepend journey title from provenance labels when available
+        let title = self
+            .entries
+            .iter()
+            .find_map(|e| e.labels.get(provenance::ORIGIN_TITLE));
+        match title {
+            Some(t) => format!("{} — {}", t, base),
+            None => base,
         }
-        let mut parts = vec![format!("{} of {} steps completed", m.completed, m.total)];
-        if m.confirmed > 0 {
-            parts.push(format!("{} confirmed", m.confirmed));
-        }
-        if m.pending_resolution > 0 {
-            parts.push(format!("{} pending resolution", m.pending_resolution));
-        }
-        if m.failed > 0 {
-            parts.push(format!("{} failed", m.failed));
-        }
-        if m.parked > 0 {
-            parts.push(format!("{} parked", m.parked));
-        }
-        parts.join(", ")
     }
 
     // -- private helpers --
