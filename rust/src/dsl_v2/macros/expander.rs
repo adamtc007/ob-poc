@@ -864,7 +864,8 @@ fn expand_verb_call_step(
 
     for (arg_name, arg_template) in &step.args {
         // Skip null/empty values
-        let value = substitute_variables(arg_template, ctx)?;
+        let template_str = super::schema::json_value_to_string(arg_template);
+        let value = substitute_variables(&template_str, ctx)?;
         if value != "null" && !value.is_empty() {
             // Format argument
             let formatted = if value.contains(' ') || value.contains('"') {
@@ -899,7 +900,8 @@ fn expand_invoke_macro_step(
     // Substitute variables in the args
     let mut resolved_args = HashMap::new();
     for (arg_name, arg_template) in &step.args {
-        let value = substitute_variables(arg_template, ctx)?;
+        let template_str = super::schema::json_value_to_string(arg_template);
+        let value = substitute_variables(&template_str, ctx)?;
         if value != "null" && !value.is_empty() {
             resolved_args.insert(arg_name.clone(), value);
         }

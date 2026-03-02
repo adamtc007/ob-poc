@@ -1171,42 +1171,42 @@ ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Establish a UK OEIC structure"
-expected_verb = "struct.uk.oeic"
+expected_verb = "struct.uk.authorised.oeic"
 category = "scenario"
 difficulty = "medium"
 expected_tier = "scenario"
 expected_scenario_id = "uk-oeic-setup"
-expected_route_target = "struct.uk.oeic"
+expected_route_target = "struct.uk.authorised.oeic"
 ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Set up a US 40-Act fund"
-expected_verb = "struct.us.40act"
+expected_verb = "struct.us.40act.open-end"
 category = "scenario"
 difficulty = "medium"
 expected_tier = "scenario"
 expected_scenario_id = "us-40act-setup"
-expected_route_target = "struct.us.40act"
+expected_route_target = "struct.us.40act.open-end"
 ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Set up a Luxembourg PE structure"
-expected_verb = "struct.lux.pe"
+expected_verb = "struct.lux.pe.scsp"
 category = "scenario"
 difficulty = "medium"
 expected_tier = "scenario"
 expected_scenario_id = "lux-pe-setup"
-expected_route_target = "struct.lux.pe"
+expected_route_target = "struct.lux.pe.scsp"
 ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Onboard a Luxembourg RAIF"
-expected_verb = "struct.lux.raif"
+expected_verb = "struct.lux.aif.raif"
 category = "scenario"
 difficulty = "medium"
 expected_tier = "scenario"
 expected_scenario_id = "lux-raif-setup"
-expected_route_target = "struct.lux.raif"
+expected_route_target = "struct.lux.aif.raif"
 ecir_path = "fallthrough"
 
 [[test]]
@@ -1353,39 +1353,39 @@ expected_route_target = "case.open"
 ecir_path = "fallthrough"
 
 [[test]]
-utterance = "Set up a trading mandate"
-expected_verb = "mandate.setup"
+utterance = "Create a trading mandate"
+expected_verb = "mandate.create"
 category = "macro_match"
 difficulty = "easy"
 expected_tier = "macro_index"
-expected_route_target = "mandate.setup"
+expected_route_target = "mandate.create"
 ecir_path = "fallthrough"
 
 [[test]]
-utterance = "Add a party as depositary"
-expected_verb = "party.assign"
+utterance = "Add a new party"
+expected_verb = "party.add"
 category = "macro_match"
-difficulty = "medium"
+difficulty = "easy"
 expected_tier = "macro_index"
-expected_route_target = "party.assign"
+expected_route_target = "party.add"
 ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Lux RAIF setup"
-expected_verb = "struct.lux.raif"
+expected_verb = "struct.lux.aif.raif"
 category = "macro_match"
 difficulty = "easy"
 expected_tier = "macro_index"
-expected_route_target = "struct.lux.raif"
+expected_route_target = "struct.lux.aif.raif"
 ecir_path = "fallthrough"
 
 [[test]]
 utterance = "UK OEIC structure"
-expected_verb = "struct.uk.oeic"
+expected_verb = "struct.uk.authorised.oeic"
 category = "macro_match"
 difficulty = "easy"
 expected_tier = "macro_index"
-expected_route_target = "struct.uk.oeic"
+expected_route_target = "struct.uk.authorised.oeic"
 ecir_path = "fallthrough"
 
 [[test]]

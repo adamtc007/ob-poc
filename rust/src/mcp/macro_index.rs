@@ -525,6 +525,48 @@ impl MacroIndex {
             });
         }
 
+        // --- Signal: Label substring match (+5) ---
+        // Query contains the full label as a substring (but isn't an exact match)
+        let label_words: Vec<&str> = label_norm.split_whitespace().collect();
+        if label_words.len() >= 2
+            && query_norm != label_norm
+            && query_norm.contains(&label_norm)
+        {
+            score += 5;
+            signals.push(MatchedSignal {
+                signal: "label_substring".to_string(),
+                score: 5,
+                detail: format!(
+                    "Query contains label '{}' as substring",
+                    entry.label
+                ),
+            });
+        }
+
+        // --- Signal: Label word coverage (+4) ---
+        // ≥75% of label words appear in query tokens (for multi-word labels)
+        if label_words.len() >= 2 {
+            let label_hits = label_words
+                .iter()
+                .filter(|w| query_tokens.contains(&w.to_string()))
+                .count();
+            let coverage = label_hits as f64 / label_words.len() as f64;
+            if coverage >= 0.75 {
+                score += 4;
+                signals.push(MatchedSignal {
+                    signal: "label_word_coverage".to_string(),
+                    score: 4,
+                    detail: format!(
+                        "Label word coverage {}/{} ({:.0}%) for '{}'",
+                        label_hits,
+                        label_words.len(),
+                        coverage * 100.0,
+                        entry.label
+                    ),
+                });
+            }
+        }
+
         // --- Signal: Alias/phrase match (+6) ---
         for alias in &entry.aliases {
             let alias_norm = normalize(alias);
@@ -994,6 +1036,152 @@ mod tests {
                 assert_eq!(m.explain.score_total, m.score);
             }
             other => panic!("Expected Matched, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_real_macro_registry_loads_all_files() {
+        use crate::dsl_v2::macros::load_macro_registry;
+        let registry = load_macro_registry().expect("Failed to load macro registry");
+        let count = registry.len();
+        // After fixing MacroPrereq serde tag format, we should have ALL macros loaded
+        // including those from files with non-empty prereqs (case.yaml, mandate.yaml,
+        // structure.yaml, screening.yaml, kyc-workflow.yaml).
+        // Pre-fix: only ~9 macros loaded (from files with prereqs: [])
+        // Post-fix: should be ~47+ macros
+        assert!(
+            count >= 30,
+            "Expected ≥30 macros from real YAML but got {}. \
+             Likely prereq deserialization is still failing.",
+            count
+        );
+        eprintln!("Real macro registry: {} macros loaded", count);
+
+        // Verify specific macros from files that previously failed due to state_exists prereqs
+        assert!(
+            registry.has("case.open"),
+            "case.open should load (case.yaml has state_exists prereqs)"
+        );
+        assert!(
+            registry.has("screening.full"),
+            "screening.full should load (screening.yaml has state_exists prereqs)"
+        );
+    }
+
+    #[test]
+    fn test_diagnostic_real_registry_irish_icav() {
+        use crate::dsl_v2::macros::load_macro_registry;
+        let registry = load_macro_registry().expect("Failed to load macro registry");
+
+        // Debug: print all FQNs in registry BEFORE building index
+        eprintln!("=== REGISTRY CONTENTS (before index build) ===");
+        eprintln!("Registry macro count: {}", registry.len());
+        let mut all_fqns: Vec<_> = registry.all_fqns().cloned().collect();
+        all_fqns.sort();
+        for fqn in &all_fqns {
+            eprintln!("  {}", fqn);
+        }
+        eprintln!("Source files: {:?}", registry.source_files());
+
+        let index = MacroIndex::from_registry(&registry, None);
+
+        eprintln!("\n=== DIAGNOSTIC: MacroIndex with real registry ===");
+        eprintln!("Total macros indexed: {}", index.len());
+
+        // Check IE macros exist
+        let ie_macros: Vec<&String> = index
+            .entries
+            .keys()
+            .filter(|k| k.contains(".ie."))
+            .collect();
+        eprintln!("IE macros in index: {:?}", ie_macros);
+
+        // Check jurisdiction_map
+        let ie_jur = index.jurisdiction_map.get("IE");
+        eprintln!("jurisdiction_map[IE]: {:?}", ie_jur);
+
+        // Check specific entry details
+        if let Some(entry) = index.entries.get("struct.ie.ucits.icav") {
+            eprintln!("struct.ie.ucits.icav entry:");
+            eprintln!("  label: {:?}", entry.label);
+            eprintln!("  jurisdiction: {:?}", entry.jurisdiction);
+            eprintln!("  structure_type: {:?}", entry.structure_type);
+            eprintln!("  noun_tokens: {:?}", entry.noun_tokens);
+            eprintln!("  mode_tags: {:?}", entry.mode_tags);
+        } else {
+            eprintln!("WARNING: struct.ie.ucits.icav NOT in index!");
+        }
+
+        // Now test resolve()
+        let query = "Create an Irish ICAV";
+        let norm = normalize(query);
+        let tokens: HashSet<String> = tokenize(query).into_iter().collect();
+        eprintln!("\nQuery: {:?}", query);
+        eprintln!("Normalized: {:?}", norm);
+        eprintln!("Tokens: {:?}", tokens);
+
+        // Check jurisdiction alias matching manually
+        for alias in jurisdiction_aliases("IE") {
+            eprintln!(
+                "  IE alias '{}': in tokens={}, in norm={}",
+                alias,
+                tokens.contains(alias),
+                norm.contains(alias)
+            );
+        }
+
+        // Check noun_map lookups
+        for token in &tokens {
+            let noun_matches = index.noun_map.get(token);
+            eprintln!(
+                "  noun_map[{:?}]: {:?}",
+                token,
+                noun_matches.map(|v| v.len())
+            );
+        }
+
+        let outcome = index.resolve(query, None, None);
+        match &outcome {
+            MacroResolveOutcome::Matched(m) => {
+                eprintln!("\nResult: Matched({}, score={})", m.fqn, m.score);
+                for s in &m.explain.matched_signals {
+                    eprintln!("  {} (+{}): {}", s.signal, s.score, s.detail);
+                }
+            }
+            MacroResolveOutcome::Ambiguous(candidates) => {
+                eprintln!("\nResult: Ambiguous({} candidates)", candidates.len());
+                for c in candidates {
+                    eprintln!("  {} (score={})", c.fqn, c.score);
+                    for s in &c.explain.matched_signals {
+                        eprintln!("    {} (+{}): {}", s.signal, s.score, s.detail);
+                    }
+                }
+            }
+            MacroResolveOutcome::NoMatch => {
+                eprintln!("\nResult: NoMatch");
+            }
+        }
+
+        // Should NOT be NoMatch
+        assert!(
+            !matches!(outcome, MacroResolveOutcome::NoMatch),
+            "MacroIndex should find results for 'Create an Irish ICAV'"
+        );
+
+        // Also test other failing queries
+        for query in &[
+            "Lux RAIF setup",
+            "UK OEIC structure",
+            "Set up a cross-border hedge fund",
+            "Set up structure for Lux SICAV",
+        ] {
+            let outcome = index.resolve(query, None, None);
+            let label = match &outcome {
+                MacroResolveOutcome::Matched(m) => format!("Matched({}, {})", m.fqn, m.score),
+                MacroResolveOutcome::Ambiguous(c) => format!("Ambiguous({})", c.len()),
+                MacroResolveOutcome::NoMatch => "NoMatch".to_string(),
+            };
+            eprintln!("  {:40} → {}", query, label);
         }
     }
 }

@@ -200,6 +200,10 @@ pub struct MacroArg {
     /// UI label shown to operator
     pub ui_label: String,
 
+    /// Optional description for the argument
+    #[serde(default)]
+    pub description: Option<String>,
+
     /// Autofill from session context (e.g., ["session.current_structure"])
     #[serde(default)]
     pub autofill_from: Option<String>,
@@ -335,7 +339,7 @@ pub struct MacroArgValidation {
 
 /// Prerequisite condition
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "kebab-case")]
+#[serde(tag = "type", rename_all = "snake_case")]
 pub enum MacroPrereq {
     /// Requires specific state flag to be set
     StateExists { key: String },
@@ -442,12 +446,19 @@ pub struct VerbCallStep {
     /// Verb to call (e.g., "cbu.create", "kyc-case.create")
     pub verb: String,
 
-    /// Arguments with variable substitution
-    pub args: HashMap<String, String>,
+    /// Arguments with variable substitution (values may be strings, booleans, or numbers)
+    pub args: HashMap<String, serde_json::Value>,
 
     /// Optional symbol binding for the result (e.g., "@cbu")
     #[serde(rename = "as", default)]
     pub bind_as: Option<String>,
+}
+
+impl VerbCallStep {
+    /// Get an argument value as a string (converts booleans/numbers to strings)
+    pub fn arg_as_str(&self, key: &str) -> Option<String> {
+        self.args.get(key).map(json_value_to_string)
+    }
 }
 
 /// A nested macro invocation step
@@ -457,13 +468,24 @@ pub struct InvokeMacroStep {
     #[serde(rename = "invoke-macro")]
     pub macro_id: String,
 
-    /// Arguments to pass to the nested macro
+    /// Arguments to pass to the nested macro (values may be strings, booleans, or numbers)
     #[serde(default)]
-    pub args: HashMap<String, String>,
+    pub args: HashMap<String, serde_json::Value>,
 
     /// Symbols to import from the nested macro's scope
     #[serde(rename = "import-symbols", default)]
     pub import_symbols: Vec<String>,
+}
+
+/// Convert a serde_json::Value to a string representation for DSL expansion
+pub fn json_value_to_string(v: &serde_json::Value) -> String {
+    match v {
+        serde_json::Value::String(s) => s.clone(),
+        serde_json::Value::Bool(b) => b.to_string(),
+        serde_json::Value::Number(n) => n.to_string(),
+        serde_json::Value::Null => "null".to_string(),
+        other => other.to_string(),
+    }
 }
 
 impl MacroExpansionStep {
@@ -702,6 +724,7 @@ unlocks: []
         let arg = MacroArg {
             arg_type: MacroArgType::Enum,
             ui_label: "Type".to_string(),
+            description: None,
             autofill_from: None,
             picker: None,
             default: None,
