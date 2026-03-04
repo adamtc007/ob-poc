@@ -19,6 +19,21 @@ pub struct EntityTypeDefBody {
     pub optional_attributes: Vec<String>,
     #[serde(default)]
     pub parent_type: Option<String>,
+    /// Governance tier from domain metadata (governed/operational).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub governance_tier: Option<String>,
+    /// Security classification from domain metadata (public/internal/confidential/restricted).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub security_classification: Option<String>,
+    /// Whether this entity contains PII data.
+    #[serde(default)]
+    pub pii: Option<bool>,
+    /// Verb FQNs that read from this entity's table (reverse index from verb_data_footprint).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub read_by_verbs: Vec<String>,
+    /// Verb FQNs that write to this entity's table (reverse index from verb_data_footprint).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub written_by_verbs: Vec<String>,
 }
 
 /// Database table mapping for entity storage.
@@ -91,6 +106,11 @@ mod tests {
             required_attributes: vec!["cbu.name".into(), "cbu.jurisdiction_code".into()],
             optional_attributes: vec!["cbu.client_label".into()],
             parent_type: None,
+            governance_tier: Some("governed".into()),
+            security_classification: Some("internal".into()),
+            pii: Some(false),
+            read_by_verbs: vec!["cbu.list".into(), "cbu.get".into()],
+            written_by_verbs: vec!["cbu.create".into()],
         };
         let json = serde_json::to_value(&val).unwrap();
         let back: EntityTypeDefBody = serde_json::from_value(json.clone()).unwrap();

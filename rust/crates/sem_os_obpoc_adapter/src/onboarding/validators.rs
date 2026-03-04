@@ -144,6 +144,11 @@ mod tests {
             required_attributes: vec![],
             optional_attributes: vec![],
             parent_type: None,
+            governance_tier: None,
+            security_classification: None,
+            pii: None,
+            read_by_verbs: vec![],
+            written_by_verbs: vec![],
         }
     }
 

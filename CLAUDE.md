@@ -64,6 +64,7 @@
 > **SessionVerbSurface:** ✅ Complete - Consolidated governance layer composition (SemReg CCIR + AgentMode + workflow phase + lifecycle + actor gating), 8-step compute pipeline, dual fingerprints (surface `vs1:` + SemReg `v1:`), FailClosed safe-harbor (~30 verbs), MCP tool `session_verb_surface`, REST endpoint `GET /api/session/:id/verb-surface`, ChatResponse enrichment, React VerbBrowser governance badges, 13 unit tests
 > **Semantic OS Tab:** ✅ Complete - Agent-driven workflow selection UI (`/semantic-os`), goals→phase_tags verb scoping in SemReg, DecisionPacket workflow prompt (Onboarding/KYC/Data Management/Stewardship), session sidebar + registry context panel, `GET /api/sem-os/context` endpoint
 > **Scenario-Based Intent Resolution (Phases 0.5-5):** ✅ Complete — MacroIndex (Tier -2B) + ScenarioIndex (Tier -2A) + CompoundSignals + SequenceValidator; deterministic scoring ledger, 16 YAML scenarios (incl. 3 macro_sequence KYC workflows), ECIR short-circuit gating, provenance labels on macro expansion, progress narration ("Step 4 of 13: Lux UCITS SICAV Setup"), 43 Tier-2 test cases with 5 hard threshold assertions (spec §11)
+> **AffinityGraph & Schema-Driven Diagram Generation:** ✅ Complete — Bidirectional verb↔data index (`sem_os_core::affinity`), 5-pass pure-Rust builder from active snapshots, 10 query methods (6 core + 4 governance), DiagramModel + MermaidRenderer (`sem_os_core::diagram`), 3 render modes (erDiagram/verb-flow/domain-map), 9 new verbs (6 registry.* + 3 schema.*), DomainMetadata YAML overlay, 6 CustomOps, 6 integration tests, 21,047 total embeddings
 
 This is the root project guide for Claude Code. Domain-specific details are in annexes.
 
@@ -3607,6 +3608,225 @@ Progress narration uses these labels: "Step 4 of 13: Luxembourg UCITS SICAV Setu
 
 ---
 
+## AffinityGraph & Schema-Driven Diagram Generation
+
+> ✅ **IMPLEMENTED (2026-03-03)**: Bidirectional verb↔data index built entirely from active registry snapshots. Diagram generation as a projection of the graph rather than standalone schema introspection.
+
+**Problem Solved:** The Semantic Registry already implicitly knew which verbs produce/consume which entities, which attributes map to which table columns, and how verbs relate through shared data. The AffinityGraph makes this implicit knowledge queryable — enabling "what verbs touch the `cbus` table?", "what data does `cbu.create` read/write?", and "generate an ERD with verb surface annotations" — without additional DB tables or migrations.
+
+### Architecture
+
+```
+Registry Snapshots (active SnapshotRows)
+    │
+    ├─ VerbContracts ──── Pass 1 ──► Forward edges (verb→data)
+    ├─ EntityTypeDefs ─── Pass 2 ──► Entity↔table bimaps
+    ├─ AttributeDefs ──── Pass 3 ──► Reverse edges (data→verb)
+    ├─ DerivationSpecs ── Pass 4 ──► Lineage edges
+    └─ RelationshipTypeDefs Pass 5 ► Entity↔entity edges
+                                          │
+                                          ▼
+                                   AffinityGraph
+                                   (in-memory, Arc<RwLock<>> cached)
+                                          │
+                          ┌───────────────┼───────────────┐
+                          ▼               ▼               ▼
+                   Query Surface    Diagram Projection  Governance
+                   (10 methods)     (ERD/VerbFlow)     (orphans, gaps)
+```
+
+### Module Placement
+
+```
+sem_os_core/src/
+├── affinity/           # NEW — pure value types + builder + queries
+│   ├── mod.rs          # AffinityGraph struct + build() + re-exports
+│   ├── types.rs        # AffinityEdge, DataRef, TableRef, ColumnRef, AffinityKind, etc.
+│   ├── builder.rs      # 5-pass builder from SnapshotRows
+│   └── query.rs        # 10 query methods
+│
+├── diagram/            # NEW — model types + enrichment + Mermaid rendering
+│   ├── mod.rs          # Re-exports + GovernanceLevel
+│   ├── model.rs        # DiagramModel, DiagramEntity, DiagramAttribute, RenderOptions
+│   ├── enrichment.rs   # build_diagram_model(tables, graph, options) → DiagramModel
+│   └── mermaid.rs      # MermaidRenderer (erDiagram + graph LR + graph TD)
+│
+rust/src/domain_ops/
+└── affinity_ops.rs     # NEW — 6 CustomOp handlers for registry.* verbs
+
+rust/crates/sem_os_obpoc_adapter/src/
+└── metadata.rs         # NEW — DomainMetadata YAML overlay types + loader
+```
+
+### 5-Pass Builder
+
+`AffinityGraph::build(snapshots: &[SnapshotRow]) -> Result<Self>` — takes a flat slice of active `SnapshotRow` (all object types), deserializes relevant body types, and runs 5 passes:
+
+| Pass | Source | Output |
+|------|--------|--------|
+| 1 | `VerbContractBody` | Forward edges: `Produces`, `Consumes`, `CrudRead/Insert/Update/Delete`, `ArgLookup{arg_name}` — also consumes `reads_from`/`writes_to` supplemental fields |
+| 2 | `EntityTypeDefBody` | `entity_to_table` + `table_to_entity` bimaps (from `db_table` field) |
+| 3 | `AttributeDefBody` | Reverse edges: `ProducesAttribute`, `ConsumesAttribute{arg_name}` + `attribute_to_column` map |
+| 4 | `DerivationSpecBody` | `DerivationEdge { from_attribute, to_attribute, spec_fqn }` lineage edges |
+| 5 | `RelationshipTypeDefBody` | `EntityRelationship { source_fqn, target_fqn, cardinality, edge_class }` |
+
+After all passes: `verb_to_data` and `data_to_verb` forward/reverse indexes built from `edges` vec.
+
+### 10 Query Methods
+
+**6 Core Queries:**
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `verbs_for_table(schema, table)` | `Vec<VerbAffinity>` | All verbs reading/writing/referencing a table |
+| `verbs_for_attribute(attr_fqn)` | `Vec<VerbAffinity>` | Verbs producing or consuming an attribute |
+| `verbs_for_entity_type(entity_fqn)` | `Vec<VerbAffinity>` | Verbs operating on entity type (via entity→table→verbs) |
+| `data_for_verb(verb_fqn)` | `Vec<DataAffinity>` | All data assets a verb touches |
+| `data_footprint(verb_fqn, depth)` | `DataFootprint` | Transitive reach (follows arg lookups + derivations up to N hops) |
+| `adjacent_verbs(verb_fqn)` | `Vec<(String, Vec<DataRef>)>` | Verbs sharing data dependencies with given verb |
+
+**4 Governance Queries:**
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `orphan_tables(known_tables)` | `Vec<TableRef>` | Tables with no verb affinity (ungoverned data) |
+| `orphan_verbs()` | `Vec<String>` | Verbs with no data affinity (disconnected operations) |
+| `write_only_attributes()` | `Vec<String>` | Attributes with source but no consuming sinks |
+| `read_before_write_attributes()` | `Vec<String>` | Attributes with sinks but no producing source |
+
+### DiagramModel + MermaidRenderer
+
+```rust
+// Enrichment pipeline
+pub fn build_diagram_model(
+    tables: &[TableInput],       // Caller-provided physical schema (name, columns, FKs)
+    graph: &AffinityGraph,       // From active registry snapshots
+    options: &RenderOptions,     // schema_filter, domain_filter, max_tables, include_columns
+) -> DiagramModel
+
+// Three render modes
+MermaidRenderer::render_erd(&model, &options)         // erDiagram syntax
+MermaidRenderer::render_verb_flow(&model, verb_fqn)   // graph LR with verb→data edges
+MermaidRenderer::render_domain_map(&model, &options)  // graph TD with domain subgraphs
+```
+
+**GovernanceLevel** annotation on each `DiagramEntity`:
+- `Full` — entity type matched in registry + verbs present
+- `Partial` — some verbs matched but no canonical entity type
+- `None` — table not registered in registry at all
+
+**Key details:** All Mermaid node IDs are sanitized (hyphens → underscores, non-alphanumeric stripped). Output is deterministic (entities and relationships sorted before rendering). `RenderOptions.max_tables` limits diagram size; `domain_filter` / `schema_filter` scope to specific domains.
+
+### 9 New Verbs
+
+**6 Affinity Navigation Verbs (appended to `rust/config/verbs/sem-reg/registry.yaml`):**
+
+| Verb FQN | Description |
+|----------|-------------|
+| `registry.verbs-for-table` | Find all verbs that read, write, or reference a database table |
+| `registry.verbs-for-attribute` | Find all verbs that produce or consume an attribute |
+| `registry.data-for-verb` | Find all data assets a verb touches (with optional transitive `depth`) |
+| `registry.adjacent-verbs` | Find verbs sharing data dependencies |
+| `registry.governance-gaps` | Identify orphan tables, orphan verbs, write-only/read-before-write attributes |
+| `registry.discover-dsl` | Phase 2 stub — utterance→verb chain synthesis (returns NotImplemented) |
+
+**3 Diagram Generation Verbs (appended to `rust/config/verbs/sem-reg/schema.yaml`):**
+
+| Verb FQN | Description |
+|----------|-------------|
+| `schema.generate-erd` | Generate entity-relationship diagram with verb surface annotations |
+| `schema.generate-verb-flow` | Generate verb-centric data flow diagram |
+| `schema.generate-discovery-map` | Phase 2 stub — domain discovery map |
+
+Each verb has 8+ invocation phrases for semantic discovery. After adding, always run `populate_embeddings`.
+
+### CoreService Integration
+
+```rust
+// New method on CoreService trait
+async fn get_affinity_graph(&self) -> Result<Arc<AffinityGraph>>;
+
+// Cache in CoreServiceImpl
+affinity_graph: Arc<RwLock<Option<AffinityGraph>>>
+```
+
+- On first call: builds from `stores.snapshots.load_active_snapshots()` if cache empty
+- After `bootstrap_seed_bundle()`: triggers cache rebuild automatically
+- Thread-safe via `Arc<RwLock<>>`
+- Graceful degradation: returns empty `AffinityGraph` if no snapshots exist (never fails the request)
+
+**CustomOps access pattern:** Each op calls `load_affinity_graph(pool)` which invokes `CoreService::get_affinity_graph()`. Follow existing patterns in `sem_reg_schema_ops.rs` for how `ExecutionContext` provides service access.
+
+### DomainMetadata YAML Overlay
+
+`rust/config/sem_os_seeds/domain_metadata.yaml` supplements the registry with verb→table forward mappings that the registry alone may not capture (e.g., verbs that lack `crud_mapping` or explicit `produces` fields):
+
+```yaml
+domains:
+  cbu:
+    description: "Client Business Unit domain"
+    tables:
+      - name: cbus
+        description: "Core CBU records"
+        governance_tier: governed
+        pii: false
+    verb_data_footprint:
+      cbu.create:
+        writes_to: [cbus]
+      cbu.list:
+        reads_from: [cbus]
+```
+
+**Types:** `DomainMetadataFile` → `BTreeMap<String, DomainEntry>` with `TableMetadata` and per-verb `VerbFootprint`. Loaded by `sem_os_obpoc_adapter::metadata::load_domain_metadata(path)`. The enriched `reads_from`/`writes_to` fields on `VerbContractBody` and `read_by_verbs`/`written_by_verbs` on `EntityTypeDefBody` are supplemental edge sources consumed by Pass 1 and Pass 2.
+
+### Commands
+
+```bash
+# Adapter tests (seed bundle enrichment)
+cargo test -p sem_os_obpoc_adapter
+
+# Core unit tests (AffinityGraph types, builder, queries, diagram)
+cargo test -p sem_os_core -- affinity
+cargo test -p sem_os_core -- diagram
+
+# Pre-commit (format + clippy + unit tests)
+cargo x pre-commit
+
+# Integration tests (requires database)
+DATABASE_URL="postgresql:///data_designer" \
+  cargo test --features database --test affinity_integration -- --ignored --nocapture
+
+# Populate embeddings (after adding new verb YAML with 9 new verbs)
+DATABASE_URL="postgresql:///data_designer" \
+  cargo run --release --package ob-semantic-matcher --bin populate_embeddings
+```
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `rust/crates/sem_os_core/src/affinity/types.rs` | `AffinityGraph`, `AffinityEdge`, `AffinityKind` (9 variants), `AffinityProvenance`, `DataRef`, `TableRef`, `ColumnRef`, `VerbAffinity`, `DataAffinity`, `DataFootprint` |
+| `rust/crates/sem_os_core/src/affinity/builder.rs` | 5-pass builder, `AffinityGraph::build(snapshots)` |
+| `rust/crates/sem_os_core/src/affinity/query.rs` | 10 query methods (6 core + 4 governance) |
+| `rust/crates/sem_os_core/src/affinity/mod.rs` | Module re-exports |
+| `rust/crates/sem_os_core/src/diagram/model.rs` | `DiagramModel`, `DiagramEntity`, `DiagramAttribute`, `DiagramRelationship`, `GovernanceLevel`, `TableInput`, `ColumnInput`, `RenderOptions` |
+| `rust/crates/sem_os_core/src/diagram/enrichment.rs` | `build_diagram_model()` — annotates physical schema with registry intelligence |
+| `rust/crates/sem_os_core/src/diagram/mermaid.rs` | `MermaidRenderer` — `render_erd`, `render_verb_flow`, `render_domain_map` |
+| `rust/crates/sem_os_core/src/diagram/mod.rs` | Module re-exports |
+| `rust/crates/sem_os_core/src/lib.rs` | `pub mod affinity; pub mod diagram;` declarations |
+| `rust/crates/sem_os_core/src/service.rs` | `get_affinity_graph()` method + `affinity_graph` cache field |
+| `rust/crates/sem_os_obpoc_adapter/src/metadata.rs` | `DomainMetadataFile`, `DomainEntry`, `TableMetadata`, `VerbFootprint`, `load_domain_metadata()` |
+| `rust/crates/sem_os_obpoc_adapter/src/lib.rs` | `pub mod metadata;` + `build_seed_bundle_with_metadata()` |
+| `rust/src/domain_ops/affinity_ops.rs` | 6 `#[register_custom_op]` handlers with typed result structs |
+| `rust/src/domain_ops/sem_reg_schema_ops.rs` | 3 diagram CustomOps added (`SchemaGenerateErdOp`, `SchemaGenerateVerbFlowOp`, `SchemaGenerateDiscoveryMapOp`) |
+| `rust/src/domain_ops/mod.rs` | `pub mod affinity_ops;` declaration |
+| `rust/config/verbs/sem-reg/registry.yaml` | 6 affinity navigation verb definitions (8+ invocation phrases each) |
+| `rust/config/verbs/sem-reg/schema.yaml` | 3 diagram verb definitions appended |
+| `rust/config/sem_os_seeds/domain_metadata.yaml` | DomainMetadata YAML overlay (verb→table forward mappings) |
+| `rust/tests/affinity_integration.rs` | 6 integration tests: live registry, verbs_for_table, data_for_verb, adjacent_verbs, governance_gaps, ERD generation |
+
+---
+
 ## Adding Verbs
 
 > ⚠️ **Before writing verb YAML, read `docs/verb-definition-spec.md`**
@@ -5945,6 +6165,10 @@ When you see these in a task, read the corresponding annex first:
 | "SequenceValidator", "sequence_validator", "macro sequence", "prereq validation", "macro_sequence" | CLAUDE.md §Scenario-Based Intent Resolution §Scenario Route Types, `rust/src/mcp/sequence_validator.rs` |
 | "provenance labels", "origin_scenario_id", "origin_macro_fqn", "progress narration" | CLAUDE.md §Scenario-Based Intent Resolution §Provenance Labels |
 | "ownership.refresh", "OwnershipRefreshOp", "bridge ManCo", "derive CBU groups" | `rust/src/domain_ops/manco_ops.rs` |
+| "AffinityGraph", "affinity_graph", "verb↔data index", "verbs_for_table", "data_for_verb", "adjacent_verbs", "data_footprint", "orphan_tables", "orphan_verbs", "governance_gaps", "write_only_attributes" | CLAUDE.md §AffinityGraph & Schema-Driven Diagram Generation, `rust/crates/sem_os_core/src/affinity/` |
+| "DiagramModel", "MermaidRenderer", "render_erd", "render_verb_flow", "render_domain_map", "build_diagram_model", "GovernanceLevel", "TableInput", "RenderOptions", "DiagramEntity" | CLAUDE.md §AffinityGraph §DiagramModel + MermaidRenderer, `rust/crates/sem_os_core/src/diagram/` |
+| "DomainMetadata", "VerbFootprint", "domain_metadata.yaml", "verb_data_footprint", "sem_os_obpoc_adapter metadata", "load_domain_metadata" | CLAUDE.md §AffinityGraph §DomainMetadata YAML Overlay, `rust/crates/sem_os_obpoc_adapter/src/metadata.rs` |
+| "affinity_ops", "AffinityVerbsForTableOp", "AffinityDataForVerbOp", "AffinityGovernanceGapsOp", "registry.verbs-for-table", "registry.data-for-verb", "schema.generate-erd", "schema.generate-verb-flow" | CLAUDE.md §AffinityGraph §9 New Verbs, `rust/src/domain_ops/affinity_ops.rs` |
 
 ---
 

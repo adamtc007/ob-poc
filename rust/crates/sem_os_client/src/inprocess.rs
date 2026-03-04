@@ -7,7 +7,10 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use sem_os_core::{principal::Principal, proto::*, seeds::SeedBundle, service::CoreService};
+use sem_os_core::{
+    affinity::AffinityGraph, principal::Principal, proto::*, seeds::SeedBundle,
+    service::CoreService,
+};
 
 use crate::{Result, SemOsClient};
 
@@ -94,6 +97,10 @@ impl SemOsClient for InProcessClient {
             snapshots_created,
             snapshot_set_id: changeset_id.to_string(), // changeset_id == snapshot_set_id by design
         })
+    }
+
+    async fn get_affinity_graph(&self) -> Result<Arc<AffinityGraph>> {
+        self.service.get_affinity_graph().await
     }
 
     async fn drain_outbox_for_test(&self) -> Result<()> {

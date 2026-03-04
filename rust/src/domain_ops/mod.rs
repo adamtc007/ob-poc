@@ -19,6 +19,7 @@
 //! 4. Ensure operations are testable in isolation
 
 mod access_review_ops;
+mod affinity_ops;
 mod agent_ops;
 mod attribute_ops;
 pub mod batch_control_ops;

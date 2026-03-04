@@ -9,9 +9,11 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use tokio::sync::RwLock;
 use uuid::Uuid;
 
 use crate::{
+    affinity::AffinityGraph,
     authoring::{
         bundle::BundleContents,
         governance_verbs::GovernanceVerbService,
@@ -186,6 +188,13 @@ pub trait CoreService: Send + Sync {
     /// Mark a bootstrap audit record as 'failed' with an error message.
     async fn bootstrap_mark_failed(&self, bundle_hash: &str, error: &str) -> Result<()>;
 
+    /// Get the pre-computed AffinityGraph (bidirectional verb↔data index).
+    ///
+    /// Built lazily on first call from active snapshots. Cached until the next publish
+    /// (bootstrap or changeset promotion) which sets the cache to `None`.
+    /// Returns an empty AffinityGraph if no active snapshots exist yet.
+    async fn get_affinity_graph(&self) -> Result<Arc<AffinityGraph>>;
+
     /// Test-only: synchronously drain and process all pending outbox events.
     async fn drain_outbox_for_test(&self) -> Result<()>;
 }
@@ -208,6 +217,8 @@ pub struct CoreServiceImpl {
     pub scratch_runner: Option<Arc<dyn ScratchSchemaRunner>>,
     pub cleanup: Option<Arc<dyn crate::authoring::cleanup::CleanupStore>>,
     pub bootstrap_audit: Option<Arc<dyn BootstrapAuditStore>>,
+    /// Cached AffinityGraph. `None` means cache is cold (build on next access).
+    pub affinity_graph: Arc<RwLock<Option<AffinityGraph>>>,
 }
 
 impl CoreServiceImpl {
@@ -232,6 +243,7 @@ impl CoreServiceImpl {
             scratch_runner: None,
             cleanup: None,
             bootstrap_audit: None,
+            affinity_graph: Arc::new(RwLock::new(None)),
         }
     }
 
@@ -427,6 +439,12 @@ impl CoreService for CoreServiceImpl {
                 .publish_batch_into_set(to_publish, set_id.0, correlation_id)
                 .await?;
 
+            // Invalidate AffinityGraph cache — new snapshots change the verb↔data index.
+            {
+                let mut guard = self.affinity_graph.write().await;
+                *guard = None;
+            }
+
             snapshot_set_id_str = Some(set_id.0.to_string());
         }
 
@@ -599,6 +617,12 @@ impl CoreService for CoreServiceImpl {
         self.snapshots
             .publish_batch_into_set(items, set_id.0, correlation_id)
             .await?;
+
+        // Invalidate AffinityGraph cache — new snapshots change the verb↔data index.
+        {
+            let mut guard = self.affinity_graph.write().await;
+            *guard = None;
+        }
 
         // 6. Update changeset status to 'published'.
         self.changesets
@@ -1018,6 +1042,25 @@ impl CoreService for CoreServiceImpl {
             SemOsError::MigrationPending("bootstrap audit store not configured".into())
         })?;
         store.mark_failed(bundle_hash, error).await
+    }
+
+    async fn get_affinity_graph(&self) -> Result<Arc<AffinityGraph>> {
+        // Fast path: cache hit.
+        {
+            let guard = self.affinity_graph.read().await;
+            if let Some(graph) = &*guard {
+                return Ok(Arc::new(graph.clone()));
+            }
+        }
+        // Slow path: build from active snapshots.
+        let snapshots = self.snapshots.load_active_snapshots().await?;
+        let graph = AffinityGraph::build(&snapshots);
+        let arc_graph = Arc::new(graph.clone());
+        {
+            let mut guard = self.affinity_graph.write().await;
+            *guard = Some(graph);
+        }
+        Ok(arc_graph)
     }
 
     async fn drain_outbox_for_test(&self) -> Result<()> {

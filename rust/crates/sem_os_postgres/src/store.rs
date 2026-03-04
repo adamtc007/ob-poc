@@ -575,6 +575,34 @@ impl SnapshotStore for PgSnapshotStore {
             })
             .collect::<Result<Vec<_>>>()
     }
+
+    async fn load_active_snapshots(&self) -> Result<Vec<SnapshotRow>> {
+        let rows = sqlx::query_as::<_, PgSnapshotRow>(
+            r#"
+            SELECT snapshot_id, snapshot_set_id,
+                   object_type::text, object_id,
+                   version_major, version_minor,
+                   status::text, governance_tier::text, trust_class::text,
+                   security_label, effective_from, effective_until,
+                   predecessor_id, change_type::text, change_rationale,
+                   created_by, approved_by, definition, created_at
+            FROM sem_reg.snapshots
+            WHERE status = 'active'
+              AND effective_until IS NULL
+            ORDER BY object_type, created_at
+            "#,
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| anyhow!(e))?;
+
+        rows.into_iter()
+            .map(|r| {
+                r.try_into()
+                    .map_err(|e: String| SemOsError::Internal(anyhow!(e)))
+            })
+            .collect::<Result<Vec<_>>>()
+    }
 }
 
 // ── PgObjectStore ─────────────────────────────────────────────

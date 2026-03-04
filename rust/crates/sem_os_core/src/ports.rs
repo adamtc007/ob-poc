@@ -45,6 +45,11 @@ pub trait SnapshotStore: Send + Sync {
     /// Used for impact analysis — finds downstream dependents of a changed object.
     /// Returns (snapshot_id, object_type, fqn) tuples.
     async fn find_dependents(&self, fqn: &str, limit: i64) -> Result<Vec<DependentSnapshot>>;
+
+    /// Load ALL active snapshots across all object types.
+    /// Returns full `SnapshotRow`s including `definition` JSONB — used by
+    /// `AffinityGraph::build()` to construct the bidirectional verb↔data index.
+    async fn load_active_snapshots(&self) -> Result<Vec<SnapshotRow>>;
 }
 
 #[async_trait]

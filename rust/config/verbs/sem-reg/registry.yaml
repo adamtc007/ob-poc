@@ -688,3 +688,229 @@ domains:
         returns:
           type: record
           capture: false
+
+      # ============================================
+      # Affinity Navigation
+      # ============================================
+      verbs-for-table:
+        description: Find all verbs that read, write, or reference a database table
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: verb_affinity
+          category: affinity_navigation
+          context: scripted_ok
+          side_effects: facts_only
+          tags: [stewardship, data]
+          subject_kinds: []
+          phase_tags: [stewardship, data]
+        behavior: plugin
+        handler: AffinityVerbsForTableOp
+        invocation_phrases:
+          - "what verbs use this table"
+          - "which operations touch this table"
+          - "find verbs for table"
+          - "verbs that read from table"
+          - "verbs that write to table"
+          - "what operations access this table"
+          - "show verb affinity for table"
+          - "which verbs reference this database table"
+          - "table verb surface"
+          - "operations on this table"
+        args:
+          - name: schema-name
+            type: string
+            required: true
+            description: PostgreSQL schema name (e.g., ob-poc, sem_reg)
+          - name: table-name
+            type: string
+            required: true
+            description: Table name to query verb affinity for
+          - name: include-lookups
+            type: boolean
+            required: false
+            default: true
+            description: Whether to include ArgLookup verbs in results
+        returns:
+          type: record
+          capture: false
+
+      verbs-for-attribute:
+        description: Find all verbs that produce or consume a given attribute
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: verb_affinity
+          category: affinity_navigation
+          context: scripted_ok
+          side_effects: facts_only
+          tags: [stewardship, data]
+          subject_kinds: []
+          phase_tags: [stewardship, data]
+        behavior: plugin
+        handler: AffinityVerbsForAttributeOp
+        invocation_phrases:
+          - "what verbs produce this attribute"
+          - "which operations consume this attribute"
+          - "find verbs for attribute"
+          - "verbs that write this attribute"
+          - "verbs that read this attribute"
+          - "attribute verb surface"
+          - "which operations touch this attribute"
+          - "show attribute affinity"
+          - "what consumes this attribute"
+        args:
+          - name: attr-fqn
+            type: string
+            required: true
+            description: Fully-qualified attribute name (e.g., cbu.jurisdiction_code)
+        returns:
+          type: record
+          capture: false
+
+      data-for-verb:
+        description: Find all data assets a verb touches (tables, columns, attributes, entities)
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: data_affinity
+          category: affinity_navigation
+          context: scripted_ok
+          side_effects: facts_only
+          tags: [stewardship, data]
+          subject_kinds: []
+          phase_tags: [stewardship, data]
+        behavior: plugin
+        handler: AffinityDataForVerbOp
+        invocation_phrases:
+          - "what data does this verb touch"
+          - "which tables does this verb read"
+          - "data footprint for verb"
+          - "what does this operation access"
+          - "show verb data dependencies"
+          - "what tables does this verb write"
+          - "data assets for verb"
+          - "verb data surface"
+          - "what data does this operation use"
+          - "transitive data footprint for verb"
+        args:
+          - name: verb-fqn
+            type: string
+            required: true
+            description: Fully-qualified verb name (e.g., cbu.create)
+          - name: depth
+            type: integer
+            required: false
+            default: 1
+            description: Traversal depth for transitive data footprint (1=direct, 2+=transitive)
+        returns:
+          type: record
+          capture: false
+
+      adjacent-verbs:
+        description: Find verbs sharing data dependencies with a given verb
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: verb_adjacency
+          category: affinity_navigation
+          context: scripted_ok
+          side_effects: facts_only
+          tags: [stewardship, data]
+          subject_kinds: []
+          phase_tags: [stewardship, data]
+        behavior: plugin
+        handler: AffinityAdjacentVerbsOp
+        invocation_phrases:
+          - "what verbs share data with this verb"
+          - "find adjacent verbs"
+          - "which operations are related to this verb"
+          - "verbs that share the same tables"
+          - "neighboring verbs in the data graph"
+          - "verbs co-accessing this data"
+          - "what operations overlap with this verb"
+          - "show verb neighbors"
+          - "related operations by shared data"
+          - "verbs with shared data dependencies"
+        args:
+          - name: verb-fqn
+            type: string
+            required: true
+            description: Fully-qualified verb name to find adjacent verbs for
+        returns:
+          type: record
+          capture: false
+
+      governance-gaps:
+        description: Identify ungoverned tables, orphan verbs, and attribute coverage gaps
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: governance_gap
+          category: affinity_navigation
+          context: scripted_ok
+          side_effects: facts_only
+          tags: [stewardship]
+          subject_kinds: []
+          phase_tags: [stewardship]
+        behavior: plugin
+        handler: AffinityGovernanceGapsOp
+        invocation_phrases:
+          - "find governance gaps"
+          - "which tables are ungoverned"
+          - "show orphan verbs"
+          - "identify data coverage gaps"
+          - "what tables have no verb affinity"
+          - "find unregistered tables"
+          - "governance coverage analysis"
+          - "show write-only attributes"
+          - "attribute governance gaps"
+          - "data governance health check"
+        args:
+          - name: schema-name
+            type: string
+            required: false
+            description: PostgreSQL schema name to check for orphan tables (all schemas if omitted)
+        returns:
+          type: record
+          capture: false
+
+      discover-dsl:
+        description: Discover a DSL chain from an utterance using affinity graph (Phase 2 stub)
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: dsl_discovery
+          category: affinity_navigation
+          context: scripted_ok
+          side_effects: facts_only
+          tags: [stewardship, data]
+          subject_kinds: []
+          phase_tags: [stewardship, data]
+        behavior: plugin
+        handler: AffinityDiscoverDslOp
+        invocation_phrases:
+          - "discover DSL for this goal"
+          - "suggest verb chain for intent"
+          - "find operations for this workflow"
+          - "what verbs accomplish this goal"
+          - "synthesize DSL from description"
+          - "build verb sequence for intent"
+          - "discover operations for this task"
+          - "suggest DSL chain"
+          - "verb chain discovery"
+          - "find workflow verbs for this intent"
+        args:
+          - name: intent
+            type: string
+            required: true
+            description: Natural language description of the goal to synthesize a verb chain for
+        returns:
+          type: record
+          capture: false

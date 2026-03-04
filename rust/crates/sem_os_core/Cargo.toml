@@ -6,6 +6,7 @@ description = "Semantic OS core — pure domain types, port traits, gate logic. 
 
 [dependencies]
 async-trait = "0.1"
+tokio = { version = "1", features = ["sync"] }
 thiserror = "1.0"
 anyhow = "1.0"
 serde = { version = "1.0", features = ["derive"] }

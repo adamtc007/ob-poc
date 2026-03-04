@@ -7,11 +7,13 @@
 //! - `seeds` — taxonomy, view, policy, derivation spec seed builders
 //! - `onboarding` — request validation and default generation
 
+pub mod metadata;
 pub mod onboarding;
 pub mod scanner;
 pub mod seeds;
 
 use dsl_core::config::types::VerbsConfig;
+use metadata::DomainMetadata;
 use sem_os_core::seeds::{
     AttributeSeed, DerivationSpecSeed, EntityTypeSeed, PolicySeed, SeedBundle, TaxonomySeed,
     VerbContractSeed, ViewSeed,
@@ -19,16 +21,38 @@ use sem_os_core::seeds::{
 
 /// Build a complete `SeedBundle` from ob-poc verb configuration.
 ///
+/// Delegates to [`build_seed_bundle_with_metadata`] with no domain metadata.
+pub fn build_seed_bundle(verbs_config: &VerbsConfig) -> SeedBundle {
+    build_seed_bundle_with_metadata(verbs_config, None)
+}
+
+/// Build a complete `SeedBundle` from ob-poc verb configuration,
+/// optionally enriched with domain metadata.
+///
+/// When `domain_metadata` is `Some`, verb contracts are enriched with
+/// `reads_from`/`writes_to` and entity types gain `governance_tier`,
+/// `security_classification`, `pii`, `read_by_verbs`, and `written_by_verbs`.
+///
 /// This is the main entry point for the adapter. It:
 /// 1. Scans verb YAML to extract verb contracts, inferred entity types, and attributes
-/// 2. Collects taxonomy, policy, view, and derivation spec seeds from pure builders
-/// 3. Serializes everything into seed DTOs with `serde_json::to_value`
-/// 4. Computes a deterministic SHA-256 bundle hash for idempotent bootstrap
-pub fn build_seed_bundle(verbs_config: &VerbsConfig) -> SeedBundle {
+/// 2. Enriches with domain metadata if available
+/// 3. Collects taxonomy, policy, view, and derivation spec seeds from pure builders
+/// 4. Serializes everything into seed DTOs with `serde_json::to_value`
+/// 5. Computes a deterministic SHA-256 bundle hash for idempotent bootstrap
+pub fn build_seed_bundle_with_metadata(
+    verbs_config: &VerbsConfig,
+    domain_metadata: Option<&DomainMetadata>,
+) -> SeedBundle {
     // 1. Scan verb configs → typed bodies
-    let verb_contract_bodies = scanner::scan_verb_contracts(verbs_config);
-    let entity_type_bodies = scanner::infer_entity_types_from_verbs(verbs_config);
+    let mut verb_contract_bodies = scanner::scan_verb_contracts(verbs_config);
+    let mut entity_type_bodies = scanner::infer_entity_types_from_verbs(verbs_config);
     let attribute_bodies = scanner::infer_attributes_from_verbs(verbs_config, &entity_type_bodies);
+
+    // 2. Enrich with DomainMetadata if available
+    if let Some(meta) = domain_metadata {
+        scanner::enrich_verb_contracts(&mut verb_contract_bodies, meta);
+        scanner::enrich_entity_types(&mut entity_type_bodies, meta);
+    }
 
     // 2. Collect seed data from pure builders
     let taxonomy_pairs = seeds::core_taxonomies();

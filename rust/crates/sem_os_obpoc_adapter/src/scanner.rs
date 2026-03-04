@@ -19,6 +19,8 @@ use sem_os_core::{
     },
 };
 
+use crate::metadata::DomainMetadata;
+
 /// Convert a `VerbConfig` to a `VerbContractBody`.
 pub fn verb_config_to_contract(
     domain: &str,
@@ -188,6 +190,8 @@ pub fn verb_config_to_contract(
         produces_focus,
         metadata,
         crud_mapping,
+        reads_from: vec![],
+        writes_to: vec![],
     }
 }
 
@@ -226,6 +230,11 @@ pub fn infer_entity_types_from_verbs(verbs_config: &VerbsConfig) -> Vec<EntityTy
                             required_attributes: vec![],
                             optional_attributes: vec![],
                             parent_type: None,
+                            governance_tier: None,
+                            security_classification: None,
+                            pii: None,
+                            read_by_verbs: vec![],
+                            written_by_verbs: vec![],
                         }
                     });
                 }
@@ -376,6 +385,60 @@ pub fn scan_verb_contracts(verbs_config: &VerbsConfig) -> Vec<VerbContractBody> 
     }
     contracts.sort_by(|a, b| a.fqn.cmp(&b.fqn));
     contracts
+}
+
+/// Enrich verb contracts with reads_from/writes_to from domain metadata.
+///
+/// For each verb contract, looks up the verb FQN in domain metadata's
+/// `verb_data_footprint` and populates the data linkage fields.
+pub fn enrich_verb_contracts(contracts: &mut [VerbContractBody], meta: &DomainMetadata) {
+    for contract in contracts.iter_mut() {
+        if let Some(footprint) = meta.find_verb_footprint(&contract.fqn) {
+            contract.reads_from = footprint.reads.clone();
+            contract.writes_to = footprint.writes.clone();
+        }
+    }
+}
+
+/// Enrich entity types with governance metadata and reverse verb index.
+///
+/// For each entity type, derives the table name from `db_table` (if present)
+/// or falls back to a pluralized FQN heuristic. Then populates:
+/// - `governance_tier` and `security_classification` from table metadata
+/// - `pii` flag from table metadata
+/// - `read_by_verbs` / `written_by_verbs` from the reverse verb index
+pub fn enrich_entity_types(entity_types: &mut [EntityTypeDefBody], meta: &DomainMetadata) {
+    for et in entity_types.iter_mut() {
+        // Derive table name from db_table field or FQN heuristic
+        let table_name = et
+            .db_table
+            .as_ref()
+            .map(|dt| dt.table.clone())
+            .unwrap_or_else(|| format!("{}s", et.fqn));
+
+        // Try schema-qualified lookup first, then unqualified
+        let schema = et.db_table.as_ref().map(|dt| dt.schema.as_str());
+        let table_lookup = meta.find_table_qualified(schema, &table_name);
+
+        if let Some((_domain, table_meta)) = table_lookup {
+            et.governance_tier = Some(to_wire_str(&table_meta.governance_tier));
+            et.security_classification = Some(to_wire_str(&table_meta.classification));
+            et.pii = Some(table_meta.pii);
+        }
+
+        // Populate reverse verb index (which verbs read/write this entity's table)
+        let readers = meta.verbs_reading(&table_name);
+        if !readers.is_empty() {
+            et.read_by_verbs = readers.into_iter().map(String::from).collect();
+            et.read_by_verbs.sort();
+        }
+
+        let writers = meta.verbs_writing(&table_name);
+        if !writers.is_empty() {
+            et.written_by_verbs = writers.into_iter().map(String::from).collect();
+            et.written_by_verbs.sort();
+        }
+    }
 }
 
 // ── Helpers ───────────────────────────────────────────────────
@@ -720,5 +783,246 @@ mod tests {
         });
         let contract = verb_config_to_contract("cbu", "special", &config);
         assert_eq!(contract.phase_tags, vec!["specific-phase".to_string()]);
+    }
+
+    // ── Domain metadata enrichment tests ─────────────────────────
+
+    const ENRICHMENT_YAML: &str = r#"
+domains:
+  deal:
+    description: "Commercial origination"
+    tables:
+      deals:
+        description: "Commercial deal record"
+        governance_tier: governed
+        classification: confidential
+        pii: false
+    verb_data_footprint:
+      deal.create:
+        writes: [deals, deal_events]
+        reads: [client_group]
+      deal.summary:
+        reads: [deals, deal_participants]
+  cbu:
+    description: "Client Business Unit"
+    tables:
+      cbus:
+        description: "CBU operational container"
+        governance_tier: governed
+        classification: internal
+        pii: false
+    verb_data_footprint:
+      cbu.create:
+        writes: [cbus]
+"#;
+
+    fn enrichment_metadata() -> crate::metadata::DomainMetadata {
+        crate::metadata::DomainMetadata::from_yaml(ENRICHMENT_YAML).unwrap()
+    }
+
+    #[test]
+    fn test_enrich_verb_contracts_populates_reads_writes() {
+        let meta = enrichment_metadata();
+        let mut contracts = vec![
+            VerbContractBody {
+                fqn: "deal.create".into(),
+                domain: "deal".into(),
+                action: "create".into(),
+                description: "Create deal".into(),
+                behavior: "plugin".into(),
+                args: vec![],
+                returns: None,
+                preconditions: vec![],
+                postconditions: vec![],
+                produces: None,
+                consumes: vec![],
+                invocation_phrases: vec![],
+                subject_kinds: vec![],
+                phase_tags: vec![],
+                requires_subject: true,
+                produces_focus: false,
+                metadata: None,
+                crud_mapping: None,
+                reads_from: vec![],
+                writes_to: vec![],
+            },
+            VerbContractBody {
+                fqn: "cbu.create".into(),
+                domain: "cbu".into(),
+                action: "create".into(),
+                description: "Create CBU".into(),
+                behavior: "plugin".into(),
+                args: vec![],
+                returns: None,
+                preconditions: vec![],
+                postconditions: vec![],
+                produces: None,
+                consumes: vec![],
+                invocation_phrases: vec![],
+                subject_kinds: vec![],
+                phase_tags: vec![],
+                requires_subject: true,
+                produces_focus: false,
+                metadata: None,
+                crud_mapping: None,
+                reads_from: vec![],
+                writes_to: vec![],
+            },
+        ];
+
+        enrich_verb_contracts(&mut contracts, &meta);
+
+        // deal.create should read client_group, write deals + deal_events
+        let deal = contracts.iter().find(|c| c.fqn == "deal.create").unwrap();
+        assert_eq!(deal.reads_from, vec!["client_group"]);
+        assert_eq!(deal.writes_to, vec!["deals", "deal_events"]);
+
+        // cbu.create should write cbus
+        let cbu = contracts.iter().find(|c| c.fqn == "cbu.create").unwrap();
+        assert!(cbu.reads_from.is_empty());
+        assert_eq!(cbu.writes_to, vec!["cbus"]);
+    }
+
+    #[test]
+    fn test_enrich_verb_contracts_no_footprint_leaves_empty() {
+        let meta = enrichment_metadata();
+        let mut contracts = vec![VerbContractBody {
+            fqn: "unknown.verb".into(),
+            domain: "unknown".into(),
+            action: "verb".into(),
+            description: "No footprint".into(),
+            behavior: "plugin".into(),
+            args: vec![],
+            returns: None,
+            preconditions: vec![],
+            postconditions: vec![],
+            produces: None,
+            consumes: vec![],
+            invocation_phrases: vec![],
+            subject_kinds: vec![],
+            phase_tags: vec![],
+            requires_subject: true,
+            produces_focus: false,
+            metadata: None,
+            crud_mapping: None,
+            reads_from: vec![],
+            writes_to: vec![],
+        }];
+
+        enrich_verb_contracts(&mut contracts, &meta);
+        assert!(contracts[0].reads_from.is_empty());
+        assert!(contracts[0].writes_to.is_empty());
+    }
+
+    #[test]
+    fn test_enrich_entity_types_populates_governance() {
+        use sem_os_core::entity_type_def::{DbTableMapping, EntityTypeDefBody};
+
+        let meta = enrichment_metadata();
+        let mut entity_types = vec![EntityTypeDefBody {
+            fqn: "deal".into(),
+            name: "Deal".into(),
+            description: "Deal entity".into(),
+            domain: "deal".into(),
+            db_table: Some(DbTableMapping {
+                schema: "ob-poc".into(),
+                table: "deals".into(),
+                primary_key: "deal_id".into(),
+                name_column: None,
+            }),
+            lifecycle_states: vec![],
+            required_attributes: vec![],
+            optional_attributes: vec![],
+            parent_type: None,
+            governance_tier: None,
+            security_classification: None,
+            pii: None,
+            read_by_verbs: vec![],
+            written_by_verbs: vec![],
+        }];
+
+        enrich_entity_types(&mut entity_types, &meta);
+
+        let deal = &entity_types[0];
+        assert_eq!(deal.governance_tier.as_deref(), Some("governed"));
+        assert_eq!(
+            deal.security_classification.as_deref(),
+            Some("confidential")
+        );
+        assert_eq!(deal.pii, Some(false));
+    }
+
+    #[test]
+    fn test_enrich_entity_types_populates_reverse_verbs() {
+        use sem_os_core::entity_type_def::{DbTableMapping, EntityTypeDefBody};
+
+        let meta = enrichment_metadata();
+        let mut entity_types = vec![EntityTypeDefBody {
+            fqn: "deal".into(),
+            name: "Deal".into(),
+            description: "Deal entity".into(),
+            domain: "deal".into(),
+            db_table: Some(DbTableMapping {
+                schema: "ob-poc".into(),
+                table: "deals".into(),
+                primary_key: "deal_id".into(),
+                name_column: None,
+            }),
+            lifecycle_states: vec![],
+            required_attributes: vec![],
+            optional_attributes: vec![],
+            parent_type: None,
+            governance_tier: None,
+            security_classification: None,
+            pii: None,
+            read_by_verbs: vec![],
+            written_by_verbs: vec![],
+        }];
+
+        enrich_entity_types(&mut entity_types, &meta);
+
+        let deal = &entity_types[0];
+        // deals is read by deal.summary, written by deal.create
+        assert!(deal.read_by_verbs.contains(&"deal.summary".to_string()));
+        assert!(deal.written_by_verbs.contains(&"deal.create".to_string()));
+        // Results should be sorted
+        assert_eq!(deal.read_by_verbs, {
+            let mut v = deal.read_by_verbs.clone();
+            v.sort();
+            v
+        });
+    }
+
+    #[test]
+    fn test_enrich_entity_types_fqn_heuristic() {
+        use sem_os_core::entity_type_def::EntityTypeDefBody;
+
+        let meta = enrichment_metadata();
+        // Entity type without db_table — uses fqn + "s" heuristic
+        let mut entity_types = vec![EntityTypeDefBody {
+            fqn: "cbu".into(),
+            name: "CBU".into(),
+            description: "Client Business Unit".into(),
+            domain: "cbu".into(),
+            db_table: None, // no db_table → falls back to "cbus"
+            lifecycle_states: vec![],
+            required_attributes: vec![],
+            optional_attributes: vec![],
+            parent_type: None,
+            governance_tier: None,
+            security_classification: None,
+            pii: None,
+            read_by_verbs: vec![],
+            written_by_verbs: vec![],
+        }];
+
+        enrich_entity_types(&mut entity_types, &meta);
+
+        let cbu = &entity_types[0];
+        // "cbus" found in metadata → governance populated
+        assert_eq!(cbu.governance_tier.as_deref(), Some("governed"));
+        assert_eq!(cbu.security_classification.as_deref(), Some("internal"));
+        // cbus is written by cbu.create
+        assert!(cbu.written_by_verbs.contains(&"cbu.create".to_string()));
     }
 }

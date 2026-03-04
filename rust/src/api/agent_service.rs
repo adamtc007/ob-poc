@@ -113,6 +113,9 @@ use crate::dsl_v2::validation::RefType;
 use crate::dsl_v2::{enrich_program, parse_program, runtime_registry, Statement};
 #[cfg(not(feature = "runbook-gate-vnext"))]
 use crate::graph::GraphScope;
+use crate::mcp::macro_index::MacroIndex;
+use crate::mcp::noun_index::NounIndex;
+use crate::mcp::scenario_index::ScenarioIndex;
 use crate::mcp::verb_search_factory::VerbSearcherFactory;
 #[cfg(not(feature = "runbook-gate-vnext"))]
 use crate::session::SessionScope;
@@ -289,6 +292,14 @@ pub struct AgentService {
     policy_gate: Arc<crate::policy::PolicyGate>,
     /// Semantic OS client — when set, routes sem_reg calls through DI boundary
     sem_os_client: Option<Arc<dyn sem_os_client::SemOsClient>>,
+    /// NounIndex for deterministic Tier -1 ECIR noun→verb resolution
+    noun_index: Option<Arc<NounIndex>>,
+    /// MacroIndex for deterministic Tier -2B macro search parity
+    macro_index: Option<Arc<MacroIndex>>,
+    /// ScenarioIndex for journey-level Tier -2A compound intent resolution
+    scenario_index: Option<Arc<ScenarioIndex>>,
+    /// Cached MacroRegistry to avoid reloading from disk on every verb search
+    macro_registry: Option<Arc<MacroRegistry>>,
 }
 
 impl AgentService {
@@ -320,6 +331,10 @@ impl AgentService {
             entity_linker: None,
             policy_gate: Arc::new(crate::policy::PolicyGate::from_env()),
             sem_os_client: None,
+            noun_index: None,
+            macro_index: None,
+            scenario_index: None,
+            macro_registry: None,
         }
     }
 
@@ -335,6 +350,30 @@ impl AgentService {
     /// Set Semantic OS client for routing sem_reg calls through DI boundary
     pub fn with_sem_os_client(mut self, client: Arc<dyn sem_os_client::SemOsClient>) -> Self {
         self.sem_os_client = Some(client);
+        self
+    }
+
+    /// Set NounIndex for deterministic Tier -1 ECIR noun→verb resolution
+    pub fn with_noun_index(mut self, ni: Arc<NounIndex>) -> Self {
+        self.noun_index = Some(ni);
+        self
+    }
+
+    /// Set MacroIndex for deterministic Tier -2B macro search parity
+    pub fn with_macro_index(mut self, mi: Arc<MacroIndex>) -> Self {
+        self.macro_index = Some(mi);
+        self
+    }
+
+    /// Set ScenarioIndex for journey-level Tier -2A compound intent resolution
+    pub fn with_scenario_index(mut self, si: Arc<ScenarioIndex>) -> Self {
+        self.scenario_index = Some(si);
+        self
+    }
+
+    /// Set cached MacroRegistry (avoids reloading from disk on every verb search)
+    pub fn with_macro_registry(mut self, mr: Arc<MacroRegistry>) -> Self {
+        self.macro_registry = Some(mr);
         self
     }
 
@@ -445,20 +484,26 @@ impl AgentService {
         (Some(debug), dominant_id, resolved_kinds)
     }
 
-    /// Build the verb searcher with macro registry
+    /// Build the verb searcher with all search indices.
+    ///
+    /// Uses cached MacroRegistry, NounIndex, MacroIndex, and ScenarioIndex
+    /// (loaded once at startup) instead of reloading from disk on every call.
     fn build_verb_searcher(&self) -> crate::mcp::verb_search::HybridVerbSearcher {
         let dyn_embedder: Arc<dyn crate::agent::learning::embedder::Embedder> =
             self.embedder.clone() as Arc<dyn crate::agent::learning::embedder::Embedder>;
 
-        // Build verb searcher with macro registry for operator vocabulary
-        let macro_dir =
-            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("config/verb_schemas/macros");
-        let macro_reg = load_macro_registry_from_dir(&macro_dir).unwrap_or_else(|e| {
-            tracing::warn!(
-                "Failed to load operator macros: {}, using empty registry",
-                e
-            );
-            MacroRegistry::new()
+        // Use cached macro registry, falling back to disk load if not provided
+        let macro_reg = self.macro_registry.clone().unwrap_or_else(|| {
+            let macro_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("config/verb_schemas/macros");
+            let reg = load_macro_registry_from_dir(&macro_dir).unwrap_or_else(|e| {
+                tracing::warn!(
+                    "Failed to load operator macros: {}, using empty registry",
+                    e
+                );
+                MacroRegistry::new()
+            });
+            Arc::new(reg)
         });
 
         // Use factory for consistent configuration across all call sites
@@ -466,11 +511,11 @@ impl AgentService {
             &self.pool,
             dyn_embedder,
             self.learned_data.clone(),
-            Arc::new(macro_reg),
+            macro_reg,
             self.lexicon.clone(),
-            None, // noun_index not yet wired through AgentService
-            None, // macro_index not yet wired through AgentService
-            None, // scenario_index not yet wired through AgentService
+            self.noun_index.clone(),
+            self.macro_index.clone(),
+            self.scenario_index.clone(),
         )
     }
 

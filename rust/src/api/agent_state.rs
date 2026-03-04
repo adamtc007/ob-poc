@@ -214,14 +214,143 @@ impl AgentState {
             "PolicyGate loaded from environment"
         );
 
-        // Build agent service with embedder, learned data, lexicon, and entity linker
+        // Load MacroRegistry once at startup (cached in AgentService)
+        let macro_dir =
+            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("config/verb_schemas/macros");
+        let macro_registry = Arc::new(
+            crate::dsl_v2::macros::load_macro_registry_from_dir(&macro_dir).unwrap_or_else(|e| {
+                tracing::warn!(
+                    "Failed to load operator macros: {}, using empty registry",
+                    e
+                );
+                crate::dsl_v2::macros::MacroRegistry::new()
+            }),
+        );
+
+        // Load NounIndex for deterministic Tier -1 ECIR noun→verb resolution
+        let noun_index: Option<Arc<crate::mcp::noun_index::NounIndex>> = {
+            use crate::dsl_v2::ConfigLoader;
+            let config_loader = ConfigLoader::from_env();
+            match config_loader.load_verbs() {
+                Ok(verbs_cfg) => {
+                    let vi =
+                        crate::mcp::noun_index::VerbContractIndex::from_verbs_config(&verbs_cfg);
+                    let yaml_paths = [
+                        std::path::Path::new("rust/config/noun_index.yaml"),
+                        std::path::Path::new("config/noun_index.yaml"),
+                        std::path::Path::new("../rust/config/noun_index.yaml"),
+                    ];
+                    let mut loaded = None;
+                    for path in &yaml_paths {
+                        if path.exists() {
+                            match crate::mcp::noun_index::NounIndex::load(path, vi.clone()) {
+                                Ok(ni) => {
+                                    tracing::info!(
+                                        aliases = ni.canonical_count(),
+                                        verb_summaries = vi.len(),
+                                        "NounIndex loaded for Chat API (ECIR Tier -1)"
+                                    );
+                                    loaded = Some(Arc::new(ni));
+                                    break;
+                                }
+                                Err(e) => {
+                                    tracing::warn!(
+                                        "Failed to load noun_index.yaml from {}: {}",
+                                        path.display(),
+                                        e
+                                    );
+                                }
+                            }
+                        }
+                    }
+                    if loaded.is_none() {
+                        tracing::info!(
+                            "NounIndex not found (ECIR disabled for Chat API). \
+                             Looked in: rust/config/, config/, ../rust/config/"
+                        );
+                    }
+                    loaded
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        "Failed to load verbs config for NounIndex: {}. ECIR disabled for Chat API.",
+                        e
+                    );
+                    None
+                }
+            }
+        };
+
+        // Build MacroIndex for deterministic Tier -2B macro search
+        let macro_index: Option<Arc<crate::mcp::macro_index::MacroIndex>> = {
+            let mi = crate::mcp::macro_index::MacroIndex::from_registry(&macro_registry, None);
+            tracing::info!(
+                entries = mi.len(),
+                "MacroIndex built for Chat API (Tier -2B)"
+            );
+            Some(Arc::new(mi))
+        };
+
+        // Load ScenarioIndex for journey-level Tier -2A resolution
+        let scenario_index: Option<Arc<crate::mcp::scenario_index::ScenarioIndex>> = {
+            let search_paths = [
+                "rust/config/scenario_index.yaml",
+                "config/scenario_index.yaml",
+                "../rust/config/scenario_index.yaml",
+            ];
+            let mut loaded = None;
+            for rel in &search_paths {
+                let path = std::path::Path::new(rel);
+                if path.exists() {
+                    match crate::mcp::scenario_index::ScenarioIndex::from_yaml_file(path) {
+                        Ok(si) => {
+                            tracing::info!(
+                                scenarios = si.len(),
+                                path = %path.display(),
+                                "ScenarioIndex loaded for Chat API (Tier -2A)"
+                            );
+                            loaded = Some(Arc::new(si));
+                            break;
+                        }
+                        Err(e) => {
+                            tracing::warn!(
+                                "Failed to load scenario_index.yaml from {}: {}",
+                                path.display(),
+                                e
+                            );
+                        }
+                    }
+                }
+            }
+            if loaded.is_none() {
+                tracing::info!(
+                    "ScenarioIndex not found (Tier -2A disabled for Chat API). \
+                     Looked in: rust/config/, config/, ../rust/config/"
+                );
+            }
+            loaded
+        };
+
+        // Build agent service with embedder, learned data, lexicon, entity linker, and search indices
         let mut agent_service = crate::api::agent_service::AgentService::new(
             pool.clone(),
             embedder,
             learned_data,
             lexicon,
         )
-        .with_entity_linker(entity_linker.clone());
+        .with_entity_linker(entity_linker.clone())
+        .with_macro_registry(macro_registry);
+
+        // Wire search indices for ECIR, MacroIndex, and ScenarioIndex
+        if let Some(ni) = noun_index {
+            agent_service = agent_service.with_noun_index(ni);
+        }
+        if let Some(mi) = macro_index {
+            agent_service = agent_service.with_macro_index(mi);
+        }
+        if let Some(si) = scenario_index {
+            agent_service = agent_service.with_scenario_index(si);
+        }
 
         // Wire SemOsClient if provided (env-driven in main.rs)
         if let Some(ref client) = sem_os_client {

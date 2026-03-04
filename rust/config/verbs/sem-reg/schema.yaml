@@ -209,3 +209,140 @@ domains:
         returns:
           type: record
           capture: false
+
+      # ============================================
+      # Diagram Generation
+      # ============================================
+      generate-erd:
+        description: Generate an entity-relationship diagram with verb surface annotations
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: erd_diagram
+          category: diagram_generation
+          context: scripted_ok
+          side_effects: facts_only
+          tags: [stewardship]
+          subject_kinds: []
+          phase_tags: [stewardship]
+        behavior: plugin
+        handler: SchemaGenerateErdOp
+        invocation_phrases:
+          - "generate ERD"
+          - "show schema diagram"
+          - "draw entity relationships"
+          - "create entity relationship diagram"
+          - "visualize database schema"
+          - "show schema as diagram"
+          - "generate mermaid ERD"
+          - "diagram this schema"
+          - "show table relationships"
+          - "ER diagram for schema"
+        args:
+          - name: schema-name
+            type: string
+            required: true
+            description: PostgreSQL schema name to generate ERD for (e.g., ob-poc, sem_reg)
+          - name: format
+            type: string
+            required: false
+            default: mermaid
+            description: Output format (currently only mermaid supported)
+          - name: show-verb-surface
+            type: boolean
+            required: false
+            default: true
+            description: Whether to include verb surface annotations on entities
+          - name: domain
+            type: string
+            required: false
+            description: Optional domain filter to show only tables for a specific domain
+          - name: max-tables
+            type: integer
+            required: false
+            default: 50
+            description: Maximum number of tables to include in the diagram
+        returns:
+          type: record
+          capture: false
+
+      generate-verb-flow:
+        description: Generate a verb-flow diagram showing what data a verb touches
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: verb_flow_diagram
+          category: diagram_generation
+          context: scripted_ok
+          side_effects: facts_only
+          tags: [stewardship, data]
+          subject_kinds: []
+          phase_tags: [stewardship, data]
+        behavior: plugin
+        handler: SchemaGenerateVerbFlowOp
+        invocation_phrases:
+          - "show verb flow diagram"
+          - "visualize verb data dependencies"
+          - "draw verb flow"
+          - "generate verb data flow"
+          - "show what data this verb touches"
+          - "diagram verb data surface"
+          - "verb flow visualization"
+          - "show data flow for verb"
+          - "generate mermaid verb flow"
+          - "visualize verb graph"
+        args:
+          - name: verb-fqn
+            type: string
+            required: true
+            description: Fully-qualified verb name to generate flow diagram for (e.g., cbu.create)
+          - name: depth
+            type: integer
+            required: false
+            default: 1
+            description: Traversal depth for transitive data edges
+        returns:
+          type: record
+          capture: false
+
+      generate-discovery-map:
+        description: Generate a domain discovery map (Phase 2 stub)
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: discovery_map
+          category: diagram_generation
+          context: scripted_ok
+          side_effects: facts_only
+          tags: [stewardship]
+          subject_kinds: []
+          phase_tags: [stewardship]
+        behavior: plugin
+        handler: SchemaGenerateDiscoveryMapOp
+        invocation_phrases:
+          - "generate discovery map"
+          - "show domain discovery map"
+          - "visualize domain structure"
+          - "domain overview diagram"
+          - "show all domains and tables"
+          - "generate domain map"
+          - "domain data landscape"
+          - "show schema discovery map"
+          - "domain table map"
+          - "visualize data landscape"
+        args:
+          - name: domain
+            type: string
+            required: false
+            description: Optional domain filter
+          - name: format
+            type: string
+            required: false
+            default: mermaid
+            description: Output format (currently only mermaid supported)
+        returns:
+          type: record
+          capture: false

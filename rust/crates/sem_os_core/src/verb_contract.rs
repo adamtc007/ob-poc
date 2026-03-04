@@ -41,6 +41,12 @@ pub struct VerbContractBody {
     /// CRUD table/schema/operation mapping (when behavior = "crud").
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub crud_mapping: Option<VerbCrudMapping>,
+    /// Tables this verb reads from (populated from domain metadata verb_data_footprint).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub reads_from: Vec<String>,
+    /// Tables this verb writes to (populated from domain metadata verb_data_footprint).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub writes_to: Vec<String>,
 }
 
 /// CRUD table/operation mapping captured from verb YAML.
@@ -187,6 +193,8 @@ mod tests {
                 schema: Some("ob-poc".into()),
                 key_column: None,
             }),
+            reads_from: vec![],
+            writes_to: vec!["cbus".into()],
         };
         let json = serde_json::to_value(&val).unwrap();
         // Check #[serde(rename = "type")] on returns and produces

@@ -1,6 +1,8 @@
 pub mod abac;
+pub mod affinity;
 pub mod authoring;
 pub mod context_resolution;
+pub mod diagram;
 pub mod enforce;
 pub mod error;
 pub mod gates;

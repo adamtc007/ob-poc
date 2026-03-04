@@ -370,6 +370,8 @@ mod tests {
             produces_focus: false,
             metadata: None,
             crud_mapping: None,
+            reads_from: vec![],
+            writes_to: vec![],
         }
     }
 

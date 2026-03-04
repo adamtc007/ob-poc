@@ -4,8 +4,12 @@
 pub mod http;
 pub mod inprocess;
 
+use std::sync::Arc;
+
 use async_trait::async_trait;
-use sem_os_core::{error::SemOsError, principal::Principal, proto::*, seeds::SeedBundle};
+use sem_os_core::{
+    affinity::AffinityGraph, error::SemOsError, principal::Principal, proto::*, seeds::SeedBundle,
+};
 
 pub type Result<T> = std::result::Result<T, SemOsError>;
 
@@ -59,6 +63,11 @@ pub trait SemOsClient: Send + Sync {
         principal: &Principal,
         changeset_id: &str,
     ) -> Result<ChangesetPublishResponse>;
+
+    /// Get the pre-computed AffinityGraph (bidirectional verb↔data index).
+    /// Only InProcessClient provides a real implementation. HttpClient returns an error
+    /// (the graph is only available in-process for Phase 1).
+    async fn get_affinity_graph(&self) -> Result<Arc<AffinityGraph>>;
 
     /// Test-only: synchronously drain and process all pending outbox events.
     /// Only implemented by InProcessClient. HttpClient returns Ok(()) immediately.

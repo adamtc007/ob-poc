@@ -227,6 +227,8 @@ fn crud_contract(
             phase_tags: vec![],
         }),
         crud_mapping: None,
+        reads_from: vec![],
+        writes_to: vec![],
     }
 }
 
@@ -347,6 +349,11 @@ mod tests {
             ],
             optional_attributes: vec!["entity.widget-description".to_string()],
             parent_type: None,
+            governance_tier: None,
+            security_classification: None,
+            pii: None,
+            read_by_verbs: vec![],
+            written_by_verbs: vec![],
         }
     }
 

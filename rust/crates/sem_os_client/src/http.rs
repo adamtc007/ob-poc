@@ -3,8 +3,12 @@
 //! All methods map to the corresponding server endpoints.
 //! Error bodies are deserialized to `SemOsError` based on HTTP status.
 
+use std::sync::Arc;
+
 use async_trait::async_trait;
-use sem_os_core::{error::SemOsError, principal::Principal, proto::*, seeds::SeedBundle};
+use sem_os_core::{
+    affinity::AffinityGraph, error::SemOsError, principal::Principal, proto::*, seeds::SeedBundle,
+};
 
 use crate::{Result, SemOsClient};
 
@@ -272,6 +276,14 @@ impl SemOsClient for HttpClient {
         resp.json::<ChangesetPublishResponse>()
             .await
             .map_err(|e| SemOsError::Internal(e.into()))
+    }
+
+    async fn get_affinity_graph(&self) -> Result<Arc<AffinityGraph>> {
+        // AffinityGraph is only available in-process (Phase 1).
+        // Phase 3 will add a REST endpoint for serialized graph transfer.
+        Err(SemOsError::MigrationPending(
+            "AffinityGraph is only available via InProcessClient (HTTP transport not yet supported)".into(),
+        ))
     }
 
     async fn drain_outbox_for_test(&self) -> Result<()> {
