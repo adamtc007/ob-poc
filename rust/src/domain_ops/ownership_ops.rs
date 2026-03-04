@@ -4,14 +4,14 @@
 //! against external sources (BODS, GLEIF).
 //!
 //! ## Key Tables
-//! - kyc.ownership_snapshots
-//! - kyc.special_rights
-//! - kyc.ownership_reconciliation_runs
-//! - kyc.ownership_reconciliation_findings
+//! - "ob-poc".ownership_snapshots
+//! - "ob-poc".special_rights
+//! - "ob-poc".ownership_reconciliation_runs
+//! - "ob-poc".ownership_reconciliation_findings
 //!
 //! ## Key SQL Functions
-//! - kyc.fn_holder_control_position()
-//! - kyc.fn_derive_ownership_snapshots()
+//! - "ob-poc".fn_holder_control_position()
+//! - "ob-poc".fn_derive_ownership_snapshots()
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -64,7 +64,7 @@ impl CustomOperation for OwnershipComputeOp {
         let _basis = extract_string_opt(verb_call, "basis").unwrap_or_else(|| "VOTES".to_string());
 
         // Call the derivation function
-        let count: i32 = sqlx::query_scalar(r#"SELECT kyc.fn_derive_ownership_snapshots($1, $2)"#)
+        let count: i32 = sqlx::query_scalar(r#"SELECT "ob-poc".fn_derive_ownership_snapshots($1, $2)"#)
             .bind(issuer_entity_id)
             .bind(as_of)
             .fetch_one(pool)
@@ -155,7 +155,7 @@ impl CustomOperation for OwnershipSnapshotListOp {
                     os.snapshot_id, os.issuer_entity_id, os.owner_entity_id, os.share_class_id,
                     os.as_of_date, os.basis, os.units, os.percentage, os.percentage_min, os.percentage_max,
                     os.derived_from, os.is_direct, os.is_aggregated, os.confidence
-                FROM kyc.ownership_snapshots os
+                FROM "ob-poc".ownership_snapshots os
                 WHERE os.issuer_entity_id = $1
                   AND os.as_of_date = $2
                   AND os.basis = $3
@@ -177,7 +177,7 @@ impl CustomOperation for OwnershipSnapshotListOp {
                     os.snapshot_id, os.issuer_entity_id, os.owner_entity_id, os.share_class_id,
                     os.as_of_date, os.basis, os.units, os.percentage, os.percentage_min, os.percentage_max,
                     os.derived_from, os.is_direct, os.is_aggregated, os.confidence
-                FROM kyc.ownership_snapshots os
+                FROM "ob-poc".ownership_snapshots os
                 WHERE os.issuer_entity_id = $1
                   AND os.as_of_date = $2
                   AND os.basis = $3
@@ -274,7 +274,7 @@ impl CustomOperation for OwnershipControlPositionsOp {
         // Use query() with manual extraction since SQLx FromRow only supports tuples up to ~16 elements
         use sqlx::Row;
         let position_rows =
-            sqlx::query(r#"SELECT * FROM kyc.fn_holder_control_position($1, $2, $3)"#)
+            sqlx::query(r#"SELECT * FROM "ob-poc".fn_holder_control_position($1, $2, $3)"#)
                 .bind(issuer_entity_id)
                 .bind(as_of)
                 .bind(&basis)
@@ -354,7 +354,7 @@ impl CustomOperation for OwnershipWhoControlsOp {
         // Use query() with manual extraction since SQLx FromRow only supports tuples up to ~16 elements
         use sqlx::Row;
         let position_rows =
-            sqlx::query(r#"SELECT * FROM kyc.fn_holder_control_position($1, $2, 'VOTES')"#)
+            sqlx::query(r#"SELECT * FROM "ob-poc".fn_holder_control_position($1, $2, 'VOTES')"#)
                 .bind(issuer_entity_id)
                 .bind(as_of)
                 .fetch_all(pool)
@@ -462,7 +462,7 @@ impl CustomOperation for OwnershipReconcileOp {
         // Create reconciliation run
         let run_id: Uuid = sqlx::query_scalar(
             r#"
-            INSERT INTO kyc.ownership_reconciliation_runs (
+            INSERT INTO "ob-poc".ownership_reconciliation_runs (
                 issuer_entity_id, as_of_date, basis, source_a, source_b, tolerance_bps, status
             ) VALUES ($1, $2, $3, $4, $5, $6, 'RUNNING')
             RETURNING run_id
@@ -481,7 +481,7 @@ impl CustomOperation for OwnershipReconcileOp {
         let snapshots_a: Vec<(Uuid, rust_decimal::Decimal)> = sqlx::query_as(
             r#"
             SELECT owner_entity_id, COALESCE(percentage, 0)
-            FROM kyc.ownership_snapshots
+            FROM "ob-poc".ownership_snapshots
             WHERE issuer_entity_id = $1
               AND as_of_date = $2
               AND derived_from = $3
@@ -500,7 +500,7 @@ impl CustomOperation for OwnershipReconcileOp {
         let snapshots_b: Vec<(Uuid, rust_decimal::Decimal)> = sqlx::query_as(
             r#"
             SELECT owner_entity_id, COALESCE(percentage, (COALESCE(percentage_min, 0) + COALESCE(percentage_max, 0)) / 2)
-            FROM kyc.ownership_snapshots
+            FROM "ob-poc".ownership_snapshots
             WHERE issuer_entity_id = $1
               AND as_of_date = $2
               AND derived_from = $3
@@ -544,7 +544,7 @@ impl CustomOperation for OwnershipReconcileOp {
 
                 sqlx::query(
                     r#"
-                    INSERT INTO kyc.ownership_reconciliation_findings (
+                    INSERT INTO "ob-poc".ownership_reconciliation_findings (
                         run_id, owner_entity_id, source_a_pct, source_b_pct, delta_bps,
                         finding_type, severity
                     ) VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -563,7 +563,7 @@ impl CustomOperation for OwnershipReconcileOp {
                 missing_in_b += 1;
                 sqlx::query(
                     r#"
-                    INSERT INTO kyc.ownership_reconciliation_findings (
+                    INSERT INTO "ob-poc".ownership_reconciliation_findings (
                         run_id, owner_entity_id, source_a_pct, finding_type, severity
                     ) VALUES ($1, $2, $3, 'MISSING_IN_EXTERNAL', 'WARN')
                     "#,
@@ -582,7 +582,7 @@ impl CustomOperation for OwnershipReconcileOp {
                 missing_in_a += 1;
                 sqlx::query(
                     r#"
-                    INSERT INTO kyc.ownership_reconciliation_findings (
+                    INSERT INTO "ob-poc".ownership_reconciliation_findings (
                         run_id, owner_entity_id, source_b_pct, finding_type, severity
                     ) VALUES ($1, $2, $3, 'MISSING_IN_REGISTER', 'ERROR')
                     "#,
@@ -599,7 +599,7 @@ impl CustomOperation for OwnershipReconcileOp {
         let total_entities = (map_a.len() + map_b.len()) as i32;
         sqlx::query(
             r#"
-            UPDATE kyc.ownership_reconciliation_runs
+            UPDATE "ob-poc".ownership_reconciliation_runs
             SET status = 'COMPLETED',
                 completed_at = now(),
                 total_entities = $2,
@@ -692,7 +692,7 @@ impl CustomOperation for OwnershipReconcileFindingsOp {
                        f.source_a_pct, f.source_b_pct, f.delta_bps,
                        f.finding_type, f.severity, f.resolution_status,
                        f.resolution_notes, f.resolved_by
-                FROM kyc.ownership_reconciliation_findings f
+                FROM "ob-poc".ownership_reconciliation_findings f
                 WHERE f.run_id = $1
                 ORDER BY f.delta_bps DESC NULLS LAST
                 "#,
@@ -707,7 +707,7 @@ impl CustomOperation for OwnershipReconcileFindingsOp {
                        f.source_a_pct, f.source_b_pct, f.delta_bps,
                        f.finding_type, f.severity, f.resolution_status,
                        f.resolution_notes, f.resolved_by
-                FROM kyc.ownership_reconciliation_findings f
+                FROM "ob-poc".ownership_reconciliation_findings f
                 WHERE f.run_id = $1 AND f.resolution_status = $2
                 ORDER BY f.delta_bps DESC NULLS LAST
                 "#,
@@ -723,7 +723,7 @@ impl CustomOperation for OwnershipReconcileFindingsOp {
                        f.source_a_pct, f.source_b_pct, f.delta_bps,
                        f.finding_type, f.severity, f.resolution_status,
                        f.resolution_notes, f.resolved_by
-                FROM kyc.ownership_reconciliation_findings f
+                FROM "ob-poc".ownership_reconciliation_findings f
                 WHERE f.run_id = $1 AND f.severity = $2
                 ORDER BY f.delta_bps DESC NULLS LAST
                 "#,
@@ -739,7 +739,7 @@ impl CustomOperation for OwnershipReconcileFindingsOp {
                        f.source_a_pct, f.source_b_pct, f.delta_bps,
                        f.finding_type, f.severity, f.resolution_status,
                        f.resolution_notes, f.resolved_by
-                FROM kyc.ownership_reconciliation_findings f
+                FROM "ob-poc".ownership_reconciliation_findings f
                 WHERE f.run_id = $1 AND f.severity = $2 AND f.resolution_status = $3
                 ORDER BY f.delta_bps DESC NULLS LAST
                 "#,
@@ -831,7 +831,7 @@ impl CustomOperation for OwnershipAnalyzeGapsOp {
         let total_pct: rust_decimal::Decimal = sqlx::query_scalar(
             r#"
             SELECT COALESCE(SUM(percentage), 0)
-            FROM kyc.ownership_snapshots
+            FROM "ob-poc".ownership_snapshots
             WHERE issuer_entity_id = $1
               AND as_of_date = $2
               AND derived_from = 'REGISTER'

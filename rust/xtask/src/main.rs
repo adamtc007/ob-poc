@@ -80,7 +80,7 @@ enum Command {
         release: bool,
     },
 
-    /// Export database schema to schema_export.sql
+    /// Export database schema to schema_export.sql and migrations/master-schema.sql
     SchemaExport,
 
     /// Generate TypeScript bindings from ob-poc-types
@@ -1973,7 +1973,12 @@ fn schema_export(sh: &Shell) -> Result<()> {
         "pg_dump -d data_designer --schema-only --no-owner --no-privileges -f schema_export.sql"
     )
     .run()?;
-    println!("Schema exported to schema_export.sql");
+    cmd!(
+        sh,
+        "pg_dump -d data_designer --schema-only --no-owner --no-privileges -f migrations/master-schema.sql"
+    )
+    .run()?;
+    println!("Schema exported to schema_export.sql and migrations/master-schema.sql");
     Ok(())
 }
 

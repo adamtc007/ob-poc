@@ -192,7 +192,7 @@ impl CustomOperation for RequestCreateOp {
         // Create the request
         let row = sqlx::query!(
             r#"
-            INSERT INTO kyc.outstanding_requests (
+            INSERT INTO "ob-poc".outstanding_requests (
                 subject_type, subject_id,
                 workstream_id, case_id, cbu_id, entity_id,
                 request_type, request_subtype, request_details,
@@ -243,7 +243,7 @@ impl CustomOperation for RequestCreateOp {
 
                 sqlx::query!(
                     r#"
-                    UPDATE kyc.entity_workstreams
+                    UPDATE "ob-poc".entity_workstreams
                     SET status = 'BLOCKED',
                         blocker_type = $2,
                         blocker_request_id = $3,
@@ -345,7 +345,7 @@ impl CustomOperation for RequestOverdueOp {
                 escalation_level,
                 blocker_message,
                 CURRENT_DATE - due_date as days_overdue
-            FROM kyc.outstanding_requests
+            FROM "ob-poc".outstanding_requests
             WHERE status = 'PENDING'
               AND ($1::uuid IS NULL OR case_id = $1)
               AND ($2::uuid IS NULL OR cbu_id = $2)
@@ -459,7 +459,7 @@ impl CustomOperation for RequestFulfillOp {
         // Update the request
         let updated = sqlx::query!(
             r#"
-            UPDATE kyc.outstanding_requests
+            UPDATE "ob-poc".outstanding_requests
             SET status = 'FULFILLED',
                 fulfilled_at = NOW(),
                 fulfillment_type = COALESCE($2, 'MANUAL_ENTRY'),
@@ -550,7 +550,7 @@ impl CustomOperation for RequestCancelOp {
 
         let updated = sqlx::query!(
             r#"
-            UPDATE kyc.outstanding_requests
+            UPDATE "ob-poc".outstanding_requests
             SET status = 'CANCELLED',
                 status_reason = $2
             WHERE request_id = $1 AND status = 'PENDING'
@@ -663,7 +663,7 @@ impl CustomOperation for RequestExtendOp {
             (None, Some(days_val)) => {
                 // Get current due date and add days
                 let current = sqlx::query_scalar!(
-                    r#"SELECT due_date FROM kyc.outstanding_requests WHERE request_id = $1"#,
+                    r#"SELECT due_date FROM "ob-poc".outstanding_requests WHERE request_id = $1"#,
                     request_id
                 )
                 .fetch_optional(pool)
@@ -686,7 +686,7 @@ impl CustomOperation for RequestExtendOp {
 
         // Fetch case_id for BPMN signal routing
         let case_id = sqlx::query_scalar!(
-            r#"SELECT case_id FROM kyc.outstanding_requests WHERE request_id = $1"#,
+            r#"SELECT case_id FROM "ob-poc".outstanding_requests WHERE request_id = $1"#,
             request_id
         )
         .fetch_optional(pool)
@@ -703,7 +703,7 @@ impl CustomOperation for RequestExtendOp {
 
         let result = sqlx::query!(
             r#"
-            UPDATE kyc.outstanding_requests
+            UPDATE "ob-poc".outstanding_requests
             SET due_date = $2,
                 communication_log = communication_log || $3::jsonb
             WHERE request_id = $1 AND status = 'PENDING'
@@ -797,7 +797,7 @@ impl CustomOperation for RequestRemindOp {
         let current = sqlx::query!(
             r#"
             SELECT reminder_count, max_reminders, last_reminder_at, case_id
-            FROM kyc.outstanding_requests
+            FROM "ob-poc".outstanding_requests
             WHERE request_id = $1 AND status = 'PENDING'
             "#,
             request_id
@@ -823,7 +823,7 @@ impl CustomOperation for RequestRemindOp {
 
         sqlx::query!(
             r#"
-            UPDATE kyc.outstanding_requests
+            UPDATE "ob-poc".outstanding_requests
             SET last_reminder_at = NOW(),
                 reminder_count = COALESCE(reminder_count, 0) + 1,
                 communication_log = communication_log || $2::jsonb
@@ -903,7 +903,7 @@ impl CustomOperation for RequestEscalateOp {
 
         // Fetch case_id before update for BPMN signal routing
         let case_id = sqlx::query_scalar!(
-            r#"SELECT case_id FROM kyc.outstanding_requests WHERE request_id = $1"#,
+            r#"SELECT case_id FROM "ob-poc".outstanding_requests WHERE request_id = $1"#,
             request_id
         )
         .fetch_optional(pool)
@@ -912,7 +912,7 @@ impl CustomOperation for RequestEscalateOp {
 
         let result = sqlx::query!(
             r#"
-            UPDATE kyc.outstanding_requests
+            UPDATE "ob-poc".outstanding_requests
             SET status = 'ESCALATED',
                 escalated_at = NOW(),
                 escalation_level = COALESCE(escalation_level, 0) + 1,
@@ -1002,7 +1002,7 @@ impl CustomOperation for RequestWaiveOp {
 
         let updated = sqlx::query!(
             r#"
-            UPDATE kyc.outstanding_requests
+            UPDATE "ob-poc".outstanding_requests
             SET status = 'WAIVED',
                 fulfilled_at = NOW(),
                 fulfillment_type = 'WAIVER',
@@ -1144,7 +1144,7 @@ impl CustomOperation for DocumentRequestOp {
         // Create the request
         let row = sqlx::query!(
             r#"
-            INSERT INTO kyc.outstanding_requests (
+            INSERT INTO "ob-poc".outstanding_requests (
                 subject_type, subject_id,
                 workstream_id, case_id, cbu_id, entity_id,
                 request_type, request_subtype, request_details,
@@ -1188,7 +1188,7 @@ impl CustomOperation for DocumentRequestOp {
             if let Some(ws_id) = subject.workstream_id {
                 sqlx::query!(
                     r#"
-                    UPDATE kyc.entity_workstreams
+                    UPDATE "ob-poc".entity_workstreams
                     SET status = 'BLOCKED',
                         blocker_type = 'AWAITING_DOCUMENT',
                         blocker_request_id = $2,
@@ -1314,7 +1314,7 @@ impl CustomOperation for DocumentUploadOp {
         // Try to find and fulfill matching pending request
         let fulfilled_request = sqlx::query!(
             r#"
-            UPDATE kyc.outstanding_requests
+            UPDATE "ob-poc".outstanding_requests
             SET status = 'FULFILLED',
                 fulfilled_at = NOW(),
                 fulfillment_type = 'DOCUMENT_UPLOAD',
@@ -1322,7 +1322,7 @@ impl CustomOperation for DocumentUploadOp {
                 fulfillment_reference_id = $3
             WHERE request_id = (
                 SELECT request_id
-                FROM kyc.outstanding_requests
+                FROM "ob-poc".outstanding_requests
                 WHERE request_type = 'DOCUMENT'
                   AND request_subtype = $2
                   AND status = 'PENDING'
@@ -1429,7 +1429,7 @@ impl CustomOperation for DocumentWaiveOp {
         // Find and waive matching request
         let updated = sqlx::query!(
             r#"
-            UPDATE kyc.outstanding_requests
+            UPDATE "ob-poc".outstanding_requests
             SET status = 'WAIVED',
                 fulfilled_at = NOW(),
                 fulfillment_type = 'WAIVER',
@@ -1490,8 +1490,8 @@ async fn derive_linked_ids(
             let row = sqlx::query!(
                 r#"
                 SELECT w.workstream_id, w.entity_id, c.case_id, c.cbu_id
-                FROM kyc.entity_workstreams w
-                JOIN kyc.cases c ON w.case_id = c.case_id
+                FROM "ob-poc".entity_workstreams w
+                JOIN "ob-poc".cases c ON w.case_id = c.case_id
                 WHERE w.workstream_id = $1
                 "#,
                 subject_id
@@ -1509,7 +1509,7 @@ async fn derive_linked_ids(
         }
         "KYC_CASE" => {
             let row = sqlx::query!(
-                r#"SELECT case_id, cbu_id FROM kyc.cases WHERE case_id = $1"#,
+                r#"SELECT case_id, cbu_id FROM "ob-poc".cases WHERE case_id = $1"#,
                 subject_id
             )
             .fetch_optional(pool)
@@ -1546,8 +1546,8 @@ async fn resolve_document_subject(
         let row = sqlx::query!(
             r#"
             SELECT w.workstream_id, w.entity_id, c.case_id, c.cbu_id
-            FROM kyc.entity_workstreams w
-            JOIN kyc.cases c ON w.case_id = c.case_id
+            FROM "ob-poc".entity_workstreams w
+            JOIN "ob-poc".cases c ON w.case_id = c.case_id
             WHERE w.workstream_id = $1
             "#,
             ws_id
@@ -1579,7 +1579,7 @@ async fn resolve_document_subject(
     // Try case
     if let Some(case_id) = extract_uuid_opt(verb_call, ctx, "case-id") {
         let row = sqlx::query!(
-            r#"SELECT case_id, cbu_id FROM kyc.cases WHERE case_id = $1"#,
+            r#"SELECT case_id, cbu_id FROM "ob-poc".cases WHERE case_id = $1"#,
             case_id
         )
         .fetch_optional(pool)
@@ -1606,7 +1606,7 @@ async fn try_unblock_workstream(workstream_id: Uuid, pool: &PgPool) -> Result<bo
     let remaining_blockers = sqlx::query_scalar!(
         r#"
         SELECT COUNT(*) as "count!"
-        FROM kyc.outstanding_requests
+        FROM "ob-poc".outstanding_requests
         WHERE workstream_id = $1
           AND status = 'PENDING'
           AND blocks_subject = TRUE
@@ -1620,7 +1620,7 @@ async fn try_unblock_workstream(workstream_id: Uuid, pool: &PgPool) -> Result<bo
         // No more blockers, unblock workstream
         let result = sqlx::query!(
             r#"
-            UPDATE kyc.entity_workstreams
+            UPDATE "ob-poc".entity_workstreams
             SET status = CASE
                     WHEN status = 'BLOCKED' THEN 'COLLECT'
                     ELSE status
@@ -1763,10 +1763,10 @@ async fn try_send_bpmn_signal(
     // Best-effort audit — fire and forget
     let _ = sqlx::query!(
         r#"
-        UPDATE kyc.outstanding_requests
+        UPDATE "ob-poc".outstanding_requests
         SET communication_log = communication_log || $2::jsonb
         WHERE request_id = (
-            SELECT request_id FROM kyc.outstanding_requests
+            SELECT request_id FROM "ob-poc".outstanding_requests
             WHERE case_id = $1 AND status = 'PENDING'
             LIMIT 1
         )

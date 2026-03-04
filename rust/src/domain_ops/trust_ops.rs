@@ -5,7 +5,7 @@
 //! Uses a combination of:
 //! - `"ob-poc".trust_parties` - High-level party roles (SETTLOR, TRUSTEE, BENEFICIARY, PROTECTOR)
 //! - `"ob-poc".entity_relationships` (relationship_type='trust_role') - Unified relationship tracking
-//! - `kyc.trust_provisions` - Granular deed provisions and powers for control analysis
+//! - `"ob-poc".trust_provisions` - Granular deed provisions and powers for control analysis
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -27,7 +27,7 @@ use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
 // ============================================================================
 
 /// Analyzes trust provisions to determine control vectors.
-/// Uses kyc.trust_provisions for granular power analysis.
+/// Uses "ob-poc".trust_provisions for granular power analysis.
 #[register_custom_op]
 pub struct TrustAnalyzeControlOp;
 
@@ -98,7 +98,7 @@ impl CustomOperation for TrustAnalyzeControlOp {
             Vec::new()
         };
 
-        // Get granular provisions from kyc.trust_provisions
+        // Get granular provisions from "ob-poc".trust_provisions
         let provisions: Vec<TrustProvision> = sqlx::query_as(
             r#"
             SELECT
@@ -106,7 +106,7 @@ impl CustomOperation for TrustAnalyzeControlOp {
                 e.name as holder_name,
                 tp.provision_type,
                 tp.discretion_level
-            FROM kyc.trust_provisions tp
+            FROM "ob-poc".trust_provisions tp
             LEFT JOIN "ob-poc".entities e ON tp.holder_entity_id = e.entity_id
             WHERE tp.cbu_id = $1 AND tp.trust_entity_id = $2 AND tp.is_active = true
             ORDER BY tp.provision_type
@@ -342,7 +342,7 @@ impl CustomOperation for TrustIdentifyUbosOp {
                     SELECT 1 FROM "ob-poc".entity_proper_persons pp
                     WHERE pp.entity_id = tp.holder_entity_id
                 ) as is_natural_person
-            FROM kyc.trust_provisions tp
+            FROM "ob-poc".trust_provisions tp
             LEFT JOIN "ob-poc".entities e ON tp.holder_entity_id = e.entity_id
             WHERE tp.cbu_id = $1 AND tp.trust_entity_id = $2 AND tp.is_active = true
             "#,
@@ -526,7 +526,7 @@ impl CustomOperation for TrustClassifyOp {
                 discretion_level,
                 COUNT(*) as count,
                 SUM(COALESCE(interest_percentage, 0)) as total_interest
-            FROM kyc.trust_provisions
+            FROM "ob-poc".trust_provisions
             WHERE cbu_id = $1 AND trust_entity_id = $2 AND is_active = true
             GROUP BY provision_type, discretion_level
             ORDER BY provision_type

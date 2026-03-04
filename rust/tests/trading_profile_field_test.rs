@@ -66,28 +66,28 @@ mod field_tests {
             // Cleanup in reverse dependency order
             if let Some(cbu_id) = self.cbu_id {
                 // Booking rules
-                sqlx::query("DELETE FROM custody.ssi_booking_rules WHERE cbu_id = $1")
+                sqlx::query("DELETE FROM \"ob-poc\".ssi_booking_rules WHERE cbu_id = $1")
                     .bind(cbu_id)
                     .execute(&self.pool)
                     .await
                     .ok();
 
                 // Universe
-                sqlx::query("DELETE FROM custody.cbu_instrument_universe WHERE cbu_id = $1")
+                sqlx::query("DELETE FROM \"ob-poc\".cbu_instrument_universe WHERE cbu_id = $1")
                     .bind(cbu_id)
                     .execute(&self.pool)
                     .await
                     .ok();
 
                 // SSIs
-                sqlx::query("DELETE FROM custody.cbu_ssi WHERE cbu_id = $1")
+                sqlx::query("DELETE FROM \"ob-poc\".cbu_ssi WHERE cbu_id = $1")
                     .bind(cbu_id)
                     .execute(&self.pool)
                     .await
                     .ok();
 
                 // Trading profiles
-                sqlx::query("DELETE FROM custody.cbu_trading_profiles WHERE cbu_id = $1")
+                sqlx::query("DELETE FROM \"ob-poc\".cbu_trading_profiles WHERE cbu_id = $1")
                     .bind(cbu_id)
                     .execute(&self.pool)
                     .await
@@ -109,13 +109,13 @@ mod field_tests {
     // MARKET LOOKUP TESTS
     // =========================================================================
 
-    /// Test that we can build mic → market_id map from custody.markets
+    /// Test that we can build mic → market_id map from \"ob-poc\".markets
     #[tokio::test]
     async fn test_market_lookup_via_mic() -> Result<()> {
         let db = TestDb::new().await?;
 
         // Build market map (same logic as materialization code)
-        let rows = sqlx::query!(r#"SELECT market_id, mic FROM custody.markets"#)
+        let rows = sqlx::query!(r#"SELECT market_id, mic FROM "ob-poc".markets"#)
             .fetch_all(&db.pool)
             .await?;
 
@@ -152,14 +152,14 @@ mod field_tests {
 
         // Get XNYS market_id
         let market_id: Uuid =
-            sqlx::query_scalar("SELECT market_id FROM custody.markets WHERE mic = 'XNYS'")
+            sqlx::query_scalar("SELECT market_id FROM \"ob-poc\".markets WHERE mic = 'XNYS'")
                 .fetch_one(&db.pool)
                 .await?;
 
         // Insert SSI with market_id (note: column is cash_account_bic, not cash_bic)
         let ssi_name = db.name("US_EQUITY_SSI");
         let result = sqlx::query!(
-            r#"INSERT INTO custody.cbu_ssi
+            r#"INSERT INTO "ob-poc".cbu_ssi
                (cbu_id, ssi_name, ssi_type, market_id, safekeeping_account, safekeeping_bic,
                 cash_account, cash_account_bic, cash_currency, status, effective_date)
                VALUES ($1, $2, 'SECURITIES', $3, 'SAFE-001', 'IRVTUS3N',
@@ -175,8 +175,8 @@ mod field_tests {
         // Read back and verify (mic comes from LEFT JOIN so it's Option)
         let ssi = sqlx::query!(
             r#"SELECT s.ssi_id, s.ssi_name, s.market_id, m.mic
-               FROM custody.cbu_ssi s
-               LEFT JOIN custody.markets m ON s.market_id = m.market_id
+               FROM "ob-poc".cbu_ssi s
+               LEFT JOIN "ob-poc".markets m ON s.market_id = m.market_id
                WHERE s.ssi_id = $1"#,
             result.ssi_id
         )
@@ -203,7 +203,7 @@ mod field_tests {
         // First create an SSI for the rule to reference
         let ssi_name = db.name("TEST_SSI");
         let ssi_id: Uuid = sqlx::query_scalar(
-            r#"INSERT INTO custody.cbu_ssi
+            r#"INSERT INTO "ob-poc".cbu_ssi
                (cbu_id, ssi_name, ssi_type, safekeeping_account, safekeeping_bic,
                 status, effective_date)
                VALUES ($1, $2, 'SECURITIES', 'SAFE-001', 'IRVTUS3N', 'ACTIVE', CURRENT_DATE)
@@ -216,14 +216,14 @@ mod field_tests {
 
         // Get market_id for XETR
         let market_id: Uuid =
-            sqlx::query_scalar("SELECT market_id FROM custody.markets WHERE mic = 'XETR'")
+            sqlx::query_scalar("SELECT market_id FROM \"ob-poc\".markets WHERE mic = 'XETR'")
                 .fetch_one(&db.pool)
                 .await?;
 
         // Insert booking rule with market_id filter
         let rule_name = db.name("German_Equities");
         sqlx::query(
-            r#"INSERT INTO custody.ssi_booking_rules
+            r#"INSERT INTO "ob-poc".ssi_booking_rules
                (cbu_id, ssi_id, rule_name, priority, market_id, currency, effective_date)
                VALUES ($1, $2, $3, 10, $4, 'EUR', CURRENT_DATE)
                ON CONFLICT (cbu_id, priority, rule_name) DO NOTHING"#,
@@ -238,8 +238,8 @@ mod field_tests {
         // Read back and verify market resolves to mic
         let row = sqlx::query!(
             r#"SELECT r.market_id, m.mic, r.specificity_score
-               FROM custody.ssi_booking_rules r
-               LEFT JOIN custody.markets m ON r.market_id = m.market_id
+               FROM "ob-poc".ssi_booking_rules r
+               LEFT JOIN "ob-poc".markets m ON r.market_id = m.market_id
                WHERE r.cbu_id = $1 AND r.rule_name = $2"#,
             cbu_id,
             rule_name
@@ -350,7 +350,7 @@ mod field_tests {
         // Insert twice with same key
         for _ in 0..2 {
             sqlx::query(
-                r#"INSERT INTO custody.cbu_ssi
+                r#"INSERT INTO "ob-poc".cbu_ssi
                    (cbu_id, ssi_name, ssi_type, safekeeping_account, safekeeping_bic,
                     status, effective_date)
                    VALUES ($1, $2, 'SECURITIES', 'SAFE-001', 'IRVTUS3N', 'ACTIVE', CURRENT_DATE)
@@ -365,7 +365,7 @@ mod field_tests {
 
         // Should only have one row
         let count: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM custody.cbu_ssi WHERE cbu_id = $1 AND ssi_name = $2",
+            "SELECT COUNT(*) FROM \"ob-poc\".cbu_ssi WHERE cbu_id = $1 AND ssi_name = $2",
         )
         .bind(cbu_id)
         .bind(&ssi_name)
@@ -387,7 +387,7 @@ mod field_tests {
         // Create SSI first
         let ssi_name = db.name("RULE_TEST_SSI");
         let ssi_id: Uuid = sqlx::query_scalar(
-            r#"INSERT INTO custody.cbu_ssi
+            r#"INSERT INTO "ob-poc".cbu_ssi
                (cbu_id, ssi_name, ssi_type, safekeeping_account, safekeeping_bic,
                 status, effective_date)
                VALUES ($1, $2, 'SECURITIES', 'SAFE-001', 'IRVTUS3N', 'ACTIVE', CURRENT_DATE)
@@ -403,7 +403,7 @@ mod field_tests {
         // Insert twice
         for _ in 0..2 {
             sqlx::query(
-                r#"INSERT INTO custody.ssi_booking_rules
+                r#"INSERT INTO "ob-poc".ssi_booking_rules
                    (cbu_id, ssi_id, rule_name, priority, currency, effective_date)
                    VALUES ($1, $2, $3, 10, 'USD', CURRENT_DATE)
                    ON CONFLICT (cbu_id, priority, rule_name) DO NOTHING"#,
@@ -417,7 +417,7 @@ mod field_tests {
 
         // Should only have one row
         let count: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM custody.ssi_booking_rules WHERE cbu_id = $1 AND rule_name = $2",
+            "SELECT COUNT(*) FROM \"ob-poc\".ssi_booking_rules WHERE cbu_id = $1 AND rule_name = $2",
         )
         .bind(cbu_id)
         .bind(&rule_name)

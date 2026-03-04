@@ -117,7 +117,7 @@ impl WorkflowDispatcher {
 
         let result = sqlx::query!(
             r#"
-            INSERT INTO kyc.outstanding_requests (
+            INSERT INTO "ob-poc".outstanding_requests (
                 subject_type, subject_id,
                 case_id,
                 request_type, request_subtype,

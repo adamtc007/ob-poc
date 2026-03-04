@@ -200,7 +200,7 @@ impl CustomOperation for UboMarkDeceasedOp {
 
         // 6. Update entity_workstreams.is_ubo = false for this person in all active cases
         sqlx::query(
-            r#"UPDATE kyc.entity_workstreams
+            r#"UPDATE "ob-poc".entity_workstreams
                SET is_ubo = false,
                    status = 'COMPLETE',
                    completed_at = NOW()

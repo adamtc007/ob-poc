@@ -121,7 +121,7 @@ impl CustomOperation for InvestorRequestDocumentsOp {
         // Update lifecycle state (trigger handles validation and history logging)
         let row = sqlx::query!(
             r#"
-            UPDATE kyc.investors
+            UPDATE "ob-poc".investors
             SET lifecycle_state = 'PENDING_DOCUMENTS',
                 lifecycle_notes = $2,
                 updated_at = NOW()
@@ -181,7 +181,7 @@ impl CustomOperation for InvestorStartKycOp {
 
         let row = sqlx::query!(
             r#"
-            UPDATE kyc.investors
+            UPDATE "ob-poc".investors
             SET lifecycle_state = 'KYC_IN_PROGRESS',
                 kyc_status = 'IN_PROGRESS',
                 kyc_case_id = COALESCE($2, kyc_case_id),
@@ -245,7 +245,7 @@ impl CustomOperation for InvestorApproveKycOp {
         // Note: No kyc_approved_by column exists in schema - removed from query
         let row = sqlx::query!(
             r#"
-            UPDATE kyc.investors
+            UPDATE "ob-poc".investors
             SET lifecycle_state = 'KYC_APPROVED',
                 kyc_status = 'APPROVED',
                 kyc_approved_at = NOW(),
@@ -309,7 +309,7 @@ impl CustomOperation for InvestorRejectKycOp {
 
         let row = sqlx::query!(
             r#"
-            UPDATE kyc.investors
+            UPDATE "ob-poc".investors
             SET lifecycle_state = 'REJECTED',
                 kyc_status = 'REJECTED',
                 rejection_reason = $2,
@@ -372,7 +372,7 @@ impl CustomOperation for InvestorMarkEligibleOp {
 
         let row = sqlx::query!(
             r#"
-            UPDATE kyc.investors
+            UPDATE "ob-poc".investors
             SET lifecycle_state = 'ELIGIBLE_TO_SUBSCRIBE',
                 investor_type = COALESCE($2, investor_type),
                 lifecycle_notes = $3,
@@ -434,7 +434,7 @@ impl CustomOperation for InvestorRecordSubscriptionOp {
 
         let row = sqlx::query!(
             r#"
-            UPDATE kyc.investors
+            UPDATE "ob-poc".investors
             SET lifecycle_state = 'SUBSCRIBED',
                 first_subscription_at = COALESCE(first_subscription_at, NOW()),
                 lifecycle_notes = $2,
@@ -453,7 +453,7 @@ impl CustomOperation for InvestorRecordSubscriptionOp {
         if let Some(hid) = holding_id {
             sqlx::query!(
                 r#"
-                UPDATE kyc.holdings
+                UPDATE "ob-poc".holdings
                 SET investor_id = $1
                 WHERE id = $2
                 "#,
@@ -509,7 +509,7 @@ impl CustomOperation for InvestorActivateOp {
 
         let row = sqlx::query!(
             r#"
-            UPDATE kyc.investors
+            UPDATE "ob-poc".investors
             SET lifecycle_state = 'ACTIVE_HOLDER',
                 lifecycle_notes = $2,
                 updated_at = NOW()
@@ -569,7 +569,7 @@ impl CustomOperation for InvestorStartRedemptionOp {
 
         let row = sqlx::query!(
             r#"
-            UPDATE kyc.investors
+            UPDATE "ob-poc".investors
             SET lifecycle_state = 'REDEEMING',
                 redemption_type = $2,
                 lifecycle_notes = $3,
@@ -630,7 +630,7 @@ impl CustomOperation for InvestorCompleteRedemptionOp {
 
         let row = sqlx::query!(
             r#"
-            UPDATE kyc.investors
+            UPDATE "ob-poc".investors
             SET lifecycle_state = 'OFFBOARDED',
                 offboarded_at = NOW(),
                 offboard_reason = 'Full redemption completed',
@@ -649,7 +649,7 @@ impl CustomOperation for InvestorCompleteRedemptionOp {
         // Close any associated holdings
         sqlx::query!(
             r#"
-            UPDATE kyc.holdings
+            UPDATE "ob-poc".holdings
             SET status = 'closed',
                 updated_at = NOW()
             WHERE investor_id = $1 AND status = 'active'
@@ -705,7 +705,7 @@ impl CustomOperation for InvestorOffboardOp {
 
         let row = sqlx::query!(
             r#"
-            UPDATE kyc.investors
+            UPDATE "ob-poc".investors
             SET lifecycle_state = 'OFFBOARDED',
                 offboard_reason = $2,
                 offboarded_at = NOW(),
@@ -725,7 +725,7 @@ impl CustomOperation for InvestorOffboardOp {
         // Close any associated holdings
         sqlx::query!(
             r#"
-            UPDATE kyc.holdings
+            UPDATE "ob-poc".holdings
             SET status = 'closed',
                 updated_at = NOW()
             WHERE investor_id = $1 AND status = 'active'
@@ -781,7 +781,7 @@ impl CustomOperation for InvestorSuspendOp {
 
         // Get current state to store for reinstatement
         let current = sqlx::query_scalar!(
-            r#"SELECT lifecycle_state FROM kyc.investors WHERE investor_id = $1"#,
+            r#"SELECT lifecycle_state FROM "ob-poc".investors WHERE investor_id = $1"#,
             investor_id
         )
         .fetch_one(pool)
@@ -790,7 +790,7 @@ impl CustomOperation for InvestorSuspendOp {
 
         let row = sqlx::query!(
             r#"
-            UPDATE kyc.investors
+            UPDATE "ob-poc".investors
             SET lifecycle_state = 'SUSPENDED',
                 suspended_reason = $2,
                 pre_suspension_state = $3,
@@ -854,7 +854,7 @@ impl CustomOperation for InvestorReinstateOp {
 
         // Get the pre-suspension state
         let pre_state = sqlx::query_scalar!(
-            r#"SELECT pre_suspension_state FROM kyc.investors WHERE investor_id = $1"#,
+            r#"SELECT pre_suspension_state FROM "ob-poc".investors WHERE investor_id = $1"#,
             investor_id
         )
         .fetch_one(pool)
@@ -864,7 +864,7 @@ impl CustomOperation for InvestorReinstateOp {
 
         let row = sqlx::query!(
             r#"
-            UPDATE kyc.investors
+            UPDATE "ob-poc".investors
             SET lifecycle_state = $2,
                 suspended_reason = NULL,
                 pre_suspension_state = NULL,
@@ -931,7 +931,7 @@ impl CustomOperation for InvestorCountByStateOp {
         let rows = sqlx::query!(
             r#"
             SELECT lifecycle_state, COUNT(*) as count
-            FROM kyc.investors
+            FROM "ob-poc".investors
             WHERE owning_cbu_id = $1
             GROUP BY lifecycle_state
             ORDER BY lifecycle_state

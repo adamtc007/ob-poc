@@ -66,7 +66,7 @@ async fn resolve_by_lei(pool: &PgPool, lei: &str) -> Result<Uuid, ResolveError> 
         UNION
         SELECT entity_id FROM "ob-poc".entity_manco WHERE lei = $1
         UNION
-        SELECT entity_id FROM custody.entity_settlement_identity WHERE lei = $1
+        SELECT entity_id FROM "ob-poc".entity_settlement_identity WHERE lei = $1
         LIMIT 1
         "#,
     )
@@ -87,7 +87,7 @@ async fn resolve_by_lei(pool: &PgPool, lei: &str) -> Result<Uuid, ResolveError> 
 /// Checks entity_settlement_identity.primary_bic
 async fn resolve_by_bic(pool: &PgPool, bic: &str) -> Result<Uuid, ResolveError> {
     let result: Option<Uuid> = sqlx::query_scalar(
-        "SELECT entity_id FROM custody.entity_settlement_identity WHERE primary_bic = $1 LIMIT 1",
+        "SELECT entity_id FROM \"ob-poc\".entity_settlement_identity WHERE primary_bic = $1 LIMIT 1",
     )
     .bind(bic)
     .fetch_optional(pool)

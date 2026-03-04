@@ -825,7 +825,7 @@ fn topological_sort(verb_calls: &[&VerbCall]) -> Result<Vec<usize>, CompileError
     }
 
     // Track which statements write to which tables (for table-level dependency ordering)
-    // Key: table name (e.g., "custody.cbu_ssi"), Value: statement indices that write to it
+    // Key: table name (e.g., "\"ob-poc\".cbu_ssi"), Value: statement indices that write to it
     let mut table_writers: HashMap<String, Vec<usize>> = HashMap::new();
 
     // First pass: record table writers

@@ -5,12 +5,12 @@
 //! for a CBU's trading configuration.
 //!
 //! Materialization syncs the document to operational tables:
-//! - custody.cbu_instrument_universe
-//! - custody.cbu_ssi
-//! - custody.ssi_booking_rules (NOTE: specificity_score is GENERATED - never insert it)
-//! - custody.isda_agreements
-//! - custody.csa_agreements
-//! - custody.subcustodian_network
+//! - "ob-poc".cbu_instrument_universe
+//! - "ob-poc".cbu_ssi
+//! - "ob-poc".ssi_booking_rules (NOTE: specificity_score is GENERATED - never insert it)
+//! - "ob-poc".isda_agreements
+//! - "ob-poc".csa_agreements
+//! - "ob-poc".subcustodian_network
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -347,11 +347,11 @@ impl CustomOperation for TradingProfileActivateOp {
 /// Materialize trading profile to operational tables
 ///
 /// This is the core operation that syncs the document to:
-/// - custody.cbu_instrument_universe
-/// - custody.cbu_ssi
-/// - custody.ssi_booking_rules (CRITICAL: specificity_score is GENERATED ALWAYS)
-/// - custody.isda_agreements
-/// - custody.csa_agreements
+/// - "ob-poc".cbu_instrument_universe
+/// - "ob-poc".cbu_ssi
+/// - "ob-poc".ssi_booking_rules (CRITICAL: specificity_score is GENERATED ALWAYS)
+/// - "ob-poc".isda_agreements
+/// - "ob-poc".csa_agreements
 #[register_custom_op]
 pub struct TradingProfileMaterializeOp;
 
@@ -489,7 +489,7 @@ impl CustomOperation for TradingProfileMaterializeOp {
 
             // Delete orphaned SSIs (exist in DB but not in matrix)
             let existing_ssis: Vec<(Uuid, String)> = sqlx::query_as(
-                r#"SELECT ssi_id, ssi_name FROM custody.cbu_ssi
+                r#"SELECT ssi_id, ssi_name FROM "ob-poc".cbu_ssi
                    WHERE cbu_id = $1 AND source = 'TRADING_PROFILE'"#,
             )
             .bind(cbu_id)
@@ -505,12 +505,12 @@ impl CustomOperation for TradingProfileMaterializeOp {
                         "materialize: deleting orphaned SSI"
                     );
                     // Delete booking rules referencing this SSI first
-                    sqlx::query("DELETE FROM custody.ssi_booking_rules WHERE ssi_id = $1")
+                    sqlx::query("DELETE FROM \"ob-poc\".ssi_booking_rules WHERE ssi_id = $1")
                         .bind(ssi_id)
                         .execute(&mut *tx)
                         .await?;
                     // Delete the SSI
-                    sqlx::query("DELETE FROM custody.cbu_ssi WHERE ssi_id = $1")
+                    sqlx::query("DELETE FROM \"ob-poc\".cbu_ssi WHERE ssi_id = $1")
                         .bind(ssi_id)
                         .execute(&mut *tx)
                         .await?;
@@ -540,7 +540,7 @@ impl CustomOperation for TradingProfileMaterializeOp {
         } else {
             // Load existing SSI name->id mapping for booking rules
             let rows = sqlx::query!(
-                r#"SELECT ssi_id, ssi_name FROM custody.cbu_ssi WHERE cbu_id = $1"#,
+                r#"SELECT ssi_id, ssi_name FROM "ob-poc".cbu_ssi WHERE cbu_id = $1"#,
                 cbu_id
             )
             .fetch_all(&mut *tx)
@@ -679,7 +679,7 @@ struct MaterializationOptions {
 async fn build_instrument_class_map(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
 ) -> Result<HashMap<String, Uuid>> {
-    let rows = sqlx::query!(r#"SELECT class_id, code FROM custody.instrument_classes"#)
+    let rows = sqlx::query!(r#"SELECT class_id, code FROM "ob-poc".instrument_classes"#)
         .fetch_all(&mut **tx)
         .await?;
 
@@ -690,7 +690,7 @@ async fn build_instrument_class_map(
 async fn build_market_map(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
 ) -> Result<HashMap<String, Uuid>> {
-    let rows = sqlx::query!(r#"SELECT market_id, mic FROM custody.markets"#)
+    let rows = sqlx::query!(r#"SELECT market_id, mic FROM "ob-poc".markets"#)
         .fetch_all(&mut **tx)
         .await?;
 
@@ -725,7 +725,7 @@ async fn materialize_ssi(
 
     // Use raw query to handle ON CONFLICT properly
     let query = format!(
-        r#"INSERT INTO custody.cbu_ssi
+        r#"INSERT INTO "ob-poc".cbu_ssi
            (ssi_id, cbu_id, ssi_name, ssi_type, market_id,
             safekeeping_account, safekeeping_bic,
             cash_account, cash_account_bic, cash_currency,
@@ -772,7 +772,7 @@ async fn materialize_ssi(
         Ok(id)
     } else {
         let existing: (Uuid,) = sqlx::query_as(
-            r#"SELECT ssi_id FROM custody.cbu_ssi WHERE cbu_id = $1 AND ssi_name = $2"#,
+            r#"SELECT ssi_id FROM "ob-poc".cbu_ssi WHERE cbu_id = $1 AND ssi_name = $2"#,
         )
         .bind(cbu_id)
         .bind(&ssi.name)
@@ -822,7 +822,7 @@ async fn materialize_universe(
             tracing::debug!(mic = %market_cfg.mic, class = %inst_cfg.class_code, "materialize_universe: inserting");
             let nil_uuid = Uuid::nil();
             let result = sqlx::query(
-                r#"INSERT INTO custody.cbu_instrument_universe
+                r#"INSERT INTO "ob-poc".cbu_instrument_universe
                    (cbu_id, instrument_class_id, market_id, currencies, settlement_types,
                     is_held, is_traded, effective_date, counterparty_key)
                    VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_DATE, $8)
@@ -894,7 +894,7 @@ async fn materialize_booking_rules(
         // Constraint is (cbu_id, priority, rule_name) - unique rule names within a priority tier
         tracing::debug!(rule_name = %rule.name, priority = rule.priority, "materialize_booking_rules: inserting");
         let result = sqlx::query(
-            r#"INSERT INTO custody.ssi_booking_rules
+            r#"INSERT INTO "ob-poc".ssi_booking_rules
                (cbu_id, ssi_id, rule_name, priority,
                 instrument_class_id, market_id, currency, settlement_type,
                 effective_date)
@@ -955,7 +955,7 @@ async fn materialize_isda_agreements(
     // Get existing ISDA IDs for this CBU
     let existing: Vec<(Uuid, Uuid, chrono::NaiveDate)> = sqlx::query_as(
         r#"SELECT isda_id, counterparty_entity_id, agreement_date
-           FROM custody.isda_agreements WHERE cbu_id = $1"#,
+           FROM "ob-poc".isda_agreements WHERE cbu_id = $1"#,
     )
     .bind(cbu_id)
     .fetch_all(&mut **tx)
@@ -972,19 +972,19 @@ async fn materialize_isda_agreements(
             );
 
             // Delete CSAs first (FK constraint)
-            sqlx::query("DELETE FROM custody.csa_agreements WHERE isda_id = $1")
+            sqlx::query("DELETE FROM \"ob-poc\".csa_agreements WHERE isda_id = $1")
                 .bind(isda_id)
                 .execute(&mut **tx)
                 .await?;
 
             // Delete product coverage (FK constraint)
-            sqlx::query("DELETE FROM custody.isda_product_coverage WHERE isda_id = $1")
+            sqlx::query("DELETE FROM \"ob-poc\".isda_product_coverage WHERE isda_id = $1")
                 .bind(isda_id)
                 .execute(&mut **tx)
                 .await?;
 
             // Delete ISDA
-            sqlx::query("DELETE FROM custody.isda_agreements WHERE isda_id = $1")
+            sqlx::query("DELETE FROM \"ob-poc\".isda_agreements WHERE isda_id = $1")
                 .bind(isda_id)
                 .execute(&mut **tx)
                 .await?;
@@ -1024,7 +1024,7 @@ async fn materialize_isda_agreements(
         );
 
         let result = sqlx::query(
-            r#"INSERT INTO custody.isda_agreements
+            r#"INSERT INTO "ob-poc".isda_agreements
                (isda_id, cbu_id, counterparty_entity_id, agreement_date, governing_law, effective_date)
                VALUES ($1, $2, $3, $4, $5, $6)
                ON CONFLICT (cbu_id, counterparty_entity_id, agreement_date) DO UPDATE SET
@@ -1048,7 +1048,7 @@ async fn materialize_isda_agreements(
         for coverage in &isda.product_coverage {
             // Look up instrument_class_id by asset_class code
             let class_id: Option<Uuid> = sqlx::query_scalar(
-                r#"SELECT class_id FROM custody.instrument_classes WHERE code = $1"#,
+                r#"SELECT class_id FROM "ob-poc".instrument_classes WHERE code = $1"#,
             )
             .bind(&coverage.asset_class)
             .fetch_optional(&mut **tx)
@@ -1056,7 +1056,7 @@ async fn materialize_isda_agreements(
 
             if let Some(class_id) = class_id {
                 sqlx::query(
-                    r#"INSERT INTO custody.isda_product_coverage
+                    r#"INSERT INTO "ob-poc".isda_product_coverage
                        (isda_id, instrument_class_id)
                        VALUES ($1, $2)
                        ON CONFLICT (isda_id, instrument_class_id) DO NOTHING"#,
@@ -1101,7 +1101,7 @@ async fn materialize_isda_agreements(
             );
 
             sqlx::query(
-                r#"INSERT INTO custody.csa_agreements
+                r#"INSERT INTO "ob-poc".csa_agreements
                    (csa_id, isda_id, csa_type, threshold_amount, threshold_currency,
                     minimum_transfer_amount, rounding_amount, collateral_ssi_id, effective_date)
                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
@@ -1147,7 +1147,7 @@ async fn materialize_corporate_actions(
     let mut event_code_to_id: HashMap<String, Uuid> = HashMap::new();
     for event_code in &ca.enabled_event_types {
         let row: Option<(Uuid,)> = sqlx::query_as(
-            r#"SELECT event_type_id FROM custody.ca_event_types WHERE event_code = $1"#,
+            r#"SELECT event_type_id FROM "ob-poc".ca_event_types WHERE event_code = $1"#,
         )
         .bind(event_code)
         .fetch_optional(&mut **tx)
@@ -1184,7 +1184,7 @@ async fn materialize_corporate_actions(
         );
 
         let result = sqlx::query(
-            r#"INSERT INTO custody.cbu_ca_preferences
+            r#"INSERT INTO "ob-poc".cbu_ca_preferences
                (cbu_id, event_type_id, processing_mode, default_election, created_at)
                VALUES ($1, $2, $3, $4, NOW())
                ON CONFLICT (cbu_id, event_type_id, instrument_class_id)
@@ -1216,7 +1216,7 @@ async fn materialize_corporate_actions(
 
         // Look up market_id if market-specific
         let market_id: Option<Uuid> = if let Some(ref mic) = rule.market_code {
-            sqlx::query_scalar(r#"SELECT market_id FROM custody.markets WHERE mic = $1"#)
+            sqlx::query_scalar(r#"SELECT market_id FROM "ob-poc".markets WHERE mic = $1"#)
                 .bind(mic)
                 .fetch_optional(&mut **tx)
                 .await?
@@ -1231,7 +1231,7 @@ async fn materialize_corporate_actions(
         );
 
         sqlx::query(
-            r#"INSERT INTO custody.cbu_ca_instruction_windows
+            r#"INSERT INTO "ob-poc".cbu_ca_instruction_windows
                (cbu_id, event_type_id, market_id, cutoff_days_before, warning_days, escalation_days, created_at)
                VALUES ($1, $2, $3, $4, $5, $6, NOW())
                ON CONFLICT (cbu_id, event_type_id, market_id)
@@ -1278,7 +1278,7 @@ async fn materialize_corporate_actions(
 
         // Note: event_type_id is NULL for global mappings
         sqlx::query(
-            r#"INSERT INTO custody.cbu_ca_ssi_mappings
+            r#"INSERT INTO "ob-poc".cbu_ca_ssi_mappings
                (cbu_id, currency, proceeds_type, ssi_id, created_at)
                VALUES ($1, $2, $3, $4, NOW())
                ON CONFLICT (cbu_id, event_type_id, currency, proceeds_type)
@@ -1602,7 +1602,7 @@ impl CustomOperation for TradingProfileAddMarketOp {
                 (name, code)
             } else {
                 let row =
-                    sqlx::query(r#"SELECT name, country_code FROM custody.markets WHERE mic = $1"#)
+                    sqlx::query(r#"SELECT name, country_code FROM "ob-poc".markets WHERE mic = $1"#)
                         .bind(&mic)
                         .fetch_optional(pool)
                         .await?;

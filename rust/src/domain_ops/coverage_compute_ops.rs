@@ -2,7 +2,7 @@
 //!
 //! Computes per-prong edge/evidence coverage for a UBO determination run,
 //! generates stable gap identifiers, checks blocking-at-gate conditions,
-//! and persists the result as JSONB in `kyc.ubo_determination_runs.coverage_snapshot`.
+//! and persists the result as JSONB in `"ob-poc".ubo_determination_runs.coverage_snapshot`.
 //!
 //! ## Coverage Prongs
 //!
@@ -146,7 +146,7 @@ impl CustomOperation for CoverageComputeOp {
         let run_row: Option<(Uuid, serde_json::Value, Option<serde_json::Value>)> = sqlx::query_as(
             r#"
                 SELECT subject_entity_id, output_snapshot, chains_snapshot
-                FROM kyc.ubo_determination_runs
+                FROM "ob-poc".ubo_determination_runs
                 WHERE run_id = $1
                   AND case_id = $2
                 "#,
@@ -517,16 +517,16 @@ async fn check_ownership_prong(
 
 /// IDENTITY prong: check if verified identity documents exist for the UBO person.
 ///
-/// Checks both `kyc.ubo_evidence` (type IDENTITY_DOC, status VERIFIED) and
-/// `kyc.entity_workstreams.identity_verified` flag.
+/// Checks both `"ob-poc".kyc_ubo_evidence` (type IDENTITY_DOC, status VERIFIED) and
+/// `"ob-poc".entity_workstreams.identity_verified` flag.
 #[cfg(feature = "database")]
 async fn check_identity_prong(pool: &PgPool, entity_id: Uuid, case_id: Uuid) -> Result<bool> {
     // Check 1: Verified identity evidence in ubo_evidence
     let evidence_count: (i64,) = sqlx::query_as(
         r#"
         SELECT COUNT(*)
-        FROM kyc.ubo_evidence ue
-        JOIN kyc.ubo_registry ur ON ur.ubo_id = ue.ubo_id
+        FROM "ob-poc".kyc_ubo_evidence ue
+        JOIN "ob-poc".kyc_ubo_registry ur ON ur.ubo_id = ue.ubo_id
         WHERE ur.ubo_person_id = $1
           AND ur.case_id = $2
           AND ue.evidence_type IN ('IDENTITY_DOC', 'PROOF_OF_ADDRESS')
@@ -546,7 +546,7 @@ async fn check_identity_prong(pool: &PgPool, entity_id: Uuid, case_id: Uuid) -> 
     let ws_verified: Option<(bool,)> = sqlx::query_as(
         r#"
         SELECT identity_verified
-        FROM kyc.entity_workstreams
+        FROM "ob-poc".entity_workstreams
         WHERE entity_id = $1
           AND case_id = $2
           AND identity_verified = true
@@ -630,7 +630,7 @@ async fn find_edge_gaps_for_control(
 
 /// SOURCE_OF_WEALTH prong: check if source of wealth evidence exists.
 ///
-/// Checks `kyc.ubo_evidence` for evidence_type in (SOURCE_OF_WEALTH,
+/// Checks `"ob-poc".kyc_ubo_evidence` for evidence_type in (SOURCE_OF_WEALTH,
 /// SOURCE_OF_FUNDS) with status VERIFIED or RECEIVED.
 #[cfg(feature = "database")]
 async fn check_source_of_wealth_prong(
@@ -641,8 +641,8 @@ async fn check_source_of_wealth_prong(
     let sow_count: (i64,) = sqlx::query_as(
         r#"
         SELECT COUNT(*)
-        FROM kyc.ubo_evidence ue
-        JOIN kyc.ubo_registry ur ON ur.ubo_id = ue.ubo_id
+        FROM "ob-poc".kyc_ubo_evidence ue
+        JOIN "ob-poc".kyc_ubo_registry ur ON ur.ubo_id = ue.ubo_id
         WHERE ur.ubo_person_id = $1
           AND ur.case_id = $2
           AND ue.evidence_type IN ('SOURCE_OF_WEALTH', 'SOURCE_OF_FUNDS',
@@ -669,7 +669,7 @@ async fn persist_coverage_snapshot(
 
     sqlx::query(
         r#"
-        UPDATE kyc.ubo_determination_runs
+        UPDATE "ob-poc".ubo_determination_runs
         SET coverage_snapshot = $2
         WHERE run_id = $1
         "#,

@@ -68,7 +68,7 @@ pub async fn verify_client_token(
     let client = sqlx::query!(
         r#"
         SELECT client_id, name, email, accessible_cbus
-        FROM client_portal.clients
+        FROM "ob-poc".clients
         WHERE client_id = $1 AND is_active = true
         "#,
         client_id

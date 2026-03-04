@@ -161,7 +161,7 @@ impl CustomOperation for WorkflowConfirmDecisionOp {
         // Update the decision
         let result = sqlx::query!(
             r#"
-            UPDATE kyc.research_decisions
+            UPDATE "ob-poc".research_decisions
             SET
                 selected_key = $2,
                 selected_key_type = $3,
@@ -256,7 +256,7 @@ impl CustomOperation for WorkflowRejectDecisionOp {
         // Update the decision
         let result = sqlx::query!(
             r#"
-            UPDATE kyc.research_decisions
+            UPDATE "ob-poc".research_decisions
             SET
                 decision_type = 'REJECTED',
                 selection_reasoning = selection_reasoning || ' | REJECTED: ' || $2,
@@ -385,7 +385,7 @@ impl CustomOperation for WorkflowAuditTrailOp {
                     decision_type,
                     auto_selected,
                     created_at
-                FROM kyc.research_decisions
+                FROM "ob-poc".research_decisions
                 WHERE target_entity_id = $1
                 ORDER BY created_at DESC
                 "#,
@@ -432,7 +432,7 @@ impl CustomOperation for WorkflowAuditTrailOp {
                     error_message,
                     duration_ms,
                     executed_at
-                FROM kyc.research_actions
+                FROM "ob-poc".research_actions
                 WHERE target_entity_id = $1
                 ORDER BY executed_at DESC
                 "#,
@@ -475,8 +475,8 @@ impl CustomOperation for WorkflowAuditTrailOp {
                     c.correct_key,
                     c.correction_reason,
                     c.corrected_at
-                FROM kyc.research_corrections c
-                JOIN kyc.research_decisions d ON d.decision_id = c.original_decision_id
+                FROM "ob-poc".research_corrections c
+                JOIN "ob-poc".research_decisions d ON d.decision_id = c.original_decision_id
                 WHERE d.target_entity_id = $1
                 ORDER BY c.corrected_at DESC
                 "#,
@@ -514,7 +514,7 @@ impl CustomOperation for WorkflowAuditTrailOp {
                     status,
                     resolution,
                     detected_at
-                FROM kyc.research_anomalies
+                FROM "ob-poc".research_anomalies
                 WHERE entity_id = $1
                 ORDER BY detected_at DESC
                 "#,
@@ -662,7 +662,7 @@ impl CustomOperation for WorkflowSupersessionTrailOp {
                       g.edges_created, g.superseded_by, g.superseded_reason,
                       g.imported_at
                FROM "ob-poc".graph_import_runs g
-               JOIN kyc.case_import_runs cir ON cir.run_id = g.run_id
+               JOIN "ob-poc".case_import_runs cir ON cir.run_id = g.run_id
                WHERE cir.case_id = $1
                ORDER BY g.imported_at ASC"#,
         )
@@ -712,8 +712,8 @@ impl CustomOperation for WorkflowSupersessionTrailOp {
             r#"SELECT c.correction_id, c.original_decision_id,
                       c.correction_type, c.wrong_key, c.correct_key,
                       c.correction_reason, c.corrected_at
-               FROM kyc.research_corrections c
-               JOIN kyc.case_import_runs cir ON cir.decision_id = c.original_decision_id
+               FROM "ob-poc".research_corrections c
+               JOIN "ob-poc".case_import_runs cir ON cir.decision_id = c.original_decision_id
                WHERE cir.case_id = $1
                ORDER BY c.corrected_at DESC"#,
         )
@@ -760,7 +760,7 @@ impl CustomOperation for WorkflowSupersessionTrailOp {
             r#"SELECT run_id, subject_entity_id, as_of, candidates_found,
                       (coverage_snapshot IS NOT NULL) AS coverage_present,
                       computed_at
-               FROM kyc.ubo_determination_runs
+               FROM "ob-poc".ubo_determination_runs
                WHERE case_id = $1 AND coverage_snapshot IS NULL
                ORDER BY computed_at DESC"#,
         )
@@ -803,7 +803,7 @@ impl CustomOperation for WorkflowSupersessionTrailOp {
         )> = sqlx::query_as(
             r#"SELECT plan_id, status, total_items,
                       determination_run_id, generated_at
-               FROM kyc.outreach_plans
+               FROM "ob-poc".outreach_plans
                WHERE case_id = $1 AND status = 'DRAFT'
                ORDER BY generated_at DESC"#,
         )
@@ -838,7 +838,7 @@ impl CustomOperation for WorkflowSupersessionTrailOp {
         )> = sqlx::query_as(
             r#"SELECT evaluation_id, tollgate_id, passed,
                       evaluation_detail, evaluated_at
-               FROM kyc.tollgate_evaluations
+               FROM "ob-poc".tollgate_evaluations
                WHERE case_id = $1
                  AND passed = false
                  AND config_version = 'supersession'

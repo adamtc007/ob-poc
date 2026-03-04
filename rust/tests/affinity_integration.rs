@@ -278,50 +278,44 @@ mod integration {
         let tables = vec![
             TableInput {
                 schema: "ob-poc".into(),
-                table: "cbus".into(),
+                table_name: "cbus".into(),
                 columns: vec![
                     ColumnInput {
                         name: "cbu_id".into(),
-                        data_type: "uuid".into(),
-                        nullable: false,
-                        is_primary_key: true,
-                        foreign_key: None,
+                        sql_type: "uuid".into(),
+                        is_nullable: false,
                     },
                     ColumnInput {
                         name: "name".into(),
-                        data_type: "text".into(),
-                        nullable: false,
-                        is_primary_key: false,
-                        foreign_key: None,
+                        sql_type: "text".into(),
+                        is_nullable: false,
                     },
                     ColumnInput {
                         name: "jurisdiction_code".into(),
-                        data_type: "varchar".into(),
-                        nullable: true,
-                        is_primary_key: false,
-                        foreign_key: None,
+                        sql_type: "varchar".into(),
+                        is_nullable: true,
                     },
                 ],
+                primary_keys: vec!["cbu_id".into()],
+                foreign_keys: vec![],
             },
             TableInput {
                 schema: "ob-poc".into(),
-                table: "entities".into(),
+                table_name: "entities".into(),
                 columns: vec![
                     ColumnInput {
                         name: "entity_id".into(),
-                        data_type: "uuid".into(),
-                        nullable: false,
-                        is_primary_key: true,
-                        foreign_key: None,
+                        sql_type: "uuid".into(),
+                        is_nullable: false,
                     },
                     ColumnInput {
                         name: "name".into(),
-                        data_type: "text".into(),
-                        nullable: false,
-                        is_primary_key: false,
-                        foreign_key: None,
+                        sql_type: "text".into(),
+                        is_nullable: false,
                     },
                 ],
+                primary_keys: vec!["entity_id".into()],
+                foreign_keys: vec![],
             },
         ];
 
@@ -333,8 +327,10 @@ mod integration {
             domain_filter: None,
             include_columns: true,
             show_governance: true,
-            max_tables: 50,
-            format: "mermaid".into(),
+            max_tables: Some(50),
+            format: Some("mermaid".to_string()),
+            show_verb_surface: false,
+            show_affinity_kind: false,
         };
 
         // Build the diagram model.

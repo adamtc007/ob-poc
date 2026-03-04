@@ -360,7 +360,7 @@ pub fn topological_sort_with_lifecycle(
     let mut state_transitions: HashMap<(String, String), usize> = HashMap::new();
 
     // Track which statements write to which tables (for table-level dependency ordering)
-    // Key: table name (e.g., "custody.cbu_ssi"), Value: statement indices that write to it
+    // Key: table name (e.g., "\"ob-poc\".cbu_ssi"), Value: statement indices that write to it
     let mut table_writers: HashMap<String, Vec<usize>> = HashMap::new();
 
     // First pass: record what each statement produces and its state transitions

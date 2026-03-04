@@ -6,13 +6,13 @@
 //! 3. Traverse upward multiplying percentages along chains
 //! 4. Detect cycles (mark as anomaly, no infinite loop)
 //! 5. Apply threshold filter (default 5%)
-//! 6. Persist results to kyc.ubo_determination_runs with JSONB snapshots
+//! 6. Persist results to "ob-poc".ubo_determination_runs with JSONB snapshots
 //!
 //! ## Key Tables
-//! - kyc.entity_workstreams (case → entity linkage)
+//! - "ob-poc".entity_workstreams (case → entity linkage)
 //! - "ob-poc".entity_relationships (ownership edges)
 //! - "ob-poc".entities + entity_types (terminus detection: natural person)
-//! - kyc.ubo_determination_runs (output)
+//! - "ob-poc".ubo_determination_runs (output)
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
@@ -147,7 +147,7 @@ impl CustomOperation for UboComputeChainsOp {
         {
             sqlx::query_as(
                 r#"SELECT entity_id, workstream_id
-                   FROM kyc.entity_workstreams
+                   FROM "ob-poc".entity_workstreams
                    WHERE case_id = $1 AND workstream_id = $2"#,
             )
             .bind(case_id)
@@ -157,7 +157,7 @@ impl CustomOperation for UboComputeChainsOp {
         } else {
             sqlx::query_as(
                 r#"SELECT entity_id, workstream_id
-                   FROM kyc.entity_workstreams
+                   FROM "ob-poc".entity_workstreams
                    WHERE case_id = $1"#,
             )
             .bind(case_id)
@@ -400,7 +400,7 @@ impl CustomOperation for UboComputeChainsOp {
         let computation_ms = start.elapsed().as_millis() as i32;
 
         // ------------------------------------------------------------------
-        // 9. Persist to kyc.ubo_determination_runs
+        // 9. Persist to "ob-poc".ubo_determination_runs
         //    One row per subject entity (first in scope for now).
         // ------------------------------------------------------------------
         let primary_subject = subject_entity_ids
@@ -409,7 +409,7 @@ impl CustomOperation for UboComputeChainsOp {
             .ok_or_else(|| anyhow!("No subject entities"))?;
 
         let run_id: Uuid = sqlx::query_scalar(
-            r#"INSERT INTO kyc.ubo_determination_runs (
+            r#"INSERT INTO "ob-poc".ubo_determination_runs (
                    subject_entity_id,
                    case_id,
                    as_of,
@@ -573,7 +573,7 @@ impl CustomOperation for UboSnapshotCaptureOp {
         // 3. Capture snapshots via UPDATE with correlated subqueries
         // ------------------------------------------------------------------
         sqlx::query(
-            r#"UPDATE kyc.ubo_determination_runs
+            r#"UPDATE "ob-poc".ubo_determination_runs
                SET output_snapshot = (
                      SELECT jsonb_agg(jsonb_build_object(
                        'ubo_id', ur.ubo_id,
@@ -581,7 +581,7 @@ impl CustomOperation for UboSnapshotCaptureOp {
                        'status', ur.status,
                        'ownership_pct', ur.ownership_pct
                      ))
-                     FROM kyc.ubo_registry ur
+                     FROM "ob-poc".kyc_ubo_registry ur
                      WHERE ur.determination_run_id = $1
                    ),
                    chains_snapshot = (
@@ -592,7 +592,7 @@ impl CustomOperation for UboSnapshotCaptureOp {
                        'ownership_pct', er.ownership_pct
                      ))
                      FROM "ob-poc".entity_relationships er
-                     JOIN kyc.entity_workstreams ew ON er.to_entity_id = ew.entity_id
+                     JOIN "ob-poc".entity_workstreams ew ON er.to_entity_id = ew.entity_id
                      WHERE ew.case_id = $2
                        AND er.relationship_type = 'OWNERSHIP'
                        AND er.effective_to IS NULL
@@ -614,7 +614,7 @@ impl CustomOperation for UboSnapshotCaptureOp {
         // ------------------------------------------------------------------
         let candidates_captured: (Option<i64>,) = sqlx::query_as(
             r#"SELECT jsonb_array_length(output_snapshot)::bigint
-               FROM kyc.ubo_determination_runs
+               FROM "ob-poc".ubo_determination_runs
                WHERE run_id = $1"#,
         )
         .bind(determination_run_id)
@@ -623,7 +623,7 @@ impl CustomOperation for UboSnapshotCaptureOp {
 
         let chains_captured: (Option<i64>,) = sqlx::query_as(
             r#"SELECT jsonb_array_length(chains_snapshot)::bigint
-               FROM kyc.ubo_determination_runs
+               FROM "ob-poc".ubo_determination_runs
                WHERE run_id = $1"#,
         )
         .bind(determination_run_id)
@@ -730,7 +730,7 @@ impl CustomOperation for UboSnapshotDiffOp {
         let rows: Vec<(Uuid, Option<serde_json::Value>, Option<serde_json::Value>)> =
             sqlx::query_as(
                 r#"SELECT run_id, output_snapshot, chains_snapshot
-                   FROM kyc.ubo_determination_runs
+                   FROM "ob-poc".ubo_determination_runs
                    WHERE run_id = ANY($1)"#,
             )
             .bind(&run_ids)

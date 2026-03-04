@@ -14,7 +14,7 @@ pub static INSTRUMENT_METADATA: TaxonomyMetadata = TaxonomyMetadata {
 
     // Type tier: Instrument Classes (in custody schema)
     // Note: queries will need to handle cross-schema join
-    type_table: "instrument_classes", // Actually custody.instrument_classes
+    type_table: "instrument_classes", // Actually "ob-poc".instrument_classes
     type_id_col: "class_id",
     type_code_col: "code",
     type_name_col: "name",
@@ -72,7 +72,7 @@ impl InstrumentDomain {
     ///
     /// Instrument classes are in custody schema, not ob-poc.
     pub fn fq_type_table() -> &'static str {
-        "custody.instrument_classes"
+        "\"ob-poc\".instrument_classes"
     }
 }
 
@@ -96,7 +96,7 @@ mod tests {
         // Note: type_table needs special handling for cross-schema
         assert_eq!(
             InstrumentDomain::fq_type_table(),
-            "custody.instrument_classes"
+            "\"ob-poc\".instrument_classes"
         );
         assert_eq!(meta.fq_op_table(), "\"ob-poc\".lifecycles");
         assert_eq!(meta.fq_gap_view(), "\"ob-poc\".v_cbu_lifecycle_gaps");

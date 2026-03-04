@@ -191,7 +191,7 @@ impl NormalizedAddress {
 
 /// Normalized control holder (PSC, 13D/G filer, shareholder, etc.)
 ///
-/// Maps to: `kyc.control_relationships`, `kyc.holdings`
+/// Maps to: `kyc.control_relationships`, `"ob-poc".holdings`
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NormalizedControlHolder {
     // === Identity ===

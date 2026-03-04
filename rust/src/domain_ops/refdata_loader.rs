@@ -247,7 +247,7 @@ impl CustomOperation for LoadMarketsOp {
 
         // Handle REPLACE mode
         if mode == "REPLACE" {
-            sqlx::query("DELETE FROM custody.markets")
+            sqlx::query("DELETE FROM \"ob-poc\".markets")
                 .execute(pool)
                 .await?;
         }
@@ -256,7 +256,7 @@ impl CustomOperation for LoadMarketsOp {
             let result = if mode == "INSERT" {
                 sqlx::query(
                     r#"
-                    INSERT INTO custody.markets
+                    INSERT INTO "ob-poc".markets
                     (mic, name, country_code, operating_mic, primary_currency,
                      supported_currencies, csd_bic, timezone, is_active)
                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
@@ -277,7 +277,7 @@ impl CustomOperation for LoadMarketsOp {
             } else {
                 sqlx::query(
                     r#"
-                    INSERT INTO custody.markets
+                    INSERT INTO "ob-poc".markets
                     (mic, name, country_code, operating_mic, primary_currency,
                      supported_currencies, csd_bic, timezone, is_active)
                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
@@ -315,7 +315,7 @@ impl CustomOperation for LoadMarketsOp {
 
         Ok(ExecutionResult::Record(json!({
             "status": "success",
-            "table": "custody.markets",
+            "table": "\"ob-poc\".markets",
             "mode": mode,
             "total": data.markets.len(),
             "inserted": inserted,
@@ -384,10 +384,10 @@ impl CustomOperation for LoadInstrumentClassesOp {
         // Handle REPLACE mode
         if mode == "REPLACE" {
             // Must delete in reverse order due to FK constraints
-            sqlx::query("DELETE FROM custody.instrument_classes WHERE parent_class_id IS NOT NULL")
+            sqlx::query("DELETE FROM \"ob-poc\".instrument_classes WHERE parent_class_id IS NOT NULL")
                 .execute(pool)
                 .await?;
-            sqlx::query("DELETE FROM custody.instrument_classes WHERE parent_class_id IS NULL")
+            sqlx::query("DELETE FROM \"ob-poc\".instrument_classes WHERE parent_class_id IS NULL")
                 .execute(pool)
                 .await?;
         }
@@ -405,7 +405,7 @@ impl CustomOperation for LoadInstrumentClassesOp {
 
             let row: (Uuid,) = sqlx::query_as(
                 r#"
-                INSERT INTO custody.instrument_classes
+                INSERT INTO "ob-poc".instrument_classes
                 (code, name, default_settlement_cycle, requires_isda, requires_collateral,
                  cfi_category, smpg_group, isda_asset_class, is_active)
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
@@ -447,7 +447,7 @@ impl CustomOperation for LoadInstrumentClassesOp {
 
                 let child_row: (Uuid,) = sqlx::query_as(
                     r#"
-                    INSERT INTO custody.instrument_classes
+                    INSERT INTO "ob-poc".instrument_classes
                     (code, name, default_settlement_cycle, requires_isda, requires_collateral,
                      smpg_group, isda_asset_class, parent_class_id, is_active)
                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
@@ -488,7 +488,7 @@ impl CustomOperation for LoadInstrumentClassesOp {
 
         Ok(ExecutionResult::Record(json!({
             "status": "success",
-            "table": "custody.instrument_classes",
+            "table": "\"ob-poc\".instrument_classes",
             "mode": mode,
             "inserted": inserted
         })))
@@ -554,7 +554,7 @@ impl CustomOperation for LoadSubcustodiansOp {
 
         // Build market MIC -> ID lookup
         let markets: Vec<(Uuid, String)> =
-            sqlx::query_as("SELECT market_id, mic FROM custody.markets")
+            sqlx::query_as("SELECT market_id, mic FROM \"ob-poc\".markets")
                 .fetch_all(pool)
                 .await?;
         let mic_to_id: HashMap<String, Uuid> =
@@ -562,7 +562,7 @@ impl CustomOperation for LoadSubcustodiansOp {
 
         // Handle REPLACE mode
         if mode == "REPLACE" {
-            sqlx::query("DELETE FROM custody.subcustodian_network")
+            sqlx::query("DELETE FROM \"ob-poc\".subcustodian_network")
                 .execute(pool)
                 .await?;
         }
@@ -603,7 +603,7 @@ impl CustomOperation for LoadSubcustodiansOp {
             for currency in &currencies {
                 let result = sqlx::query(
                     r#"
-                    INSERT INTO custody.subcustodian_network
+                    INSERT INTO "ob-poc".subcustodian_network
                     (market_id, currency, subcustodian_bic, subcustodian_name,
                      local_agent_bic, local_agent_name, local_agent_account,
                      csd_participant_id, place_of_settlement_bic, is_primary,
@@ -643,7 +643,7 @@ impl CustomOperation for LoadSubcustodiansOp {
 
         Ok(ExecutionResult::Record(json!({
             "status": if errors.is_empty() { "success" } else { "partial" },
-            "table": "custody.subcustodian_network",
+            "table": "\"ob-poc\".subcustodian_network",
             "mode": mode,
             "inserted": inserted,
             "skipped": skipped,

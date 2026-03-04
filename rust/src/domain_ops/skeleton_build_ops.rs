@@ -93,7 +93,7 @@ impl CustomOperation for SkeletonBuildOp {
             r#"INSERT INTO "ob-poc".graph_import_runs
                (run_id, run_kind, source, scope_root_entity_id, status, started_at)
                SELECT $1, 'SKELETON_BUILD', $2, c.client_group_id, 'ACTIVE', NOW()
-               FROM kyc.cases c WHERE c.case_id = $3"#,
+               FROM "ob-poc".cases c WHERE c.case_id = $3"#,
         )
         .bind(run_id)
         .bind(&source)
@@ -103,7 +103,7 @@ impl CustomOperation for SkeletonBuildOp {
 
         // Link import run to case
         sqlx::query(
-            r#"INSERT INTO kyc.case_import_runs (case_id, run_id)
+            r#"INSERT INTO "ob-poc".case_import_runs (case_id, run_id)
                VALUES ($1, $2)
                ON CONFLICT DO NOTHING"#,
         )
@@ -178,7 +178,7 @@ impl CustomOperation for SkeletonBuildOp {
 //   3. Missing percentage check on ownership edges
 //   4. Supply >100% check per target entity
 //   5. Source conflict check (different sources, different percentages)
-//   6. Persist anomalies to kyc.research_anomalies
+//   6. Persist anomalies to "ob-poc".research_anomalies
 // ============================================================================
 
 /// Edge representation for graph validation.
@@ -233,8 +233,8 @@ pub async fn run_graph_validate(
             FROM "ob-poc".entity_relationships er
             WHERE (er.effective_to IS NULL OR er.effective_to > CURRENT_DATE)
               AND (
-                  er.from_entity_id IN (SELECT entity_id FROM kyc.entity_workstreams WHERE case_id = $1)
-                  OR er.to_entity_id IN (SELECT entity_id FROM kyc.entity_workstreams WHERE case_id = $1)
+                  er.from_entity_id IN (SELECT entity_id FROM "ob-poc".entity_workstreams WHERE case_id = $1)
+                  OR er.to_entity_id IN (SELECT entity_id FROM "ob-poc".entity_workstreams WHERE case_id = $1)
               )
             ORDER BY er.to_entity_id, er.from_entity_id
             "#,
@@ -281,7 +281,7 @@ pub async fn run_graph_validate(
     if !anomalies.is_empty() {
         let representative_entity_id: Option<Uuid> = {
             let row: Option<(Uuid,)> = sqlx::query_as(
-                r#"SELECT entity_id FROM kyc.entity_workstreams WHERE case_id = $1 LIMIT 1"#,
+                r#"SELECT entity_id FROM "ob-poc".entity_workstreams WHERE case_id = $1 LIMIT 1"#,
             )
             .bind(case_id)
             .fetch_optional(&mut **tx)
@@ -292,7 +292,7 @@ pub async fn run_graph_validate(
         if let Some(target_entity_id) = representative_entity_id {
             let action_id: Uuid = sqlx::query_scalar(
                 r#"
-                INSERT INTO kyc.research_actions (
+                INSERT INTO "ob-poc".research_actions (
                     target_entity_id, action_type, source_provider, source_key,
                     source_key_type, verb_domain, verb_name, verb_args,
                     success, entities_created, entities_updated, relationships_created
@@ -332,7 +332,7 @@ pub async fn run_graph_validate(
 
                 sqlx::query(
                     r#"
-                    INSERT INTO kyc.research_anomalies (
+                    INSERT INTO "ob-poc".research_anomalies (
                         action_id, entity_id, rule_code, severity,
                         description, status
                     ) VALUES ($1, $2, $3, $4, $5, 'OPEN')
@@ -599,7 +599,7 @@ pub async fn run_ubo_compute(
 
     // 1. Load subject entities
     let subject_entities: Vec<(Uuid,)> =
-        sqlx::query_as(r#"SELECT entity_id FROM kyc.entity_workstreams WHERE case_id = $1"#)
+        sqlx::query_as(r#"SELECT entity_id FROM "ob-poc".entity_workstreams WHERE case_id = $1"#)
             .bind(case_id)
             .fetch_all(&mut **tx)
             .await?;
@@ -609,7 +609,7 @@ pub async fn run_ubo_compute(
     if subject_entity_ids.is_empty() {
         // No workstream entities — create an empty determination run
         let run_id: Uuid = sqlx::query_scalar(
-            r#"INSERT INTO kyc.ubo_determination_runs (
+            r#"INSERT INTO "ob-poc".ubo_determination_runs (
                    subject_entity_id, case_id, as_of, config_version, threshold_pct,
                    candidates_found, output_snapshot, chains_snapshot,
                    computed_at, computed_by, computation_ms
@@ -808,7 +808,7 @@ pub async fn run_ubo_compute(
     let primary_subject = subject_entity_ids.first().copied().unwrap_or(Uuid::nil());
 
     let run_id: Uuid = sqlx::query_scalar(
-        r#"INSERT INTO kyc.ubo_determination_runs (
+        r#"INSERT INTO "ob-poc".ubo_determination_runs (
                subject_entity_id, case_id, as_of, config_version, threshold_pct,
                candidates_found, output_snapshot, chains_snapshot,
                computed_at, computed_by, computation_ms
@@ -864,7 +864,7 @@ pub async fn run_coverage_compute(
 ) -> Result<f64> {
     // 1. Load candidates from determination run's output_snapshot
     let run_row: Option<(serde_json::Value,)> = sqlx::query_as(
-        r#"SELECT output_snapshot FROM kyc.ubo_determination_runs
+        r#"SELECT output_snapshot FROM "ob-poc".ubo_determination_runs
            WHERE run_id = $1 AND case_id = $2"#,
     )
     .bind(determination_run_id)
@@ -877,7 +877,7 @@ pub async fn run_coverage_compute(
         None => {
             // No determination run found — write 0% coverage
             sqlx::query(
-                r#"UPDATE kyc.ubo_determination_runs
+                r#"UPDATE "ob-poc".ubo_determination_runs
                    SET coverage_snapshot = $2
                    WHERE run_id = $1"#,
             )
@@ -895,7 +895,7 @@ pub async fn run_coverage_compute(
     if candidate_entity_ids.is_empty() {
         let snapshot = serde_json::json!({"overall_coverage_pct": 100.0, "gaps": []});
         sqlx::query(
-            r#"UPDATE kyc.ubo_determination_runs SET coverage_snapshot = $2 WHERE run_id = $1"#,
+            r#"UPDATE "ob-poc".ubo_determination_runs SET coverage_snapshot = $2 WHERE run_id = $1"#,
         )
         .bind(determination_run_id)
         .bind(&snapshot)
@@ -918,7 +918,7 @@ pub async fn run_coverage_compute(
         let ownership_count: (i64,) = sqlx::query_as(
             r#"SELECT COUNT(*) FROM "ob-poc".entity_relationships
                WHERE from_entity_id = $1
-                 AND to_entity_id IN (SELECT entity_id FROM kyc.entity_workstreams WHERE case_id = $2)
+                 AND to_entity_id IN (SELECT entity_id FROM "ob-poc".entity_workstreams WHERE case_id = $2)
                  AND relationship_type IN ('ownership', 'OWNERSHIP')
                  AND percentage IS NOT NULL
                  AND (effective_to IS NULL OR effective_to > CURRENT_DATE)"#,
@@ -943,8 +943,8 @@ pub async fn run_coverage_compute(
 
         // IDENTITY: check verified evidence or workstream flag
         let identity_count: (i64,) = sqlx::query_as(
-            r#"SELECT COUNT(*) FROM kyc.ubo_evidence ue
-               JOIN kyc.ubo_registry ur ON ur.ubo_id = ue.ubo_id
+            r#"SELECT COUNT(*) FROM "ob-poc".kyc_ubo_evidence ue
+               JOIN "ob-poc".kyc_ubo_registry ur ON ur.ubo_id = ue.ubo_id
                WHERE ur.ubo_person_id = $1 AND ur.case_id = $2
                  AND ue.evidence_type IN ('IDENTITY_DOC', 'PROOF_OF_ADDRESS')
                  AND ue.status = 'VERIFIED'"#,
@@ -956,7 +956,7 @@ pub async fn run_coverage_compute(
         .unwrap_or((0,));
 
         let ws_verified: Option<(bool,)> = sqlx::query_as(
-            r#"SELECT identity_verified FROM kyc.entity_workstreams
+            r#"SELECT identity_verified FROM "ob-poc".entity_workstreams
                WHERE entity_id = $1 AND case_id = $2 AND identity_verified = true
                LIMIT 1"#,
         )
@@ -981,7 +981,7 @@ pub async fn run_coverage_compute(
         let control_count: (i64,) = sqlx::query_as(
             r#"SELECT COUNT(*) FROM "ob-poc".entity_relationships
                WHERE from_entity_id = $1
-                 AND to_entity_id IN (SELECT entity_id FROM kyc.entity_workstreams WHERE case_id = $2)
+                 AND to_entity_id IN (SELECT entity_id FROM "ob-poc".entity_workstreams WHERE case_id = $2)
                  AND (relationship_type = 'control' OR control_type IS NOT NULL)
                  AND (effective_to IS NULL OR effective_to > CURRENT_DATE)"#,
         )
@@ -1005,8 +1005,8 @@ pub async fn run_coverage_compute(
 
         // SOURCE_OF_WEALTH: check SOW evidence
         let sow_count: (i64,) = sqlx::query_as(
-            r#"SELECT COUNT(*) FROM kyc.ubo_evidence ue
-               JOIN kyc.ubo_registry ur ON ur.ubo_id = ue.ubo_id
+            r#"SELECT COUNT(*) FROM "ob-poc".kyc_ubo_evidence ue
+               JOIN "ob-poc".kyc_ubo_registry ur ON ur.ubo_id = ue.ubo_id
                WHERE ur.ubo_person_id = $1 AND ur.case_id = $2
                  AND ue.evidence_type IN ('SOURCE_OF_WEALTH', 'SOURCE_OF_FUNDS',
                                           'ANNUAL_RETURN', 'CHAIN_PROOF')
@@ -1068,7 +1068,7 @@ pub async fn run_coverage_compute(
     });
 
     sqlx::query(
-        r#"UPDATE kyc.ubo_determination_runs SET coverage_snapshot = $2 WHERE run_id = $1"#,
+        r#"UPDATE "ob-poc".ubo_determination_runs SET coverage_snapshot = $2 WHERE run_id = $1"#,
     )
     .bind(determination_run_id)
     .bind(&coverage_snapshot)
@@ -1140,7 +1140,7 @@ pub async fn run_outreach_plan(
 ) -> Result<(Option<Uuid>, i32)> {
     // 1. Read coverage snapshot to get gaps
     let snapshot_row: Option<(Option<serde_json::Value>,)> = sqlx::query_as(
-        r#"SELECT coverage_snapshot FROM kyc.ubo_determination_runs
+        r#"SELECT coverage_snapshot FROM "ob-poc".ubo_determination_runs
            WHERE run_id = $1 AND case_id = $2"#,
     )
     .bind(determination_run_id)
@@ -1163,7 +1163,7 @@ pub async fn run_outreach_plan(
     if gaps.is_empty() {
         // No gaps — create empty plan
         let plan_id: (Uuid,) = sqlx::query_as(
-            r#"INSERT INTO kyc.outreach_plans (case_id, determination_run_id, status, total_items)
+            r#"INSERT INTO "ob-poc".outreach_plans (case_id, determination_run_id, status, total_items)
                VALUES ($1, $2, 'DRAFT', 0)
                RETURNING plan_id"#,
         )
@@ -1187,7 +1187,7 @@ pub async fn run_outreach_plan(
     }
 
     let subject_entity_id: Uuid = sqlx::query_scalar(
-        r#"SELECT subject_entity_id FROM kyc.ubo_determination_runs WHERE run_id = $1"#,
+        r#"SELECT subject_entity_id FROM "ob-poc".ubo_determination_runs WHERE run_id = $1"#,
     )
     .bind(determination_run_id)
     .fetch_one(&mut **tx)
@@ -1269,7 +1269,7 @@ pub async fn run_outreach_plan(
 
     // 5. Insert plan + items
     let plan_id: (Uuid,) = sqlx::query_as(
-        r#"INSERT INTO kyc.outreach_plans (case_id, determination_run_id, status, total_items)
+        r#"INSERT INTO "ob-poc".outreach_plans (case_id, determination_run_id, status, total_items)
            VALUES ($1, $2, 'DRAFT', $3)
            RETURNING plan_id"#,
     )
@@ -1281,7 +1281,7 @@ pub async fn run_outreach_plan(
 
     for item in &planned_items {
         sqlx::query(
-            r#"INSERT INTO kyc.outreach_items (
+            r#"INSERT INTO "ob-poc".outreach_items (
                    plan_id, prong, target_entity_id, gap_description,
                    request_text, doc_type_requested, priority, closes_gap_ref, status
                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'PENDING')"#,
@@ -1316,7 +1316,7 @@ pub async fn run_outreach_plan(
 //   1. Load gate definition from ob_ref.tollgate_definitions
 //   2. Check ownership coverage >= threshold (default 70%)
 //   3. Check all entities have at least one ownership edge
-//   4. Record evaluation in kyc.tollgate_evaluations
+//   4. Record evaluation in "ob-poc".tollgate_evaluations
 // ============================================================================
 
 /// Shared skeleton build step 6: evaluate SKELETON_READY tollgate.
@@ -1351,7 +1351,7 @@ pub async fn run_tollgate_evaluate(
         r#"SELECT
                COUNT(*) AS total_entities,
                COUNT(*) FILTER (WHERE ownership_proved = TRUE) AS ownership_proved_count
-           FROM kyc.entity_workstreams
+           FROM "ob-poc".entity_workstreams
            WHERE case_id = $1"#,
     )
     .bind(case_id)
@@ -1370,7 +1370,7 @@ pub async fn run_tollgate_evaluate(
     // 3. Check all entities have at least one ownership edge
     let entities_without_edges: (i64,) = sqlx::query_as(
         r#"SELECT COUNT(*)
-           FROM kyc.entity_workstreams ew
+           FROM "ob-poc".entity_workstreams ew
            WHERE ew.case_id = $1
              AND NOT EXISTS (
                  SELECT 1 FROM "ob-poc".entity_relationships er
@@ -1416,7 +1416,7 @@ pub async fn run_tollgate_evaluate(
     });
 
     sqlx::query(
-        r#"INSERT INTO kyc.tollgate_evaluations (
+        r#"INSERT INTO "ob-poc".tollgate_evaluations (
                case_id, tollgate_id, passed, evaluation_detail, config_version
            ) VALUES ($1, 'SKELETON_READY', $2, $3, 'v1')"#,
     )

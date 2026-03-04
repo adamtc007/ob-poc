@@ -30,7 +30,7 @@ domains:
         crud:
           operation: upsert
           table: entity_workstreams
-          schema: kyc
+          schema: ob-poc
           returning: workstream_id
           conflict_keys:
             - case_id
@@ -44,7 +44,7 @@ domains:
             lookup:
               table: cases
               entity_type: kyc_case
-              schema: kyc
+              schema: ob-poc
               search_key: case_id
               primary_key: case_id
           - name: entity-id
@@ -64,7 +64,7 @@ domains:
             lookup:
               table: entity_workstreams
               entity_type: entity_workstream
-              schema: kyc
+              schema: ob-poc
               search_key: workstream_id
               primary_key: workstream_id
           - name: discovery-reason
@@ -107,7 +107,7 @@ domains:
         crud:
           operation: update
           table: entity_workstreams
-          schema: kyc
+          schema: ob-poc
           key: workstream_id
         emits_event: workstream.status-changed
         args:
@@ -118,7 +118,7 @@ domains:
             lookup:
               table: entity_workstreams
               entity_type: entity_workstream
-              schema: kyc
+              schema: ob-poc
               search_key: workstream_id
               primary_key: workstream_id
           - name: status
@@ -153,7 +153,7 @@ domains:
         crud:
           operation: update
           table: entity_workstreams
-          schema: kyc
+          schema: ob-poc
           key: workstream_id
           set_values:
             status: BLOCKED
@@ -167,7 +167,7 @@ domains:
             lookup:
               table: entity_workstreams
               entity_type: entity_workstream
-              schema: kyc
+              schema: ob-poc
               search_key: workstream_id
               primary_key: workstream_id
           - name: reason
@@ -194,7 +194,7 @@ domains:
         crud:
           operation: update
           table: entity_workstreams
-          schema: kyc
+          schema: ob-poc
           key: workstream_id
           set_values:
             status: COMPLETE
@@ -208,7 +208,7 @@ domains:
             lookup:
               table: entity_workstreams
               entity_type: entity_workstream
-              schema: kyc
+              schema: ob-poc
               search_key: workstream_id
               primary_key: workstream_id
           - name: risk-rating
@@ -240,7 +240,7 @@ domains:
         crud:
           operation: update
           table: entity_workstreams
-          schema: kyc
+          schema: ob-poc
           key: workstream_id
           set_values:
             requires_enhanced_dd: true
@@ -254,7 +254,7 @@ domains:
             lookup:
               table: entity_workstreams
               entity_type: entity_workstream
-              schema: kyc
+              schema: ob-poc
               search_key: workstream_id
               primary_key: workstream_id
         returns:
@@ -277,7 +277,7 @@ domains:
         crud:
           operation: update
           table: entity_workstreams
-          schema: kyc
+          schema: ob-poc
           key: workstream_id
           set_values:
             is_ubo: true
@@ -290,7 +290,7 @@ domains:
             lookup:
               table: entity_workstreams
               entity_type: entity_workstream
-              schema: kyc
+              schema: ob-poc
               search_key: workstream_id
               primary_key: workstream_id
           - name: ownership-percentage
@@ -317,7 +317,7 @@ domains:
         crud:
           operation: list_by_fk
           table: entity_workstreams
-          schema: kyc
+          schema: ob-poc
           fk_col: case_id
         args:
           - name: case-id
@@ -326,7 +326,7 @@ domains:
             lookup:
               table: cases
               entity_type: kyc_case
-              schema: kyc
+              schema: ob-poc
               search_key: case_id
               primary_key: case_id
           - name: status
@@ -353,7 +353,7 @@ domains:
         crud:
           operation: select
           table: entity_workstreams
-          schema: kyc
+          schema: ob-poc
         args:
           - name: workstream-id
             type: uuid
@@ -362,7 +362,7 @@ domains:
             lookup:
               table: entity_workstreams
               entity_type: entity_workstream
-              schema: kyc
+              schema: ob-poc
               search_key: workstream_id
               primary_key: workstream_id
         returns:
@@ -390,7 +390,7 @@ domains:
             lookup:
               table: entity_workstreams
               entity_type: entity_workstream
-              schema: kyc
+              schema: ob-poc
               search_key: workstream_id
               primary_key: workstream_id
         returns:

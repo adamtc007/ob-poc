@@ -3,7 +3,7 @@
 //! Evaluates a specific named tollgate gate against the current case state.
 //! Loads the gate definition from `ob_ref.tollgate_definitions`, computes
 //! pass/fail against case data, and records the result in
-//! `kyc.tollgate_evaluations`.
+//! `"ob-poc".tollgate_evaluations`.
 //!
 //! ## Rationale
 //! Gate evaluation requires custom code because:
@@ -95,7 +95,7 @@ async fn evaluate_skeleton_ready(
         SELECT
             COUNT(*) AS total_entities,
             COUNT(*) FILTER (WHERE ownership_proved = TRUE) AS ownership_proved_count
-        FROM kyc.entity_workstreams
+        FROM "ob-poc".entity_workstreams
         WHERE case_id = $1
         "#,
     )
@@ -132,12 +132,12 @@ async fn evaluate_skeleton_ready(
     let entities_without_edges: (i64,) = sqlx::query_as(
         r#"
         SELECT COUNT(*)
-        FROM kyc.entity_workstreams ew
+        FROM "ob-poc".entity_workstreams ew
         WHERE ew.case_id = $1
           AND NOT EXISTS (
               SELECT 1
               FROM "ob-poc".cbu_ownership_graph og
-              JOIN kyc.cases c ON c.case_id = $1
+              JOIN "ob-poc".cases c ON c.case_id = $1
               WHERE og.cbu_id = c.cbu_id
                 AND (og.from_entity_id = ew.entity_id OR og.to_entity_id = ew.entity_id)
           )
@@ -175,7 +175,7 @@ async fn evaluate_skeleton_ready(
         let source_count: (i64,) = sqlx::query_as(
             r#"
             SELECT COUNT(DISTINCT run_id)
-            FROM kyc.ubo_determination_runs
+            FROM "ob-poc".ubo_determination_runs
             WHERE case_id = $1
             "#,
         )
@@ -233,7 +233,7 @@ async fn evaluate_evidence_complete(
         SELECT
             COUNT(*) AS total,
             COUNT(*) FILTER (WHERE ownership_proved = TRUE) AS proved
-        FROM kyc.entity_workstreams
+        FROM "ob-poc".entity_workstreams
         WHERE case_id = $1
         "#,
     )
@@ -277,7 +277,7 @@ async fn evaluate_evidence_complete(
         SELECT
             COUNT(*) AS total,
             COUNT(*) FILTER (WHERE identity_verified = TRUE) AS verified
-        FROM kyc.entity_workstreams
+        FROM "ob-poc".entity_workstreams
         WHERE case_id = $1
         "#,
     )
@@ -321,7 +321,7 @@ async fn evaluate_evidence_complete(
         SELECT
             COUNT(*) AS total,
             COUNT(*) FILTER (WHERE screening_cleared = TRUE) AS cleared
-        FROM kyc.entity_workstreams
+        FROM "ob-poc".entity_workstreams
         WHERE case_id = $1
         "#,
     )
@@ -363,8 +363,8 @@ async fn evaluate_evidence_complete(
     let outstanding_items: (i64,) = sqlx::query_as(
         r#"
         SELECT COUNT(*)
-        FROM kyc.outreach_items oi
-        JOIN kyc.outreach_plans op ON op.plan_id = oi.plan_id
+        FROM "ob-poc".outreach_items oi
+        JOIN "ob-poc".outreach_plans op ON op.plan_id = oi.plan_id
         WHERE op.case_id = $1
           AND oi.status = 'PENDING'
         "#,
@@ -420,7 +420,7 @@ async fn evaluate_review_complete(
         let open_workstreams: (i64,) = sqlx::query_as(
             r#"
             SELECT COUNT(*)
-            FROM kyc.entity_workstreams
+            FROM "ob-poc".entity_workstreams
             WHERE case_id = $1
               AND status NOT IN ('CLOSED', 'COMPLETED')
             "#,
@@ -457,7 +457,7 @@ async fn evaluate_review_complete(
         let unapproved_ubos: (i64,) = sqlx::query_as(
             r#"
             SELECT COUNT(*)
-            FROM kyc.entity_workstreams
+            FROM "ob-poc".entity_workstreams
             WHERE case_id = $1
               AND is_ubo = TRUE
               AND (evidence_complete IS NULL OR evidence_complete = FALSE)
@@ -494,8 +494,8 @@ async fn evaluate_review_complete(
         let open_findings: (i64,) = sqlx::query_as(
             r#"
             SELECT COUNT(*)
-            FROM kyc.ownership_reconciliation_findings orf
-            JOIN kyc.ownership_reconciliation_runs orr ON orr.reconciliation_run_id = orf.reconciliation_run_id
+            FROM "ob-poc".ownership_reconciliation_findings orf
+            JOIN "ob-poc".ownership_reconciliation_runs orr ON orr.reconciliation_run_id = orf.reconciliation_run_id
             WHERE orr.case_id = $1
               AND orf.status IN ('OPEN', 'UNDER_REVIEW')
             "#,
@@ -530,7 +530,7 @@ async fn evaluate_review_complete(
 ///
 /// Loads gate definition from `ob_ref.tollgate_definitions`, dispatches to
 /// gate-specific evaluation logic, and records the result in
-/// `kyc.tollgate_evaluations`.
+/// `"ob-poc".tollgate_evaluations`.
 #[register_custom_op]
 pub struct TollgateEvaluateGateOp;
 
@@ -572,7 +572,7 @@ impl CustomOperation for TollgateEvaluateGateOp {
         // 1. Validate case exists and get status
         // ---------------------------------------------------------------
         let case_info: Option<(Uuid, String)> =
-            sqlx::query_as(r#"SELECT case_id, status FROM kyc.cases WHERE case_id = $1"#)
+            sqlx::query_as(r#"SELECT case_id, status FROM "ob-poc".cases WHERE case_id = $1"#)
                 .bind(case_id)
                 .fetch_optional(pool)
                 .await?;
@@ -629,7 +629,7 @@ impl CustomOperation for TollgateEvaluateGateOp {
                 // Record the failed evaluation
                 let eval_row: (Uuid, String) = sqlx::query_as(
                     r#"
-                    INSERT INTO kyc.tollgate_evaluations (
+                    INSERT INTO "ob-poc".tollgate_evaluations (
                         case_id, tollgate_id, passed, evaluation_detail, config_version
                     )
                     VALUES ($1, $2, FALSE, $3, 'v1')
@@ -713,7 +713,7 @@ impl CustomOperation for TollgateEvaluateGateOp {
         // ---------------------------------------------------------------
         let eval_row: (Uuid, String) = sqlx::query_as(
             r#"
-            INSERT INTO kyc.tollgate_evaluations (
+            INSERT INTO "ob-poc".tollgate_evaluations (
                 case_id, tollgate_id, passed, evaluation_detail, gaps, config_version
             )
             VALUES ($1, $2, $3, $4, $5, 'v1')

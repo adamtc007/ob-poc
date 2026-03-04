@@ -339,7 +339,7 @@ impl CustomOperation for MatrixCompareProductsOp {
             r#"SELECT l.code, l.name
                FROM "ob-poc".lifecycles l
                JOIN "ob-poc".instrument_lifecycles il ON il.lifecycle_id = l.lifecycle_id
-               JOIN custody.instrument_classes ic ON ic.class_id = il.instrument_class_id
+               JOIN "ob-poc".instrument_classes ic ON ic.class_id = il.instrument_class_id
                WHERE ic.code = $1 AND il.is_mandatory = true AND l.is_active = true"#,
         )
         .bind(instrument_class)

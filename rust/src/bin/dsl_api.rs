@@ -847,7 +847,7 @@ async fn get_kyc_case(
     let case_row = sqlx::query!(
         r#"SELECT case_id, cbu_id, status, case_type, risk_rating,
                   opened_at, closed_at
-           FROM kyc.cases WHERE case_id = $1"#,
+           FROM "ob-poc".cases WHERE case_id = $1"#,
         case_id
     )
     .fetch_optional(&state.pool)
@@ -857,7 +857,7 @@ async fn get_kyc_case(
 
     let workstreams = sqlx::query!(
         r#"SELECT workstream_id, entity_id, status, is_ubo, risk_rating
-           FROM kyc.entity_workstreams WHERE case_id = $1"#,
+           FROM "ob-poc".entity_workstreams WHERE case_id = $1"#,
         case_id
     )
     .fetch_all(&state.pool)
@@ -866,7 +866,7 @@ async fn get_kyc_case(
 
     let flags = sqlx::query!(
         r#"SELECT red_flag_id, flag_type, severity, status, description
-           FROM kyc.red_flags WHERE case_id = $1"#,
+           FROM "ob-poc".red_flags WHERE case_id = $1"#,
         case_id
     )
     .fetch_all(&state.pool)
@@ -915,15 +915,15 @@ async fn cleanup_cbu(
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     // KYC data
-    let _ = sqlx::query(r#"DELETE FROM kyc.red_flags WHERE case_id IN (SELECT case_id FROM kyc.cases WHERE cbu_id = $1)"#)
+    let _ = sqlx::query(r#"DELETE FROM "ob-poc".red_flags WHERE case_id IN (SELECT case_id FROM "ob-poc".cases WHERE cbu_id = $1)"#)
         .bind(cbu_id).execute(&mut *tx).await;
-    let _ = sqlx::query(r#"DELETE FROM kyc.screenings WHERE workstream_id IN (SELECT workstream_id FROM kyc.entity_workstreams WHERE case_id IN (SELECT case_id FROM kyc.cases WHERE cbu_id = $1))"#)
+    let _ = sqlx::query(r#"DELETE FROM "ob-poc".screenings WHERE workstream_id IN (SELECT workstream_id FROM "ob-poc".entity_workstreams WHERE case_id IN (SELECT case_id FROM "ob-poc".cases WHERE cbu_id = $1))"#)
         .bind(cbu_id).execute(&mut *tx).await;
-    let _ = sqlx::query(r#"DELETE FROM kyc.doc_requests WHERE workstream_id IN (SELECT workstream_id FROM kyc.entity_workstreams WHERE case_id IN (SELECT case_id FROM kyc.cases WHERE cbu_id = $1))"#)
+    let _ = sqlx::query(r#"DELETE FROM "ob-poc".doc_requests WHERE workstream_id IN (SELECT workstream_id FROM "ob-poc".entity_workstreams WHERE case_id IN (SELECT case_id FROM "ob-poc".cases WHERE cbu_id = $1))"#)
         .bind(cbu_id).execute(&mut *tx).await;
-    let _ = sqlx::query(r#"DELETE FROM kyc.entity_workstreams WHERE case_id IN (SELECT case_id FROM kyc.cases WHERE cbu_id = $1)"#)
+    let _ = sqlx::query(r#"DELETE FROM "ob-poc".entity_workstreams WHERE case_id IN (SELECT case_id FROM "ob-poc".cases WHERE cbu_id = $1)"#)
         .bind(cbu_id).execute(&mut *tx).await;
-    let _ = sqlx::query(r#"DELETE FROM kyc.cases WHERE cbu_id = $1"#)
+    let _ = sqlx::query(r#"DELETE FROM "ob-poc".cases WHERE cbu_id = $1"#)
         .bind(cbu_id)
         .execute(&mut *tx)
         .await;

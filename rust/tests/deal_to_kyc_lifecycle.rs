@@ -135,7 +135,7 @@ mod deal_to_kyc_lifecycle {
         async fn create_case_with_deal(&self, cbu_id: Uuid, deal_id: Uuid, group_id: Uuid) -> Uuid {
             let id = Uuid::new_v4();
             sqlx::query(
-                r#"INSERT INTO kyc.cases
+                r#"INSERT INTO "ob-poc".cases
                      (case_id, cbu_id, case_type, status, deal_id, client_group_id)
                    VALUES ($1, $2, 'NEW_CLIENT', 'INTAKE', $3, $4)"#,
             )
@@ -153,7 +153,7 @@ mod deal_to_kyc_lifecycle {
         async fn create_case_standalone(&self, cbu_id: Uuid) -> Uuid {
             let id = Uuid::new_v4();
             sqlx::query(
-                r#"INSERT INTO kyc.cases (case_id, cbu_id, case_type, status)
+                r#"INSERT INTO "ob-poc".cases (case_id, cbu_id, case_type, status)
                    VALUES ($1, $2, 'NEW_CLIENT', 'INTAKE')"#,
             )
             .bind(id)
@@ -187,7 +187,7 @@ mod deal_to_kyc_lifecycle {
         async fn advance_case_to_review(&self, case_id: Uuid) {
             for status in ["DISCOVERY", "ASSESSMENT", "REVIEW"] {
                 sqlx::query(
-                    r#"UPDATE kyc.cases SET status = $2, updated_at = NOW()
+                    r#"UPDATE "ob-poc".cases SET status = $2, updated_at = NOW()
                        WHERE case_id = $1"#,
                 )
                 .bind(case_id)
@@ -203,7 +203,7 @@ mod deal_to_kyc_lifecycle {
         async fn close_case(&self, case_id: Uuid, close_status: &str) {
             // Load case to get deal_id
             let case_row: (String, Option<Uuid>, Option<String>) = sqlx::query_as(
-                r#"SELECT status, deal_id, case_ref FROM kyc.cases WHERE case_id = $1"#,
+                r#"SELECT status, deal_id, case_ref FROM "ob-poc".cases WHERE case_id = $1"#,
             )
             .bind(case_id)
             .fetch_one(&self.pool)
@@ -222,7 +222,7 @@ mod deal_to_kyc_lifecycle {
 
             // Close the case
             sqlx::query(
-                r#"UPDATE kyc.cases
+                r#"UPDATE "ob-poc".cases
                    SET status = $2, closed_at = NOW(), updated_at = NOW()
                    WHERE case_id = $1"#,
             )
@@ -322,7 +322,7 @@ mod deal_to_kyc_lifecycle {
 
             // KYC cases
             sqlx::query(
-                r#"DELETE FROM kyc.cases WHERE cbu_id IN
+                r#"DELETE FROM "ob-poc".cases WHERE cbu_id IN
                    (SELECT cbu_id FROM "ob-poc".cbus WHERE cbu_name LIKE $1)"#,
             )
             .bind(&pattern)
@@ -402,7 +402,7 @@ mod deal_to_kyc_lifecycle {
 
             // Verify case has deal_id
             let case_deal: (Option<Uuid>,) =
-                sqlx::query_as(r#"SELECT deal_id FROM kyc.cases WHERE case_id = $1"#)
+                sqlx::query_as(r#"SELECT deal_id FROM "ob-poc".cases WHERE case_id = $1"#)
                     .bind(case_id)
                     .fetch_one(&db.pool)
                     .await
@@ -413,7 +413,7 @@ mod deal_to_kyc_lifecycle {
             db.advance_case_to_review(case_id).await;
 
             let status: (String,) =
-                sqlx::query_as(r#"SELECT status FROM kyc.cases WHERE case_id = $1"#)
+                sqlx::query_as(r#"SELECT status FROM "ob-poc".cases WHERE case_id = $1"#)
                     .bind(case_id)
                     .fetch_one(&db.pool)
                     .await
@@ -425,7 +425,7 @@ mod deal_to_kyc_lifecycle {
 
             // Verify case is APPROVED with closed_at
             let closed_case: (String, Option<chrono::DateTime<chrono::Utc>>) =
-                sqlx::query_as(r#"SELECT status, closed_at FROM kyc.cases WHERE case_id = $1"#)
+                sqlx::query_as(r#"SELECT status, closed_at FROM "ob-poc".cases WHERE case_id = $1"#)
                     .bind(case_id)
                     .fetch_one(&db.pool)
                     .await
@@ -581,7 +581,7 @@ mod deal_to_kyc_lifecycle {
 
             // Verify case is APPROVED
             let status: (String,) =
-                sqlx::query_as(r#"SELECT status FROM kyc.cases WHERE case_id = $1"#)
+                sqlx::query_as(r#"SELECT status FROM "ob-poc".cases WHERE case_id = $1"#)
                     .bind(case_id)
                     .fetch_one(&db.pool)
                     .await
@@ -641,7 +641,7 @@ mod deal_to_kyc_lifecycle {
 
             // Verify case is REJECTED
             let status: (String,) =
-                sqlx::query_as(r#"SELECT status FROM kyc.cases WHERE case_id = $1"#)
+                sqlx::query_as(r#"SELECT status FROM "ob-poc".cases WHERE case_id = $1"#)
                     .bind(case_id)
                     .fetch_one(&db.pool)
                     .await
@@ -649,7 +649,7 @@ mod deal_to_kyc_lifecycle {
             assert_eq!(status.0, "REJECTED");
 
             let closed_at: (Option<chrono::DateTime<chrono::Utc>>,) =
-                sqlx::query_as(r#"SELECT closed_at FROM kyc.cases WHERE case_id = $1"#)
+                sqlx::query_as(r#"SELECT closed_at FROM "ob-poc".cases WHERE case_id = $1"#)
                     .bind(case_id)
                     .fetch_one(&db.pool)
                     .await

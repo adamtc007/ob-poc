@@ -104,6 +104,7 @@ fn make_string_arg(name: &str) -> MacroArg {
     MacroArg {
         arg_type: MacroArgType::Str,
         ui_label: name.to_string(),
+        description: None,
         autofill_from: None,
         picker: None,
         default: None,
@@ -315,7 +316,10 @@ async fn test_macro_expands_to_primitives() {
                 verb: "cbu.create".to_string(),
                 args: {
                     let mut m = HashMap::new();
-                    m.insert("name".to_string(), "${arg.name}".to_string());
+                    m.insert(
+                        "name".to_string(),
+                        serde_json::Value::String("${arg.name}".to_string()),
+                    );
                     m
                 },
                 bind_as: None,
@@ -416,7 +420,10 @@ async fn test_nested_macro_fixpoint() {
                 verb: "entity.create".to_string(),
                 args: {
                     let mut m = HashMap::new();
-                    m.insert("name".to_string(), "${arg.party-name}".to_string());
+                    m.insert(
+                        "name".to_string(),
+                        serde_json::Value::String("${arg.party-name}".to_string()),
+                    );
                     m
                 },
                 bind_as: None,
@@ -440,7 +447,10 @@ async fn test_nested_macro_fixpoint() {
                     verb: "cbu.create".to_string(),
                     args: {
                         let mut m = HashMap::new();
-                        m.insert("name".to_string(), "${arg.name}".to_string());
+                        m.insert(
+                            "name".to_string(),
+                            serde_json::Value::String("${arg.name}".to_string()),
+                        );
                         m
                     },
                     bind_as: None,
@@ -449,7 +459,10 @@ async fn test_nested_macro_fixpoint() {
                     macro_id: "party.setup".to_string(),
                     args: {
                         let mut m = HashMap::new();
-                        m.insert("party-name".to_string(), "${arg.party-name}".to_string());
+                        m.insert(
+                            "party-name".to_string(),
+                            serde_json::Value::String("${arg.party-name}".to_string()),
+                        );
                         m
                     },
                     import_symbols: vec![],
@@ -528,7 +541,10 @@ fn test_cycle_detection() {
                 macro_id: "cycle.b".to_string(),
                 args: {
                     let mut m = HashMap::new();
-                    m.insert("x".to_string(), "${arg.x}".to_string());
+                    m.insert(
+                        "x".to_string(),
+                        serde_json::Value::String("${arg.x}".to_string()),
+                    );
                     m
                 },
                 import_symbols: vec![],
@@ -550,7 +566,10 @@ fn test_cycle_detection() {
                 macro_id: "cycle.a".to_string(),
                 args: {
                     let mut m = HashMap::new();
-                    m.insert("x".to_string(), "${arg.x}".to_string());
+                    m.insert(
+                        "x".to_string(),
+                        serde_json::Value::String("${arg.x}".to_string()),
+                    );
                     m
                 },
                 import_symbols: vec![],
@@ -601,7 +620,10 @@ fn test_depth_limit() {
                 macro_id: format!("deep.{}", i + 1),
                 args: {
                     let mut m = HashMap::new();
-                    m.insert("x".to_string(), "${arg.x}".to_string());
+                    m.insert(
+                        "x".to_string(),
+                        serde_json::Value::String("${arg.x}".to_string()),
+                    );
                     m
                 },
                 import_symbols: vec![],
@@ -612,7 +634,10 @@ fn test_depth_limit() {
                 verb: "cbu.create".to_string(),
                 args: {
                     let mut m = HashMap::new();
-                    m.insert("name".to_string(), "${arg.x}".to_string());
+                    m.insert(
+                        "name".to_string(),
+                        serde_json::Value::String("${arg.x}".to_string()),
+                    );
                     m
                 },
                 bind_as: None,
@@ -669,7 +694,10 @@ fn test_pack_constraint_blocks_forbidden_verb() {
                 verb: "cbu.create".to_string(),
                 args: {
                     let mut m = HashMap::new();
-                    m.insert("name".to_string(), "${arg.name}".to_string());
+                    m.insert(
+                        "name".to_string(),
+                        serde_json::Value::String("${arg.name}".to_string()),
+                    );
                     m
                 },
                 bind_as: None,

@@ -383,7 +383,7 @@ impl AgentController {
     ) -> Result<(Uuid, Uuid)> {
         // Record decision
         let decision_id: Uuid = sqlx::query_scalar(
-            r#"INSERT INTO kyc.research_decisions
+            r#"INSERT INTO "ob-poc".research_decisions
                (target_entity_id, search_query, source_provider, candidates_found,
                 candidates_count, selected_key, selected_key_type, selection_confidence,
                 selection_reasoning, decision_type, auto_selected)
@@ -425,7 +425,7 @@ impl AgentController {
 
         // Record action
         let action_id: Uuid = sqlx::query_scalar(
-            r#"INSERT INTO kyc.research_actions
+            r#"INSERT INTO "ob-poc".research_actions
                (decision_id, verb_fqn, result_summary, entities_created, entities_updated)
                VALUES ($1, $2, $3, $4, 0)
                RETURNING action_id"#,
@@ -771,7 +771,7 @@ impl AgentControllerHandle {
     ) -> Result<(Uuid, Uuid)> {
         // Record decision
         let decision_id: Uuid = sqlx::query_scalar(
-            r#"INSERT INTO kyc.research_decisions
+            r#"INSERT INTO "ob-poc".research_decisions
                (target_entity_id, search_query, source_provider, candidates_found,
                 candidates_count, selected_key, selected_key_type, selection_confidence,
                 selection_reasoning, decision_type, auto_selected)
@@ -820,7 +820,7 @@ impl AgentControllerHandle {
 
         // Record action
         let action_id: Uuid = sqlx::query_scalar(
-            r#"INSERT INTO kyc.research_actions
+            r#"INSERT INTO "ob-poc".research_actions
                (decision_id, verb_fqn, result_summary, entities_created, entities_updated)
                VALUES ($1, $2, $3, $4, 0)
                RETURNING action_id"#,

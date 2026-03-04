@@ -83,8 +83,8 @@ impl CustomOperation for SubcustodianLookupOp {
                 sn.place_of_settlement_bic as pset_bic,
                 sn.csd_participant_id,
                 sn.is_primary
-            FROM custody.subcustodian_network sn
-            JOIN custody.markets m ON m.market_id = sn.market_id
+            FROM "ob-poc".subcustodian_network sn
+            JOIN "ob-poc".markets m ON m.market_id = sn.market_id
             WHERE m.mic = $1
               AND sn.currency = $2
               AND sn.is_active = true
@@ -220,11 +220,12 @@ impl CustomOperation for LookupSsiForTradeOp {
             .and_then(|a| a.value.as_string());
 
         // Look up instrument class ID
-        let class_id: Option<Uuid> =
-            sqlx::query_scalar("SELECT class_id FROM custody.instrument_classes WHERE code = $1")
-                .bind(instrument_class)
-                .fetch_optional(pool)
-                .await?;
+        let class_id: Option<Uuid> = sqlx::query_scalar(
+            "SELECT class_id FROM \"ob-poc\".instrument_classes WHERE code = $1",
+        )
+        .bind(instrument_class)
+        .fetch_optional(pool)
+        .await?;
 
         let class_id = class_id
             .ok_or_else(|| anyhow::anyhow!("Unknown instrument class: {}", instrument_class))?;
@@ -232,7 +233,7 @@ impl CustomOperation for LookupSsiForTradeOp {
         // Look up security type ID if provided
         let security_type_id: Option<Uuid> = if let Some(st) = security_type {
             sqlx::query_scalar(
-                "SELECT security_type_id FROM custody.security_types WHERE code = $1",
+                "SELECT security_type_id FROM \"ob-poc\".security_types WHERE code = $1",
             )
             .bind(st)
             .fetch_optional(pool)
@@ -243,7 +244,7 @@ impl CustomOperation for LookupSsiForTradeOp {
 
         // Look up market ID if provided
         let market_id: Option<Uuid> = if let Some(m) = market {
-            sqlx::query_scalar("SELECT market_id FROM custody.markets WHERE mic = $1")
+            sqlx::query_scalar("SELECT market_id FROM \"ob-poc\".markets WHERE mic = $1")
                 .bind(m)
                 .fetch_optional(pool)
                 .await?
@@ -251,8 +252,18 @@ impl CustomOperation for LookupSsiForTradeOp {
             None
         };
 
-        // Use the database function for matching
-        let row = sqlx::query!(
+        // Use the database function for matching.
+        #[derive(sqlx::FromRow)]
+        struct SsiMatchRow {
+            ssi_id: Uuid,
+            ssi_name: String,
+            rule_id: Option<Uuid>,
+            rule_name: Option<String>,
+            rule_priority: Option<i32>,
+            specificity_score: Option<rust_decimal::Decimal>,
+        }
+
+        let row: Option<SsiMatchRow> = sqlx::query_as(
             r#"
             SELECT
                 ssi_id,
@@ -261,15 +272,15 @@ impl CustomOperation for LookupSsiForTradeOp {
                 rule_name,
                 rule_priority,
                 specificity_score
-            FROM custody.find_ssi_for_trade($1, $2, $3, $4, $5, $6, NULL)
+            FROM "ob-poc".find_ssi_for_trade($1, $2, $3, $4, $5, $6, NULL)
             "#,
-            cbu_id,
-            class_id,
-            security_type_id,
-            market_id,
-            currency,
-            settlement_type
         )
+        .bind(cbu_id)
+        .bind(class_id)
+        .bind(security_type_id)
+        .bind(market_id)
+        .bind(currency)
+        .bind(settlement_type)
         .fetch_optional(pool)
         .await?;
 
@@ -360,13 +371,13 @@ impl CustomOperation for ValidateBookingCoverageOp {
                 m.mic as "market?",
                 u.currencies,
                 u.settlement_types
-            FROM custody.cbu_instrument_universe u
-            JOIN custody.instrument_classes ic ON ic.class_id = u.instrument_class_id
-            LEFT JOIN custody.markets m ON m.market_id = u.market_id
+            FROM "ob-poc".cbu_instrument_universe u
+            JOIN "ob-poc".instrument_classes ic ON ic.class_id = u.instrument_class_id
+            LEFT JOIN "ob-poc".markets m ON m.market_id = u.market_id
             WHERE u.cbu_id = $1
               AND u.is_active = true
               AND NOT EXISTS (
-                  SELECT 1 FROM custody.ssi_booking_rules r
+                  SELECT 1 FROM "ob-poc".ssi_booking_rules r
                   WHERE r.cbu_id = u.cbu_id
                     AND r.is_active = true
                     AND (r.instrument_class_id IS NULL OR r.instrument_class_id = u.instrument_class_id)
@@ -386,14 +397,14 @@ impl CustomOperation for ValidateBookingCoverageOp {
                 r.rule_name,
                 ic.code as "instrument_class?",
                 m.mic as "market?"
-            FROM custody.ssi_booking_rules r
-            LEFT JOIN custody.instrument_classes ic ON ic.class_id = r.instrument_class_id
-            LEFT JOIN custody.markets m ON m.market_id = r.market_id
+            FROM "ob-poc".ssi_booking_rules r
+            LEFT JOIN "ob-poc".instrument_classes ic ON ic.class_id = r.instrument_class_id
+            LEFT JOIN "ob-poc".markets m ON m.market_id = r.market_id
             WHERE r.cbu_id = $1
               AND r.is_active = true
               AND r.instrument_class_id IS NOT NULL
               AND NOT EXISTS (
-                  SELECT 1 FROM custody.cbu_instrument_universe u
+                  SELECT 1 FROM "ob-poc".cbu_instrument_universe u
                   WHERE u.cbu_id = r.cbu_id
                     AND u.is_active = true
                     AND u.instrument_class_id = r.instrument_class_id
@@ -508,7 +519,7 @@ impl CustomOperation for DeriveRequiredCoverageOp {
                 u.settlement_types,
                 CASE
                     WHEN EXISTS (
-                        SELECT 1 FROM custody.ssi_booking_rules r
+                        SELECT 1 FROM "ob-poc".ssi_booking_rules r
                         WHERE r.cbu_id = u.cbu_id
                           AND r.is_active = true
                           AND (r.instrument_class_id IS NULL OR r.instrument_class_id = u.instrument_class_id)
@@ -516,9 +527,9 @@ impl CustomOperation for DeriveRequiredCoverageOp {
                     ) THEN 'COVERED'
                     ELSE 'MISSING'
                 END as coverage_status
-            FROM custody.cbu_instrument_universe u
-            JOIN custody.instrument_classes ic ON ic.class_id = u.instrument_class_id
-            LEFT JOIN custody.markets m ON m.market_id = u.market_id
+            FROM "ob-poc".cbu_instrument_universe u
+            JOIN "ob-poc".instrument_classes ic ON ic.class_id = u.instrument_class_id
+            LEFT JOIN "ob-poc".markets m ON m.market_id = u.market_id
             WHERE u.cbu_id = $1
               AND u.is_active = true
             ORDER BY ic.code, m.mic
@@ -739,7 +750,7 @@ impl CustomOperation for SetupSsiFromDocumentOp {
 
             // Look up market_id if market_mic provided
             let market_id: Option<Uuid> = if let Some(mic) = &ssi.market_mic {
-                sqlx::query_scalar("SELECT market_id FROM custody.markets WHERE mic = $1")
+                sqlx::query_scalar("SELECT market_id FROM \"ob-poc\".markets WHERE mic = $1")
                     .bind(mic)
                     .fetch_optional(pool)
                     .await?
@@ -765,7 +776,7 @@ impl CustomOperation for SetupSsiFromDocumentOp {
             let ssi_id = Uuid::new_v4();
             sqlx::query!(
                 r#"
-                INSERT INTO custody.cbu_ssi (
+                INSERT INTO "ob-poc".cbu_ssi (
                     ssi_id, cbu_id, ssi_name, ssi_type, market_id,
                     safekeeping_account, safekeeping_bic, safekeeping_account_name,
                     cash_account, cash_account_bic, cash_currency,
@@ -810,7 +821,7 @@ impl CustomOperation for SetupSsiFromDocumentOp {
             for agent in &ssi.agent_overrides {
                 sqlx::query!(
                     r#"
-                    INSERT INTO custody.cbu_ssi_agent_override (
+                    INSERT INTO "ob-poc".cbu_ssi_agent_override (
                         ssi_id, agent_role, agent_bic, agent_account, agent_name, sequence_order, reason
                     ) VALUES ($1, $2, $3, $4, $5, $6, $7)
                     "#,
@@ -832,7 +843,7 @@ impl CustomOperation for SetupSsiFromDocumentOp {
                 // Look up instrument_class_id if provided
                 let instrument_class_id: Option<Uuid> = if let Some(ic) = &rule.instrument_class {
                     sqlx::query_scalar(
-                        "SELECT class_id FROM custody.instrument_classes WHERE code = $1",
+                        "SELECT class_id FROM \"ob-poc\".instrument_classes WHERE code = $1",
                     )
                     .bind(ic)
                     .fetch_optional(pool)
@@ -844,7 +855,7 @@ impl CustomOperation for SetupSsiFromDocumentOp {
                 // Look up security_type_id if provided
                 let security_type_id: Option<Uuid> = if let Some(st) = &rule.security_type {
                     sqlx::query_scalar(
-                        "SELECT security_type_id FROM custody.security_types WHERE code = $1",
+                        "SELECT security_type_id FROM \"ob-poc\".security_types WHERE code = $1",
                     )
                     .bind(st)
                     .fetch_optional(pool)
@@ -863,7 +874,7 @@ impl CustomOperation for SetupSsiFromDocumentOp {
 
                 sqlx::query!(
                     r#"
-                    INSERT INTO custody.ssi_booking_rules (
+                    INSERT INTO "ob-poc".ssi_booking_rules (
                         cbu_id, ssi_id, rule_name, priority,
                         instrument_class_id, security_type_id, market_id,
                         currency, settlement_type, effective_date

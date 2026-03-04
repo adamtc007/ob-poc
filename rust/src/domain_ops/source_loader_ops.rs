@@ -1252,7 +1252,7 @@ async fn log_research_action(
     entities_updated: i32,
 ) -> Result<()> {
     sqlx::query(
-        r#"INSERT INTO kyc.research_actions
+        r#"INSERT INTO "ob-poc".research_actions
            (decision_id, verb, result_summary, entities_created, entities_updated)
            VALUES ($1, $2, $3, $4, $5)"#,
     )

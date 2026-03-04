@@ -985,7 +985,7 @@ pub async fn diff_document_vs_operational(
         .collect();
 
     let op_ssis = sqlx::query!(
-        r#"SELECT ssi_name FROM custody.cbu_ssi WHERE cbu_id = $1"#,
+        r#"SELECT ssi_name FROM "ob-poc".cbu_ssi WHERE cbu_id = $1"#,
         cbu_id
     )
     .fetch_all(pool)
@@ -1010,7 +1010,7 @@ pub async fn diff_document_vs_operational(
         doc.booking_rules.iter().map(|r| r.name.clone()).collect();
 
     let op_rules = sqlx::query!(
-        r#"SELECT rule_name FROM custody.ssi_booking_rules WHERE cbu_id = $1"#,
+        r#"SELECT rule_name FROM "ob-poc".ssi_booking_rules WHERE cbu_id = $1"#,
         cbu_id
     )
     .fetch_all(pool)
@@ -1040,8 +1040,8 @@ pub async fn diff_document_vs_operational(
 
     let op_universe = sqlx::query!(
         r#"SELECT m.mic
-           FROM custody.cbu_instrument_universe u
-           JOIN custody.markets m ON u.market_id = m.market_id
+           FROM "ob-poc".cbu_instrument_universe u
+           JOIN "ob-poc".markets m ON u.market_id = m.market_id
            WHERE u.cbu_id = $1"#,
         cbu_id
     )
@@ -1126,7 +1126,7 @@ pub async fn sync_from_operational(
         let op_ssis = sqlx::query!(
             r#"SELECT ssi_name, ssi_type, safekeeping_account, safekeeping_bic,
                       cash_account, cash_account_bic, cash_currency, pset_bic
-               FROM custody.cbu_ssi
+               FROM "ob-poc".cbu_ssi
                WHERE cbu_id = $1"#,
             cbu_id
         )
@@ -1176,10 +1176,10 @@ pub async fn sync_from_operational(
                       ic.code as instrument_class,
                       m.mic as market,
                       r.currency, r.settlement_type
-               FROM custody.ssi_booking_rules r
-               JOIN custody.cbu_ssi s ON r.ssi_id = s.ssi_id
-               LEFT JOIN custody.instrument_classes ic ON r.instrument_class_id = ic.class_id
-               LEFT JOIN custody.markets m ON r.market_id = m.market_id
+               FROM "ob-poc".ssi_booking_rules r
+               JOIN "ob-poc".cbu_ssi s ON r.ssi_id = s.ssi_id
+               LEFT JOIN "ob-poc".instrument_classes ic ON r.instrument_class_id = ic.class_id
+               LEFT JOIN "ob-poc".markets m ON r.market_id = m.market_id
                WHERE r.cbu_id = $1"#,
             cbu_id
         )
@@ -1214,8 +1214,8 @@ pub async fn sync_from_operational(
     if sections.is_empty() || sections.contains(&"universe".to_string()) {
         let op_universe = sqlx::query!(
             r#"SELECT m.mic, u.currencies, u.settlement_types
-               FROM custody.cbu_instrument_universe u
-               JOIN custody.markets m ON u.market_id = m.market_id
+               FROM "ob-poc".cbu_instrument_universe u
+               JOIN "ob-poc".markets m ON u.market_id = m.market_id
                WHERE u.cbu_id = $1"#,
             cbu_id
         )

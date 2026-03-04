@@ -42,7 +42,7 @@ mod capital_tests {
 
             // Clean up capital structure tables
             sqlx::query(
-                r#"DELETE FROM kyc.special_rights WHERE issuer_entity_id IN
+                r#"DELETE FROM "ob-poc".special_rights WHERE issuer_entity_id IN
                    (SELECT entity_id FROM "ob-poc".entities WHERE name LIKE $1)"#,
             )
             .bind(&pattern)
@@ -51,7 +51,7 @@ mod capital_tests {
             .ok();
 
             sqlx::query(
-                r#"DELETE FROM kyc.dilution_instruments WHERE issuer_entity_id IN
+                r#"DELETE FROM "ob-poc".dilution_instruments WHERE issuer_entity_id IN
                    (SELECT entity_id FROM "ob-poc".entities WHERE name LIKE $1)"#,
             )
             .bind(&pattern)
@@ -60,8 +60,8 @@ mod capital_tests {
             .ok();
 
             sqlx::query(
-                r#"DELETE FROM kyc.holdings WHERE share_class_id IN
-                   (SELECT id FROM kyc.share_classes WHERE name LIKE $1)"#,
+                r#"DELETE FROM "ob-poc".holdings WHERE share_class_id IN
+                   (SELECT id FROM "ob-poc".share_classes WHERE name LIKE $1)"#,
             )
             .bind(&pattern)
             .execute(&self.pool)
@@ -69,8 +69,8 @@ mod capital_tests {
             .ok();
 
             sqlx::query(
-                r#"DELETE FROM kyc.issuance_events WHERE share_class_id IN
-                   (SELECT id FROM kyc.share_classes WHERE name LIKE $1)"#,
+                r#"DELETE FROM "ob-poc".issuance_events WHERE share_class_id IN
+                   (SELECT id FROM "ob-poc".share_classes WHERE name LIKE $1)"#,
             )
             .bind(&pattern)
             .execute(&self.pool)
@@ -78,8 +78,8 @@ mod capital_tests {
             .ok();
 
             sqlx::query(
-                r#"DELETE FROM kyc.share_class_supply WHERE share_class_id IN
-                   (SELECT id FROM kyc.share_classes WHERE name LIKE $1)"#,
+                r#"DELETE FROM "ob-poc".share_class_supply WHERE share_class_id IN
+                   (SELECT id FROM "ob-poc".share_classes WHERE name LIKE $1)"#,
             )
             .bind(&pattern)
             .execute(&self.pool)
@@ -87,15 +87,15 @@ mod capital_tests {
             .ok();
 
             sqlx::query(
-                r#"DELETE FROM kyc.share_class_identifiers WHERE share_class_id IN
-                   (SELECT id FROM kyc.share_classes WHERE name LIKE $1)"#,
+                r#"DELETE FROM "ob-poc".share_class_identifiers WHERE share_class_id IN
+                   (SELECT id FROM "ob-poc".share_classes WHERE name LIKE $1)"#,
             )
             .bind(&pattern)
             .execute(&self.pool)
             .await
             .ok();
 
-            sqlx::query(r#"DELETE FROM kyc.share_classes WHERE name LIKE $1"#)
+            sqlx::query(r#"DELETE FROM "ob-poc".share_classes WHERE name LIKE $1"#)
                 .bind(&pattern)
                 .execute(&self.pool)
                 .await
@@ -166,7 +166,7 @@ mod capital_tests {
         // Create share class
         let share_class_id = sqlx::query_scalar!(
             r#"
-            INSERT INTO kyc.share_classes (
+            INSERT INTO "ob-poc".share_classes (
                 cbu_id, issuer_entity_id, name, instrument_kind,
                 votes_per_unit, economic_per_unit, status
             ) VALUES ($1, $2, $3, 'ORDINARY_EQUITY', 1.0, 1.0, 'active')
@@ -181,7 +181,7 @@ mod capital_tests {
 
         // Verify share class was created
         let row = sqlx::query!(
-            r#"SELECT name, instrument_kind, votes_per_unit FROM kyc.share_classes WHERE id = $1"#,
+            r#"SELECT name, instrument_kind, votes_per_unit FROM "ob-poc".share_classes WHERE id = $1"#,
             share_class_id
         )
         .fetch_one(&db.pool)
@@ -209,7 +209,7 @@ mod capital_tests {
         // Create Class A (1 vote per share)
         sqlx::query!(
             r#"
-            INSERT INTO kyc.share_classes (
+            INSERT INTO "ob-poc".share_classes (
                 cbu_id, issuer_entity_id, name, instrument_kind,
                 votes_per_unit, economic_per_unit, status
             ) VALUES ($1, $2, $3, 'ORDINARY_EQUITY', 1.0, 1.0, 'active')
@@ -224,7 +224,7 @@ mod capital_tests {
         // Create Class B (10 votes per share - super voting)
         let class_b_id = sqlx::query_scalar!(
             r#"
-            INSERT INTO kyc.share_classes (
+            INSERT INTO "ob-poc".share_classes (
                 cbu_id, issuer_entity_id, name, instrument_kind,
                 votes_per_unit, economic_per_unit, status
             ) VALUES ($1, $2, $3, 'ORDINARY_EQUITY', 10.0, 1.0, 'active')
@@ -239,7 +239,7 @@ mod capital_tests {
 
         // Verify super-voting class
         let row = sqlx::query!(
-            r#"SELECT votes_per_unit FROM kyc.share_classes WHERE id = $1"#,
+            r#"SELECT votes_per_unit FROM "ob-poc".share_classes WHERE id = $1"#,
             class_b_id
         )
         .fetch_one(&db.pool)
@@ -273,7 +273,7 @@ mod capital_tests {
         // Create share class
         let share_class_id = sqlx::query_scalar!(
             r#"
-            INSERT INTO kyc.share_classes (
+            INSERT INTO "ob-poc".share_classes (
                 cbu_id, issuer_entity_id, name, instrument_kind,
                 votes_per_unit, status
             ) VALUES ($1, $2, $3, 'ORDINARY_EQUITY', 1.0, 'active')
@@ -289,7 +289,7 @@ mod capital_tests {
         // Insert supply state
         sqlx::query!(
             r#"
-            INSERT INTO kyc.share_class_supply (
+            INSERT INTO "ob-poc".share_class_supply (
                 share_class_id, as_of_date,
                 authorized_units, issued_units, outstanding_units,
                 treasury_units, reserved_units
@@ -308,7 +308,7 @@ mod capital_tests {
                 issued_units,
                 outstanding_units,
                 treasury_units
-            FROM kyc.share_class_supply
+            FROM "ob-poc".share_class_supply
             WHERE share_class_id = $1
             "#,
             share_class_id
@@ -348,7 +348,7 @@ mod capital_tests {
         // Create share class
         let share_class_id = sqlx::query_scalar!(
             r#"
-            INSERT INTO kyc.share_classes (
+            INSERT INTO "ob-poc".share_classes (
                 cbu_id, issuer_entity_id, name, instrument_kind, votes_per_unit, status
             ) VALUES ($1, $2, $3, 'ORDINARY_EQUITY', 1.0, 'active')
             RETURNING id
@@ -363,7 +363,7 @@ mod capital_tests {
         // Set supply - 1000 shares issued
         sqlx::query!(
             r#"
-            INSERT INTO kyc.share_class_supply (share_class_id, as_of_date, issued_units, outstanding_units)
+            INSERT INTO "ob-poc".share_class_supply (share_class_id, as_of_date, issued_units, outstanding_units)
             VALUES ($1, CURRENT_DATE, 1000, 1000)
             "#,
             share_class_id
@@ -374,7 +374,7 @@ mod capital_tests {
         // Create holding - holder owns 600 shares (60%)
         sqlx::query!(
             r#"
-            INSERT INTO kyc.holdings (share_class_id, investor_entity_id, units, status)
+            INSERT INTO "ob-poc".holdings (share_class_id, investor_entity_id, units, status)
             VALUES ($1, $2, 600, 'active')
             "#,
             share_class_id,
@@ -387,7 +387,7 @@ mod capital_tests {
         let holding = sqlx::query!(
             r#"
             SELECT units, status
-            FROM kyc.holdings
+            FROM "ob-poc".holdings
             WHERE share_class_id = $1 AND investor_entity_id = $2
             "#,
             share_class_id,
@@ -425,7 +425,7 @@ mod capital_tests {
         // Create share class
         let share_class_id = sqlx::query_scalar!(
             r#"
-            INSERT INTO kyc.share_classes (
+            INSERT INTO "ob-poc".share_classes (
                 cbu_id, issuer_entity_id, name, instrument_kind, status
             ) VALUES ($1, $2, $3, 'PREFERENCE_EQUITY', 'active')
             RETURNING id
@@ -440,7 +440,7 @@ mod capital_tests {
         // Create special rights (attached to share class)
         sqlx::query!(
             r#"
-            INSERT INTO kyc.special_rights (
+            INSERT INTO "ob-poc".special_rights (
                 issuer_entity_id, share_class_id, right_type, notes
             ) VALUES
             ($1, $2, 'BOARD_APPOINTMENT', 'Right to appoint one board member'),
@@ -456,7 +456,7 @@ mod capital_tests {
         let rights = sqlx::query!(
             r#"
             SELECT right_type, notes
-            FROM kyc.special_rights
+            FROM "ob-poc".special_rights
             WHERE share_class_id = $1
             ORDER BY right_type
             "#,
@@ -495,7 +495,7 @@ mod capital_tests {
         // Create share class for conversion target
         let share_class_id = sqlx::query_scalar!(
             r#"
-            INSERT INTO kyc.share_classes (
+            INSERT INTO "ob-poc".share_classes (
                 cbu_id, issuer_entity_id, name, instrument_kind, status
             ) VALUES ($1, $2, $3, 'ORDINARY_EQUITY', 'active')
             RETURNING id
@@ -510,7 +510,7 @@ mod capital_tests {
         // Create stock option grant
         let option_id = sqlx::query_scalar!(
             r#"
-            INSERT INTO kyc.dilution_instruments (
+            INSERT INTO "ob-poc".dilution_instruments (
                 issuer_entity_id, converts_to_share_class_id, instrument_type,
                 holder_entity_id, units_granted, exercise_price, exercise_currency,
                 vesting_start_date, vesting_end_date, vesting_cliff_months,
@@ -534,7 +534,7 @@ mod capital_tests {
         let option = sqlx::query!(
             r#"
             SELECT instrument_type, units_granted, status
-            FROM kyc.dilution_instruments
+            FROM "ob-poc".dilution_instruments
             WHERE instrument_id = $1
             "#,
             option_id
@@ -568,7 +568,7 @@ mod capital_tests {
         // Create share class
         let share_class_id = sqlx::query_scalar!(
             r#"
-            INSERT INTO kyc.share_classes (
+            INSERT INTO "ob-poc".share_classes (
                 cbu_id, issuer_entity_id, name, instrument_kind, status
             ) VALUES ($1, $2, $3, 'ORDINARY_EQUITY', 'active')
             RETURNING id
@@ -583,7 +583,7 @@ mod capital_tests {
         // Add identifiers
         sqlx::query!(
             r#"
-            INSERT INTO kyc.share_class_identifiers (share_class_id, scheme_code, identifier_value, is_primary)
+            INSERT INTO "ob-poc".share_class_identifiers (share_class_id, scheme_code, identifier_value, is_primary)
             VALUES
             ($1, 'ISIN', 'US1234567890', true),
             ($1, 'SEDOL', 'B123456', false),
@@ -598,7 +598,7 @@ mod capital_tests {
         let identifiers = sqlx::query!(
             r#"
             SELECT scheme_code, identifier_value, is_primary
-            FROM kyc.share_class_identifiers
+            FROM "ob-poc".share_class_identifiers
             WHERE share_class_id = $1
             ORDER BY is_primary DESC, scheme_code
             "#,
@@ -634,7 +634,7 @@ mod capital_tests {
         // Create share class
         let share_class_id = sqlx::query_scalar!(
             r#"
-            INSERT INTO kyc.share_classes (
+            INSERT INTO "ob-poc".share_classes (
                 cbu_id, issuer_entity_id, name, instrument_kind, status
             ) VALUES ($1, $2, $3, 'ORDINARY_EQUITY', 'active')
             RETURNING id
@@ -649,7 +649,7 @@ mod capital_tests {
         // Record initial issuance
         sqlx::query!(
             r#"
-            INSERT INTO kyc.issuance_events (
+            INSERT INTO "ob-poc".issuance_events (
                 share_class_id, issuer_entity_id, event_type, effective_date,
                 units_delta, price_per_unit, price_currency,
                 notes
@@ -664,7 +664,7 @@ mod capital_tests {
         // Record follow-on issuance
         sqlx::query!(
             r#"
-            INSERT INTO kyc.issuance_events (
+            INSERT INTO "ob-poc".issuance_events (
                 share_class_id, issuer_entity_id, event_type, effective_date,
                 units_delta, price_per_unit, price_currency,
                 notes
@@ -680,7 +680,7 @@ mod capital_tests {
         let events = sqlx::query!(
             r#"
             SELECT event_type, units_delta, notes
-            FROM kyc.issuance_events
+            FROM "ob-poc".issuance_events
             WHERE share_class_id = $1
             ORDER BY effective_date, created_at
             "#,

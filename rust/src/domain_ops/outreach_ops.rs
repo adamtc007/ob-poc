@@ -89,7 +89,7 @@ impl CustomOperation for OutreachRecordResponseOp {
         // Update the request
         let result = sqlx::query!(
             r#"
-            UPDATE kyc.outreach_requests
+            UPDATE "ob-poc".outreach_requests
             SET
                 status = 'RESPONDED',
                 response_type = $2,
@@ -178,7 +178,7 @@ impl CustomOperation for OutreachListOverdueOp {
                 r.deadline_date,
                 r.sent_at,
                 (CURRENT_DATE - r.deadline_date) AS days_past_deadline
-            FROM kyc.outreach_requests r
+            FROM "ob-poc".outreach_requests r
             JOIN "ob-poc".entities e ON e.entity_id = r.target_entity_id
             WHERE r.status IN ('SENT', 'REMINDED', 'PENDING')
               AND r.deadline_date IS NOT NULL

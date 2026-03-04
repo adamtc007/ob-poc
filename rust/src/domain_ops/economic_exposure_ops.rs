@@ -159,7 +159,7 @@ impl CustomOperation for EconomicExposureComputeOp {
                 path_entities,
                 path_names,
                 stopped_reason
-            FROM kyc.fn_compute_economic_exposure($1, $2, $3, $4, $5, $6, $7)
+            FROM "ob-poc".fn_compute_economic_exposure($1, $2, $3, $4, $5, $6, $7)
             "#,
         )
         .bind(root_entity_id)
@@ -241,7 +241,7 @@ impl CustomOperation for EconomicExposureSummaryOp {
                 role_type,
                 depth,
                 stop_reason
-            FROM kyc.fn_economic_exposure_summary($1, $2, $3)
+            FROM "ob-poc".fn_economic_exposure_summary($1, $2, $3)
             "#,
         )
         .bind(issuer_entity_id)

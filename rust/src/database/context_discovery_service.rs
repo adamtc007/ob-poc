@@ -122,7 +122,7 @@ impl ContextDiscoveryService {
                 case_type,
                 risk_rating,
                 opened_at
-            FROM kyc.cases
+            FROM "ob-poc".cases
             WHERE cbu_id = $1
               AND status NOT IN ('APPROVED', 'REJECTED', 'WITHDRAWN')
             ORDER BY opened_at DESC
@@ -196,7 +196,7 @@ impl ContextDiscoveryService {
                 ia.agreement_date,
                 ia.is_active,
                 e.name as "counterparty_name?"
-            FROM custody.isda_agreements ia
+            FROM "ob-poc".isda_agreements ia
             LEFT JOIN "ob-poc".entities e ON e.entity_id = ia.counterparty_entity_id
             WHERE ia.cbu_id = $1
               AND ia.is_active = true

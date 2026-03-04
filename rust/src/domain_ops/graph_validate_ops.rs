@@ -9,7 +9,7 @@
 //! - Orphan entities check (entities with no inbound or outbound relationships)
 //!
 //! The op queries `entity_relationships` from the database, runs all validation checks,
-//! and persists any anomalies found into `kyc.research_anomalies`.
+//! and persists any anomalies found into `"ob-poc".research_anomalies`.
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
@@ -52,7 +52,7 @@ pub struct GraphValidateResult {
     pub edges_analysed: i32,
     /// Number of distinct entities in the graph.
     pub entities_analysed: i32,
-    /// Number of anomalies persisted to kyc.research_anomalies.
+    /// Number of anomalies persisted to "ob-poc".research_anomalies.
     pub anomalies_persisted: i32,
 }
 
@@ -127,7 +127,7 @@ impl CustomOperation for GraphValidateOp {
 
         let anomalies_found = anomalies.len() as i32;
 
-        // Persist anomalies to kyc.research_anomalies.
+        // Persist anomalies to "ob-poc".research_anomalies.
         let anomalies_persisted =
             persist_anomalies(pool, &anomalies, case_id, &all_entity_ids).await?;
 
@@ -181,8 +181,8 @@ async fn load_edges(pool: &PgPool, case_id: Option<Uuid>) -> Result<Vec<Edge>> {
                 FROM "ob-poc".entity_relationships er
                 WHERE (er.effective_to IS NULL OR er.effective_to > CURRENT_DATE)
                   AND (
-                      er.from_entity_id IN (SELECT entity_id FROM kyc.entity_workstreams WHERE case_id = $1)
-                      OR er.to_entity_id IN (SELECT entity_id FROM kyc.entity_workstreams WHERE case_id = $1)
+                      er.from_entity_id IN (SELECT entity_id FROM "ob-poc".entity_workstreams WHERE case_id = $1)
+                      OR er.to_entity_id IN (SELECT entity_id FROM "ob-poc".entity_workstreams WHERE case_id = $1)
                   )
                 ORDER BY er.to_entity_id, er.from_entity_id
                 "#,
@@ -632,7 +632,7 @@ fn check_orphan_entities(
 // Anomaly Persistence
 // ============================================================================
 
-/// Persists anomalies to kyc.research_anomalies.
+/// Persists anomalies to "ob-poc".research_anomalies.
 /// Creates a research_action record to serve as the parent for anomaly rows.
 /// Returns the number of anomalies persisted.
 #[cfg(feature = "database")]
@@ -650,7 +650,7 @@ async fn persist_anomalies(
     // the case, or the first entity from the graph if no case.
     let representative_entity_id = if let Some(cid) = case_id {
         let row: Option<(Uuid,)> = sqlx::query_as(
-            r#"SELECT entity_id FROM kyc.entity_workstreams WHERE case_id = $1 LIMIT 1"#,
+            r#"SELECT entity_id FROM "ob-poc".entity_workstreams WHERE case_id = $1 LIMIT 1"#,
         )
         .bind(cid)
         .fetch_optional(pool)
@@ -666,7 +666,7 @@ async fn persist_anomalies(
     // Create a research_action as parent for the anomaly records.
     let action_id: Uuid = sqlx::query_scalar(
         r#"
-        INSERT INTO kyc.research_actions (
+        INSERT INTO "ob-poc".research_actions (
             target_entity_id,
             action_type,
             source_provider,
@@ -742,7 +742,7 @@ async fn persist_anomalies(
 
         sqlx::query(
             r#"
-            INSERT INTO kyc.research_anomalies (
+            INSERT INTO "ob-poc".research_anomalies (
                 action_id,
                 entity_id,
                 rule_code,

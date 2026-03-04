@@ -159,7 +159,7 @@ impl CustomOperation for InvestorRoleSetOp {
         // Call the upsert function which handles temporal versioning
         let result: (uuid::Uuid,) = sqlx::query_as(
             r#"
-            SELECT kyc.upsert_role_profile(
+            SELECT "ob-poc".upsert_role_profile(
                 $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NULL
             )
             "#,
@@ -240,7 +240,7 @@ impl CustomOperation for InvestorRoleReadAsOfOp {
                 effective_from, effective_to,
                 source, source_reference, notes,
                 created_at, updated_at
-            FROM kyc.investor_role_profiles
+            FROM "ob-poc".investor_role_profiles
             WHERE issuer_entity_id = $1
               AND holder_entity_id = $2
               AND effective_from <= $3
@@ -363,7 +363,7 @@ impl CustomOperation for InvestorRoleMarkAsNomineeOp {
         // Hardcoded defaults for nominee
         let result: (uuid::Uuid,) = sqlx::query_as(
             r#"
-            SELECT kyc.upsert_role_profile(
+            SELECT "ob-poc".upsert_role_profile(
                 $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NULL
             )
             "#,
@@ -434,7 +434,7 @@ impl CustomOperation for InvestorRoleMarkAsFofOp {
         // Hardcoded defaults for FoF
         let result: (uuid::Uuid,) = sqlx::query_as(
             r#"
-            SELECT kyc.upsert_role_profile(
+            SELECT "ob-poc".upsert_role_profile(
                 $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NULL
             )
             "#,
@@ -506,7 +506,7 @@ impl CustomOperation for InvestorRoleMarkAsMasterPoolOp {
         // Hardcoded defaults for master pool
         let result: (uuid::Uuid,) = sqlx::query_as(
             r#"
-            SELECT kyc.upsert_role_profile(
+            SELECT "ob-poc".upsert_role_profile(
                 $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NULL
             )
             "#,
@@ -578,7 +578,7 @@ impl CustomOperation for InvestorRoleMarkAsEndInvestorOp {
         // Hardcoded defaults for end investor
         let result: (uuid::Uuid,) = sqlx::query_as(
             r#"
-            SELECT kyc.upsert_role_profile(
+            SELECT "ob-poc".upsert_role_profile(
                 $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NULL
             )
             "#,

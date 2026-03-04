@@ -1359,9 +1359,9 @@ impl CustomOperation for SessionSetCaseOp {
     ) -> Result<ExecutionResult> {
         let case_id = get_required_uuid(verb_call, "case-id", ctx)?;
 
-        // Fetch KYC case details from kyc.cases
+        // Fetch KYC case details from "ob-poc".cases
         let case = sqlx::query!(
-            r#"SELECT case_id, status, case_type FROM kyc.cases WHERE case_id = $1"#,
+            r#"SELECT case_id, status, case_type FROM "ob-poc".cases WHERE case_id = $1"#,
             case_id
         )
         .fetch_optional(pool)

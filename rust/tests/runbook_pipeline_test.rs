@@ -64,6 +64,7 @@ fn macro_registry_with_structure_setup() -> MacroRegistry {
             MacroArg {
                 arg_type: MacroArgType::Str,
                 ui_label: "Name".to_string(),
+                description: None,
                 autofill_from: None,
                 picker: None,
                 default: None,
@@ -114,8 +115,14 @@ fn macro_registry_with_structure_setup() -> MacroRegistry {
                 verb: "cbu.create".to_string(),
                 args: {
                     let mut m = HashMap::new();
-                    m.insert("name".to_string(), "${arg.name}".to_string());
-                    m.insert("client-id".to_string(), "${scope.client_id}".to_string());
+                    m.insert(
+                        "name".to_string(),
+                        serde_json::Value::String("${arg.name}".to_string()),
+                    );
+                    m.insert(
+                        "client-id".to_string(),
+                        serde_json::Value::String("${scope.client_id}".to_string()),
+                    );
                     m
                 },
                 bind_as: None,
@@ -138,6 +145,7 @@ fn macro_registry_with_multi_step() -> MacroRegistry {
             MacroArg {
                 arg_type: MacroArgType::Str,
                 ui_label: "Name".to_string(),
+                description: None,
                 autofill_from: None,
                 picker: None,
                 default: None,
@@ -189,7 +197,10 @@ fn macro_registry_with_multi_step() -> MacroRegistry {
                     verb: "cbu.create".to_string(),
                     args: {
                         let mut m = HashMap::new();
-                        m.insert("name".to_string(), "${arg.name}".to_string());
+                        m.insert(
+                            "name".to_string(),
+                            serde_json::Value::String("${arg.name}".to_string()),
+                        );
                         m
                     },
                     bind_as: Some("@cbu".to_string()),
@@ -198,7 +209,10 @@ fn macro_registry_with_multi_step() -> MacroRegistry {
                     verb: "trading-profile.create".to_string(),
                     args: {
                         let mut m = HashMap::new();
-                        m.insert("cbu-id".to_string(), "@cbu".to_string());
+                        m.insert(
+                            "cbu-id".to_string(),
+                            serde_json::Value::String("@cbu".to_string()),
+                        );
                         m
                     },
                     bind_as: None,

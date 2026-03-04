@@ -598,7 +598,7 @@ impl RequirementEvaluator {
         let unverified: Vec<(Uuid, String)> = sqlx::query_as(
             r#"
             SELECT u.ubo_id, e.name
-            FROM "ob-poc".ubo_registry u
+            FROM "ob-poc".kyc_ubo_registry u
             JOIN "ob-poc".entities e ON u.ubo_person_id = e.entity_id
             WHERE u.cbu_id = $1
             AND u.verification_status NOT IN ('VERIFIED', 'PROVEN')
@@ -633,9 +633,9 @@ impl RequirementEvaluator {
         let alerts: Vec<(Uuid, Uuid)> = sqlx::query_as(
             r#"
             SELECT s.screening_id, ew.entity_id
-            FROM kyc.screenings s
-            JOIN kyc.entity_workstreams ew ON s.workstream_id = ew.workstream_id
-            JOIN kyc.cases c ON ew.case_id = c.case_id
+            FROM "ob-poc".screenings s
+            JOIN "ob-poc".entity_workstreams ew ON s.workstream_id = ew.workstream_id
+            JOIN "ob-poc".cases c ON ew.case_id = c.case_id
             WHERE c.cbu_id = $1
             AND s.status = 'HIT_PENDING_REVIEW'
             "#,
@@ -671,9 +671,9 @@ impl RequirementEvaluator {
         let incomplete: bool = sqlx::query_scalar(
             r#"
             SELECT EXISTS(
-                SELECT 1 FROM kyc.doc_requests dr
-                JOIN kyc.entity_workstreams ew ON dr.workstream_id = ew.workstream_id
-                JOIN kyc.cases c ON ew.case_id = c.case_id
+                SELECT 1 FROM "ob-poc".doc_requests dr
+                JOIN "ob-poc".entity_workstreams ew ON dr.workstream_id = ew.workstream_id
+                JOIN "ob-poc".cases c ON ew.case_id = c.case_id
                 WHERE c.cbu_id = $1
                 AND dr.status NOT IN ('VERIFIED', 'WAIVED')
             )
@@ -931,9 +931,9 @@ impl RequirementEvaluator {
         let stale: Vec<(Uuid, String, Option<DateTime<Utc>>)> = sqlx::query_as(
             r#"
             SELECT ew.entity_id, s.screening_type, s.completed_at
-            FROM kyc.screenings s
-            JOIN kyc.entity_workstreams ew ON s.workstream_id = ew.workstream_id
-            JOIN kyc.cases c ON ew.case_id = c.case_id
+            FROM "ob-poc".screenings s
+            JOIN "ob-poc".entity_workstreams ew ON s.workstream_id = ew.workstream_id
+            JOIN "ob-poc".cases c ON ew.case_id = c.case_id
             WHERE c.cbu_id = $1
             AND s.completed_at < NOW() - ($2 || ' days')::INTERVAL
             AND s.status IN ('CLEAR', 'HIT_CONFIRMED', 'HIT_DISMISSED')
@@ -972,9 +972,9 @@ impl RequirementEvaluator {
         let pending: Vec<(Uuid, Uuid, String)> = sqlx::query_as(
             r#"
             SELECT s.screening_id, ew.entity_id, s.screening_type
-            FROM kyc.screenings s
-            JOIN kyc.entity_workstreams ew ON s.workstream_id = ew.workstream_id
-            JOIN kyc.cases c ON ew.case_id = c.case_id
+            FROM "ob-poc".screenings s
+            JOIN "ob-poc".entity_workstreams ew ON s.workstream_id = ew.workstream_id
+            JOIN "ob-poc".cases c ON ew.case_id = c.case_id
             WHERE c.cbu_id = $1
             AND s.status = 'HIT_PENDING_REVIEW'
             "#,
@@ -1074,7 +1074,7 @@ impl RequirementEvaluator {
         let has_ubos: bool = sqlx::query_scalar(
             r#"
             SELECT EXISTS(
-                SELECT 1 FROM "ob-poc".ubo_registry
+                SELECT 1 FROM "ob-poc".kyc_ubo_registry
                 WHERE cbu_id = $1
             )
             "#,
@@ -1109,7 +1109,7 @@ impl RequirementEvaluator {
             sqlx::query_scalar(
                 r#"
                 SELECT EXISTS(
-                    SELECT 1 FROM kyc.cases
+                    SELECT 1 FROM "ob-poc".cases
                     WHERE cbu_id = $1 AND case_type = $2
                 )
                 "#,
@@ -1122,7 +1122,7 @@ impl RequirementEvaluator {
         } else {
             sqlx::query_scalar(
                 r#"
-                SELECT EXISTS(SELECT 1 FROM kyc.cases WHERE cbu_id = $1)
+                SELECT EXISTS(SELECT 1 FROM "ob-poc".cases WHERE cbu_id = $1)
                 "#,
             )
             .bind(cbu_id)
@@ -1155,7 +1155,7 @@ impl RequirementEvaluator {
     ) -> Result<Vec<Blocker>, WorkflowError> {
         let unassigned: Option<Uuid> = sqlx::query_scalar(
             r#"
-            SELECT case_id FROM kyc.cases
+            SELECT case_id FROM "ob-poc".cases
             WHERE cbu_id = $1
             AND assigned_analyst_id IS NULL
             AND status NOT IN ('APPROVED', 'REJECTED', 'WITHDRAWN')
@@ -1191,7 +1191,7 @@ impl RequirementEvaluator {
     ) -> Result<Vec<Blocker>, WorkflowError> {
         let unrated: Option<Uuid> = sqlx::query_scalar(
             r#"
-            SELECT case_id FROM kyc.cases
+            SELECT case_id FROM "ob-poc".cases
             WHERE cbu_id = $1
             AND risk_rating IS NULL
             AND status NOT IN ('INTAKE', 'APPROVED', 'REJECTED', 'WITHDRAWN')
@@ -1227,7 +1227,7 @@ impl RequirementEvaluator {
     ) -> Result<Vec<Blocker>, WorkflowError> {
         let needs_approval: Option<Uuid> = sqlx::query_scalar(
             r#"
-            SELECT case_id FROM kyc.cases
+            SELECT case_id FROM "ob-poc".cases
             WHERE cbu_id = $1
             AND status = 'REVIEW'
             ORDER BY opened_at DESC
@@ -1262,7 +1262,7 @@ impl RequirementEvaluator {
         // Similar to approval but checking if rejection was recorded
         let needs_rejection: Option<Uuid> = sqlx::query_scalar(
             r#"
-            SELECT case_id FROM kyc.cases
+            SELECT case_id FROM "ob-poc".cases
             WHERE cbu_id = $1
             AND status = 'BLOCKED'
             ORDER BY opened_at DESC
@@ -1299,11 +1299,11 @@ impl RequirementEvaluator {
             r#"
             SELECT cer.entity_id
             FROM "ob-poc".cbu_entity_roles cer
-            JOIN kyc.cases c ON c.cbu_id = cer.cbu_id
+            JOIN "ob-poc".cases c ON c.cbu_id = cer.cbu_id
             WHERE cer.cbu_id = $1
             AND c.status NOT IN ('APPROVED', 'REJECTED', 'WITHDRAWN')
             AND NOT EXISTS (
-                SELECT 1 FROM kyc.entity_workstreams ew
+                SELECT 1 FROM "ob-poc".entity_workstreams ew
                 WHERE ew.case_id = c.case_id
                 AND ew.entity_id = cer.entity_id
             )
@@ -1341,8 +1341,8 @@ impl RequirementEvaluator {
         let incomplete: Vec<(Uuid, Uuid)> = sqlx::query_as(
             r#"
             SELECT ew.workstream_id, ew.entity_id
-            FROM kyc.entity_workstreams ew
-            JOIN kyc.cases c ON ew.case_id = c.case_id
+            FROM "ob-poc".entity_workstreams ew
+            JOIN "ob-poc".cases c ON ew.case_id = c.case_id
             WHERE c.cbu_id = $1
             AND ew.status NOT IN ('COMPLETE', 'BLOCKED')
             "#,
@@ -1454,8 +1454,8 @@ impl RequirementEvaluator {
         let has_signoff: bool = sqlx::query_scalar(
             r#"
             SELECT EXISTS(
-                SELECT 1 FROM kyc.case_events ce
-                JOIN kyc.cases c ON ce.case_id = c.case_id
+                SELECT 1 FROM "ob-poc".case_events ce
+                JOIN "ob-poc".cases c ON ce.case_id = c.case_id
                 WHERE c.cbu_id = $1
                 AND ce.event_type = 'SIGN_OFF'
             )
@@ -1492,7 +1492,7 @@ impl RequirementEvaluator {
         let unscheduled: bool = sqlx::query_scalar(
             r#"
             SELECT NOT EXISTS(
-                SELECT 1 FROM kyc.cases c
+                SELECT 1 FROM "ob-poc".cases c
                 JOIN "ob-poc".entity_kyc_status eks ON eks.cbu_id = c.cbu_id
                 WHERE c.cbu_id = $1
                 AND eks.next_review_date IS NOT NULL
@@ -1528,7 +1528,7 @@ impl RequirementEvaluator {
         let missing: Vec<(Uuid, String)> = sqlx::query_as(
             r#"
             SELECT u.ubo_person_id, e.name
-            FROM "ob-poc".ubo_registry u
+            FROM "ob-poc".kyc_ubo_registry u
             JOIN "ob-poc".entities e ON u.ubo_person_id = e.entity_id
             WHERE u.cbu_id = $1
             AND NOT EXISTS (

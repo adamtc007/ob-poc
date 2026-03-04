@@ -134,7 +134,7 @@ impl GuardEvaluator {
     ) -> Result<GuardResult, WorkflowError> {
         let case_status: Option<String> = sqlx::query_scalar(
             r#"
-            SELECT status FROM kyc.cases
+            SELECT status FROM "ob-poc".cases
             WHERE cbu_id = $1
             ORDER BY opened_at DESC
             LIMIT 1
@@ -251,9 +251,9 @@ impl GuardEvaluator {
             let open_alerts: Vec<(Uuid, Uuid)> = sqlx::query_as(
                 r#"
                 SELECT s.screening_id, ew.entity_id
-                FROM kyc.screenings s
-                JOIN kyc.entity_workstreams ew ON s.workstream_id = ew.workstream_id
-                JOIN kyc.cases c ON ew.case_id = c.case_id
+                FROM "ob-poc".screenings s
+                JOIN "ob-poc".entity_workstreams ew ON s.workstream_id = ew.workstream_id
+                JOIN "ob-poc".cases c ON ew.case_id = c.case_id
                 WHERE c.cbu_id = $1
                 AND s.status = 'HIT_PENDING_REVIEW'
                 "#,
@@ -436,7 +436,7 @@ impl GuardEvaluator {
         let unverified_ubos: Vec<(Uuid, String)> = sqlx::query_as(
             r#"
             SELECT u.ubo_id, e.name
-            FROM "ob-poc".ubo_registry u
+            FROM "ob-poc".kyc_ubo_registry u
             JOIN "ob-poc".entities e ON u.ubo_person_id = e.entity_id
             WHERE u.cbu_id = $1
             AND u.verification_status NOT IN ('VERIFIED', 'PROVEN')

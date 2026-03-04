@@ -43,7 +43,7 @@ async fn create_test_cbu(pool: &PgPool, name: &str) -> Uuid {
 /// Test helper to get instrument class ID
 async fn get_instrument_class_id(pool: &PgPool, code: &str) -> Option<Uuid> {
     sqlx::query_scalar!(
-        "SELECT class_id FROM custody.instrument_classes WHERE code = $1",
+        "SELECT class_id FROM \"ob-poc\".instrument_classes WHERE code = $1",
         code
     )
     .fetch_optional(pool)
@@ -53,7 +53,7 @@ async fn get_instrument_class_id(pool: &PgPool, code: &str) -> Option<Uuid> {
 
 /// Test helper to get market ID
 async fn get_market_id(pool: &PgPool, mic: &str) -> Option<Uuid> {
-    sqlx::query_scalar!("SELECT market_id FROM custody.markets WHERE mic = $1", mic)
+    sqlx::query_scalar!("SELECT market_id FROM \"ob-poc\".markets WHERE mic = $1", mic)
         .fetch_optional(pool)
         .await
         .expect("Failed to query market")
@@ -63,18 +63,18 @@ async fn get_market_id(pool: &PgPool, mic: &str) -> Option<Uuid> {
 async fn cleanup_test_cbu(pool: &PgPool, cbu_id: Uuid) {
     // Delete in order respecting foreign keys
     let _ = sqlx::query!(
-        "DELETE FROM custody.ssi_booking_rules WHERE cbu_id = $1",
+        "DELETE FROM \"ob-poc\".ssi_booking_rules WHERE cbu_id = $1",
         cbu_id
     )
     .execute(pool)
     .await;
 
-    let _ = sqlx::query!("DELETE FROM custody.cbu_ssi WHERE cbu_id = $1", cbu_id)
+    let _ = sqlx::query!("DELETE FROM \"ob-poc\".cbu_ssi WHERE cbu_id = $1", cbu_id)
         .execute(pool)
         .await;
 
     let _ = sqlx::query!(
-        "DELETE FROM custody.cbu_instrument_universe WHERE cbu_id = $1",
+        "DELETE FROM \"ob-poc\".cbu_instrument_universe WHERE cbu_id = $1",
         cbu_id
     )
     .execute(pool)
@@ -107,7 +107,7 @@ async fn test_add_universe_entry() {
     // Add universe entry
     let universe_id = sqlx::query_scalar!(
         r#"
-        INSERT INTO custody.cbu_instrument_universe
+        INSERT INTO "ob-poc".cbu_instrument_universe
             (cbu_id, instrument_class_id, market_id, currencies, settlement_types)
         VALUES ($1, $2, $3, ARRAY['USD'], ARRAY['DVP'])
         RETURNING universe_id
@@ -124,7 +124,7 @@ async fn test_add_universe_entry() {
 
     // Verify entry exists
     let count: i64 = sqlx::query_scalar!(
-        "SELECT COUNT(*) FROM custody.cbu_instrument_universe WHERE cbu_id = $1",
+        "SELECT COUNT(*) FROM \"ob-poc\".cbu_instrument_universe WHERE cbu_id = $1",
         cbu_id
     )
     .fetch_one(&pool)
@@ -153,7 +153,7 @@ async fn test_universe_with_multiple_currencies() {
     // Add universe with GBP and USD (cross-currency trading)
     let universe_id = sqlx::query_scalar!(
         r#"
-        INSERT INTO custody.cbu_instrument_universe
+        INSERT INTO "ob-poc".cbu_instrument_universe
             (cbu_id, instrument_class_id, market_id, currencies, settlement_types)
         VALUES ($1, $2, $3, ARRAY['GBP', 'USD'], ARRAY['DVP', 'FOP'])
         RETURNING universe_id
@@ -168,7 +168,7 @@ async fn test_universe_with_multiple_currencies() {
 
     // Verify currencies array
     let row = sqlx::query!(
-        "SELECT currencies FROM custody.cbu_instrument_universe WHERE universe_id = $1",
+        "SELECT currencies FROM \"ob-poc\".cbu_instrument_universe WHERE universe_id = $1",
         universe_id
     )
     .fetch_one(&pool)
@@ -196,7 +196,7 @@ async fn test_create_ssi() {
     // Create SSI
     let ssi_id = sqlx::query_scalar!(
         r#"
-        INSERT INTO custody.cbu_ssi (
+        INSERT INTO "ob-poc".cbu_ssi (
             cbu_id, ssi_name, ssi_type,
             safekeeping_account, safekeeping_bic,
             cash_account, cash_account_bic, cash_currency,
@@ -218,7 +218,7 @@ async fn test_create_ssi() {
 
     // Verify SSI exists and is active
     let status: String = sqlx::query_scalar!(
-        "SELECT status FROM custody.cbu_ssi WHERE ssi_id = $1",
+        "SELECT status FROM \"ob-poc\".cbu_ssi WHERE ssi_id = $1",
         ssi_id
     )
     .fetch_one(&pool)
@@ -239,7 +239,7 @@ async fn test_ssi_status_transitions() {
     // Create SSI in PENDING state
     let ssi_id = sqlx::query_scalar!(
         r#"
-        INSERT INTO custody.cbu_ssi (
+        INSERT INTO "ob-poc".cbu_ssi (
             cbu_id, ssi_name, ssi_type,
             safekeeping_account, safekeeping_bic,
             pset_bic, status, effective_date
@@ -257,7 +257,7 @@ async fn test_ssi_status_transitions() {
 
     // Activate SSI
     sqlx::query!(
-        "UPDATE custody.cbu_ssi SET status = 'ACTIVE' WHERE ssi_id = $1",
+        "UPDATE \"ob-poc\".cbu_ssi SET status = 'ACTIVE' WHERE ssi_id = $1",
         ssi_id
     )
     .execute(&pool)
@@ -266,7 +266,7 @@ async fn test_ssi_status_transitions() {
 
     // Verify active
     let status: String = sqlx::query_scalar!(
-        "SELECT status FROM custody.cbu_ssi WHERE ssi_id = $1",
+        "SELECT status FROM \"ob-poc\".cbu_ssi WHERE ssi_id = $1",
         ssi_id
     )
     .fetch_one(&pool)
@@ -278,7 +278,7 @@ async fn test_ssi_status_transitions() {
 
     // Suspend SSI
     sqlx::query!(
-        "UPDATE custody.cbu_ssi SET status = 'SUSPENDED' WHERE ssi_id = $1",
+        "UPDATE \"ob-poc\".cbu_ssi SET status = 'SUSPENDED' WHERE ssi_id = $1",
         ssi_id
     )
     .execute(&pool)
@@ -286,7 +286,7 @@ async fn test_ssi_status_transitions() {
     .expect("Failed to suspend SSI");
 
     let status: String = sqlx::query_scalar!(
-        "SELECT status FROM custody.cbu_ssi WHERE ssi_id = $1",
+        "SELECT status FROM \"ob-poc\".cbu_ssi WHERE ssi_id = $1",
         ssi_id
     )
     .fetch_one(&pool)
@@ -311,7 +311,7 @@ async fn test_create_booking_rule() {
     // Create SSI first
     let ssi_id = sqlx::query_scalar!(
         r#"
-        INSERT INTO custody.cbu_ssi (
+        INSERT INTO "ob-poc".cbu_ssi (
             cbu_id, ssi_name, ssi_type,
             safekeeping_account, safekeeping_bic,
             pset_bic, status, effective_date
@@ -338,7 +338,7 @@ async fn test_create_booking_rule() {
     // Create specific booking rule
     let rule_id = sqlx::query_scalar!(
         r#"
-        INSERT INTO custody.ssi_booking_rules (
+        INSERT INTO "ob-poc".ssi_booking_rules (
             cbu_id, ssi_id, rule_name, priority,
             instrument_class_id, market_id, currency, settlement_type
         )
@@ -359,7 +359,7 @@ async fn test_create_booking_rule() {
 
     // Verify specificity score was computed (should be 4 - all fields specified)
     let specificity: i32 = sqlx::query_scalar!(
-        "SELECT specificity_score FROM custody.ssi_booking_rules WHERE rule_id = $1",
+        "SELECT specificity_score FROM \"ob-poc\".ssi_booking_rules WHERE rule_id = $1",
         rule_id
     )
     .fetch_one(&pool)
@@ -385,7 +385,7 @@ async fn test_booking_rule_priority_ordering() {
     // Create SSI
     let ssi_id = sqlx::query_scalar!(
         r#"
-        INSERT INTO custody.cbu_ssi (
+        INSERT INTO "ob-poc".cbu_ssi (
             cbu_id, ssi_name, ssi_type,
             safekeeping_account, safekeeping_bic,
             pset_bic, status, effective_date
@@ -408,7 +408,7 @@ async fn test_booking_rule_priority_ordering() {
     // Create high priority specific rule (priority 10)
     let _rule1 = sqlx::query_scalar!(
         r#"
-        INSERT INTO custody.ssi_booking_rules (
+        INSERT INTO "ob-poc".ssi_booking_rules (
             cbu_id, ssi_id, rule_name, priority,
             instrument_class_id, currency
         )
@@ -426,7 +426,7 @@ async fn test_booking_rule_priority_ordering() {
     // Create lower priority fallback rule (priority 50)
     let _rule2 = sqlx::query_scalar!(
         r#"
-        INSERT INTO custody.ssi_booking_rules (
+        INSERT INTO "ob-poc".ssi_booking_rules (
             cbu_id, ssi_id, rule_name, priority,
             currency
         )
@@ -444,7 +444,7 @@ async fn test_booking_rule_priority_ordering() {
     let rules = sqlx::query!(
         r#"
         SELECT rule_name, priority, specificity_score
-        FROM custody.ssi_booking_rules
+        FROM "ob-poc".ssi_booking_rules
         WHERE cbu_id = $1
         ORDER BY priority ASC, specificity_score DESC
         "#,
@@ -474,7 +474,7 @@ async fn test_wildcard_booking_rule() {
     // Create SSI
     let ssi_id = sqlx::query_scalar!(
         r#"
-        INSERT INTO custody.cbu_ssi (
+        INSERT INTO "ob-poc".cbu_ssi (
             cbu_id, ssi_name, ssi_type,
             safekeeping_account, safekeeping_bic,
             pset_bic, status, effective_date
@@ -493,7 +493,7 @@ async fn test_wildcard_booking_rule() {
     // Create wildcard rule (all NULLs = catch-all)
     let rule_id = sqlx::query_scalar!(
         r#"
-        INSERT INTO custody.ssi_booking_rules (
+        INSERT INTO "ob-poc".ssi_booking_rules (
             cbu_id, ssi_id, rule_name, priority
         )
         VALUES ($1, $2, 'Catch-All Rule', 100)
@@ -508,7 +508,7 @@ async fn test_wildcard_booking_rule() {
 
     // Specificity should be 0 (no criteria specified)
     let specificity: i32 = sqlx::query_scalar!(
-        "SELECT specificity_score FROM custody.ssi_booking_rules WHERE rule_id = $1",
+        "SELECT specificity_score FROM \"ob-poc\".ssi_booking_rules WHERE rule_id = $1",
         rule_id
     )
     .fetch_one(&pool)
@@ -533,7 +533,7 @@ async fn test_ssi_lookup_exact_match() {
     // Create SSI
     let ssi_id = sqlx::query_scalar!(
         r#"
-        INSERT INTO custody.cbu_ssi (
+        INSERT INTO "ob-poc".cbu_ssi (
             cbu_id, ssi_name, ssi_type,
             safekeeping_account, safekeeping_bic,
             pset_bic, status, effective_date
@@ -560,7 +560,7 @@ async fn test_ssi_lookup_exact_match() {
     // Create specific rule
     sqlx::query!(
         r#"
-        INSERT INTO custody.ssi_booking_rules (
+        INSERT INTO "ob-poc".ssi_booking_rules (
             cbu_id, ssi_id, rule_name, priority,
             instrument_class_id, market_id, currency, settlement_type
         )
@@ -579,8 +579,8 @@ async fn test_ssi_lookup_exact_match() {
     let result = sqlx::query!(
         r#"
         SELECT r.ssi_id, r.rule_name, s.ssi_name
-        FROM custody.ssi_booking_rules r
-        JOIN custody.cbu_ssi s ON s.ssi_id = r.ssi_id
+        FROM "ob-poc".ssi_booking_rules r
+        JOIN "ob-poc".cbu_ssi s ON s.ssi_id = r.ssi_id
         WHERE r.cbu_id = $1
           AND r.is_active = true
           AND s.status = 'ACTIVE'
@@ -617,7 +617,7 @@ async fn test_ssi_lookup_fallback_to_wildcard() {
     // Create SSI
     let ssi_id = sqlx::query_scalar!(
         r#"
-        INSERT INTO custody.cbu_ssi (
+        INSERT INTO "ob-poc".cbu_ssi (
             cbu_id, ssi_name, ssi_type,
             safekeeping_account, safekeeping_bic,
             pset_bic, status, effective_date
@@ -646,7 +646,7 @@ async fn test_ssi_lookup_fallback_to_wildcard() {
     if let Some(xlon_id) = xlon_market_id {
         sqlx::query!(
             r#"
-            INSERT INTO custody.ssi_booking_rules (
+            INSERT INTO "ob-poc".ssi_booking_rules (
                 cbu_id, ssi_id, rule_name, priority,
                 instrument_class_id, market_id, currency
             )
@@ -665,7 +665,7 @@ async fn test_ssi_lookup_fallback_to_wildcard() {
     // Create wildcard fallback rule
     sqlx::query!(
         r#"
-        INSERT INTO custody.ssi_booking_rules (
+        INSERT INTO "ob-poc".ssi_booking_rules (
             cbu_id, ssi_id, rule_name, priority
         )
         VALUES ($1, $2, 'Catch-All Fallback', 100)
@@ -681,8 +681,8 @@ async fn test_ssi_lookup_fallback_to_wildcard() {
     let result = sqlx::query!(
         r#"
         SELECT r.rule_name, r.priority
-        FROM custody.ssi_booking_rules r
-        JOIN custody.cbu_ssi s ON s.ssi_id = r.ssi_id
+        FROM "ob-poc".ssi_booking_rules r
+        JOIN "ob-poc".cbu_ssi s ON s.ssi_id = r.ssi_id
         WHERE r.cbu_id = $1
           AND r.is_active = true
           AND s.status = 'ACTIVE'
@@ -729,7 +729,7 @@ async fn test_coverage_validation_complete() {
     // Add universe entry
     sqlx::query!(
         r#"
-        INSERT INTO custody.cbu_instrument_universe
+        INSERT INTO "ob-poc".cbu_instrument_universe
             (cbu_id, instrument_class_id, market_id, currencies, settlement_types)
         VALUES ($1, $2, $3, ARRAY['USD'], ARRAY['DVP'])
         "#,
@@ -744,7 +744,7 @@ async fn test_coverage_validation_complete() {
     // Create matching SSI and rule
     let ssi_id = sqlx::query_scalar!(
         r#"
-        INSERT INTO custody.cbu_ssi (
+        INSERT INTO "ob-poc".cbu_ssi (
             cbu_id, ssi_name, ssi_type,
             safekeeping_account, safekeeping_bic,
             pset_bic, status, effective_date
@@ -762,7 +762,7 @@ async fn test_coverage_validation_complete() {
 
     sqlx::query!(
         r#"
-        INSERT INTO custody.ssi_booking_rules (
+        INSERT INTO "ob-poc".ssi_booking_rules (
             cbu_id, ssi_id, rule_name, priority,
             instrument_class_id, market_id
         )
@@ -781,11 +781,11 @@ async fn test_coverage_validation_complete() {
     let gaps = sqlx::query!(
         r#"
         SELECT u.universe_id
-        FROM custody.cbu_instrument_universe u
+        FROM "ob-poc".cbu_instrument_universe u
         WHERE u.cbu_id = $1
           AND u.is_active = true
           AND NOT EXISTS (
-              SELECT 1 FROM custody.ssi_booking_rules r
+              SELECT 1 FROM "ob-poc".ssi_booking_rules r
               WHERE r.cbu_id = u.cbu_id
                 AND r.is_active = true
                 AND (r.instrument_class_id IS NULL OR r.instrument_class_id = u.instrument_class_id)
@@ -824,7 +824,7 @@ async fn test_coverage_validation_with_gap() {
     // Add universe entries for both EQUITY and GOVT_BOND
     sqlx::query!(
         r#"
-        INSERT INTO custody.cbu_instrument_universe
+        INSERT INTO "ob-poc".cbu_instrument_universe
             (cbu_id, instrument_class_id, market_id, currencies, settlement_types)
         VALUES ($1, $2, $3, ARRAY['USD'], ARRAY['DVP'])
         "#,
@@ -839,7 +839,7 @@ async fn test_coverage_validation_with_gap() {
     if let Some(bond_id) = bond_class_id {
         sqlx::query!(
             r#"
-            INSERT INTO custody.cbu_instrument_universe
+            INSERT INTO "ob-poc".cbu_instrument_universe
                 (cbu_id, instrument_class_id, market_id, currencies, settlement_types)
             VALUES ($1, $2, $3, ARRAY['USD'], ARRAY['DVP'])
             "#,
@@ -855,7 +855,7 @@ async fn test_coverage_validation_with_gap() {
     // Create SSI and rule ONLY for EQUITY (gap for GOVT_BOND)
     let ssi_id = sqlx::query_scalar!(
         r#"
-        INSERT INTO custody.cbu_ssi (
+        INSERT INTO "ob-poc".cbu_ssi (
             cbu_id, ssi_name, ssi_type,
             safekeeping_account, safekeeping_bic,
             pset_bic, status, effective_date
@@ -873,7 +873,7 @@ async fn test_coverage_validation_with_gap() {
 
     sqlx::query!(
         r#"
-        INSERT INTO custody.ssi_booking_rules (
+        INSERT INTO "ob-poc".ssi_booking_rules (
             cbu_id, ssi_id, rule_name, priority,
             instrument_class_id, market_id
         )
@@ -892,11 +892,11 @@ async fn test_coverage_validation_with_gap() {
     let gaps = sqlx::query!(
         r#"
         SELECT u.universe_id
-        FROM custody.cbu_instrument_universe u
+        FROM "ob-poc".cbu_instrument_universe u
         WHERE u.cbu_id = $1
           AND u.is_active = true
           AND NOT EXISTS (
-              SELECT 1 FROM custody.ssi_booking_rules r
+              SELECT 1 FROM "ob-poc".ssi_booking_rules r
               WHERE r.cbu_id = u.cbu_id
                 AND r.is_active = true
                 AND (r.instrument_class_id IS NULL OR r.instrument_class_id = u.instrument_class_id)

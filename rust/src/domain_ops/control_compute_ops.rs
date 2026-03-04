@@ -7,7 +7,7 @@
 //! 4. Output `(controller_entity_id, control_type, basis)` tuples
 //!
 //! ## Key Tables
-//! - kyc.entity_workstreams (case → entity linkage)
+//! - "ob-poc".entity_workstreams (case → entity linkage)
 //! - "ob-poc".entity_relationships (control/management edges)
 //! - "ob-poc".cbu_entity_roles (officer roles)
 //!
@@ -146,7 +146,7 @@ impl CustomOperation for ControlComputeOp {
                     r#"SELECT er.from_entity_id, er.to_entity_id, er.relationship_type,
                               er.confidence, er.evidence_hint
                        FROM "ob-poc".entity_relationships er
-                       JOIN kyc.entity_workstreams ew ON er.to_entity_id = ew.entity_id
+                       JOIN "ob-poc".entity_workstreams ew ON er.to_entity_id = ew.entity_id
                        WHERE ew.case_id = $1
                          AND er.to_entity_id = $2
                          AND er.relationship_type IN (
@@ -164,7 +164,7 @@ impl CustomOperation for ControlComputeOp {
                     r#"SELECT er.from_entity_id, er.to_entity_id, er.relationship_type,
                               er.confidence, er.evidence_hint
                        FROM "ob-poc".entity_relationships er
-                       JOIN kyc.entity_workstreams ew ON er.to_entity_id = ew.entity_id
+                       JOIN "ob-poc".entity_workstreams ew ON er.to_entity_id = ew.entity_id
                        WHERE ew.case_id = $1
                          AND er.relationship_type IN (
                              'CONTROL', 'MANAGEMENT', 'BOARD_APPOINTMENT', 'SPECIAL_RIGHTS'
@@ -214,7 +214,7 @@ impl CustomOperation for ControlComputeOp {
             sqlx::query_as(
                 r#"SELECT cer.entity_id, cer.role_type, cer.cbu_id
                    FROM "ob-poc".cbu_entity_roles cer
-                   JOIN kyc.entity_workstreams ew ON cer.entity_id = ew.entity_id
+                   JOIN "ob-poc".entity_workstreams ew ON cer.entity_id = ew.entity_id
                    WHERE ew.case_id = $1
                      AND cer.entity_id = $2
                      AND cer.role_type IN (
@@ -229,7 +229,7 @@ impl CustomOperation for ControlComputeOp {
             sqlx::query_as(
                 r#"SELECT cer.entity_id, cer.role_type, cer.cbu_id
                    FROM "ob-poc".cbu_entity_roles cer
-                   JOIN kyc.entity_workstreams ew ON cer.entity_id = ew.entity_id
+                   JOIN "ob-poc".entity_workstreams ew ON cer.entity_id = ew.entity_id
                    WHERE ew.case_id = $1
                      AND cer.role_type IN (
                          'DIRECTOR', 'OFFICER', 'SECRETARY', 'COMPLIANCE_OFFICER'
@@ -270,7 +270,7 @@ impl CustomOperation for ControlComputeOp {
             eid
         } else {
             let first_entity: Option<(Uuid,)> = sqlx::query_as(
-                r#"SELECT entity_id FROM kyc.entity_workstreams
+                r#"SELECT entity_id FROM "ob-poc".entity_workstreams
                    WHERE case_id = $1 ORDER BY entity_id LIMIT 1"#,
             )
             .bind(case_id)

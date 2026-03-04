@@ -56,12 +56,12 @@ impl CustomOperation for ScreeningPepOp {
             })
             .ok_or_else(|| anyhow::anyhow!("Missing entity-id argument"))?;
 
-        // Screenings now require a workstream_id (kyc.screenings table)
+        // Screenings now require a workstream_id ("ob-poc".screenings table)
         // This verb should be called via case-screening.initiate which has workstream context
         // For backwards compatibility, check if there's an active workstream for this entity
         let workstream = sqlx::query!(
-            r#"SELECT w.workstream_id FROM kyc.entity_workstreams w
-               JOIN kyc.cases c ON c.case_id = w.case_id
+            r#"SELECT w.workstream_id FROM "ob-poc".entity_workstreams w
+               JOIN "ob-poc".cases c ON c.case_id = w.case_id
                WHERE w.entity_id = $1 AND w.status NOT IN ('COMPLETE', 'BLOCKED')
                ORDER BY w.created_at DESC
                LIMIT 1"#,
@@ -82,7 +82,7 @@ impl CustomOperation for ScreeningPepOp {
 
         // Check for existing pending screening
         let existing = sqlx::query!(
-            r#"SELECT screening_id FROM kyc.screenings
+            r#"SELECT screening_id FROM "ob-poc".screenings
                WHERE workstream_id = $1 AND screening_type = 'PEP' AND status = 'PENDING'
                LIMIT 1"#,
             workstream_id
@@ -99,7 +99,7 @@ impl CustomOperation for ScreeningPepOp {
         let screening_id = Uuid::new_v4();
 
         sqlx::query!(
-            r#"INSERT INTO kyc.screenings
+            r#"INSERT INTO "ob-poc".screenings
                (screening_id, workstream_id, screening_type, status)
                VALUES ($1, $2, 'PEP', 'PENDING')"#,
             screening_id,
@@ -165,10 +165,10 @@ impl CustomOperation for ScreeningSanctionsOp {
             })
             .ok_or_else(|| anyhow::anyhow!("Missing entity-id argument"))?;
 
-        // Screenings now require a workstream_id (kyc.screenings table)
+        // Screenings now require a workstream_id ("ob-poc".screenings table)
         let workstream = sqlx::query!(
-            r#"SELECT w.workstream_id FROM kyc.entity_workstreams w
-               JOIN kyc.cases c ON c.case_id = w.case_id
+            r#"SELECT w.workstream_id FROM "ob-poc".entity_workstreams w
+               JOIN "ob-poc".cases c ON c.case_id = w.case_id
                WHERE w.entity_id = $1 AND w.status NOT IN ('COMPLETE', 'BLOCKED')
                ORDER BY w.created_at DESC
                LIMIT 1"#,
@@ -188,7 +188,7 @@ impl CustomOperation for ScreeningSanctionsOp {
 
         // Check for existing pending screening
         let existing = sqlx::query!(
-            r#"SELECT screening_id FROM kyc.screenings
+            r#"SELECT screening_id FROM "ob-poc".screenings
                WHERE workstream_id = $1 AND screening_type = 'SANCTIONS' AND status = 'PENDING'
                LIMIT 1"#,
             workstream_id
@@ -205,7 +205,7 @@ impl CustomOperation for ScreeningSanctionsOp {
         let screening_id = Uuid::new_v4();
 
         sqlx::query!(
-            r#"INSERT INTO kyc.screenings
+            r#"INSERT INTO "ob-poc".screenings
                (screening_id, workstream_id, screening_type, status)
                VALUES ($1, $2, 'SANCTIONS', 'PENDING')"#,
             screening_id,

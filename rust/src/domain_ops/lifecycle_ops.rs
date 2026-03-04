@@ -108,7 +108,7 @@ impl CustomOperation for LifecycleProvisionOp {
                 .find(|a| a.key == "market")
                 .and_then(|a| a.value.as_string())
             {
-                sqlx::query_scalar(r#"SELECT market_id FROM custody.markets WHERE mic = $1"#)
+                sqlx::query_scalar(r#"SELECT market_id FROM "ob-poc".markets WHERE mic = $1"#)
                     .bind(mic)
                     .fetch_optional(pool)
                     .await?
@@ -554,7 +554,7 @@ impl CustomOperation for LifecycleDiscoverOp {
             r#"SELECT l.code, l.name, il.is_mandatory, il.requires_isda
                FROM "ob-poc".lifecycles l
                JOIN "ob-poc".instrument_lifecycles il ON il.lifecycle_id = l.lifecycle_id
-               JOIN custody.instrument_classes ic ON ic.class_id = il.instrument_class_id
+               JOIN "ob-poc".instrument_classes ic ON ic.class_id = il.instrument_class_id
                WHERE ic.code = $1
                  AND il.is_active = true
                  AND l.is_active = true

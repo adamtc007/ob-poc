@@ -303,7 +303,7 @@ async fn get_cap_table(
     let share_classes = get_share_classes_internal(&pool, issuer_id).await?;
 
     // Get holder positions using fn_holder_control_position
-    let holder_rows = sqlx::query(r#"SELECT * FROM kyc.fn_holder_control_position($1, $2, $3)"#)
+    let holder_rows = sqlx::query(r#"SELECT * FROM "ob-poc".fn_holder_control_position($1, $2, $3)"#)
         .bind(issuer_id)
         .bind(as_of)
         .bind(basis)
@@ -388,9 +388,9 @@ async fn get_supply(
             COALESCE(scs.outstanding_units, 0) as "outstanding_units!",
             COALESCE(scs.treasury_units, 0) as "treasury_units!",
             COALESCE(scs.reserved_units, 0) as "reserved_units!"
-        FROM kyc.share_classes sc
-        LEFT JOIN kyc.share_class_supply scs ON scs.share_class_id = sc.id
-            AND scs.as_of_date = (SELECT MAX(as_of_date) FROM kyc.share_class_supply WHERE share_class_id = sc.id)
+        FROM "ob-poc".share_classes sc
+        LEFT JOIN "ob-poc".share_class_supply scs ON scs.share_class_id = sc.id
+            AND scs.as_of_date = (SELECT MAX(as_of_date) FROM "ob-poc".share_class_supply WHERE share_class_id = sc.id)
         WHERE sc.issuer_entity_id = $1
           AND sc.status = 'active'
         ORDER BY sc.name
@@ -458,7 +458,7 @@ async fn get_control_positions(
     let as_of = parse_as_of_date(query.as_of.as_deref())?;
     let basis = query.basis.as_deref().unwrap_or("VOTING").to_string();
 
-    let rows = sqlx::query(r#"SELECT * FROM kyc.fn_holder_control_position($1, $2, $3)"#)
+    let rows = sqlx::query(r#"SELECT * FROM "ob-poc".fn_holder_control_position($1, $2, $3)"#)
         .bind(issuer_id)
         .bind(as_of)
         .bind(&basis)
@@ -523,10 +523,10 @@ async fn get_special_rights(
             sr.description,
             sr.effective_from,
             sr.effective_to
-        FROM kyc.special_rights sr
+        FROM "ob-poc".special_rights sr
         JOIN "ob-poc".entities e ON e.entity_id = sr.holder_entity_id
         WHERE sr.share_class_id IN (
-            SELECT id FROM kyc.share_classes WHERE issuer_entity_id = $1
+            SELECT id FROM "ob-poc".share_classes WHERE issuer_entity_id = $1
         )
         ORDER BY sr.right_type, e.name
         "#,
@@ -580,10 +580,10 @@ async fn get_reconciliation_runs(
             rr.run_ts,
             rr.snapshot_a_id,
             rr.snapshot_b_id,
-            (SELECT COUNT(*)::int FROM kyc.ownership_reconciliation_findings rf WHERE rf.run_id = rr.run_id) as total_findings,
-            (SELECT COUNT(*)::int FROM kyc.ownership_reconciliation_findings rf WHERE rf.run_id = rr.run_id AND rf.status = 'OPEN') as open_findings
-        FROM kyc.ownership_reconciliation_runs rr
-        JOIN kyc.ownership_snapshots os ON os.snapshot_id = rr.snapshot_a_id
+            (SELECT COUNT(*)::int FROM "ob-poc".ownership_reconciliation_findings rf WHERE rf.run_id = rr.run_id) as total_findings,
+            (SELECT COUNT(*)::int FROM "ob-poc".ownership_reconciliation_findings rf WHERE rf.run_id = rr.run_id AND rf.status = 'OPEN') as open_findings
+        FROM "ob-poc".ownership_reconciliation_runs rr
+        JOIN "ob-poc".ownership_snapshots os ON os.snapshot_id = rr.snapshot_a_id
         WHERE os.issuer_entity_id = $1
         ORDER BY rr.run_ts DESC
         LIMIT $2
@@ -644,7 +644,7 @@ async fn get_reconciliation_findings(
             rf.delta_pct,
             rf.status,
             rf.resolution_note
-        FROM kyc.ownership_reconciliation_findings rf
+        FROM "ob-poc".ownership_reconciliation_findings rf
         JOIN "ob-poc".entities e ON e.entity_id = rf.holder_entity_id
         WHERE rf.run_id = $1
         ORDER BY rf.severity DESC, rf.delta_pct DESC NULLS LAST
@@ -748,7 +748,7 @@ async fn get_ownership_graph(
     }
 
     // Get holder positions and add as nodes with edges
-    let holder_rows = sqlx::query(r#"SELECT * FROM kyc.fn_holder_control_position($1, $2, $3)"#)
+    let holder_rows = sqlx::query(r#"SELECT * FROM "ob-poc".fn_holder_control_position($1, $2, $3)"#)
         .bind(issuer_id)
         .bind(as_of)
         .bind(basis)
@@ -840,7 +840,7 @@ async fn get_economic_exposure(
             path_entities,
             path_names,
             stopped_reason
-        FROM kyc.fn_compute_economic_exposure($1, $2, $3, $4, $5, $6, $7)
+        FROM "ob-poc".fn_compute_economic_exposure($1, $2, $3, $4, $5, $6, $7)
         "#,
     )
     .bind(entity_id)
@@ -932,9 +932,9 @@ async fn get_share_classes_internal(
             COALESCE(sc.instrument_kind, 'FUND_UNIT') as "instrument_kind!",
             COALESCE(sc.votes_per_unit, 1.0) as "votes_per_unit!",
             COALESCE(scs.issued_units, 0) as "issued_units!"
-        FROM kyc.share_classes sc
-        LEFT JOIN kyc.share_class_supply scs ON scs.share_class_id = sc.id
-            AND scs.as_of_date = (SELECT MAX(as_of_date) FROM kyc.share_class_supply WHERE share_class_id = sc.id)
+        FROM "ob-poc".share_classes sc
+        LEFT JOIN "ob-poc".share_class_supply scs ON scs.share_class_id = sc.id
+            AND scs.as_of_date = (SELECT MAX(as_of_date) FROM "ob-poc".share_class_supply WHERE share_class_id = sc.id)
         WHERE sc.issuer_entity_id = $1
           AND sc.status = 'active'
         ORDER BY sc.name
@@ -992,7 +992,7 @@ async fn get_share_class_identifiers(
     let rows = sqlx::query!(
         r#"
         SELECT scheme_code as scheme, identifier_value as value
-        FROM kyc.share_class_identifiers
+        FROM "ob-poc".share_class_identifiers
         WHERE share_class_id = $1
         "#,
         share_class_id
@@ -1019,9 +1019,9 @@ async fn get_holder_special_rights(
     let rows = sqlx::query(
         r#"
         SELECT sr.right_type
-        FROM kyc.special_rights sr
+        FROM "ob-poc".special_rights sr
         WHERE sr.holder_entity_id = $2
-          AND sr.share_class_id IN (SELECT id FROM kyc.share_classes WHERE issuer_entity_id = $1)
+          AND sr.share_class_id IN (SELECT id FROM "ob-poc".share_classes WHERE issuer_entity_id = $1)
           AND (sr.effective_to IS NULL OR sr.effective_to > CURRENT_DATE)
         "#,
     )
@@ -1294,7 +1294,7 @@ async fn get_threshold_config(
             significant_threshold_pct,
             control_threshold_pct,
             control_basis
-        FROM kyc.issuer_control_config
+        FROM "ob-poc".issuer_control_config
         WHERE issuer_entity_id = $1
           AND effective_from <= $2
           AND (effective_to IS NULL OR effective_to > $2)
@@ -1365,14 +1365,14 @@ async fn get_all_holder_positions(
             COALESCE(hcp.economic_pct, 0) as economic_pct,
             COALESCE(i.kyc_status, 'UNKNOWN') as kyc_status,
             i.tax_jurisdiction as jurisdiction
-        FROM kyc.holdings h
-        JOIN kyc.share_classes sc ON sc.id = h.share_class_id
+        FROM "ob-poc".holdings h
+        JOIN "ob-poc".share_classes sc ON sc.id = h.share_class_id
         JOIN "ob-poc".entities e ON e.entity_id = h.investor_entity_id
         JOIN "ob-poc".entity_types et ON et.entity_type_id = e.entity_type_id
-        LEFT JOIN kyc.investors i ON i.entity_id = h.investor_entity_id
+        LEFT JOIN "ob-poc".investors i ON i.entity_id = h.investor_entity_id
         LEFT JOIN LATERAL (
             SELECT voting_pct, economic_pct
-            FROM kyc.fn_holder_control_position($1, $2, $3)
+            FROM "ob-poc".fn_holder_control_position($1, $2, $3)
             WHERE holder_entity_id = h.investor_entity_id
         ) hcp ON true
         WHERE sc.issuer_entity_id = $1
@@ -1480,7 +1480,7 @@ async fn get_holder_rights(
     let rows = sqlx::query(
         r#"
         SELECT right_type, board_seats
-        FROM kyc.special_rights
+        FROM "ob-poc".special_rights
         WHERE issuer_entity_id = $1
           AND holder_entity_id = $2
           AND (effective_to IS NULL OR effective_to > CURRENT_DATE)
@@ -1616,19 +1616,19 @@ async fn get_total_issued_units(
     let query = if share_class_filter.is_some() {
         r#"
         SELECT COALESCE(SUM(scs.issued_units), 0) as total
-        FROM kyc.share_class_supply scs
-        JOIN kyc.share_classes sc ON sc.id = scs.share_class_id
+        FROM "ob-poc".share_class_supply scs
+        JOIN "ob-poc".share_classes sc ON sc.id = scs.share_class_id
         WHERE sc.issuer_entity_id = $1
           AND scs.share_class_id = $2
-          AND scs.as_of_date = (SELECT MAX(as_of_date) FROM kyc.share_class_supply WHERE share_class_id = scs.share_class_id)
+          AND scs.as_of_date = (SELECT MAX(as_of_date) FROM "ob-poc".share_class_supply WHERE share_class_id = scs.share_class_id)
         "#
     } else {
         r#"
         SELECT COALESCE(SUM(scs.issued_units), 0) as total
-        FROM kyc.share_class_supply scs
-        JOIN kyc.share_classes sc ON sc.id = scs.share_class_id
+        FROM "ob-poc".share_class_supply scs
+        JOIN "ob-poc".share_classes sc ON sc.id = scs.share_class_id
         WHERE sc.issuer_entity_id = $1
-          AND scs.as_of_date = (SELECT MAX(as_of_date) FROM kyc.share_class_supply WHERE share_class_id = scs.share_class_id)
+          AND scs.as_of_date = (SELECT MAX(as_of_date) FROM "ob-poc".share_class_supply WHERE share_class_id = scs.share_class_id)
         "#
     };
 
@@ -1656,7 +1656,7 @@ async fn check_has_dilution_data(
 ) -> Result<bool, (StatusCode, String)> {
     let count: i64 = sqlx::query_scalar(
         r#"
-        SELECT COUNT(*) FROM kyc.dilution_instruments
+        SELECT COUNT(*) FROM "ob-poc".dilution_instruments
         WHERE issuer_entity_id = $1 AND status = 'ACTIVE'
         "#,
     )
@@ -1676,10 +1676,10 @@ fn build_investor_count_query(filters: &InvestorFilters) -> (String, Vec<String>
     let mut query = String::from(
         r#"
         SELECT COUNT(DISTINCT h.investor_entity_id)
-        FROM kyc.holdings h
-        JOIN kyc.share_classes sc ON sc.id = h.share_class_id
+        FROM "ob-poc".holdings h
+        JOIN "ob-poc".share_classes sc ON sc.id = h.share_class_id
         JOIN "ob-poc".entities e ON e.entity_id = h.investor_entity_id
-        LEFT JOIN kyc.investors i ON i.entity_id = h.investor_entity_id
+        LEFT JOIN "ob-poc".investors i ON i.entity_id = h.investor_entity_id
         WHERE sc.issuer_entity_id = $1
           AND h.status = 'active'
         "#,
@@ -1736,11 +1736,11 @@ fn build_investor_list_query(
             COALESCE(i.kyc_status, 'UNKNOWN') as kyc_status,
             i.tax_jurisdiction as jurisdiction,
             MIN(h.acquisition_date) as acquisition_date
-        FROM kyc.holdings h
-        JOIN kyc.share_classes sc ON sc.id = h.share_class_id
+        FROM "ob-poc".holdings h
+        JOIN "ob-poc".share_classes sc ON sc.id = h.share_class_id
         JOIN "ob-poc".entities e ON e.entity_id = h.investor_entity_id
         JOIN "ob-poc".entity_types et ON et.entity_type_id = e.entity_type_id
-        LEFT JOIN kyc.investors i ON i.entity_id = h.investor_entity_id
+        LEFT JOIN "ob-poc".investors i ON i.entity_id = h.investor_entity_id
         WHERE sc.issuer_entity_id = $1
           AND h.status = 'active'
         "#,

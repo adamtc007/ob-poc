@@ -1,6 +1,6 @@
 //! Evidence custom operations for KYC UBO evidence management.
 //!
-//! Operations for managing evidence records in `kyc.ubo_evidence` that
+//! Operations for managing evidence records in `"ob-poc".kyc_ubo_evidence` that
 //! support the UBO registry lifecycle. Evidence entries track documents
 //! and other artifacts required to prove beneficial ownership determinations.
 //!
@@ -90,7 +90,7 @@ pub struct EvidenceWaiveResult {
 #[cfg(feature = "database")]
 async fn fetch_evidence_status(pool: &PgPool, evidence_id: Uuid) -> Result<String> {
     let row: Option<(String,)> =
-        sqlx::query_as(r#"SELECT status FROM kyc.ubo_evidence WHERE evidence_id = $1"#)
+        sqlx::query_as(r#"SELECT status FROM "ob-poc".kyc_ubo_evidence WHERE evidence_id = $1"#)
             .bind(evidence_id)
             .fetch_optional(pool)
             .await?;
@@ -105,7 +105,7 @@ async fn fetch_evidence_status(pool: &PgPool, evidence_id: Uuid) -> Result<Strin
 
 /// Creates a new evidence requirement with status REQUIRED.
 ///
-/// Inserts a row into `kyc.ubo_evidence` linked to the given UBO registry
+/// Inserts a row into `"ob-poc".kyc_ubo_evidence` linked to the given UBO registry
 /// entry. The evidence starts in REQUIRED status and must be fulfilled by
 /// linking a document (evidence.link) before it can be verified.
 #[register_custom_op]
@@ -139,7 +139,7 @@ impl CustomOperation for EvidenceRequireOp {
 
         let evidence_id: Uuid = sqlx::query_scalar(
             r#"
-            INSERT INTO kyc.ubo_evidence
+            INSERT INTO "ob-poc".kyc_ubo_evidence
                 (registry_id, evidence_type, description, doc_type, status)
             VALUES ($1, $2, $3, $4, 'REQUIRED')
             RETURNING evidence_id
@@ -220,7 +220,7 @@ impl CustomOperation for EvidenceLinkOp {
 
         sqlx::query(
             r#"
-            UPDATE kyc.ubo_evidence
+            UPDATE "ob-poc".kyc_ubo_evidence
             SET document_id = $2,
                 status = 'RECEIVED',
                 updated_at = NOW()
@@ -299,7 +299,7 @@ impl CustomOperation for EvidenceVerifyOp {
 
         let verified_at: chrono::DateTime<chrono::Utc> = sqlx::query_scalar(
             r#"
-            UPDATE kyc.ubo_evidence
+            UPDATE "ob-poc".kyc_ubo_evidence
             SET status = 'VERIFIED',
                 verified_at = NOW(),
                 verified_by = $2,
@@ -380,7 +380,7 @@ impl CustomOperation for EvidenceRejectOp {
 
         // Fetch the current document_id before clearing it
         let previous_document_id: Option<Uuid> = sqlx::query_scalar(
-            r#"SELECT document_id FROM kyc.ubo_evidence WHERE evidence_id = $1"#,
+            r#"SELECT document_id FROM "ob-poc".kyc_ubo_evidence WHERE evidence_id = $1"#,
         )
         .bind(evidence_id)
         .fetch_one(pool)
@@ -388,7 +388,7 @@ impl CustomOperation for EvidenceRejectOp {
 
         sqlx::query(
             r#"
-            UPDATE kyc.ubo_evidence
+            UPDATE "ob-poc".kyc_ubo_evidence
             SET status = 'REJECTED',
                 document_id = NULL,
                 notes = $2,
@@ -460,7 +460,7 @@ impl CustomOperation for EvidenceWaiveOp {
 
         sqlx::query(
             r#"
-            UPDATE kyc.ubo_evidence
+            UPDATE "ob-poc".kyc_ubo_evidence
             SET status = 'WAIVED',
                 waived_reason = $2,
                 waived_by = $3,

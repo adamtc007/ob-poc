@@ -225,8 +225,8 @@ async fn login(
     let client = sqlx::query!(
         r#"
         SELECT c.client_id, c.name, c.email, c.accessible_cbus, cr.credential_hash
-        FROM client_portal.clients c
-        JOIN client_portal.credentials cr ON c.client_id = cr.client_id
+        FROM "ob-poc".clients c
+        JOIN "ob-poc".credentials cr ON c.client_id = cr.client_id
         WHERE c.client_id = $1 AND c.is_active = true AND cr.is_active = true
         "#,
         request.client_id
@@ -280,7 +280,7 @@ async fn login(
 
     // Update last login
     let _ = sqlx::query!(
-        "UPDATE client_portal.clients SET last_login_at = now() WHERE client_id = $1",
+        "UPDATE \"ob-poc\".clients SET last_login_at = now() WHERE client_id = $1",
         client.client_id
     )
     .execute(&state.pool)
@@ -307,15 +307,15 @@ async fn get_status(
             COALESCE(
                 (SELECT COUNT(*) FILTER (WHERE r.status = 'FULFILLED') * 100 /
                  NULLIF(COUNT(*), 0)
-                 FROM kyc.outstanding_requests r WHERE r.cbu_id = c.cbu_id),
+                 FROM "ob-poc".outstanding_requests r WHERE r.cbu_id = c.cbu_id),
                 0
             )::int as progress_percent,
             COALESCE(
-                (SELECT status FROM kyc.cases WHERE cbu_id = c.cbu_id
+                (SELECT status FROM "ob-poc".cases WHERE cbu_id = c.cbu_id
                  ORDER BY created_at DESC LIMIT 1),
                 'NOT_STARTED'
             ) as current_stage,
-            (SELECT COUNT(*) FROM kyc.outstanding_requests r
+            (SELECT COUNT(*) FROM "ob-poc".outstanding_requests r
              WHERE r.cbu_id = c.cbu_id
                AND r.status NOT IN ('FULFILLED', 'CANCELLED', 'WAIVED')
                AND r.client_visible = true
@@ -371,9 +371,9 @@ async fn get_outstanding(
             r.status,
             r.due_date,
             r.client_notes,
-            (SELECT COUNT(*) FROM client_portal.submissions s
+            (SELECT COUNT(*) FROM "ob-poc".submissions s
              WHERE s.request_id = r.request_id) as submission_count
-        FROM kyc.outstanding_requests r
+        FROM "ob-poc".outstanding_requests r
         LEFT JOIN "ob-poc".entities e ON r.entity_id = e.entity_id
         WHERE r.cbu_id = ANY($1)
           AND r.client_visible = true
@@ -435,9 +435,9 @@ async fn get_request_detail(
             r.status,
             r.due_date,
             r.client_notes,
-            (SELECT COUNT(*) FROM client_portal.submissions s
+            (SELECT COUNT(*) FROM "ob-poc".submissions s
              WHERE s.request_id = r.request_id) as submission_count
-        FROM kyc.outstanding_requests r
+        FROM "ob-poc".outstanding_requests r
         LEFT JOIN "ob-poc".entities e ON r.entity_id = e.entity_id
         WHERE r.request_id = $1
           AND r.client_visible = true
@@ -494,7 +494,7 @@ async fn submit_document(
 ) -> Result<Json<SuccessResponse>, (StatusCode, String)> {
     // Verify client has access to this request
     let outstanding = sqlx::query!(
-        "SELECT cbu_id FROM kyc.outstanding_requests WHERE request_id = $1",
+        "SELECT cbu_id FROM \"ob-poc\".outstanding_requests WHERE request_id = $1",
         request.request_id
     )
     .fetch_optional(&state.pool)
@@ -522,7 +522,7 @@ async fn submit_document(
     // Create submission
     let submission_id = sqlx::query_scalar!(
         r#"
-        INSERT INTO client_portal.submissions
+        INSERT INTO "ob-poc".submissions
             (client_id, request_id, submission_type, document_type, file_reference, file_name)
         VALUES ($1, $2, 'DOCUMENT', $3, $4, $5)
         RETURNING submission_id
@@ -546,7 +546,7 @@ async fn submit_document(
     // Update request status to indicate submission received
     let _ = sqlx::query!(
         r#"
-        UPDATE kyc.outstanding_requests
+        UPDATE "ob-poc".outstanding_requests
         SET status = CASE WHEN status = 'PENDING' THEN 'SUBMITTED' ELSE status END,
             updated_at = now()
         WHERE request_id = $1
@@ -571,7 +571,7 @@ async fn provide_info(
 ) -> Result<Json<SuccessResponse>, (StatusCode, String)> {
     // Verify client has access
     let outstanding = sqlx::query!(
-        "SELECT cbu_id FROM kyc.outstanding_requests WHERE request_id = $1",
+        "SELECT cbu_id FROM \"ob-poc\".outstanding_requests WHERE request_id = $1",
         request.request_id
     )
     .fetch_optional(&state.pool)
@@ -599,7 +599,7 @@ async fn provide_info(
     // Create info submission
     let submission_id = sqlx::query_scalar!(
         r#"
-        INSERT INTO client_portal.submissions
+        INSERT INTO "ob-poc".submissions
             (client_id, request_id, submission_type, info_type, info_data, note_text)
         VALUES ($1, $2, 'INFORMATION', $3, $4, $5)
         RETURNING submission_id
@@ -635,7 +635,7 @@ async fn add_note(
 ) -> Result<Json<SuccessResponse>, (StatusCode, String)> {
     // Verify access
     let outstanding = sqlx::query!(
-        "SELECT cbu_id FROM kyc.outstanding_requests WHERE request_id = $1",
+        "SELECT cbu_id FROM \"ob-poc\".outstanding_requests WHERE request_id = $1",
         request.request_id
     )
     .fetch_optional(&state.pool)
@@ -663,7 +663,7 @@ async fn add_note(
     // Update client_notes on request
     sqlx::query!(
         r#"
-        UPDATE kyc.outstanding_requests
+        UPDATE "ob-poc".outstanding_requests
         SET client_notes = COALESCE(client_notes || E'\n', '') || $2,
             updated_at = now()
         WHERE request_id = $1
@@ -691,7 +691,7 @@ async fn add_note(
         let reminder_date = expected_date - chrono::Duration::days(1);
         let _ = sqlx::query!(
             r#"
-            INSERT INTO client_portal.commitments
+            INSERT INTO "ob-poc".commitments
                 (client_id, request_id, commitment_text, expected_date, reminder_date)
             VALUES ($1, $2, $3, $4, $5)
             "#,
@@ -721,7 +721,7 @@ async fn escalate(
     // Create escalation
     let escalation_id = sqlx::query_scalar!(
         r#"
-        INSERT INTO client_portal.escalations
+        INSERT INTO "ob-poc".escalations
             (client_id, reason, preferred_contact, conversation_context)
         VALUES ($1, $2, $3, $4)
         RETURNING escalation_id

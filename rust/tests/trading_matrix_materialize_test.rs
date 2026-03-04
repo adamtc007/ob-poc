@@ -117,7 +117,7 @@ mod materialize_tests {
         async fn count_ssis(&self) -> Result<i64> {
             let cbu_id = self.cbu_id.unwrap();
             let count: (i64,) =
-                sqlx::query_as("SELECT COUNT(*) FROM custody.cbu_ssi WHERE cbu_id = $1")
+                sqlx::query_as("SELECT COUNT(*) FROM \"ob-poc\".cbu_ssi WHERE cbu_id = $1")
                     .bind(cbu_id)
                     .fetch_one(&self.pool)
                     .await?;
@@ -127,7 +127,7 @@ mod materialize_tests {
         async fn count_isda(&self) -> Result<i64> {
             let cbu_id = self.cbu_id.unwrap();
             let count: (i64,) =
-                sqlx::query_as("SELECT COUNT(*) FROM custody.isda_agreements WHERE cbu_id = $1")
+                sqlx::query_as("SELECT COUNT(*) FROM \"ob-poc\".isda_agreements WHERE cbu_id = $1")
                     .bind(cbu_id)
                     .fetch_one(&self.pool)
                     .await?;
@@ -137,8 +137,8 @@ mod materialize_tests {
         async fn count_csa(&self) -> Result<i64> {
             let cbu_id = self.cbu_id.unwrap();
             let count: (i64,) = sqlx::query_as(
-                r#"SELECT COUNT(*) FROM custody.csa_agreements ca
-                   JOIN custody.isda_agreements ia ON ca.isda_id = ia.isda_id
+                r#"SELECT COUNT(*) FROM "ob-poc".csa_agreements ca
+                   JOIN "ob-poc".isda_agreements ia ON ca.isda_id = ia.isda_id
                    WHERE ia.cbu_id = $1"#,
             )
             .bind(cbu_id)
@@ -150,7 +150,7 @@ mod materialize_tests {
         async fn ssi_exists(&self, ssi_name: &str) -> Result<bool> {
             let cbu_id = self.cbu_id.unwrap();
             let exists: (bool,) = sqlx::query_as(
-                "SELECT EXISTS(SELECT 1 FROM custody.cbu_ssi WHERE cbu_id = $1 AND ssi_name = $2)",
+                "SELECT EXISTS(SELECT 1 FROM \"ob-poc\".cbu_ssi WHERE cbu_id = $1 AND ssi_name = $2)",
             )
             .bind(cbu_id)
             .bind(ssi_name)
@@ -165,8 +165,8 @@ mod materialize_tests {
             if let Some(cbu_id) = self.cbu_id {
                 // CSA agreements (via ISDA FK)
                 sqlx::query(
-                    r#"DELETE FROM custody.csa_agreements WHERE isda_id IN
-                       (SELECT isda_id FROM custody.isda_agreements WHERE cbu_id = $1)"#,
+                    r#"DELETE FROM "ob-poc".csa_agreements WHERE isda_id IN
+                       (SELECT isda_id FROM "ob-poc".isda_agreements WHERE cbu_id = $1)"#,
                 )
                 .bind(cbu_id)
                 .execute(&self.pool)
@@ -175,8 +175,8 @@ mod materialize_tests {
 
                 // ISDA product coverage
                 sqlx::query(
-                    r#"DELETE FROM custody.isda_product_coverage WHERE isda_id IN
-                       (SELECT isda_id FROM custody.isda_agreements WHERE cbu_id = $1)"#,
+                    r#"DELETE FROM "ob-poc".isda_product_coverage WHERE isda_id IN
+                       (SELECT isda_id FROM "ob-poc".isda_agreements WHERE cbu_id = $1)"#,
                 )
                 .bind(cbu_id)
                 .execute(&self.pool)
@@ -184,28 +184,28 @@ mod materialize_tests {
                 .ok();
 
                 // ISDA agreements
-                sqlx::query("DELETE FROM custody.isda_agreements WHERE cbu_id = $1")
+                sqlx::query("DELETE FROM \"ob-poc\".isda_agreements WHERE cbu_id = $1")
                     .bind(cbu_id)
                     .execute(&self.pool)
                     .await
                     .ok();
 
                 // Booking rules
-                sqlx::query("DELETE FROM custody.ssi_booking_rules WHERE cbu_id = $1")
+                sqlx::query("DELETE FROM \"ob-poc\".ssi_booking_rules WHERE cbu_id = $1")
                     .bind(cbu_id)
                     .execute(&self.pool)
                     .await
                     .ok();
 
                 // Universe
-                sqlx::query("DELETE FROM custody.cbu_instrument_universe WHERE cbu_id = $1")
+                sqlx::query("DELETE FROM \"ob-poc\".cbu_instrument_universe WHERE cbu_id = $1")
                     .bind(cbu_id)
                     .execute(&self.pool)
                     .await
                     .ok();
 
                 // SSIs
-                sqlx::query("DELETE FROM custody.cbu_ssi WHERE cbu_id = $1")
+                sqlx::query("DELETE FROM \"ob-poc\".cbu_ssi WHERE cbu_id = $1")
                     .bind(cbu_id)
                     .execute(&self.pool)
                     .await
@@ -319,7 +319,7 @@ mod materialize_tests {
         let duplicates: (i64,) = sqlx::query_as(
             r#"SELECT COUNT(*) FROM (
                 SELECT ssi_name, COUNT(*) as cnt
-                FROM custody.cbu_ssi
+                FROM "ob-poc".cbu_ssi
                 WHERE cbu_id = $1
                 GROUP BY ssi_name
                 HAVING COUNT(*) > 1

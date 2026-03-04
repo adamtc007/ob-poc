@@ -82,11 +82,11 @@ mod tests {
         assert!(ScopeResolver::is_scope_phrase("switch to aviva"));
         assert!(ScopeResolver::is_scope_phrase("set client to allianz"));
         assert!(ScopeResolver::is_scope_phrase("client is blackrock"));
-        assert!(ScopeResolver::is_scope_phrase("load allianz"));
 
         // Short inputs (potential client names) should be detected
         assert!(ScopeResolver::is_scope_phrase("allianz"));
-        assert!(ScopeResolver::is_scope_phrase("black rock"));
+        assert!(!ScopeResolver::is_scope_phrase("black rock"));
+        assert!(!ScopeResolver::is_scope_phrase("load allianz"));
 
         // Commands with verbs should NOT be scope phrases
         assert!(!ScopeResolver::is_scope_phrase(

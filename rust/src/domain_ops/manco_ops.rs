@@ -59,7 +59,7 @@ impl CustomOperation for MancoBridgeRolesOp {
         let as_of = extract_date_opt(verb_call, "as-of");
 
         let row: (i32, i32) =
-            sqlx::query_as("SELECT * FROM kyc.fn_bridge_manco_role_to_board_rights($1)")
+            sqlx::query_as("SELECT * FROM \"ob-poc\".fn_bridge_manco_role_to_board_rights($1)")
                 .bind(as_of)
                 .fetch_one(pool)
                 .await?;
@@ -111,7 +111,7 @@ impl CustomOperation for MancoBridgeGleifFundManagersOp {
         let as_of = extract_date_opt(verb_call, "as-of");
 
         let row: (i32, i32) =
-            sqlx::query_as("SELECT * FROM kyc.fn_bridge_gleif_fund_manager_to_board_rights($1)")
+            sqlx::query_as("SELECT * FROM \"ob-poc\".fn_bridge_gleif_fund_manager_to_board_rights($1)")
                 .bind(as_of)
                 .fetch_one(pool)
                 .await?;
@@ -137,7 +137,7 @@ impl CustomOperation for MancoBridgeGleifFundManagersOp {
     }
 }
 
-/// Bridge BODS ownership statements to kyc.holdings
+/// Bridge BODS ownership statements to "ob-poc".holdings
 #[register_custom_op]
 pub struct MancoBridgeBodsOwnershipOp;
 
@@ -163,7 +163,7 @@ impl CustomOperation for MancoBridgeBodsOwnershipOp {
         let as_of = extract_date_opt(verb_call, "as-of");
 
         let row: (i32, i32, i32) =
-            sqlx::query_as("SELECT * FROM kyc.fn_bridge_bods_to_holdings($1)")
+            sqlx::query_as("SELECT * FROM \"ob-poc\".fn_bridge_bods_to_holdings($1)")
                 .bind(as_of)
                 .fetch_one(pool)
                 .await?;
@@ -443,7 +443,7 @@ impl CustomOperation for MancoPrimaryControllerOp {
             Option<Decimal>,    // economic_pct
             Option<bool>,       // has_control
             Option<bool>,       // has_significant_influence
-        )> = sqlx::query_as("SELECT * FROM kyc.fn_primary_governance_controller($1, $2)")
+        )> = sqlx::query_as("SELECT * FROM \"ob-poc\".fn_primary_governance_controller($1, $2)")
             .bind(issuer_entity_id)
             .bind(as_of)
             .fetch_optional(pool)
@@ -819,7 +819,7 @@ impl CustomOperation for OwnershipComputeControlLinksOp {
         let issuer_entity_id = extract_uuid_opt(verb_call, ctx, "issuer-entity-id");
         let as_of = extract_date_opt(verb_call, "as-of");
 
-        let count: i32 = sqlx::query_scalar("SELECT kyc.fn_compute_control_links($1, $2)")
+        let count: i32 = sqlx::query_scalar("SELECT \"ob-poc\".fn_compute_control_links($1, $2)")
             .bind(issuer_entity_id)
             .bind(as_of)
             .fetch_one(pool)
@@ -869,7 +869,7 @@ impl CustomOperation for OwnershipRefreshOp {
 
         // 1. Bridge ManCo roles → board rights
         let manco_row: (i32, i32) =
-            sqlx::query_as("SELECT * FROM kyc.fn_bridge_manco_role_to_board_rights($1)")
+            sqlx::query_as("SELECT * FROM \"ob-poc\".fn_bridge_manco_role_to_board_rights($1)")
                 .bind(as_of)
                 .fetch_one(pool)
                 .await?;
@@ -880,7 +880,7 @@ impl CustomOperation for OwnershipRefreshOp {
 
         // 2. Bridge GLEIF fund managers → board rights
         let gleif_row: (i32, i32) =
-            sqlx::query_as("SELECT * FROM kyc.fn_bridge_gleif_fund_manager_to_board_rights($1)")
+            sqlx::query_as("SELECT * FROM \"ob-poc\".fn_bridge_gleif_fund_manager_to_board_rights($1)")
                 .bind(as_of)
                 .fetch_one(pool)
                 .await?;
@@ -891,7 +891,7 @@ impl CustomOperation for OwnershipRefreshOp {
 
         // 3. Bridge BODS ownership → holdings
         let bods_row: (i32, i32, i32) =
-            sqlx::query_as("SELECT * FROM kyc.fn_bridge_bods_to_holdings($1)")
+            sqlx::query_as("SELECT * FROM \"ob-poc\".fn_bridge_bods_to_holdings($1)")
                 .bind(as_of)
                 .fetch_one(pool)
                 .await?;
@@ -902,7 +902,7 @@ impl CustomOperation for OwnershipRefreshOp {
         };
 
         // 4. Compute control links
-        let links_count: i32 = sqlx::query_scalar("SELECT kyc.fn_compute_control_links(NULL, $1)")
+        let links_count: i32 = sqlx::query_scalar("SELECT \"ob-poc\".fn_compute_control_links(NULL, $1)")
             .bind(as_of)
             .fetch_one(pool)
             .await?;

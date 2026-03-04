@@ -2675,7 +2675,7 @@ impl UnifiedSession {
 
         sqlx::query(
             r#"
-            INSERT INTO "ob-poc".sessions (id, user_id, name, cbu_ids, history, future)
+            INSERT INTO "ob-poc".client_portal_sessions (id, user_id, name, cbu_ids, history, future)
             VALUES ($1, $2, $3, $4, $5, $6)
             ON CONFLICT (id) DO UPDATE SET
                 user_id = EXCLUDED.user_id,
@@ -2717,7 +2717,7 @@ impl UnifiedSession {
         )> = sqlx::query_as(
             r#"
             SELECT id, user_id, name, cbu_ids, history, future
-            FROM "ob-poc".sessions
+            FROM "ob-poc".client_portal_sessions
             WHERE id = $1 AND expires_at > NOW()
             "#,
         )
@@ -2763,7 +2763,7 @@ impl UnifiedSession {
     /// Delete session from database
     #[cfg(feature = "database")]
     pub async fn delete(id: Uuid, pool: &sqlx::PgPool) -> Result<bool, sqlx::Error> {
-        let result = sqlx::query(r#"DELETE FROM "ob-poc".sessions WHERE id = $1"#)
+        let result = sqlx::query(r#"DELETE FROM "ob-poc".client_portal_sessions WHERE id = $1"#)
             .bind(id)
             .execute(pool)
             .await?;
@@ -2785,7 +2785,7 @@ impl UnifiedSession {
                 name,
                 array_length(cbu_ids, 1) as cbu_count,
                 updated_at
-            FROM "ob-poc".sessions
+            FROM "ob-poc".client_portal_sessions
             WHERE ($1::uuid IS NULL AND user_id IS NULL) OR user_id = $1
             AND expires_at > NOW()
             ORDER BY updated_at DESC

@@ -1,7 +1,7 @@
 //! Partnership Operations - Partnership capital and control management
 //!
 //! Plugin handlers for partnership.yaml verbs that require custom logic.
-//! Uses kyc.partnership_capital table for partner capital tracking.
+//! Uses "ob-poc".partnership_capital table for partner capital tracking.
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
@@ -22,7 +22,7 @@ use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
 // ============================================================================
 
 /// Records a capital contribution to a partnership, updating capital accounts.
-/// Updates the capital_contributed column in kyc.partnership_capital.
+/// Updates the capital_contributed column in "ob-poc".partnership_capital.
 #[register_custom_op]
 pub struct PartnershipContributionOp;
 
@@ -78,7 +78,7 @@ impl CustomOperation for PartnershipContributionOp {
         let partner_record: Option<PartnerRecord> = sqlx::query_as(
             r#"
             SELECT id, partner_type, capital_commitment, capital_contributed, capital_returned
-            FROM kyc.partnership_capital
+            FROM "ob-poc".partnership_capital
             WHERE partnership_entity_id = $1 AND partner_entity_id = $2 AND is_active = true
             "#,
         )
@@ -111,7 +111,7 @@ impl CustomOperation for PartnershipContributionOp {
         // Update capital_contributed
         sqlx::query(
             r#"
-            UPDATE kyc.partnership_capital
+            UPDATE "ob-poc".partnership_capital
             SET capital_contributed = $1, updated_at = NOW()
             WHERE id = $2
             "#,
@@ -164,7 +164,7 @@ impl CustomOperation for PartnershipContributionOp {
 // ============================================================================
 
 /// Records a capital return/distribution from partnership to partner.
-/// Updates the capital_returned column in kyc.partnership_capital.
+/// Updates the capital_returned column in "ob-poc".partnership_capital.
 #[register_custom_op]
 pub struct PartnershipDistributionOp;
 
@@ -215,7 +215,7 @@ impl CustomOperation for PartnershipDistributionOp {
         let partner_record: Option<PartnerRecord> = sqlx::query_as(
             r#"
             SELECT id, partner_type, capital_commitment, capital_contributed, capital_returned
-            FROM kyc.partnership_capital
+            FROM "ob-poc".partnership_capital
             WHERE partnership_entity_id = $1 AND partner_entity_id = $2 AND is_active = true
             "#,
         )
@@ -253,7 +253,7 @@ impl CustomOperation for PartnershipDistributionOp {
         // Update capital_returned
         sqlx::query(
             r#"
-            UPDATE kyc.partnership_capital
+            UPDATE "ob-poc".partnership_capital
             SET capital_returned = $1, updated_at = NOW()
             WHERE id = $2
             "#,
@@ -347,7 +347,7 @@ impl CustomOperation for PartnershipReconcileOp {
                 pc.voting_pct,
                 pc.capital_commitment,
                 pc.capital_contributed
-            FROM kyc.partnership_capital pc
+            FROM "ob-poc".partnership_capital pc
             JOIN "ob-poc".entities e ON pc.partner_entity_id = e.entity_id
             WHERE pc.partnership_entity_id = $1 AND pc.is_active = true
             ORDER BY pc.partner_type, pc.profit_share_pct DESC NULLS LAST
@@ -514,7 +514,7 @@ impl CustomOperation for PartnershipAnalyzeControlOp {
                     SELECT 1 FROM "ob-poc".entity_proper_persons pp
                     WHERE pp.entity_id = pc.partner_entity_id
                 ) as is_natural_person
-            FROM kyc.partnership_capital pc
+            FROM "ob-poc".partnership_capital pc
             JOIN "ob-poc".entities e ON pc.partner_entity_id = e.entity_id
             WHERE pc.partnership_entity_id = $1 AND pc.is_active = true
             ORDER BY pc.partner_type, pc.profit_share_pct DESC NULLS LAST

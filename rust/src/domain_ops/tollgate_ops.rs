@@ -57,7 +57,7 @@ impl CustomOperation for TollgateEvaluateOp {
 
         // Get case info
         let case_info: Option<(Uuid,)> =
-            sqlx::query_as(r#"SELECT cbu_id FROM kyc.cases WHERE case_id = $1"#)
+            sqlx::query_as(r#"SELECT cbu_id FROM "ob-poc".cases WHERE case_id = $1"#)
                 .bind(case_id)
                 .fetch_optional(pool)
                 .await?;
@@ -68,7 +68,7 @@ impl CustomOperation for TollgateEvaluateOp {
         let metrics = compute_metrics(pool, cbu_id, case_id).await?;
 
         // Get thresholds for this evaluation type
-        // Uses kyc.tollgate_thresholds with comparison-based evaluation
+        // Uses "ob-poc".tollgate_thresholds with comparison-based evaluation
         #[derive(sqlx::FromRow)]
         struct ThresholdRow {
             threshold_name: String,
@@ -82,7 +82,7 @@ impl CustomOperation for TollgateEvaluateOp {
         let thresholds: Vec<ThresholdRow> = sqlx::query_as(
             r#"
             SELECT threshold_name, metric_type, comparison, threshold_value, is_blocking, weight
-            FROM kyc.tollgate_thresholds
+            FROM "ob-poc".tollgate_thresholds
             WHERE $1 = ANY(applies_to_case_types) OR applies_to_case_types IS NULL
             ORDER BY is_blocking DESC, threshold_name
             "#,
@@ -191,7 +191,7 @@ impl CustomOperation for TollgateEvaluateOp {
         // Record evaluation - schema requires cbu_id
         let evaluation_id: (Uuid,) = sqlx::query_as(
             r#"
-            INSERT INTO kyc.tollgate_evaluations (
+            INSERT INTO "ob-poc".tollgate_evaluations (
                 case_id, cbu_id, evaluation_type, overall_result, score,
                 metrics, threshold_results, blocking_failures, warnings, evaluated_by
             )
@@ -264,7 +264,7 @@ impl CustomOperation for TollgateGetMetricsOp {
         // Find active case for this CBU
         let case_id: Option<(Uuid,)> = sqlx::query_as(
             r#"
-            SELECT case_id FROM kyc.cases
+            SELECT case_id FROM "ob-poc".cases
             WHERE cbu_id = $1 AND status NOT IN ('APPROVED', 'REJECTED', 'WITHDRAWN')
             ORDER BY opened_at DESC
             LIMIT 1
@@ -338,7 +338,7 @@ impl CustomOperation for TollgateOverrideOp {
 
         // Verify evaluation exists and is a failure
         let eval: Option<(String,)> =
-            sqlx::query_as(r#"SELECT overall_result FROM kyc.tollgate_evaluations WHERE id = $1"#)
+            sqlx::query_as(r#"SELECT overall_result FROM "ob-poc".tollgate_evaluations WHERE id = $1"#)
                 .bind(evaluation_id)
                 .fetch_optional(pool)
                 .await?;
@@ -352,7 +352,7 @@ impl CustomOperation for TollgateOverrideOp {
         // Record override - schema requires approval_authority
         let override_id: (Uuid,) = sqlx::query_as(
             r#"
-            INSERT INTO kyc.tollgate_overrides (
+            INSERT INTO "ob-poc".tollgate_overrides (
                 evaluation_id, override_reason, approved_by, approval_authority, conditions, expiry_date
             )
             VALUES ($1, $2, $3, $4, $5, $6::date)
@@ -410,7 +410,7 @@ impl CustomOperation for TollgateDecisionReadinessOp {
 
         // Get case info
         let case_info: Option<(Uuid, String)> =
-            sqlx::query_as(r#"SELECT cbu_id, status FROM kyc.cases WHERE case_id = $1"#)
+            sqlx::query_as(r#"SELECT cbu_id, status FROM "ob-poc".cases WHERE case_id = $1"#)
                 .bind(case_id)
                 .fetch_optional(pool)
                 .await?;
@@ -422,7 +422,7 @@ impl CustomOperation for TollgateDecisionReadinessOp {
             r#"
             SELECT DISTINCT ON (evaluation_type)
                 evaluation_type, overall_result, score
-            FROM kyc.tollgate_evaluations
+            FROM "ob-poc".tollgate_evaluations
             WHERE case_id = $1
             ORDER BY evaluation_type, evaluated_at DESC
             "#,
@@ -556,7 +556,7 @@ async fn compute_metrics(pool: &PgPool, cbu_id: Uuid, case_id: Uuid) -> Result<T
     let ubo_stats: (Option<rust_decimal::Decimal>,) = sqlx::query_as(
         r#"
         SELECT COALESCE(SUM(ownership_percentage), 0)
-        FROM "ob-poc".ubo_registry
+        FROM "ob-poc".kyc_ubo_registry
         WHERE cbu_id = $1 AND workflow_status = 'VERIFIED'
         "#,
     )
@@ -573,8 +573,8 @@ async fn compute_metrics(pool: &PgPool, cbu_id: Uuid, case_id: Uuid) -> Result<T
         SELECT
             COUNT(*) as total,
             COUNT(*) FILTER (WHERE status IN ('VERIFIED', 'WAIVED')) as complete
-        FROM kyc.doc_requests dr
-        JOIN kyc.entity_workstreams ew ON dr.workstream_id = ew.workstream_id
+        FROM "ob-poc".doc_requests dr
+        JOIN "ob-poc".entity_workstreams ew ON dr.workstream_id = ew.workstream_id
         WHERE ew.case_id = $1
         "#,
     )
@@ -598,8 +598,8 @@ async fn compute_metrics(pool: &PgPool, cbu_id: Uuid, case_id: Uuid) -> Result<T
         SELECT
             COUNT(*) as total,
             COUNT(*) FILTER (WHERE status IN ('CLEAR', 'HIT_DISMISSED')) as clear
-        FROM kyc.screenings s
-        JOIN kyc.entity_workstreams ew ON s.workstream_id = ew.workstream_id
+        FROM "ob-poc".screenings s
+        JOIN "ob-poc".entity_workstreams ew ON s.workstream_id = ew.workstream_id
         WHERE ew.case_id = $1
         "#,
     )
@@ -620,7 +620,7 @@ async fn compute_metrics(pool: &PgPool, cbu_id: Uuid, case_id: Uuid) -> Result<T
     // Red flag count
     let red_flag_count: (i64,) = sqlx::query_as(
         r#"
-        SELECT COUNT(*) FROM kyc.red_flags
+        SELECT COUNT(*) FROM "ob-poc".red_flags
         WHERE case_id = $1 AND status IN ('OPEN', 'UNDER_REVIEW', 'BLOCKING')
         "#,
     )
@@ -645,7 +645,7 @@ async fn compute_metrics(pool: &PgPool, cbu_id: Uuid, case_id: Uuid) -> Result<T
     let last_activity: Option<(i64,)> = sqlx::query_as(
         r#"
         SELECT EXTRACT(DAY FROM (now() - last_activity_at))::bigint
-        FROM kyc.cases
+        FROM "ob-poc".cases
         WHERE case_id = $1
         "#,
     )

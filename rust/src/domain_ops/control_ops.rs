@@ -162,7 +162,7 @@ impl CustomOperation for ControlAnalyzeOp {
                 .push("voting_rights".to_string());
         }
 
-        // 3. Check board control using kyc.board_compositions
+        // 3. Check board control using "ob-poc".board_compositions
         // This table tracks who appoints whom to the board
         #[derive(sqlx::FromRow)]
         struct BoardControlRow {
@@ -180,9 +180,9 @@ impl CustomOperation for ControlAnalyzeOp {
                     bc.appointed_by_entity_id as appointer_id,
                     e.name as appointer_name,
                     COUNT(*) as appointments,
-                    (SELECT COUNT(*) FROM kyc.board_compositions
+                    (SELECT COUNT(*) FROM "ob-poc".board_compositions
                      WHERE entity_id = $1 AND (ended_at IS NULL OR ended_at > CURRENT_DATE)) as total_board
-                FROM kyc.board_compositions bc
+                FROM "ob-poc".board_compositions bc
                 LEFT JOIN "ob-poc".entities e ON bc.appointed_by_entity_id = e.entity_id
                 WHERE bc.entity_id = $1
                   AND (bc.ended_at IS NULL OR bc.ended_at > CURRENT_DATE)
@@ -229,7 +229,7 @@ impl CustomOperation for ControlAnalyzeOp {
         }
 
         // 4. Check trust control (if entity is a trust)
-        // Uses kyc.trust_provisions for granular provisions analysis
+        // Uses "ob-poc".trust_provisions for granular provisions analysis
         if entity_type.as_deref() == Some("trust_discretionary") {
             #[derive(sqlx::FromRow)]
             struct TrustControlRow {
@@ -246,7 +246,7 @@ impl CustomOperation for ControlAnalyzeOp {
                     e.name,
                     tp.provision_type,
                     tp.has_discretion
-                FROM kyc.trust_provisions tp
+                FROM "ob-poc".trust_provisions tp
                 JOIN "ob-poc".entities e ON tp.holder_entity_id = e.entity_id
                 WHERE tp.trust_entity_id = $1
                   AND (tp.effective_to IS NULL OR tp.effective_to > CURRENT_DATE)
@@ -283,7 +283,7 @@ impl CustomOperation for ControlAnalyzeOp {
         }
 
         // 5. Check partnership control (if entity is a partnership)
-        // Uses kyc.partnership_capital for partner economics and control rights
+        // Uses "ob-poc".partnership_capital for partner economics and control rights
         if entity_type.as_deref() == Some("partnership_limited") {
             #[derive(sqlx::FromRow)]
             struct GpControlRow {
@@ -296,7 +296,7 @@ impl CustomOperation for ControlAnalyzeOp {
                 SELECT
                     pc.partner_entity_id,
                     e.name
-                FROM kyc.partnership_capital pc
+                FROM "ob-poc".partnership_capital pc
                 JOIN "ob-poc".entities e ON pc.partner_entity_id = e.entity_id
                 WHERE pc.partnership_entity_id = $1
                   AND pc.partner_type = 'GP'
@@ -586,7 +586,7 @@ impl CustomOperation for ControlBuildGraphOp {
             }
         }
 
-        // Add board appointment edges from kyc.board_compositions
+        // Add board appointment edges from "ob-poc".board_compositions
         let entity_ids: Vec<Uuid> = cbu_entities.iter().map(|(id,)| *id).collect();
 
         #[derive(sqlx::FromRow)]
@@ -600,7 +600,7 @@ impl CustomOperation for ControlBuildGraphOp {
             SELECT DISTINCT
                 bc.appointed_by_entity_id,
                 bc.entity_id
-            FROM kyc.board_compositions bc
+            FROM "ob-poc".board_compositions bc
             WHERE bc.entity_id = ANY($1)
               AND bc.appointed_by_entity_id IS NOT NULL
               AND (bc.ended_at IS NULL OR bc.ended_at > CURRENT_DATE)
@@ -746,7 +746,7 @@ impl CustomOperation for ControlIdentifyUbosOp {
         .await?;
 
         // Also check for control-based UBOs (board control, trust roles, GP status)
-        // Uses kyc.board_compositions, kyc.trust_provisions, kyc.partnership_capital
+        // Uses "ob-poc".board_compositions, "ob-poc".trust_provisions, "ob-poc".partnership_capital
         #[derive(sqlx::FromRow)]
         struct ControlUboRow {
             person_entity_id: Uuid,
@@ -769,7 +769,7 @@ impl CustomOperation for ControlIdentifyUbosOp {
                 pp.nationality,
                 'board_control'::text as control_vector,
                 NULL::numeric as effective_percentage
-            FROM kyc.board_compositions bc
+            FROM "ob-poc".board_compositions bc
             JOIN "ob-poc".cbu_entity_roles cer ON cer.entity_id = bc.entity_id AND cer.cbu_id = $1
             JOIN "ob-poc".entities e ON bc.appointed_by_entity_id = e.entity_id
             JOIN "ob-poc".entity_proper_persons pp ON pp.entity_id = e.entity_id
@@ -787,7 +787,7 @@ impl CustomOperation for ControlIdentifyUbosOp {
                 pp.nationality,
                 'trust_' || tp.provision_type as control_vector,
                 NULL::numeric as effective_percentage
-            FROM kyc.trust_provisions tp
+            FROM "ob-poc".trust_provisions tp
             JOIN "ob-poc".cbu_entity_roles cer ON cer.entity_id = tp.trust_entity_id AND cer.cbu_id = $1
             JOIN "ob-poc".entities e ON tp.holder_entity_id = e.entity_id
             JOIN "ob-poc".entity_proper_persons pp ON pp.entity_id = e.entity_id
@@ -805,7 +805,7 @@ impl CustomOperation for ControlIdentifyUbosOp {
                 pp.nationality,
                 'general_partner'::text as control_vector,
                 pc.profit_share_pct as effective_percentage
-            FROM kyc.partnership_capital pc
+            FROM "ob-poc".partnership_capital pc
             JOIN "ob-poc".cbu_entity_roles cer ON cer.entity_id = pc.partnership_entity_id AND cer.cbu_id = $1
             JOIN "ob-poc".entities e ON pc.partner_entity_id = e.entity_id
             JOIN "ob-poc".entity_proper_persons pp ON pp.entity_id = e.entity_id
@@ -1135,7 +1135,7 @@ impl CustomOperation for ControlReconcileOwnershipOp {
             .map(|d| d.to_string().parse::<f64>().unwrap_or(0.01))
             .unwrap_or(0.01); // 1% tolerance for rounding
 
-        // Get ownership from share capital using kyc.holdings and kyc.share_classes
+        // Get ownership from share capital using "ob-poc".holdings and "ob-poc".share_classes
         #[derive(sqlx::FromRow)]
         struct ShareOwnershipRow {
             investor_entity_id: Uuid,
@@ -1148,16 +1148,16 @@ impl CustomOperation for ControlReconcileOwnershipOp {
                 SELECT
                     h.investor_entity_id,
                     SUM(h.units) as total_units
-                FROM kyc.holdings h
-                JOIN kyc.share_classes sc ON h.share_class_id = sc.id
+                FROM "ob-poc".holdings h
+                JOIN "ob-poc".share_classes sc ON h.share_class_id = sc.id
                 WHERE sc.issuer_entity_id = $1
                   AND h.status = 'active'
                 GROUP BY h.investor_entity_id
             ),
             total_issued AS (
                 SELECT COALESCE(SUM(h.units), 0) as all_units
-                FROM kyc.holdings h
-                JOIN kyc.share_classes sc ON h.share_class_id = sc.id
+                FROM "ob-poc".holdings h
+                JOIN "ob-poc".share_classes sc ON h.share_class_id = sc.id
                 WHERE sc.issuer_entity_id = $1
                   AND h.status = 'active'
             )
@@ -1403,10 +1403,10 @@ impl CustomOperation for ShowBoardControllerOp {
                     bc.appointed_by_entity_id as appointer_id,
                     e.name as appointer_name,
                     COUNT(*) as appointments,
-                    (SELECT COUNT(*) FROM kyc.board_compositions bc2
+                    (SELECT COUNT(*) FROM "ob-poc".board_compositions bc2
                      WHERE bc2.entity_id IN (SELECT entity_id FROM cbu_entities)
                      AND (bc2.ended_at IS NULL OR bc2.ended_at > CURRENT_DATE)) as total_board
-                FROM kyc.board_compositions bc
+                FROM "ob-poc".board_compositions bc
                 JOIN "ob-poc".entities e ON bc.appointed_by_entity_id = e.entity_id
                 WHERE bc.entity_id IN (SELECT entity_id FROM cbu_entities)
                   AND bc.appointed_by_entity_id IS NOT NULL

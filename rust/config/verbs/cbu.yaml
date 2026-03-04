@@ -41,7 +41,7 @@ domains:
             description: CBU name (typically the fund name)
           - name: jurisdiction
             type: string
-            required: true
+            required: false
             description: Jurisdiction code (e.g., US, GB, LU, IE, KY)
             lookup:
               table: master_jurisdictions

@@ -1667,7 +1667,7 @@ async fn log_research_action(
     entities_updated: i32,
 ) -> Result<Uuid> {
     let action_id: Uuid = sqlx::query_scalar(
-        r#"INSERT INTO kyc.research_actions
+        r#"INSERT INTO "ob-poc".research_actions
            (decision_id, verb_fqn, result_summary, entities_created, entities_updated)
            VALUES ($1, $2, $3, $4, $5)
            RETURNING action_id"#,

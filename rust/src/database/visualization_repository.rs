@@ -804,7 +804,7 @@ impl VisualizationRepository {
             ShareClassView,
             r#"SELECT id, name, currency as "currency!", class_category, isin,
                       nav_per_share::text as nav_per_share, fund_type
-               FROM kyc.share_classes
+               FROM "ob-poc".share_classes
                WHERE cbu_id = $1
                ORDER BY class_category DESC, name"#,
             cbu_id
@@ -818,8 +818,8 @@ impl VisualizationRepository {
     pub async fn get_holdings(&self, cbu_id: Uuid) -> Result<Vec<HoldingView>> {
         let rows = sqlx::query!(
             r#"SELECT h.investor_entity_id, h.share_class_id, h.units::text as "units!"
-               FROM kyc.holdings h
-               JOIN kyc.share_classes sc ON h.share_class_id = sc.id
+               FROM "ob-poc".holdings h
+               JOIN "ob-poc".share_classes sc ON h.share_class_id = sc.id
                WHERE sc.cbu_id = $1 AND h.status = 'active'"#,
             cbu_id
         )
@@ -1039,9 +1039,9 @@ impl VisualizationRepository {
     pub async fn get_cbu_screenings(&self, cbu_id: Uuid) -> Result<Vec<CbuScreeningView>> {
         let rows = sqlx::query!(
             r#"SELECT s.screening_id, w.entity_id, s.screening_type, s.status, s.result_summary as result
-               FROM kyc.screenings s
-               JOIN kyc.entity_workstreams w ON w.workstream_id = s.workstream_id
-               JOIN kyc.cases c ON c.case_id = w.case_id
+               FROM "ob-poc".screenings s
+               JOIN "ob-poc".entity_workstreams w ON w.workstream_id = s.workstream_id
+               JOIN "ob-poc".cases c ON c.case_id = w.case_id
                WHERE c.cbu_id = $1"#,
             cbu_id
         )
@@ -1136,8 +1136,8 @@ impl VisualizationRepository {
     pub async fn get_entity_screenings(&self, entity_id: Uuid) -> Result<Vec<EntityScreeningView>> {
         let rows = sqlx::query!(
             r#"SELECT s.screening_id, s.screening_type, s.status, s.result_summary as result
-               FROM kyc.screenings s
-               JOIN kyc.entity_workstreams w ON w.workstream_id = s.workstream_id
+               FROM "ob-poc".screenings s
+               JOIN "ob-poc".entity_workstreams w ON w.workstream_id = s.workstream_id
                WHERE w.entity_id = $1"#,
             entity_id
         )
@@ -1284,9 +1284,9 @@ impl VisualizationRepository {
                 ic.name as "class_name?",
                 m.name as "market_name?",
                 m.mic as "mic?"
-               FROM custody.cbu_instrument_universe u
-               LEFT JOIN custody.instrument_classes ic ON ic.class_id = u.instrument_class_id
-               LEFT JOIN custody.markets m ON m.market_id = u.market_id
+               FROM "ob-poc".cbu_instrument_universe u
+               LEFT JOIN "ob-poc".instrument_classes ic ON ic.class_id = u.instrument_class_id
+               LEFT JOIN "ob-poc".markets m ON m.market_id = u.market_id
                WHERE u.cbu_id = $1"#,
             cbu_id
         )
@@ -1316,8 +1316,8 @@ impl VisualizationRepository {
                       s.safekeeping_account, s.safekeeping_bic, s.cash_account, s.cash_account_bic,
                       s.market_id,
                       m.mic as "mic?"
-               FROM custody.cbu_ssi s
-               LEFT JOIN custody.markets m ON m.market_id = s.market_id
+               FROM "ob-poc".cbu_ssi s
+               LEFT JOIN "ob-poc".markets m ON m.market_id = s.market_id
                WHERE s.cbu_id = $1"#,
             cbu_id
         )
@@ -1349,9 +1349,9 @@ impl VisualizationRepository {
                       r.instrument_class_id, r.market_id, r.currency, r.is_active,
                       ic.name as "class_name?",
                       m.mic as "mic?"
-               FROM custody.ssi_booking_rules r
-               LEFT JOIN custody.instrument_classes ic ON ic.class_id = r.instrument_class_id
-               LEFT JOIN custody.markets m ON m.market_id = r.market_id
+               FROM "ob-poc".ssi_booking_rules r
+               LEFT JOIN "ob-poc".instrument_classes ic ON ic.class_id = r.instrument_class_id
+               LEFT JOIN "ob-poc".markets m ON m.market_id = r.market_id
                WHERE r.cbu_id = $1
                ORDER BY r.priority"#,
             cbu_id
@@ -1382,7 +1382,7 @@ impl VisualizationRepository {
             r#"SELECT i.isda_id, i.counterparty_entity_id, i.governing_law,
                       i.agreement_date, i.is_active,
                       e.name as "counterparty_name?"
-               FROM custody.isda_agreements i
+               FROM "ob-poc".isda_agreements i
                LEFT JOIN "ob-poc".entities e ON e.entity_id = i.counterparty_entity_id
                WHERE i.cbu_id = $1"#,
             cbu_id
@@ -1407,7 +1407,7 @@ impl VisualizationRepository {
     pub async fn get_csas(&self, isda_id: Uuid) -> Result<Vec<CsaView>> {
         let rows = sqlx::query!(
             r#"SELECT csa_id, csa_type, is_active
-               FROM custody.csa_agreements
+               FROM "ob-poc".csa_agreements
                WHERE isda_id = $1"#,
             isda_id
         )
@@ -1438,8 +1438,8 @@ impl VisualizationRepository {
                 w.risk_rating,
                 NULL::date as next_review_date,
                 e.name as "entity_name?"
-               FROM kyc.entity_workstreams w
-               JOIN kyc.cases c ON c.case_id = w.case_id
+               FROM "ob-poc".entity_workstreams w
+               JOIN "ob-poc".cases c ON c.case_id = w.case_id
                JOIN "ob-poc".entities e ON e.entity_id = w.entity_id
                WHERE c.cbu_id = $1"#,
             cbu_id
@@ -1469,9 +1469,9 @@ impl VisualizationRepository {
                 dr.status,
                 w.entity_id as requested_from_entity_id,
                 e.name as "entity_name?"
-               FROM kyc.doc_requests dr
-               JOIN kyc.entity_workstreams w ON w.workstream_id = dr.workstream_id
-               JOIN kyc.cases c ON c.case_id = w.case_id
+               FROM "ob-poc".doc_requests dr
+               JOIN "ob-poc".entity_workstreams w ON w.workstream_id = dr.workstream_id
+               JOIN "ob-poc".cases c ON c.case_id = w.case_id
                LEFT JOIN "ob-poc".entities e ON e.entity_id = w.entity_id
                WHERE c.cbu_id = $1"#,
             cbu_id
@@ -1501,9 +1501,9 @@ impl VisualizationRepository {
                 s.result_summary as result,
                 NULL::varchar as resolution,
                 e.name as "entity_name?"
-               FROM kyc.screenings s
-               JOIN kyc.entity_workstreams w ON w.workstream_id = s.workstream_id
-               JOIN kyc.cases c ON c.case_id = w.case_id
+               FROM "ob-poc".screenings s
+               JOIN "ob-poc".entity_workstreams w ON w.workstream_id = s.workstream_id
+               JOIN "ob-poc".cases c ON c.case_id = w.case_id
                JOIN "ob-poc".entities e ON e.entity_id = w.entity_id
                WHERE c.cbu_id = $1"#,
             cbu_id
@@ -1876,7 +1876,7 @@ impl VisualizationRepository {
             r#"SELECT
                 case_id, cbu_id, status, escalation_level, risk_rating,
                 case_type, sla_deadline, opened_at, closed_at
-               FROM kyc.cases
+               FROM "ob-poc".cases
                WHERE case_id = $1"#,
             case_id
         )
@@ -1914,7 +1914,7 @@ impl VisualizationRepository {
                 w.discovery_reason,
                 w.discovery_depth,
                 w.discovery_source_workstream_id
-               FROM kyc.entity_workstreams w
+               FROM "ob-poc".entity_workstreams w
                JOIN "ob-poc".entities e ON e.entity_id = w.entity_id
                JOIN "ob-poc".entity_types et ON et.entity_type_id = e.entity_type_id
                LEFT JOIN "ob-poc".entity_limited_companies lc ON lc.entity_id = e.entity_id
@@ -1956,7 +1956,7 @@ impl VisualizationRepository {
             r#"SELECT
                 red_flag_id, case_id, workstream_id, flag_type, severity,
                 status, description, source, raised_at
-               FROM kyc.red_flags
+               FROM "ob-poc".red_flags
                WHERE case_id = $1
                ORDER BY raised_at DESC"#,
             case_id
@@ -1988,7 +1988,7 @@ impl VisualizationRepository {
                 COUNT(*) FILTER (WHERE status IN ('RECEIVED', 'UNDER_REVIEW')) as "received!",
                 COUNT(*) FILTER (WHERE status = 'VERIFIED') as "verified!",
                 COUNT(*) FILTER (WHERE status = 'REJECTED') as "rejected!"
-               FROM kyc.doc_requests
+               FROM "ob-poc".doc_requests
                WHERE workstream_id = $1"#,
             workstream_id
         )
@@ -2013,7 +2013,7 @@ impl VisualizationRepository {
                 COUNT(*) FILTER (WHERE status = 'CLEAR') as "clear!",
                 COUNT(*) FILTER (WHERE status = 'HIT_PENDING_REVIEW') as "pending_review!",
                 COUNT(*) FILTER (WHERE status = 'HIT_CONFIRMED') as "confirmed_hits!"
-               FROM kyc.screenings
+               FROM "ob-poc".screenings
                WHERE workstream_id = $1"#,
             workstream_id
         )
@@ -2159,9 +2159,9 @@ impl VisualizationRepository {
                 e.name as "counterparty_name?",
                 u.currencies,
                 COALESCE(ic.requires_isda, false) as "is_otc!"
-               FROM custody.cbu_instrument_universe u
-               JOIN custody.instrument_classes ic ON ic.class_id = u.instrument_class_id
-               LEFT JOIN custody.markets m ON m.market_id = u.market_id
+               FROM "ob-poc".cbu_instrument_universe u
+               JOIN "ob-poc".instrument_classes ic ON ic.class_id = u.instrument_class_id
+               LEFT JOIN "ob-poc".markets m ON m.market_id = u.market_id
                LEFT JOIN "ob-poc".entities e ON e.entity_id = u.counterparty_entity_id
                WHERE u.cbu_id = $1 AND u.is_active = true
                ORDER BY ic.code, m.mic, e.name"#,
@@ -2197,7 +2197,7 @@ impl VisualizationRepository {
                 e.name as counterparty_name,
                 i.governing_law,
                 i.agreement_date
-               FROM custody.isda_agreements i
+               FROM "ob-poc".isda_agreements i
                JOIN "ob-poc".entities e ON e.entity_id = i.counterparty_entity_id
                WHERE i.cbu_id = $1 AND i.is_active = true
                ORDER BY e.name"#,
@@ -2226,7 +2226,7 @@ impl VisualizationRepository {
                 csa_type,
                 threshold_amount::float8 as "threshold_amount: f64",
                 threshold_currency
-               FROM custody.csa_agreements
+               FROM "ob-poc".csa_agreements
                WHERE isda_id = $1 AND is_active = true"#,
             isda_id
         )

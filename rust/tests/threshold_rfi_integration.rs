@@ -45,23 +45,23 @@ async fn create_test_cbu(pool: &PgPool, name: &str, jurisdiction: &str, client_t
 async fn cleanup_test_cbu(pool: &PgPool, cbu_id: Uuid) {
     // Clean up in order
     let _ = sqlx::query!(
-        r#"DELETE FROM kyc.doc_requests WHERE workstream_id IN
-           (SELECT workstream_id FROM kyc.entity_workstreams WHERE case_id IN
-            (SELECT case_id FROM kyc.cases WHERE cbu_id = $1))"#,
+        r#"DELETE FROM "ob-poc".doc_requests WHERE workstream_id IN
+           (SELECT workstream_id FROM "ob-poc".entity_workstreams WHERE case_id IN
+            (SELECT case_id FROM "ob-poc".cases WHERE cbu_id = $1))"#,
         cbu_id
     )
     .execute(pool)
     .await;
 
     let _ = sqlx::query!(
-        r#"DELETE FROM kyc.entity_workstreams WHERE case_id IN
-           (SELECT case_id FROM kyc.cases WHERE cbu_id = $1)"#,
+        r#"DELETE FROM "ob-poc".entity_workstreams WHERE case_id IN
+           (SELECT case_id FROM "ob-poc".cases WHERE cbu_id = $1)"#,
         cbu_id
     )
     .execute(pool)
     .await;
 
-    let _ = sqlx::query!("DELETE FROM kyc.cases WHERE cbu_id = $1", cbu_id)
+    let _ = sqlx::query!("DELETE FROM \"ob-poc\".cases WHERE cbu_id = $1", cbu_id)
         .execute(pool)
         .await;
 
@@ -291,7 +291,7 @@ async fn test_kyc_case_creation_for_cbu() {
 
     // Create a KYC case
     let case_id = sqlx::query_scalar!(
-        r#"INSERT INTO kyc.cases (cbu_id, case_type, status)
+        r#"INSERT INTO "ob-poc".cases (cbu_id, case_type, status)
            VALUES ($1, 'NEW_CLIENT', 'INTAKE')
            RETURNING case_id"#,
         cbu_id
@@ -304,7 +304,7 @@ async fn test_kyc_case_creation_for_cbu() {
 
     // Verify case exists
     let case = sqlx::query!(
-        "SELECT status, case_type FROM kyc.cases WHERE case_id = $1",
+        "SELECT status, case_type FROM \"ob-poc\".cases WHERE case_id = $1",
         case_id
     )
     .fetch_one(&pool)
@@ -344,7 +344,7 @@ async fn test_doc_request_creation() {
 
     // Create KYC case
     let case_id = sqlx::query_scalar!(
-        r#"INSERT INTO kyc.cases (cbu_id, case_type, status)
+        r#"INSERT INTO "ob-poc".cases (cbu_id, case_type, status)
            VALUES ($1, 'NEW_CLIENT', 'DISCOVERY')
            RETURNING case_id"#,
         cbu_id
@@ -355,7 +355,7 @@ async fn test_doc_request_creation() {
 
     // Create workstream
     let workstream_id = sqlx::query_scalar!(
-        r#"INSERT INTO kyc.entity_workstreams (case_id, entity_id, status)
+        r#"INSERT INTO "ob-poc".entity_workstreams (case_id, entity_id, status)
            VALUES ($1, $2, 'COLLECT')
            RETURNING workstream_id"#,
         case_id,
@@ -367,7 +367,7 @@ async fn test_doc_request_creation() {
 
     // Create document request
     let request_id = sqlx::query_scalar!(
-        r#"INSERT INTO kyc.doc_requests (workstream_id, doc_type, status, is_mandatory)
+        r#"INSERT INTO "ob-poc".doc_requests (workstream_id, doc_type, status, is_mandatory)
            VALUES ($1, 'PASSPORT', 'REQUIRED', true)
            RETURNING request_id"#,
         workstream_id
@@ -380,7 +380,7 @@ async fn test_doc_request_creation() {
 
     // Verify request exists
     let req = sqlx::query!(
-        "SELECT doc_type, status, is_mandatory FROM kyc.doc_requests WHERE request_id = $1",
+        "SELECT doc_type, status, is_mandatory FROM \"ob-poc\".doc_requests WHERE request_id = $1",
         request_id
     )
     .fetch_one(&pool)
@@ -428,7 +428,7 @@ async fn test_doc_request_status_transitions() {
     .expect("Failed to create entity");
 
     let case_id = sqlx::query_scalar!(
-        r#"INSERT INTO kyc.cases (cbu_id, case_type, status)
+        r#"INSERT INTO "ob-poc".cases (cbu_id, case_type, status)
            VALUES ($1, 'NEW_CLIENT', 'DISCOVERY')
            RETURNING case_id"#,
         cbu_id
@@ -438,7 +438,7 @@ async fn test_doc_request_status_transitions() {
     .expect("Failed to create case");
 
     let workstream_id = sqlx::query_scalar!(
-        r#"INSERT INTO kyc.entity_workstreams (case_id, entity_id, status)
+        r#"INSERT INTO "ob-poc".entity_workstreams (case_id, entity_id, status)
            VALUES ($1, $2, 'COLLECT')
            RETURNING workstream_id"#,
         case_id,
@@ -449,7 +449,7 @@ async fn test_doc_request_status_transitions() {
     .expect("Failed to create workstream");
 
     let request_id = sqlx::query_scalar!(
-        r#"INSERT INTO kyc.doc_requests (workstream_id, doc_type, status)
+        r#"INSERT INTO "ob-poc".doc_requests (workstream_id, doc_type, status)
            VALUES ($1, 'UTILITY_BILL', 'REQUIRED')
            RETURNING request_id"#,
         workstream_id
@@ -460,7 +460,7 @@ async fn test_doc_request_status_transitions() {
 
     // Transition: REQUIRED -> REQUESTED
     sqlx::query!(
-        "UPDATE kyc.doc_requests SET status = 'REQUESTED', requested_at = NOW() WHERE request_id = $1",
+        "UPDATE \"ob-poc\".doc_requests SET status = 'REQUESTED', requested_at = NOW() WHERE request_id = $1",
         request_id
     )
     .execute(&pool)
@@ -469,7 +469,7 @@ async fn test_doc_request_status_transitions() {
 
     // Transition: REQUESTED -> RECEIVED
     sqlx::query!(
-        "UPDATE kyc.doc_requests SET status = 'RECEIVED', received_at = NOW() WHERE request_id = $1",
+        "UPDATE \"ob-poc\".doc_requests SET status = 'RECEIVED', received_at = NOW() WHERE request_id = $1",
         request_id
     )
     .execute(&pool)
@@ -478,7 +478,7 @@ async fn test_doc_request_status_transitions() {
 
     // Transition: RECEIVED -> VERIFIED
     sqlx::query!(
-        "UPDATE kyc.doc_requests SET status = 'VERIFIED', verified_at = NOW() WHERE request_id = $1",
+        "UPDATE \"ob-poc\".doc_requests SET status = 'VERIFIED', verified_at = NOW() WHERE request_id = $1",
         request_id
     )
     .execute(&pool)
@@ -486,7 +486,7 @@ async fn test_doc_request_status_transitions() {
     .expect("Failed to update to VERIFIED");
 
     let final_status: String = sqlx::query_scalar!(
-        "SELECT status FROM kyc.doc_requests WHERE request_id = $1",
+        "SELECT status FROM \"ob-poc\".doc_requests WHERE request_id = $1",
         request_id
     )
     .fetch_one(&pool)
@@ -535,7 +535,7 @@ async fn test_rfi_completion_check() {
     .expect("Failed to create entity");
 
     let case_id = sqlx::query_scalar!(
-        r#"INSERT INTO kyc.cases (cbu_id, case_type, status)
+        r#"INSERT INTO "ob-poc".cases (cbu_id, case_type, status)
            VALUES ($1, 'NEW_CLIENT', 'DISCOVERY')
            RETURNING case_id"#,
         cbu_id
@@ -545,7 +545,7 @@ async fn test_rfi_completion_check() {
     .expect("Failed to create case");
 
     let workstream_id = sqlx::query_scalar!(
-        r#"INSERT INTO kyc.entity_workstreams (case_id, entity_id, status)
+        r#"INSERT INTO "ob-poc".entity_workstreams (case_id, entity_id, status)
            VALUES ($1, $2, 'COLLECT')
            RETURNING workstream_id"#,
         case_id,
@@ -557,7 +557,7 @@ async fn test_rfi_completion_check() {
 
     // Create 2 mandatory and 1 optional request
     sqlx::query!(
-        r#"INSERT INTO kyc.doc_requests (workstream_id, doc_type, status, is_mandatory)
+        r#"INSERT INTO "ob-poc".doc_requests (workstream_id, doc_type, status, is_mandatory)
            VALUES ($1, 'PASSPORT', 'VERIFIED', true)"#,
         workstream_id
     )
@@ -566,7 +566,7 @@ async fn test_rfi_completion_check() {
     .expect("Failed to create request 1");
 
     sqlx::query!(
-        r#"INSERT INTO kyc.doc_requests (workstream_id, doc_type, status, is_mandatory)
+        r#"INSERT INTO "ob-poc".doc_requests (workstream_id, doc_type, status, is_mandatory)
            VALUES ($1, 'UTILITY_BILL', 'REQUIRED', true)"#,
         workstream_id
     )
@@ -575,7 +575,7 @@ async fn test_rfi_completion_check() {
     .expect("Failed to create request 2");
 
     sqlx::query!(
-        r#"INSERT INTO kyc.doc_requests (workstream_id, doc_type, status, is_mandatory)
+        r#"INSERT INTO "ob-poc".doc_requests (workstream_id, doc_type, status, is_mandatory)
            VALUES ($1, 'BANK_STATEMENT', 'WAIVED', false)"#,
         workstream_id
     )
@@ -589,7 +589,7 @@ async fn test_rfi_completion_check() {
              COUNT(*) FILTER (WHERE is_mandatory = true) as mandatory_count,
              COUNT(*) FILTER (WHERE is_mandatory = true AND status IN ('VERIFIED', 'WAIVED')) as mandatory_complete,
              COUNT(*) FILTER (WHERE status = 'REQUIRED' OR status = 'REQUESTED') as pending_count
-           FROM kyc.doc_requests
+           FROM "ob-poc".doc_requests
            WHERE workstream_id = $1"#,
         workstream_id
     )

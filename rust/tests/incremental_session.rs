@@ -135,6 +135,7 @@ impl TestSession {
 // =============================================================================
 
 #[tokio::test]
+#[ignore] // Requires running server
 async fn test_01_session_create_and_execute() {
     let session = TestSession::new("test01")
         .await
@@ -160,6 +161,7 @@ async fn test_01_session_create_and_execute() {
 }
 
 #[tokio::test]
+#[ignore] // Requires running server
 async fn test_02_binding_persistence_across_executions() {
     let session = TestSession::new("test02")
         .await
@@ -195,6 +197,7 @@ async fn test_02_binding_persistence_across_executions() {
 }
 
 #[tokio::test]
+#[ignore] // Requires running server
 async fn test_03_multiple_bindings_accumulated() {
     let session = TestSession::new("test03")
         .await
@@ -310,6 +313,7 @@ async fn test_05_full_onboarding_flow() {
 // =============================================================================
 
 #[tokio::test]
+#[ignore] // Requires running server
 async fn test_10_invalid_dsl_syntax() {
     let session = TestSession::new("test10")
         .await
@@ -324,6 +328,7 @@ async fn test_10_invalid_dsl_syntax() {
 }
 
 #[tokio::test]
+#[ignore] // Requires running server
 async fn test_11_unknown_verb() {
     let session = TestSession::new("test11")
         .await
@@ -340,6 +345,7 @@ async fn test_11_unknown_verb() {
 }
 
 #[tokio::test]
+#[ignore] // Requires running server
 async fn test_12_unresolved_reference() {
     let session = TestSession::new("test12")
         .await
@@ -367,6 +373,7 @@ async fn test_12_unresolved_reference() {
 }
 
 #[tokio::test]
+#[ignore] // Requires running server
 async fn test_13_missing_required_arg() {
     let session = TestSession::new("test13")
         .await
@@ -384,6 +391,7 @@ async fn test_13_missing_required_arg() {
 }
 
 #[tokio::test]
+#[ignore] // Requires running server
 async fn test_14_error_recovery_continues_session() {
     let session = TestSession::new("test14")
         .await
@@ -422,6 +430,7 @@ async fn test_14_error_recovery_continues_session() {
 }
 
 #[tokio::test]
+#[ignore] // Requires running server
 async fn test_15_multiple_errors_tracked() {
     let session = TestSession::new("test15")
         .await
@@ -459,6 +468,7 @@ async fn test_15_multiple_errors_tracked() {
 // =============================================================================
 
 #[tokio::test]
+#[ignore] // Requires running server
 async fn test_20_empty_dsl() {
     let session = TestSession::new("test20")
         .await
@@ -472,6 +482,7 @@ async fn test_20_empty_dsl() {
 }
 
 #[tokio::test]
+#[ignore] // Requires running server
 async fn test_21_whitespace_only_dsl() {
     let session = TestSession::new("test21")
         .await
@@ -486,6 +497,7 @@ async fn test_21_whitespace_only_dsl() {
 }
 
 #[tokio::test]
+#[ignore] // Requires running server
 async fn test_22_comment_only_dsl() {
     let session = TestSession::new("test22")
         .await
@@ -503,6 +515,7 @@ async fn test_22_comment_only_dsl() {
 }
 
 #[tokio::test]
+#[ignore] // Requires running server
 async fn test_23_very_long_dsl() {
     let session = TestSession::new("test23")
         .await
@@ -534,6 +547,7 @@ async fn test_23_very_long_dsl() {
 }
 
 #[tokio::test]
+#[ignore] // Requires running server
 async fn test_24_special_characters_in_names() {
     let session = TestSession::new("test24")
         .await
@@ -553,6 +567,7 @@ async fn test_24_special_characters_in_names() {
 }
 
 #[tokio::test]
+#[ignore] // Requires running server
 async fn test_25_unicode_in_names() {
     let session = TestSession::new("test25")
         .await
@@ -609,6 +624,7 @@ async fn test_26_binding_name_reuse() {
 // =============================================================================
 
 #[tokio::test]
+#[ignore] // Requires running server
 async fn test_30_parallel_sessions_isolated() {
     // Create two sessions
     let session1 = TestSession::new("test30a").await.expect("Session 1");
@@ -643,6 +659,7 @@ async fn test_30_parallel_sessions_isolated() {
 }
 
 #[tokio::test]
+#[ignore] // Requires running server
 async fn test_31_session_isolation_bindings() {
     let session1 = TestSession::new("test31a").await.expect("Session 1");
     let session2 = TestSession::new("test31b").await.expect("Session 2");
@@ -671,6 +688,7 @@ async fn test_31_session_isolation_bindings() {
 }
 
 #[tokio::test]
+#[ignore] // Requires running server
 async fn test_32_many_concurrent_sessions() {
     let mut handles = vec![];
 
@@ -710,6 +728,7 @@ async fn test_32_many_concurrent_sessions() {
 // =============================================================================
 
 #[tokio::test]
+#[ignore] // Requires running server
 async fn test_40_domain_detection_cbu() {
     let session = TestSession::new("test40").await.expect("Session");
     let name = session.unique_name("Domain CBU Fund");
@@ -729,6 +748,7 @@ async fn test_40_domain_detection_cbu() {
 }
 
 #[tokio::test]
+#[ignore] // Requires running server
 async fn test_41_domain_detection_kyc_case() {
     let session = TestSession::new("test41").await.expect("Session");
     let name = session.unique_name("Domain KYC Fund");
@@ -755,6 +775,7 @@ async fn test_41_domain_detection_kyc_case() {
 }
 
 #[tokio::test]
+#[ignore] // Requires running server
 async fn test_42_cross_domain_flow() {
     let session = TestSession::new("test42").await.expect("Session");
     let name = session.unique_name("Cross Domain Fund");
@@ -804,6 +825,7 @@ async fn test_42_cross_domain_flow() {
 // =============================================================================
 
 #[tokio::test]
+#[ignore] // Requires running server
 async fn test_50_rapid_fire_executions() {
     let session = TestSession::new("test50").await.expect("Session");
     let name = session.unique_name("Rapid Fund");
@@ -833,6 +855,7 @@ async fn test_50_rapid_fire_executions() {
 }
 
 #[tokio::test]
+#[ignore] // Requires running server
 async fn test_51_session_after_long_pause() {
     let session = TestSession::new("test51").await.expect("Session");
     let name = session.unique_name("Pause Fund");
@@ -868,6 +891,7 @@ async fn test_51_session_after_long_pause() {
 }
 
 #[tokio::test]
+#[ignore] // Requires running server
 async fn test_52_invalid_session_id() {
     let client = Client::new();
     let fake_session_id = Uuid::new_v4();
@@ -951,6 +975,7 @@ async fn get_db_pool() -> sqlx::PgPool {
 
 /// Test 60: Verify session is persisted to dsl_sessions table
 #[tokio::test]
+#[ignore] // Requires running server
 async fn test_60_session_persisted_to_db() {
     let session = TestSession::new("test60").await.expect("Session");
     let name = session.unique_name("DB Persist Fund");
@@ -989,6 +1014,7 @@ async fn test_60_session_persisted_to_db() {
 
 /// Test 61: Verify DSL snapshot is saved on successful execution
 #[tokio::test]
+#[ignore] // Requires running server
 async fn test_61_snapshot_saved_on_success() {
     let session = TestSession::new("test61").await.expect("Session");
     let name = session.unique_name("Snapshot Fund");
@@ -1033,6 +1059,7 @@ async fn test_61_snapshot_saved_on_success() {
 
 /// Test 62: Verify bindings are persisted to session
 #[tokio::test]
+#[ignore] // Requires running server
 async fn test_62_bindings_persisted() {
     let session = TestSession::new("test62").await.expect("Session");
     let name = session.unique_name("Bindings Fund");
@@ -1070,6 +1097,7 @@ async fn test_62_bindings_persisted() {
 
 /// Test 63: Verify cbu_id is captured in session
 #[tokio::test]
+#[ignore] // Requires running server
 async fn test_63_cbu_id_captured() {
     let session = TestSession::new("test63").await.expect("Session");
     let name = session.unique_name("CBU Capture Fund");
@@ -1113,6 +1141,7 @@ async fn test_63_cbu_id_captured() {
 
 /// Test 64: Verify domain detection is persisted
 #[tokio::test]
+#[ignore] // Requires running server
 async fn test_64_domain_detection_persisted() {
     let session = TestSession::new("test64").await.expect("Session");
     let name = session.unique_name("Domain Fund");
@@ -1153,6 +1182,7 @@ async fn test_64_domain_detection_persisted() {
 
 /// Test 65: Verify multiple snapshots accumulate
 #[tokio::test]
+#[ignore] // Requires running server
 async fn test_65_multiple_snapshots_accumulate() {
     let session = TestSession::new("test65").await.expect("Session");
     let name = session.unique_name("Multi Snapshot Fund");
@@ -1196,6 +1226,7 @@ async fn test_65_multiple_snapshots_accumulate() {
 
 /// Test 66: Verify failed execution does NOT create snapshot
 #[tokio::test]
+#[ignore] // Requires running server
 async fn test_66_no_snapshot_on_failure() {
     let session = TestSession::new("test66").await.expect("Session");
     let pool = get_db_pool().await;
@@ -1252,6 +1283,7 @@ async fn test_67_error_recorded_in_session() {
 
 /// Test 68: Verify cross-domain execution updates session
 #[tokio::test]
+#[ignore] // Requires running server
 async fn test_68_cross_domain_updates_session() {
     let session = TestSession::new("test68").await.expect("Session");
     let name = session.unique_name("Cross Domain Fund");

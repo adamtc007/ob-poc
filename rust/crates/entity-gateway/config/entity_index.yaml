@@ -320,7 +320,7 @@ entities:
   # Instrument Classes (custody schema)
   instrument_class:
     nickname: "INSTRUMENT_CLASS"
-    source_table: "custody.instrument_classes"
+    source_table: '"ob-poc".instrument_classes'
     return_key: "class_id"
     display_template: "{name}"
     index_mode: exact
@@ -336,7 +336,7 @@ entities:
   # Markets (custody schema)
   market:
     nickname: "MARKET"
-    source_table: "custody.markets"
+    source_table: '"ob-poc".markets'
     return_key: "market_id"
     display_template: "{name}"
     index_mode: exact
@@ -444,7 +444,7 @@ entities:
   # Standing Settlement Instructions - for :ssi-id name-based lookup
   ssi:
     nickname: "SSI"
-    source_table: "custody.cbu_ssi"
+    source_table: '"ob-poc".cbu_ssi'
     return_key: "ssi_id"
     display_template: "{ssi_name} ({ssi_type})"
     index_mode: trigram # SSI names need fuzzy search
@@ -461,7 +461,7 @@ entities:
   # Booking Rules - for :rule-id name-based lookup
   booking_rule:
     nickname: "BOOKING_RULE"
-    source_table: "custody.ssi_booking_rules"
+    source_table: '"ob-poc".ssi_booking_rules'
     return_key: "rule_id"
     display_template: "{rule_name}"
     index_mode: trigram # Rule names need fuzzy search
@@ -480,7 +480,7 @@ entities:
   # Share Classes - for :share-class-id name-based lookup
   share_class:
     nickname: "SHARE_CLASS"
-    source_table: "kyc.share_classes"
+    source_table: '"ob-poc".share_classes'
     return_key: "id"
     display_template: "{name} ({isin})"
     index_mode: trigram # Share class names need fuzzy search

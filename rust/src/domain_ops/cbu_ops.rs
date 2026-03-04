@@ -66,10 +66,7 @@ impl CustomOperation for CbuCreateOp {
             .arguments
             .iter()
             .find(|a| a.key == "jurisdiction")
-            .and_then(|a| a.value.as_string())
-            .ok_or_else(|| {
-                anyhow::anyhow!("cbu.create: Missing required argument :jurisdiction")
-            })?;
+            .and_then(|a| a.value.as_string());
 
         let fund_entity_id = verb_call
             .arguments
@@ -702,9 +699,9 @@ impl CustomOperation for CbuShowOp {
         let screenings = sqlx::query!(
             r#"SELECT s.screening_id, w.entity_id, e.name as entity_name,
                       s.screening_type, s.status, s.result_summary
-               FROM kyc.screenings s
-               JOIN kyc.entity_workstreams w ON w.workstream_id = s.workstream_id
-               JOIN kyc.cases c ON c.case_id = w.case_id
+               FROM "ob-poc".screenings s
+               JOIN "ob-poc".entity_workstreams w ON w.workstream_id = s.workstream_id
+               JOIN "ob-poc".cases c ON c.case_id = w.case_id
                JOIN "ob-poc".entities e ON e.entity_id = w.entity_id
                WHERE c.cbu_id = $1
                ORDER BY s.screening_type, e.name"#,
@@ -758,7 +755,7 @@ impl CustomOperation for CbuShowOp {
         let cases = sqlx::query!(
             r#"SELECT case_id, status, case_type, risk_rating, escalation_level,
                       opened_at, closed_at
-               FROM kyc.cases
+               FROM "ob-poc".cases
                WHERE cbu_id = $1
                ORDER BY opened_at DESC"#,
             cbu_id
@@ -957,7 +954,7 @@ impl CustomOperation for CbuDecideOp {
             None => {
                 // Find active case for this CBU
                 let row = sqlx::query!(
-                    r#"SELECT case_id FROM kyc.cases
+                    r#"SELECT case_id FROM "ob-poc".cases
                        WHERE cbu_id = $1 AND status NOT IN ('APPROVED', 'REJECTED', 'WITHDRAWN', 'EXPIRED')
                        ORDER BY opened_at DESC LIMIT 1"#,
                     cbu_id
@@ -985,7 +982,7 @@ impl CustomOperation for CbuDecideOp {
         let should_close = matches!(decision, "APPROVED" | "REJECTED");
         if should_close {
             sqlx::query!(
-                r#"UPDATE kyc.cases SET status = $1, closed_at = now(), last_activity_at = now() WHERE case_id = $2"#,
+                r#"UPDATE "ob-poc".cases SET status = $1, closed_at = now(), last_activity_at = now() WHERE case_id = $2"#,
                 new_case_status,
                 case_id
             )
@@ -994,7 +991,7 @@ impl CustomOperation for CbuDecideOp {
         } else {
             // REFERRED - update escalation level
             sqlx::query!(
-                r#"UPDATE kyc.cases SET escalation_level = 'SENIOR_COMPLIANCE', last_activity_at = now() WHERE case_id = $1"#,
+                r#"UPDATE "ob-poc".cases SET escalation_level = 'SENIOR_COMPLIANCE', last_activity_at = now() WHERE case_id = $1"#,
                 case_id
             )
             .execute(&mut *tx)
@@ -1130,24 +1127,11 @@ impl CustomOperation for CbuDeleteCascadeOp {
         // Phase 1: Delete from kyc schema tables
         // =====================================================================
 
-        // kyc.screenings (via workstreams via cases)
+        // "ob-poc".screenings (via workstreams via cases)
         let result = sqlx::query(
-            r#"DELETE FROM kyc.screenings WHERE workstream_id IN (
-                SELECT workstream_id FROM kyc.entity_workstreams WHERE case_id IN (
-                    SELECT case_id FROM kyc.cases WHERE cbu_id = $1
-                )
-            )"#,
-        )
-        .bind(cbu_id)
-        .execute(&mut *tx)
-        .await?;
-        deleted_counts.insert("kyc.screenings".to_string(), result.rows_affected() as i64);
-
-        // kyc.doc_requests (via workstreams)
-        let result = sqlx::query(
-            r#"DELETE FROM kyc.doc_requests WHERE workstream_id IN (
-                SELECT workstream_id FROM kyc.entity_workstreams WHERE case_id IN (
-                    SELECT case_id FROM kyc.cases WHERE cbu_id = $1
+            r#"DELETE FROM "ob-poc".screenings WHERE workstream_id IN (
+                SELECT workstream_id FROM "ob-poc".entity_workstreams WHERE case_id IN (
+                    SELECT case_id FROM "ob-poc".cases WHERE cbu_id = $1
                 )
             )"#,
         )
@@ -1155,60 +1139,85 @@ impl CustomOperation for CbuDeleteCascadeOp {
         .execute(&mut *tx)
         .await?;
         deleted_counts.insert(
-            "kyc.doc_requests".to_string(),
+            "\"ob-poc\".screenings".to_string(),
             result.rows_affected() as i64,
         );
 
-        // kyc.red_flags
+        // "ob-poc".doc_requests (via workstreams)
         let result = sqlx::query(
-            r#"DELETE FROM kyc.red_flags WHERE case_id IN (
-                SELECT case_id FROM kyc.cases WHERE cbu_id = $1
-            )"#,
-        )
-        .bind(cbu_id)
-        .execute(&mut *tx)
-        .await?;
-        deleted_counts.insert("kyc.red_flags".to_string(), result.rows_affected() as i64);
-
-        // kyc.case_events
-        let result = sqlx::query(
-            r#"DELETE FROM kyc.case_events WHERE case_id IN (
-                SELECT case_id FROM kyc.cases WHERE cbu_id = $1
-            )"#,
-        )
-        .bind(cbu_id)
-        .execute(&mut *tx)
-        .await?;
-        deleted_counts.insert("kyc.case_events".to_string(), result.rows_affected() as i64);
-
-        // kyc.entity_workstreams
-        let result = sqlx::query(
-            r#"DELETE FROM kyc.entity_workstreams WHERE case_id IN (
-                SELECT case_id FROM kyc.cases WHERE cbu_id = $1
+            r#"DELETE FROM "ob-poc".doc_requests WHERE workstream_id IN (
+                SELECT workstream_id FROM "ob-poc".entity_workstreams WHERE case_id IN (
+                    SELECT case_id FROM "ob-poc".cases WHERE cbu_id = $1
+                )
             )"#,
         )
         .bind(cbu_id)
         .execute(&mut *tx)
         .await?;
         deleted_counts.insert(
-            "kyc.entity_workstreams".to_string(),
+            "\"ob-poc\".doc_requests".to_string(),
             result.rows_affected() as i64,
         );
 
-        // kyc.cases
-        let result = sqlx::query(r#"DELETE FROM kyc.cases WHERE cbu_id = $1"#)
-            .bind(cbu_id)
-            .execute(&mut *tx)
-            .await?;
-        deleted_counts.insert("kyc.cases".to_string(), result.rows_affected() as i64);
+        // "ob-poc".red_flags
+        let result = sqlx::query(
+            r#"DELETE FROM "ob-poc".red_flags WHERE case_id IN (
+                SELECT case_id FROM "ob-poc".cases WHERE cbu_id = $1
+            )"#,
+        )
+        .bind(cbu_id)
+        .execute(&mut *tx)
+        .await?;
+        deleted_counts.insert(
+            "\"ob-poc\".red_flags".to_string(),
+            result.rows_affected() as i64,
+        );
 
-        // kyc.share_classes
-        let result = sqlx::query(r#"DELETE FROM kyc.share_classes WHERE cbu_id = $1"#)
+        // "ob-poc".case_events
+        let result = sqlx::query(
+            r#"DELETE FROM "ob-poc".case_events WHERE case_id IN (
+                SELECT case_id FROM "ob-poc".cases WHERE cbu_id = $1
+            )"#,
+        )
+        .bind(cbu_id)
+        .execute(&mut *tx)
+        .await?;
+        deleted_counts.insert(
+            "\"ob-poc\".case_events".to_string(),
+            result.rows_affected() as i64,
+        );
+
+        // "ob-poc".entity_workstreams
+        let result = sqlx::query(
+            r#"DELETE FROM "ob-poc".entity_workstreams WHERE case_id IN (
+                SELECT case_id FROM "ob-poc".cases WHERE cbu_id = $1
+            )"#,
+        )
+        .bind(cbu_id)
+        .execute(&mut *tx)
+        .await?;
+        deleted_counts.insert(
+            "\"ob-poc\".entity_workstreams".to_string(),
+            result.rows_affected() as i64,
+        );
+
+        // "ob-poc".cases
+        let result = sqlx::query(r#"DELETE FROM "ob-poc".cases WHERE cbu_id = $1"#)
             .bind(cbu_id)
             .execute(&mut *tx)
             .await?;
         deleted_counts.insert(
-            "kyc.share_classes".to_string(),
+            "\"ob-poc\".cases".to_string(),
+            result.rows_affected() as i64,
+        );
+
+        // "ob-poc".share_classes
+        let result = sqlx::query(r#"DELETE FROM "ob-poc".share_classes WHERE cbu_id = $1"#)
+            .bind(cbu_id)
+            .execute(&mut *tx)
+            .await?;
+        deleted_counts.insert(
+            "\"ob-poc\".share_classes".to_string(),
             result.rows_affected() as i64,
         );
 
@@ -1216,83 +1225,86 @@ impl CustomOperation for CbuDeleteCascadeOp {
         // Phase 2: Delete from custody schema tables
         // =====================================================================
 
-        // custody.ssi_booking_rules
-        let result = sqlx::query(r#"DELETE FROM custody.ssi_booking_rules WHERE cbu_id = $1"#)
+        // "ob-poc".ssi_booking_rules
+        let result = sqlx::query(r#"DELETE FROM "ob-poc".ssi_booking_rules WHERE cbu_id = $1"#)
             .bind(cbu_id)
             .execute(&mut *tx)
             .await?;
         deleted_counts.insert(
-            "custody.ssi_booking_rules".to_string(),
+            "\"ob-poc\".ssi_booking_rules".to_string(),
             result.rows_affected() as i64,
         );
 
-        // custody.cbu_ssi_agent_override (via cbu_ssi)
+        // "ob-poc".cbu_ssi_agent_override (via cbu_ssi)
         let result = sqlx::query(
-            r#"DELETE FROM custody.cbu_ssi_agent_override WHERE ssi_id IN (
-                SELECT ssi_id FROM custody.cbu_ssi WHERE cbu_id = $1
+            r#"DELETE FROM "ob-poc".cbu_ssi_agent_override WHERE ssi_id IN (
+                SELECT ssi_id FROM "ob-poc".cbu_ssi WHERE cbu_id = $1
             )"#,
         )
         .bind(cbu_id)
         .execute(&mut *tx)
         .await?;
         deleted_counts.insert(
-            "custody.cbu_ssi_agent_override".to_string(),
+            "\"ob-poc\".cbu_ssi_agent_override".to_string(),
             result.rows_affected() as i64,
         );
 
-        // custody.cbu_ssi
-        let result = sqlx::query(r#"DELETE FROM custody.cbu_ssi WHERE cbu_id = $1"#)
+        // "ob-poc".cbu_ssi
+        let result = sqlx::query(r#"DELETE FROM "ob-poc".cbu_ssi WHERE cbu_id = $1"#)
             .bind(cbu_id)
             .execute(&mut *tx)
             .await?;
-        deleted_counts.insert("custody.cbu_ssi".to_string(), result.rows_affected() as i64);
+        deleted_counts.insert(
+            "\"ob-poc\".cbu_ssi".to_string(),
+            result.rows_affected() as i64,
+        );
 
-        // custody.cbu_instrument_universe
+        // "ob-poc".cbu_instrument_universe
         let result =
-            sqlx::query(r#"DELETE FROM custody.cbu_instrument_universe WHERE cbu_id = $1"#)
+            sqlx::query(r#"DELETE FROM "ob-poc".cbu_instrument_universe WHERE cbu_id = $1"#)
                 .bind(cbu_id)
                 .execute(&mut *tx)
                 .await?;
         deleted_counts.insert(
-            "custody.cbu_instrument_universe".to_string(),
+            "\"ob-poc\".cbu_instrument_universe".to_string(),
             result.rows_affected() as i64,
         );
 
-        // custody.csa_agreements (via isda_agreements)
+        // "ob-poc".csa_agreements (via isda_agreements)
         let result = sqlx::query(
-            r#"DELETE FROM custody.csa_agreements WHERE isda_id IN (
-                SELECT isda_id FROM custody.isda_agreements WHERE cbu_id = $1
+            r#"DELETE FROM "ob-poc".csa_agreements WHERE isda_id IN (
+                SELECT isda_id FROM "ob-poc".isda_agreements WHERE cbu_id = $1
             )"#,
         )
         .bind(cbu_id)
         .execute(&mut *tx)
         .await?;
         deleted_counts.insert(
-            "custody.csa_agreements".to_string(),
+            "\"ob-poc\".csa_agreements".to_string(),
             result.rows_affected() as i64,
         );
 
-        // custody.isda_product_coverage (via isda_agreements)
+        // "ob-poc".isda_product_coverage (via isda_agreements)
         let result = sqlx::query(
-            r#"DELETE FROM custody.isda_product_coverage WHERE isda_id IN (
-                SELECT isda_id FROM custody.isda_agreements WHERE cbu_id = $1
+            r#"DELETE FROM "ob-poc".isda_product_coverage WHERE isda_id IN (
+                SELECT isda_id FROM "ob-poc".isda_agreements WHERE cbu_id = $1
             )"#,
         )
         .bind(cbu_id)
         .execute(&mut *tx)
         .await?;
         deleted_counts.insert(
-            "custody.isda_product_coverage".to_string(),
+            "\"ob-poc\".isda_product_coverage".to_string(),
             result.rows_affected() as i64,
         );
 
-        // custody.isda_agreements
-        let result = sqlx::query(r#"DELETE FROM custody.isda_agreements WHERE cbu_id = $1"#)
+        // "ob-poc".isda_agreements
+        let result = sqlx::query(r#"DELETE FROM "ob-poc".isda_agreements WHERE cbu_id = $1"#)
             .bind(cbu_id)
             .execute(&mut *tx)
             .await?;
         deleted_counts.insert(
-            "custody.isda_agreements".to_string(),
+            "\"ob-poc\".isda_agreements".to_string(),
             result.rows_affected() as i64,
         );
 
@@ -1360,8 +1372,8 @@ impl CustomOperation for CbuDeleteCascadeOp {
 
         // ubo_evidence (via ubo_registry)
         let result = sqlx::query(
-            r#"DELETE FROM "ob-poc".ubo_evidence WHERE ubo_id IN (
-                SELECT ubo_id FROM "ob-poc".ubo_registry WHERE cbu_id = $1
+            r#"DELETE FROM "ob-poc".kyc_ubo_evidence WHERE ubo_id IN (
+                SELECT ubo_id FROM "ob-poc".kyc_ubo_registry WHERE cbu_id = $1
             )"#,
         )
         .bind(cbu_id)
@@ -1370,7 +1382,7 @@ impl CustomOperation for CbuDeleteCascadeOp {
         deleted_counts.insert("ubo_evidence".to_string(), result.rows_affected() as i64);
 
         // ubo_registry
-        let result = sqlx::query(r#"DELETE FROM "ob-poc".ubo_registry WHERE cbu_id = $1"#)
+        let result = sqlx::query(r#"DELETE FROM "ob-poc".kyc_ubo_registry WHERE cbu_id = $1"#)
             .bind(cbu_id)
             .execute(&mut *tx)
             .await?;
@@ -1383,11 +1395,11 @@ impl CustomOperation for CbuDeleteCascadeOp {
             .await?;
         deleted_counts.insert("ubo_snapshots".to_string(), result.rows_affected() as i64);
 
-        // case_evaluation_snapshots (via kyc.cases - already deleted cases but snapshot may remain)
+        // case_evaluation_snapshots (via "ob-poc".cases - already deleted cases but snapshot may remain)
         // Note: FK may reference deleted case, so we use cbu_id directly
         let result = sqlx::query(
             r#"DELETE FROM "ob-poc".case_evaluation_snapshots WHERE case_id IN (
-                SELECT case_id FROM kyc.cases WHERE cbu_id = $1
+                SELECT case_id FROM "ob-poc".cases WHERE cbu_id = $1
             )"#,
         )
         .bind(cbu_id)

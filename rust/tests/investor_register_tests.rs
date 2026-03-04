@@ -33,7 +33,7 @@ async fn test_role_profile_upsert_creates_new() {
     // Insert role profile via SQL function (effective_from = CURRENT_DATE)
     let result: (Uuid,) = sqlx::query_as(
         r#"
-        SELECT kyc.upsert_role_profile(
+        SELECT "ob-poc".upsert_role_profile(
             $1, $2, 'END_INVESTOR', 'NONE', 'EXTERNAL', false, true,
             NULL, NULL, NULL, CURRENT_DATE, 'TEST', NULL, NULL, NULL
         )
@@ -51,7 +51,7 @@ async fn test_role_profile_upsert_creates_new() {
     let profile = sqlx::query!(
         r#"
         SELECT role_type, lookthrough_policy, is_ubo_eligible
-        FROM kyc.investor_role_profiles
+        FROM "ob-poc".investor_role_profiles
         WHERE id = $1
         "#,
         result.0
@@ -79,7 +79,7 @@ async fn test_role_profile_temporal_versioning() {
     // Create first version with effective_from = 2024-01-01
     let _v1: (Uuid,) = sqlx::query_as(
         r#"
-        SELECT kyc.upsert_role_profile(
+        SELECT "ob-poc".upsert_role_profile(
             $1, $2, 'NOMINEE', 'NONE', 'EXTERNAL', false, false,
             NULL, NULL, NULL, '2024-01-01'::date, 'TEST', NULL, NULL, NULL
         )
@@ -94,7 +94,7 @@ async fn test_role_profile_temporal_versioning() {
     // Create second version with effective_from = 2024-06-01 (should close first)
     let _v2: (Uuid,) = sqlx::query_as(
         r#"
-        SELECT kyc.upsert_role_profile(
+        SELECT "ob-poc".upsert_role_profile(
             $1, $2, 'END_INVESTOR', 'ON_DEMAND', 'EXTERNAL', true, true,
             NULL, NULL, NULL, '2024-06-01'::date, 'TEST', NULL, NULL, NULL
         )
@@ -110,7 +110,7 @@ async fn test_role_profile_temporal_versioning() {
     let profile_march = sqlx::query!(
         r#"
         SELECT role_type, is_ubo_eligible
-        FROM kyc.investor_role_profiles
+        FROM "ob-poc".investor_role_profiles
         WHERE issuer_entity_id = $1 AND holder_entity_id = $2
           AND effective_from <= '2024-03-01'::date
           AND (effective_to IS NULL OR effective_to > '2024-03-01'::date)
@@ -129,7 +129,7 @@ async fn test_role_profile_temporal_versioning() {
     let profile_sept = sqlx::query!(
         r#"
         SELECT role_type, is_ubo_eligible
-        FROM kyc.investor_role_profiles
+        FROM "ob-poc".investor_role_profiles
         WHERE issuer_entity_id = $1 AND holder_entity_id = $2
           AND effective_from <= '2024-09-01'::date
           AND (effective_to IS NULL OR effective_to > '2024-09-01'::date)
@@ -162,7 +162,7 @@ async fn test_fund_vehicle_upsert() {
     // Insert fund vehicle
     sqlx::query!(
         r#"
-        INSERT INTO kyc.fund_vehicles (fund_entity_id, vehicle_type, is_umbrella, domicile_country)
+        INSERT INTO "ob-poc".fund_vehicles (fund_entity_id, vehicle_type, is_umbrella, domicile_country)
         VALUES ($1, 'SCSP', true, 'LU')
         ON CONFLICT (fund_entity_id) DO UPDATE SET vehicle_type = EXCLUDED.vehicle_type
         "#,
@@ -176,7 +176,7 @@ async fn test_fund_vehicle_upsert() {
     let summary = sqlx::query!(
         r#"
         SELECT fund_name, vehicle_type, is_umbrella, domicile_country
-        FROM kyc.v_fund_vehicle_summary
+        FROM "ob-poc".v_fund_vehicle_summary
         WHERE fund_entity_id = $1
         "#,
         fund_id
@@ -191,7 +191,7 @@ async fn test_fund_vehicle_upsert() {
 
     // Cleanup
     sqlx::query!(
-        "DELETE FROM kyc.fund_vehicles WHERE fund_entity_id = $1",
+        "DELETE FROM \"ob-poc\".fund_vehicles WHERE fund_entity_id = $1",
         fund_id
     )
     .execute(&pool)
@@ -209,7 +209,7 @@ async fn test_fund_compartments() {
     // Create umbrella fund vehicle
     sqlx::query!(
         r#"
-        INSERT INTO kyc.fund_vehicles (fund_entity_id, vehicle_type, is_umbrella, domicile_country)
+        INSERT INTO "ob-poc".fund_vehicles (fund_entity_id, vehicle_type, is_umbrella, domicile_country)
         VALUES ($1, 'SICAV_RAIF', true, 'LU')
         "#,
         umbrella_id
@@ -221,7 +221,7 @@ async fn test_fund_compartments() {
     // Create compartments
     sqlx::query!(
         r#"
-        INSERT INTO kyc.fund_compartments (umbrella_fund_entity_id, compartment_code, compartment_name)
+        INSERT INTO "ob-poc".fund_compartments (umbrella_fund_entity_id, compartment_code, compartment_name)
         VALUES
             ($1, 'EQUITY', 'Global Equity Fund'),
             ($1, 'BOND', 'Fixed Income Fund')
@@ -236,7 +236,7 @@ async fn test_fund_compartments() {
     let summary = sqlx::query!(
         r#"
         SELECT compartment_count
-        FROM kyc.v_fund_vehicle_summary
+        FROM "ob-poc".v_fund_vehicle_summary
         WHERE fund_entity_id = $1
         "#,
         umbrella_id
@@ -249,14 +249,14 @@ async fn test_fund_compartments() {
 
     // Cleanup
     sqlx::query!(
-        "DELETE FROM kyc.fund_compartments WHERE umbrella_fund_entity_id = $1",
+        "DELETE FROM \"ob-poc\".fund_compartments WHERE umbrella_fund_entity_id = $1",
         umbrella_id
     )
     .execute(&pool)
     .await
     .unwrap();
     sqlx::query!(
-        "DELETE FROM kyc.fund_vehicles WHERE fund_entity_id = $1",
+        "DELETE FROM \"ob-poc\".fund_vehicles WHERE fund_entity_id = $1",
         umbrella_id
     )
     .execute(&pool)
@@ -276,7 +276,7 @@ async fn test_economic_exposure_function_exists() {
     // Verify the function exists and can be called (even with no data)
     let result = sqlx::query!(
         r#"
-        SELECT COUNT(*) as "count!" FROM kyc.fn_compute_economic_exposure(
+        SELECT COUNT(*) as "count!" FROM "ob-poc".fn_compute_economic_exposure(
             '00000000-0000-0000-0000-000000000000'::uuid,
             CURRENT_DATE,
             6, 0.0001, 200, true, true
@@ -298,7 +298,7 @@ async fn test_economic_exposure_summary_function_exists() {
     // Verify the function exists
     let result = sqlx::query!(
         r#"
-        SELECT COUNT(*) as "count!" FROM kyc.fn_economic_exposure_summary(
+        SELECT COUNT(*) as "count!" FROM "ob-poc".fn_economic_exposure_summary(
             '00000000-0000-0000-0000-000000000000'::uuid,
             CURRENT_DATE,
             5.0
@@ -325,7 +325,7 @@ async fn test_issuer_control_config_defaults() {
     // Insert with defaults (effective_from defaults to CURRENT_DATE)
     sqlx::query!(
         r#"
-        INSERT INTO kyc.issuer_control_config (issuer_entity_id, effective_from)
+        INSERT INTO "ob-poc".issuer_control_config (issuer_entity_id, effective_from)
         VALUES ($1, CURRENT_DATE)
         ON CONFLICT (issuer_entity_id, effective_from) DO NOTHING
         "#,
@@ -345,7 +345,7 @@ async fn test_issuer_control_config_defaults() {
             control_threshold_pct,
             control_basis,
             disclosure_basis
-        FROM kyc.issuer_control_config
+        FROM "ob-poc".issuer_control_config
         WHERE issuer_entity_id = $1
         "#,
         issuer_id
@@ -412,7 +412,7 @@ async fn test_issuer_control_config_defaults() {
 
     // Cleanup
     sqlx::query!(
-        "DELETE FROM kyc.issuer_control_config WHERE issuer_entity_id = $1",
+        "DELETE FROM \"ob-poc\".issuer_control_config WHERE issuer_entity_id = $1",
         issuer_id
     )
     .execute(&pool)
@@ -441,7 +441,7 @@ async fn test_ubo_sync_skips_ta_holdings() {
     // Create a TA holding with 30% ownership (should NOT create UBO edge)
     sqlx::query!(
         r#"
-        INSERT INTO kyc.holdings (share_class_id, investor_entity_id, units, usage_type, status)
+        INSERT INTO "ob-poc".holdings (share_class_id, investor_entity_id, units, usage_type, status)
         VALUES ($1, $2, 30.0, 'TA', 'active')
         "#,
         share_class_id,
@@ -495,7 +495,7 @@ async fn test_ubo_sync_creates_edge_for_ubo_holdings() {
     // Create a UBO holding with 30% ownership (should create UBO edge)
     sqlx::query!(
         r#"
-        INSERT INTO kyc.holdings (share_class_id, investor_entity_id, units, usage_type, status)
+        INSERT INTO "ob-poc".holdings (share_class_id, investor_entity_id, units, usage_type, status)
         VALUES ($1, $2, 30.0, 'UBO', 'active')
         "#,
         share_class_id,
@@ -556,7 +556,7 @@ async fn test_ubo_sync_respects_ubo_eligibility_false() {
     // Create a role profile marking the holder as NOT UBO eligible (nominee)
     sqlx::query!(
         r#"
-        INSERT INTO kyc.investor_role_profiles
+        INSERT INTO "ob-poc".investor_role_profiles
         (issuer_entity_id, holder_entity_id, role_type, is_ubo_eligible, lookthrough_policy)
         VALUES ($1, $2, 'NOMINEE', false, 'NONE')
         "#,
@@ -574,7 +574,7 @@ async fn test_ubo_sync_respects_ubo_eligibility_false() {
     // Despite being usage_type='UBO' and ≥25%, should NOT create edge because is_ubo_eligible=false
     sqlx::query!(
         r#"
-        INSERT INTO kyc.holdings (share_class_id, investor_entity_id, units, usage_type, status)
+        INSERT INTO "ob-poc".holdings (share_class_id, investor_entity_id, units, usage_type, status)
         VALUES ($1, $2, 50.0, 'UBO', 'active')
         "#,
         share_class_id,
@@ -625,7 +625,7 @@ async fn test_ubo_sync_default_deny_pooled_vehicles() {
     // The trigger should default-deny for pooled vehicle types
     sqlx::query!(
         r#"
-        INSERT INTO kyc.investor_role_profiles
+        INSERT INTO "ob-poc".investor_role_profiles
         (issuer_entity_id, holder_entity_id, role_type, lookthrough_policy)
         VALUES ($1, $2, 'INTERMEDIARY_FOF', 'ON_DEMAND')
         "#,
@@ -642,7 +642,7 @@ async fn test_ubo_sync_default_deny_pooled_vehicles() {
     // Create a UBO holding with 40% ownership
     sqlx::query!(
         r#"
-        INSERT INTO kyc.holdings (share_class_id, investor_entity_id, units, usage_type, status)
+        INSERT INTO "ob-poc".holdings (share_class_id, investor_entity_id, units, usage_type, status)
         VALUES ($1, $2, 40.0, 'UBO', 'active')
         "#,
         share_class_id,
@@ -693,7 +693,7 @@ async fn test_economic_exposure_max_rows_limit() {
     // This mainly tests that the parameter is accepted and function doesn't crash
     let result = sqlx::query!(
         r#"
-        SELECT COUNT(*) as "count!" FROM kyc.fn_compute_economic_exposure(
+        SELECT COUNT(*) as "count!" FROM "ob-poc".fn_compute_economic_exposure(
             '00000000-0000-0000-0000-000000000000'::uuid,
             CURRENT_DATE,
             6,      -- max_depth
@@ -723,7 +723,7 @@ async fn test_economic_exposure_min_pct_threshold() {
     // Call with min_pct=50% - only very large holdings would traverse
     let result = sqlx::query!(
         r#"
-        SELECT COUNT(*) as "count!" FROM kyc.fn_compute_economic_exposure(
+        SELECT COUNT(*) as "count!" FROM "ob-poc".fn_compute_economic_exposure(
             '00000000-0000-0000-0000-000000000000'::uuid,
             CURRENT_DATE,
             6,
@@ -750,7 +750,7 @@ async fn test_economic_exposure_max_depth_parameter() {
     // Call with max_depth=2
     let result = sqlx::query!(
         r#"
-        SELECT COUNT(*) as "count!" FROM kyc.fn_compute_economic_exposure(
+        SELECT COUNT(*) as "count!" FROM "ob-poc".fn_compute_economic_exposure(
             '00000000-0000-0000-0000-000000000000'::uuid,
             CURRENT_DATE,
             2,      -- max_depth = 2 (shallow)
@@ -776,13 +776,16 @@ async fn test_economic_exposure_max_depth_parameter() {
 async fn create_test_share_class(pool: &PgPool, entity_id: Uuid, name: &str) -> Uuid {
     let share_class_id = Uuid::new_v4();
     let unique_name = format!("{} {}", name, share_class_id);
+    let cbu_id = ensure_test_cbu_for_entity(pool, entity_id).await;
 
     sqlx::query!(
         r#"
-        INSERT INTO kyc.share_classes (id, entity_id, name, status)
-        VALUES ($1, $2, $3, 'active')
+        INSERT INTO "ob-poc".share_classes (id, cbu_id, entity_id, issuer_entity_id, name, status)
+        VALUES ($1, $2, $3, $4, $5, 'active')
         "#,
         share_class_id,
+        cbu_id,
+        entity_id,
         entity_id,
         unique_name
     )
@@ -796,7 +799,7 @@ async fn create_test_share_class(pool: &PgPool, entity_id: Uuid, name: &str) -> 
 async fn cleanup_test_share_class(pool: &PgPool, share_class_id: Uuid) {
     // Delete holdings first
     let _ = sqlx::query!(
-        "DELETE FROM kyc.holdings WHERE share_class_id = $1",
+        "DELETE FROM \"ob-poc\".holdings WHERE share_class_id = $1",
         share_class_id
     )
     .execute(pool)
@@ -804,7 +807,7 @@ async fn cleanup_test_share_class(pool: &PgPool, share_class_id: Uuid) {
 
     // Delete share class
     let _ = sqlx::query!(
-        "DELETE FROM kyc.share_classes WHERE id = $1",
+        "DELETE FROM \"ob-poc\".share_classes WHERE id = $1",
         share_class_id
     )
     .execute(pool)
@@ -844,10 +847,54 @@ async fn create_test_entity(pool: &PgPool, name: &str) -> Uuid {
     entity_id
 }
 
+async fn ensure_test_cbu_for_entity(pool: &PgPool, entity_id: Uuid) -> Uuid {
+    let existing = sqlx::query_scalar!(
+        r#"
+        SELECT cbu_id as "cbu_id!"
+        FROM "ob-poc".cbus
+        WHERE commercial_client_entity_id = $1
+        LIMIT 1
+        "#,
+        entity_id
+    )
+    .fetch_optional(pool)
+    .await
+    .unwrap();
+
+    if let Some(cbu_id) = existing {
+        return cbu_id;
+    }
+
+    let cbu_id = Uuid::new_v4();
+    let cbu_name = format!("Test CBU {}", cbu_id);
+
+    sqlx::query!(
+        r#"
+        INSERT INTO "ob-poc".cbus (cbu_id, name, commercial_client_entity_id)
+        VALUES ($1, $2, $3)
+        "#,
+        cbu_id,
+        cbu_name,
+        entity_id
+    )
+    .execute(pool)
+    .await
+    .unwrap();
+
+    cbu_id
+}
+
 async fn cleanup_test_entity(pool: &PgPool, entity_id: Uuid) {
     // Clean up related data first
     let _ = sqlx::query!(
-        "DELETE FROM kyc.investor_role_profiles WHERE issuer_entity_id = $1 OR holder_entity_id = $1",
+        "DELETE FROM \"ob-poc\".investor_role_profiles WHERE issuer_entity_id = $1 OR holder_entity_id = $1",
+        entity_id
+    )
+    .execute(pool)
+    .await;
+
+    let _ = sqlx::query!(
+        r#"DELETE FROM "ob-poc".cbus WHERE commercial_client_entity_id = $1"#,
         entity_id
     )
     .execute(pool)

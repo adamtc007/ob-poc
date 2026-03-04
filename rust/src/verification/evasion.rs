@@ -310,8 +310,8 @@ impl EvasionDetector {
                 COUNT(*) FILTER (WHERE status IN ('REQUIRED', 'REQUESTED')) as pending,
                 COUNT(*) FILTER (WHERE status = 'REJECTED') as rejected,
                 COUNT(*) FILTER (WHERE status = 'WAIVED') as waived
-            FROM kyc.doc_requests dr
-            JOIN kyc.entity_workstreams w ON w.workstream_id = dr.workstream_id
+            FROM "ob-poc".doc_requests dr
+            JOIN "ob-poc".entity_workstreams w ON w.workstream_id = dr.workstream_id
             WHERE w.case_id = $1
             "#,
         )
@@ -327,8 +327,8 @@ impl EvasionDetector {
             SELECT
                 AVG(EXTRACT(EPOCH FROM (received_at - requested_at)) / 86400)::float8 as avg_days,
                 MAX(EXTRACT(EPOCH FROM (received_at - requested_at)) / 86400)::float8 as max_days
-            FROM kyc.doc_requests dr
-            JOIN kyc.entity_workstreams w ON w.workstream_id = dr.workstream_id
+            FROM "ob-poc".doc_requests dr
+            JOIN "ob-poc".entity_workstreams w ON w.workstream_id = dr.workstream_id
             WHERE w.case_id = $1
             AND received_at IS NOT NULL
             AND requested_at IS NOT NULL
@@ -345,8 +345,8 @@ impl EvasionDetector {
         let extension_count: i64 = sqlx::query_scalar(
             r#"
             SELECT COUNT(DISTINCT dr.request_id)
-            FROM kyc.doc_requests dr
-            JOIN kyc.entity_workstreams w ON w.workstream_id = dr.workstream_id
+            FROM "ob-poc".doc_requests dr
+            JOIN "ob-poc".entity_workstreams w ON w.workstream_id = dr.workstream_id
             WHERE w.case_id = $1
             AND dr.due_date IS NOT NULL
             AND dr.received_at IS NOT NULL

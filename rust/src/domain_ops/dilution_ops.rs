@@ -4,11 +4,11 @@
 //! and other dilution instruments.
 //!
 //! ## Key Tables
-//! - kyc.dilution_instruments
-//! - kyc.dilution_exercise_events
+//! - "ob-poc".dilution_instruments
+//! - "ob-poc".dilution_exercise_events
 //!
 //! ## Key SQL Functions
-//! - kyc.fn_diluted_supply_at()
+//! - "ob-poc".fn_diluted_supply_at()
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
@@ -89,7 +89,7 @@ impl CustomOperation for DilutionGrantOptionsOp {
 
         // Get issuer from share class
         let issuer_entity_id: Uuid =
-            sqlx::query_scalar(r#"SELECT issuer_entity_id FROM kyc.share_classes WHERE id = $1"#)
+            sqlx::query_scalar(r#"SELECT issuer_entity_id FROM "ob-poc".share_classes WHERE id = $1"#)
                 .bind(share_class_id)
                 .fetch_optional(pool)
                 .await?
@@ -97,7 +97,7 @@ impl CustomOperation for DilutionGrantOptionsOp {
 
         let instrument_id: Uuid = sqlx::query_scalar(
             r#"
-            INSERT INTO kyc.dilution_instruments (
+            INSERT INTO "ob-poc".dilution_instruments (
                 issuer_entity_id, share_class_id, holder_entity_id, instrument_type,
                 units_authorized, units_outstanding, strike_price, grant_date,
                 vesting_start_date, expiry_date, vesting_months, cliff_months,
@@ -198,7 +198,7 @@ impl CustomOperation for DilutionIssueWarrantOp {
 
         // Get issuer from share class
         let issuer_entity_id: Uuid =
-            sqlx::query_scalar(r#"SELECT issuer_entity_id FROM kyc.share_classes WHERE id = $1"#)
+            sqlx::query_scalar(r#"SELECT issuer_entity_id FROM "ob-poc".share_classes WHERE id = $1"#)
                 .bind(share_class_id)
                 .fetch_optional(pool)
                 .await?
@@ -206,7 +206,7 @@ impl CustomOperation for DilutionIssueWarrantOp {
 
         let instrument_id: Uuid = sqlx::query_scalar(
             r#"
-            INSERT INTO kyc.dilution_instruments (
+            INSERT INTO "ob-poc".dilution_instruments (
                 issuer_entity_id, share_class_id, holder_entity_id, instrument_type,
                 units_authorized, units_outstanding, strike_price, grant_date,
                 expiry_date, status, warrant_series
@@ -304,7 +304,7 @@ impl CustomOperation for DilutionCreateSafeOp {
 
         let instrument_id: Uuid = sqlx::query_scalar(
             r#"
-            INSERT INTO kyc.dilution_instruments (
+            INSERT INTO "ob-poc".dilution_instruments (
                 issuer_entity_id, share_class_id, holder_entity_id, instrument_type,
                 principal_amount, valuation_cap, discount_pct, grant_date,
                 status, safe_type
@@ -408,7 +408,7 @@ impl CustomOperation for DilutionCreateConvertibleNoteOp {
 
         let instrument_id: Uuid = sqlx::query_scalar(
             r#"
-            INSERT INTO kyc.dilution_instruments (
+            INSERT INTO "ob-poc".dilution_instruments (
                 issuer_entity_id, share_class_id, holder_entity_id, instrument_type,
                 principal_amount, interest_rate, valuation_cap, discount_pct,
                 grant_date, maturity_date, status
@@ -552,7 +552,7 @@ impl CustomOperation for DilutionExerciseOp {
 
         // Check for existing operation (idempotent)
         let existing: Option<Uuid> = sqlx::query_scalar(
-            r#"SELECT exercise_id FROM kyc.dilution_exercise_events WHERE idempotency_key = $1"#,
+            r#"SELECT exercise_id FROM "ob-poc".dilution_exercise_events WHERE idempotency_key = $1"#,
         )
         .bind(&idempotency_key)
         .fetch_optional(pool)
@@ -643,7 +643,7 @@ impl DilutionExerciseOp {
                    instrument_type, units_granted, units_exercised, units_forfeited,
                    COALESCE(conversion_ratio, 1.0) as conversion_ratio,
                    exercise_price, status
-            FROM kyc.dilution_instruments
+            FROM "ob-poc".dilution_instruments
             WHERE instrument_id = $1
             FOR UPDATE
             "#,
@@ -725,7 +725,7 @@ impl DilutionExerciseOp {
 
         let rows = sqlx::query(
             r#"
-            UPDATE kyc.dilution_instruments
+            UPDATE "ob-poc".dilution_instruments
             SET units_exercised = $2,
                 status = $3,
                 updated_at = now()
@@ -749,13 +749,13 @@ impl DilutionExerciseOp {
         // 5. Create or update holding (upsert pattern)
         let holding_id: Uuid = sqlx::query_scalar(
             r#"
-            INSERT INTO kyc.holdings (
+            INSERT INTO "ob-poc".holdings (
                 share_class_id, investor_entity_id, units,
                 cost_basis, acquisition_date, status
             ) VALUES ($1, $2, $3, $4, $5, 'active')
             ON CONFLICT (share_class_id, investor_entity_id)
             DO UPDATE SET
-                units = kyc.holdings.units + EXCLUDED.units,
+                units = "ob-poc".holdings.units + EXCLUDED.units,
                 updated_at = now()
             RETURNING id
             "#,
@@ -771,7 +771,7 @@ impl DilutionExerciseOp {
         // 6. Create exercise event (audit)
         let exercise_id: Uuid = sqlx::query_scalar(
             r#"
-            INSERT INTO kyc.dilution_exercise_events (
+            INSERT INTO "ob-poc".dilution_exercise_events (
                 instrument_id, units_exercised, exercise_date,
                 exercise_price_paid, shares_issued, resulting_holding_id,
                 is_cashless, shares_withheld_for_tax, idempotency_key,
@@ -799,12 +799,12 @@ impl DilutionExerciseOp {
         // 7. Update supply
         sqlx::query(
             r#"
-            UPDATE kyc.share_class_supply
+            UPDATE "ob-poc".share_class_supply
             SET issued_units = issued_units + $2,
                 outstanding_units = outstanding_units + $2,
                 updated_at = now()
             WHERE share_class_id = $1
-              AND as_of_date = (SELECT MAX(as_of_date) FROM kyc.share_class_supply WHERE share_class_id = $1)
+              AND as_of_date = (SELECT MAX(as_of_date) FROM "ob-poc".share_class_supply WHERE share_class_id = $1)
             "#,
         )
         .bind(share_class_id)
@@ -815,7 +815,7 @@ impl DilutionExerciseOp {
         // 8. Create issuance event for audit trail
         sqlx::query(
             r#"
-            INSERT INTO kyc.issuance_events (
+            INSERT INTO "ob-poc".issuance_events (
                 share_class_id, issuer_entity_id, event_type, units_delta,
                 price_per_unit, effective_date, notes, status
             ) VALUES ($1, $2, 'CONVERSION', $3, $4, $5, $6, 'EFFECTIVE')
@@ -884,7 +884,7 @@ impl CustomOperation for DilutionForfeitOp {
         let instrument: Option<(rust_decimal::Decimal,)> = sqlx::query_as(
             r#"
             SELECT units_outstanding
-            FROM kyc.dilution_instruments
+            FROM "ob-poc".dilution_instruments
             WHERE instrument_id = $1 AND status = 'OUTSTANDING'
             "#,
         )
@@ -910,7 +910,7 @@ impl CustomOperation for DilutionForfeitOp {
         // Record forfeit event
         let event_id: Uuid = sqlx::query_scalar(
             r#"
-            INSERT INTO kyc.dilution_exercise_events (
+            INSERT INTO "ob-poc".dilution_exercise_events (
                 instrument_id, exercise_type, units, exercise_date, notes, status
             ) VALUES ($1, 'FORFEIT', $2, $3, $4, 'COMPLETED')
             RETURNING event_id
@@ -933,7 +933,7 @@ impl CustomOperation for DilutionForfeitOp {
 
         sqlx::query(
             r#"
-            UPDATE kyc.dilution_instruments
+            UPDATE "ob-poc".dilution_instruments
             SET units_outstanding = $2, status = $3, updated_at = now()
             WHERE instrument_id = $1
             "#,
@@ -1024,7 +1024,7 @@ impl CustomOperation for DilutionListOp {
                        instrument_type, units_authorized, units_outstanding,
                        strike_price, principal_amount, valuation_cap,
                        grant_date, expiry_date, status
-                FROM kyc.dilution_instruments
+                FROM "ob-poc".dilution_instruments
                 WHERE issuer_entity_id = $1 AND instrument_type = $2 AND status = $3
                 ORDER BY grant_date DESC
                 "#,
@@ -1041,7 +1041,7 @@ impl CustomOperation for DilutionListOp {
                        instrument_type, units_authorized, units_outstanding,
                        strike_price, principal_amount, valuation_cap,
                        grant_date, expiry_date, status
-                FROM kyc.dilution_instruments
+                FROM "ob-poc".dilution_instruments
                 WHERE issuer_entity_id = $1
                 ORDER BY grant_date DESC
                 "#,
@@ -1056,7 +1056,7 @@ impl CustomOperation for DilutionListOp {
                        instrument_type, units_authorized, units_outstanding,
                        strike_price, principal_amount, valuation_cap,
                        grant_date, expiry_date, status
-                FROM kyc.dilution_instruments
+                FROM "ob-poc".dilution_instruments
                 WHERE issuer_entity_id = $1 AND status = $2
                 ORDER BY grant_date DESC
                 "#,
@@ -1078,7 +1078,7 @@ impl CustomOperation for DilutionListOp {
                 .await?;
 
                 let share_class_name: Option<String> = if let Some(sc_id) = i.2 {
-                    sqlx::query_scalar(r#"SELECT name FROM kyc.share_classes WHERE id = $1"#)
+                    sqlx::query_scalar(r#"SELECT name FROM "ob-poc".share_classes WHERE id = $1"#)
                         .bind(sc_id)
                         .fetch_optional(pool)
                         .await?
@@ -1165,7 +1165,7 @@ impl CustomOperation for DilutionGetSummaryOp {
             r#"
             SELECT issuer_entity_id, share_class_name, instrument_type,
                    units_authorized, units_outstanding, units_exercised, weighted_avg_strike
-            FROM kyc.v_dilution_summary
+            FROM "ob-poc".v_dilution_summary
             WHERE issuer_entity_id = $1
             ORDER BY instrument_type
             "#,
@@ -1200,8 +1200,8 @@ impl CustomOperation for DilutionGetSummaryOp {
         let outstanding_shares: rust_decimal::Decimal = sqlx::query_scalar(
             r#"
             SELECT COALESCE(SUM(scs.outstanding_units), 0)
-            FROM kyc.share_classes sc
-            LEFT JOIN kyc.share_class_supply scs ON scs.share_class_id = sc.id
+            FROM "ob-poc".share_classes sc
+            LEFT JOIN "ob-poc".share_class_supply scs ON scs.share_class_id = sc.id
             WHERE sc.issuer_entity_id = $1
             "#,
         )

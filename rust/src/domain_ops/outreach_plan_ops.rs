@@ -3,7 +3,7 @@
 //! Generates an outreach plan from coverage gaps produced by a UBO determination run.
 //! Groups gaps by prong, maps each gap to the required document type per spec 2A.2,
 //! bundles items by entity (max 8 per plan), and inserts into
-//! `kyc.outreach_plans` + `kyc.outreach_items`.
+//! `"ob-poc".outreach_plans` + `"ob-poc".outreach_items`.
 //!
 //! ## Rationale
 //! Plan generation requires custom code because:
@@ -151,7 +151,7 @@ impl CustomOperation for OutreachPlanGenerateOp {
         // 1. Validate case exists
         // ---------------------------------------------------------------
         let case_exists: Option<(Uuid,)> =
-            sqlx::query_as(r#"SELECT case_id FROM kyc.cases WHERE case_id = $1"#)
+            sqlx::query_as(r#"SELECT case_id FROM "ob-poc".cases WHERE case_id = $1"#)
                 .bind(case_id)
                 .fetch_optional(pool)
                 .await?;
@@ -172,7 +172,7 @@ impl CustomOperation for OutreachPlanGenerateOp {
         let det_run: DeterminationRow = sqlx::query_as(
             r#"
             SELECT coverage_snapshot, subject_entity_id
-            FROM kyc.ubo_determination_runs
+            FROM "ob-poc".ubo_determination_runs
             WHERE run_id = $1 AND case_id = $2
             "#,
         )
@@ -201,7 +201,7 @@ impl CustomOperation for OutreachPlanGenerateOp {
             // No gaps found — create an empty plan
             let plan_id: (Uuid,) = sqlx::query_as(
                 r#"
-                INSERT INTO kyc.outreach_plans (case_id, determination_run_id, status, total_items)
+                INSERT INTO "ob-poc".outreach_plans (case_id, determination_run_id, status, total_items)
                 VALUES ($1, $2, 'DRAFT', 0)
                 RETURNING plan_id
                 "#,
@@ -277,7 +277,7 @@ impl CustomOperation for OutreachPlanGenerateOp {
         // ---------------------------------------------------------------
         let plan_id: (Uuid,) = sqlx::query_as(
             r#"
-            INSERT INTO kyc.outreach_plans (case_id, determination_run_id, status, total_items)
+            INSERT INTO "ob-poc".outreach_plans (case_id, determination_run_id, status, total_items)
             VALUES ($1, $2, 'DRAFT', $3)
             RETURNING plan_id
             "#,
@@ -296,7 +296,7 @@ impl CustomOperation for OutreachPlanGenerateOp {
         for item in &planned_items {
             let item_row: (Uuid, String) = sqlx::query_as(
                 r#"
-                INSERT INTO kyc.outreach_items (
+                INSERT INTO "ob-poc".outreach_items (
                     plan_id, prong, target_entity_id, gap_description,
                     request_text, doc_type_requested, priority, closes_gap_ref, status
                 )

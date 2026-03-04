@@ -31,7 +31,7 @@ domains:
         crud:
           operation: upsert
           table: screenings
-          schema: kyc
+          schema: ob-poc
           returning: screening_id
           conflict_keys:
             - workstream_id
@@ -45,7 +45,7 @@ domains:
             lookup:
               table: entity_workstreams
               entity_type: entity_workstream
-              schema: kyc
+              schema: ob-poc
               search_key: workstream_id
               primary_key: workstream_id
           - name: screening-type
@@ -94,7 +94,7 @@ domains:
         crud:
           operation: update
           table: screenings
-          schema: kyc
+          schema: ob-poc
           key: screening_id
           set_values:
             completed_at: now()
@@ -107,7 +107,7 @@ domains:
             lookup:
               table: screenings
               entity_type: screening
-              schema: kyc
+              schema: ob-poc
               search_key: screening_id
               primary_key: screening_id
           - name: status
@@ -150,7 +150,7 @@ domains:
         crud:
           operation: update
           table: screenings
-          schema: kyc
+          schema: ob-poc
           key: screening_id
           set_values:
             reviewed_at: now()
@@ -163,7 +163,7 @@ domains:
             lookup:
               table: screenings
               entity_type: screening
-              schema: kyc
+              schema: ob-poc
               search_key: screening_id
               primary_key: screening_id
           - name: status
@@ -184,7 +184,7 @@ domains:
             lookup:
               table: red_flags
               entity_type: red_flag
-              schema: kyc
+              schema: ob-poc
               search_key: red_flag_id
               primary_key: red_flag_id
         returns:
@@ -211,7 +211,7 @@ domains:
         crud:
           operation: list_by_fk
           table: screenings
-          schema: kyc
+          schema: ob-poc
           fk_col: workstream_id
         args:
           - name: workstream-id
@@ -220,7 +220,7 @@ domains:
             lookup:
               table: entity_workstreams
               entity_type: entity_workstream
-              schema: kyc
+              schema: ob-poc
               search_key: workstream_id
               primary_key: workstream_id
           - name: screening-type

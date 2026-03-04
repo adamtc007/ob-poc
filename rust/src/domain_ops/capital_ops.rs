@@ -92,7 +92,7 @@ impl CustomOperation for CapitalTransferOp {
         // 1. Verify source holding has enough units
         let source_holding: Option<(Uuid, rust_decimal::Decimal)> = sqlx::query_as(
             r#"
-            SELECT id, units FROM kyc.holdings
+            SELECT id, units FROM "ob-poc".holdings
             WHERE share_class_id = $1 AND investor_entity_id = $2 AND status = 'active'
             "#,
         )
@@ -115,7 +115,7 @@ impl CustomOperation for CapitalTransferOp {
         // 2. Get or create target holding
         let target_holding: Option<(Uuid, rust_decimal::Decimal)> = sqlx::query_as(
             r#"
-            SELECT id, units FROM kyc.holdings
+            SELECT id, units FROM "ob-poc".holdings
             WHERE share_class_id = $1 AND investor_entity_id = $2 AND status = 'active'
             "#,
         )
@@ -130,7 +130,7 @@ impl CustomOperation for CapitalTransferOp {
             // Create new holding for recipient
             let new_id: (Uuid,) = sqlx::query_as(
                 r#"
-                INSERT INTO kyc.holdings (share_class_id, investor_entity_id, units, status)
+                INSERT INTO "ob-poc".holdings (share_class_id, investor_entity_id, units, status)
                 VALUES ($1, $2, 0, 'active')
                 RETURNING id
                 "#,
@@ -145,7 +145,7 @@ impl CustomOperation for CapitalTransferOp {
         // 3. Update source holding
         sqlx::query(
             r#"
-            UPDATE kyc.holdings SET units = units - $1, updated_at = now()
+            UPDATE "ob-poc".holdings SET units = units - $1, updated_at = now()
             WHERE id = $2
             "#,
         )
@@ -157,7 +157,7 @@ impl CustomOperation for CapitalTransferOp {
         // 4. Update target holding
         sqlx::query(
             r#"
-            UPDATE kyc.holdings SET units = units + $1, updated_at = now()
+            UPDATE "ob-poc".holdings SET units = units + $1, updated_at = now()
             WHERE id = $2
             "#,
         )
@@ -170,7 +170,7 @@ impl CustomOperation for CapitalTransferOp {
         let amount = price_per_unit.map(|p| p * units);
         let transfer_out_id: (Uuid,) = sqlx::query_as(
             r#"
-            INSERT INTO kyc.movements (
+            INSERT INTO "ob-poc".movements (
                 holding_id, movement_type, units, price_per_unit, amount,
                 currency, trade_date, status, reference
             )
@@ -190,7 +190,7 @@ impl CustomOperation for CapitalTransferOp {
         // 6. Record transfer-in movement
         let _transfer_in_id: (Uuid,) = sqlx::query_as(
             r#"
-            INSERT INTO kyc.movements (
+            INSERT INTO "ob-poc".movements (
                 holding_id, movement_type, units, price_per_unit, amount,
                 currency, trade_date, status, reference
             )
@@ -253,7 +253,7 @@ impl CustomOperation for CapitalReconcileOp {
         let share_classes: Vec<(Uuid, String, i64, rust_decimal::Decimal)> = sqlx::query_as(
             r#"
             SELECT id, name, issued_shares, voting_rights_per_share
-            FROM kyc.share_classes
+            FROM "ob-poc".share_classes
             WHERE issuer_entity_id = $1 AND status = 'active'
             "#,
         )
@@ -273,7 +273,7 @@ impl CustomOperation for CapitalReconcileOp {
             let holdings: Vec<(Uuid, rust_decimal::Decimal)> = sqlx::query_as(
                 r#"
                 SELECT investor_entity_id, units
-                FROM kyc.holdings
+                FROM "ob-poc".holdings
                 WHERE share_class_id = $1 AND status = 'active' AND units > 0
                 "#,
             )
@@ -514,7 +514,7 @@ impl CustomOperation for CapitalIssueSharesOp {
         let share_class: Option<(i64, Option<i64>)> = sqlx::query_as(
             r#"
             SELECT issued_shares, authorized_shares
-            FROM kyc.share_classes
+            FROM "ob-poc".share_classes
             WHERE id = $1
             "#,
         )
@@ -542,7 +542,7 @@ impl CustomOperation for CapitalIssueSharesOp {
         // Update issued shares
         let result = sqlx::query(
             r#"
-            UPDATE kyc.share_classes
+            UPDATE "ob-poc".share_classes
             SET issued_shares = $1, updated_at = now()
             WHERE id = $2
             "#,
@@ -608,7 +608,7 @@ impl CustomOperation for CapitalCancelSharesOp {
         let share_class: Option<(i64,)> = sqlx::query_as(
             r#"
             SELECT issued_shares
-            FROM kyc.share_classes
+            FROM "ob-poc".share_classes
             WHERE id = $1
             "#,
         )
@@ -622,7 +622,7 @@ impl CustomOperation for CapitalCancelSharesOp {
         let allocated: (rust_decimal::Decimal,) = sqlx::query_as(
             r#"
             SELECT COALESCE(SUM(units), 0)
-            FROM kyc.holdings
+            FROM "ob-poc".holdings
             WHERE share_class_id = $1 AND status = 'active'
             "#,
         )
@@ -652,7 +652,7 @@ impl CustomOperation for CapitalCancelSharesOp {
         // Update issued shares
         let result = sqlx::query(
             r#"
-            UPDATE kyc.share_classes
+            UPDATE "ob-poc".share_classes
             SET issued_shares = $1, updated_at = now()
             WHERE id = $2
             "#,
@@ -750,7 +750,7 @@ impl CustomOperation for CapitalShareClassCreateOp {
         // Insert share class
         let share_class_id: Uuid = sqlx::query_scalar(
             r#"
-            INSERT INTO kyc.share_classes (
+            INSERT INTO "ob-poc".share_classes (
                 issuer_entity_id, cbu_id, name, instrument_kind,
                 votes_per_unit, economic_per_unit, currency,
                 authorized_shares, class_category
@@ -773,7 +773,7 @@ impl CustomOperation for CapitalShareClassCreateOp {
         let internal_ref = format!("SC-{}", &share_class_id.to_string()[..8]);
         sqlx::query(
             r#"
-            INSERT INTO kyc.share_class_identifiers (
+            INSERT INTO "ob-poc".share_class_identifiers (
                 share_class_id, scheme_code, identifier_value, is_primary
             ) VALUES ($1, 'INTERNAL', $2, true)
             "#,
@@ -786,7 +786,7 @@ impl CustomOperation for CapitalShareClassCreateOp {
         // Initialize supply at zero
         sqlx::query(
             r#"
-            INSERT INTO kyc.share_class_supply (
+            INSERT INTO "ob-poc".share_class_supply (
                 share_class_id, authorized_units, issued_units, outstanding_units, as_of_date
             ) VALUES ($1, $2, 0, 0, CURRENT_DATE)
             "#,
@@ -857,7 +857,7 @@ impl CustomOperation for CapitalShareClassGetSupplyOp {
             .unwrap_or_else(|| chrono::Utc::now().date_naive());
 
         let supply: Option<ShareClassSupplyRow> =
-            sqlx::query_as(r#"SELECT * FROM kyc.fn_share_class_supply_at($1, $2)"#)
+            sqlx::query_as(r#"SELECT * FROM "ob-poc".fn_share_class_supply_at($1, $2)"#)
                 .bind(share_class_id)
                 .bind(as_of)
                 .fetch_optional(pool)
@@ -932,7 +932,7 @@ impl CustomOperation for CapitalIssueInitialOp {
 
         // Get issuer from share class
         let issuer_entity_id: Uuid =
-            sqlx::query_scalar(r#"SELECT issuer_entity_id FROM kyc.share_classes WHERE id = $1"#)
+            sqlx::query_scalar(r#"SELECT issuer_entity_id FROM "ob-poc".share_classes WHERE id = $1"#)
                 .bind(share_class_id)
                 .fetch_optional(pool)
                 .await?
@@ -942,7 +942,7 @@ impl CustomOperation for CapitalIssueInitialOp {
         let prior_exists: bool = sqlx::query_scalar(
             r#"
             SELECT EXISTS(
-                SELECT 1 FROM kyc.issuance_events
+                SELECT 1 FROM "ob-poc".issuance_events
                 WHERE share_class_id = $1 AND status = 'EFFECTIVE'
             )
             "#,
@@ -963,7 +963,7 @@ impl CustomOperation for CapitalIssueInitialOp {
         // Insert event
         let event_id: Uuid = sqlx::query_scalar(
             r#"
-            INSERT INTO kyc.issuance_events (
+            INSERT INTO "ob-poc".issuance_events (
                 share_class_id, issuer_entity_id, event_type, units_delta,
                 price_per_unit, effective_date, board_resolution_ref, status
             ) VALUES ($1, $2, 'INITIAL_ISSUE', $3, $4, $5, $6, 'EFFECTIVE')
@@ -982,7 +982,7 @@ impl CustomOperation for CapitalIssueInitialOp {
         // Update or insert supply
         sqlx::query(
             r#"
-            INSERT INTO kyc.share_class_supply (
+            INSERT INTO "ob-poc".share_class_supply (
                 share_class_id, issued_units, outstanding_units, as_of_date, as_of_event_id
             ) VALUES ($1, $2, $2, $3, $4)
             ON CONFLICT (share_class_id, as_of_date) DO UPDATE SET
@@ -1000,7 +1000,7 @@ impl CustomOperation for CapitalIssueInitialOp {
         .await?;
 
         // Also update share_classes.issued_shares for compatibility
-        sqlx::query(r#"UPDATE kyc.share_classes SET issued_shares = $2 WHERE id = $1"#)
+        sqlx::query(r#"UPDATE "ob-poc".share_classes SET issued_shares = $2 WHERE id = $1"#)
             .bind(share_class_id)
             .bind(units)
             .execute(&mut *tx)
@@ -1079,8 +1079,8 @@ impl CustomOperation for CapitalIssueNewOp {
         let share_info: Option<(Uuid, Option<rust_decimal::Decimal>)> = sqlx::query_as(
             r#"
             SELECT sc.issuer_entity_id, scs.issued_units
-            FROM kyc.share_classes sc
-            LEFT JOIN kyc.share_class_supply scs ON scs.share_class_id = sc.id
+            FROM "ob-poc".share_classes sc
+            LEFT JOIN "ob-poc".share_class_supply scs ON scs.share_class_id = sc.id
             WHERE sc.id = $1
             ORDER BY scs.as_of_date DESC NULLS LAST
             LIMIT 1
@@ -1100,7 +1100,7 @@ impl CustomOperation for CapitalIssueNewOp {
         // Insert event
         let event_id: Uuid = sqlx::query_scalar(
             r#"
-            INSERT INTO kyc.issuance_events (
+            INSERT INTO "ob-poc".issuance_events (
                 share_class_id, issuer_entity_id, event_type, units_delta,
                 price_per_unit, effective_date, board_resolution_ref, status
             ) VALUES ($1, $2, 'NEW_ISSUE', $3, $4, $5, $6, 'EFFECTIVE')
@@ -1119,7 +1119,7 @@ impl CustomOperation for CapitalIssueNewOp {
         // Update supply
         sqlx::query(
             r#"
-            INSERT INTO kyc.share_class_supply (
+            INSERT INTO "ob-poc".share_class_supply (
                 share_class_id, issued_units, outstanding_units, as_of_date, as_of_event_id
             ) VALUES ($1, $2, $2, $3, $4)
             ON CONFLICT (share_class_id, as_of_date) DO UPDATE SET
@@ -1219,7 +1219,7 @@ impl CustomOperation for CapitalSplitOp {
 
         // Check for existing operation (idempotent)
         let existing: Option<Uuid> = sqlx::query_scalar(
-            r#"SELECT event_id FROM kyc.issuance_events WHERE idempotency_key = $1"#,
+            r#"SELECT event_id FROM "ob-poc".issuance_events WHERE idempotency_key = $1"#,
         )
         .bind(&idempotency_key)
         .fetch_optional(pool)
@@ -1238,7 +1238,7 @@ impl CustomOperation for CapitalSplitOp {
 
         // Get issuer and validate share class exists
         let issuer_entity_id: Uuid =
-            sqlx::query_scalar(r#"SELECT issuer_entity_id FROM kyc.share_classes WHERE id = $1"#)
+            sqlx::query_scalar(r#"SELECT issuer_entity_id FROM "ob-poc".share_classes WHERE id = $1"#)
                 .bind(share_class_id)
                 .fetch_optional(pool)
                 .await?
@@ -1251,7 +1251,7 @@ impl CustomOperation for CapitalSplitOp {
             .await?;
 
         // Advisory lock on share class (prevents concurrent splits)
-        let lock_id: i64 = sqlx::query_scalar(r#"SELECT kyc.uuid_to_lock_id($1)"#)
+        let lock_id: i64 = sqlx::query_scalar(r#"SELECT "ob-poc".uuid_to_lock_id($1)"#)
             .bind(share_class_id)
             .fetch_one(&mut *tx)
             .await?;
@@ -1263,7 +1263,7 @@ impl CustomOperation for CapitalSplitOp {
         // Validate current state
         let current_issued: Option<rust_decimal::Decimal> = sqlx::query_scalar(
             r#"
-            SELECT issued_units FROM kyc.share_class_supply
+            SELECT issued_units FROM "ob-poc".share_class_supply
             WHERE share_class_id = $1
             ORDER BY as_of_date DESC
             LIMIT 1
@@ -1287,7 +1287,7 @@ impl CustomOperation for CapitalSplitOp {
         // 1. Insert split event with idempotency key
         let event_id: Uuid = sqlx::query_scalar(
             r#"
-            INSERT INTO kyc.issuance_events (
+            INSERT INTO "ob-poc".issuance_events (
                 share_class_id, issuer_entity_id, event_type, units_delta,
                 ratio_from, ratio_to, effective_date, record_date, status,
                 idempotency_key
@@ -1309,7 +1309,7 @@ impl CustomOperation for CapitalSplitOp {
         // 2. Update supply (multiply all unit counts)
         let supply_updated = sqlx::query(
             r#"
-            UPDATE kyc.share_class_supply
+            UPDATE "ob-poc".share_class_supply
             SET issued_units = issued_units * $2,
                 outstanding_units = outstanding_units * $2,
                 treasury_units = COALESCE(treasury_units, 0) * $2,
@@ -1317,7 +1317,7 @@ impl CustomOperation for CapitalSplitOp {
                 as_of_event_id = $3,
                 updated_at = now()
             WHERE share_class_id = $1
-              AND as_of_date = (SELECT MAX(as_of_date) FROM kyc.share_class_supply WHERE share_class_id = $1)
+              AND as_of_date = (SELECT MAX(as_of_date) FROM "ob-poc".share_class_supply WHERE share_class_id = $1)
             "#,
         )
         .bind(share_class_id)
@@ -1330,7 +1330,7 @@ impl CustomOperation for CapitalSplitOp {
         // 3. Bulk update ALL holdings for this share class
         let holdings_updated = sqlx::query(
             r#"
-            UPDATE kyc.holdings
+            UPDATE "ob-poc".holdings
             SET units = units * $2,
                 cost_basis = CASE WHEN cost_basis IS NOT NULL
                              THEN cost_basis / $2 ELSE NULL END,
@@ -1347,7 +1347,7 @@ impl CustomOperation for CapitalSplitOp {
         // 4. Bulk update ALL dilution instruments converting to this share class
         let instruments_updated = sqlx::query(
             r#"
-            UPDATE kyc.dilution_instruments
+            UPDATE "ob-poc".dilution_instruments
             SET conversion_ratio = conversion_ratio * $2,
                 exercise_price = CASE WHEN exercise_price IS NOT NULL
                                  THEN exercise_price / $2 ELSE NULL END,
@@ -1435,7 +1435,7 @@ impl CustomOperation for CapitalBuybackOp {
             .unwrap_or_else(|| chrono::Utc::now().date_naive());
 
         let issuer_entity_id: Uuid =
-            sqlx::query_scalar(r#"SELECT issuer_entity_id FROM kyc.share_classes WHERE id = $1"#)
+            sqlx::query_scalar(r#"SELECT issuer_entity_id FROM "ob-poc".share_classes WHERE id = $1"#)
                 .bind(share_class_id)
                 .fetch_optional(pool)
                 .await?
@@ -1447,7 +1447,7 @@ impl CustomOperation for CapitalBuybackOp {
 
         let event_id: Uuid = sqlx::query_scalar(
             r#"
-            INSERT INTO kyc.issuance_events (
+            INSERT INTO "ob-poc".issuance_events (
                 share_class_id, issuer_entity_id, event_type, units_delta,
                 price_per_unit, total_amount, effective_date, status
             ) VALUES ($1, $2, 'BUYBACK', $3, $4, $5, $6, 'EFFECTIVE')
@@ -1466,13 +1466,13 @@ impl CustomOperation for CapitalBuybackOp {
         // Update supply - move to treasury
         sqlx::query(
             r#"
-            UPDATE kyc.share_class_supply
+            UPDATE "ob-poc".share_class_supply
             SET outstanding_units = outstanding_units - $2,
                 treasury_units = treasury_units + $2,
                 as_of_event_id = $3,
                 updated_at = now()
             WHERE share_class_id = $1
-              AND as_of_date = (SELECT MAX(as_of_date) FROM kyc.share_class_supply WHERE share_class_id = $1)
+              AND as_of_date = (SELECT MAX(as_of_date) FROM "ob-poc".share_class_supply WHERE share_class_id = $1)
             "#
         )
         .bind(share_class_id)
@@ -1539,7 +1539,7 @@ impl CustomOperation for CapitalCancelOp {
         let reason = extract_string_opt(verb_call, "reason");
 
         let issuer_entity_id: Uuid =
-            sqlx::query_scalar(r#"SELECT issuer_entity_id FROM kyc.share_classes WHERE id = $1"#)
+            sqlx::query_scalar(r#"SELECT issuer_entity_id FROM "ob-poc".share_classes WHERE id = $1"#)
                 .bind(share_class_id)
                 .fetch_optional(pool)
                 .await?
@@ -1549,7 +1549,7 @@ impl CustomOperation for CapitalCancelOp {
 
         let event_id: Uuid = sqlx::query_scalar(
             r#"
-            INSERT INTO kyc.issuance_events (
+            INSERT INTO "ob-poc".issuance_events (
                 share_class_id, issuer_entity_id, event_type, units_delta,
                 effective_date, notes, status
             ) VALUES ($1, $2, 'CANCELLATION', $3, $4, $5, 'EFFECTIVE')
@@ -1567,13 +1567,13 @@ impl CustomOperation for CapitalCancelOp {
         // Update supply - reduce issued and outstanding
         sqlx::query(
             r#"
-            UPDATE kyc.share_class_supply
+            UPDATE "ob-poc".share_class_supply
             SET issued_units = issued_units - $2,
                 outstanding_units = outstanding_units - $2,
                 as_of_event_id = $3,
                 updated_at = now()
             WHERE share_class_id = $1
-              AND as_of_date = (SELECT MAX(as_of_date) FROM kyc.share_class_supply WHERE share_class_id = $1)
+              AND as_of_date = (SELECT MAX(as_of_date) FROM "ob-poc".share_class_supply WHERE share_class_id = $1)
             "#
         )
         .bind(share_class_id)
@@ -1649,9 +1649,9 @@ impl CustomOperation for CapitalCapTableOp {
             SELECT sc.id, sc.name, COALESCE(sc.instrument_kind, 'FUND_UNIT'),
                    COALESCE(scs.issued_units, sc.issued_shares, 0),
                    COALESCE(sc.votes_per_unit, sc.voting_rights_per_share, 1)
-            FROM kyc.share_classes sc
-            LEFT JOIN kyc.share_class_supply scs ON scs.share_class_id = sc.id
-                AND scs.as_of_date = (SELECT MAX(as_of_date) FROM kyc.share_class_supply WHERE share_class_id = sc.id AND as_of_date <= $2)
+            FROM "ob-poc".share_classes sc
+            LEFT JOIN "ob-poc".share_class_supply scs ON scs.share_class_id = sc.id
+                AND scs.as_of_date = (SELECT MAX(as_of_date) FROM "ob-poc".share_class_supply WHERE share_class_id = sc.id AND as_of_date <= $2)
             WHERE sc.issuer_entity_id = $1
             "#
         )
@@ -1664,7 +1664,7 @@ impl CustomOperation for CapitalCapTableOp {
         // since SQLx FromRow only supports tuples up to ~16 elements
         use sqlx::Row;
         let holder_rows =
-            sqlx::query(r#"SELECT * FROM kyc.fn_holder_control_position($1, $2, $3)"#)
+            sqlx::query(r#"SELECT * FROM "ob-poc".fn_holder_control_position($1, $2, $3)"#)
                 .bind(issuer_entity_id)
                 .bind(as_of)
                 .bind(&basis)
@@ -1812,7 +1812,7 @@ impl CustomOperation for CapitalHoldersOp {
         // Use query() with manual extraction since SQLx FromRow only supports tuples up to ~16 elements
         use sqlx::Row;
         let holder_rows =
-            sqlx::query(r#"SELECT * FROM kyc.fn_holder_control_position($1, $2, 'VOTES')"#)
+            sqlx::query(r#"SELECT * FROM "ob-poc".fn_holder_control_position($1, $2, 'VOTES')"#)
                 .bind(issuer_entity_id)
                 .bind(as_of)
                 .fetch_all(pool)

@@ -1,0 +1,362 @@
+{
+  "entity_type_defs_total": 262,
+  "entity_tables_with_affinity": 8,
+  "entity_tables_orphaned": 254,
+  "entity_affinity_coverage_pct": 3.05,
+  "orphaned_entity_examples": [
+    {
+      "fqn": "ob_poc.cbu_attr_values",
+      "table_ref": "ob-poc:cbu_attr_values"
+    },
+    {
+      "fqn": "kyc.case_events",
+      "table_ref": "kyc:case_events"
+    },
+    {
+      "fqn": "ob_poc.cbu_board_controller",
+      "table_ref": "ob-poc:cbu_board_controller"
+    },
+    {
+      "fqn": "kyc.case_import_runs",
+      "table_ref": "kyc:case_import_runs"
+    },
+    {
+      "fqn": "kyc.tollgate_evaluations",
+      "table_ref": "kyc:tollgate_evaluations"
+    },
+    {
+      "fqn": "kyc.cases",
+      "table_ref": "kyc:cases"
+    },
+    {
+      "fqn": "kyc.doc_requests",
+      "table_ref": "kyc:doc_requests"
+    },
+    {
+      "fqn": "kyc.fund_vehicles",
+      "table_ref": "kyc:fund_vehicles"
+    },
+    {
+      "fqn": "kyc.investor_role_profiles",
+      "table_ref": "kyc:investor_role_profiles"
+    },
+    {
+      "fqn": "kyc.issuer_control_config",
+      "table_ref": "kyc:issuer_control_config"
+    },
+    {
+      "fqn": "kyc.outreach_plans",
+      "table_ref": "kyc:outreach_plans"
+    },
+    {
+      "fqn": "kyc.dilution_exercise_events",
+      "table_ref": "kyc:dilution_exercise_events"
+    },
+    {
+      "fqn": "kyc.entity_workstreams",
+      "table_ref": "kyc:entity_workstreams"
+    },
+    {
+      "fqn": "kyc.holding_control_links",
+      "table_ref": "kyc:holding_control_links"
+    },
+    {
+      "fqn": "kyc.investors",
+      "table_ref": "kyc:investors"
+    },
+    {
+      "fqn": "kyc.movements",
+      "table_ref": "kyc:movements"
+    },
+    {
+      "fqn": "kyc.dilution_instruments",
+      "table_ref": "kyc:dilution_instruments"
+    },
+    {
+      "fqn": "kyc.fund_compartments",
+      "table_ref": "kyc:fund_compartments"
+    },
+    {
+      "fqn": "kyc.holdings",
+      "table_ref": "kyc:holdings"
+    },
+    {
+      "fqn": "kyc.issuance_events",
+      "table_ref": "kyc:issuance_events"
+    },
+    {
+      "fqn": "kyc.outreach_items",
+      "table_ref": "kyc:outreach_items"
+    },
+    {
+      "fqn": "kyc.outstanding_requests",
+      "table_ref": "kyc:outstanding_requests"
+    },
+    {
+      "fqn": "kyc.outreach_requests",
+      "table_ref": "kyc:outreach_requests"
+    },
+    {
+      "fqn": "kyc.ownership_reconciliation_runs",
+      "table_ref": "kyc:ownership_reconciliation_runs"
+    },
+    {
+      "fqn": "kyc.research_actions",
+      "table_ref": "kyc:research_actions"
+    },
+    {
+      "fqn": "kyc.research_decisions",
+      "table_ref": "kyc:research_decisions"
+    },
+    {
+      "fqn": "kyc.share_class_supply",
+      "table_ref": "kyc:share_class_supply"
+    },
+    {
+      "fqn": "ob_poc.cbu_control_anchors",
+      "table_ref": "ob-poc:cbu_control_anchors"
+    },
+    {
+      "fqn": "kyc.ownership_reconciliation_findings",
+      "table_ref": "kyc:ownership_reconciliation_findings"
+    },
+    {
+      "fqn": "kyc.red_flags",
+      "table_ref": "kyc:red_flags"
+    },
+    {
+      "fqn": "kyc.research_corrections",
+      "table_ref": "kyc:research_corrections"
+    },
+    {
+      "fqn": "kyc.share_class_identifiers",
+      "table_ref": "kyc:share_class_identifiers"
+    },
+    {
+      "fqn": "kyc.special_rights",
+      "table_ref": "kyc:special_rights"
+    },
+    {
+      "fqn": "kyc.ubo_evidence",
+      "table_ref": "kyc:ubo_evidence"
+    },
+    {
+      "fqn": "kyc.ownership_snapshots",
+      "table_ref": "kyc:ownership_snapshots"
+    },
+    {
+      "fqn": "kyc.research_anomalies",
+      "table_ref": "kyc:research_anomalies"
+    },
+    {
+      "fqn": "kyc.screenings",
+      "table_ref": "kyc:screenings"
+    },
+    {
+      "fqn": "kyc.share_classes",
+      "table_ref": "kyc:share_classes"
+    },
+    {
+      "fqn": "kyc.ubo_determination_runs",
+      "table_ref": "kyc:ubo_determination_runs"
+    },
+    {
+      "fqn": "ob_poc.attribute_registry",
+      "table_ref": "ob-poc:attribute_registry"
+    },
+    {
+      "fqn": "kyc.ubo_registry",
+      "table_ref": "kyc:ubo_registry"
+    },
+    {
+      "fqn": "ob_poc.attribute_values_typed",
+      "table_ref": "ob-poc:attribute_values_typed"
+    },
+    {
+      "fqn": "ob_poc.bods_entity_types",
+      "table_ref": "ob-poc:bods_entity_types"
+    },
+    {
+      "fqn": "ob_poc.bods_person_statements",
+      "table_ref": "ob-poc:bods_person_statements"
+    },
+    {
+      "fqn": "ob_poc.bpmn_correlations",
+      "table_ref": "ob-poc:bpmn_correlations"
+    },
+    {
+      "fqn": "ob_poc.bpmn_pending_dispatches",
+      "table_ref": "ob-poc:bpmn_pending_dispatches"
+    },
+    {
+      "fqn": "ob_poc.attribute_observations",
+      "table_ref": "ob-poc:attribute_observations"
+    },
+    {
+      "fqn": "ob_poc.board_control_evidence",
+      "table_ref": "ob-poc:board_control_evidence"
+    },
+    {
+      "fqn": "ob_poc.bods_interest_types",
+      "table_ref": "ob-poc:bods_interest_types"
+    },
+    {
+      "fqn": "ob_poc.booking_location",
+      "table_ref": "ob-poc:booking_location"
+    },
+    {
+      "fqn": "ob_poc.bpmn_job_frames",
+      "table_ref": "ob-poc:bpmn_job_frames"
+    },
+    {
+      "fqn": "ob_poc.case_evaluation_snapshots",
+      "table_ref": "ob-poc:case_evaluation_snapshots"
+    },
+    {
+      "fqn": "ob_poc.bods_entity_statements",
+      "table_ref": "ob-poc:bods_entity_statements"
+    },
+    {
+      "fqn": "ob_poc.bods_ownership_statements",
+      "table_ref": "ob-poc:bods_ownership_statements"
+    },
+    {
+      "fqn": "ob_poc.booking_principal",
+      "table_ref": "ob-poc:booking_principal"
+    },
+    {
+      "fqn": "ob_poc.bpmn_parked_tokens",
+      "table_ref": "ob-poc:bpmn_parked_tokens"
+    },
+    {
+      "fqn": "ob_poc.case_types",
+      "table_ref": "ob-poc:case_types"
+    },
+    {
+      "fqn": "ob_poc.cbu_change_log",
+      "table_ref": "ob-poc:cbu_change_log"
+    },
+    {
+      "fqn": "ob_poc.cbu_creation_log",
+      "table_ref": "ob-poc:cbu_creation_log"
+    },
+    {
+      "fqn": "ob_poc.cbu_evidence",
+      "table_ref": "ob-poc:cbu_evidence"
+    },
+    {
+      "fqn": "ob_poc.cbu_layout_overrides",
+      "table_ref": "ob-poc:cbu_layout_overrides"
+    },
+    {
+      "fqn": "ob_poc.cbu_resource_instances",
+      "table_ref": "ob-poc:cbu_resource_instances"
+    },
+    {
+      "fqn": "ob_poc.cbu_subscriptions",
+      "table_ref": "ob-poc:cbu_subscriptions"
+    },
+    {
+      "fqn": "ob_poc.cbu_entity_roles",
+      "table_ref": "ob-poc:cbu_entity_roles"
+    },
+    {
+      "fqn": "ob_poc.cbu_groups",
+      "table_ref": "ob-poc:cbu_groups"
+    },
+    {
+      "fqn": "ob_poc.cbu_matrix_product_overlay",
+      "table_ref": "ob-poc:cbu_matrix_product_overlay"
+    },
+    {
+      "fqn": "ob_poc.cbu_relationship_verification",
+      "table_ref": "ob-poc:cbu_relationship_verification"
+    },
+    {
+      "fqn": "ob_poc.cbu_sla_commitments",
+      "table_ref": "ob-poc:cbu_sla_commitments"
+    },
+    {
+      "fqn": "ob_poc.cbu_group_members",
+      "table_ref": "ob-poc:cbu_group_members"
+    },
+    {
+      "fqn": "ob_poc.cbu_lifecycle_instances",
+      "table_ref": "ob-poc:cbu_lifecycle_instances"
+    },
+    {
+      "fqn": "ob_poc.cbu_product_subscriptions",
+      "table_ref": "ob-poc:cbu_product_subscriptions"
+    },
+    {
+      "fqn": "ob_poc.cbu_service_readiness",
+      "table_ref": "ob-poc:cbu_service_readiness"
+    },
+    {
+      "fqn": "ob_poc.cbu_trading_profiles",
+      "table_ref": "ob-poc:cbu_trading_profiles"
+    },
+    {
+      "fqn": "ob_poc.contract_products",
+      "table_ref": "ob-poc:contract_products"
+    },
+    {
+      "fqn": "ob_poc.cbu_unified_attr_requirements",
+      "table_ref": "ob-poc:cbu_unified_attr_requirements"
+    },
+    {
+      "fqn": "ob_poc.client_classification",
+      "table_ref": "ob-poc:client_classification"
+    },
+    {
+      "fqn": "ob_poc.client_group_alias_embedding",
+      "table_ref": "ob-poc:client_group_alias_embedding"
+    },
+    {
+      "fqn": "ob_poc.client_group_entity_roles",
+      "table_ref": "ob-poc:client_group_entity_roles"
+    },
+    {
+      "fqn": "ob_poc.client_group_relationship",
+      "table_ref": "ob-poc:client_group_relationship"
+    },
+    {
+      "fqn": "ob_poc.client_profile",
+      "table_ref": "ob-poc:client_profile"
+    }
+  ],
+  "covered_entity_examples": [
+    {
+      "fqn": "ob_poc.cbu_convergence_status",
+      "table_ref": "ob-poc:cbu_convergence_status"
+    },
+    {
+      "fqn": "ob_poc.cbu_ownership_graph",
+      "table_ref": "ob-poc:cbu_ownership_graph"
+    },
+    {
+      "fqn": "ob_poc.entity_relationships_current",
+      "table_ref": "ob-poc:entity_relationships_current"
+    },
+    {
+      "fqn": "ob_poc.entity_search_view",
+      "table_ref": "ob-poc:entity_search_view"
+    },
+    {
+      "fqn": "ob_poc.jurisdictions",
+      "table_ref": "ob-poc:jurisdictions"
+    },
+    {
+      "fqn": "ob_poc.ubo_expired_proofs",
+      "table_ref": "ob-poc:ubo_expired_proofs"
+    },
+    {
+      "fqn": "ob_poc.ubo_convergence_status",
+      "table_ref": "ob-poc:ubo_convergence_status"
+    },
+    {
+      "fqn": "ob_poc.ubo_missing_proofs",
+      "table_ref": "ob-poc:ubo_missing_proofs"
+    }
+  ]
+}

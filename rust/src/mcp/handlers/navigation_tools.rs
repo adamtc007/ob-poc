@@ -803,7 +803,7 @@ impl ToolHandlers {
 
         // Count universe entries
         let universe_count: i64 = sqlx::query_scalar!(
-            r#"SELECT COUNT(*) FROM custody.cbu_instrument_universe WHERE cbu_id = $1"#,
+            r#"SELECT COUNT(*) FROM "ob-poc".cbu_instrument_universe WHERE cbu_id = $1"#,
             cbu_id
         )
         .fetch_one(&self.pool)
@@ -812,7 +812,7 @@ impl ToolHandlers {
 
         // Count SSIs
         let ssi_count: i64 = sqlx::query_scalar!(
-            r#"SELECT COUNT(*) FROM custody.cbu_ssi WHERE cbu_id = $1"#,
+            r#"SELECT COUNT(*) FROM "ob-poc".cbu_ssi WHERE cbu_id = $1"#,
             cbu_id
         )
         .fetch_one(&self.pool)
@@ -821,7 +821,7 @@ impl ToolHandlers {
 
         // Count booking rules
         let rule_count: i64 = sqlx::query_scalar!(
-            r#"SELECT COUNT(*) FROM custody.ssi_booking_rules WHERE cbu_id = $1"#,
+            r#"SELECT COUNT(*) FROM "ob-poc".ssi_booking_rules WHERE cbu_id = $1"#,
             cbu_id
         )
         .fetch_one(&self.pool)
@@ -830,7 +830,7 @@ impl ToolHandlers {
 
         // Count settlement chains
         let chain_count: i64 = sqlx::query_scalar!(
-            r#"SELECT COUNT(*) FROM custody.cbu_settlement_chains WHERE cbu_id = $1"#,
+            r#"SELECT COUNT(*) FROM "ob-poc".cbu_settlement_chains WHERE cbu_id = $1"#,
             cbu_id
         )
         .fetch_one(&self.pool)
@@ -839,7 +839,7 @@ impl ToolHandlers {
 
         // Count ISDA agreements
         let isda_count: i64 = sqlx::query_scalar!(
-            r#"SELECT COUNT(*) FROM custody.isda_agreements WHERE cbu_id = $1"#,
+            r#"SELECT COUNT(*) FROM "ob-poc".isda_agreements WHERE cbu_id = $1"#,
             cbu_id
         )
         .fetch_one(&self.pool)
@@ -850,8 +850,8 @@ impl ToolHandlers {
         let instrument_classes: Vec<String> = sqlx::query_scalar!(
             r#"
             SELECT DISTINCT ic.code
-            FROM custody.cbu_instrument_universe u
-            JOIN custody.instrument_classes ic ON ic.class_id = u.instrument_class_id
+            FROM "ob-poc".cbu_instrument_universe u
+            JOIN "ob-poc".instrument_classes ic ON ic.class_id = u.instrument_class_id
             WHERE u.cbu_id = $1
             ORDER BY ic.code
             "#,
@@ -864,8 +864,8 @@ impl ToolHandlers {
         let markets: Vec<String> = sqlx::query_scalar!(
             r#"
             SELECT DISTINCT m.mic
-            FROM custody.cbu_instrument_universe u
-            JOIN custody.markets m ON m.market_id = u.market_id
+            FROM "ob-poc".cbu_instrument_universe u
+            JOIN "ob-poc".markets m ON m.market_id = u.market_id
             WHERE u.cbu_id = $1 AND u.market_id IS NOT NULL
             ORDER BY m.mic
             "#,

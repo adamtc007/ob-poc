@@ -113,7 +113,7 @@ impl CustomOperation for AccessReviewPopulateOp {
                 'PENDING'
             FROM teams.memberships m
             JOIN teams.teams t ON m.team_id = t.team_id
-            JOIN client_portal.clients c ON m.user_id = c.client_id
+            JOIN "ob-poc".clients c ON m.user_id = c.client_id
             WHERE m.effective_to IS NULL
               AND t.is_active = true
               AND (

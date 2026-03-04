@@ -583,6 +583,7 @@ async fn e2e_04_runbook_park_and_resume() {
         depends_on: vec![],
         result: None,
         invocation: None,
+        compiled_runbook_id: None,
     };
     let entry_id = entry.id;
     runbook.add_entry(entry);
@@ -925,6 +926,7 @@ async fn e2e_08_signal_relay_bounces_to_orchestrator() {
             depends_on: vec![],
             result: None,
             invocation: None,
+            compiled_runbook_id: None,
         };
         session.runbook.add_entry(entry);
         session.runbook.set_status(RunbookStatus::Ready);
@@ -1131,6 +1133,7 @@ async fn e2e_09_cancellation_bounces_to_orchestrator() {
             depends_on: vec![],
             result: None,
             invocation: None,
+            compiled_runbook_id: None,
         };
         session.runbook.add_entry(entry);
         session.runbook.set_status(RunbookStatus::Ready);
@@ -1451,7 +1454,7 @@ async fn e2e_11_payload_integrity_corrupt_hash_rejected() {
 /// execute correctly through the same WorkflowDispatcher interface.
 ///
 /// - `session.info` is configured as Direct → executor runs inline.
-/// - `kyc.open-case` is configured as Orchestrated → dispatches to BPMN-Lite.
+/// - `"ob-poc".open-case` is configured as Orchestrated → dispatches to BPMN-Lite.
 ///
 /// Both should produce valid outcomes via the same `execute_v2()` call.
 #[tokio::test]
@@ -1492,7 +1495,7 @@ async fn e2e_12_direct_vs_orchestrated_equivalence() {
         "Direct verb should invoke the inner executor exactly once"
     );
 
-    // 2. Orchestrated route: kyc.open-case
+    // 2. Orchestrated route: "ob-poc".open-case
     let entry_id_orch = Uuid::new_v4();
     let orch_outcome = dispatcher
         .execute_v2(

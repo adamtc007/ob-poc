@@ -8,7 +8,7 @@
 //!
 //! When an import run is superseded, the following downstream re-derivation occurs:
 //! 1. Soft-end all edges from the run (existing)
-//! 2. Record corrections in `kyc.research_corrections` for linked decisions
+//! 2. Record corrections in `"ob-poc".research_corrections` for linked decisions
 //! 3. Mark UBO determination runs as stale (nullify coverage_snapshot)
 //! 4. Mark outreach plans linked to stale determination runs as DRAFT
 //! 5. Insert stale tollgate evaluations for affected cases
@@ -133,7 +133,7 @@ impl CustomOperation for ImportRunBeginOp {
             // regardless of whether the run was newly created or already existed.
             if let Some(cid) = case_id {
                 sqlx::query(
-                    r#"INSERT INTO kyc.case_import_runs (case_id, run_id, decision_id)
+                    r#"INSERT INTO "ob-poc".case_import_runs (case_id, run_id, decision_id)
                        VALUES ($1, $2, $3)
                        ON CONFLICT DO NOTHING"#,
                 )
@@ -172,7 +172,7 @@ impl CustomOperation for ImportRunBeginOp {
         // Link to case if provided
         if let Some(cid) = case_id {
             sqlx::query(
-                r#"INSERT INTO kyc.case_import_runs (case_id, run_id, decision_id)
+                r#"INSERT INTO "ob-poc".case_import_runs (case_id, run_id, decision_id)
                    VALUES ($1, $2, $3)
                    ON CONFLICT DO NOTHING"#,
             )
@@ -327,7 +327,7 @@ impl CustomOperation for ImportRunSupersedeOp {
         // Step 3: Find linked cases (with their decision IDs for corrections)
         // ====================================================================
         let linked_cases: Vec<LinkedCaseRow> = sqlx::query_as::<_, (Uuid, Option<Uuid>)>(
-            r#"SELECT case_id, decision_id FROM kyc.case_import_runs WHERE run_id = $1"#,
+            r#"SELECT case_id, decision_id FROM "ob-poc".case_import_runs WHERE run_id = $1"#,
         )
         .bind(run_id)
         .fetch_all(pool)
@@ -353,7 +353,7 @@ impl CustomOperation for ImportRunSupersedeOp {
             if let Some(decision_id) = linked.decision_id {
                 let correction_id = Uuid::new_v4();
                 let inserted = sqlx::query(
-                    r#"INSERT INTO kyc.research_corrections
+                    r#"INSERT INTO "ob-poc".research_corrections
                        (correction_id, original_decision_id, correction_type,
                         correction_reason, corrected_by)
                        VALUES ($1, $2, 'STALE_DATA', $3, $4)"#,
@@ -385,7 +385,7 @@ impl CustomOperation for ImportRunSupersedeOp {
         let case_ids: Vec<Uuid> = linked_cases.iter().map(|lc| lc.case_id).collect();
         let ubo_runs_staled: i64 = if !case_ids.is_empty() {
             sqlx::query(
-                r#"UPDATE kyc.ubo_determination_runs
+                r#"UPDATE "ob-poc".ubo_determination_runs
                    SET coverage_snapshot = NULL
                    WHERE case_id = ANY($1)
                      AND coverage_snapshot IS NOT NULL"#,
@@ -407,12 +407,12 @@ impl CustomOperation for ImportRunSupersedeOp {
         // ====================================================================
         let outreach_plans_reset: i64 = if !case_ids.is_empty() {
             sqlx::query(
-                r#"UPDATE kyc.outreach_plans
+                r#"UPDATE "ob-poc".outreach_plans
                    SET status = 'DRAFT'
                    WHERE case_id = ANY($1)
                      AND status IN ('APPROVED', 'SENT')
                      AND determination_run_id IN (
-                         SELECT run_id FROM kyc.ubo_determination_runs
+                         SELECT run_id FROM "ob-poc".ubo_determination_runs
                          WHERE case_id = ANY($1)
                      )"#,
             )
@@ -437,7 +437,7 @@ impl CustomOperation for ImportRunSupersedeOp {
             // Find tollgates that previously passed for this case
             let passed_tollgates: Vec<(String,)> = sqlx::query_as(
                 r#"SELECT DISTINCT tollgate_id
-                   FROM kyc.tollgate_evaluations
+                   FROM "ob-poc".tollgate_evaluations
                    WHERE case_id = $1 AND passed = true"#,
             )
             .bind(case_id)
@@ -455,7 +455,7 @@ impl CustomOperation for ImportRunSupersedeOp {
                 });
 
                 let inserted = sqlx::query(
-                    r#"INSERT INTO kyc.tollgate_evaluations
+                    r#"INSERT INTO "ob-poc".tollgate_evaluations
                        (evaluation_id, case_id, tollgate_id, passed,
                         evaluation_detail, config_version)
                        VALUES ($1, $2, $3, false, $4, 'supersession')"#,

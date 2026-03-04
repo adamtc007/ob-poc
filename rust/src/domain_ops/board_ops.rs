@@ -71,7 +71,7 @@ impl CustomOperation for BoardAnalyzeControlOp {
                 ap.name as appointer_name,
                 bc.appointment_date,
                 bc.is_active
-            FROM kyc.board_compositions bc
+            FROM "ob-poc".board_compositions bc
             JOIN "ob-poc".entities p ON bc.person_entity_id = p.entity_id
             JOIN "ob-poc".roles r ON bc.role_id = r.role_id
             LEFT JOIN "ob-poc".entities ap ON bc.appointed_by_entity_id = ap.entity_id
@@ -109,7 +109,7 @@ impl CustomOperation for BoardAnalyzeControlOp {
                 e.name as holder_name,
                 ar.right_type,
                 ar.max_appointments
-            FROM kyc.appointment_rights ar
+            FROM "ob-poc".appointment_rights ar
             JOIN "ob-poc".entities e ON ar.holder_entity_id = e.entity_id
             WHERE ar.target_entity_id = $1
               AND ar.is_active = true

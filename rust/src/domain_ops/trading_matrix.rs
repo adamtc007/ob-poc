@@ -132,7 +132,7 @@ impl CustomOperation for FindImForTradeOp {
                 priority,
                 instruction_method,
                 scope_all
-            FROM custody.cbu_im_assignments
+            FROM "ob-poc".cbu_im_assignments
             WHERE cbu_id = $1
               AND status = 'ACTIVE'
               AND (
@@ -266,7 +266,7 @@ impl CustomOperation for FindPricingForInstrumentOp {
 
         // First, resolve instrument_class code to ID
         let class_id: Option<Uuid> = sqlx::query_scalar!(
-            r#"SELECT class_id FROM custody.instrument_classes WHERE code = $1"#,
+            r#"SELECT class_id FROM "ob-poc".instrument_classes WHERE code = $1"#,
             instrument_class
         )
         .fetch_optional(pool)
@@ -285,7 +285,7 @@ impl CustomOperation for FindPricingForInstrumentOp {
         // If market specified, resolve to ID
         let market_id: Option<Uuid> = if let Some(ref mic) = market {
             sqlx::query_scalar!(
-                r#"SELECT market_id FROM custody.markets WHERE mic = $1"#,
+                r#"SELECT market_id FROM "ob-poc".markets WHERE mic = $1"#,
                 mic
             )
             .fetch_optional(pool)
@@ -306,7 +306,7 @@ impl CustomOperation for FindPricingForInstrumentOp {
                 tolerance_pct,
                 stale_action,
                 priority
-            FROM custody.cbu_pricing_config
+            FROM "ob-poc".cbu_pricing_config
             WHERE cbu_id = $1
               AND is_active = true
               AND instrument_class_id = $2

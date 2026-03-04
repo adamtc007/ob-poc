@@ -40,9 +40,9 @@ mod db_tests {
 
             // Delete kyc schema tables first (new case model)
             sqlx::query(
-                r#"DELETE FROM kyc.screenings WHERE workstream_id IN
-                   (SELECT w.workstream_id FROM kyc.entity_workstreams w
-                    JOIN kyc.cases c ON c.case_id = w.case_id
+                r#"DELETE FROM "ob-poc".screenings WHERE workstream_id IN
+                   (SELECT w.workstream_id FROM "ob-poc".entity_workstreams w
+                    JOIN "ob-poc".cases c ON c.case_id = w.case_id
                     JOIN "ob-poc".cbus cbu ON cbu.cbu_id = c.cbu_id
                     WHERE cbu.name LIKE $1)"#,
             )
@@ -52,8 +52,8 @@ mod db_tests {
             .ok();
 
             sqlx::query(
-                r#"DELETE FROM kyc.entity_workstreams WHERE case_id IN
-                   (SELECT c.case_id FROM kyc.cases c
+                r#"DELETE FROM "ob-poc".entity_workstreams WHERE case_id IN
+                   (SELECT c.case_id FROM "ob-poc".cases c
                     JOIN "ob-poc".cbus cbu ON cbu.cbu_id = c.cbu_id
                     WHERE cbu.name LIKE $1)"#,
             )
@@ -63,7 +63,7 @@ mod db_tests {
             .ok();
 
             sqlx::query(
-                r#"DELETE FROM kyc.cases WHERE cbu_id IN
+                r#"DELETE FROM "ob-poc".cases WHERE cbu_id IN
                    (SELECT cbu_id FROM "ob-poc".cbus WHERE name LIKE $1)"#,
             )
             .bind(&pattern)
@@ -165,11 +165,11 @@ mod db_tests {
         Ok(count.unwrap_or(0))
     }
 
-    // Helper: Count screenings for an entity (via kyc.screenings joined to workstreams)
+    // Helper: Count screenings for an entity (via "ob-poc".screenings joined to workstreams)
     async fn count_screenings(pool: &PgPool, entity_id: Uuid) -> Result<i64> {
         let count: Option<i64> = sqlx::query_scalar(
-            r#"SELECT COUNT(*) FROM kyc.screenings s
-               JOIN kyc.entity_workstreams w ON w.workstream_id = s.workstream_id
+            r#"SELECT COUNT(*) FROM "ob-poc".screenings s
+               JOIN "ob-poc".entity_workstreams w ON w.workstream_id = s.workstream_id
                WHERE w.entity_id = $1"#,
         )
         .bind(entity_id)
@@ -809,7 +809,7 @@ mod db_tests {
     async fn read_case_status(pool: &PgPool, case_id: Uuid) -> Result<CaseStatusRow> {
         let row = sqlx::query_as!(
             CaseStatusRow,
-            r#"SELECT case_id, status, closed_at FROM kyc.cases WHERE case_id = $1"#,
+            r#"SELECT case_id, status, closed_at FROM "ob-poc".cases WHERE case_id = $1"#,
             case_id
         )
         .fetch_one(pool)
@@ -882,7 +882,7 @@ mod db_tests {
         let case_id = ctx.resolve("case").expect("case should be bound");
 
         // Update case to REVIEW status (ready for decision)
-        sqlx::query(r#"UPDATE kyc.cases SET status = 'REVIEW' WHERE case_id = $1"#)
+        sqlx::query(r#"UPDATE "ob-poc".cases SET status = 'REVIEW' WHERE case_id = $1"#)
             .bind(case_id)
             .execute(&db.pool)
             .await?;
@@ -1127,7 +1127,7 @@ mod db_tests {
 
         // Transition to APPROVED
         sqlx::query(
-            r#"UPDATE kyc.cases
+            r#"UPDATE "ob-poc".cases
                SET status = 'APPROVED', closed_at = NOW()
                WHERE case_id = $1"#,
         )
@@ -1211,7 +1211,7 @@ mod db_tests {
 
         // 3. Update case status
         sqlx::query(
-            r#"UPDATE kyc.cases SET status = 'APPROVED', closed_at = NOW() WHERE case_id = $1"#,
+            r#"UPDATE "ob-poc".cases SET status = 'APPROVED', closed_at = NOW() WHERE case_id = $1"#,
         )
         .bind(case_id)
         .execute(&db.pool)
@@ -1274,7 +1274,7 @@ mod db_tests {
         // Escalation stays in REVIEW status but changes escalation_level
         // (ESCALATED is not a valid status - escalation is tracked via escalation_level)
         sqlx::query(
-            r#"UPDATE kyc.cases SET escalation_level = 'SENIOR_COMPLIANCE' WHERE case_id = $1"#,
+            r#"UPDATE "ob-poc".cases SET escalation_level = 'SENIOR_COMPLIANCE' WHERE case_id = $1"#,
         )
         .bind(case_id)
         .execute(&db.pool)

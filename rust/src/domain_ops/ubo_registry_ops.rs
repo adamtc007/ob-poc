@@ -95,7 +95,7 @@ const TERMINAL_STATUSES: &[&str] = &["APPROVED", "WAIVED", "REJECTED", "EXPIRED"
 #[cfg(feature = "database")]
 async fn fetch_current_status(pool: &PgPool, registry_id: Uuid) -> Result<String> {
     let row: Option<(String,)> =
-        sqlx::query_as(r#"SELECT status FROM kyc.ubo_registry WHERE registry_id = $1"#)
+        sqlx::query_as(r#"SELECT status FROM "ob-poc".kyc_ubo_registry WHERE registry_id = $1"#)
             .bind(registry_id)
             .fetch_optional(pool)
             .await?;
@@ -174,7 +174,7 @@ impl CustomOperation for UboRegistryPromoteOp {
 
         sqlx::query(
             r#"
-            UPDATE kyc.ubo_registry
+            UPDATE "ob-poc".kyc_ubo_registry
             SET status = 'IDENTIFIED',
                 identified_at = NOW(),
                 notes = COALESCE($2, notes),
@@ -254,7 +254,7 @@ impl CustomOperation for UboRegistryAdvanceOp {
         // The column name comes from our own validated constant, not user input.
         let sql = format!(
             r#"
-            UPDATE kyc.ubo_registry
+            UPDATE "ob-poc".kyc_ubo_registry
             SET status = $2,
                 {} = NOW(),
                 notes = COALESCE($3, notes),
@@ -337,7 +337,7 @@ impl CustomOperation for UboRegistryWaiveOp {
 
         sqlx::query(
             r#"
-            UPDATE kyc.ubo_registry
+            UPDATE "ob-poc".kyc_ubo_registry
             SET status = 'WAIVED',
                 waived_at = NOW(),
                 waived_by = $2,
@@ -418,7 +418,7 @@ impl CustomOperation for UboRegistryRejectOp {
 
         sqlx::query(
             r#"
-            UPDATE kyc.ubo_registry
+            UPDATE "ob-poc".kyc_ubo_registry
             SET status = 'REJECTED',
                 rejected_at = NOW(),
                 notes = $2,
@@ -497,7 +497,7 @@ impl CustomOperation for UboRegistryExpireOp {
 
         sqlx::query(
             r#"
-            UPDATE kyc.ubo_registry
+            UPDATE "ob-poc".kyc_ubo_registry
             SET status = 'EXPIRED',
                 expired_at = NOW(),
                 notes = COALESCE($2, notes),

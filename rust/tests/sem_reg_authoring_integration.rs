@@ -132,8 +132,8 @@ artifacts:
         let plan = svc.plan_publish(cs.change_set_id).await.expect("plan");
         println!(
             "  Plan: {} added, {} modified",
-            plan.added.len(),
-            plan.modified.len()
+            plan.diff.added.len(),
+            plan.diff.modified.len()
         );
 
         // 5. Publish

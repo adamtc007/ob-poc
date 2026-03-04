@@ -238,7 +238,7 @@ async fn fetch_all_cbus(pool: &PgPool) -> Result<Vec<CbuRow>, sqlx::Error> {
             c.risk_context->>'status' as risk_status,
             (SELECT COUNT(*) FROM "ob-poc".cbu_entity_roles cer WHERE cer.cbu_id = c.cbu_id) as entity_count,
             EXISTS(
-                SELECT 1 FROM kyc.cases k
+                SELECT 1 FROM "ob-poc".cases k
                 WHERE k.cbu_id = c.cbu_id
                 AND k.status NOT IN ('APPROVED', 'REJECTED', 'WITHDRAWN')
             ) as pending_kyc
@@ -279,7 +279,7 @@ async fn fetch_cluster_cbus(
             c.risk_context->>'status' as risk_status,
             (SELECT COUNT(*) FROM "ob-poc".cbu_entity_roles cer WHERE cer.cbu_id = c.cbu_id) as entity_count,
             EXISTS(
-                SELECT 1 FROM kyc.cases k
+                SELECT 1 FROM "ob-poc".cases k
                 WHERE k.cbu_id = c.cbu_id
                 AND k.status NOT IN ('APPROVED', 'REJECTED', 'WITHDRAWN')
             ) as pending_kyc

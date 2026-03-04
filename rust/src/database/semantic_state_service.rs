@@ -121,7 +121,7 @@ async fn query_existing_entities(
     }
 
     // KYC cases
-    let cases = sqlx::query_scalar!(r#"SELECT case_id FROM kyc.cases WHERE cbu_id = $1"#, cbu_id)
+    let cases = sqlx::query_scalar!(r#"SELECT case_id FROM "ob-poc".cases WHERE cbu_id = $1"#, cbu_id)
         .fetch_all(pool)
         .await?;
     if !cases.is_empty() {
@@ -131,7 +131,7 @@ async fn query_existing_entities(
         // Entity workstreams (linked via kyc_case)
         if !case_ids.is_empty() {
             let workstreams = sqlx::query_scalar!(
-                r#"SELECT workstream_id FROM kyc.entity_workstreams
+                r#"SELECT workstream_id FROM "ob-poc".entity_workstreams
                    WHERE case_id = ANY($1)"#,
                 &case_ids
             )
@@ -156,7 +156,7 @@ async fn query_existing_entities(
 
     // Instrument universe entries
     let universe = sqlx::query_scalar!(
-        r#"SELECT universe_id FROM custody.cbu_instrument_universe WHERE cbu_id = $1"#,
+        r#"SELECT universe_id FROM "ob-poc".cbu_instrument_universe WHERE cbu_id = $1"#,
         cbu_id
     )
     .fetch_all(pool)
@@ -167,7 +167,7 @@ async fn query_existing_entities(
 
     // SSIs
     let ssis = sqlx::query_scalar!(
-        r#"SELECT ssi_id FROM custody.cbu_ssi WHERE cbu_id = $1"#,
+        r#"SELECT ssi_id FROM "ob-poc".cbu_ssi WHERE cbu_id = $1"#,
         cbu_id
     )
     .fetch_all(pool)
@@ -178,7 +178,7 @@ async fn query_existing_entities(
 
         // Booking rules (linked via SSI)
         let rules = sqlx::query_scalar!(
-            r#"SELECT rule_id FROM custody.ssi_booking_rules
+            r#"SELECT rule_id FROM "ob-poc".ssi_booking_rules
                WHERE ssi_id = ANY($1)"#,
             &ssi_ids
         )
@@ -191,7 +191,7 @@ async fn query_existing_entities(
 
     // ISDA agreements
     let isdas = sqlx::query_scalar!(
-        r#"SELECT isda_id FROM custody.isda_agreements WHERE cbu_id = $1 AND is_active = true"#,
+        r#"SELECT isda_id FROM "ob-poc".isda_agreements WHERE cbu_id = $1 AND is_active = true"#,
         cbu_id
     )
     .fetch_all(pool)
@@ -202,7 +202,7 @@ async fn query_existing_entities(
 
         // CSA agreements (linked via ISDA)
         let csas = sqlx::query_scalar!(
-            r#"SELECT csa_id FROM custody.csa_agreements
+            r#"SELECT csa_id FROM "ob-poc".csa_agreements
                WHERE isda_id = ANY($1)"#,
             &isda_ids
         )
@@ -228,7 +228,7 @@ async fn query_existing_entities(
 
     // Pricing configs
     let pricing = sqlx::query_scalar!(
-        r#"SELECT config_id FROM custody.cbu_pricing_config WHERE cbu_id = $1"#,
+        r#"SELECT config_id FROM "ob-poc".cbu_pricing_config WHERE cbu_id = $1"#,
         cbu_id
     )
     .fetch_all(pool)
@@ -239,7 +239,7 @@ async fn query_existing_entities(
 
     // Share classes (for transfer agency)
     let share_classes = sqlx::query_scalar!(
-        r#"SELECT id FROM kyc.share_classes WHERE cbu_id = $1"#,
+        r#"SELECT id FROM "ob-poc".share_classes WHERE cbu_id = $1"#,
         cbu_id
     )
     .fetch_all(pool)
@@ -250,7 +250,7 @@ async fn query_existing_entities(
 
         // Holdings (linked via share class)
         let holdings = sqlx::query_scalar!(
-            r#"SELECT id FROM kyc.holdings
+            r#"SELECT id FROM "ob-poc".holdings
                WHERE share_class_id = ANY($1)"#,
             &class_ids
         )

@@ -181,7 +181,7 @@ impl CustomOperation for AgentStartOp {
         // Record agent start in database
         sqlx::query!(
             r#"
-            INSERT INTO kyc.research_decisions
+            INSERT INTO "ob-poc".research_decisions
                 (decision_id, session_id, source_provider, search_query, decision_type,
                  selection_confidence, selection_reasoning, candidates_found, created_at)
             VALUES ($1, $2, 'manual', $3, 'AUTO_SELECTED', 1.0, $4, '[]'::jsonb, NOW())
@@ -386,7 +386,7 @@ impl CustomOperation for AgentConfirmOp {
         if let Some(cp_id) = checkpoint_id {
             sqlx::query!(
                 r#"
-                UPDATE kyc.research_decisions
+                UPDATE "ob-poc".research_decisions
                 SET decision_type = 'USER_CONFIRMED',
                     verified_at = NOW()
                 WHERE decision_id = $1
@@ -449,7 +449,7 @@ impl CustomOperation for AgentRejectOp {
         if let Some(cp_id) = checkpoint_id {
             sqlx::query!(
                 r#"
-                UPDATE kyc.research_decisions
+                UPDATE "ob-poc".research_decisions
                 SET decision_type = 'REJECTED',
                     verified_at = NOW()
                 WHERE decision_id = $1
@@ -513,7 +513,7 @@ impl CustomOperation for AgentSelectOp {
         if let Some(cp_id) = checkpoint_id {
             sqlx::query!(
                 r#"
-                UPDATE kyc.research_decisions
+                UPDATE "ob-poc".research_decisions
                 SET decision_type = 'USER_SELECTED',
                     verified_at = NOW()
                 WHERE decision_id = $1
@@ -579,7 +579,7 @@ impl CustomOperation for AgentStatusOp {
         let latest = sqlx::query!(
             r#"
             SELECT decision_id, search_query, decision_type, created_at
-            FROM kyc.research_decisions
+            FROM "ob-poc".research_decisions
             WHERE session_id = $1
               AND search_query LIKE 'agent:%'
             ORDER BY created_at DESC
@@ -599,7 +599,7 @@ impl CustomOperation for AgentStatusOp {
                         COUNT(*) FILTER (WHERE search_query NOT LIKE 'agent:%') as "decision_count!",
                         COUNT(*) FILTER (WHERE decision_type = 'USER_CONFIRMED') as "confirmed_count!",
                         COUNT(*) FILTER (WHERE decision_type = 'REJECTED') as "rejected_count!"
-                    FROM kyc.research_decisions
+                    FROM "ob-poc".research_decisions
                     WHERE session_id = $1
                       AND created_at >= $2
                     "#,
@@ -612,7 +612,7 @@ impl CustomOperation for AgentStatusOp {
                 let action_count = sqlx::query_scalar!(
                     r#"
                     SELECT COUNT(*) as "count!"
-                    FROM kyc.research_actions
+                    FROM "ob-poc".research_actions
                     WHERE session_id = $1
                       AND executed_at >= $2
                     "#,
@@ -685,7 +685,7 @@ impl CustomOperation for AgentHistoryOp {
             r#"
             SELECT decision_id, source_provider, search_query, decision_type,
                    selection_confidence, selected_key, created_at
-            FROM kyc.research_decisions
+            FROM "ob-poc".research_decisions
             WHERE session_id = $1
             ORDER BY created_at DESC
             LIMIT $2
@@ -716,7 +716,7 @@ impl CustomOperation for AgentHistoryOp {
             r#"
             SELECT action_id, decision_id, verb_domain, verb_name,
                    success, entities_created, executed_at
-            FROM kyc.research_actions
+            FROM "ob-poc".research_actions
             WHERE session_id = $1
             ORDER BY executed_at DESC
             LIMIT $2

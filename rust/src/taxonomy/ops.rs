@@ -351,7 +351,7 @@ impl<D: TaxonomyDomain> TaxonomyOps<D> {
         let meta = D::metadata();
         // Handle cross-schema case for instrument domain
         if meta.type_table == "instrument_classes" {
-            "custody.instrument_classes".to_string()
+            "\"ob-poc\".instrument_classes".to_string()
         } else {
             meta.fq_type_table()
         }
@@ -411,7 +411,7 @@ mod tests {
     fn test_instrument_ops_type_table() {
         assert_eq!(
             TaxonomyOps::<InstrumentDomain>::fq_type_table(),
-            "custody.instrument_classes"
+            "\"ob-poc\".instrument_classes"
         );
     }
 

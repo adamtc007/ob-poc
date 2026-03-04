@@ -366,7 +366,7 @@ impl ViewportService {
         let instrument_type_count: i64 = sqlx::query_scalar!(
             r#"
             SELECT COUNT(DISTINCT instrument_class_id) as "count!"
-            FROM custody.cbu_instrument_universe
+            FROM "ob-poc".cbu_instrument_universe
             WHERE cbu_id = $1 AND is_active = true
             "#,
             cbu_id
@@ -379,7 +379,7 @@ impl ViewportService {
         let ssi_count: i64 = sqlx::query_scalar!(
             r#"
             SELECT COUNT(*) as "count!"
-            FROM custody.cbu_ssi
+            FROM "ob-poc".cbu_ssi
             WHERE cbu_id = $1 AND status = 'ACTIVE'
             "#,
             cbu_id
@@ -392,7 +392,7 @@ impl ViewportService {
         let booking_rule_count: i64 = sqlx::query_scalar!(
             r#"
             SELECT COUNT(*) as "count!"
-            FROM custody.ssi_booking_rules
+            FROM "ob-poc".ssi_booking_rules
             WHERE cbu_id = $1 AND is_active = true
             "#,
             cbu_id
@@ -423,10 +423,10 @@ impl ViewportService {
                 COUNT(DISTINCT ciu.market_id) as "mic_count!: i64",
                 COUNT(DISTINCT sbr.ssi_id) as "bic_count!: i64",
                 bool_or(ciu.is_traded) as is_traded
-            FROM custody.instrument_classes ic
-            LEFT JOIN custody.cbu_instrument_universe ciu
+            FROM "ob-poc".instrument_classes ic
+            LEFT JOIN "ob-poc".cbu_instrument_universe ciu
                 ON ic.class_id = ciu.instrument_class_id AND ciu.cbu_id = $1 AND ciu.is_active = true
-            LEFT JOIN custody.ssi_booking_rules sbr
+            LEFT JOIN "ob-poc".ssi_booking_rules sbr
                 ON ic.class_id = sbr.instrument_class_id AND sbr.cbu_id = $1 AND sbr.is_active = true
             GROUP BY ic.class_id, ic.code, ic.name
             HAVING COUNT(DISTINCT ciu.universe_id) > 0
