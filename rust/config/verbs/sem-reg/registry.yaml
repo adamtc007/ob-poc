@@ -762,10 +762,15 @@ domains:
           - "show attribute affinity"
           - "what consumes this attribute"
         args:
-          - name: attr-fqn
+          - name: attribute-fqn
             type: string
             required: true
             description: Fully-qualified attribute name (e.g., cbu.jurisdiction_code)
+          - name: direction
+            type: string
+            required: false
+            default: both
+            description: Filter direction (produces, consumes, both)
         returns:
           type: record
           capture: false
@@ -841,6 +846,11 @@ domains:
             type: string
             required: true
             description: Fully-qualified verb name to find adjacent verbs for
+          - name: min-overlap
+            type: integer
+            required: false
+            default: 1
+            description: Minimum shared data references required for adjacency
         returns:
           type: record
           capture: false
@@ -876,6 +886,11 @@ domains:
             type: string
             required: false
             description: PostgreSQL schema name to check for orphan tables (all schemas if omitted)
+          - name: gap-type
+            type: string
+            required: false
+            default: all
+            description: Filter (orphan_tables, orphan_verbs, write_only, read_before_write, all)
         returns:
           type: record
           capture: false
@@ -907,10 +922,19 @@ domains:
           - "verb chain discovery"
           - "find workflow verbs for this intent"
         args:
-          - name: intent
+          - name: utterance
             type: string
             required: true
             description: Natural language description of the goal to synthesize a verb chain for
+          - name: subject-id
+            type: uuid
+            required: false
+            description: Optional subject entity UUID for scoped discovery
+          - name: max-chain-length
+            type: integer
+            required: false
+            default: 5
+            description: Maximum verbs to include in a suggested DSL chain
         returns:
           type: record
           capture: false

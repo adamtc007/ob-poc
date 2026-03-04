@@ -8,6 +8,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write;
 
+use crate::affinity::discovery::DiscoveryResponse;
 use crate::affinity::AffinityGraph;
 use crate::diagram::model::{
     DiagramEntity, DiagramModel, GovernanceLevel, RelationshipKind, RenderOptions,
@@ -61,7 +62,11 @@ pub fn render_erd(model: &DiagramModel, options: &RenderOptions) -> String {
         if options.show_verb_surface && !entity.verb_surface.is_empty() {
             write!(out, "    %% Verbs:").unwrap();
             for vs in &entity.verb_surface {
-                write!(out, " {}({})", vs.verb_fqn, vs.relation).unwrap();
+                if options.show_affinity_kind {
+                    write!(out, " {}({})", vs.verb_fqn, vs.relation).unwrap();
+                } else {
+                    write!(out, " {}", vs.verb_fqn).unwrap();
+                }
             }
             writeln!(out).unwrap();
         }
@@ -225,6 +230,50 @@ pub fn render_domain_map(model: &DiagramModel, _options: &RenderOptions) -> Stri
     out
 }
 
+// ── Discovery Map Renderer ───────────────────────────────────
+
+/// Render an utterance -> intent -> verb -> data discovery map in Mermaid `graph TD` syntax.
+pub fn render_discovery_map(
+    utterance: &str,
+    discovery: &DiscoveryResponse,
+    graph: &AffinityGraph,
+) -> String {
+    let mut out = String::with_capacity(4096);
+    writeln!(out, "graph TD").unwrap();
+
+    let utterance_id = sanitize_id(&format!("utterance:{utterance}"));
+    writeln!(out, "    {utterance_id}[\"Utterance: {utterance}\"]").unwrap();
+
+    for intent in &discovery.intent_matches {
+        let intent_id = sanitize_id(&format!("intent:{}:{}", intent.verb, intent.score));
+        writeln!(
+            out,
+            "    {intent_id}[\"Intent: {} ({:.2})\"]",
+            intent.verb, intent.score
+        )
+        .unwrap();
+        writeln!(out, "    {utterance_id} --> {intent_id}").unwrap();
+
+        let verb_id = sanitize_id(&format!("verb:{}", intent.verb));
+        writeln!(out, "    {verb_id}[\"{}\"]", intent.verb).unwrap();
+        writeln!(out, "    {intent_id} --> {verb_id}").unwrap();
+
+        let mut seen_data = BTreeSet::new();
+        for data in graph.data_for_verb(&intent.verb) {
+            let key = data.data_ref.index_key();
+            if !seen_data.insert(key.clone()) {
+                continue;
+            }
+            let data_id = sanitize_id(&format!("data:{key}"));
+            let label = data_ref_label(&data.data_ref);
+            writeln!(out, "    {data_id}[(\"{label}\")]").unwrap();
+            writeln!(out, "    {verb_id} --> {data_id}").unwrap();
+        }
+    }
+
+    out
+}
+
 // ── Helpers ────────────────────────────────────────────────────
 
 /// Extract table name from a "schema:table" key.
@@ -281,7 +330,7 @@ mod tests {
     use super::*;
     use crate::affinity::{AffinityEdge, AffinityKind, AffinityProvenance, DataRef, TableRef};
     use crate::diagram::model::{DiagramMetadata, DiagramRelationship, VerbSurfaceEntry};
-    use std::collections::HashMap;
+    use std::collections::{HashMap, HashSet};
 
     fn sample_model() -> DiagramModel {
         DiagramModel {
@@ -359,11 +408,13 @@ mod tests {
             attribute_to_column: HashMap::new(),
             derivation_edges: vec![],
             entity_relationships: vec![],
+            known_verbs: HashSet::new(),
         };
         graph.verb_to_data.insert("cbu.create".into(), vec![0]);
         graph
             .data_to_verb
             .insert("table:ob-poc:cbus".into(), vec![0]);
+        graph.known_verbs.insert("cbu.create".into());
         graph
     }
 

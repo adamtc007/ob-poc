@@ -24,10 +24,10 @@ mod integration {
     use anyhow::Result;
     use sqlx::PgPool;
 
-    use sem_os_core::affinity::AffinityGraph;
     use sem_os_core::affinity::types::{DataRef, TableRef};
-    use sem_os_core::diagram::{build_diagram_model, render_erd};
+    use sem_os_core::affinity::AffinityGraph;
     use sem_os_core::diagram::model::{ColumnInput, RenderOptions, TableInput};
+    use sem_os_core::diagram::{build_diagram_model, render_erd};
     use sem_os_core::ports::SnapshotStore;
     use sem_os_postgres::PgStores;
 
@@ -100,7 +100,10 @@ mod integration {
             }
         }
 
-        println!("✓ AffinityGraph built successfully with {} edges", graph.edges.len());
+        println!(
+            "✓ AffinityGraph built successfully with {} edges",
+            graph.edges.len()
+        );
         Ok(())
     }
 
@@ -116,12 +119,12 @@ mod integration {
 
         let verbs = graph.verbs_for_table("ob-poc", "cbus");
 
-        println!(
-            "verbs_for_table(ob-poc, cbus): {} results",
-            verbs.len()
-        );
+        println!("verbs_for_table(ob-poc, cbus): {} results", verbs.len());
         for v in &verbs {
-            println!("  {} ({:?} via {:?})", v.verb_fqn, v.affinity_kind, v.provenance);
+            println!(
+                "  {} ({:?} via {:?})",
+                v.verb_fqn, v.affinity_kind, v.provenance
+            );
         }
 
         // Must find at least some verbs touching the cbus table.
@@ -138,7 +141,10 @@ mod integration {
             "cbu.create not found in verbs_for_table(ob-poc, cbus); got: {verb_fqns:?}"
         );
 
-        println!("✓ verbs_for_table returned {} verbs including cbu.create", verbs.len());
+        println!(
+            "✓ verbs_for_table returned {} verbs including cbu.create",
+            verbs.len()
+        );
         Ok(())
     }
 
@@ -155,7 +161,10 @@ mod integration {
 
         println!("data_for_verb(cbu.create): {} results", data.len());
         for d in &data {
-            println!("  {:?} ({:?} via {:?})", d.data_ref, d.affinity_kind, d.provenance);
+            println!(
+                "  {:?} ({:?} via {:?})",
+                d.data_ref, d.affinity_kind, d.provenance
+            );
         }
 
         assert!(
@@ -197,11 +206,7 @@ mod integration {
 
         println!("adjacent_verbs(cbu.create): {} results", adj.len());
         for (fqn, shared) in &adj {
-            println!(
-                "  {} (shares {} data assets)",
-                fqn,
-                shared.len()
-            );
+            println!("  {} (shares {} data assets)", fqn, shared.len());
         }
 
         // Must return some adjacent verbs — at least cbu.list, cbu.get, etc.
@@ -218,7 +223,10 @@ mod integration {
             "cbu.list not found in adjacent_verbs(cbu.create); got: {adj_fqns:?}"
         );
 
-        println!("✓ adjacent_verbs(cbu.create) includes cbu.list ({} adjacent total)", adj.len());
+        println!(
+            "✓ adjacent_verbs(cbu.create) includes cbu.list ({} adjacent total)",
+            adj.len()
+        );
         Ok(())
     }
 
@@ -348,7 +356,11 @@ mod integration {
         // Render to Mermaid.
         let mermaid = render_erd(&model, &options);
 
-        println!("Mermaid output ({} chars):\n{}", mermaid.len(), &mermaid[..mermaid.len().min(500)]);
+        println!(
+            "Mermaid output ({} chars):\n{}",
+            mermaid.len(),
+            &mermaid[..mermaid.len().min(500)]
+        );
 
         // Must start with erDiagram.
         assert!(
@@ -362,12 +374,12 @@ mod integration {
             "Mermaid output does not contain 'cbus' entity:\n{mermaid}"
         );
 
-        assert!(
-            !mermaid.is_empty(),
-            "Mermaid output is empty"
-        );
+        assert!(!mermaid.is_empty(), "Mermaid output is empty");
 
-        println!("✓ ERD generation produced valid Mermaid output ({} chars)", mermaid.len());
+        println!(
+            "✓ ERD generation produced valid Mermaid output ({} chars)",
+            mermaid.len()
+        );
         Ok(())
     }
 }

@@ -25,6 +25,7 @@ impl AffinityGraph {
     /// no snapshots are provided or none match relevant types.
     pub fn build(snapshots: &[SnapshotRow]) -> Self {
         let mut edges: Vec<AffinityEdge> = Vec::new();
+        let mut known_verbs: std::collections::HashSet<String> = std::collections::HashSet::new();
         let mut entity_to_table: HashMap<String, TableRef> = HashMap::new();
         let mut table_to_entity: HashMap<String, String> = HashMap::new();
         let mut attribute_to_column: HashMap<String, ColumnRef> = HashMap::new();
@@ -39,6 +40,7 @@ impl AffinityGraph {
             let Ok(body) = row.parse_definition::<VerbContractBody>() else {
                 continue;
             };
+            known_verbs.insert(body.fqn.clone());
             pass1_verb_contract(&body, &mut edges);
         }
 
@@ -110,6 +112,7 @@ impl AffinityGraph {
             attribute_to_column,
             derivation_edges,
             entity_relationships,
+            known_verbs,
         }
     }
 }
@@ -146,13 +149,13 @@ fn pass1_verb_contract(body: &VerbContractBody, edges: &mut Vec<AffinityEdge>) {
     // crud_mapping → Table edge
     if let Some(ref crud) = body.crud_mapping {
         let kind = match crud.operation.as_str() {
-            "select" | "read" => AffinityKind::CrudRead,
-            "insert" | "create" => AffinityKind::CrudInsert,
-            "update" => AffinityKind::CrudUpdate,
-            "delete" => AffinityKind::CrudDelete,
-            _ => AffinityKind::CrudRead, // fallback
+            "select" | "read" => Some(AffinityKind::CrudRead),
+            "insert" | "create" => Some(AffinityKind::CrudInsert),
+            "update" => Some(AffinityKind::CrudUpdate),
+            "delete" => Some(AffinityKind::CrudDelete),
+            _ => None,
         };
-        if let Some(ref table) = crud.table {
+        if let (Some(kind), Some(table)) = (kind, crud.table.as_ref()) {
             edges.push(AffinityEdge {
                 verb_fqn: verb_fqn.clone(),
                 data_ref: DataRef::Table(TableRef::new(

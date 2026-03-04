@@ -258,7 +258,9 @@ mod tests {
             attribute_to_column: HashMap::new(),
             derivation_edges: vec![],
             entity_relationships: vec![],
+            known_verbs: HashSet::new(),
         };
+        graph.known_verbs.insert("cbu.create".into());
 
         // Entity↔table bimaps
         graph

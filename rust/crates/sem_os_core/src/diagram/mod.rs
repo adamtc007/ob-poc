@@ -9,7 +9,9 @@ pub mod mermaid;
 pub mod model;
 
 pub use enrichment::build_diagram_model;
-pub use mermaid::{render_domain_map, render_erd, render_verb_flow, sanitize_id};
+pub use mermaid::{
+    render_discovery_map, render_domain_map, render_erd, render_verb_flow, sanitize_id,
+};
 pub use model::{
     ColumnInput, DiagramAttribute, DiagramEntity, DiagramMetadata, DiagramModel,
     DiagramRelationship, ForeignKeyInput, GovernanceLevel, RelationshipKind, RenderOptions,

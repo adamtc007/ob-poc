@@ -35,6 +35,10 @@ pub struct AffinityGraph {
 
     /// Entity↔entity relationships from RelationshipTypeDefs.
     pub entity_relationships: Vec<EntityRelationship>,
+
+    /// All declared verb FQNs from VerbContract snapshots, including verbs
+    /// that produced zero affinity edges.
+    pub known_verbs: HashSet<String>,
 }
 
 /// A single verb↔data relationship.
@@ -414,6 +418,7 @@ mod tests {
             attribute_to_column: HashMap::new(),
             derivation_edges: vec![],
             entity_relationships: vec![],
+            known_verbs: HashSet::new(),
         };
         assert!(graph.edges.is_empty());
         let json = serde_json::to_value(&graph).unwrap();

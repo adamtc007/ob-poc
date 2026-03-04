@@ -179,6 +179,8 @@ pub struct RenderOptions {
     pub format: Option<String>,
     /// Whether to show verb surface annotations.
     pub show_verb_surface: bool,
+    /// Whether to include affinity kind labels in verb annotations.
+    pub show_affinity_kind: bool,
 }
 
 // ── Convenience constructors ────────────────────────────────────

@@ -142,17 +142,21 @@ impl AffinityGraph {
 
     /// Verbs with no data affinity (disconnected operations).
     pub fn orphan_verbs(&self) -> Vec<String> {
-        // Collect verbs that appear in edges
-        let verbs_with_data: HashSet<&str> =
-            self.edges.iter().map(|e| e.verb_fqn.as_str()).collect();
+        let verbs_with_data: HashSet<&str> = self
+            .verb_to_data
+            .iter()
+            .filter(|(_, edges)| !edges.is_empty())
+            .map(|(verb, _)| verb.as_str())
+            .collect();
 
-        // Any verb in verb_to_data should have edges, but check for
-        // verbs whose edges were somehow all removed.
-        self.verb_to_data
-            .keys()
+        let mut orphaned: Vec<String> = self
+            .known_verbs
+            .iter()
             .filter(|v| !verbs_with_data.contains(v.as_str()))
             .cloned()
-            .collect()
+            .collect();
+        orphaned.sort();
+        orphaned
     }
 
     /// Attributes with source but no sinks (written but never read).
@@ -402,6 +406,7 @@ mod tests {
             attribute_to_column: HashMap::new(),
             derivation_edges: vec![],
             entity_relationships: vec![],
+            known_verbs: HashSet::new(),
         }
     }
 
@@ -583,6 +588,7 @@ mod tests {
             attribute_to_column: HashMap::new(),
             derivation_edges: vec![],
             entity_relationships: vec![],
+            known_verbs: HashSet::new(),
         };
         assert!(graph.orphan_verbs().is_empty());
     }

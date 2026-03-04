@@ -254,6 +254,30 @@ domains:
             required: false
             default: true
             description: Whether to include verb surface annotations on entities
+          - name: show-affinity-kind
+            type: boolean
+            required: false
+            default: false
+            description: Whether to expose affinity relation labels alongside verbs
+          - name: enrich
+            type: boolean
+            required: false
+            default: true
+            description: Whether to enrich with AffinityGraph metadata
+          - name: tables
+            type: string_list
+            required: false
+            description: Optional list of table names to include
+          - name: depth
+            type: integer
+            required: false
+            default: 1
+            description: Traversal depth hint for enrichment
+          - name: group-by
+            type: string
+            required: false
+            default: schema
+            description: Grouping hint (domain, schema, verb_domain, none)
           - name: domain
             type: string
             required: false
@@ -296,12 +320,21 @@ domains:
         args:
           - name: verb-fqn
             type: string
-            required: true
+            required: false
             description: Fully-qualified verb name to generate flow diagram for (e.g., cbu.create)
+          - name: domain
+            type: string
+            required: false
+            description: Domain prefix to render a domain-centric verb flow (e.g., cbu)
+          - name: format
+            type: string
+            required: false
+            default: mermaid
+            description: Output format (currently only mermaid supported)
           - name: depth
             type: integer
             required: false
-            default: 1
+            default: 2
             description: Traversal depth for transitive data edges
         returns:
           type: record
@@ -343,6 +376,11 @@ domains:
             required: false
             default: mermaid
             description: Output format (currently only mermaid supported)
+          - name: cluster-by
+            type: string
+            required: false
+            default: verb
+            description: Clustering mode (verb, data, intent, domain)
         returns:
           type: record
           capture: false

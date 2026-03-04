@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-> **Last reviewed:** 2026-03-01
+> **Last reviewed:** 2026-03-04
 > **Frontend:** React/TypeScript (`ob-poc-ui-react/`) - Chat UI with scope panel, Inspector, Semantic OS Tab
 > **Backend:** Rust/Axum (`rust/crates/ob-poc-web/`) - Serves React + REST API
 > **Crates:** 22 active Rust crates (16 ob-poc + 6 sem_os_*; esper_* deprecated; ob-poc-graph + viewport removed)
@@ -65,6 +65,8 @@
 > **Semantic OS Tab:** ✅ Complete - Agent-driven workflow selection UI (`/semantic-os`), goals→phase_tags verb scoping in SemReg, DecisionPacket workflow prompt (Onboarding/KYC/Data Management/Stewardship), session sidebar + registry context panel, `GET /api/sem-os/context` endpoint
 > **Scenario-Based Intent Resolution (Phases 0.5-5):** ✅ Complete — MacroIndex (Tier -2B) + ScenarioIndex (Tier -2A) + CompoundSignals + SequenceValidator; deterministic scoring ledger, 16 YAML scenarios (incl. 3 macro_sequence KYC workflows), ECIR short-circuit gating, provenance labels on macro expansion, progress narration ("Step 4 of 13: Lux UCITS SICAV Setup"), 43 Tier-2 test cases with 5 hard threshold assertions (spec §11)
 > **AffinityGraph & Schema-Driven Diagram Generation:** ✅ Complete — Bidirectional verb↔data index (`sem_os_core::affinity`), 5-pass pure-Rust builder from active snapshots, 10 query methods (6 core + 4 governance), DiagramModel + MermaidRenderer (`sem_os_core::diagram`), 3 render modes (erDiagram/verb-flow/domain-map), 9 new verbs (6 registry.* + 3 schema.*), DomainMetadata YAML overlay, 6 CustomOps, 6 integration tests, 21,047 total embeddings
+> **Discovery Pipeline (Phase 2):** ✅ Complete — `registry.discover-dsl` implemented end-to-end (utterance→intent matches→verb chain synthesis→disambiguation/governance context); `schema.generate-discovery-map` implemented with Mermaid projection
+> **Utterance API Coverage Harness:** ✅ Complete — `rust/tests/utterance_api_coverage.rs` runs standard utterance fixtures through `/api/session/:id/execute` with `registry.discover-dsl`, emits JSON/MD/CSV coverage artifacts for expected↔predicted DSL verbs
 
 This is the root project guide for Claude Code. Domain-specific details are in annexes.
 
@@ -3202,7 +3204,18 @@ cargo x test-verbs --sweep        # Threshold calibration sweep
 
 # Explore a specific query
 cargo x test-verbs --explore "load the allianz book"
+
+# API coverage harness (live server execute path)
+# 1) Start server:
+# DATABASE_URL="postgresql:///data_designer" OBPOC_ALLOW_RAW_EXECUTE=true OBPOC_STRICT_SEMREG=false cargo run -p ob-poc-web
+# 2) Run harness:
+RUSTC_WRAPPER= cargo test --test utterance_api_coverage -- --ignored --nocapture
 ```
+
+The API harness validates `registry.discover-dsl` end-to-end via `/api/session/:id/execute`, then writes:
+- `target/utterance-api-coverage/utterance_coverage_results.json`
+- `target/utterance-api-coverage/utterance_coverage_report.md`
+- `target/utterance-api-coverage/utterance_verb_xref.csv`
 
 ### Test Categories
 
@@ -3728,7 +3741,7 @@ MermaidRenderer::render_domain_map(&model, &options)  // graph TD with domain su
 | `registry.data-for-verb` | Find all data assets a verb touches (with optional transitive `depth`) |
 | `registry.adjacent-verbs` | Find verbs sharing data dependencies |
 | `registry.governance-gaps` | Identify orphan tables, orphan verbs, write-only/read-before-write attributes |
-| `registry.discover-dsl` | Phase 2 stub — utterance→verb chain synthesis (returns NotImplemented) |
+| `registry.discover-dsl` | Utterance→intent→DSL discovery with ranked `intent_matches`, `suggested_sequence`, `disambiguation_needed`, and `governance_context` |
 
 **3 Diagram Generation Verbs (appended to `rust/config/verbs/sem-reg/schema.yaml`):**
 
@@ -3736,7 +3749,7 @@ MermaidRenderer::render_domain_map(&model, &options)  // graph TD with domain su
 |----------|-------------|
 | `schema.generate-erd` | Generate entity-relationship diagram with verb surface annotations |
 | `schema.generate-verb-flow` | Generate verb-centric data flow diagram |
-| `schema.generate-discovery-map` | Phase 2 stub — domain discovery map |
+| `schema.generate-discovery-map` | Generates Mermaid utterance→intent→verb→data discovery map projection |
 
 Each verb has 8+ invocation phrases for semantic discovery. After adding, always run `populate_embeddings`.
 
@@ -3796,6 +3809,20 @@ cargo x pre-commit
 DATABASE_URL="postgresql:///data_designer" \
   cargo test --features database --test affinity_integration -- --ignored --nocapture
 
+# Discovery ops runtime wiring smoke tests (requires database)
+DATABASE_URL="postgresql:///data_designer" \
+  cargo test --features database --test discovery_ops_integration -- --ignored --nocapture
+
+# API utterance coverage harness (requires running ob-poc-web on :3002 by default)
+RUSTC_WRAPPER= \
+  cargo test --test utterance_api_coverage -- --ignored --nocapture
+
+# Optional coverage gate + filter
+UTTERANCE_FILTER=hard \
+UTTERANCE_MIN_ACCURACY=0.25 \
+RUSTC_WRAPPER= \
+  cargo test --test utterance_api_coverage -- --ignored --nocapture
+
 # Populate embeddings (after adding new verb YAML with 9 new verbs)
 DATABASE_URL="postgresql:///data_designer" \
   cargo run --release --package ob-semantic-matcher --bin populate_embeddings
@@ -3808,6 +3835,7 @@ DATABASE_URL="postgresql:///data_designer" \
 | `rust/crates/sem_os_core/src/affinity/types.rs` | `AffinityGraph`, `AffinityEdge`, `AffinityKind` (9 variants), `AffinityProvenance`, `DataRef`, `TableRef`, `ColumnRef`, `VerbAffinity`, `DataAffinity`, `DataFootprint` |
 | `rust/crates/sem_os_core/src/affinity/builder.rs` | 5-pass builder, `AffinityGraph::build(snapshots)` |
 | `rust/crates/sem_os_core/src/affinity/query.rs` | 10 query methods (6 core + 4 governance) |
+| `rust/crates/sem_os_core/src/affinity/discovery.rs` | Discovery pipeline types + logic: `match_intent`, `synthesize_chain`, `generate_disambiguation`, `discover_dsl`, discovery-map edge projection |
 | `rust/crates/sem_os_core/src/affinity/mod.rs` | Module re-exports |
 | `rust/crates/sem_os_core/src/diagram/model.rs` | `DiagramModel`, `DiagramEntity`, `DiagramAttribute`, `DiagramRelationship`, `GovernanceLevel`, `TableInput`, `ColumnInput`, `RenderOptions` |
 | `rust/crates/sem_os_core/src/diagram/enrichment.rs` | `build_diagram_model()` — annotates physical schema with registry intelligence |
@@ -3824,6 +3852,8 @@ DATABASE_URL="postgresql:///data_designer" \
 | `rust/config/verbs/sem-reg/schema.yaml` | 3 diagram verb definitions appended |
 | `rust/config/sem_os_seeds/domain_metadata.yaml` | DomainMetadata YAML overlay (verb→table forward mappings) |
 | `rust/tests/affinity_integration.rs` | 6 integration tests: live registry, verbs_for_table, data_for_verb, adjacent_verbs, governance_gaps, ERD generation |
+| `rust/tests/discovery_ops_integration.rs` | Runtime wiring smoke tests for `registry.discover-dsl` and `schema.generate-discovery-map` |
+| `rust/tests/utterance_api_coverage.rs` | API execute-path utterance coverage harness with expected↔predicted verb scoring and report artifacts |
 
 ---
 

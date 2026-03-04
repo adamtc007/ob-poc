@@ -16,13 +16,14 @@ use sqlx::PgPool;
 
 #[cfg(feature = "database")]
 use {
-    crate::sem_reg::types::{pg_rows_to_snapshot_rows, PgSnapshotRow},
-    sem_os_core::affinity::AffinityGraph,
+    crate::domain_ops::affinity_graph_cache::load_affinity_graph_cached,
+    sem_os_core::affinity::{match_intent, AffinityGraph, DataRef},
     sem_os_core::diagram::{
         enrichment::build_diagram_model,
         mermaid,
         model::{ColumnInput, ForeignKeyInput, RenderOptions, TableInput},
     },
+    sem_os_core::verb_contract::VerbContractBody,
 };
 
 // ── Typed result types ────────────────────────────────────────────
@@ -32,14 +33,28 @@ struct GenerateErdResult {
     schema: String,
     format: String,
     table_count: usize,
+    show_affinity_kind: bool,
+    group_by: String,
     diagram: String,
 }
 
 #[derive(Debug, serde::Serialize)]
 struct GenerateVerbFlowResult {
+    mode: String,
     verb_fqn: String,
+    domain: Option<String>,
     depth: u32,
     format: String,
+    diagram: String,
+}
+
+#[derive(Debug, serde::Serialize)]
+struct GenerateDiscoveryMapResult {
+    domain: Option<String>,
+    cluster_by: String,
+    format: String,
+    utterance_count: usize,
+    intent_count: usize,
     diagram: String,
 }
 
@@ -232,21 +247,85 @@ impl CustomOperation for SchemaCrossReferenceOp {
 
 // ── Diagram generation ops ────────────────────────────────────────────────────
 
-/// Shared helper: load AffinityGraph from active snapshots.
 #[cfg(feature = "database")]
-async fn load_affinity_graph_for_schema(pool: &PgPool) -> anyhow::Result<AffinityGraph> {
-    let pg_rows = sqlx::query_as::<_, PgSnapshotRow>(
-        "SELECT snapshot_id, snapshot_set_id, object_type, object_id, \
-         version_major, version_minor, status, governance_tier, trust_class, \
-         security_label, effective_from, effective_until, predecessor_id, \
-         change_type, change_rationale, created_by, approved_by, definition, \
-         created_at \
-         FROM sem_reg.snapshots WHERE status = 'active'",
+fn get_string_list_arg(verb_call: &VerbCall, name: &str) -> Option<Vec<String>> {
+    verb_call.arguments.iter().find_map(|a| {
+        if a.key != name {
+            return None;
+        }
+        if let Some(s) = a.value.as_string() {
+            return Some(vec![s.to_string()]);
+        }
+        a.value.as_list().map(|list| {
+            list.iter()
+                .filter_map(|node| node.as_string().map(ToOwned::to_owned))
+                .collect()
+        })
+    })
+}
+
+#[cfg(feature = "database")]
+async fn load_active_verb_contracts(pool: &PgPool) -> anyhow::Result<Vec<VerbContractBody>> {
+    let rows = sqlx::query_as::<_, (serde_json::Value,)>(
+        "SELECT definition \
+         FROM sem_reg.snapshots \
+         WHERE status = 'active' AND object_type::text = 'verb_contract'",
     )
     .fetch_all(pool)
     .await?;
-    let snapshots = pg_rows_to_snapshot_rows(pg_rows)?;
-    Ok(AffinityGraph::build(&snapshots))
+
+    let mut verbs = Vec::new();
+    for (definition,) in rows {
+        if let Ok(verb) = serde_json::from_value::<VerbContractBody>(definition) {
+            verbs.push(verb);
+        }
+    }
+    Ok(verbs)
+}
+
+#[cfg(feature = "database")]
+fn render_domain_verb_flow(domain: &str, graph: &AffinityGraph, depth: u32) -> String {
+    let mut out = String::new();
+    out.push_str("graph LR\n");
+
+    let mut verbs: Vec<String> = graph
+        .verb_to_data
+        .keys()
+        .filter(|v| v.starts_with(&format!("{domain}.")))
+        .cloned()
+        .collect();
+    verbs.sort();
+
+    for verb in &verbs {
+        let verb_id = mermaid::sanitize_id(verb);
+        out.push_str(&format!("    {verb_id}[\"{verb}\"]\n"));
+        for da in graph.data_for_verb(verb) {
+            let data_key = da.data_ref.index_key();
+            let data_id = mermaid::sanitize_id(&data_key);
+            let label = match da.data_ref {
+                DataRef::Table(ref t) => format!("{}:{}", t.schema, t.table),
+                DataRef::Column(ref c) => format!("{}:{}.{}", c.schema, c.table, c.column),
+                DataRef::EntityType { ref fqn } => format!("entity:{fqn}"),
+                DataRef::Attribute { ref fqn } => format!("attr:{fqn}"),
+            };
+            out.push_str(&format!("    {data_id}[(\"{label}\")]\n"));
+            out.push_str(&format!("    {verb_id} --> {data_id}\n"));
+        }
+    }
+
+    if depth > 1 {
+        for verb in &verbs {
+            let verb_id = mermaid::sanitize_id(verb);
+            for (adj, _) in graph.adjacent_verbs(verb) {
+                if adj.starts_with(&format!("{domain}.")) {
+                    let adj_id = mermaid::sanitize_id(&adj);
+                    out.push_str(&format!("    {verb_id} -.-> {adj_id}\n"));
+                }
+            }
+        }
+    }
+
+    out
 }
 
 /// Shared helper: query physical tables from information_schema for a given schema.
@@ -370,12 +449,33 @@ impl CustomOperation for SchemaGenerateErdOp {
     ) -> Result<ExecutionResult> {
         let schema_name = get_string_arg(verb_call, "schema-name")
             .ok_or_else(|| anyhow::anyhow!("schema.generate-erd: schema-name is required"))?;
+        let format = get_string_arg(verb_call, "format").unwrap_or_else(|| "mermaid".to_string());
+        if format != "mermaid" {
+            return Err(anyhow::anyhow!(
+                "schema.generate-erd: unsupported format '{}', only 'mermaid' is currently supported",
+                format
+            ));
+        }
         let show_verb_surface = get_bool_arg(verb_call, "show-verb-surface").unwrap_or(true);
+        let show_affinity_kind = get_bool_arg(verb_call, "show-affinity-kind").unwrap_or(false);
+        let enrich = get_bool_arg(verb_call, "enrich").unwrap_or(true);
         let domain_filter = get_string_arg(verb_call, "domain");
+        let group_by =
+            get_string_arg(verb_call, "group-by").unwrap_or_else(|| "schema".to_string());
         let max_tables = get_int_arg(verb_call, "max-tables").unwrap_or(50) as usize;
+        let requested_tables = get_string_list_arg(verb_call, "tables");
 
-        let tables = extract_tables_from_schema(pool, &schema_name).await?;
-        let graph = load_affinity_graph_for_schema(pool).await?;
+        let mut tables = extract_tables_from_schema(pool, &schema_name).await?;
+        if let Some(ref wanted) = requested_tables {
+            let wanted_set: std::collections::HashSet<&str> =
+                wanted.iter().map(String::as_str).collect();
+            tables.retain(|t| wanted_set.contains(t.table_name.as_str()));
+        }
+        let graph = if enrich {
+            load_affinity_graph_cached(pool).await?
+        } else {
+            AffinityGraph::build(&[])
+        };
 
         let options = RenderOptions {
             schema_filter: Some(vec![schema_name.clone()]),
@@ -383,16 +483,19 @@ impl CustomOperation for SchemaGenerateErdOp {
             include_columns: true,
             show_governance: false,
             show_verb_surface,
+            show_affinity_kind,
             max_tables: Some(max_tables),
-            format: Some("mermaid".to_string()),
+            format: Some(format.clone()),
         };
         let model = build_diagram_model(&tables, &graph, &options);
         let mermaid_output = mermaid::render_erd(&model, &options);
 
         let result = GenerateErdResult {
             schema: schema_name,
-            format: "mermaid".to_string(),
+            format,
             table_count: model.entities.len(),
+            show_affinity_kind,
+            group_by,
             diagram: mermaid_output,
         };
         Ok(ExecutionResult::Record(serde_json::to_value(result)?))
@@ -431,18 +534,45 @@ impl CustomOperation for SchemaGenerateVerbFlowOp {
         _ctx: &mut ExecutionContext,
         pool: &PgPool,
     ) -> Result<ExecutionResult> {
-        let verb_fqn = get_string_arg(verb_call, "verb-fqn")
-            .ok_or_else(|| anyhow::anyhow!("schema.generate-verb-flow: verb-fqn is required"))?;
-        let depth = get_int_arg(verb_call, "depth").unwrap_or(1) as u32;
+        let format = get_string_arg(verb_call, "format").unwrap_or_else(|| "mermaid".to_string());
+        if format != "mermaid" {
+            return Err(anyhow::anyhow!(
+                "schema.generate-verb-flow: unsupported format '{}', only 'mermaid' is currently supported",
+                format
+            ));
+        }
+        let verb_fqn = get_string_arg(verb_call, "verb-fqn");
+        let domain = get_string_arg(verb_call, "domain");
+        if verb_fqn.is_none() && domain.is_none() {
+            return Err(anyhow::anyhow!(
+                "schema.generate-verb-flow: either verb-fqn or domain is required"
+            ));
+        }
+        let depth = get_int_arg(verb_call, "depth").unwrap_or(2) as u32;
 
-        let graph = load_affinity_graph_for_schema(pool).await?;
-        let mermaid_output = mermaid::render_verb_flow(&verb_fqn, &graph, depth);
+        let graph = load_affinity_graph_cached(pool).await?;
+        let (mode, verb_value, diagram) = if let Some(ref vfqn) = verb_fqn {
+            (
+                "verb".to_string(),
+                vfqn.clone(),
+                mermaid::render_verb_flow(vfqn, &graph, depth),
+            )
+        } else {
+            let domain_value = domain.clone().unwrap_or_default();
+            (
+                "domain".to_string(),
+                domain_value.clone(),
+                render_domain_verb_flow(&domain_value, &graph, depth),
+            )
+        };
 
         let result = GenerateVerbFlowResult {
-            verb_fqn,
+            mode,
+            verb_fqn: verb_value,
+            domain,
             depth,
-            format: "mermaid".to_string(),
-            diagram: mermaid_output,
+            format,
+            diagram,
         };
         Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
@@ -459,7 +589,7 @@ impl CustomOperation for SchemaGenerateVerbFlowOp {
     }
 }
 
-/// Generate a domain discovery map (Phase 2 stub).
+/// Generate a domain discovery map.
 #[register_custom_op]
 pub struct SchemaGenerateDiscoveryMapOp;
 
@@ -472,22 +602,86 @@ impl CustomOperation for SchemaGenerateDiscoveryMapOp {
         "generate-discovery-map"
     }
     fn rationale(&self) -> &'static str {
-        "Discovery map generation deferred to Phase 2"
+        "Generate utterance -> intent -> verb -> data map from AffinityGraph and verb phrases"
     }
 
     #[cfg(feature = "database")]
     async fn execute(
         &self,
-        _verb_call: &VerbCall,
+        verb_call: &VerbCall,
         _ctx: &mut ExecutionContext,
-        _pool: &PgPool,
+        pool: &PgPool,
     ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::to_value(
-            serde_json::json!({
-                "status": "not_implemented",
-                "message": "schema.generate-discovery-map is planned for Phase 2.",
-            }),
-        )?))
+        let domain = get_string_arg(verb_call, "domain");
+        let format = get_string_arg(verb_call, "format").unwrap_or_else(|| "mermaid".to_string());
+        if format != "mermaid" {
+            return Err(anyhow::anyhow!(
+                "schema.generate-discovery-map: unsupported format '{}', only 'mermaid' is currently supported",
+                format
+            ));
+        }
+        let cluster_by =
+            get_string_arg(verb_call, "cluster-by").unwrap_or_else(|| "verb".to_string());
+        let graph = load_affinity_graph_cached(pool).await?;
+        let verbs = load_active_verb_contracts(pool).await?;
+
+        let scoped_verbs: Vec<VerbContractBody> = if let Some(ref dom) = domain {
+            verbs.into_iter().filter(|v| v.domain == *dom).collect()
+        } else {
+            verbs
+        };
+
+        let mut utterances = Vec::new();
+        for verb in &scoped_verbs {
+            if verb.invocation_phrases.is_empty() {
+                utterances.push(format!("{} {}", verb.domain, verb.action));
+            } else {
+                utterances.extend(verb.invocation_phrases.iter().take(2).cloned());
+            }
+        }
+        utterances.sort();
+        utterances.dedup();
+        utterances.truncate(24);
+
+        let mut intent_matches = Vec::new();
+        for utterance in &utterances {
+            let mut matched = match_intent(utterance, &graph, &scoped_verbs);
+            matched.truncate(4);
+            intent_matches.extend(matched);
+        }
+        intent_matches.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.verb.cmp(&b.verb))
+        });
+        intent_matches.truncate(32);
+
+        let discovery = sem_os_core::affinity::DiscoveryResponse {
+            intent_matches: intent_matches.clone(),
+            suggested_sequence: Vec::new(),
+            disambiguation_needed: Vec::new(),
+            governance_context: sem_os_core::affinity::GovernanceContext {
+                all_tables_governed: true,
+                required_mode: cluster_by.clone(),
+                policy_check: None,
+            },
+        };
+        let source_utterance = domain
+            .clone()
+            .map(|d| format!("domain:{d}"))
+            .unwrap_or_else(|| "domain:all".to_owned());
+        let diagram = mermaid::render_discovery_map(&source_utterance, &discovery, &graph);
+
+        let result = GenerateDiscoveryMapResult {
+            domain,
+            cluster_by,
+            format,
+            utterance_count: utterances.len(),
+            intent_count: intent_matches.len(),
+            diagram,
+        };
+        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
 
     #[cfg(not(feature = "database"))]
@@ -496,11 +690,8 @@ impl CustomOperation for SchemaGenerateDiscoveryMapOp {
         _verb_call: &VerbCall,
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::to_value(
-            serde_json::json!({
-                "status": "not_implemented",
-                "message": "schema.generate-discovery-map is planned for Phase 2.",
-            }),
-        )?))
+        Err(anyhow::anyhow!(
+            "schema.generate-discovery-map requires database"
+        ))
     }
 }
