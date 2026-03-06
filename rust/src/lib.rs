@@ -163,6 +163,9 @@ pub mod policy;
 #[cfg(feature = "database")]
 pub mod sem_reg;
 
+// Sage — intent understanding layer (plane, polarity, domain — no verb FQNs)
+pub mod sage;
+
 // Core domain capabilities
 pub use domains::{DomainHandler, DomainRegistry, DomainResult};
 

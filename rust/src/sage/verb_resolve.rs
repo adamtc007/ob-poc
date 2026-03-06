@@ -1,0 +1,358 @@
+//! Structured verb scoring for the Coder layer.
+//!
+//! This scorer never reads natural-language utterances directly. It consumes
+//! `OutcomeIntent` plus precomputed `VerbMetadataIndex` rows and ranks verbs
+//! using deterministic metadata.
+
+use std::collections::HashSet;
+
+use super::outcome::OutcomeIntent;
+use super::verb_index::{VerbMeta, VerbMetadataIndex};
+use super::IntentPolarity;
+
+/// Ranked candidate returned by the structured scorer.
+#[derive(Debug, Clone)]
+pub struct ScoredVerbCandidate {
+    pub fqn: String,
+    pub score: f32,
+    pub action_score: f32,
+    pub param_overlap_score: f32,
+}
+
+/// Deterministic metadata-based verb scorer.
+#[derive(Debug, Clone)]
+pub struct StructuredVerbScorer {
+    index: VerbMetadataIndex,
+}
+
+impl StructuredVerbScorer {
+    /// Create a scorer from a metadata index.
+    ///
+    /// # Examples
+    /// ```ignore
+    /// use ob_poc::sage::verb_index::VerbMetadataIndex;
+    /// use ob_poc::sage::verb_resolve::StructuredVerbScorer;
+    ///
+    /// let index = VerbMetadataIndex::load()?;
+    /// let scorer = StructuredVerbScorer::new(index);
+    /// # Ok::<(), anyhow::Error>(())
+    /// ```
+    pub fn new(index: VerbMetadataIndex) -> Self {
+        Self { index }
+    }
+
+    /// Score verbs for an outcome intent and return the top `limit` candidates.
+    ///
+    /// # Examples
+    /// ```ignore
+    /// use ob_poc::sage::{IntentPolarity, ObservationPlane, OutcomeAction, OutcomeIntent, SageConfidence};
+    /// use ob_poc::sage::verb_index::VerbMetadataIndex;
+    /// use ob_poc::sage::verb_resolve::StructuredVerbScorer;
+    ///
+    /// let scorer = StructuredVerbScorer::new(VerbMetadataIndex::load()?);
+    /// let intent = OutcomeIntent {
+    ///     summary: "List CBUs".to_string(),
+    ///     plane: ObservationPlane::Instance,
+    ///     polarity: IntentPolarity::Read,
+    ///     domain_concept: "cbu".to_string(),
+    ///     action: OutcomeAction::Read,
+    ///     subject: None,
+    ///     steps: vec![],
+    ///     confidence: SageConfidence::Low,
+    ///     pending_clarifications: vec![],
+    /// };
+    /// let candidates = scorer.score(&intent, 3);
+    /// assert!(!candidates.is_empty());
+    /// # Ok::<(), anyhow::Error>(())
+    /// ```
+    pub fn score(&self, intent: &OutcomeIntent, limit: usize) -> Vec<ScoredVerbCandidate> {
+        let requested_action = normalized_action_tags(intent);
+        let requested_params = requested_param_keys(intent);
+        let intent_keywords = intent_keywords(intent);
+
+        let mut candidates = self
+            .index
+            .iter()
+            .filter(|meta| meta.planes.contains(&intent.plane))
+            .filter(|meta| matches_polarity(meta.polarity, intent.polarity))
+            .map(|meta| {
+                let action_score = action_score(meta, &requested_action, &intent_keywords);
+                let param_overlap_score = param_overlap_score(meta, &requested_params);
+                let score = 0.6 * action_score + 0.4 * param_overlap_score;
+                ScoredVerbCandidate {
+                    fqn: meta.fqn.clone(),
+                    score,
+                    action_score,
+                    param_overlap_score,
+                }
+            })
+            .collect::<Vec<_>>();
+
+        candidates.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.fqn.cmp(&b.fqn))
+        });
+        candidates.truncate(limit);
+        candidates
+    }
+
+    /// Access the underlying metadata index.
+    ///
+    /// # Examples
+    /// ```ignore
+    /// use ob_poc::sage::verb_index::VerbMetadataIndex;
+    /// use ob_poc::sage::verb_resolve::StructuredVerbScorer;
+    ///
+    /// let scorer = StructuredVerbScorer::new(VerbMetadataIndex::load()?);
+    /// assert!(scorer.index().len() > 0);
+    /// # Ok::<(), anyhow::Error>(())
+    /// ```
+    pub fn index(&self) -> &VerbMetadataIndex {
+        &self.index
+    }
+}
+
+fn matches_polarity(candidate: IntentPolarity, requested: IntentPolarity) -> bool {
+    candidate == requested || requested == IntentPolarity::Ambiguous
+}
+
+fn normalized_action_tags(intent: &OutcomeIntent) -> HashSet<String> {
+    let mut tags = HashSet::new();
+    tags.insert(intent.action.as_str().to_string());
+    if !intent.domain_concept.is_empty() {
+        tags.insert(intent.domain_concept.clone());
+    }
+    for step in &intent.steps {
+        tags.insert(step.action.as_str().to_string());
+        if !step.target.is_empty() {
+            tags.insert(step.target.clone());
+        }
+    }
+    tags
+}
+
+fn requested_param_keys(intent: &OutcomeIntent) -> HashSet<String> {
+    let mut keys = HashSet::new();
+    for step in &intent.steps {
+        keys.extend(step.params.keys().cloned());
+    }
+    keys
+}
+
+fn intent_keywords(intent: &OutcomeIntent) -> HashSet<String> {
+    let mut keywords = HashSet::new();
+    for token in intent.summary.split(|ch: char| !ch.is_ascii_alphanumeric()) {
+        let token = token.trim().to_ascii_lowercase();
+        if token.len() >= 3 {
+            keywords.insert(token);
+        }
+    }
+    if !intent.domain_concept.is_empty() {
+        keywords.insert(intent.domain_concept.to_ascii_lowercase());
+    }
+    keywords
+}
+
+fn action_score(
+    meta: &VerbMeta,
+    requested_action: &HashSet<String>,
+    intent_keywords: &HashSet<String>,
+) -> f32 {
+    let verb_name = meta.verb_name.to_ascii_lowercase();
+    if requested_action.contains(&verb_name) {
+        return 0.8;
+    }
+
+    let action_tags = meta
+        .action_tags
+        .iter()
+        .map(|tag| tag.to_ascii_lowercase())
+        .collect::<HashSet<_>>();
+    if requested_action.iter().any(|tag| action_tags.contains(tag)) {
+        return 0.5;
+    }
+
+    let description_words = meta
+        .description
+        .split(|ch: char| !ch.is_ascii_alphanumeric())
+        .map(|word| word.trim().to_ascii_lowercase())
+        .filter(|word| word.len() >= 3)
+        .collect::<HashSet<_>>();
+    if intent_keywords
+        .iter()
+        .any(|word| description_words.contains(word))
+    {
+        return 0.3;
+    }
+
+    0.0
+}
+
+fn param_overlap_score(meta: &VerbMeta, requested_params: &HashSet<String>) -> f32 {
+    if requested_params.is_empty() || meta.param_names.is_empty() {
+        return 0.0;
+    }
+
+    let candidate_params = meta
+        .param_names
+        .iter()
+        .map(|name| name.to_ascii_lowercase())
+        .collect::<HashSet<_>>();
+
+    let intersection = requested_params
+        .iter()
+        .filter(|key| candidate_params.contains(&key.to_ascii_lowercase()))
+        .count();
+    let union = requested_params.len() + candidate_params.len() - intersection;
+
+    if union == 0 {
+        0.0
+    } else {
+        intersection as f32 / union as f32
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+
+    use crate::sage::verb_index::VerbMeta;
+    use crate::sage::{
+        Clarification, EntityRef, ObservationPlane, OutcomeAction, OutcomeStep, SageConfidence,
+    };
+
+    fn index_with(entries: Vec<VerbMeta>) -> VerbMetadataIndex {
+        let mut by_fqn = HashMap::new();
+        for entry in entries {
+            by_fqn.insert(entry.fqn.clone(), entry);
+        }
+        // same module can't access private field across module boundaries, so use from test helper below
+        VerbMetadataIndex::from_test_map(by_fqn)
+    }
+
+    fn sample_meta(
+        fqn: &str,
+        polarity: IntentPolarity,
+        planes: Vec<ObservationPlane>,
+        action_tags: &[&str],
+        params: &[&str],
+        description: &str,
+    ) -> VerbMeta {
+        let (domain, verb_name) = fqn.split_once('.').unwrap();
+        VerbMeta {
+            fqn: fqn.to_string(),
+            domain: domain.to_string(),
+            verb_name: verb_name.to_string(),
+            polarity,
+            planes,
+            action_tags: action_tags.iter().map(|s| s.to_string()).collect(),
+            param_names: params.iter().map(|s| s.to_string()).collect(),
+            required_params: vec![],
+            description: description.to_string(),
+        }
+    }
+
+    fn sample_intent() -> OutcomeIntent {
+        OutcomeIntent {
+            summary: "Create a CBU for this client".to_string(),
+            plane: ObservationPlane::Instance,
+            polarity: IntentPolarity::Write,
+            domain_concept: "cbu".to_string(),
+            action: OutcomeAction::Create,
+            subject: Some(EntityRef {
+                mention: "this client".to_string(),
+                kind_hint: Some("entity".to_string()),
+                uuid: None,
+            }),
+            steps: vec![OutcomeStep {
+                action: OutcomeAction::Create,
+                target: "cbu".to_string(),
+                params: HashMap::from([(String::from("client-id"), String::from("123"))]),
+                notes: None,
+            }],
+            confidence: SageConfidence::Medium,
+            pending_clarifications: Vec::<Clarification>::new(),
+        }
+    }
+
+    #[test]
+    fn scorer_filters_by_plane_and_polarity() {
+        let scorer = StructuredVerbScorer::new(index_with(vec![
+            sample_meta(
+                "cbu.create",
+                IntentPolarity::Write,
+                vec![ObservationPlane::Instance],
+                &["create", "cbu"],
+                &["client-id"],
+                "Create a CBU",
+            ),
+            sample_meta(
+                "registry.list-entities",
+                IntentPolarity::Read,
+                vec![ObservationPlane::Structure, ObservationPlane::Registry],
+                &["list", "registry"],
+                &[],
+                "List registry entities",
+            ),
+        ]));
+
+        let candidates = scorer.score(&sample_intent(), 5);
+        assert_eq!(candidates.len(), 1);
+        assert_eq!(candidates[0].fqn, "cbu.create");
+    }
+
+    #[test]
+    fn scorer_prefers_exact_action_and_param_overlap() {
+        let scorer = StructuredVerbScorer::new(index_with(vec![
+            sample_meta(
+                "cbu.create",
+                IntentPolarity::Write,
+                vec![ObservationPlane::Instance],
+                &["create", "cbu"],
+                &["client-id"],
+                "Create a CBU",
+            ),
+            sample_meta(
+                "cbu.assign-role",
+                IntentPolarity::Write,
+                vec![ObservationPlane::Instance],
+                &["assign", "cbu"],
+                &["role-id"],
+                "Assign role to a CBU",
+            ),
+        ]));
+
+        let candidates = scorer.score(&sample_intent(), 5);
+        assert_eq!(candidates[0].fqn, "cbu.create");
+        assert!(candidates[0].score > candidates[1].score);
+    }
+
+    #[test]
+    fn scorer_uses_description_keywords_as_fallback() {
+        let intent = OutcomeIntent {
+            summary: "timeline for this deal".to_string(),
+            plane: ObservationPlane::Instance,
+            polarity: IntentPolarity::Read,
+            domain_concept: "status-history".to_string(),
+            action: OutcomeAction::Read,
+            subject: None,
+            steps: vec![],
+            confidence: SageConfidence::Low,
+            pending_clarifications: vec![],
+        };
+        let scorer = StructuredVerbScorer::new(index_with(vec![sample_meta(
+            "deal.timeline",
+            IntentPolarity::Read,
+            vec![ObservationPlane::Instance],
+            &["deal"],
+            &[],
+            "Show the deal timeline and status history",
+        )]));
+
+        let candidates = scorer.score(&intent, 3);
+        assert_eq!(candidates[0].action_score, 0.3);
+    }
+}

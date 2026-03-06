@@ -24,16 +24,20 @@ use crate::agent::telemetry;
 use crate::agent::verb_surface::{
     compute_session_verb_surface, SessionVerbSurface, VerbSurfaceContext, VerbSurfaceFailPolicy,
 };
+use crate::dsl_v2::ast::find_unresolved_ref_locations;
 use crate::dsl_v2::verb_registry::registry;
+use crate::dsl_v2::{compile, enrich_program, parse_program, runtime_registry_arc};
 use crate::lookup::LookupService;
 use crate::mcp::intent_pipeline::{
-    IntentPipeline, PipelineOutcome, PipelineResult, StructuredIntent,
+    compute_dsl_hash, IntentPipeline, PipelineOutcome, PipelineResult, StructuredIntent,
+    UnresolvedRef,
 };
 use crate::mcp::scope_resolution::ScopeContext;
 use crate::mcp::verb_search::{
-    HybridVerbSearcher, JourneyMetadata, JourneyRoute, VerbSearchResult,
+    HybridVerbSearcher, JourneyMetadata, JourneyRoute, VerbSearchResult, VerbSearchSource,
 };
 use crate::policy::{gate::PolicySnapshot, PolicyGate};
+use crate::sage::{CoderResult, ObservationPlane, OutcomeStep, SageConfidence, SageEngine};
 use crate::sem_reg::abac::ActorContext;
 
 use sem_os_client::SemOsClient;
@@ -71,6 +75,8 @@ pub struct OrchestratorContext {
     /// Session workflow focus (e.g., "semos-kyc", "semos-onboarding").
     /// Used by `SessionVerbSurface` for domain-level workflow filtering.
     pub stage_focus: Option<String>,
+    /// Optional Sage engine used for Stage 1.5 shadow classification.
+    pub sage_engine: Option<Arc<dyn SageEngine>>,
 }
 
 /// Where the utterance originated.
@@ -165,6 +171,17 @@ pub struct IntentTrace {
     /// Contains scenario_id, scenario_title, and resolved route.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub journey_match: Option<JourneyMetadata>,
+    /// Sage shadow plane classification (Stage 1.5, populated when SAGE_SHADOW=1).
+    /// One of: "Instance", "Structure", "Registry".
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sage_plane: Option<String>,
+    /// Sage shadow polarity classification (Stage 1.5, populated when SAGE_SHADOW=1).
+    /// One of: "Read", "Write", "Ambiguous".
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sage_polarity: Option<String>,
+    /// Sage shadow domain hints (Stage 1.5, populated when SAGE_SHADOW=1).
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub sage_domain_hints: Vec<String>,
 }
 
 /// Returns true for pipeline outcomes that are "early exits" -- scope resolution,
@@ -318,6 +335,34 @@ fn apply_data_management_candidate_policy(
     filtered
 }
 
+fn should_use_generic_task_subject_for_sage(
+    stage_focus: Option<&str>,
+    sage_intent: Option<&crate::sage::OutcomeIntent>,
+) -> bool {
+    is_data_management_focus(stage_focus)
+        && matches!(
+            sage_intent,
+            Some(intent)
+                if intent.plane == ObservationPlane::Structure
+                    && intent.polarity == crate::sage::IntentPolarity::Read
+        )
+}
+
+fn allow_data_management_structure_fast_path(
+    stage_focus: Option<&str>,
+    sage_intent: &crate::sage::OutcomeIntent,
+    verb_fqn: &str,
+) -> bool {
+    is_data_management_focus(stage_focus)
+        && sage_intent.plane == ObservationPlane::Structure
+        && sage_intent.polarity == crate::sage::IntentPolarity::Read
+        && is_structure_semantics_verb(verb_fqn)
+}
+
+fn can_skip_fast_path_parse_validation(verb_fqn: &str) -> bool {
+    is_structure_semantics_verb(verb_fqn) && verb_fqn.matches('.').count() >= 2
+}
+
 /// Process an utterance through the unified pipeline.
 ///
 /// Flow:
@@ -334,6 +379,48 @@ pub async fn handle_utterance(
     utterance: &str,
 ) -> anyhow::Result<OrchestratorOutcome> {
     let policy = &ctx.policy_gate;
+    let sage_shadow_enabled = std::env::var("SAGE_SHADOW").is_ok();
+    let sage_fast_path_enabled = std::env::var("SAGE_FAST_PATH").ok().as_deref() == Some("1");
+    let sage_enabled = sage_shadow_enabled || sage_fast_path_enabled;
+
+    // -- Stage 1.5: Sage shadow classification (SAGE_SHADOW=1) --
+    // Fires BEFORE entity linking (E-SAGE-1) on raw utterance only.
+    // Zero production impact: result only used for logging + trace stamping.
+    let sage_intent: Option<crate::sage::OutcomeIntent> = if sage_enabled {
+        let sage_ctx = crate::sage::SageContext {
+            session_id: ctx.session_id,
+            stage_focus: ctx.stage_focus.clone(),
+            goals: ctx.goals.clone(),
+            entity_kind: None, // E-SAGE-1: no entity resolution yet
+            dominant_entity_name: None,
+            last_intents: vec![],
+        };
+        let sage_engine = ctx
+            .sage_engine
+            .clone()
+            .unwrap_or_else(|| Arc::new(crate::sage::DeterministicSage));
+        match sage_engine.classify(utterance, &sage_ctx).await {
+            Ok(intent) => {
+                tracing::info!(
+                    sage_plane = ?intent.plane,
+                    sage_polarity = ?intent.polarity,
+                    sage_domain = %intent.domain_concept,
+                    "Stage 1.5: Sage shadow classification"
+                );
+                Some(intent)
+            }
+            Err(e) => {
+                tracing::warn!(error = %e, "Stage 1.5: SageEngine failed (non-fatal)");
+                None
+            }
+        }
+    } else {
+        None
+    };
+
+    let mut sage_coder_result: Option<CoderResult> = None;
+    let mut sage_coder_elapsed_ms: Option<u128> = None;
+    let mut sage_coder_error: Option<String> = None;
 
     // -- Step 1: Entity linking --
     let lookup_result = if let Some(ref lookup_svc) = ctx.lookup_service {
@@ -377,7 +464,10 @@ pub async fn handle_utterance(
         .unwrap_or_default();
 
     // -- Step 2: SemReg context resolution -> ContextEnvelope --
-    let envelope = resolve_sem_reg_verbs(ctx, semreg_entity_kind.as_deref()).await;
+    let use_generic_task_subject =
+        should_use_generic_task_subject_for_sage(ctx.stage_focus.as_deref(), sage_intent.as_ref());
+    let envelope =
+        resolve_sem_reg_verbs(ctx, semreg_entity_kind.as_deref(), use_generic_task_subject).await;
 
     // -- Step 2.5: Compute SessionVerbSurface (all governance layers) --
     let fail_policy = if policy.semreg_fail_closed() {
@@ -417,6 +507,109 @@ pub async fn handle_utterance(
     // This consolidates SemReg + AgentMode + workflow filtering into one set.
     let surface_allowed: std::collections::HashSet<String> = surface.allowed_fqns();
     let searcher = (*ctx.verb_searcher).clone();
+
+    if let Some(ref si) = sage_intent {
+        let started_at = std::time::Instant::now();
+        match crate::sage::CoderEngine::load().and_then(|engine| engine.resolve(si)) {
+            Ok(coder_result) => {
+                sage_coder_elapsed_ms = Some(started_at.elapsed().as_millis());
+                sage_coder_result = Some(coder_result);
+            }
+            Err(error) => {
+                sage_coder_elapsed_ms = Some(started_at.elapsed().as_millis());
+                sage_coder_error = Some(error.to_string());
+            }
+        }
+    }
+
+    if sage_fast_path_enabled {
+        if let (Some(si), Some(coder_result)) = (sage_intent.as_ref(), sage_coder_result.as_ref()) {
+            let sage_only = si.plane == ObservationPlane::Structure
+                && si.polarity == crate::sage::IntentPolarity::Read
+                && si.pending_clarifications.is_empty();
+            let confidence_ok =
+                matches!(si.confidence, SageConfidence::High | SageConfidence::Medium);
+            let verb_allowed = if !surface_allowed.is_empty() {
+                surface_allowed.contains(&coder_result.verb_fqn)
+                    || allow_data_management_structure_fast_path(
+                        ctx.stage_focus.as_deref(),
+                        si,
+                        &coder_result.verb_fqn,
+                    )
+            } else if !envelope.is_unavailable() && !envelope.is_deny_all() {
+                envelope.allowed_verbs.contains(&coder_result.verb_fqn)
+                    || allow_data_management_structure_fast_path(
+                        ctx.stage_focus.as_deref(),
+                        si,
+                        &coder_result.verb_fqn,
+                    )
+            } else {
+                !policy.semreg_fail_closed()
+            };
+
+            if sage_only && confidence_ok && coder_result.missing_args.is_empty() && verb_allowed {
+                let fast_path_result =
+                    build_sage_fast_path_result(utterance, ctx.scope.clone(), si, coder_result)?;
+                let fast_path_candidates = fast_path_result
+                    .verb_candidates
+                    .iter()
+                    .map(|candidate| (candidate.verb.clone(), candidate.score))
+                    .collect::<Vec<_>>();
+                let chosen_verb = Some(coder_result.verb_fqn.clone());
+                let mut trace = build_trace(
+                    utterance,
+                    ctx,
+                    &entity_candidates,
+                    &dominant_entity_name,
+                    &dominant_entity_kind,
+                    &sem_reg_verb_names,
+                    &fast_path_candidates,
+                    &fast_path_candidates,
+                    &chosen_verb,
+                    &chosen_verb,
+                    &fast_path_result,
+                    &envelope,
+                    Some("sage_fast_path".to_string()),
+                    false,
+                    false,
+                    &[],
+                    false,
+                    None,
+                    None,
+                );
+                trace.selection_source = "sage_fast_path".to_string();
+                trace.surface_fingerprint = Some(surface.surface_fingerprint.0.clone());
+                trace.sage_plane = Some(format!("{:?}", si.plane));
+                trace.sage_polarity = Some(format!("{:?}", si.polarity));
+                trace.sage_domain_hints = if si.domain_concept.is_empty() {
+                    vec![]
+                } else {
+                    vec![si.domain_concept.clone()]
+                };
+
+                tracing::info!(
+                    verb = %coder_result.verb_fqn,
+                    dsl = %coder_result.dsl,
+                    sage_confidence = %si.confidence.as_str(),
+                    sage_coder_resolution = ?coder_result.resolution,
+                    unresolved_refs = fast_path_result.unresolved_refs.len(),
+                    "Sage-only fast path: Read+Structure — bypassing pipeline"
+                );
+
+                let mut outcome = OrchestratorOutcome {
+                    pipeline_result: fast_path_result,
+                    context_envelope: Some(envelope),
+                    surface: Some(surface),
+                    lookup_result,
+                    trace,
+                    journey_decision: None,
+                };
+                emit_telemetry(ctx, utterance, &mut outcome).await;
+                return Ok(outcome);
+            }
+        }
+    }
+
     let pipeline = {
         let p = IntentPipeline::with_pool(searcher, ctx.pool.clone());
         if !surface_allowed.is_empty() {
@@ -467,7 +660,7 @@ pub async fn handle_utterance(
 
     // -- Early exit check --
     if is_early_exit(&discovery_result.outcome) {
-        let trace = build_trace(
+        let mut trace = build_trace(
             utterance,
             ctx,
             &entity_candidates,
@@ -488,6 +681,16 @@ pub async fn handle_utterance(
             None,
             None,
         );
+        // Stamp sage shadow fields (Stage 1.5, SAGE_SHADOW=1)
+        if let Some(ref si) = sage_intent {
+            trace.sage_plane = Some(format!("{:?}", si.plane));
+            trace.sage_polarity = Some(format!("{:?}", si.polarity));
+            trace.sage_domain_hints = if si.domain_concept.is_empty() {
+                vec![]
+            } else {
+                vec![si.domain_concept.clone()]
+            };
+        }
         let mut outcome = OrchestratorOutcome {
             pipeline_result: discovery_result,
             context_envelope: Some(envelope),
@@ -704,7 +907,8 @@ pub async fn handle_utterance(
     if policy.semreg_fail_closed() && !envelope.is_unavailable() {
         if let Some(ref verb_fqn) = selected_verb_fqn {
             toctou_performed = true;
-            let new_envelope = resolve_sem_reg_verbs(ctx, semreg_entity_kind.as_deref()).await;
+            let new_envelope =
+                resolve_sem_reg_verbs(ctx, semreg_entity_kind.as_deref(), false).await;
 
             if let Some(toctou) = envelope.toctou_recheck(&new_envelope, verb_fqn) {
                 use crate::agent::context_envelope::TocTouResult;
@@ -799,6 +1003,41 @@ pub async fn handle_utterance(
     }
     // Stamp surface fingerprint into trace
     trace.surface_fingerprint = Some(surface.surface_fingerprint.0.clone());
+    // Stamp sage shadow fields (Stage 1.5, SAGE_SHADOW=1)
+    if let Some(ref si) = sage_intent {
+        trace.sage_plane = Some(format!("{:?}", si.plane));
+        trace.sage_polarity = Some(format!("{:?}", si.polarity));
+        trace.sage_domain_hints = if si.domain_concept.is_empty() {
+            vec![]
+        } else {
+            vec![si.domain_concept.clone()]
+        };
+    }
+
+    if let Some(ref coder_result) = sage_coder_result {
+        let existing_verb = trace.final_verb.clone();
+        let existing_dsl = trace.dsl_generated.clone().unwrap_or_default();
+        let dsl_similarity = dsl_similarity(&coder_result.dsl, &existing_dsl);
+        tracing::info!(
+            sage_coder_verb = %coder_result.verb_fqn,
+            existing_verb = ?existing_verb,
+            sage_coder_dsl = %coder_result.dsl,
+            existing_dsl = %existing_dsl,
+            sage_coder_resolution = ?coder_result.resolution,
+            sage_coder_missing_args = ?coder_result.missing_args,
+            sage_coder_unresolved_refs = ?coder_result.unresolved_refs,
+            verb_agreement = (existing_verb.as_deref() == Some(coder_result.verb_fqn.as_str())),
+            dsl_similarity,
+            sage_coder_ms = sage_coder_elapsed_ms.unwrap_or_default(),
+            "Stage 2.4: Sage->Coder shadow comparison"
+        );
+    } else if let Some(error) = sage_coder_error {
+        tracing::warn!(
+            error = %error,
+            sage_coder_ms = sage_coder_elapsed_ms.unwrap_or_default(),
+            "Stage 2.4: Sage->Coder shadow comparison failed (non-fatal)"
+        );
+    }
 
     tracing::info!(
         source = ?trace.source,
@@ -829,6 +1068,129 @@ pub async fn handle_utterance(
     };
     emit_telemetry(ctx, utterance, &mut outcome).await;
     Ok(outcome)
+}
+
+fn dsl_similarity(lhs: &str, rhs: &str) -> f32 {
+    if lhs.is_empty() || rhs.is_empty() {
+        return 0.0;
+    }
+
+    let lhs_tokens = lhs
+        .split_whitespace()
+        .collect::<std::collections::HashSet<_>>();
+    let rhs_tokens = rhs
+        .split_whitespace()
+        .collect::<std::collections::HashSet<_>>();
+    let intersection = lhs_tokens.intersection(&rhs_tokens).count();
+    let union = lhs_tokens.union(&rhs_tokens).count();
+
+    if union == 0 {
+        0.0
+    } else {
+        intersection as f32 / union as f32
+    }
+}
+
+#[cfg(feature = "database")]
+fn build_sage_fast_path_result(
+    utterance: &str,
+    scope: Option<ScopeContext>,
+    outcome: &crate::sage::OutcomeIntent,
+    coder_result: &CoderResult,
+) -> anyhow::Result<PipelineResult> {
+    let config = dsl_core::config::loader::ConfigLoader::from_env().load_verbs()?;
+    let (domain, verb_name) = coder_result
+        .verb_fqn
+        .split_once('.')
+        .ok_or_else(|| anyhow::anyhow!("invalid coder verb '{}'", coder_result.verb_fqn))?;
+    let verb_cfg = config
+        .domains
+        .get(domain)
+        .and_then(|domain_cfg| domain_cfg.verbs.get(verb_name))
+        .ok_or_else(|| {
+            anyhow::anyhow!("missing config for coder verb '{}'", coder_result.verb_fqn)
+        })?;
+    let step = outcome
+        .steps
+        .first()
+        .cloned()
+        .unwrap_or_else(|| OutcomeStep {
+            action: outcome.action.clone(),
+            target: outcome.domain_concept.clone(),
+            params: std::collections::HashMap::new(),
+            notes: None,
+        });
+    let intent = crate::sage::arg_assembly::structured_intent_from_step(
+        &coder_result.verb_fqn,
+        &step,
+        verb_cfg,
+    )?;
+
+    let parsed = parse_program(&coder_result.dsl);
+    let skip_parse_validation = can_skip_fast_path_parse_validation(&coder_result.verb_fqn);
+    let (unresolved_refs, parse_error) = match parsed.as_ref() {
+        Ok(ast) => {
+            let registry = runtime_registry_arc();
+            let enriched = enrich_program(ast.clone(), &registry);
+            let refs = find_unresolved_ref_locations(&enriched.program)
+                .into_iter()
+                .map(|loc| UnresolvedRef {
+                    param_name: loc.arg_key,
+                    search_value: loc.search_text,
+                    entity_type: Some(loc.entity_type),
+                    search_column: loc.search_column,
+                    ref_id: loc.ref_id,
+            })
+                .collect::<Vec<_>>();
+            (refs, None)
+        }
+        Err(_) if skip_parse_validation => (vec![], None),
+        Err(error) => (vec![], Some(format!("Parse error after assembly: {:?}", error))),
+    };
+
+    let (valid, validation_error) = match parse_error {
+        Some(error) => (false, Some(error)),
+        None if skip_parse_validation => (true, None),
+        None => match parsed {
+            Ok(ast) => match compile(&ast) {
+                Ok(_) => (true, None),
+                Err(error) => (false, Some(format!("Compile error: {:?}", error))),
+            },
+            Err(error) => (false, Some(format!("Parse error: {:?}", error))),
+        },
+    };
+
+    let score = match outcome.confidence {
+        SageConfidence::High => 1.0,
+        SageConfidence::Medium => 0.8,
+        SageConfidence::Low => 0.6,
+    };
+    let scope_context = scope.filter(ScopeContext::has_scope);
+
+    Ok(PipelineResult {
+        intent,
+        verb_candidates: vec![VerbSearchResult {
+            verb: coder_result.verb_fqn.clone(),
+            score,
+            source: VerbSearchSource::NounTaxonomy,
+            matched_phrase: utterance.to_string(),
+            description: Some("sage_fast_path".to_string()),
+            journey: None,
+        }],
+        dsl: coder_result.dsl.clone(),
+        dsl_hash: Some(compute_dsl_hash(&coder_result.dsl)),
+        valid,
+        validation_error,
+        unresolved_refs: unresolved_refs.clone(),
+        missing_required: coder_result.missing_args.clone(),
+        outcome: if coder_result.missing_args.is_empty() && unresolved_refs.is_empty() && valid {
+            PipelineOutcome::Ready
+        } else {
+            PipelineOutcome::NeedsUserInput
+        },
+        scope_resolution: None,
+        scope_context,
+    })
 }
 
 /// Build an IntentTrace from the current orchestrator state.
@@ -937,6 +1299,9 @@ fn build_trace(
         toctou_new_fingerprint,
         surface_fingerprint: None, // Set by caller after build_trace()
         journey_match: None,       // Set by caller when Tier -2 match is used
+        sage_plane: None,          // Set by caller when SAGE_SHADOW=1
+        sage_polarity: None,       // Set by caller when SAGE_SHADOW=1
+        sage_domain_hints: vec![], // Set by caller when SAGE_SHADOW=1
     }
 }
 
@@ -1323,7 +1688,7 @@ pub async fn handle_utterance_with_forced_verb(
     // Even though the user selected this verb, we still validate it against
     // the current SemReg allowed set. This closes the TOCTOU gap where the
     // verb was allowed at discovery time but may have been revoked since.
-    let envelope = resolve_sem_reg_verbs(ctx, semreg_entity_kind.as_deref()).await;
+    let envelope = resolve_sem_reg_verbs(ctx, semreg_entity_kind.as_deref(), false).await;
 
     let sem_reg_verb_names: Option<Vec<String>> = if envelope.is_unavailable() {
         None
@@ -1425,6 +1790,9 @@ pub async fn handle_utterance_with_forced_verb(
             toctou_new_fingerprint: Some(envelope.fingerprint_str().to_string()),
             surface_fingerprint: None,
             journey_match: None,
+            sage_plane: None,
+            sage_polarity: None,
+            sage_domain_hints: vec![],
         };
 
         let mut outcome = OrchestratorOutcome {
@@ -1500,6 +1868,9 @@ pub async fn handle_utterance_with_forced_verb(
         toctou_new_fingerprint: None,
         surface_fingerprint: None,
         journey_match: None,
+        sage_plane: None,
+        sage_polarity: None,
+        sage_domain_hints: vec![],
     };
 
     tracing::info!(
@@ -1531,14 +1902,15 @@ pub async fn handle_utterance_with_forced_verb(
 pub(crate) async fn resolve_sem_reg_verbs(
     ctx: &OrchestratorContext,
     entity_kind: Option<&str>,
+    use_generic_task_subject: bool,
 ) -> ContextEnvelope {
     // Route through SemOsClient when available (DI boundary), fallback to direct call.
     if let Some(ref client) = ctx.sem_os_client {
-        resolve_via_client(client.as_ref(), ctx, entity_kind).await
+        resolve_via_client(client.as_ref(), ctx, entity_kind, use_generic_task_subject).await
     } else {
         #[cfg(feature = "database")]
         {
-            resolve_via_direct(ctx, entity_kind).await
+            resolve_via_direct(ctx, entity_kind, use_generic_task_subject).await
         }
         #[cfg(not(feature = "database"))]
         {
@@ -1553,10 +1925,13 @@ async fn resolve_via_client(
     client: &dyn SemOsClient,
     ctx: &OrchestratorContext,
     entity_kind: Option<&str>,
+    use_generic_task_subject: bool,
 ) -> ContextEnvelope {
     use sem_os_core::context_resolution::{EvidenceMode, SubjectRef};
 
-    let subject = if let Some(entity_id) = ctx.dominant_entity_id {
+    let subject = if use_generic_task_subject {
+        SubjectRef::TaskId(ctx.session_id.unwrap_or_else(Uuid::new_v4))
+    } else if let Some(entity_id) = ctx.dominant_entity_id {
         SubjectRef::EntityId(entity_id)
     } else if let Some(case_id) = ctx.case_id {
         SubjectRef::CaseId(case_id)
@@ -1618,12 +1993,15 @@ async fn resolve_via_client(
 async fn resolve_via_direct(
     ctx: &OrchestratorContext,
     entity_kind: Option<&str>,
+    use_generic_task_subject: bool,
 ) -> ContextEnvelope {
     use crate::sem_reg::context_resolution::{
         resolve_context, ContextResolutionRequest, EvidenceMode, SubjectRef,
     };
 
-    let subject = if let Some(entity_id) = ctx.dominant_entity_id {
+    let subject = if use_generic_task_subject {
+        SubjectRef::TaskId(ctx.session_id.unwrap_or_else(Uuid::new_v4))
+    } else if let Some(entity_id) = ctx.dominant_entity_id {
         SubjectRef::EntityId(entity_id)
     } else if let Some(case_id) = ctx.case_id {
         SubjectRef::CaseId(case_id)
@@ -1778,6 +2156,9 @@ mod tests {
             toctou_new_fingerprint: None,
             surface_fingerprint: None,
             journey_match: None,
+            sage_plane: None,
+            sage_polarity: None,
+            sage_domain_hints: vec![],
         }
     }
 
@@ -2009,6 +2390,97 @@ mod tests {
                 "missing verb {verb_fqn}"
             );
         }
+    }
+
+    #[tokio::test]
+    async fn test_deterministic_sage_fast_path_primitives_for_documents() {
+        let sage = crate::sage::DeterministicSage;
+        let ctx = crate::sage::SageContext {
+            session_id: None,
+            stage_focus: Some("semos-data-management".to_string()),
+            goals: vec![],
+            entity_kind: None,
+            dominant_entity_name: None,
+            last_intents: vec![],
+        };
+        let outcome = sage.classify("show me documents", &ctx).await.unwrap();
+        let coder = crate::sage::CoderEngine::load().unwrap();
+        let coder_result = coder.resolve(&outcome).unwrap();
+
+        assert_eq!(outcome.plane, crate::sage::ObservationPlane::Structure);
+        assert_eq!(outcome.polarity, crate::sage::IntentPolarity::Read);
+        assert_eq!(outcome.confidence, crate::sage::SageConfidence::High);
+        assert_eq!(coder_result.verb_fqn, "schema.entity.describe");
+        assert!(coder_result.missing_args.is_empty());
+        assert_eq!(
+            coder_result.dsl,
+            "(schema.entity.describe :entity-type \"document\")"
+        );
+    }
+
+    #[test]
+    fn test_structure_reads_use_generic_task_subject_in_data_management() {
+        let intent = crate::sage::OutcomeIntent {
+            summary: "Describe entity schema for document with fields relationships and verbs"
+                .to_string(),
+            plane: crate::sage::ObservationPlane::Structure,
+            polarity: crate::sage::IntentPolarity::Read,
+            domain_concept: "document".to_string(),
+            action: crate::sage::OutcomeAction::Read,
+            subject: None,
+            steps: vec![],
+            confidence: crate::sage::SageConfidence::High,
+            pending_clarifications: vec![],
+        };
+
+        assert!(should_use_generic_task_subject_for_sage(
+            Some("semos-data-management"),
+            Some(&intent)
+        ));
+        assert!(!should_use_generic_task_subject_for_sage(
+            Some("semos-kyc"),
+            Some(&intent)
+        ));
+    }
+
+    #[test]
+    fn test_data_management_structure_fast_path_allows_schema_verbs() {
+        let intent = crate::sage::OutcomeIntent {
+            summary: "Describe entity schema for document with fields relationships and verbs"
+                .to_string(),
+            plane: crate::sage::ObservationPlane::Structure,
+            polarity: crate::sage::IntentPolarity::Read,
+            domain_concept: "document".to_string(),
+            action: crate::sage::OutcomeAction::Read,
+            subject: None,
+            steps: vec![],
+            confidence: crate::sage::SageConfidence::High,
+            pending_clarifications: vec![],
+        };
+
+        assert!(allow_data_management_structure_fast_path(
+            Some("semos-data-management"),
+            &intent,
+            "schema.entity.describe"
+        ));
+        assert!(!allow_data_management_structure_fast_path(
+            Some("semos-kyc"),
+            &intent,
+            "schema.entity.describe"
+        ));
+        assert!(!allow_data_management_structure_fast_path(
+            Some("semos-data-management"),
+            &intent,
+            "document.get"
+        ));
+    }
+
+    #[test]
+    fn test_structure_semantics_fast_path_can_skip_parse_validation() {
+        assert!(can_skip_fast_path_parse_validation(
+            "schema.entity.describe"
+        ));
+        assert!(!can_skip_fast_path_parse_validation("document.get"));
     }
 
     #[test]

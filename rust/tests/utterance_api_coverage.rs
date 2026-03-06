@@ -26,7 +26,11 @@
 use std::collections::{BTreeMap, HashMap};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
+use ob_poc::sage::{
+    CoderEngine, DeterministicSage, LlmSage, ObservationPlane, SageContext, SageEngine,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
@@ -43,6 +47,8 @@ struct TestCase {
     category: String,
     difficulty: String,
     #[serde(default)]
+    expected_plane: Option<String>,
+    #[serde(default)]
     alt_verbs: Vec<String>,
 }
 
@@ -55,6 +61,9 @@ struct RowResult {
     predicted_top_verb: Option<String>,
     predicted_top3: Vec<String>,
     pass: bool,
+    sage_verb: Option<String>,
+    sage_dsl: Option<String>,
+    sage_match: bool,
     category: String,
     difficulty: String,
     intent_count: usize,
@@ -72,8 +81,11 @@ struct BucketStats {
 struct Summary {
     total: usize,
     passed_top1_or_alt: usize,
+    sage_passed_top1_or_alt: usize,
     failed: usize,
+    sage_failed: usize,
     accuracy: f64,
+    sage_accuracy: f64,
 }
 
 #[derive(Debug, Serialize)]
@@ -182,6 +194,42 @@ fn parse_top_intents(value: &serde_json::Value) -> (Option<String>, Vec<String>,
     (top, top3, intents.len())
 }
 
+fn build_sage_engine() -> Arc<dyn SageEngine> {
+    if std::env::var("SAGE_LLM").ok().as_deref() == Some("1") {
+        if let Ok(client) = ob_agentic::client_factory::create_llm_client() {
+            return Arc::new(LlmSage::new(client));
+        }
+    }
+
+    Arc::new(DeterministicSage)
+}
+
+fn parse_plane(value: Option<&str>) -> Option<ObservationPlane> {
+    match value?.trim().to_ascii_lowercase().as_str() {
+        "instance" => Some(ObservationPlane::Instance),
+        "structure" => Some(ObservationPlane::Structure),
+        "registry" => Some(ObservationPlane::Registry),
+        _ => None,
+    }
+}
+
+fn sage_context_for_case(case: &TestCase) -> SageContext {
+    let stage_focus = match parse_plane(case.expected_plane.as_deref()) {
+        Some(ObservationPlane::Structure) => Some("semos-data-management".to_string()),
+        Some(ObservationPlane::Registry) => Some("semos-stewardship".to_string()),
+        _ => None,
+    };
+
+    SageContext {
+        session_id: None,
+        stage_focus,
+        goals: Vec::new(),
+        entity_kind: None,
+        dominant_entity_name: None,
+        last_intents: Vec::new(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -219,13 +267,17 @@ mod tests {
         }
 
         let client = reqwest::Client::new();
+        let sage_engine = build_sage_engine();
+        let coder_engine = CoderEngine::load()?;
         let mut rows = Vec::with_capacity(tests.len());
         let mut by_category: HashMap<String, (usize, usize)> = HashMap::new();
         let mut by_difficulty: HashMap<String, (usize, usize)> = HashMap::new();
         let mut by_entity: HashMap<String, (usize, usize)> = HashMap::new();
         let mut expected_dist: BTreeMap<String, usize> = BTreeMap::new();
         let mut predicted_dist: BTreeMap<String, usize> = BTreeMap::new();
+        let mut sage_predicted_dist: BTreeMap<String, usize> = BTreeMap::new();
         let mut xref: BTreeMap<(String, String), usize> = BTreeMap::new();
+        let mut sage_xref: BTreeMap<(String, String), usize> = BTreeMap::new();
 
         println!();
         println!("=======================================================================");
@@ -305,6 +357,21 @@ mod tests {
                 .map(|v| v == &case.expected_verb || case.alt_verbs.iter().any(|alt| alt == v))
                 .unwrap_or(false);
 
+            let sage_context = sage_context_for_case(case);
+            let sage_outcome = sage_engine
+                .classify(&case.utterance, &sage_context)
+                .await
+                .ok();
+            let sage_coder = sage_outcome
+                .as_ref()
+                .and_then(|outcome| coder_engine.resolve(outcome).ok());
+            let sage_verb = sage_coder.as_ref().map(|r| r.verb_fqn.clone());
+            let sage_dsl = sage_coder.as_ref().map(|r| r.dsl.clone());
+            let sage_match = sage_verb
+                .as_ref()
+                .map(|v| v == &case.expected_verb || case.alt_verbs.iter().any(|alt| alt == v))
+                .unwrap_or(false);
+
             let expected_prefix = case
                 .expected_verb
                 .split('.')
@@ -320,12 +387,21 @@ mod tests {
             if let Some(pred) = predicted_top_verb.as_ref() {
                 *predicted_dist.entry(pred.clone()).or_insert(0) += 1;
             }
+            if let Some(pred) = sage_verb.as_ref() {
+                *sage_predicted_dist.entry(pred.clone()).or_insert(0) += 1;
+            }
             *xref
                 .entry((
                     case.expected_verb.clone(),
                     predicted_top_verb
                         .clone()
                         .unwrap_or_else(|| "<none>".to_owned()),
+                ))
+                .or_insert(0) += 1;
+            *sage_xref
+                .entry((
+                    case.expected_verb.clone(),
+                    sage_verb.clone().unwrap_or_else(|| "<none>".to_owned()),
                 ))
                 .or_insert(0) += 1;
 
@@ -337,6 +413,9 @@ mod tests {
                 predicted_top_verb,
                 predicted_top3,
                 pass,
+                sage_verb,
+                sage_dsl,
+                sage_match,
                 category: case.category.clone(),
                 difficulty: case.difficulty.clone(),
                 intent_count,
@@ -346,11 +425,17 @@ mod tests {
         }
 
         let passed = rows.iter().filter(|r| r.pass).count();
+        let sage_passed = rows.iter().filter(|r| r.sage_match).count();
         let total = rows.len();
         let accuracy = if total == 0 {
             0.0
         } else {
             passed as f64 / total as f64
+        };
+        let sage_accuracy = if total == 0 {
+            0.0
+        } else {
+            sage_passed as f64 / total as f64
         };
 
         let mut mismatches: Vec<RowResult> = rows.iter().filter(|r| !r.pass).cloned().collect();
@@ -360,8 +445,11 @@ mod tests {
             summary: Summary {
                 total,
                 passed_top1_or_alt: passed,
+                sage_passed_top1_or_alt: sage_passed,
                 failed: total.saturating_sub(passed),
+                sage_failed: total.saturating_sub(sage_passed),
                 accuracy,
+                sage_accuracy,
             },
             by_category: finalize_bucket(by_category),
             by_difficulty: finalize_bucket(by_difficulty),
@@ -384,8 +472,19 @@ mod tests {
         md.push_str(&format!(
             "- Pass (top1 == expected or in alt_verbs): {passed}\n"
         ));
+        md.push_str(&format!(
+            "- Sage+Coder pass (top1 == expected or in alt_verbs): {sage_passed}\n"
+        ));
         md.push_str(&format!("- Fail: {}\n", total.saturating_sub(passed)));
+        md.push_str(&format!(
+            "- Sage+Coder fail: {}\n",
+            total.saturating_sub(sage_passed)
+        ));
         md.push_str(&format!("- Accuracy: {:.2}%\n\n", accuracy * 100.0));
+        md.push_str(&format!(
+            "- Sage+Coder accuracy: {:.2}%\n\n",
+            sage_accuracy * 100.0
+        ));
 
         md.push_str("## Accuracy by category\n");
         for (k, v) in &report.by_category {
@@ -423,10 +522,11 @@ mod tests {
         md.push_str("## First 40 mismatches\n");
         for row in mismatches.iter().take(40) {
             md.push_str(&format!(
-                "- #{}: expected `{}` got `{}` | {}\n",
+                "- #{}: expected `{}` got API=`{}` Sage=`{}` | {}\n",
                 row.idx,
                 row.expected_verb,
                 row.predicted_top_verb.as_deref().unwrap_or("<none>"),
+                row.sage_verb.as_deref().unwrap_or("<none>"),
                 row.utterance
             ));
         }
@@ -436,12 +536,22 @@ mod tests {
         for ((expected, predicted), count) in xref {
             csv.push_str(&format!("{expected},{predicted},{count}\n"));
         }
+        csv.push_str("\nexpected_verb,sage_verb,count\n");
+        for ((expected, predicted), count) in sage_xref {
+            csv.push_str(&format!("{expected},{predicted},{count}\n"));
+        }
         fs::write(&csv_path, csv)?;
 
         println!("Report JSON: {}", json_path.display());
         println!("Report MD:   {}", md_path.display());
         println!("Verb XRef:   {}", csv_path.display());
         println!("Coverage: {:.2}% ({}/{})", accuracy * 100.0, passed, total);
+        println!(
+            "Sage+Coder Coverage: {:.2}% ({}/{})",
+            sage_accuracy * 100.0,
+            sage_passed,
+            total
+        );
 
         if let Some(min) = min_accuracy {
             anyhow::ensure!(

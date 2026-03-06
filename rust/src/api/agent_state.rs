@@ -21,6 +21,7 @@ use sqlx::PgPool;
 use std::sync::Arc;
 
 use crate::policy::PolicyGate;
+use crate::sage::{DeterministicSage, LlmSage, SageEngine};
 
 // ============================================================================
 // State
@@ -49,6 +50,29 @@ pub struct AgentState {
 }
 
 impl AgentState {
+    fn build_sage_engine() -> Arc<dyn SageEngine> {
+        if std::env::var("SAGE_LLM").ok().as_deref() == Some("1") {
+            match ob_agentic::client_factory::create_llm_client() {
+                Ok(client) => {
+                    tracing::info!(
+                        provider = client.provider_name(),
+                        model = client.model_name(),
+                        "SAGE_LLM=1 enabled; using LlmSage"
+                    );
+                    return Arc::new(LlmSage::new(client));
+                }
+                Err(error) => {
+                    tracing::warn!(
+                        error = %error,
+                        "SAGE_LLM=1 requested but LLM client unavailable; falling back to DeterministicSage"
+                    );
+                }
+            }
+        }
+
+        Arc::new(DeterministicSage)
+    }
+
     /// Create with semantic verb search (blocks on embedder init ~3-5s)
     ///
     /// This is the primary constructor. Initializes Candle embedder synchronously
@@ -65,6 +89,7 @@ impl AgentState {
         let session_repo = Arc::new(crate::database::SessionRepository::new(pool.clone()));
         let dsl_repo = Arc::new(crate::database::DslRepository::new(pool.clone()));
         let session_manager = crate::api::session_manager::SessionManager::new(sessions.clone());
+        let sage_engine = Self::build_sage_engine();
 
         // Initialize embedder synchronously (blocks ~3-5s, but only at startup)
         // This is REQUIRED - server cannot start without semantic search
@@ -342,7 +367,8 @@ impl AgentState {
             lexicon,
         )
         .with_entity_linker(entity_linker.clone())
-        .with_macro_registry(macro_registry);
+        .with_macro_registry(macro_registry)
+        .with_sage_engine(sage_engine);
 
         // Wire search indices for ECIR, MacroIndex, and ScenarioIndex
         if let Some(ni) = noun_index {

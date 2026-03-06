@@ -117,6 +117,7 @@ use crate::mcp::macro_index::MacroIndex;
 use crate::mcp::noun_index::NounIndex;
 use crate::mcp::scenario_index::ScenarioIndex;
 use crate::mcp::verb_search_factory::VerbSearcherFactory;
+use crate::sage::SageEngine;
 #[cfg(not(feature = "runbook-gate-vnext"))]
 use crate::session::SessionScope;
 use crate::session::{SessionState, UnifiedSession, UnresolvedRefInfo};
@@ -300,6 +301,8 @@ pub struct AgentService {
     scenario_index: Option<Arc<ScenarioIndex>>,
     /// Cached MacroRegistry to avoid reloading from disk on every verb search
     macro_registry: Option<Arc<MacroRegistry>>,
+    /// Optional Sage engine for Stage 1.5 shadow classification.
+    sage_engine: Option<Arc<dyn SageEngine>>,
 }
 
 impl AgentService {
@@ -446,6 +449,7 @@ impl AgentService {
             macro_index: None,
             scenario_index: None,
             macro_registry: None,
+            sage_engine: None,
         }
     }
 
@@ -485,6 +489,20 @@ impl AgentService {
     /// Set cached MacroRegistry (avoids reloading from disk on every verb search)
     pub fn with_macro_registry(mut self, mr: Arc<MacroRegistry>) -> Self {
         self.macro_registry = Some(mr);
+        self
+    }
+
+    /// Set Sage engine for Stage 1.5 shadow classification.
+    ///
+    /// # Examples
+    /// ```ignore
+    /// use std::sync::Arc;
+    /// use ob_poc::sage::DeterministicSage;
+    ///
+    /// let service = service.with_sage_engine(Arc::new(DeterministicSage));
+    /// ```
+    pub fn with_sage_engine(mut self, sage_engine: Arc<dyn SageEngine>) -> Self {
+        self.sage_engine = Some(sage_engine);
         self
     }
 
@@ -658,6 +676,7 @@ impl AgentService {
             agent_mode: sem_os_core::authoring::agent_mode::AgentMode::default(),
             goals,
             stage_focus: session.context.stage_focus.clone(),
+            sage_engine: self.sage_engine.clone(),
         }
     }
 
@@ -696,7 +715,8 @@ impl AgentService {
             actor,
             crate::agent::orchestrator::UtteranceSource::Chat,
         );
-        let envelope = crate::agent::orchestrator::resolve_sem_reg_verbs(&ctx, None).await;
+        let envelope =
+            crate::agent::orchestrator::resolve_sem_reg_verbs(&ctx, None, false).await;
         Ok(envelope)
     }
 

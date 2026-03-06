@@ -943,20 +943,7 @@ Respond with ONLY valid JSON:
     ///
     /// Returns string only - unresolved refs are extracted from enriched AST later (Fix C)
     fn assemble_dsl_string(&self, intent: &StructuredIntent) -> Result<String> {
-        let mut dsl = format!("({}", intent.verb);
-
-        for arg in &intent.arguments {
-            // Skip Missing args - they shouldn't appear in DSL
-            if matches!(arg.value, IntentArgValue::Missing { .. }) {
-                continue;
-            }
-
-            let value_str = format_intent_value_string_only(&arg.value);
-            dsl.push_str(&format!(" :{} {}", arg.name, value_str));
-        }
-
-        dsl.push(')');
-        Ok(dsl)
+        assemble_dsl_string(intent)
     }
 
     /// Validate generated DSL
@@ -1063,6 +1050,23 @@ fn format_intent_value_string_only(value: &IntentArgValue) -> String {
             format!("{{{}}}", formatted.join(" "))
         }
     }
+}
+
+/// Assemble a DSL string from a structured intent.
+pub fn assemble_dsl_string(intent: &StructuredIntent) -> Result<String> {
+    let mut dsl = format!("({}", intent.verb);
+
+    for arg in &intent.arguments {
+        if matches!(arg.value, IntentArgValue::Missing { .. }) {
+            continue;
+        }
+
+        let value_str = format_intent_value_string_only(&arg.value);
+        dsl.push_str(&format!(" :{} {}", arg.name, value_str));
+    }
+
+    dsl.push(')');
+    Ok(dsl)
 }
 
 /// Compute SHA-256 hash of DSL string for version tracking (Issue K)

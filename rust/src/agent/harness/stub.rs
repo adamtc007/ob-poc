@@ -56,6 +56,7 @@ pub fn build_stub_context(
         agent_mode: sem_os_core::authoring::agent_mode::AgentMode::default(),
         goals: vec![],
         stage_focus: None,
+        sage_engine: None,
     }
 }
 
