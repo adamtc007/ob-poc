@@ -5,11 +5,15 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
+use serde_json::json;
+use std::collections::BTreeSet;
 
 use ob_poc_macros::register_custom_op;
 
 use super::sem_reg_helpers::{delegate_to_tool, get_bool_arg, get_int_arg, get_string_arg};
 use super::{CustomOperation, ExecutionContext, ExecutionResult, VerbCall};
+use crate::dsl_v2::verb_registry::registry;
+use crate::ontology::{ontology, SearchKeyDef};
 
 #[cfg(feature = "database")]
 use sqlx::PgPool;
@@ -17,6 +21,7 @@ use sqlx::PgPool;
 #[cfg(feature = "database")]
 use {
     crate::domain_ops::affinity_graph_cache::load_affinity_graph_cached,
+    crate::sem_reg::{entity_type_def::EntityTypeDefBody, store::SnapshotStore, types::ObjectType},
     sem_os_core::affinity::{match_intent, AffinityGraph, DataRef},
     sem_os_core::diagram::{
         enrichment::build_diagram_model,
@@ -56,6 +61,477 @@ struct GenerateDiscoveryMapResult {
     utterance_count: usize,
     intent_count: usize,
     diagram: String,
+}
+
+fn get_first_string_arg(verb_call: &VerbCall, names: &[&str]) -> Option<String> {
+    names
+        .iter()
+        .find_map(|name| get_string_arg(verb_call, name))
+}
+
+fn normalize_structure_target(raw: &str) -> String {
+    let normalized = raw.trim().to_lowercase();
+    match normalized.as_str() {
+        "documents" => "document".to_string(),
+        "products" => "product".to_string(),
+        "deals" | "deal record" | "deal records" | "records" => "deal".to_string(),
+        "cbus" | "client business units" | "client business unit" => "cbu".to_string(),
+        other => other.trim_end_matches('s').to_string(),
+    }
+}
+
+fn resolve_structure_entity_arg(verb_call: &VerbCall) -> Option<String> {
+    let raw = get_first_string_arg(
+        verb_call,
+        &[
+            "entity-type",
+            "entity_type",
+            "entity",
+            "domain",
+            "domain-name",
+        ],
+    )?;
+    let normalized = normalize_structure_target(&raw);
+    Some(ontology().resolve_alias(&normalized).to_string())
+}
+
+fn summarize_entity_relationships(entity_type: &str) -> Vec<serde_json::Value> {
+    let ontology = ontology();
+    let entity = ontology.get_entity(entity_type);
+    let category = entity.map(|def| def.category.as_str());
+
+    ontology
+        .taxonomy()
+        .relationships()
+        .iter()
+        .filter(|rel| {
+            rel.parent == entity_type
+                || rel.child == entity_type
+                || category == Some(rel.parent.as_str())
+                || category == Some(rel.child.as_str())
+        })
+        .map(|rel| {
+            json!({
+                "parent": rel.parent,
+                "child": rel.child,
+                "fk_arg": rel.fk_arg,
+                "description": rel.description,
+            })
+        })
+        .collect()
+}
+
+fn summarize_domain_verbs(domain: &str) -> Vec<serde_json::Value> {
+    let mut verbs: Vec<_> = registry()
+        .verbs_for_domain(domain)
+        .into_iter()
+        .map(|verb| {
+            let required_args: Vec<&str> = verb.required_arg_names();
+            let optional_args: Vec<&str> = verb.optional_arg_names();
+            json!({
+                "verb_fqn": verb.full_name(),
+                "description": verb.description,
+                "required_args": required_args,
+                "optional_args": optional_args,
+            })
+        })
+        .collect();
+    verbs.sort_by(|a, b| a["verb_fqn"].as_str().cmp(&b["verb_fqn"].as_str()));
+    verbs
+}
+
+fn summarize_entity_fields_from_ontology(entity_type: &str) -> Vec<serde_json::Value> {
+    let ontology = ontology();
+    let Some(entity) = ontology.get_entity(entity_type) else {
+        return Vec::new();
+    };
+
+    let mut seen = BTreeSet::new();
+    let mut fields = Vec::new();
+
+    if seen.insert(entity.db.pk.clone()) {
+        fields.push(json!({
+            "name": entity.db.pk,
+            "required": true,
+            "source": "ontology.db.pk",
+        }));
+    }
+
+    for key in &entity.search_keys {
+        match key {
+            SearchKeyDef::Single { column, .. } => {
+                if seen.insert(column.clone()) {
+                    fields.push(json!({
+                        "name": column,
+                        "required": false,
+                        "source": "ontology.search_key",
+                    }));
+                }
+            }
+            SearchKeyDef::Composite { columns, .. } => {
+                for column in columns {
+                    if seen.insert(column.clone()) {
+                        fields.push(json!({
+                            "name": column,
+                            "required": false,
+                            "source": "ontology.search_key",
+                        }));
+                    }
+                }
+            }
+        }
+    }
+
+    fields
+}
+
+#[cfg(feature = "database")]
+async fn load_entity_type_body(
+    pool: &PgPool,
+    entity_type: &str,
+) -> Result<Option<EntityTypeDefBody>> {
+    let candidates = [entity_type.to_string(), format!("entity.{entity_type}")];
+    for candidate in candidates {
+        if let Some(row) = SnapshotStore::find_active_by_definition_field(
+            pool,
+            ObjectType::EntityTypeDef,
+            "fqn",
+            &candidate,
+        )
+        .await?
+        {
+            if let Ok(body) = serde_json::from_value::<EntityTypeDefBody>(row.definition.clone()) {
+                return Ok(Some(body));
+            }
+        }
+    }
+    Ok(None)
+}
+
+#[cfg(feature = "database")]
+async fn describe_entity_structure(entity_type: &str, pool: &PgPool) -> Result<serde_json::Value> {
+    let ontology = ontology();
+    let ontology_entity = ontology.get_entity(entity_type);
+    let snapshot_body = load_entity_type_body(pool, entity_type).await?;
+
+    let fields = if let Some(body) = &snapshot_body {
+        body.required_attributes
+            .iter()
+            .map(|fqn| json!({"name": fqn, "required": true, "source": "sem_reg.required_attribute"}))
+            .chain(body.optional_attributes.iter().map(|fqn| {
+                json!({"name": fqn, "required": false, "source": "sem_reg.optional_attribute"})
+            }))
+            .collect::<Vec<_>>()
+    } else {
+        summarize_entity_fields_from_ontology(entity_type)
+    };
+
+    let relationships = summarize_entity_relationships(entity_type);
+    let verbs = summarize_domain_verbs(entity_type);
+
+    Ok(json!({
+        "entity_type": entity_type,
+        "description": snapshot_body
+            .as_ref()
+            .map(|body| body.description.clone())
+            .or_else(|| ontology_entity.map(|entity| entity.description.clone())),
+        "domain": snapshot_body
+            .as_ref()
+            .map(|body| body.domain.clone())
+            .unwrap_or_else(|| entity_type.to_string()),
+        "db_table": snapshot_body
+            .as_ref()
+            .and_then(|body| body.db_table.as_ref().map(|table| json!(table)))
+            .or_else(|| ontology_entity.map(|entity| json!({
+                "schema": entity.db.schema,
+                "table": entity.db.table,
+                "primary_key": entity.db.pk,
+            }))),
+        "field_count": fields.len(),
+        "relationship_count": relationships.len(),
+        "verb_count": verbs.len(),
+        "fields": fields,
+        "relationships": relationships,
+        "verbs": verbs,
+        "source": if snapshot_body.is_some() { "sem_reg+ontology+runtime_registry" } else { "ontology+runtime_registry" },
+    }))
+}
+
+#[cfg(not(feature = "database"))]
+fn describe_entity_structure(entity_type: &str) -> serde_json::Value {
+    let ontology = ontology();
+    let ontology_entity = ontology.get_entity(entity_type);
+    let fields = summarize_entity_fields_from_ontology(entity_type);
+    let relationships = summarize_entity_relationships(entity_type);
+    let verbs = summarize_domain_verbs(entity_type);
+
+    json!({
+        "entity_type": entity_type,
+        "description": ontology_entity.map(|entity| entity.description.clone()),
+        "domain": entity_type,
+        "db_table": ontology_entity.map(|entity| json!({
+            "schema": entity.db.schema,
+            "table": entity.db.table,
+            "primary_key": entity.db.pk,
+        })),
+        "field_count": fields.len(),
+        "relationship_count": relationships.len(),
+        "verb_count": verbs.len(),
+        "fields": fields,
+        "relationships": relationships,
+        "verbs": verbs,
+        "source": "ontology+runtime_registry",
+    })
+}
+
+// ── Structure Semantics Verbs ──────────────────────────────────
+
+/// Describe the structure semantics of a domain.
+#[register_custom_op]
+pub struct SchemaDomainDescribeOp;
+
+#[async_trait]
+impl CustomOperation for SchemaDomainDescribeOp {
+    fn domain(&self) -> &'static str {
+        "schema"
+    }
+    fn verb(&self) -> &'static str {
+        "domain.describe"
+    }
+    fn rationale(&self) -> &'static str {
+        "Summarizes a data-management domain from ontology and runtime verb metadata"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let entity_type = resolve_structure_entity_arg(verb_call).ok_or_else(|| {
+            anyhow::anyhow!("schema.domain.describe requires :domain or :entity-type")
+        })?;
+        Ok(ExecutionResult::Record(
+            describe_entity_structure(&entity_type, pool).await?,
+        ))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        let entity_type = resolve_structure_entity_arg(verb_call).ok_or_else(|| {
+            anyhow::anyhow!("schema.domain.describe requires :domain or :entity-type")
+        })?;
+        Ok(ExecutionResult::Record(describe_entity_structure(
+            &entity_type,
+        )))
+    }
+}
+
+/// Describe the structure semantics of an entity type.
+#[register_custom_op]
+pub struct SchemaEntityDescribeOp;
+
+#[async_trait]
+impl CustomOperation for SchemaEntityDescribeOp {
+    fn domain(&self) -> &'static str {
+        "schema"
+    }
+    fn verb(&self) -> &'static str {
+        "entity.describe"
+    }
+    fn rationale(&self) -> &'static str {
+        "Returns fields, relationships, and verbs for an entity type from registry and DSL metadata"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let entity_type = resolve_structure_entity_arg(verb_call)
+            .ok_or_else(|| anyhow::anyhow!("schema.entity.describe requires :entity-type"))?;
+        Ok(ExecutionResult::Record(
+            describe_entity_structure(&entity_type, pool).await?,
+        ))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        let entity_type = resolve_structure_entity_arg(verb_call)
+            .ok_or_else(|| anyhow::anyhow!("schema.entity.describe requires :entity-type"))?;
+        Ok(ExecutionResult::Record(describe_entity_structure(
+            &entity_type,
+        )))
+    }
+}
+
+/// List fields for an entity type.
+#[register_custom_op]
+pub struct SchemaEntityListFieldsOp;
+
+#[async_trait]
+impl CustomOperation for SchemaEntityListFieldsOp {
+    fn domain(&self) -> &'static str {
+        "schema"
+    }
+    fn verb(&self) -> &'static str {
+        "entity.list-fields"
+    }
+    fn rationale(&self) -> &'static str {
+        "Lists structure fields from SemReg entity definitions or ontology fallbacks"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let entity_type = resolve_structure_entity_arg(verb_call)
+            .ok_or_else(|| anyhow::anyhow!("schema.entity.list-fields requires :entity-type"))?;
+        let record = describe_entity_structure(&entity_type, pool).await?;
+        Ok(ExecutionResult::Record(json!({
+            "entity_type": entity_type,
+            "fields": record["fields"].clone(),
+            "field_count": record["field_count"].clone(),
+            "source": record["source"].clone(),
+        })))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        let entity_type = resolve_structure_entity_arg(verb_call)
+            .ok_or_else(|| anyhow::anyhow!("schema.entity.list-fields requires :entity-type"))?;
+        let record = describe_entity_structure(&entity_type);
+        Ok(ExecutionResult::Record(json!({
+            "entity_type": entity_type,
+            "fields": record["fields"].clone(),
+            "field_count": record["field_count"].clone(),
+            "source": record["source"].clone(),
+        })))
+    }
+}
+
+/// List relationships for an entity type.
+#[register_custom_op]
+pub struct SchemaEntityListRelationshipsOp;
+
+#[async_trait]
+impl CustomOperation for SchemaEntityListRelationshipsOp {
+    fn domain(&self) -> &'static str {
+        "schema"
+    }
+    fn verb(&self) -> &'static str {
+        "entity.list-relationships"
+    }
+    fn rationale(&self) -> &'static str {
+        "Lists ontology-backed relationships relevant to an entity type"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let entity_type = resolve_structure_entity_arg(verb_call).ok_or_else(|| {
+            anyhow::anyhow!("schema.entity.list-relationships requires :entity-type")
+        })?;
+        let record = describe_entity_structure(&entity_type, pool).await?;
+        Ok(ExecutionResult::Record(json!({
+            "entity_type": entity_type,
+            "relationships": record["relationships"].clone(),
+            "relationship_count": record["relationship_count"].clone(),
+            "source": record["source"].clone(),
+        })))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        let entity_type = resolve_structure_entity_arg(verb_call).ok_or_else(|| {
+            anyhow::anyhow!("schema.entity.list-relationships requires :entity-type")
+        })?;
+        let record = describe_entity_structure(&entity_type);
+        Ok(ExecutionResult::Record(json!({
+            "entity_type": entity_type,
+            "relationships": record["relationships"].clone(),
+            "relationship_count": record["relationship_count"].clone(),
+            "source": record["source"].clone(),
+        })))
+    }
+}
+
+/// List verbs for an entity type's domain.
+#[register_custom_op]
+pub struct SchemaEntityListVerbsOp;
+
+#[async_trait]
+impl CustomOperation for SchemaEntityListVerbsOp {
+    fn domain(&self) -> &'static str {
+        "schema"
+    }
+    fn verb(&self) -> &'static str {
+        "entity.list-verbs"
+    }
+    fn rationale(&self) -> &'static str {
+        "Lists runtime verb contracts for the entity type's DSL domain"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let entity_type = resolve_structure_entity_arg(verb_call)
+            .ok_or_else(|| anyhow::anyhow!("schema.entity.list-verbs requires :entity-type"))?;
+        let record = describe_entity_structure(&entity_type, pool).await?;
+        Ok(ExecutionResult::Record(json!({
+            "entity_type": entity_type,
+            "verbs": record["verbs"].clone(),
+            "verb_count": record["verb_count"].clone(),
+            "source": record["source"].clone(),
+        })))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        let entity_type = resolve_structure_entity_arg(verb_call)
+            .ok_or_else(|| anyhow::anyhow!("schema.entity.list-verbs requires :entity-type"))?;
+        let record = describe_entity_structure(&entity_type);
+        Ok(ExecutionResult::Record(json!({
+            "entity_type": entity_type,
+            "verbs": record["verbs"].clone(),
+            "verb_count": record["verb_count"].clone(),
+            "source": record["source"].clone(),
+        })))
+    }
 }
 
 // ── Schema Introspection ──────────────────────────────────────────

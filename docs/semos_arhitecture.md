@@ -27,6 +27,30 @@ Semantic OS enforces governance through **three complementary layers**:
 
 The system is deployed as a **standalone service** (6 Rust crates) with port-trait isolation, REST+JWT API, outbox-driven projections, and optional in-process mode for the ob-poc monolith.
 
+### Data Management Contract (2026-03-06)
+
+Semantic OS Data Management is a **structure semantics** surface, not a record-content retrieval surface.
+
+- In `semos-data-management` and `semos-data`, noun-only exploratory prompts default to structure-first verbs.
+- The default structure target is the entity/domain model: fields, relationships, and available verbs.
+- ID-bound content verbs such as `*.get` are not the default in this mode unless the utterance explicitly instance-targets with `*-id`, `id:`, `for id`, or `@handle` syntax.
+- The standard structure verbs are now:
+  - `schema.domain.describe`
+  - `schema.entity.describe`
+  - `schema.entity.list-fields`
+  - `schema.entity.list-relationships`
+  - `schema.entity.list-verbs`
+
+### Unified Input Trace
+
+The SemOS data-management call path remains on the unified session ingress only:
+
+1. UI submits `POST /api/session/:id/input` with `kind=utterance`.
+2. `rust/src/api/agent_routes.rs` adapts that request into the chat/session service path.
+3. `rust/src/api/agent_service.rs` builds `OrchestratorContext` and calls `handle_utterance()`.
+4. `rust/src/agent/orchestrator.rs` applies the structure-first rewrite and data-management candidate policy.
+5. The selected `schema.entity.*` verb executes through the standard DSL/custom-op path.
+
 ---
 
 ## 2. Problem Statement

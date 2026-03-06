@@ -24,6 +24,7 @@ use crate::agent::telemetry;
 use crate::agent::verb_surface::{
     compute_session_verb_surface, SessionVerbSurface, VerbSurfaceContext, VerbSurfaceFailPolicy,
 };
+use crate::dsl_v2::verb_registry::registry;
 use crate::lookup::LookupService;
 use crate::mcp::intent_pipeline::{
     IntentPipeline, PipelineOutcome, PipelineResult, StructuredIntent,
@@ -176,6 +177,147 @@ fn is_early_exit(outcome: &PipelineOutcome) -> bool {
     )
 }
 
+/// Deterministic rewrite for SemOS Data Management noun-only exploration.
+///
+/// In data-management mode, generic prompts like "show me CBU" should resolve
+/// to schema/semantic intents first, not instance-level record retrieval.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct DataManagementRewrite {
+    rewritten_utterance: String,
+    domain_hint: &'static str,
+}
+
+fn is_data_management_focus(stage_focus: Option<&str>) -> bool {
+    matches!(stage_focus, Some("semos-data-management" | "semos-data"))
+}
+
+fn has_explicit_instance_targeting(lower: &str) -> bool {
+    // Explicit instance targeting signals should bypass structure-first rewrite.
+    lower.contains("deal-id")
+        || lower.contains("cbu-id")
+        || lower.contains("entity-id")
+        || lower.contains("document-id")
+        || lower.contains("product-id")
+        || lower.contains(" id ")
+        || lower.contains(" id:")
+        || lower.contains('@')
+}
+
+fn infer_data_management_domain(lower: &str) -> Option<&'static str> {
+    if lower.contains("document") || lower.contains("documents") {
+        return Some("document");
+    }
+    if lower.contains("product") || lower.contains("products") {
+        return Some("product");
+    }
+    if lower.contains("deal") || lower.contains("deals") || lower.contains("record") {
+        return Some("deal");
+    }
+    if lower.contains(" cbu")
+        || lower.starts_with("cbu")
+        || lower.contains(" cbus")
+        || lower.starts_with("cbus")
+    {
+        return Some("cbu");
+    }
+    None
+}
+
+fn should_use_structure_first_prompt(lower: &str) -> bool {
+    let exploratory_prefix = lower.starts_with("show")
+        || lower.starts_with("list")
+        || lower.starts_with("what")
+        || lower.starts_with("describe");
+    let mutating_or_instance_actions = [
+        "create", "update", "delete", "remove", "open", "download", "upload", "for id",
+    ];
+    exploratory_prefix
+        && !mutating_or_instance_actions
+            .iter()
+            .any(|w| lower.contains(w))
+}
+
+fn data_management_rewrite(
+    stage_focus: Option<&str>,
+    utterance: &str,
+) -> Option<DataManagementRewrite> {
+    if !is_data_management_focus(stage_focus) {
+        return None;
+    }
+    let lower = utterance.trim().to_lowercase();
+    if has_explicit_instance_targeting(&lower) || !should_use_structure_first_prompt(&lower) {
+        return None;
+    }
+    let domain = infer_data_management_domain(&lower)?;
+    Some(DataManagementRewrite {
+        rewritten_utterance: format!(
+            "describe entity schema for {domain} with fields relationships and verbs"
+        ),
+        domain_hint: "schema",
+    })
+}
+
+fn is_structure_semantics_verb(verb_fqn: &str) -> bool {
+    verb_fqn.starts_with("schema.")
+        || matches!(
+            verb_fqn,
+            "registry.search" | "registry.describe-object" | "registry.list-objects"
+        )
+}
+
+fn is_instance_bound_content_verb(verb_fqn: &str) -> bool {
+    if is_structure_semantics_verb(verb_fqn) {
+        return false;
+    }
+
+    if verb_fqn.ends_with(".get") {
+        return true;
+    }
+
+    registry()
+        .get_by_name(verb_fqn)
+        .map(|verb| {
+            verb.required_args()
+                .iter()
+                .any(|arg| arg.name.ends_with("-id"))
+        })
+        .unwrap_or(false)
+}
+
+fn apply_data_management_candidate_policy(
+    stage_focus: Option<&str>,
+    utterance: &str,
+    rewrite_applied: bool,
+    candidates: Vec<VerbSearchResult>,
+) -> Vec<VerbSearchResult> {
+    if !is_data_management_focus(stage_focus) {
+        return candidates;
+    }
+
+    let lower = utterance.trim().to_lowercase();
+    if has_explicit_instance_targeting(&lower) {
+        return candidates;
+    }
+
+    let mut filtered: Vec<VerbSearchResult> = candidates
+        .into_iter()
+        .filter(|candidate| !is_instance_bound_content_verb(&candidate.verb))
+        .collect();
+
+    if rewrite_applied {
+        let structure_candidates: Vec<VerbSearchResult> = filtered
+            .iter()
+            .filter(|candidate| is_structure_semantics_verb(&candidate.verb))
+            .cloned()
+            .collect();
+        if !structure_candidates.is_empty() {
+            filtered = structure_candidates;
+        }
+    }
+
+    filtered
+}
+
 /// Process an utterance through the unified pipeline.
 ///
 /// Flow:
@@ -217,13 +359,25 @@ pub async fn handle_utterance(
         .and_then(|lr| lr.dominant_entity.as_ref())
         .map(|e| e.entity_kind.clone());
 
+    // Semantic OS data-management is domain-first. Entity-linker can resolve
+    // generic nouns like "deal" to arbitrary entities, which over-constrains
+    // SemReg entity-kind filtering and can lead to deny-all outcomes.
+    let semreg_entity_kind = if matches!(
+        ctx.stage_focus.as_deref(),
+        Some("semos-data-management" | "semos-data")
+    ) {
+        None
+    } else {
+        dominant_entity_kind.clone()
+    };
+
     let entity_candidates: Vec<String> = lookup_result
         .as_ref()
         .map(|lr| lr.entities.iter().map(|e| e.mention_text.clone()).collect())
         .unwrap_or_default();
 
     // -- Step 2: SemReg context resolution -> ContextEnvelope --
-    let envelope = resolve_sem_reg_verbs(ctx, dominant_entity_kind.as_deref()).await;
+    let envelope = resolve_sem_reg_verbs(ctx, semreg_entity_kind.as_deref()).await;
 
     // -- Step 2.5: Compute SessionVerbSurface (all governance layers) --
     let fail_policy = if policy.semreg_fail_closed() {
@@ -276,8 +430,27 @@ pub async fn handle_utterance(
         }
     };
 
+    let rewrite = data_management_rewrite(ctx.stage_focus.as_deref(), utterance);
+    let discovery_utterance = rewrite
+        .as_ref()
+        .map(|r| r.rewritten_utterance.as_str())
+        .unwrap_or(utterance);
+    let discovery_domain_hint = rewrite.as_ref().map(|r| r.domain_hint);
+    if let Some(ref rw) = rewrite {
+        tracing::info!(
+            input = utterance,
+            rewritten_input = rw.rewritten_utterance,
+            domain_hint = rw.domain_hint,
+            "SemOS data-management structure-first rewrite applied"
+        );
+    }
+
     let discovery_result = pipeline
-        .process_with_scope(utterance, None, ctx.scope.clone())
+        .process_with_scope(
+            discovery_utterance,
+            discovery_domain_hint,
+            ctx.scope.clone(),
+        )
         .await?;
 
     // Capture pre-SemReg state
@@ -402,6 +575,25 @@ pub async fn handle_utterance(
         }
     }
 
+    let before_data_management = filtered_candidates.len();
+    filtered_candidates = apply_data_management_candidate_policy(
+        ctx.stage_focus.as_deref(),
+        utterance,
+        rewrite.is_some(),
+        filtered_candidates,
+    );
+    if filtered_candidates.is_empty() && before_data_management > 0 {
+        blocked_reason.get_or_insert_with(|| {
+            "Data-management mode blocked instance-bound content verbs without explicit instance targeting"
+                .into()
+        });
+        tracing::warn!(
+            before = before_data_management,
+            input = utterance,
+            "Data-management candidate policy removed all remaining verb candidates"
+        );
+    }
+
     let post_filter: Vec<(String, f32)> = filtered_candidates
         .iter()
         .map(|v| (v.verb.clone(), v.score))
@@ -475,7 +667,7 @@ pub async fn handle_utterance(
                 let searcher2 = (*ctx.verb_searcher).clone();
                 let pipeline2 = IntentPipeline::with_pool(searcher2, ctx.pool.clone());
                 let mut forced_result = pipeline2
-                    .process_with_forced_verb(utterance, &top.verb, ctx.scope.clone())
+                    .process_with_forced_verb(discovery_utterance, &top.verb, ctx.scope.clone())
                     .await?;
                 forced_result.verb_candidates = filtered_candidates;
                 forced_result
@@ -512,7 +704,7 @@ pub async fn handle_utterance(
     if policy.semreg_fail_closed() && !envelope.is_unavailable() {
         if let Some(ref verb_fqn) = selected_verb_fqn {
             toctou_performed = true;
-            let new_envelope = resolve_sem_reg_verbs(ctx, dominant_entity_kind.as_deref()).await;
+            let new_envelope = resolve_sem_reg_verbs(ctx, semreg_entity_kind.as_deref()).await;
 
             if let Some(toctou) = envelope.toctou_recheck(&new_envelope, verb_fqn) {
                 use crate::agent::context_envelope::TocTouResult;
@@ -1111,6 +1303,17 @@ pub async fn handle_utterance_with_forced_verb(
         .and_then(|lr| lr.dominant_entity.as_ref())
         .map(|e| e.entity_kind.clone());
 
+    // Keep SemReg entity-kind filtering off for Semantic OS data-management
+    // sessions for the same reason as `handle_utterance`.
+    let semreg_entity_kind = if matches!(
+        ctx.stage_focus.as_deref(),
+        Some("semos-data-management" | "semos-data")
+    ) {
+        None
+    } else {
+        dominant_entity_kind.clone()
+    };
+
     let entity_candidates: Vec<String> = lookup_result
         .as_ref()
         .map(|lr| lr.entities.iter().map(|e| e.mention_text.clone()).collect())
@@ -1120,7 +1323,7 @@ pub async fn handle_utterance_with_forced_verb(
     // Even though the user selected this verb, we still validate it against
     // the current SemReg allowed set. This closes the TOCTOU gap where the
     // verb was allowed at discovery time but may have been revoked since.
-    let envelope = resolve_sem_reg_verbs(ctx, dominant_entity_kind.as_deref()).await;
+    let envelope = resolve_sem_reg_verbs(ctx, semreg_entity_kind.as_deref()).await;
 
     let sem_reg_verb_names: Option<Vec<String>> = if envelope.is_unavailable() {
         None
@@ -1355,11 +1558,13 @@ async fn resolve_via_client(
 
     let subject = if let Some(entity_id) = ctx.dominant_entity_id {
         SubjectRef::EntityId(entity_id)
+    } else if let Some(case_id) = ctx.case_id {
+        SubjectRef::CaseId(case_id)
     } else {
-        SubjectRef::CaseId(
-            ctx.case_id
-                .unwrap_or_else(|| ctx.session_id.unwrap_or_else(Uuid::new_v4)),
-        )
+        // Default generic chat/repl sessions to TaskId instead of CaseId.
+        // CaseId triggers a lookup in "ob-poc".kyc_cases, which may not exist
+        // in non-KYC deployments and would force SemReg into unavailable mode.
+        SubjectRef::TaskId(ctx.session_id.unwrap_or_else(Uuid::new_v4))
     };
     // Convert ob-poc ActorContext → sem_os_core ActorContext via serde round-trip
     // (structurally identical types in separate crates)
@@ -1367,13 +1572,23 @@ async fn resolve_via_client(
         let json = serde_json::to_value(&ctx.actor).expect("ActorContext serializes");
         serde_json::from_value(json).expect("ActorContext round-trips")
     };
+    let evidence_mode = if matches!(
+        ctx.stage_focus.as_deref(),
+        Some("semos-data-management" | "semos-data")
+    ) {
+        // Data-management workflows need operational verbs for domain actions
+        // like deal/cbu/document/product management.
+        EvidenceMode::Exploratory
+    } else {
+        EvidenceMode::default()
+    };
     let request = sem_os_core::context_resolution::ContextResolutionRequest {
         subject,
         intent: None,
         actor: core_actor,
         goals: ctx.goals.clone(),
         constraints: Default::default(),
-        evidence_mode: EvidenceMode::default(),
+        evidence_mode,
         point_in_time: None,
         entity_kind: entity_kind.map(|s| s.to_string()),
     };
@@ -1410,11 +1625,23 @@ async fn resolve_via_direct(
 
     let subject = if let Some(entity_id) = ctx.dominant_entity_id {
         SubjectRef::EntityId(entity_id)
+    } else if let Some(case_id) = ctx.case_id {
+        SubjectRef::CaseId(case_id)
     } else {
-        SubjectRef::CaseId(
-            ctx.case_id
-                .unwrap_or_else(|| ctx.session_id.unwrap_or_else(Uuid::new_v4)),
-        )
+        // Default generic chat/repl sessions to TaskId instead of CaseId.
+        // CaseId triggers a lookup in "ob-poc".kyc_cases, which may not exist
+        // in non-KYC deployments and would force SemReg into unavailable mode.
+        SubjectRef::TaskId(ctx.session_id.unwrap_or_else(Uuid::new_v4))
+    };
+    let evidence_mode = if matches!(
+        ctx.stage_focus.as_deref(),
+        Some("semos-data-management" | "semos-data")
+    ) {
+        // Data-management workflows need operational verbs for domain actions
+        // like deal/cbu/document/product management.
+        EvidenceMode::Exploratory
+    } else {
+        EvidenceMode::default()
     };
     let request = ContextResolutionRequest {
         subject,
@@ -1422,7 +1649,7 @@ async fn resolve_via_direct(
         actor: ctx.actor.clone(),
         goals: ctx.goals.clone(),
         constraints: Default::default(),
-        evidence_mode: EvidenceMode::default(),
+        evidence_mode,
         point_in_time: None,
         entity_kind: entity_kind.map(|s| s.to_string()),
     };
@@ -1464,7 +1691,10 @@ pub async fn resolve_allowed_verbs(
 ) -> ContextEnvelope {
     use sem_os_core::context_resolution::{EvidenceMode, SubjectRef};
 
-    let subject = SubjectRef::CaseId(session_id.unwrap_or_else(Uuid::new_v4));
+    // Resolve against a neutral task subject for generic sessions. This avoids
+    // coupling resolve_context to KYC case tables in environments that do not
+    // run case workflows.
+    let subject = SubjectRef::TaskId(session_id.unwrap_or_else(Uuid::new_v4));
     let core_actor: sem_os_core::abac::ActorContext = {
         let json = serde_json::to_value(actor).expect("ActorContext serializes");
         serde_json::from_value(json).expect("ActorContext round-trips")
@@ -1663,6 +1893,122 @@ mod tests {
         assert!(!is_early_exit(&PipelineOutcome::NeedsClarification));
         assert!(!is_early_exit(&PipelineOutcome::NoMatch));
         assert!(!is_early_exit(&PipelineOutcome::NoAllowedVerbs));
+    }
+
+    #[test]
+    fn test_data_management_rewrite_baseline_prompts() {
+        let cases = [
+            ("show me deal record", "deal"),
+            ("show me CBU", "cbu"),
+            ("show me documents", "document"),
+            ("show me products", "product"),
+        ];
+
+        for (utterance, domain) in cases {
+            let rewrite = data_management_rewrite(Some("semos-data-management"), utterance)
+                .unwrap_or_else(|| panic!("expected rewrite for {utterance}"));
+            assert_eq!(rewrite.domain_hint, "schema");
+            assert_eq!(
+                rewrite.rewritten_utterance,
+                format!("describe entity schema for {domain} with fields relationships and verbs")
+            );
+        }
+    }
+
+    #[test]
+    fn test_data_management_rewrite_skips_explicit_instance_targeting() {
+        let cases = [
+            "show me documents for id 123",
+            "show me cbu-id 123",
+            "show me product @abc",
+            "show me deal record id: 42",
+        ];
+
+        for utterance in cases {
+            assert!(
+                data_management_rewrite(Some("semos-data-management"), utterance).is_none(),
+                "unexpected rewrite for {utterance}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_data_management_rewrite_requires_data_management_focus() {
+        assert!(data_management_rewrite(Some("semos-kyc"), "show me documents").is_none());
+        assert!(data_management_rewrite(None, "show me products").is_none());
+
+        let alias = data_management_rewrite(Some("semos-data"), "show me CBU")
+            .expect("semos-data alias should still rewrite");
+        assert_eq!(alias.domain_hint, "schema");
+    }
+
+    #[test]
+    fn test_data_management_candidate_policy_prefers_structure_verbs() {
+        let candidates = vec![
+            VerbSearchResult {
+                verb: "deal.get".into(),
+                score: 0.99,
+                source: crate::mcp::verb_search::VerbSearchSource::PatternEmbedding,
+                matched_phrase: "show me deal record".into(),
+                description: None,
+                journey: None,
+            },
+            VerbSearchResult {
+                verb: "schema.entity.describe".into(),
+                score: 0.95,
+                source: crate::mcp::verb_search::VerbSearchSource::PatternEmbedding,
+                matched_phrase: "describe entity schema".into(),
+                description: None,
+                journey: None,
+            },
+        ];
+
+        let filtered = apply_data_management_candidate_policy(
+            Some("semos-data-management"),
+            "show me deal record",
+            true,
+            candidates,
+        );
+
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].verb, "schema.entity.describe");
+    }
+
+    #[test]
+    fn test_data_management_candidate_policy_allows_instance_targeting() {
+        let candidates = vec![VerbSearchResult {
+            verb: "document.get".into(),
+            score: 0.99,
+            source: crate::mcp::verb_search::VerbSearchSource::PatternEmbedding,
+            matched_phrase: "show me document-id 123".into(),
+            description: None,
+            journey: None,
+        }];
+
+        let filtered = apply_data_management_candidate_policy(
+            Some("semos-data-management"),
+            "show me document-id 123",
+            false,
+            candidates.clone(),
+        );
+
+        assert_eq!(filtered, candidates);
+    }
+
+    #[test]
+    fn test_structure_semantics_verbs_exist_in_registry() {
+        for verb_fqn in [
+            "schema.domain.describe",
+            "schema.entity.describe",
+            "schema.entity.list-fields",
+            "schema.entity.list-relationships",
+            "schema.entity.list-verbs",
+        ] {
+            assert!(
+                registry().get_by_name(verb_fqn).is_some(),
+                "missing verb {verb_fqn}"
+            );
+        }
     }
 
     #[test]

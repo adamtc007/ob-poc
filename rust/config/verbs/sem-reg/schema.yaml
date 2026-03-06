@@ -17,12 +17,165 @@ domains:
       definitions, entity type definitions, and verb contracts suitable
       for publishing into the Semantic Registry.
     invocation_hints:
+      - "describe entity schema"
+      - "show schema fields"
+      - "show schema relationships"
+      - "show schema verbs"
       - "introspect schema"
       - "extract attributes from schema"
       - "extract verbs"
       - "extract entities"
       - "cross reference schema"
     verbs:
+      # ============================================
+      # Structure Semantics
+      # ============================================
+      domain.describe:
+        description: Describe a data-management domain from structure semantics
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: schema_domain
+          category: schema_analysis
+          context: scripted_ok
+          side_effects: facts_only
+          tags: [stewardship, schema, data-management]
+          subject_kinds: []
+          phase_tags: [stewardship, data-management, data]
+        behavior: plugin
+        handler: SchemaDomainDescribeOp
+        invocation_phrases:
+          - "describe schema domain"
+          - "describe data domain"
+          - "show domain schema"
+          - "show semantic model for domain"
+        args:
+          - name: domain
+            type: string
+            required: true
+            description: Domain or entity type to describe (e.g., deal, cbu, document, product)
+        returns:
+          type: record
+          capture: false
+
+      entity.describe:
+        description: Describe an entity type with fields, relationships, and available verbs
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: schema_entity
+          category: schema_analysis
+          context: scripted_ok
+          side_effects: facts_only
+          tags: [stewardship, schema, data-management]
+          subject_kinds: []
+          phase_tags: [stewardship, data-management, data]
+        behavior: plugin
+        handler: SchemaEntityDescribeOp
+        invocation_phrases:
+          - "describe entity schema"
+          - "show entity schema"
+          - "show schema fields relationships and verbs"
+          - "describe semantic registry entity"
+          - "show semantic model for entity"
+        args:
+          - name: entity-type
+            type: string
+            required: true
+            description: Entity type to describe (e.g., deal, cbu, document, product)
+        returns:
+          type: record
+          capture: false
+
+      entity.list-fields:
+        description: List fields for an entity type from registry or ontology metadata
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: schema_field
+          category: schema_analysis
+          context: scripted_ok
+          side_effects: facts_only
+          tags: [stewardship, schema, data-management]
+          subject_kinds: []
+          phase_tags: [stewardship, data-management, data]
+        behavior: plugin
+        handler: SchemaEntityListFieldsOp
+        invocation_phrases:
+          - "list schema fields"
+          - "show fields for entity"
+          - "what fields does this entity have"
+          - "show entity attributes"
+        args:
+          - name: entity-type
+            type: string
+            required: true
+            description: Entity type to inspect
+        returns:
+          type: record
+          capture: false
+
+      entity.list-relationships:
+        description: List relationships for an entity type from ontology metadata
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: schema_relationship
+          category: schema_analysis
+          context: scripted_ok
+          side_effects: facts_only
+          tags: [stewardship, schema, data-management]
+          subject_kinds: []
+          phase_tags: [stewardship, data-management, data]
+        behavior: plugin
+        handler: SchemaEntityListRelationshipsOp
+        invocation_phrases:
+          - "list schema relationships"
+          - "show entity relationships"
+          - "what does this entity relate to"
+          - "show foreign key relationships"
+        args:
+          - name: entity-type
+            type: string
+            required: true
+            description: Entity type to inspect
+        returns:
+          type: record
+          capture: false
+
+      entity.list-verbs:
+        description: List DSL verbs available for an entity type's domain
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: schema_verb
+          category: schema_analysis
+          context: scripted_ok
+          side_effects: facts_only
+          tags: [stewardship, schema, data-management]
+          subject_kinds: []
+          phase_tags: [stewardship, data-management, data]
+        behavior: plugin
+        handler: SchemaEntityListVerbsOp
+        invocation_phrases:
+          - "list schema verbs"
+          - "show available verbs"
+          - "what verbs apply to this entity"
+          - "show operations for entity"
+        args:
+          - name: entity-type
+            type: string
+            required: true
+            description: Entity type to inspect
+        returns:
+          type: record
+          capture: false
+
       # ============================================
       # Schema Introspection
       # ============================================

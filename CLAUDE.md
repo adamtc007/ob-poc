@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-> **Last reviewed:** 2026-03-04
+> **Last reviewed:** 2026-03-06
 > **Frontend:** React/TypeScript (`ob-poc-ui-react/`) - Chat UI with scope panel, Inspector, Semantic OS Tab
 > **Backend:** Rust/Axum (`rust/crates/ob-poc-web/`) - Serves React + REST API
 > **Crates:** 22 active Rust crates (16 ob-poc + 6 sem_os_*; esper_* deprecated; ob-poc-graph + viewport removed)
@@ -63,10 +63,12 @@
 > **CCIR — Context-Constrained Intent Resolution (Migration 103):** ✅ Complete - ContextEnvelope replaces SemRegVerbPolicy, structured PruneReason (7 variants), deterministic AllowedVerbSetFingerprint (SHA-256), TOCTOU recheck, pre-constrained verb search (allowed verbs threaded into HybridVerbSearcher), SemReg enforcement at dsl_execute, legacy V1 module cleanup (4 modules deleted: ~2,700 LOC), 16 unit tests
 > **SessionVerbSurface:** ✅ Complete - Consolidated governance layer composition (SemReg CCIR + AgentMode + workflow phase + lifecycle + actor gating), 8-step compute pipeline, dual fingerprints (surface `vs1:` + SemReg `v1:`), FailClosed safe-harbor (~30 verbs), MCP tool `session_verb_surface`, REST endpoint `GET /api/session/:id/verb-surface`, ChatResponse enrichment, React VerbBrowser governance badges, 13 unit tests
 > **Semantic OS Tab:** ✅ Complete - Agent-driven workflow selection UI (`/semantic-os`), goals→phase_tags verb scoping in SemReg, DecisionPacket workflow prompt (Onboarding/KYC/Data Management/Stewardship), session sidebar + registry context panel, `GET /api/sem-os/context` endpoint
+> **SemOS Data Management Structure Contract:** ✅ Complete - noun-only exploration in `semos-data-management` / `semos-data` is structure-first, rewrites to `schema.entity.describe` / `schema.entity.*`, and instance-bound content verbs requiring `*-id` are blocked unless the user explicitly targets an instance
 > **Scenario-Based Intent Resolution (Phases 0.5-5):** ✅ Complete — MacroIndex (Tier -2B) + ScenarioIndex (Tier -2A) + CompoundSignals + SequenceValidator; deterministic scoring ledger, 16 YAML scenarios (incl. 3 macro_sequence KYC workflows), ECIR short-circuit gating, provenance labels on macro expansion, progress narration ("Step 4 of 13: Lux UCITS SICAV Setup"), 43 Tier-2 test cases with 5 hard threshold assertions (spec §11)
 > **AffinityGraph & Schema-Driven Diagram Generation:** ✅ Complete — Bidirectional verb↔data index (`sem_os_core::affinity`), 5-pass pure-Rust builder from active snapshots, 10 query methods (6 core + 4 governance), DiagramModel + MermaidRenderer (`sem_os_core::diagram`), 3 render modes (erDiagram/verb-flow/domain-map), 9 new verbs (6 registry.* + 3 schema.*), DomainMetadata YAML overlay, 6 CustomOps, 6 integration tests, 21,047 total embeddings
 > **Discovery Pipeline (Phase 2):** ✅ Complete — `registry.discover-dsl` implemented end-to-end (utterance→intent matches→verb chain synthesis→disambiguation/governance context); `schema.generate-discovery-map` implemented with Mermaid projection
 > **Utterance API Coverage Harness:** ✅ Complete — `rust/tests/utterance_api_coverage.rs` runs standard utterance fixtures through `/api/session/:id/execute` with `registry.discover-dsl`, emits JSON/MD/CSV coverage artifacts for expected↔predicted DSL verbs
+> **Unified Session Input Cutover (First Cut):** ✅ Complete — single ingress endpoint `POST /api/session/:id/input` with adapter dispatch (`utterance`, `decision_reply`, `repl_v2`), legacy chat/decision/repl-input endpoints hard-blocked (410 Gone), React chat + REPL clients rewired, server call-stack trace confirms UI traffic enters only through unified input
 
 This is the root project guide for Claude Code. Domain-specific details are in annexes.
 
@@ -115,6 +117,9 @@ cargo x bpmn-lite deploy           # Docker build + compose up
 # Schema overview (living doc with mermaid ER diagrams)
 # Regenerate PDF after schema changes:
 npx md-to-pdf migrations/OB_POC_SCHEMA_ENTITY_OVERVIEW.md
+
+# Refresh schema exports from the live source DB
+cargo x schema-export
 ```
 
 ---
@@ -147,11 +152,21 @@ ob-poc-ui-react/
 |----------|---------|
 | `POST /api/session` | Create agent session (with optional `workflow_focus`) |
 | `GET /api/session/:id` | Get session with messages |
-| `POST /api/session/:id/chat` | Send chat message |
+| `POST /api/session/:id/input` | Unified session input ingress (`kind=utterance|decision_reply|repl_v2`) |
 | `GET /api/session/:id/scope-graph` | Get loaded CBUs (scope) |
 | `GET /api/cbu/:id/graph` | Get single CBU's entity graph |
 | `GET /api/projections/:id` | Get Inspector projection |
 | `GET /api/sem-os/context` | Get Semantic OS registry stats + recent changesets |
+
+### Unified Input Cutover (2026-03-05)
+
+- **Single ingress:** All user prompts/utterances from chat UI and REPL UI now post to `POST /api/session/:id/input`.
+- **Adapter dispatch:** Request `kind` selects server adapter path:
+  - `utterance` → agent chat orchestration
+  - `decision_reply` → DecisionPacket reply handling
+  - `repl_v2` → REPL V2 orchestrator input handling
+- **Legacy hard block (enforced):** `POST /api/session/:id/chat`, `POST /api/session/:id/decision/reply`, and `POST /api/repl/v2/session/:id/input` return `410 Gone`.
+- **Tracing requirement:** endpoint adoption is validated via component-level call-stack trace (UI callsite → API client → HTTP endpoint → server route → adapter).
 
 ### Development
 
@@ -525,7 +540,7 @@ User says: "spin up a fund for Acme"
   - Pre-constrained verb search: allowed verbs threaded into `IntentPipeline.with_allowed_verbs()` → `HybridVerbSearcher` (Phase 3 CCIR)
   - AST-based macro governance: `parse_program()` + `VerbCall::full_name()` extracts verbs from macro expansions
   - IntentTrace fields: `selection_source` (discovery/user_choice/macro/semreg), `macro_semreg_checked`, `macro_denied_verbs`, `forced_verb`, `allowed_verbs_fingerprint`, `pruned_verbs_count`, `toctou_recheck_performed`, `toctou_result`, `toctou_new_fingerprint`
-  - `/select-verb` retired (410 Gone) — verb selection routed through `/decision/reply` → orchestrator forced-verb
+  - `/select-verb` retired (410 Gone) — verb selection routed through `POST /api/session/:id/input` (`kind=decision_reply`) → orchestrator forced-verb
 - `rust/src/agent/context_envelope.rs` — `ContextEnvelope`, `PruneReason` (7 variants), `AllowedVerbSetFingerprint`, `TocTouResult`, 16 unit tests
 - `rust/src/session/unified.rs` — `RunSheet.runnable_dsl()` returns only Draft/Ready entries (prevents re-executing already-run entries)
 - `rust/src/agent/telemetry/` — Append-only intent telemetry (PII-safe)
@@ -1330,7 +1345,7 @@ DATABASE_URL="postgresql:///data_designer" \
 
 ## Verb Disambiguation UI (057)
 
-> ✅ **IMPLEMENTED (2026-01-27)**: Interactive disambiguation when verb search returns multiple high-confidence matches.
+> ✅ **IMPLEMENTED (2026-01-27)**, **cut over (2026-03-05)**: Interactive disambiguation remains active, but client replies now route through unified session input.
 
 When the semantic verb search returns multiple verbs with similar scores (within `AMBIGUITY_MARGIN = 0.05`), the system presents an interactive disambiguation UI instead of guessing.
 
@@ -1353,12 +1368,14 @@ When the semantic verb search returns multiple verbs with similar scores (within
 │      ▼                                                                       │
 │  UI shows disambiguation card with clickable verb buttons                   │
 │      │                                                                       │
-│      ├─► User clicks verb → POST /select-verb                               │
+│      ├─► User clicks verb → POST /api/session/:id/input                     │
+│      │         { kind: "decision_reply", ... }                              │
 │      │       → Gold-standard learning signal (confidence=0.95)              │
 │      │       → Phrase variants generated for robust learning                │
 │      │       → Continue with selected verb                                  │
 │      │                                                                       │
-│      └─► User cancels/times out (30s) → POST /abandon-disambiguation        │
+│      └─► User cancels/times out (30s) → POST /api/session/:id/input         │
+│                { kind: "decision_reply", ... }                              │
 │              → Negative signals for all candidates                          │
 │              → Clear disambiguation state                                   │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -1368,8 +1385,9 @@ When the semantic verb search returns multiple verbs with similar scores (within
 
 | Endpoint | Purpose |
 |----------|---------|
-| `POST /api/session/:id/select-verb` | User selected a verb from disambiguation |
-| `POST /api/session/:id/abandon-disambiguation` | User cancelled or timed out |
+| `POST /api/session/:id/input` | Decision replies (`kind=decision_reply`) for select/reject/cancel |
+| `POST /api/session/:id/select-verb` | Legacy endpoint (410 Gone) |
+| `POST /api/session/:id/abandon-disambiguation` | Legacy endpoint (410 Gone) |
 
 **Types (`ob-poc-types`):**
 
@@ -1416,7 +1434,7 @@ pub struct VerbDisambiguationState {
 | File | Purpose |
 |------|---------|
 | `rust/crates/ob-poc-types/src/lib.rs` | Type definitions |
-| `rust/src/api/agent_routes.rs` | `/select-verb`, `/abandon-disambiguation` endpoints |
+| `rust/src/api/agent_routes.rs` | Unified `POST /api/session/:id/input` decision-reply adapter |
 | `rust/src/api/agent_service.rs` | `handle_verb_selection()`, wires to ChatResponse |
 > **Note:** The egui UI for disambiguation (`ob-poc-ui`) has been removed. Disambiguation is now handled by the React frontend and V2 REPL API.
 
@@ -4300,7 +4318,7 @@ Template batch operations can use `@session_cbus` as source to iterate over all 
 | `ClarifyingState` | Integrated into orchestrator state machine |
 | `ReplSession` with ledger | `ReplSessionV2` with runbook fold |
 | `ReplOrchestrator` | `ReplOrchestratorV2` with pack-scoped scoring |
-| `/api/repl/session/:id/input` | `/api/repl/v2/session/:id/input` (V2 routes) |
+| `/api/repl/session/:id/input` | `/api/session/:id/input` (`kind=repl_v2`, unified ingress) |
 | `HybridIntentMatcher` | `IntentService` + `search_with_context()` |
 
 See **V2 REPL Architecture** section below for the active implementation.
@@ -4624,7 +4642,7 @@ CI gate: `test_corpus_total_at_least_50` ensures corpus doesn't regress.
 |----------|---------|
 | `POST /api/repl/v2/session` | Create V2 REPL session |
 | `GET /api/repl/v2/session/:id` | Get full session state |
-| `POST /api/repl/v2/session/:id/input` | Unified input (all `UserInputV2` types) |
+| `POST /api/session/:id/input` | Unified input ingress; use `kind=repl_v2` for all `UserInputV2` payloads |
 | `DELETE /api/repl/v2/session/:id` | Delete session |
 | `POST /api/repl/v2/signal` | External system completion signals |
 
