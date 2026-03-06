@@ -110,6 +110,23 @@ document:
     - "upload"
   domain: document
 
+deal:
+  pref_label: "deal"
+  aliases:
+    - "deal record"
+    - "sales deal"
+    - "client deal"
+    - "opportunity"
+  domain: deal
+
+product:
+  pref_label: "product"
+  aliases:
+    - "offering"
+    - "service"
+    - "product catalog"
+  domain: product
+
 client_group:
   pref_label: "client group"
   aliases:

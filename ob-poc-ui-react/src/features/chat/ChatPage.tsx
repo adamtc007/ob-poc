@@ -2,19 +2,27 @@
  * Chat Page - Agent chat UI
  */
 
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useEffect, useRef, useCallback } from "react";
 import { Loader2 } from "lucide-react";
 import { chatApi } from "../../api/chat";
+import { isSessionMissingError } from "../../api/sessionStorage";
 import { queryKeys, queryClient } from "../../lib/query";
 import { useChatStore } from "../../stores/chat";
-import { ChatSidebar, ChatMessage, ChatInput, ScopePanel, VerbBrowser } from "./components";
+import {
+  ChatSidebar,
+  ChatMessage,
+  ChatInput,
+  ScopePanel,
+  VerbBrowser,
+} from "./components";
 import { DealPanel } from "../deal/components";
 import type { DecisionReply } from "../../types/chat";
 
 export function ChatPage() {
   const { sessionId } = useParams<{ sessionId?: string }>();
+  const navigate = useNavigate();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const {
     setCurrentSession,
@@ -31,6 +39,19 @@ export function ChatPage() {
     queryFn: () => chatApi.getSession(sessionId!),
     enabled: !!sessionId,
   });
+  const sessionMissing = isSessionMissingError(error);
+
+  useEffect(() => {
+    if (!sessionId || !sessionMissing) return;
+
+    queryClient.removeQueries({
+      queryKey: queryKeys.chat.session(sessionId),
+    });
+    queryClient.invalidateQueries({
+      queryKey: queryKeys.chat.sessions(),
+    });
+    navigate("/chat", { replace: true });
+  }, [navigate, sessionId, sessionMissing]);
 
   // Update store when data changes
   useEffect(() => {
@@ -44,18 +65,25 @@ export function ChatPage() {
   // Fetch verb surface when session loads
   useEffect(() => {
     if (!sessionId) return;
-    chatApi.getVerbSurface(sessionId).then((result) => {
-      if (result.verbs.length > 0) {
-        setAvailableVerbs(
-          result.verbs,
-          result.surface_fingerprint
-            ? { fingerprint: result.surface_fingerprint, totalRegistry: result.totalRegistry ?? 0, finalCount: result.verbs.length }
-            : undefined,
-        );
-      }
-    }).catch((err) => {
-      console.warn("[ChatPage] getVerbSurface failed:", err);
-    });
+    chatApi
+      .getVerbSurface(sessionId)
+      .then((result) => {
+        if (result.verbs.length > 0) {
+          setAvailableVerbs(
+            result.verbs,
+            result.surface_fingerprint
+              ? {
+                  fingerprint: result.surface_fingerprint,
+                  totalRegistry: result.totalRegistry ?? 0,
+                  finalCount: result.verbs.length,
+                }
+              : undefined,
+          );
+        }
+      })
+      .catch((err) => {
+        console.warn("[ChatPage] getVerbSurface failed:", err);
+      });
   }, [sessionId, setAvailableVerbs]);
 
   // Scroll to bottom when messages change
@@ -90,7 +118,11 @@ export function ChatPage() {
         setAvailableVerbs(
           response.available_verbs,
           response.surface_fingerprint
-            ? { fingerprint: response.surface_fingerprint, totalRegistry: 0, finalCount: response.available_verbs.length }
+            ? {
+                fingerprint: response.surface_fingerprint,
+                totalRegistry: 0,
+                finalCount: response.available_verbs.length,
+              }
             : undefined,
         );
       }
@@ -114,7 +146,11 @@ export function ChatPage() {
         setAvailableVerbs(
           response.available_verbs,
           response.surface_fingerprint
-            ? { fingerprint: response.surface_fingerprint, totalRegistry: 0, finalCount: response.available_verbs.length }
+            ? {
+                fingerprint: response.surface_fingerprint,
+                totalRegistry: 0,
+                finalCount: response.available_verbs.length,
+              }
             : undefined,
         );
       }
@@ -232,16 +268,21 @@ export function ChatPage() {
       </div>
 
       {/* Right sidebar - Scope, Verbs, and Deal panels */}
-      <div className="w-72 flex-shrink-0 border-l border-[var(--border-primary)] bg-[var(--bg-secondary)] flex flex-col overflow-hidden">
-        {/* Deal context panel */}
-        {sessionId && <DealPanel sessionId={sessionId} />}
+      {!sessionMissing && (
+        <div className="w-72 flex-shrink-0 border-l border-[var(--border-primary)] bg-[var(--bg-secondary)] flex flex-col overflow-hidden">
+          {/* Deal context panel */}
+          {sessionId && <DealPanel sessionId={sessionId} />}
 
-        {/* Scope panel showing loaded CBUs */}
-        <ScopePanel sessionId={sessionId} />
+          {/* Scope panel showing loaded CBUs */}
+          <ScopePanel sessionId={sessionId} />
 
-        {/* Available commands / verb browser */}
-        <VerbBrowser className="border-t border-[var(--border-primary)]" onVerbSubmit={handleVerbSubmit} />
-      </div>
+          {/* Available commands / verb browser */}
+          <VerbBrowser
+            className="border-t border-[var(--border-primary)]"
+            onVerbSubmit={handleVerbSubmit}
+          />
+        </div>
+      )}
     </div>
   );
 }

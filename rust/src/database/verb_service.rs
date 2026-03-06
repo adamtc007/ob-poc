@@ -70,6 +70,13 @@ struct GlobalLearnedSemanticRow {
     similarity: f64,
 }
 
+/// Row struct for exact pattern lookup from dsl_verbs pattern arrays.
+#[derive(Debug, sqlx::FromRow)]
+struct ExactPatternRow {
+    phrase: String,
+    verb: String,
+}
+
 /// Row struct for verb pattern embedding queries (includes category)
 #[derive(Debug, sqlx::FromRow)]
 struct VerbPatternSemanticRow {
@@ -223,6 +230,93 @@ impl VerbService {
     // ========================================================================
     // Global Learned Phrases
     // ========================================================================
+
+    /// Find exact pattern matches from `dsl_verbs` pattern arrays.
+    ///
+    /// Checks both:
+    /// - `yaml_intent_patterns` (seeded from YAML invocation phrases)
+    /// - `intent_patterns` (learned patterns)
+    ///
+    /// This provides deterministic exact matching even before embedding refresh.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// let service = VerbService::new(pool);
+    /// let matches = service
+    ///     .find_exact_verb_patterns("show me products", None, 5)
+    ///     .await?;
+    /// ```
+    pub async fn find_exact_verb_patterns(
+        &self,
+        phrase: &str,
+        allowed_verbs: Option<&[String]>,
+        limit: usize,
+    ) -> Result<Vec<SemanticMatch>, sqlx::Error> {
+        let normalized = phrase.trim().to_lowercase();
+        if normalized.is_empty() || limit == 0 {
+            return Ok(Vec::new());
+        }
+
+        let rows = if let Some(allowed) = allowed_verbs {
+            if allowed.is_empty() {
+                Vec::new()
+            } else {
+                sqlx::query_as::<_, ExactPatternRow>(
+                    r#"
+                    SELECT DISTINCT ON (dv.full_name)
+                        p.pattern AS phrase,
+                        dv.full_name AS verb
+                    FROM "ob-poc".dsl_verbs dv
+                    CROSS JOIN LATERAL unnest(
+                        COALESCE(dv.yaml_intent_patterns, '{}'::text[])
+                        || COALESCE(dv.intent_patterns, '{}'::text[])
+                    ) AS p(pattern)
+                    WHERE dv.full_name = ANY($2)
+                      AND LOWER(TRIM(p.pattern)) = $1
+                    ORDER BY dv.full_name
+                    LIMIT $3
+                    "#,
+                )
+                .bind(&normalized)
+                .bind(allowed)
+                .bind(limit as i32)
+                .fetch_all(&self.pool)
+                .await?
+            }
+        } else {
+            sqlx::query_as::<_, ExactPatternRow>(
+                r#"
+                SELECT DISTINCT ON (dv.full_name)
+                    p.pattern AS phrase,
+                    dv.full_name AS verb
+                FROM "ob-poc".dsl_verbs dv
+                CROSS JOIN LATERAL unnest(
+                    COALESCE(dv.yaml_intent_patterns, '{}'::text[])
+                    || COALESCE(dv.intent_patterns, '{}'::text[])
+                ) AS p(pattern)
+                WHERE LOWER(TRIM(p.pattern)) = $1
+                ORDER BY dv.full_name
+                LIMIT $2
+                "#,
+            )
+            .bind(&normalized)
+            .bind(limit as i32)
+            .fetch_all(&self.pool)
+            .await?
+        };
+
+        Ok(rows
+            .into_iter()
+            .map(|r| SemanticMatch {
+                phrase: r.phrase,
+                verb: r.verb,
+                similarity: 1.0,
+                confidence: None,
+                category: Some("exact_pattern".to_string()),
+            })
+            .collect())
+    }
 
     /// Find global learned phrase by semantic similarity
     pub async fn find_global_learned_semantic(

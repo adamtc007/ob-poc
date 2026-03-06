@@ -14,12 +14,13 @@ import {
   User,
   Users,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   scopeApi,
   type CbuSummary,
   type EntitySummary,
 } from "../../../api/scope";
+import { isSessionMissingError } from "../../../api/sessionStorage";
 import { queryKeys } from "../../../lib/query";
 
 interface ScopePanelProps {
@@ -176,8 +177,18 @@ export function ScopePanel({ sessionId, className = "" }: ScopePanelProps) {
     queryKey: queryKeys.scope(sessionId || ""),
     queryFn: () => scopeApi.getScope(sessionId!),
     enabled: !!sessionId,
-    refetchInterval: 5000, // Refresh every 5 seconds to catch scope changes
+    refetchInterval: (query) =>
+      isSessionMissingError(query.state.error) ? false : 5000,
+    retry: (failureCount, err) =>
+      !isSessionMissingError(err) && failureCount < 2,
   });
+  const sessionMissing = isSessionMissingError(error);
+
+  useEffect(() => {
+    if (sessionMissing) {
+      console.info("[ScopePanel] session missing; stopping scope polling.");
+    }
+  }, [sessionMissing]);
 
   // Open viewport in new window
   const handlePopOut = (e: React.MouseEvent) => {
@@ -261,7 +272,11 @@ export function ScopePanel({ sessionId, className = "" }: ScopePanelProps) {
         <div className="p-2 max-h-[50vh] overflow-auto">
           {error ? (
             <div className="text-sm text-[var(--accent-red)] p-2">
-              {error instanceof Error ? error.message : "Failed to load scope"}
+              {sessionMissing
+                ? "Session no longer exists. Create a new session."
+                : error instanceof Error
+                  ? error.message
+                  : "Failed to load scope"}
             </div>
           ) : data?.error ? (
             <div className="text-sm text-[var(--text-muted)] p-2 text-center">

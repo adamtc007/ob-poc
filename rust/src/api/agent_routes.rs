@@ -48,7 +48,7 @@ use ob_poc_types::{
         UnresolvedRefResponse as ApiUnresolvedRefResponse,
     },
     AstArgument, AstSpan, AstStatement, AstValue, BoundEntityInfo, ChatResponse, DslState,
-    SessionStateEnum,
+    SessionInputRequest, SessionInputResponse, SessionStateEnum,
 };
 
 use axum::{
@@ -398,7 +398,8 @@ pub(crate) fn create_agent_router_with_state(state: AgentState) -> Router {
         .route("/api/session", post(create_session))
         .route("/api/session/:id", get(get_session))
         .route("/api/session/:id", delete(delete_session))
-        .route("/api/session/:id/chat", post(chat_session))
+        .route("/api/session/:id/input", post(session_input))
+        .route("/api/session/:id/chat", post(chat_session_legacy_blocked))
         .route("/api/session/:id/execute", post(execute_session_dsl))
         .route("/api/session/:id/clear", post(clear_session_dsl))
         .route("/api/session/:id/bind", post(set_session_binding))
@@ -500,7 +501,7 @@ pub(crate) fn create_agent_router_with_state(state: AgentState) -> Router {
         // Unified decision reply (NEW - handles all clarification responses)
         .route(
             "/api/session/:id/decision/reply",
-            post(crate::api::agent_learning_routes::handle_decision_reply),
+            post(decision_reply_legacy_blocked),
         )
         .with_state(state)
 }
@@ -508,6 +509,96 @@ pub(crate) fn create_agent_router_with_state(state: AgentState) -> Router {
 // ============================================================================
 // Session Handlers
 // ============================================================================
+
+/// POST /api/session/:id/chat (legacy) — hard-blocked in unified-input cutover.
+async fn chat_session_legacy_blocked() -> (StatusCode, Json<serde_json::Value>) {
+    (
+        StatusCode::GONE,
+        Json(serde_json::json!({
+            "error": "Legacy endpoint removed. Use POST /api/session/:id/input with kind=utterance."
+        })),
+    )
+}
+
+/// POST /api/session/:id/decision/reply (legacy) — hard-blocked in unified-input cutover.
+async fn decision_reply_legacy_blocked() -> (StatusCode, Json<serde_json::Value>) {
+    (
+        StatusCode::GONE,
+        Json(serde_json::json!({
+            "error": "Legacy endpoint removed. Use POST /api/session/:id/input with kind=decision_reply."
+        })),
+    )
+}
+
+/// POST /api/session/:id/input - Unified session input endpoint.
+async fn session_input(
+    State(state): State<AgentState>,
+    Path(session_id): Path<Uuid>,
+    headers: axum::http::HeaderMap,
+    Json(req): Json<SessionInputRequest>,
+) -> Result<Json<SessionInputResponse>, StatusCode> {
+    match req {
+        SessionInputRequest::Utterance { message } => {
+            let chat_req = ChatRequest {
+                message,
+                cbu_id: None,
+                disambiguation_response: None,
+            };
+            let response = chat_session(State(state), Path(session_id), headers, Json(chat_req))
+                .await?
+                .0;
+            Ok(Json(SessionInputResponse::Chat {
+                response: Box::new(response),
+            }))
+        }
+        SessionInputRequest::DecisionReply { packet_id, reply } => {
+            let decision_req = ob_poc_types::DecisionReplyRequest { packet_id, reply };
+            let response = crate::api::agent_learning_routes::handle_decision_reply(
+                State(state),
+                Path(session_id),
+                headers,
+                Json(decision_req),
+            )
+            .await?
+            .0;
+            Ok(Json(SessionInputResponse::Decision { response }))
+        }
+        SessionInputRequest::ReplV2 { input } => {
+            #[cfg(feature = "vnext-repl")]
+            {
+                let repl_req: crate::api::repl_routes_v2::InputRequestV2 =
+                    serde_json::from_value(input).map_err(|e| {
+                        tracing::warn!(error = %e, "Invalid repl_v2 input payload");
+                        StatusCode::BAD_REQUEST
+                    })?;
+
+                let orchestrator = state
+                    .repl_v2_orchestrator
+                    .clone()
+                    .ok_or(StatusCode::SERVICE_UNAVAILABLE)?;
+                let repl_state = crate::api::repl_routes_v2::ReplV2RouteState { orchestrator };
+
+                let repl_response = crate::api::repl_routes_v2::input_v2(
+                    State(repl_state),
+                    Path(session_id),
+                    Json(repl_req),
+                )
+                .await
+                .map_err(|(status, _)| status)?
+                .0;
+
+                let response = serde_json::to_value(repl_response)
+                    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+                Ok(Json(SessionInputResponse::ReplV2 { response }))
+            }
+            #[cfg(not(feature = "vnext-repl"))]
+            {
+                let _ = input;
+                Err(StatusCode::NOT_IMPLEMENTED)
+            }
+        }
+    }
+}
 
 /// POST /api/session - Create new session
 async fn create_session(

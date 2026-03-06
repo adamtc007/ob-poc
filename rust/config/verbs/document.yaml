@@ -468,6 +468,7 @@ domains:
         description: Get document with latest version status
         invocation_phrases:
           - "get document details"
+          - "show me document"
           - "show document status"
           - "retrieve document record"
           - "look up document"
@@ -531,6 +532,11 @@ domains:
         behavior: crud
         invocation_phrases:
           - show documents for entity
+          - show me documents for entity
+          - show me documents
+          - show documents
+          - list documents
+          - documents
           - list entity documents
           - what documents does entity have
         metadata:

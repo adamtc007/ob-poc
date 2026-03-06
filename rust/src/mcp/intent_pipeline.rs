@@ -1122,6 +1122,32 @@ fn infer_domain_from_phrase(phrase: &str) -> Option<String> {
         return Some("ubo".to_string());
     }
 
+    // Deal domain - check BEFORE view so "show me deal record" resolves to deal.*
+    if words
+        .iter()
+        .any(|w| matches!(*w, "deal" | "deals" | "pipeline" | "record"))
+    {
+        return Some("deal".to_string());
+    }
+
+    // Product domain - check BEFORE view so "show me products" resolves to product.*
+    if words
+        .iter()
+        .any(|w| matches!(*w, "product" | "products" | "offering" | "catalog"))
+    {
+        return Some("product".to_string());
+    }
+
+    // Document domain - check BEFORE view so "show me documents" resolves to document.*
+    if words.iter().any(|w| {
+        matches!(
+            *w,
+            "document" | "documents" | "upload" | "verify" | "solicit"
+        )
+    }) {
+        return Some("document".to_string());
+    }
+
     // View/visualization domain
     if words.iter().any(|w| {
         matches!(
@@ -1213,14 +1239,6 @@ fn infer_domain_from_phrase(phrase: &str) -> Option<String> {
     // GLEIF domain
     if words.iter().any(|w| matches!(*w, "gleif" | "lei")) {
         return Some("gleif".to_string());
-    }
-
-    // Document domain
-    if words
-        .iter()
-        .any(|w| matches!(*w, "document" | "upload" | "verify" | "solicit"))
-    {
-        return Some("document".to_string());
     }
 
     // No domain could be inferred - allow full search

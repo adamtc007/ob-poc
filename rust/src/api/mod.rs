@@ -107,6 +107,9 @@ pub use entity_routes::{create_entity_router, create_scoped_entity_router};
 #[cfg(feature = "server")]
 pub use agent_state::{create_agent_router_with_semantic, AgentState};
 
+#[cfg(all(feature = "server", feature = "vnext-repl"))]
+pub use agent_state::create_agent_router_with_semantic_and_repl;
+
 #[cfg(feature = "server")]
 pub use dsl_viewer_routes::create_dsl_viewer_router;
 

@@ -167,7 +167,10 @@ impl ContextEnvelope {
         let mut pruned = Vec::new();
 
         for vc in &response.candidate_verbs {
-            if matches!(vc.access_decision, AccessDecision::Allow) {
+            if matches!(
+                vc.access_decision,
+                AccessDecision::Allow | AccessDecision::AllowWithMasking { .. }
+            ) {
                 allowed.insert(vc.fqn.clone());
                 allowed_contracts.push(VerbCandidateSummary {
                     fqn: vc.fqn.clone(),

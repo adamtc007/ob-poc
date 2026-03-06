@@ -240,7 +240,30 @@ impl RegistryService {
         // Step 1: Run the standard publish gates (proof rule, security, approval, version)
         let predecessor = if let Some(pred_id) = meta.predecessor_id {
             let pg_row = sqlx::query_as::<_, PgSnapshotRow>(
-                "SELECT * FROM sem_reg.snapshots WHERE snapshot_id = $1",
+                r#"
+                SELECT
+                    snapshot_id,
+                    snapshot_set_id,
+                    object_type::text AS object_type,
+                    object_id,
+                    version_major,
+                    version_minor,
+                    status::text AS status,
+                    governance_tier::text AS governance_tier,
+                    trust_class::text AS trust_class,
+                    security_label,
+                    effective_from,
+                    effective_until,
+                    predecessor_id,
+                    change_type::text AS change_type,
+                    change_rationale,
+                    created_by,
+                    approved_by,
+                    definition,
+                    created_at
+                FROM sem_reg.snapshots
+                WHERE snapshot_id = $1
+                "#,
             )
             .bind(pred_id)
             .fetch_optional(pool)
@@ -301,7 +324,30 @@ impl RegistryService {
         // Evaluate publish gates
         let predecessor = if let Some(pred_id) = meta.predecessor_id {
             let pg_row = sqlx::query_as::<_, PgSnapshotRow>(
-                "SELECT * FROM sem_reg.snapshots WHERE snapshot_id = $1",
+                r#"
+                SELECT
+                    snapshot_id,
+                    snapshot_set_id,
+                    object_type::text AS object_type,
+                    object_id,
+                    version_major,
+                    version_minor,
+                    status::text AS status,
+                    governance_tier::text AS governance_tier,
+                    trust_class::text AS trust_class,
+                    security_label,
+                    effective_from,
+                    effective_until,
+                    predecessor_id,
+                    change_type::text AS change_type,
+                    change_rationale,
+                    created_by,
+                    approved_by,
+                    definition,
+                    created_at
+                FROM sem_reg.snapshots
+                WHERE snapshot_id = $1
+                "#,
             )
             .bind(pred_id)
             .fetch_optional(pool)

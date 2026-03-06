@@ -97,9 +97,12 @@ domains:
           phase_tags: [deal]
         invocation_phrases:
           - "get deal"
-          - "show deal"
+          - "show deal by id"
+          - "show deal record by id"
+          - "show me deal by id"
+          - "show me deal record by id"
           - "deal details"
-          - "view deal"
+          - "view deal by id"
         args:
           - name: deal-id
             type: uuid
@@ -124,6 +127,10 @@ domains:
         invocation_phrases:
           - "list deals"
           - "show deals"
+          - "show me deals"
+          - "show me deal records"
+          - "show me deal record"
+          - "show me deal pipeline"
           - "all deals"
           - "deals for client"
           - "my deals"

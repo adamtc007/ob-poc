@@ -212,17 +212,21 @@ export const replV2Api = {
   },
 
   /**
-   * Send any input to the V2 REPL (unified endpoint).
-   * POST /api/repl/v2/session/:id/input
+   * Send any input to V2 REPL via unified session input endpoint.
+   * POST /api/session/:id/input with { kind: "repl_v2", input: ... }
    */
   async sendInput(
     sessionId: string,
     input: InputRequestV2,
   ): Promise<ReplResponseV2> {
-    return api.post<ReplResponseV2>(
-      `${V2_BASE}/session/${sessionId}/input`,
+    const envelope = await api.post<{
+      kind: "repl_v2";
+      response: ReplResponseV2;
+    }>(`/session/${sessionId}/input`, {
+      kind: "repl_v2",
       input,
-    );
+    });
+    return envelope.response;
   },
 
   /**

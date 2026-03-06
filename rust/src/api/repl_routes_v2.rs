@@ -8,7 +8,7 @@
 //!
 //! - `POST /api/repl/v2/session`           — Create session
 //! - `GET  /api/repl/v2/session/:id`       — Get session state
-//! - `POST /api/repl/v2/session/:id/input` — Unified input
+//! - `POST /api/repl/v2/session/:id/input` — Legacy input endpoint (410 Gone)
 //! - `DELETE /api/repl/v2/session/:id`      — Delete session
 //! - `POST /api/repl/v2/signal`            — External system signals completion of a parked entry
 
@@ -303,8 +303,8 @@ async fn get_session_v2(
     Ok(Json(SessionStateResponseV2::from(session)))
 }
 
-/// POST /api/repl/v2/session/:id/input — Unified input endpoint.
-async fn input_v2(
+/// Internal REPL V2 input adapter used by unified `/api/session/:id/input`.
+pub(crate) async fn input_v2(
     State(state): State<ReplV2RouteState>,
     Path(session_id): Path<Uuid>,
     Json(input): Json<InputRequestV2>,
@@ -324,6 +324,16 @@ async fn input_v2(
             ))
         }
     }
+}
+
+/// POST /api/repl/v2/session/:id/input (legacy) — hard-blocked in unified-input cutover.
+async fn input_v2_legacy_blocked() -> (StatusCode, Json<serde_json::Value>) {
+    (
+        StatusCode::GONE,
+        Json(serde_json::json!({
+            "error": "Legacy endpoint removed. Use POST /api/session/:id/input with kind=repl_v2."
+        })),
+    )
 }
 
 /// DELETE /api/repl/v2/session/:id — Delete V2 session.
@@ -399,10 +409,10 @@ pub fn router() -> Router<ReplV2RouteState> {
     Router::new()
         .route("/session", post(create_session_v2))
         .route(
-            "/session/{id}",
+            "/session/:id",
             get(get_session_v2).delete(delete_session_v2),
         )
-        .route("/session/{id}/input", post(input_v2))
+        .route("/session/:id/input", post(input_v2_legacy_blocked))
         .route("/signal", post(signal_v2))
 }
 

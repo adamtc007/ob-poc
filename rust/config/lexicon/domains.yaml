@@ -16,6 +16,28 @@ cbu:
     - "onboard"
     - "onboarding"
 
+deal:
+  label: "Deal Management"
+  parent: null
+  inference_keywords:
+    - "deal"
+    - "deals"
+    - "deal record"
+    - "opportunity"
+    - "pipeline"
+    - "sales"
+
+product:
+  label: "Product Catalog"
+  parent: null
+  inference_keywords:
+    - "product"
+    - "products"
+    - "offering"
+    - "offerings"
+    - "catalog"
+    - "service"
+
 entity:
   label: "Entity Management"
   parent: null
@@ -147,6 +169,7 @@ document:
   parent: null
   inference_keywords:
     - "document"
+    - "documents"
     - "file"
     - "upload"
     - "attachment"

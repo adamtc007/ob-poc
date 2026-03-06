@@ -6,6 +6,10 @@
  */
 
 import { api } from "./client";
+import {
+  isSessionMissingError,
+  pruneSessionIdFromStorage,
+} from "./sessionStorage";
 
 /**
  * CBU summary from graph nodes
@@ -130,9 +134,17 @@ export const scopeApi = {
     affectedEntityIds: string[];
     error?: string;
   }> {
-    const response = await api.get<ScopeGraphResponse>(
-      `/session/${sessionId}/scope-graph`,
-    );
+    let response: ScopeGraphResponse;
+    try {
+      response = await api.get<ScopeGraphResponse>(
+        `/session/${sessionId}/scope-graph`,
+      );
+    } catch (error) {
+      if (isSessionMissingError(error)) {
+        pruneSessionIdFromStorage(sessionId);
+      }
+      throw error;
+    }
 
     return {
       cbus: extractCbuSummaries(response),

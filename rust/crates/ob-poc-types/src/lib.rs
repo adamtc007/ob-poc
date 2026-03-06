@@ -27,6 +27,7 @@ pub mod investor_register;
 pub mod manco_group;
 pub mod resolution;
 pub mod semantic_stage;
+pub mod session_input;
 pub mod trading_matrix;
 pub mod viewport;
 
@@ -40,6 +41,7 @@ pub use commands::*;
 pub use decision::*;
 pub use disambiguation::*;
 pub use resolution::*;
+pub use session_input::*;
 
 // ============================================================================
 // RESOLVED KEY - UUID vs Code distinction

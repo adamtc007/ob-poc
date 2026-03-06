@@ -805,6 +805,7 @@ impl HybridVerbSearcher {
             let macro_results = self.search_macros(query, limit);
             for result in macro_results {
                 if self.matches_domain(&result.verb, domain_filter)
+                    && allowed_verbs.is_none_or(|av| av.contains(&result.verb))
                     && !seen_verbs.contains(&result.verb)
                 {
                     tracing::debug!(
@@ -836,6 +837,7 @@ impl HybridVerbSearcher {
             let lexicon_results = lexicon.search_verbs(&normalized, None, limit);
             for candidate in lexicon_results {
                 if self.matches_domain(&candidate.dsl_verb, domain_filter)
+                    && allowed_verbs.is_none_or(|av| av.contains(&candidate.dsl_verb))
                     && !seen_verbs.contains(&candidate.dsl_verb)
                 {
                     // Determine source based on score: exact (1.0) vs token overlap (<1.0)
@@ -870,7 +872,9 @@ impl HybridVerbSearcher {
         // 1. User-specific learned phrases (exact match)
         if let Some(uid) = user_id {
             if let Some(result) = self.search_user_learned_exact(uid, &normalized).await? {
-                if self.matches_domain(&result.verb, domain_filter) {
+                if self.matches_domain(&result.verb, domain_filter)
+                    && allowed_verbs.is_none_or(|av| av.contains(&result.verb))
+                {
                     seen_verbs.insert(result.verb.clone());
                     results.push(result);
                 }
@@ -882,7 +886,9 @@ impl HybridVerbSearcher {
             if let Some(learned) = &self.learned_data {
                 let guard = learned.read().await;
                 if let Some(verb) = guard.resolve_phrase(&normalized) {
-                    if self.matches_domain(verb, domain_filter) {
+                    if self.matches_domain(verb, domain_filter)
+                        && allowed_verbs.is_none_or(|av| av.contains(verb))
+                    {
                         let description = self.get_verb_description(verb).await;
                         results.push(VerbSearchResult {
                             verb: verb.to_string(),
@@ -893,6 +899,48 @@ impl HybridVerbSearcher {
                             journey: None,
                         });
                         seen_verbs.insert(verb.to_string());
+                    }
+                }
+            }
+        }
+
+        // 2.5 Exact pattern match from dsl_verbs arrays (yaml_intent_patterns + intent_patterns).
+        // This enables deterministic phrase matching immediately after YAML sync,
+        // without requiring a populate_embeddings run.
+        if results.is_empty() {
+            if let Some(ref verb_service) = self.verb_service {
+                let allowed_vec =
+                    allowed_verbs.map(|verbs| verbs.iter().cloned().collect::<Vec<String>>());
+                match verb_service
+                    .find_exact_verb_patterns(&normalized, allowed_vec.as_deref(), limit)
+                    .await
+                {
+                    Ok(exact_matches) => {
+                        tracing::debug!(
+                            query = %normalized,
+                            matches = exact_matches.len(),
+                            "VerbSearch: exact dsl_verbs pattern lookup"
+                        );
+                        for matched in exact_matches {
+                            if !self.matches_domain(&matched.verb, domain_filter)
+                                || seen_verbs.contains(&matched.verb)
+                            {
+                                continue;
+                            }
+                            let description = self.get_verb_description(&matched.verb).await;
+                            seen_verbs.insert(matched.verb.clone());
+                            results.push(VerbSearchResult {
+                                verb: matched.verb,
+                                score: 1.0,
+                                source: VerbSearchSource::GlobalLearned,
+                                matched_phrase: matched.phrase,
+                                description,
+                                journey: None,
+                            });
+                        }
+                    }
+                    Err(e) => {
+                        tracing::warn!(error = %e, "VerbSearch: exact dsl_verbs pattern lookup failed");
                     }
                 }
             }

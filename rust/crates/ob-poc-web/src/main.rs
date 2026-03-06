@@ -24,7 +24,7 @@ use crate::state::AppState;
 
 // Import API routers from main ob-poc crate
 use ob_poc::api::{
-    control_routes, create_agent_router_with_semantic, create_attribute_router,
+    control_routes, create_agent_router_with_semantic_and_repl, create_attribute_router,
     create_cbu_session_router_with_pool, create_client_router, create_deal_router,
     create_dsl_viewer_router, create_entity_router, create_graph_router, create_resolution_router,
     create_scoped_entity_router, create_session_graph_router, create_session_store,
@@ -434,46 +434,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .allow_methods(Any)
         .allow_headers(Any);
 
-    // Build stateless API router (from main ob-poc crate) with SHARED session store
-    // Use async semantic-enabled router for Candle-based verb search
-    let agent_router =
-        create_agent_router_with_semantic(pool.clone(), sessions.clone(), sem_os_client.clone())
-            .await;
-
-    let api_router: Router<()> = Router::new()
-        .merge(agent_router)
-        .merge(create_attribute_router(pool.clone()))
-        .merge(create_entity_router())
-        .merge(create_dsl_viewer_router(pool.clone()))
-        .merge(create_resolution_router(sessions.clone(), gateway_resolver))
-        // Client portal router (separate auth, scoped access)
-        .merge(create_client_router(pool.clone(), sessions.clone()))
-        // Trading matrix router (custody taxonomy browser)
-        .merge(create_trading_matrix_router(pool.clone()))
-        // Taxonomy navigation router (fractal drill-down)
-        .merge(create_taxonomy_router(pool.clone(), sessions.clone()))
-        // Deal taxonomy router (deal visualization and navigation)
-        .merge(create_deal_router(pool.clone(), sessions.clone()))
-        // Graph visualization (legacy CBU endpoints)
-        .merge(create_graph_router(pool.clone()))
-        // Session-scoped graph (shares state with REPL and taxonomy)
-        .merge(create_session_graph_router(pool.clone(), sessions.clone()))
-        // Galaxy navigation - universe view and cluster detail
-        .merge(create_universe_router(pool.clone()))
-        // Control/ownership routes (board controller, control sphere)
-        .merge(control_routes(pool.clone()))
-        // Session-scoped entity search (constraint cascade)
-        .merge(create_scoped_entity_router(sessions.clone()))
-        // Service resource pipeline (intents, discovery, readiness)
-        .merge(service_resource_router(pool.clone()))
-        // CBU session management (load/unload CBUs, undo/redo)
-        .nest(
-            "/api/cbu-session",
-            create_cbu_session_router_with_pool(pool.clone()),
-        )
-        // Stewardship routes (focus, show loop, SSE, manifests)
-        .merge(create_stewardship_router(pool.clone()));
-
     // Build voice matching router (semantic + phonetic)
     let voice_router = routes::voice::create_voice_router(pool.clone());
 
@@ -627,7 +587,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // =========================================================================
     // REPL V2 — Pack-Guided Runbook Pipeline
     // =========================================================================
-    let repl_v2_router = {
+    let (repl_v2_router, repl_v2_orchestrator) = {
         use ob_poc::api::repl_routes_v2::{self, ReplV2RouteState};
         use ob_poc::journey::router::PackRouter;
         use ob_poc::repl::orchestrator_v2::ReplOrchestratorV2;
@@ -918,14 +878,63 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             tracing::info!("REPL V2: SemOS client wired for context-constrained verb search");
         }
 
+        let repl_v2_orchestrator = Arc::new(orchestrator);
         let v2_state = ReplV2RouteState {
-            orchestrator: Arc::new(orchestrator),
+            orchestrator: repl_v2_orchestrator.clone(),
         };
 
         tracing::info!("REPL V2 orchestrator initialized with semantic intent service");
 
-        repl_routes_v2::router().with_state(v2_state)
+        (
+            repl_routes_v2::router().with_state(v2_state),
+            repl_v2_orchestrator,
+        )
     };
+
+    // Build stateless API router (from main ob-poc crate) with SHARED session store.
+    // Unified input endpoint (`/api/session/:id/input`) receives the REPL V2 adapter.
+    let agent_router = create_agent_router_with_semantic_and_repl(
+        pool.clone(),
+        sessions.clone(),
+        sem_os_client.clone(),
+        Some(repl_v2_orchestrator),
+    )
+    .await;
+
+    let api_router: Router<()> = Router::new()
+        .merge(agent_router)
+        .merge(create_attribute_router(pool.clone()))
+        .merge(create_entity_router())
+        .merge(create_dsl_viewer_router(pool.clone()))
+        .merge(create_resolution_router(sessions.clone(), gateway_resolver))
+        // Client portal router (separate auth, scoped access)
+        .merge(create_client_router(pool.clone(), sessions.clone()))
+        // Trading matrix router (custody taxonomy browser)
+        .merge(create_trading_matrix_router(pool.clone()))
+        // Taxonomy navigation router (fractal drill-down)
+        .merge(create_taxonomy_router(pool.clone(), sessions.clone()))
+        // Deal taxonomy router (deal visualization and navigation)
+        // Mounted under /api so routes like /api/session/:id/deal-context resolve.
+        .nest("/api", create_deal_router(pool.clone(), sessions.clone()))
+        // Graph visualization (legacy CBU endpoints)
+        .merge(create_graph_router(pool.clone()))
+        // Session-scoped graph (shares state with REPL and taxonomy)
+        .merge(create_session_graph_router(pool.clone(), sessions.clone()))
+        // Galaxy navigation - universe view and cluster detail
+        .merge(create_universe_router(pool.clone()))
+        // Control/ownership routes (board controller, control sphere)
+        .merge(control_routes(pool.clone()))
+        // Session-scoped entity search (constraint cascade)
+        .merge(create_scoped_entity_router(sessions.clone()))
+        // Service resource pipeline (intents, discovery, readiness)
+        .merge(service_resource_router(pool.clone()))
+        // CBU session management (load/unload CBUs, undo/redo)
+        .nest(
+            "/api/cbu-session",
+            create_cbu_session_router_with_pool(pool.clone()),
+        )
+        // Stewardship routes (focus, show loop, SSE, manifests)
+        .merge(create_stewardship_router(pool.clone()));
 
     // React dist directory - serve assets from React build
     let react_dist_dir = std::env::var("REACT_DIST_DIR").unwrap_or_else(|_| {
@@ -1012,6 +1021,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing::info!("  /api/cbu              - List CBUs");
     tracing::info!("  /api/cbu/:id/graph    - Get CBU graph");
     tracing::info!("  /api/session          - Session management");
+    tracing::info!("  /api/session/:id/input - Unified session input (chat/decision/repl)");
     tracing::info!("  /api/session/:id/resolution/* - Entity resolution");
     tracing::info!("  /api/agent/*          - DSL generation");
     tracing::info!("  /api/entity/search    - Entity search");
@@ -1021,7 +1031,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing::info!("  /api/voice/match      - Semantic voice matching");
     tracing::info!("  /api/voice/health     - Voice matcher health");
     tracing::info!("  /api/repl/v2/session  - REPL V2 session management");
-    tracing::info!("  /api/repl/v2/session/:id/input - REPL V2 unified input");
+    tracing::info!("  /api/repl/v2/session/:id/input - Legacy (410; use /api/session/:id/input)");
     tracing::info!("  /api/universe         - Galaxy universe view");
     tracing::info!("  /api/cluster/:type/:id - Cluster detail view");
     tracing::info!("");

@@ -6,6 +6,10 @@
  */
 
 import { api } from "./client";
+import {
+  isSessionMissingError,
+  pruneSessionIdFromStorage,
+} from "./sessionStorage";
 import type {
   DealSummary,
   DealGraphResponse,
@@ -79,7 +83,9 @@ export const dealApi = {
    * Get rate card lines
    */
   async getRateCardLines(rateCardId: string): Promise<RateCardLineSummary[]> {
-    return api.get<RateCardLineSummary[]>(`/deal/rate-card/${rateCardId}/lines`);
+    return api.get<RateCardLineSummary[]>(
+      `/deal/rate-card/${rateCardId}/lines`,
+    );
   },
 
   /**
@@ -92,9 +98,7 @@ export const dealApi = {
   /**
    * Get participants for a deal
    */
-  async getDealParticipants(
-    dealId: string,
-  ): Promise<DealParticipantSummary[]> {
+  async getDealParticipants(dealId: string): Promise<DealParticipantSummary[]> {
     return api.get<DealParticipantSummary[]>(`/deal/${dealId}/participants`);
   },
 
@@ -120,7 +124,16 @@ export const dealApi = {
    * Get current deal context from session
    */
   async getSessionDealContext(sessionId: string): Promise<SessionDealContext> {
-    return api.get<SessionDealContext>(`/session/${sessionId}/deal-context`);
+    try {
+      return await api.get<SessionDealContext>(
+        `/session/${sessionId}/deal-context`,
+      );
+    } catch (error) {
+      if (isSessionMissingError(error)) {
+        pruneSessionIdFromStorage(sessionId);
+      }
+      throw error;
+    }
   },
 };
 

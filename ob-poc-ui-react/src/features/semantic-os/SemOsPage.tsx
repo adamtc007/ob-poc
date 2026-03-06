@@ -12,6 +12,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useEffect, useRef, useCallback } from "react";
 import { Loader2 } from "lucide-react";
 import { chatApi } from "../../api/chat";
+import { isSessionMissingError } from "../../api/sessionStorage";
 import { queryKeys, queryClient } from "../../lib/query";
 import { useChatStore } from "../../stores/chat";
 import { ChatMessage, ChatInput, VerbBrowser } from "../chat/components";
@@ -55,6 +56,18 @@ export function SemOsPage() {
     queryFn: () => chatApi.getSession(sessionId!),
     enabled: !!sessionId,
   });
+  const sessionMissing = isSessionMissingError(error);
+
+  useEffect(() => {
+    if (!sessionId || !sessionMissing) return;
+    queryClient.removeQueries({
+      queryKey: queryKeys.semOs.session(sessionId),
+    });
+    queryClient.invalidateQueries({
+      queryKey: queryKeys.semOs.sessions(),
+    });
+    navigate("/semantic-os", { replace: true });
+  }, [navigate, sessionId, sessionMissing]);
 
   // Update store when data changes
   useEffect(() => {
@@ -68,18 +81,25 @@ export function SemOsPage() {
   // Fetch verb surface when session loads
   useEffect(() => {
     if (!sessionId) return;
-    chatApi.getVerbSurface(sessionId).then((result) => {
-      if (result.verbs.length > 0) {
-        setAvailableVerbs(
-          result.verbs,
-          result.surface_fingerprint
-            ? { fingerprint: result.surface_fingerprint, totalRegistry: result.totalRegistry ?? 0, finalCount: result.verbs.length }
-            : undefined,
-        );
-      }
-    }).catch((err) => {
-      console.warn("[SemOsPage] getVerbSurface failed:", err);
-    });
+    chatApi
+      .getVerbSurface(sessionId)
+      .then((result) => {
+        if (result.verbs.length > 0) {
+          setAvailableVerbs(
+            result.verbs,
+            result.surface_fingerprint
+              ? {
+                  fingerprint: result.surface_fingerprint,
+                  totalRegistry: result.totalRegistry ?? 0,
+                  finalCount: result.verbs.length,
+                }
+              : undefined,
+          );
+        }
+      })
+      .catch((err) => {
+        console.warn("[SemOsPage] getVerbSurface failed:", err);
+      });
   }, [sessionId, setAvailableVerbs]);
 
   // Scroll to bottom when messages change
@@ -113,7 +133,11 @@ export function SemOsPage() {
         setAvailableVerbs(
           response.available_verbs,
           response.surface_fingerprint
-            ? { fingerprint: response.surface_fingerprint, totalRegistry: 0, finalCount: response.available_verbs.length }
+            ? {
+                fingerprint: response.surface_fingerprint,
+                totalRegistry: 0,
+                finalCount: response.available_verbs.length,
+              }
             : undefined,
         );
       }
@@ -137,7 +161,11 @@ export function SemOsPage() {
         setAvailableVerbs(
           response.available_verbs,
           response.surface_fingerprint
-            ? { fingerprint: response.surface_fingerprint, totalRegistry: 0, finalCount: response.available_verbs.length }
+            ? {
+                fingerprint: response.surface_fingerprint,
+                totalRegistry: 0,
+                finalCount: response.available_verbs.length,
+              }
             : undefined,
         );
       }
@@ -253,18 +281,21 @@ export function SemOsPage() {
           isStreaming={isStreaming}
           disabled={!sessionId || sendMutation.isPending}
           placeholder={
-            sessionId
-              ? "Type a message..."
-              : "Select or create a session first"
+            sessionId ? "Type a message..." : "Select or create a session first"
           }
         />
       </div>
 
       {/* Right sidebar - Registry context + Verb browser */}
-      <div className="w-64 flex-shrink-0 border-l border-[var(--border-primary)] bg-[var(--bg-secondary)] flex flex-col overflow-hidden">
-        <SemOsContextPanel className="" />
-        <VerbBrowser className="border-t border-[var(--border-primary)]" onVerbSubmit={handleVerbSubmit} />
-      </div>
+      {!sessionMissing && (
+        <div className="w-64 flex-shrink-0 border-l border-[var(--border-primary)] bg-[var(--bg-secondary)] flex flex-col overflow-hidden">
+          <SemOsContextPanel className="" />
+          <VerbBrowser
+            className="border-t border-[var(--border-primary)]"
+            onVerbSubmit={handleVerbSubmit}
+          />
+        </div>
+      )}
     </div>
   );
 }

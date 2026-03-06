@@ -303,6 +303,117 @@ pub struct AgentService {
 }
 
 impl AgentService {
+    /// Return true when session context checks should not enforce client/deal gating.
+    ///
+    /// Semantic OS workflows are registry-scoped and should not force
+    /// client-group/deal prompts before intent routing.
+    fn skips_client_scope_gate(stage_focus: Option<&str>) -> bool {
+        matches!(stage_focus, Some(s) if s.starts_with("semos-"))
+    }
+
+    /// Best-effort NL mapping for Semantic OS workflow selection prompts.
+    ///
+    /// Returns workflow choice ID expected by the pending decision packet.
+    fn infer_semos_workflow_choice(input_lower: &str) -> Option<&'static str> {
+        let normalized = input_lower.trim();
+        if normalized.is_empty() {
+            return None;
+        }
+
+        // Order matters: prefer explicit data-management phrasing first.
+        if normalized.contains("data management")
+            || normalized.contains("manage data")
+            || normalized.contains("data entity")
+            || normalized.contains("entity data")
+            || normalized.contains("data entities")
+            || normalized.contains("entity management")
+            || normalized.contains("taxonomy")
+            || normalized.contains("data governance")
+        {
+            return Some("3");
+        }
+
+        if normalized.contains("onboarding") || normalized.contains("onboard") {
+            return Some("1");
+        }
+
+        if normalized.contains("kyc")
+            || normalized.contains("know your customer")
+            || normalized.contains("screening")
+            || normalized.contains("due diligence")
+        {
+            return Some("2");
+        }
+
+        if normalized.contains("stewardship")
+            || normalized.contains("publish")
+            || normalized.contains("changeset")
+            || normalized.contains("change set")
+        {
+            return Some("4");
+        }
+
+        None
+    }
+
+    /// Map Semantic OS stage focus to SemReg phase-tag goals.
+    ///
+    /// `semos-data-management` is intentionally expanded to include:
+    /// - `data` (registry/data stewardship verbs)
+    /// - `deal` (commercial data records)
+    /// - `onboarding` (CBU-tagged data records)
+    /// - `kyc` (document-tagged records)
+    /// - `navigation` (session/view navigation verbs)
+    fn stage_focus_goals(stage_focus: Option<&str>) -> Vec<String> {
+        match stage_focus {
+            Some("semos-data-management") | Some("semos-data") => vec![
+                "data-management".to_string(),
+                "data".to_string(),
+                "deal".to_string(),
+                "onboarding".to_string(),
+                "kyc".to_string(),
+                "navigation".to_string(),
+            ],
+            Some(s) if s.starts_with("semos-") => {
+                vec![s.strip_prefix("semos-").unwrap_or_default().to_string()]
+            }
+            _ => vec![],
+        }
+    }
+
+    /// Whether a pending decision is a hard gate that must be resolved first.
+    fn is_mandatory_pending_decision(packet: &ob_poc_types::DecisionPacket) -> bool {
+        use ob_poc_types::DecisionKind;
+        matches!(packet.kind, DecisionKind::ClarifyGroup)
+            || (matches!(packet.kind, DecisionKind::ClarifyScope)
+                && packet.trace.decision_reason == "semos_workflow_selection")
+    }
+
+    /// Build and return a retry response while restoring pending decision state.
+    fn reprompt_pending_decision(
+        session: &mut UnifiedSession,
+        packet: ob_poc_types::DecisionPacket,
+        message: String,
+    ) -> AgentChatResponse {
+        session.pending_decision = Some(packet.clone());
+        session.add_agent_message(message.clone(), None, None);
+        AgentChatResponse {
+            message,
+            session_state: SessionState::PendingValidation,
+            can_execute: false,
+            dsl_source: None,
+            ast: None,
+            disambiguation: None,
+            commands: None,
+            unresolved_refs: None,
+            current_ref_index: None,
+            dsl_hash: None,
+            verb_disambiguation: None,
+            intent_tier: None,
+            decision: Some(packet),
+        }
+    }
+
     /// Create agent service with pool and embedder
     ///
     /// The embedder is REQUIRED for semantic verb search. All prompts go through
@@ -530,18 +641,12 @@ impl AgentService {
         use crate::agent::orchestrator::OrchestratorContext;
 
         // Map stage_focus to SemReg goals for verb phase_tag filtering.
-        // Convention: stage_focus "semos-kyc" → goals ["kyc"].
-        let goals = match session.context.stage_focus.as_deref() {
-            Some(s) if s.starts_with("semos-") => {
-                vec![s.strip_prefix("semos-").unwrap().to_string()]
-            }
-            _ => vec![],
-        };
+        let goals = Self::stage_focus_goals(session.context.stage_focus.as_deref());
 
         OrchestratorContext {
             actor,
             session_id: Some(session.id),
-            case_id: Some(session.id), // Use session ID as case ID
+            case_id: session.current_case.as_ref().map(|c| c.case_id),
             dominant_entity_id: session.context.dominant_entity_id,
             scope: session.context.client_scope.clone(),
             pool: self.pool.clone(),
@@ -691,6 +796,7 @@ impl AgentService {
         if let Some(pending) = session.pending_decision.take() {
             // Check if input is a number (1, 2, 3, etc.) or special keyword
             let input_upper = input.trim().to_uppercase();
+            let input_lower = input.trim().to_lowercase();
             if input_upper == "NEW"
                 || input_upper == "SKIP"
                 || input.trim().parse::<usize>().is_ok()
@@ -721,32 +827,26 @@ impl AgentService {
                 }
 
                 // Invalid selection — restore pending so user can retry
-                let msg = format!(
-                    "Please select a valid option (1-{}) or type NEW/SKIP.",
-                    pending.choices.len()
-                );
-                session.add_agent_message(msg.clone(), None, None);
-                return Ok(AgentChatResponse {
-                    message: msg,
-
-                    session_state: SessionState::PendingValidation,
-                    can_execute: false,
-                    dsl_source: None,
-                    ast: None,
-                    disambiguation: None,
-                    commands: None,
-                    unresolved_refs: None,
-                    current_ref_index: None,
-                    dsl_hash: None,
-                    verb_disambiguation: None,
-                    intent_tier: None,
-                    decision: Some(pending),
-                });
+                let msg = if pending
+                    .choices
+                    .iter()
+                    .any(|c| c.id == "NEW" || c.id == "SKIP")
+                {
+                    format!(
+                        "Please select a valid option (1-{}) or type NEW/SKIP.",
+                        pending.choices.len()
+                    )
+                } else {
+                    format!(
+                        "Please select a valid option (1-{}).",
+                        pending.choices.len()
+                    )
+                };
+                return Ok(Self::reprompt_pending_decision(session, pending, msg));
             }
             // Not a number/keyword - try fuzzy match against choice labels
             // This handles cases like typing "aviva" when the choices list
             // contains "Aviva Investors"
-            let input_lower = input.trim().to_lowercase();
             if let Some(matched_idx) = pending
                 .choices
                 .iter()
@@ -756,6 +856,18 @@ impl AgentService {
                 return self
                     .handle_decision_selection(session, &pending, &choice)
                     .await;
+            }
+
+            // Semantic OS workflow selection accepts natural language intents,
+            // e.g. "I want to manage data" should map to Data Management.
+            if pending.trace.decision_reason == "semos_workflow_selection" {
+                if let Some(choice_id) = Self::infer_semos_workflow_choice(&input_lower) {
+                    if let Some(choice) = pending.choices.iter().find(|c| c.id == choice_id) {
+                        return self
+                            .handle_decision_selection(session, &pending, choice)
+                            .await;
+                    }
+                }
             }
 
             // No match found against choice labels.
@@ -781,8 +893,12 @@ impl AgentService {
                     .await;
                 // Fall through to process original input via intent pipeline
             }
-            // For non-deal decisions, pending is already taken (cleared).
-            // Fall through to process input via intent pipeline.
+            // Mandatory decisions must remain active until user picks an option.
+            if Self::is_mandatory_pending_decision(&pending) {
+                let msg = pending.prompt.clone();
+                return Ok(Self::reprompt_pending_decision(session, pending, msg));
+            }
+            // Optional decisions can fall through to the normal intent pipeline.
         }
 
         // 4. Check for pending intent tier selection
@@ -1287,6 +1403,12 @@ impl AgentService {
             DecisionPacket, DecisionTrace, SessionStateView, UserChoice,
         };
 
+        // Semantic OS workflow sessions are registry-scoped and should not be
+        // blocked on client/deal context collection.
+        if Self::skips_client_scope_gate(session.context.stage_focus.as_deref()) {
+            return None;
+        }
+
         // Skip context check if session already has deal context or gate was skipped
         if session.context.deal_id.is_some() || session.context.deal_gate_skipped {
             return None;
@@ -1557,6 +1679,7 @@ impl AgentService {
         use ob_poc_types::{ClarificationPayload, DecisionKind};
 
         let message = match &packet.kind {
+            DecisionKind::Proposal => format!("Selected: {}", choice.label),
             DecisionKind::ClarifyGroup => {
                 // Handle client group selection
                 if let ClarificationPayload::Group(group_payload) = &packet.payload {
@@ -1618,7 +1741,28 @@ impl AgentService {
                     }
                 }
             }
-            _ => format!("Selected: {}", choice.label),
+            DecisionKind::ClarifyScope => {
+                let is_semos = packet.trace.decision_reason == "semos_workflow_selection";
+                if is_semos {
+                    let stage_focus = match choice.id.as_str() {
+                        "1" => "semos-onboarding",
+                        "2" => "semos-kyc",
+                        "3" => "semos-data-management",
+                        "4" => "semos-stewardship",
+                        _ => "semos-data-management",
+                    };
+                    session.context.stage_focus = Some(stage_focus.to_string());
+                    format!(
+                        "Great, let's work on {}. I'll scope to that workflow.",
+                        choice.label
+                    )
+                } else {
+                    format!("Selected scope: {}", choice.label)
+                }
+            }
+            DecisionKind::ClarifyVerb => format!("Selected verb: {}", choice.label),
+            DecisionKind::ClarifyEntity => format!("Selected entity: {}", choice.label),
+            DecisionKind::Refuse => format!("Selected: {}", choice.label),
         };
 
         session.add_agent_message(message.clone(), None, None);

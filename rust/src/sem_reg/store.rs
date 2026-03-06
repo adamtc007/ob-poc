@@ -117,9 +117,28 @@ impl SnapshotStore {
     ) -> Result<Option<SnapshotRow>> {
         let row = sqlx::query_as::<_, PgSnapshotRow>(
             r#"
-            SELECT *
+            SELECT
+                snapshot_id,
+                snapshot_set_id,
+                object_type::text AS object_type,
+                object_id,
+                version_major,
+                version_minor,
+                status::text AS status,
+                governance_tier::text AS governance_tier,
+                trust_class::text AS trust_class,
+                security_label,
+                effective_from,
+                effective_until,
+                predecessor_id,
+                change_type::text AS change_type,
+                change_rationale,
+                created_by,
+                approved_by,
+                definition,
+                created_at
             FROM sem_reg.snapshots
-            WHERE object_type = $1
+            WHERE object_type::text = $1
               AND object_id = $2
               AND status = 'active'
               AND effective_until IS NULL
@@ -143,9 +162,28 @@ impl SnapshotStore {
     ) -> Result<Option<SnapshotRow>> {
         let row = sqlx::query_as::<_, PgSnapshotRow>(
             r#"
-            SELECT *
+            SELECT
+                snapshot_id,
+                snapshot_set_id,
+                object_type::text AS object_type,
+                object_id,
+                version_major,
+                version_minor,
+                status::text AS status,
+                governance_tier::text AS governance_tier,
+                trust_class::text AS trust_class,
+                security_label,
+                effective_from,
+                effective_until,
+                predecessor_id,
+                change_type::text AS change_type,
+                change_rationale,
+                created_by,
+                approved_by,
+                definition,
+                created_at
             FROM sem_reg.snapshots
-            WHERE object_type = $1
+            WHERE object_type::text = $1
               AND object_id = $2
               AND status = 'active'
               AND effective_from <= $3
@@ -172,9 +210,28 @@ impl SnapshotStore {
     ) -> Result<Vec<SnapshotRow>> {
         let rows = sqlx::query_as::<_, PgSnapshotRow>(
             r#"
-            SELECT *
+            SELECT
+                snapshot_id,
+                snapshot_set_id,
+                object_type::text AS object_type,
+                object_id,
+                version_major,
+                version_minor,
+                status::text AS status,
+                governance_tier::text AS governance_tier,
+                trust_class::text AS trust_class,
+                security_label,
+                effective_from,
+                effective_until,
+                predecessor_id,
+                change_type::text AS change_type,
+                change_rationale,
+                created_by,
+                approved_by,
+                definition,
+                created_at
             FROM sem_reg.snapshots
-            WHERE object_type = $1
+            WHERE object_type::text = $1
               AND object_id = $2
             ORDER BY effective_from DESC
             "#,
@@ -197,9 +254,28 @@ impl SnapshotStore {
     ) -> Result<Vec<SnapshotRow>> {
         let rows = sqlx::query_as::<_, PgSnapshotRow>(
             r#"
-            SELECT *
+            SELECT
+                snapshot_id,
+                snapshot_set_id,
+                object_type::text AS object_type,
+                object_id,
+                version_major,
+                version_minor,
+                status::text AS status,
+                governance_tier::text AS governance_tier,
+                trust_class::text AS trust_class,
+                security_label,
+                effective_from,
+                effective_until,
+                predecessor_id,
+                change_type::text AS change_type,
+                change_rationale,
+                created_by,
+                approved_by,
+                definition,
+                created_at
             FROM sem_reg.snapshots
-            WHERE object_type = $1
+            WHERE object_type::text = $1
               AND status = 'active'
               AND effective_until IS NULL
             ORDER BY created_at DESC
@@ -257,9 +333,28 @@ impl SnapshotStore {
         // We build a simple query since the field name is controlled by us
         let query = format!(
             r#"
-            SELECT *
+            SELECT
+                snapshot_id,
+                snapshot_set_id,
+                object_type::text AS object_type,
+                object_id,
+                version_major,
+                version_minor,
+                status::text AS status,
+                governance_tier::text AS governance_tier,
+                trust_class::text AS trust_class,
+                security_label,
+                effective_from,
+                effective_until,
+                predecessor_id,
+                change_type::text AS change_type,
+                change_rationale,
+                created_by,
+                approved_by,
+                definition,
+                created_at
             FROM sem_reg.snapshots
-            WHERE object_type = $1
+            WHERE object_type::text = $1
               AND status = 'active'
               AND effective_until IS NULL
               AND definition->>'{field_name}' = $2

@@ -200,6 +200,96 @@ entity.read:
   target_types: [entity]
   crud_type: read
 
+# Deal Domain - Deal Record management
+deal.list:
+  pref_label: "list deals"
+  alt_labels:
+    - "show deals"
+    - "show me deals"
+    - "show me deal record"
+    - "deal pipeline"
+    - "sales pipeline"
+  invocation_phrases:
+    - "show me deal records"
+    - "list deals"
+    - "show all deals"
+  domain: deal
+  target_types: []
+  crud_type: read
+
+deal.get:
+  pref_label: "get deal"
+  alt_labels:
+    - "show deal"
+    - "deal details"
+    - "deal record"
+    - "show me deal"
+  invocation_phrases:
+    - "show me deal record"
+    - "show deal details"
+  domain: deal
+  target_types: []
+  crud_type: read
+
+deal.search:
+  pref_label: "search deals"
+  alt_labels:
+    - "find deal"
+    - "lookup deal"
+    - "query deal"
+  invocation_phrases:
+    - "find deal record"
+    - "search deals"
+  domain: deal
+  target_types: []
+  crud_type: read
+
+# Document Domain
+document.for-entity:
+  pref_label: "list documents"
+  alt_labels:
+    - "show documents"
+    - "show me documents"
+    - "entity documents"
+    - "document list"
+  invocation_phrases:
+    - "show documents for entity"
+    - "list documents"
+    - "show me documents"
+  domain: document
+  target_types: [entity]
+  crud_type: read
+
+# Product Domain
+product.list:
+  pref_label: "list products"
+  alt_labels:
+    - "show products"
+    - "show me products"
+    - "product catalog"
+    - "offerings"
+  invocation_phrases:
+    - "list products"
+    - "show me products"
+    - "show product catalog"
+  domain: product
+  target_types: []
+  crud_type: read
+
+product.read:
+  pref_label: "get product"
+  alt_labels:
+    - "show product"
+    - "show me product"
+    - "product details"
+    - "offering details"
+  invocation_phrases:
+    - "show me product details"
+    - "get product by code"
+  domain: product
+  target_types: []
+  crud_type: read
+
 # UBO Domain - Ultimate Beneficial Ownership
 ubo.list-ubos:
   pref_label: "discover ubo"

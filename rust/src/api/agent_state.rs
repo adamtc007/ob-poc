@@ -43,6 +43,9 @@ pub struct AgentState {
     pub policy_gate: Arc<PolicyGate>,
     /// Semantic OS client for SemReg verb filtering (governance enforcement)
     pub sem_os_client: Option<Arc<dyn sem_os_client::SemOsClient>>,
+    #[cfg(feature = "vnext-repl")]
+    /// REPL V2 orchestrator used by unified `/api/session/:id/input` adapter.
+    pub repl_v2_orchestrator: Option<Arc<crate::repl::orchestrator_v2::ReplOrchestratorV2>>,
 }
 
 impl AgentState {
@@ -374,6 +377,8 @@ impl AgentState {
             entity_linker,
             policy_gate,
             sem_os_client,
+            #[cfg(feature = "vnext-repl")]
+            repl_v2_orchestrator: None,
         }
     }
 }
@@ -393,5 +398,18 @@ pub async fn create_agent_router_with_semantic(
     sem_os_client: Option<Arc<dyn sem_os_client::SemOsClient>>,
 ) -> Router {
     let state = AgentState::with_semantic(pool, sessions, sem_os_client).await;
+    crate::api::agent_routes::create_agent_router_with_state(state)
+}
+
+/// Create agent router with semantic verb search and an optional REPL V2 adapter.
+#[cfg(feature = "vnext-repl")]
+pub async fn create_agent_router_with_semantic_and_repl(
+    pool: PgPool,
+    sessions: SessionStore,
+    sem_os_client: Option<Arc<dyn sem_os_client::SemOsClient>>,
+    repl_v2_orchestrator: Option<Arc<crate::repl::orchestrator_v2::ReplOrchestratorV2>>,
+) -> Router {
+    let mut state = AgentState::with_semantic(pool, sessions, sem_os_client).await;
+    state.repl_v2_orchestrator = repl_v2_orchestrator;
     crate::api::agent_routes::create_agent_router_with_state(state)
 }

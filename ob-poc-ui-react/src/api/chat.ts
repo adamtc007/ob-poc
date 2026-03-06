@@ -6,6 +6,11 @@
  */
 
 import { api } from "./client";
+import {
+  CHAT_SESSIONS_STORAGE_KEY,
+  isSessionMissingError,
+  pruneSessionIdFromStorage,
+} from "./sessionStorage";
 import type {
   ChatSession,
   ChatSessionSummary,
@@ -83,7 +88,7 @@ export const chatApi = {
   listSessions(): Promise<ChatSessionSummary[]> {
     // Backend doesn't persist session list - return empty
     // In future, could store session IDs in localStorage
-    const stored = localStorage.getItem("ob-poc-sessions");
+    const stored = localStorage.getItem(CHAT_SESSIONS_STORAGE_KEY);
     if (stored) {
       try {
         return Promise.resolve(JSON.parse(stored));
@@ -96,12 +101,22 @@ export const chatApi = {
 
   /** Get a chat session with messages */
   async getSession(id: string): Promise<ChatSession> {
-    const backend = await api.get<BackendSession>(`/session/${id}`);
-    return mapBackendSession(backend);
+    try {
+      const backend = await api.get<BackendSession>(`/session/${id}`);
+      return mapBackendSession(backend);
+    } catch (error) {
+      if (isSessionMissingError(error)) {
+        pruneSessionIdFromStorage(id);
+      }
+      throw error;
+    }
   },
 
   /** Create a new chat session */
-  async createSession(title?: string, workflowFocus?: string): Promise<ChatSession> {
+  async createSession(
+    title?: string,
+    workflowFocus?: string,
+  ): Promise<ChatSession> {
     // Backend returns CreateSessionResponse: { session_id, created_at, state, welcome_message, decision? }
     const body: Record<string, unknown> = {};
     if (workflowFocus) {
@@ -159,7 +174,7 @@ export const chatApi = {
     }
 
     // Store session ID locally for listing
-    const stored = localStorage.getItem("ob-poc-sessions");
+    const stored = localStorage.getItem(CHAT_SESSIONS_STORAGE_KEY);
     const sessions: ChatSessionSummary[] = stored ? JSON.parse(stored) : [];
     sessions.unshift({
       id: session.id,
@@ -169,7 +184,7 @@ export const chatApi = {
       message_count: 0,
     });
     localStorage.setItem(
-      "ob-poc-sessions",
+      CHAT_SESSIONS_STORAGE_KEY,
       JSON.stringify(sessions.slice(0, 50)),
     ); // Keep last 50
 
@@ -179,11 +194,11 @@ export const chatApi = {
   /** Delete a chat session */
   async deleteSession(id: string): Promise<void> {
     // Always remove from local storage first — session list is localStorage-driven
-    const stored = localStorage.getItem("ob-poc-sessions");
+    const stored = localStorage.getItem(CHAT_SESSIONS_STORAGE_KEY);
     if (stored) {
       const sessions: ChatSessionSummary[] = JSON.parse(stored);
       const filtered = sessions.filter((s) => s.id !== id);
-      localStorage.setItem("ob-poc-sessions", JSON.stringify(filtered));
+      localStorage.setItem(CHAT_SESSIONS_STORAGE_KEY, JSON.stringify(filtered));
     }
 
     // Best-effort backend cleanup (idempotent — 204 even if not in memory)
@@ -195,41 +210,86 @@ export const chatApi = {
   },
 
   /**
-   * Send a message to a session (via /chat endpoint)
-   * Backend: POST /api/session/:id/chat
+   * Send a message to a session (via unified /input endpoint)
+   * Backend: POST /api/session/:id/input with { kind: "utterance", ... }
    */
   async sendMessage(
     sessionId: string,
     request: SendMessageRequest,
   ): Promise<SendMessageResponse> {
-    const response = await api.post<{
-      message?: string;
-      response?: string;
-      dsl?: { source?: string } | string;
-      generated_dsl?: string;
-      session_state?: string;
-      unresolved_refs?: unknown[];
-      verb_disambiguation?: unknown;
-      intent_tier?: unknown;
-      clarification?: unknown;
-      error?: string;
-      available_verbs?: VerbProfile[];
-      surface_fingerprint?: string;
-      // Backend DecisionPacket for client group/deal/verb clarification
-      decision?: {
-        packet_id: string;
-        kind: string; // "ClarifyGroup" | "ClarifyDeal" | "ClarifyVerb" | "ClarifyScope"
-        prompt: string;
-        choices: Array<{
-          id: string;
-          label: string;
-          description: string;
-          is_escape?: boolean;
-        }>;
-        payload: unknown;
-        confirm_token?: string;
+    let envelope: {
+      kind: "chat";
+      response: {
+        message?: string;
+        response?: string;
+        dsl?: { source?: string } | string;
+        generated_dsl?: string;
+        session_state?: string;
+        unresolved_refs?: unknown[];
+        verb_disambiguation?: unknown;
+        intent_tier?: unknown;
+        clarification?: unknown;
+        error?: string;
+        available_verbs?: VerbProfile[];
+        surface_fingerprint?: string;
+        // Backend DecisionPacket for client group/deal/verb clarification
+        decision?: {
+          packet_id: string;
+          kind: string;
+          prompt: string;
+          choices: Array<{
+            id: string;
+            label: string;
+            description: string;
+            is_escape?: boolean;
+          }>;
+          payload: unknown;
+          confirm_token?: string;
+        };
       };
-    }>(`/session/${sessionId}/chat`, { message: request.message });
+    };
+    try {
+      envelope = await api.post<{
+        kind: "chat";
+        response: {
+          message?: string;
+          response?: string;
+          dsl?: { source?: string } | string;
+          generated_dsl?: string;
+          session_state?: string;
+          unresolved_refs?: unknown[];
+          verb_disambiguation?: unknown;
+          intent_tier?: unknown;
+          clarification?: unknown;
+          error?: string;
+          available_verbs?: VerbProfile[];
+          surface_fingerprint?: string;
+          // Backend DecisionPacket for client group/deal/verb clarification
+          decision?: {
+            packet_id: string;
+            kind: string;
+            prompt: string;
+            choices: Array<{
+              id: string;
+              label: string;
+              description: string;
+              is_escape?: boolean;
+            }>;
+            payload: unknown;
+            confirm_token?: string;
+          };
+        };
+      }>(`/session/${sessionId}/input`, {
+        kind: "utterance",
+        message: request.message,
+      });
+    } catch (error) {
+      if (isSessionMissingError(error)) {
+        pruneSessionIdFromStorage(sessionId);
+      }
+      throw error;
+    }
+    const response = envelope.response;
 
     // Extract content from response - backend uses 'message' field
     let content = response.message || response.response || "";
@@ -316,7 +376,7 @@ export const chatApi = {
     }
 
     // Update local storage message count
-    const stored = localStorage.getItem("ob-poc-sessions");
+    const stored = localStorage.getItem(CHAT_SESSIONS_STORAGE_KEY);
     if (stored) {
       const sessions: ChatSessionSummary[] = JSON.parse(stored);
       const session = sessions.find((s) => s.id === sessionId);
@@ -324,7 +384,10 @@ export const chatApi = {
         session.message_count = (session.message_count || 0) + 2;
         session.updated_at = new Date().toISOString();
         session.last_message_preview = request.message.slice(0, 100);
-        localStorage.setItem("ob-poc-sessions", JSON.stringify(sessions));
+        localStorage.setItem(
+          CHAT_SESSIONS_STORAGE_KEY,
+          JSON.stringify(sessions),
+        );
       }
     }
 
@@ -338,7 +401,13 @@ export const chatApi = {
 
     return {
       message: assistantMessage,
-      session: session || { id: sessionId, title: "", created_at: new Date().toISOString(), updated_at: new Date().toISOString(), messages: [] },
+      session: session || {
+        id: sessionId,
+        title: "",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        messages: [],
+      },
       available_verbs: response.available_verbs,
       surface_fingerprint: response.surface_fingerprint,
     };
@@ -348,34 +417,59 @@ export const chatApi = {
   async replyToDecision(
     sessionId: string,
     reply: DecisionReply,
-  ): Promise<{ message: ChatMessage; available_verbs?: VerbProfile[]; surface_fingerprint?: string }> {
-    // Map frontend DecisionReply to backend DecisionReplyRequest format
-    // Backend expects: { packet_id, reply: UserReply } where UserReply is a tagged enum
+  ): Promise<{
+    message: ChatMessage;
+    available_verbs?: VerbProfile[];
+    surface_fingerprint?: string;
+  }> {
+    // Map frontend DecisionReply to backend UserReply (tagged with "action").
     let userReply: unknown;
     if (reply.selected_option !== undefined) {
-      // selected_option is the choice ID (e.g. "1", "2") — convert to 0-indexed
+      // selected_option is the choice ID (e.g. "1", "2") — convert to 0-indexed.
       const index = parseInt(reply.selected_option, 10);
-      userReply = { Select: { index: isNaN(index) ? 0 : index - 1 } };
+      userReply = { action: "select", index: isNaN(index) ? 0 : index - 1 };
     } else if (reply.freeform_response !== undefined) {
-      userReply = { TypeExact: { text: reply.freeform_response } };
+      userReply = { action: "type_exact", text: reply.freeform_response };
     } else if (reply.confirmed !== undefined) {
       userReply = reply.confirmed
-        ? { Confirm: { token: reply.confirm_token || null } }
-        : "Cancel";
+        ? { action: "confirm", token: reply.confirm_token || null }
+        : { action: "cancel" };
     } else {
-      userReply = "Cancel";
+      userReply = { action: "cancel" };
     }
 
-    const response = await api.post<{
-      message?: string;
-      response?: string;
-      next_packet?: unknown;
-      available_verbs?: VerbProfile[];
-      surface_fingerprint?: string;
-    }>(`/session/${sessionId}/decision/reply`, {
-      packet_id: reply.packet_id,
-      reply: userReply,
-    });
+    let envelope: {
+      kind: "decision";
+      response: {
+        message?: string;
+        response?: string;
+        next_packet?: unknown;
+        available_verbs?: VerbProfile[];
+        surface_fingerprint?: string;
+      };
+    };
+    try {
+      envelope = await api.post<{
+        kind: "decision";
+        response: {
+          message?: string;
+          response?: string;
+          next_packet?: unknown;
+          available_verbs?: VerbProfile[];
+          surface_fingerprint?: string;
+        };
+      }>(`/session/${sessionId}/input`, {
+        kind: "decision_reply",
+        packet_id: reply.packet_id,
+        reply: userReply,
+      });
+    } catch (error) {
+      if (isSessionMissingError(error)) {
+        pruneSessionIdFromStorage(sessionId);
+      }
+      throw error;
+    }
+    const response = envelope.response;
 
     const verbs: VerbProfile[] = (response.available_verbs || []).map((v) => ({
       fqn: v.fqn,
@@ -400,8 +494,12 @@ export const chatApi = {
   },
 
   /** Get verb surface for a session */
-  async getVerbSurface(sessionId: string): Promise<{ verbs: VerbProfile[]; surface_fingerprint?: string; totalRegistry?: number }> {
-    const response = await api.get<{
+  async getVerbSurface(sessionId: string): Promise<{
+    verbs: VerbProfile[];
+    surface_fingerprint?: string;
+    totalRegistry?: number;
+  }> {
+    let response: {
       verbs?: Array<{
         fqn: string;
         domain: string;
@@ -415,7 +513,29 @@ export const chatApi = {
         final_count: number;
       };
       surface_fingerprint?: string;
-    }>(`/session/${sessionId}/verb-surface`);
+    };
+    try {
+      response = await api.get<{
+        verbs?: Array<{
+          fqn: string;
+          domain: string;
+          action?: string;
+          description: string;
+          governance_tier?: string;
+          preconditions_met?: boolean;
+        }>;
+        filter_summary?: {
+          total_registry: number;
+          final_count: number;
+        };
+        surface_fingerprint?: string;
+      }>(`/session/${sessionId}/verb-surface`);
+    } catch (error) {
+      if (isSessionMissingError(error)) {
+        pruneSessionIdFromStorage(sessionId);
+      }
+      throw error;
+    }
 
     const verbs: VerbProfile[] = (response.verbs || []).map((v) => ({
       fqn: v.fqn,

@@ -9,6 +9,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { FileText, ChevronRight, Loader2, X } from "lucide-react";
 import { dealApi } from "../../../api/deal";
+import { isSessionMissingError } from "../../../api/sessionStorage";
 import { queryKeys } from "../../../lib/query";
 
 interface DealPanelProps {
@@ -19,11 +20,19 @@ interface DealPanelProps {
 export function DealPanel({ sessionId, onUnloadDeal }: DealPanelProps) {
   const navigate = useNavigate();
 
-  const { data: dealContext, isLoading } = useQuery({
+  const {
+    data: dealContext,
+    isLoading,
+    error,
+  } = useQuery({
     queryKey: queryKeys.deals.sessionContext(sessionId),
     queryFn: () => dealApi.getSessionDealContext(sessionId),
-    refetchInterval: 5000, // Refresh every 5 seconds
+    refetchInterval: (query) =>
+      isSessionMissingError(query.state.error) ? false : 5000,
+    retry: (failureCount, err) =>
+      !isSessionMissingError(err) && failureCount < 2,
   });
+  const sessionMissing = isSessionMissingError(error);
 
   // Don't render if no deal context
   if (isLoading) {
@@ -38,6 +47,15 @@ export function DealPanel({ sessionId, onUnloadDeal }: DealPanelProps) {
   }
 
   if (!dealContext?.deal_id) {
+    if (sessionMissing) {
+      return (
+        <div className="p-3 border-b border-[var(--border-primary)]">
+          <div className="text-sm text-[var(--text-muted)]">
+            Session no longer exists.
+          </div>
+        </div>
+      );
+    }
     return null;
   }
 

@@ -93,7 +93,7 @@ impl ActorResolver {
             .get("x-obpoc-roles")
             .and_then(|v| v.to_str().ok())
             .map(|r| r.split(',').map(|s| s.trim().to_string()).collect())
-            .unwrap_or_else(|| vec!["viewer".into()]);
+            .unwrap_or_else(|| vec!["analyst".into()]);
         let department = headers
             .get("x-obpoc-department")
             .and_then(|v| v.to_str().ok())
@@ -107,12 +107,13 @@ impl ActorResolver {
                 "confidential" => Some(Classification::Confidential),
                 "restricted" => Some(Classification::Restricted),
                 _ => None,
-            });
+            })
+            .or(Some(Classification::Restricted));
         let jurisdictions: Vec<String> = headers
             .get("x-obpoc-jurisdictions")
             .and_then(|v| v.to_str().ok())
             .map(|j| j.split(',').map(|s| s.trim().to_string()).collect())
-            .unwrap_or_default();
+            .unwrap_or_else(|| vec!["*".into()]);
         ActorContext {
             actor_id,
             roles,
@@ -127,21 +128,21 @@ impl ActorResolver {
         let actor_id = std::env::var("MCP_ACTOR_ID").unwrap_or_else(|_| "mcp_anonymous".into());
         let roles: Vec<String> = std::env::var("MCP_ROLES")
             .map(|r| r.split(',').map(String::from).collect())
-            .unwrap_or_else(|_| vec!["viewer".into()]);
+            .unwrap_or_else(|_| vec!["analyst".into()]);
         let department = std::env::var("MCP_DEPARTMENT").ok();
-        let clearance =
-            std::env::var("MCP_CLEARANCE")
-                .ok()
-                .and_then(|s| match s.to_lowercase().as_str() {
-                    "public" => Some(Classification::Public),
-                    "internal" => Some(Classification::Internal),
-                    "confidential" => Some(Classification::Confidential),
-                    "restricted" => Some(Classification::Restricted),
-                    _ => None,
-                });
+        let clearance = std::env::var("MCP_CLEARANCE")
+            .ok()
+            .and_then(|s| match s.to_lowercase().as_str() {
+                "public" => Some(Classification::Public),
+                "internal" => Some(Classification::Internal),
+                "confidential" => Some(Classification::Confidential),
+                "restricted" => Some(Classification::Restricted),
+                _ => None,
+            })
+            .or(Some(Classification::Restricted));
         let jurisdictions: Vec<String> = std::env::var("MCP_JURISDICTIONS")
             .map(|j| j.split(',').map(String::from).collect())
-            .unwrap_or_default();
+            .unwrap_or_else(|_| vec!["*".into()]);
         ActorContext {
             actor_id,
             roles,
@@ -159,8 +160,8 @@ impl ActorResolver {
             actor_id: session_id.to_string(),
             roles,
             department: None,
-            clearance: None,
-            jurisdictions: vec![],
+            clearance: Some(crate::sem_reg::types::Classification::Restricted),
+            jurisdictions: vec!["*".into()],
         }
     }
 }

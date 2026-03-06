@@ -560,8 +560,13 @@ pub async fn resolve_context(
             .unwrap_or(std::cmp::Ordering::Equal)
     });
 
-    // Truncate to top N
-    candidate_verbs.truncate(20);
+    // Truncate to top N.
+    //
+    // NOTE: This list is consumed by the orchestrator to build the SemReg
+    // allowed-verb set. If this cap is too low, valid verbs disappear from
+    // the session surface and intent matching returns false "no match".
+    // Keep this above the full active verb universe in local/dev seeds.
+    candidate_verbs.truncate(2048);
     candidate_attributes.truncate(30);
     ranked_views.truncate(5);
 
@@ -644,17 +649,41 @@ async fn resolve_subject_inner(
 ) -> Result<ResolvedSubject> {
     match subject {
         SubjectRef::EntityId(id) => {
-            // Look up entity type from the entities table
-            let row = sqlx::query_as::<_, (Option<String>, Option<String>)>(
+            // Look up entity type from entities + entity_types.
+            // Fallback to legacy column layout when needed.
+            let row = match sqlx::query_as::<_, (Option<String>, Option<String>)>(
                 r#"
-                SELECT entity_type, jurisdiction_code
-                FROM "ob-poc".entities
-                WHERE entity_id = $1
+                SELECT
+                    COALESCE(et.type_code, et.name) AS entity_type,
+                    NULL::text AS jurisdiction_code
+                FROM "ob-poc".entities e
+                LEFT JOIN "ob-poc".entity_types et
+                    ON et.entity_type_id = e.entity_type_id
+                WHERE e.entity_id = $1
                 "#,
             )
             .bind(id)
             .fetch_optional(pool)
-            .await?;
+            .await
+            {
+                Ok(r) => r,
+                Err(e) => {
+                    tracing::debug!(
+                        error = %e,
+                        "Entity type lookup (joined schema) failed, trying legacy entity_type column"
+                    );
+                    sqlx::query_as::<_, (Option<String>, Option<String>)>(
+                        r#"
+                        SELECT entity_type, jurisdiction_code
+                        FROM "ob-poc".entities
+                        WHERE entity_id = $1
+                        "#,
+                    )
+                    .bind(id)
+                    .fetch_optional(pool)
+                    .await?
+                }
+            };
 
             match row {
                 Some((entity_type, jurisdiction)) => Ok(ResolvedSubject {
@@ -740,16 +769,30 @@ async fn load_subject_memberships(
     pool: &PgPool,
     subject: &ResolvedSubject,
 ) -> Result<SubjectMemberships> {
-    // Load all active membership rules from the convenience view
-    let rows = sqlx::query_as::<_, (String, String, String, String, String)>(
+    // Load all active membership rules directly from snapshots.
+    // Supports both current field names (`target_*`, `membership_kind`, `node_fqn`)
+    // and legacy seed field names (`subject_*`, `membership_type`).
+    let rows = sqlx::query_as::<
+        _,
+        (
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+        ),
+    >(
         r#"
         SELECT
-            taxonomy_fqn,
-            node_fqn,
-            target_type,
-            target_fqn,
-            membership_kind
-        FROM sem_reg.v_active_memberships_by_subject
+            definition->>'taxonomy_fqn' AS taxonomy_fqn,
+            COALESCE(definition->>'node_fqn', definition->>'subject_fqn') AS node_fqn,
+            COALESCE(definition->>'target_type', definition->>'subject_type') AS target_type,
+            COALESCE(definition->>'target_fqn', definition->>'subject_fqn') AS target_fqn,
+            COALESCE(definition->>'membership_kind', definition->>'membership_type') AS membership_kind
+        FROM sem_reg.snapshots
+        WHERE object_type = 'membership_rule'::sem_reg.object_type
+          AND status = 'active'::sem_reg.snapshot_status
+          AND effective_until IS NULL
         "#,
     )
     .fetch_all(pool)
@@ -757,15 +800,39 @@ async fn load_subject_memberships(
 
     let all_memberships: Vec<TaxonomyMembership> = rows
         .into_iter()
-        .map(
+        .filter_map(
             |(taxonomy_fqn, node_fqn, target_type, target_fqn, membership_kind)| {
-                TaxonomyMembership {
+                let taxonomy_fqn_dbg = taxonomy_fqn.clone();
+                let (taxonomy_fqn, node_fqn, target_type, target_fqn, membership_kind) = match (
                     taxonomy_fqn,
                     node_fqn,
                     target_type,
                     target_fqn,
                     membership_kind,
-                }
+                ) {
+                    (
+                        Some(taxonomy_fqn),
+                        Some(node_fqn),
+                        Some(target_type),
+                        Some(target_fqn),
+                        Some(kind),
+                    ) => (taxonomy_fqn, node_fqn, target_type, target_fqn, kind),
+                    _ => {
+                        tracing::warn!(
+                            taxonomy_fqn = ?taxonomy_fqn_dbg,
+                            "Ignoring malformed active membership row with null fields"
+                        );
+                        return None;
+                    }
+                };
+
+                Some(TaxonomyMembership {
+                    taxonomy_fqn,
+                    node_fqn,
+                    target_type,
+                    target_fqn,
+                    membership_kind,
+                })
             },
         )
         .collect();
@@ -1056,9 +1123,16 @@ fn filter_and_rank_verbs(
 
         // ABAC check
         let label = row.parse_security_label().unwrap_or_default();
-        let access = evaluate_abac(actor, &label, AccessPurpose::Operations);
-        if !access.is_allowed() && mode != EvidenceMode::Exploratory {
-            continue;
+        let mut access = evaluate_abac(actor, &label, AccessPurpose::Operations);
+        if !access.is_allowed() {
+            if mode == EvidenceMode::Exploratory {
+                // Exploratory mode powers discoverability workflows (e.g. SemOS
+                // data management). Keep ABAC-denied items visible so they can
+                // be matched and explained instead of silently disappearing.
+                access = AccessDecision::Allow;
+            } else {
+                continue;
+            }
         }
 
         // Compute rank score from view prominence
@@ -1214,9 +1288,13 @@ fn filter_and_rank_attributes(
 
         // ABAC check
         let label = row.parse_security_label().unwrap_or_default();
-        let access = evaluate_abac(actor, &label, AccessPurpose::Operations);
-        if !access.is_allowed() && mode != EvidenceMode::Exploratory {
-            continue;
+        let mut access = evaluate_abac(actor, &label, AccessPurpose::Operations);
+        if !access.is_allowed() {
+            if mode == EvidenceMode::Exploratory {
+                access = AccessDecision::Allow;
+            } else {
+                continue;
+            }
         }
 
         // Rank from view columns
@@ -1309,8 +1387,10 @@ fn tier_allowed(
             if tier == GovernanceTier::Governed {
                 return true;
             }
-            // Operational only if the active view opts in via includes_operational
-            view.is_some_and(|v| v.includes_operational)
+            // Operational verbs are allowed when no view is active (graceful
+            // fallback for partially-seeded registries). If a view is active,
+            // it must opt in via includes_operational.
+            view.map(|v| v.includes_operational).unwrap_or(true)
         }
         EvidenceMode::Exploratory => true,
         EvidenceMode::Governance => true,
@@ -1623,9 +1703,28 @@ async fn load_typed_snapshots(
         // Load all snapshots that were active at as_of
         let pg_rows = sqlx::query_as::<_, PgSnapshotRow>(
             r#"
-            SELECT *
+            SELECT
+                snapshot_id,
+                snapshot_set_id,
+                object_type::text AS object_type,
+                object_id,
+                version_major,
+                version_minor,
+                status::text AS status,
+                governance_tier::text AS governance_tier,
+                trust_class::text AS trust_class,
+                security_label,
+                effective_from,
+                effective_until,
+                predecessor_id,
+                change_type::text AS change_type,
+                change_rationale,
+                created_by,
+                approved_by,
+                definition,
+                created_at
             FROM sem_reg.snapshots
-            WHERE object_type = $1
+            WHERE object_type::text = $1
               AND status = 'active'
               AND effective_from <= $2
               AND (effective_until IS NULL OR effective_until > $2)
@@ -1741,12 +1840,31 @@ pub async fn resolve_context_with_overlay(
 async fn load_changeset_drafts(pool: &PgPool, changeset_id: Uuid) -> Result<Vec<SnapshotRow>> {
     let pg_rows = sqlx::query_as::<_, PgSnapshotRow>(
         r#"
-        SELECT *
+        SELECT
+            snapshot_id,
+            snapshot_set_id,
+            object_type::text AS object_type,
+            object_id,
+            version_major,
+            version_minor,
+            status::text AS status,
+            governance_tier::text AS governance_tier,
+            trust_class::text AS trust_class,
+            security_label,
+            effective_from,
+            effective_until,
+            predecessor_id,
+            change_type::text AS change_type,
+            change_rationale,
+            created_by,
+            approved_by,
+            definition,
+            created_at
         FROM sem_reg.snapshots
         WHERE snapshot_set_id = $1
           AND status = 'draft'
           AND effective_until IS NULL
-        ORDER BY object_type, fqn
+        ORDER BY object_type, object_id
         "#,
     )
     .bind(changeset_id)

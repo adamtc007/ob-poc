@@ -104,10 +104,9 @@ pub fn evaluate_abac(
 
     // 2. Jurisdiction check: actor must be cleared for at least one of the object's jurisdictions
     if !label.jurisdictions.is_empty() {
-        let has_jurisdiction = label
-            .jurisdictions
-            .iter()
-            .any(|j| actor.jurisdictions.contains(j));
+        let has_jurisdiction = label.jurisdictions.iter().any(|j| {
+            actor.jurisdictions.contains(j) || actor.jurisdictions.iter().any(|a| a == "*")
+        });
         if !has_jurisdiction {
             return AccessDecision::Deny {
                 reason: format!(

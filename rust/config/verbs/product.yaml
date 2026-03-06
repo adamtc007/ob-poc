@@ -11,7 +11,9 @@ domains:
           noun: product
           phase_tags: [onboarding]
         invocation_phrases:
+          - "show me product"
           - "show product details"
+          - "show me product details"
           - "get product by code"
           - "look up product"
           - "what is this product"
@@ -51,6 +53,10 @@ domains:
           noun: product
           phase_tags: [onboarding]
         invocation_phrases:
+          - "show me products"
+          - "products"
+          - "list products"
+          - "show products"
           - "list available products"
           - "show product catalog"
           - "what products are available"
