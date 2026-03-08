@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-> **Last reviewed:** 2026-03-06
+> **Last reviewed:** 2026-03-08
 > **Frontend:** React/TypeScript (`ob-poc-ui-react/`) - Chat UI with scope panel, Inspector, Semantic OS Tab
 > **Backend:** Rust/Axum (`rust/crates/ob-poc-web/`) - Serves React + REST API
 > **Crates:** 22 active Rust crates (16 ob-poc + 6 sem_os_*; esper_* deprecated; ob-poc-graph + viewport removed)
@@ -69,6 +69,10 @@
 > **Discovery Pipeline (Phase 2):** ✅ Complete — `registry.discover-dsl` implemented end-to-end (utterance→intent matches→verb chain synthesis→disambiguation/governance context); `schema.generate-discovery-map` implemented with Mermaid projection
 > **Utterance API Coverage Harness:** ✅ Complete — `rust/tests/utterance_api_coverage.rs` runs standard utterance fixtures through `/api/session/:id/execute` with `registry.discover-dsl`, emits JSON/MD/CSV coverage artifacts for expected↔predicted DSL verbs
 > **Unified Session Input Cutover (First Cut):** ✅ Complete — single ingress endpoint `POST /api/session/:id/input` with adapter dispatch (`utterance`, `decision_reply`, `repl_v2`), legacy chat/decision/repl-input endpoints hard-blocked (410 Gone), React chat + REPL clients rewired, server call-stack trace confirms UI traffic enters only through unified input
+> **Sage Intent Skeleton (Phase 1):** ✅ Complete — observation-plane + polarity pre-classification, deterministic and LLM-backed Sage engines, shadow wiring, Sage coverage harness, data-management structure-read fast-path prerequisites
+> **Coder Rewrite (Phase 2):** ✅ Complete — verb metadata index, structured verb resolution, OutcomeStep arg assembly, Sage+Coder shadow comparison, utterance comparative harness, `SAGE_FAST_PATH=1` read+structure fast path for data-management schema introspection
+> **Sage/Coder GATE 5:** ⚠️ Comparative harness run complete — existing pipeline `58/134` (`43.28%`), deterministic Sage+Coder `6/134` (`4.48%`), LLM-backed Sage+Coder `7/134` (`5.22%`); outcome points to vocabulary/routing work before further LLM spend
+> **Phase 0 Vocabulary Rationalization (Batches 1-3):** ✅ Complete — domain merges/deletions (`case-screening`, `doc-request`, `product-subscription`, `fund-vehicle`, `fund-compartment`, `lifecycle`), type-parameterized family merges (`entity.*`, `ubo.*`, `sla.*`, `trading-profile.*`, `fund.*`), unified `refdata.*` runtime + tests
 
 This is the root project guide for Claude Code. Domain-specific details are in annexes.
 
