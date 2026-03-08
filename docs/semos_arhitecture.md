@@ -2,7 +2,7 @@
 
 > **Version:** 3.0
 > **Date:** 2026-02-27
-> **Status:** Living document — consolidation of 9 prior specs
+> **Status:** Living document — consolidation of 9 prior specs, updated for the 2026-03-08 runtime schema consolidation
 > **Audience:** Engineering, governance, architecture review
 
 ---
@@ -26,6 +26,13 @@ Semantic OS enforces governance through **three complementary layers**:
 | **GovernedQuery** | What compiles | Proc macro checks against bincode cache at compile time |
 
 The system is deployed as a **standalone service** (6 Rust crates) with port-trait isolation, REST+JWT API, outbox-driven projections, and optional in-process mode for the ob-poc monolith.
+
+### Current Runtime State (2026-03-08)
+
+- Business runtime data is consolidated into `"ob-poc"`.
+- Semantic OS runtime data is consolidated into `sem_reg`, `sem_reg_authoring`, and `sem_reg_pub`.
+- The legacy runtime schemas `stewardship`, `agent`, `teams`, `feedback`, `events`, `sessions`, `ob_ref`, and `ob_kyc` have been retired.
+- `rust/config/sem_os_seeds/domain_metadata.yaml` now covers `306/306` live `"ob-poc"` tables and includes remediated SemOS footprint metadata for `sem-reg` and stewardship-backed verbs.
 
 ### Data Management Contract (2026-03-06)
 
@@ -137,7 +144,7 @@ The SemOS data-management call path remains on the unified session ingress only:
 │  PgSnapshotStore │ PgChangesetStore │ PgOutboxStore │ ...          │
 ├────────────────────────────────────────────────────────────────────┤
 │  STORAGE                                                            │
-│  PostgreSQL (sem_reg │ sem_reg_pub │ sem_reg_authoring │ stewardship)│
+│  PostgreSQL (sem_reg │ sem_reg_pub │ sem_reg_authoring │ "ob-poc")   │
 └────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -677,10 +684,10 @@ OutboxDispatcher (background task, configurable interval)
 
 | Schema | Purpose |
 |--------|---------|
-| `sem_reg` | Core: snapshots, snapshot_sets, outbox_events, changesets, agent plans/decisions |
+| `sem_reg` | Core: snapshots, snapshot_sets, outbox_events, changesets, agent plans/decisions, stewardship storage |
 | `sem_reg_pub` | Read-optimized projections: active_snapshot_set, projection_watermark |
 | `sem_reg_authoring` | Authoring: validation_reports, governance_audit_log, publish_batches, artifacts, archives |
-| `stewardship` | Stewardship: events, basis_records, basis_claims, conflict_records, focus_states, viewport_manifests |
+| `"ob-poc"` | Business runtime data after schema consolidation |
 
 ### Migrations (078-103)
 

@@ -166,6 +166,31 @@ domains:
         governance_tier: governed
         classification: internal
         pii: false
+      cbu_attr_values:
+        description: "CBU-scoped attribute values for onboarding configuration"
+        governance_tier: operational
+        classification: internal
+        pii: false
+      cbu_layout_overrides:
+        description: "Per-CBU UI layout overrides for visualization"
+        governance_tier: operational
+        classification: internal
+        pii: false
+      cbu_relationship_verification:
+        description: "CBU relationship verification status and evidence tracking"
+        governance_tier: governed
+        classification: confidential
+        pii: false
+      cbu_ssi_agent_override:
+        description: "Agent-applied SSI overrides per CBU"
+        governance_tier: operational
+        classification: internal
+        pii: false
+      cbu_unified_attr_requirements:
+        description: "Unified attribute requirement matrix per CBU (product × jurisdiction)"
+        governance_tier: governed
+        classification: internal
+        pii: false
     verb_data_footprint:
       cbu.create:
         reads: [cbus, cbu_entity_roles]
@@ -312,6 +337,31 @@ domains:
         description: "Feature flags for ML/entity linking"
         governance_tier: operational
         classification: internal
+        pii: false
+      entity_regulatory_registrations:
+        description: "Regulatory registration records per entity (regulator, status, reference)"
+        governance_tier: governed
+        classification: confidential
+        pii: false
+      entity_relationships_history:
+        description: "Historical entity relationship snapshots for audit trail"
+        governance_tier: governed
+        classification: confidential
+        pii: false
+      entity_type_dependencies:
+        description: "Inter-entity-type dependency rules for structural validation"
+        governance_tier: governed
+        classification: internal
+        pii: false
+      entity_ubos:
+        description: "Denormalized entity→UBO lookup table for fast resolution"
+        governance_tier: governed
+        classification: confidential
+        pii: true
+      delegation_relationships:
+        description: "Delegation of authority relationships between entities"
+        governance_tier: governed
+        classification: confidential
         pii: false
     verb_data_footprint:
       entity.create:
@@ -516,6 +566,26 @@ domains:
         governance_tier: governed
         classification: confidential
         pii: false
+      sla_templates:
+        description: "SLA template definitions with metric types and thresholds"
+        governance_tier: governed
+        classification: internal
+        pii: false
+      sla_metric_types:
+        description: "SLA metric type reference data (response time, availability, etc.)"
+        governance_tier: governed
+        classification: internal
+        pii: false
+      sla_measurements:
+        description: "SLA measurement records — actual vs committed values"
+        governance_tier: operational
+        classification: internal
+        pii: false
+      sla_breaches:
+        description: "SLA breach records with severity and remediation tracking"
+        governance_tier: operational
+        classification: internal
+        pii: false
     verb_data_footprint:
       billing.create-profile:
         reads: [deals, deal_rate_cards]
@@ -645,11 +715,11 @@ domains:
         reads: [cbu_trading_profiles]
         writes:
           [
-            custody.cbu_instrument_universe,
-            custody.cbu_ssi,
-            custody.ssi_booking_rules,
-            custody.isda_agreements,
-            custody.csa_agreements,
+            cbu_instrument_universe,
+            cbu_ssi,
+            ssi_booking_rules,
+            isda_agreements,
+            csa_agreements,
           ]
       trading-profile.diff:
         reads: [cbu_trading_profiles]
@@ -692,6 +762,16 @@ domains:
         pii: false
       repl_sessions_v2:
         description: "V2 REPL session state (pack, runbook, context stack)"
+        governance_tier: operational
+        classification: internal
+        pii: false
+      event_log:
+        description: "Global event log after schema consolidation"
+        governance_tier: operational
+        classification: internal
+        pii: false
+      session_log:
+        description: "Session-scoped execution and navigation log after schema consolidation"
         governance_tier: operational
         classification: internal
         pii: false
@@ -740,24 +820,34 @@ domains:
         governance_tier: operational
         classification: confidential
         pii: false
-      kyc.fund_vehicles:
+      fund_vehicles:
         description: "KYC fund vehicle records per case"
         governance_tier: governed
         classification: internal
         pii: false
-      kyc.fund_compartments:
+      fund_compartments:
         description: "Fund compartment structures per vehicle"
         governance_tier: governed
         classification: internal
         pii: false
-      kyc.share_classes:
+      share_classes:
         description: "Share class definitions within compartments"
         governance_tier: governed
         classification: internal
         pii: false
-      kyc.share_class_identifiers:
+      share_class_identifiers:
         description: "Share class identifier references (ISIN, CUSIP)"
         governance_tier: operational
+        classification: internal
+        pii: false
+      share_class_supply:
+        description: "Issued and available share class supply records"
+        governance_tier: governed
+        classification: internal
+        pii: false
+      instrument_lifecycles:
+        description: "Instrument lifecycle states linked to fund/share-class operations"
+        governance_tier: governed
         classification: internal
         pii: false
     verb_data_footprint:
@@ -780,127 +870,177 @@ domains:
   kyc:
     description: "KYC case management — case lifecycle, entity workstreams, UBO registry, screening, evidence, and tollgate evaluation"
     tables:
-      kyc.cases:
+      cases:
         description: "Case record with status machine (INTAKE → DISCOVERY → ASSESSMENT → REVIEW → APPROVED/REJECTED)"
         governance_tier: governed
         classification: confidential
         pii: false
-      kyc.entity_workstreams:
+      entity_workstreams:
         description: "Per-entity workstream within case with identity/ownership/screening verification"
         governance_tier: governed
         classification: confidential
         pii: false
-      kyc.case_events:
+      case_events:
         description: "Immutable event log per case"
         governance_tier: operational
         classification: confidential
         pii: false
-      kyc.case_import_runs:
+      case_import_runs:
         description: "Import run case linkage with as_of date and idempotency"
         governance_tier: operational
         classification: internal
         pii: false
-      kyc.ubo_registry:
-        description: "Per-case UBO assertions with relationship_type, ownership_percentage, verification_status"
+      case_evaluation_snapshots:
+        description: "Point-in-time KYC case evaluation snapshots for audit trail"
         governance_tier: governed
-        classification: restricted
-        pii: true
-      kyc.ubo_evidence:
-        description: "Evidence supporting UBO claims (source, confidence, date_verified)"
+        classification: confidential
+        pii: false
+      case_types:
+        description: "Reference data: KYC case type definitions"
         governance_tier: governed
-        classification: restricted
+        classification: internal
+        pii: false
+      kyc_decisions:
+        description: "Recorded KYC decisions with rationale and approver"
+        governance_tier: governed
+        classification: confidential
+        pii: false
+      kyc_service_agreements:
+        description: "KYC service agreements linking cases to service commitments"
+        governance_tier: governed
+        classification: confidential
+        pii: false
+      kyc_ubo_evidence:
+        description: "Case-workflow evidence model tying evidence to screenings, relationships, determination runs"
+        governance_tier: governed
+        classification: confidential
         pii: true
-      kyc.ubo_determination_runs:
+      kyc_ubo_registry:
+        description: "Case-scoped UBO assertions with verification and screening status"
+        governance_tier: governed
+        classification: confidential
+        pii: true
+      ubo_determination_runs:
         description: "UBO compute pipeline execution records"
         governance_tier: operational
         classification: confidential
         pii: false
-      kyc.screenings:
+      screenings:
         description: "Screening records per workstream (sanctions, PEP, adverse media)"
         governance_tier: governed
         classification: confidential
         pii: true
-      kyc.red_flags:
+      red_flags:
         description: "Risk indicators (flag_type, severity, resolved_at)"
         governance_tier: governed
         classification: confidential
         pii: false
-      kyc.doc_requests:
+      doc_requests:
         description: "Document requests per workstream with status machine and due dates"
         governance_tier: operational
         classification: confidential
         pii: false
-      kyc.outreach_plans:
+      outreach_requests:
+        description: "Client outreach requests for missing KYC proofs"
+        governance_tier: operational
+        classification: internal
+        pii: false
+      outreach_plans:
         description: "Outreach communication planning"
         governance_tier: operational
         classification: internal
         pii: false
-      kyc.outreach_items:
+      outreach_items:
         description: "Individual outreach messages"
         governance_tier: operational
         classification: internal
         pii: false
-      kyc.tollgate_evaluations:
+      tollgate_evaluations:
         description: "KYC approval tollgate evaluation records"
         governance_tier: governed
         classification: confidential
         pii: false
-      kyc.holdings:
-        description: "Ownership holdings within KYC scope"
-        governance_tier: governed
-        classification: confidential
-        pii: false
-      kyc.ownership_snapshots:
+      ownership_snapshots:
         description: "Point-in-time ownership chain snapshots per CBU/case"
         governance_tier: governed
         classification: confidential
         pii: false
-      kyc.investors:
-        description: "Investor records within KYC scope"
-        governance_tier: governed
-        classification: confidential
-        pii: true
-      kyc.research_actions:
+      research_actions:
         description: "Research workflow action items"
         governance_tier: operational
         classification: internal
         pii: false
-      kyc.research_decisions:
+      research_decisions:
         description: "Research workflow decisions"
         governance_tier: governed
         classification: confidential
         pii: false
-      kyc.outstanding_requests:
+      outstanding_requests:
         description: "Outstanding action items with due dates and assignments"
         governance_tier: operational
         classification: internal
         pii: false
+      threshold_factors:
+        description: "UBO threshold factor definitions for ownership percentage computation"
+        governance_tier: governed
+        classification: internal
+        pii: false
+      threshold_requirements:
+        description: "Jurisdiction/entity-type threshold requirements for UBO determination"
+        governance_tier: governed
+        classification: internal
+        pii: false
+      trust_parties:
+        description: "Trust party roles (settlor, protector, beneficiary) for trust structures"
+        governance_tier: governed
+        classification: confidential
+        pii: true
+      ubo_assertion_log:
+        description: "Audit log of UBO assertion changes with before/after snapshots"
+        governance_tier: governed
+        classification: confidential
+        pii: true
+      ubo_snapshot_comparisons:
+        description: "Diff records between consecutive UBO determination snapshots"
+        governance_tier: governed
+        classification: confidential
+        pii: false
+      verification_challenges:
+        description: "Identity verification challenges issued to entities"
+        governance_tier: governed
+        classification: confidential
+        pii: true
+      verification_escalations:
+        description: "Escalated verification cases requiring manual review"
+        governance_tier: governed
+        classification: confidential
+        pii: true
     verb_data_footprint:
       kyc-case.create:
         reads: [cbus, deals, client_group, entities]
-        writes: [kyc.cases]
+        writes: [cases]
       kyc-case.update-status:
-        reads: [kyc.cases]
-        writes: [kyc.cases]
+        reads: [cases]
+        writes: [cases]
       kyc-case.escalate:
-        reads: [kyc.cases]
-        writes: [kyc.cases]
+        reads: [cases]
+        writes: [cases]
       kyc-case.assign:
-        reads: [kyc.cases, entities]
-        writes: [kyc.cases]
+        reads: [cases, entities]
+        writes: [cases]
       kyc-case.set-risk-rating:
-        reads: [kyc.cases]
-        writes: [kyc.cases]
+        reads: [cases]
+        writes: [cases]
       kyc-case.close:
-        reads: [kyc.cases]
-        writes: [kyc.cases]
+        reads: [cases]
+        writes: [cases]
       kyc-case.read:
-        reads: [kyc.cases]
+        reads: [cases]
       kyc-case.list-by-cbu:
-        reads: [kyc.cases]
+        reads: [cases]
       kyc-case.reopen:
-        reads: [kyc.cases]
-        writes: [kyc.cases]
+        reads: [cases]
+        writes: [cases]
 
   # ---------------------------------------------------------------------------
   # UBO & OWNERSHIP — Beneficial Ownership & Control
@@ -956,6 +1096,51 @@ domains:
       bods_ownership_statements:
         description: "BODS ownership/control statements linking persons to entities"
         governance_tier: operational
+        classification: confidential
+        pii: false
+      ownership_reconciliation_runs:
+        description: "Ownership reconciliation run records with scope and results"
+        governance_tier: governed
+        classification: confidential
+        pii: false
+      ownership_reconciliation_findings:
+        description: "Discrepancies found during ownership reconciliation"
+        governance_tier: governed
+        classification: confidential
+        pii: false
+      dilution_instruments:
+        description: "Dilution instrument definitions (options, warrants, convertibles)"
+        governance_tier: governed
+        classification: confidential
+        pii: false
+      dilution_exercise_events:
+        description: "Dilution instrument exercise events affecting ownership percentages"
+        governance_tier: governed
+        classification: confidential
+        pii: false
+      holding_control_links:
+        description: "Links between holdings and control edges for ownership chain traversal"
+        governance_tier: governed
+        classification: confidential
+        pii: false
+      issuance_events:
+        description: "Share/unit issuance events affecting ownership structure"
+        governance_tier: governed
+        classification: confidential
+        pii: false
+      issuer_control_config:
+        description: "Issuer-level control configuration for ownership computation"
+        governance_tier: governed
+        classification: confidential
+        pii: false
+      proofs:
+        description: "Ownership proof records linking assertions to evidence"
+        governance_tier: governed
+        classification: confidential
+        pii: false
+      special_rights:
+        description: "Special voting/veto/appointment rights affecting control determination"
+        governance_tier: governed
         classification: confidential
         pii: false
     verb_data_footprint:
@@ -1021,166 +1206,191 @@ domains:
   custody:
     description: "Custody operations — settlement chains, SSIs, ISDA/CSA agreements, booking rules, tax, and subcustodian network"
     tables:
-      custody.cbu_instrument_universe:
+      cbu_instrument_universe:
         description: "Instruments tradeable per CBU (materialized from trading profile)"
         governance_tier: governed
         classification: confidential
         pii: false
-      custody.cbu_ssi:
+      cbu_ssi:
         description: "Standing Settlement Instructions per CBU"
         governance_tier: governed
         classification: confidential
         pii: false
-      custody.ssi_booking_rules:
+      ssi_booking_rules:
         description: "Priority-ordered booking rules for settlement routing"
         governance_tier: governed
         classification: confidential
         pii: false
-      custody.isda_agreements:
+      isda_agreements:
         description: "ISDA master agreements for OTC derivatives"
         governance_tier: governed
         classification: confidential
         pii: false
-      custody.csa_agreements:
+      csa_agreements:
         description: "CSA collateral support annexes"
         governance_tier: governed
         classification: confidential
         pii: false
-      custody.cbu_settlement_chains:
+      cbu_settlement_chains:
         description: "Settlement chain definitions per CBU"
         governance_tier: governed
         classification: confidential
         pii: false
-      custody.settlement_chain_hops:
+      settlement_chain_hops:
         description: "Individual hops in settlement chains"
         governance_tier: governed
         classification: confidential
         pii: false
-      custody.entity_settlement_identity:
+      entity_settlement_identity:
         description: "Settlement identity per entity (BIC, account numbers)"
         governance_tier: governed
         classification: confidential
         pii: false
-      custody.entity_ssi:
+      entity_ssi:
         description: "Entity-level SSIs"
         governance_tier: governed
         classification: confidential
         pii: false
-      custody.cbu_tax_status:
+      cbu_tax_status:
         description: "Tax status per CBU"
         governance_tier: governed
         classification: confidential
         pii: false
-      custody.cbu_tax_reporting:
+      cbu_tax_reporting:
         description: "Tax reporting configuration per CBU"
         governance_tier: governed
         classification: confidential
         pii: false
-      custody.cbu_tax_reclaim_config:
+      cbu_tax_reclaim_config:
         description: "Tax reclaim configuration"
         governance_tier: governed
         classification: confidential
         pii: false
-      custody.tax_jurisdictions:
+      tax_jurisdictions:
         description: "Tax jurisdiction definitions"
         governance_tier: governed
         classification: internal
         pii: false
-      custody.tax_treaty_rates:
+      tax_treaty_rates:
         description: "Tax treaty rate lookups"
         governance_tier: governed
         classification: internal
         pii: false
-      custody.markets:
+      markets:
         description: "Market definitions (MIC codes, settlement cycles)"
         governance_tier: governed
         classification: internal
         pii: false
-      custody.instrument_classes:
+      instrument_classes:
         description: "Instrument class taxonomy"
         governance_tier: governed
         classification: internal
         pii: false
-      custody.security_types:
+      security_types:
         description: "Security type classification"
         governance_tier: governed
         classification: internal
         pii: false
-      custody.settlement_locations:
+      settlement_locations:
         description: "Settlement location definitions (CSDs, ICSDs)"
         governance_tier: governed
         classification: internal
         pii: false
-      custody.subcustodian_network:
+      subcustodian_network:
         description: "Subcustodian network definitions"
         governance_tier: governed
         classification: internal
         pii: false
-      custody.cbu_im_assignments:
+      cbu_im_assignments:
         description: "Investment manager assignments per CBU"
         governance_tier: governed
         classification: confidential
         pii: false
-      custody.cbu_cash_sweep_config:
+      cbu_cash_sweep_config:
         description: "Cash sweep configuration per CBU"
         governance_tier: governed
         classification: confidential
         pii: false
-      custody.cbu_pricing_config:
+      cbu_pricing_config:
         description: "NAV pricing configuration per CBU"
         governance_tier: governed
         classification: confidential
         pii: false
-      custody.cbu_cross_border_config:
+      cbu_cross_border_config:
         description: "Cross-border trading configuration"
         governance_tier: governed
         classification: confidential
         pii: false
-      custody.cbu_ca_preferences:
+      cbu_ca_preferences:
         description: "Corporate action preferences per CBU"
         governance_tier: governed
         classification: confidential
         pii: false
-      custody.cbu_ca_instruction_windows:
+      cbu_ca_instruction_windows:
         description: "Corporate action instruction window definitions"
         governance_tier: governed
         classification: internal
         pii: false
-      custody.cbu_ca_ssi_mappings:
+      cbu_ca_ssi_mappings:
         description: "Corporate action SSI mappings"
         governance_tier: governed
         classification: confidential
         pii: false
-      custody.cbu_settlement_location_preferences:
+      cbu_settlement_location_preferences:
         description: "Preferred settlement locations per CBU"
         governance_tier: governed
         classification: confidential
         pii: false
+      ca_event_types:
+        description: "Corporate action event type reference data"
+        governance_tier: governed
+        classification: internal
+        pii: false
+      isda_product_coverage:
+        description: "ISDA product coverage mapping per agreement"
+        governance_tier: governed
+        classification: confidential
+        pii: false
+      isda_product_taxonomy:
+        description: "ISDA product classification taxonomy"
+        governance_tier: governed
+        classification: internal
+        pii: false
+      settlement_types:
+        description: "Settlement type reference data (DVP, FOP, etc.)"
+        governance_tier: governed
+        classification: internal
+        pii: false
+      ssi_types:
+        description: "SSI type reference data"
+        governance_tier: governed
+        classification: internal
+        pii: false
     verb_data_footprint:
       settlement-chain.create:
-        reads: [custody.cbu_settlement_chains]
-        writes: [custody.cbu_settlement_chains]
+        reads: [cbu_settlement_chains]
+        writes: [cbu_settlement_chains]
       settlement-chain.add-hop:
-        reads: [custody.cbu_settlement_chains]
-        writes: [custody.settlement_chain_hops]
+        reads: [cbu_settlement_chains]
+        writes: [settlement_chain_hops]
       isda.create:
         reads: [entities]
-        writes: [custody.isda_agreements]
+        writes: [isda_agreements]
       csa.create:
-        reads: [custody.isda_agreements]
-        writes: [custody.csa_agreements]
+        reads: [isda_agreements]
+        writes: [csa_agreements]
       ssi.create:
         reads: [cbus]
-        writes: [custody.cbu_ssi]
+        writes: [cbu_ssi]
       booking-rule.create:
-        reads: [custody.cbu_ssi]
-        writes: [custody.ssi_booking_rules]
+        reads: [cbu_ssi]
+        writes: [ssi_booking_rules]
       tax-config.set-status:
         reads: [cbus]
-        writes: [custody.cbu_tax_status]
+        writes: [cbu_tax_status]
       tax-config.set-reporting:
         reads: [cbus]
-        writes: [custody.cbu_tax_reporting]
+        writes: [cbu_tax_reporting]
 
   # ---------------------------------------------------------------------------
   # BOOKING PRINCIPAL — Who Books It, Where?
@@ -1313,6 +1523,56 @@ domains:
         governance_tier: operational
         classification: internal
         pii: false
+      onboarding_plans:
+        description: "Onboarding plan definitions linking deals to delivery milestones"
+        governance_tier: governed
+        classification: internal
+        pii: false
+      onboarding_requests:
+        description: "Legacy onboarding request records (see also deal_onboarding_requests)"
+        governance_tier: operational
+        classification: internal
+        pii: false
+      provisioning_requests:
+        description: "Resource provisioning request lifecycle tracking"
+        governance_tier: operational
+        classification: internal
+        pii: false
+      provisioning_events:
+        description: "Provisioning event audit trail (attempts, successes, failures)"
+        governance_tier: operational
+        classification: internal
+        pii: false
+      service_intents:
+        description: "Service delivery intent records linking onboarding requests to required services"
+        governance_tier: operational
+        classification: internal
+        pii: false
+      resource_attribute_requirements:
+        description: "Attribute requirements per resource type for provisioning validation"
+        governance_tier: governed
+        classification: internal
+        pii: false
+      resource_dependencies:
+        description: "Inter-resource dependency graph for provisioning ordering"
+        governance_tier: governed
+        classification: internal
+        pii: false
+      resource_instance_attributes:
+        description: "Attribute values on provisioned resource instances"
+        governance_tier: operational
+        classification: internal
+        pii: false
+      resource_instance_dependencies:
+        description: "Materialized dependency links between resource instances"
+        governance_tier: operational
+        classification: internal
+        pii: false
+      requirement_acceptable_docs:
+        description: "Mapping of onboarding requirements to acceptable document types"
+        governance_tier: governed
+        classification: internal
+        pii: false
     verb_data_footprint:
       product.list:
         reads: [products]
@@ -1347,6 +1607,11 @@ domains:
         governance_tier: governed
         classification: internal
         pii: false
+      sheet_execution_audit:
+        description: "Audit trail of sheet-driven document execution and extraction operations"
+        governance_tier: operational
+        classification: internal
+        pii: false
     verb_data_footprint:
       document.solicit:
         reads: [document_catalog, document_types]
@@ -1357,6 +1622,29 @@ domains:
       document.reject:
         reads: [document_catalog]
         writes: [document_catalog]
+
+  # ---------------------------------------------------------------------------
+  # ATTRIBUTE — Governed Attribute Dictionary & Evidence Pipeline
+  # ---------------------------------------------------------------------------
+  attribute:
+    description: "Governed attribute dictionary and typed value storage for evidence extraction"
+    tables:
+      attribute_registry:
+        description: "Master dictionary of governed attributes (names, types, domains, validation rules)"
+        governance_tier: governed
+        classification: internal
+        pii: false
+      attribute_values_typed:
+        description: "Typed attribute value storage with entity/CBU scoping"
+        governance_tier: governed
+        classification: confidential
+        pii: true
+      attribute_observations:
+        description: "Observed/derived attribute facts with provenance and confidence scores"
+        governance_tier: operational
+        classification: confidential
+        pii: true
+    verb_data_footprint: {}
 
   # ---------------------------------------------------------------------------
   # SCREENING — Sanctions, PEP & Adverse Media
@@ -1384,6 +1672,21 @@ domains:
         governance_tier: governed
         classification: confidential
         pii: true
+      detected_patterns:
+        description: "Detected screening pattern records used for explainability and review"
+        governance_tier: operational
+        classification: internal
+        pii: false
+      risk_bands:
+        description: "Risk band reference data for screening and KYC scoring"
+        governance_tier: governed
+        classification: internal
+        pii: false
+      risk_ratings:
+        description: "Risk rating reference data used by screening workflows"
+        governance_tier: governed
+        classification: internal
+        pii: false
     verb_data_footprint:
       screening.run:
         reads:
@@ -1404,22 +1707,22 @@ domains:
   investor:
     description: "Investor register, holdings, movements, and look-through analysis"
     tables:
-      kyc.investors:
+      investors:
         description: "Investor records per KYC case"
         governance_tier: governed
         classification: confidential
         pii: true
-      kyc.holdings:
+      holdings:
         description: "Investor holdings (ownership percentages, share classes)"
         governance_tier: governed
         classification: confidential
         pii: false
-      kyc.movements:
+      movements:
         description: "Holding movements (subscriptions, redemptions, transfers)"
         governance_tier: governed
         classification: confidential
         pii: false
-      kyc.investor_role_profiles:
+      investor_role_profiles:
         description: "Investor role profiles within fund structures"
         governance_tier: governed
         classification: confidential
@@ -1427,17 +1730,17 @@ domains:
     verb_data_footprint:
       investor.register:
         reads: [entities]
-        writes: [kyc.investors]
+        writes: [investors]
       investor.list:
-        reads: [kyc.investors]
+        reads: [investors]
       holding.create:
-        reads: [kyc.investors]
-        writes: [kyc.holdings]
+        reads: [investors]
+        writes: [holdings]
       holding.list:
-        reads: [kyc.holdings]
+        reads: [holdings]
       movement.record:
-        reads: [kyc.holdings]
-        writes: [kyc.movements]
+        reads: [holdings]
+        writes: [movements]
 
   # ---------------------------------------------------------------------------
   # TEAM — Team Management & Access Control
@@ -1552,6 +1855,21 @@ domains:
         governance_tier: operational
         classification: internal
         pii: false
+      intent_feedback_analysis:
+        description: "Derived analysis records over intent feedback for tuning and review"
+        governance_tier: operational
+        classification: internal
+        pii: false
+      events:
+        description: "Agent telemetry events capturing user messages, generated DSL, and correction signals"
+        governance_tier: operational
+        classification: confidential
+        pii: true
+      intent_events:
+        description: "Intent pipeline event records used for shadow and coverage analysis"
+        governance_tier: operational
+        classification: confidential
+        pii: true
     verb_data_footprint:
       agent.teach:
         reads: [dsl_verbs]
@@ -1598,6 +1916,76 @@ domains:
         pii: false
       compiled_runbook_events:
         description: "Compiled runbook execution events"
+        governance_tier: operational
+        classification: internal
+        pii: false
+      dsl_ob:
+        description: "DSL operation buffer — in-flight command state"
+        governance_tier: operational
+        classification: internal
+        pii: false
+      dsl_session_locks:
+        description: "Advisory locks for DSL session exclusivity"
+        governance_tier: operational
+        classification: internal
+        pii: false
+      dsl_snapshots:
+        description: "DSL session state snapshots for replay and recovery"
+        governance_tier: operational
+        classification: internal
+        pii: false
+      dsl_verb_categories:
+        description: "Verb categorization for UI grouping and discovery"
+        governance_tier: operational
+        classification: internal
+        pii: false
+      dsl_verb_sync_log:
+        description: "Audit trail of verb registry sync operations"
+        governance_tier: operational
+        classification: internal
+        pii: false
+      dsl_view_state_changes:
+        description: "View state transition log for UI/session debugging"
+        governance_tier: operational
+        classification: internal
+        pii: false
+      dsl_workflow_phases:
+        description: "Workflow phase definitions for multi-step DSL operations"
+        governance_tier: operational
+        classification: internal
+        pii: false
+      staged_command:
+        description: "In-construction staged command with DAG analysis and confirmation gate"
+        governance_tier: operational
+        classification: internal
+        pii: false
+      staged_command_candidate:
+        description: "Candidate verb matches for staged command resolution"
+        governance_tier: operational
+        classification: internal
+        pii: false
+      staged_command_entity:
+        description: "Resolved entities bound to staged command arguments"
+        governance_tier: operational
+        classification: internal
+        pii: false
+      staged_runbook:
+        description: "In-construction runbook envelope before compilation"
+        governance_tier: operational
+        classification: internal
+        pii: false
+      repl_invocation_records:
+        description: "REPL command invocation history for replay and debugging"
+        governance_tier: operational
+        classification: internal
+        pii: false
+      semantic_match_cache:
+        description: "Cached semantic similarity results for verb resolution"
+        governance_tier: operational
+        classification: internal
+        pii: false
+      verb_centroids:
+        description: "Centroid embeddings per verb for fast similarity lookups"
         governance_tier: operational
         classification: internal
         pii: false
@@ -1726,25 +2114,329 @@ domains:
         governance_tier: operational
         classification: internal
         pii: false
+      sem_reg.classification_levels:
+        description: "Security classification reference data (Public, Internal, Confidential, Restricted)"
+        governance_tier: governed
+        classification: internal
+        pii: false
+      sem_reg.disambiguation_prompts:
+        description: "Disambiguation questions with options for agent plan decision-making"
+        governance_tier: operational
+        classification: internal
+        pii: false
+      sem_reg_pub.active_verb_contracts:
+        description: "Flattened active verb contract projections for runtime consumption"
+        governance_tier: operational
+        classification: internal
+        pii: false
+      sem_reg_pub.active_entity_types:
+        description: "Flattened active entity type definition projections for runtime consumption"
+        governance_tier: operational
+        classification: internal
+        pii: false
+      sem_reg_pub.active_taxonomies:
+        description: "Flattened active taxonomy definition projections for runtime consumption"
+        governance_tier: operational
+        classification: internal
+        pii: false
+      sem_reg_pub.projection_watermark:
+        description: "Outbox dispatcher progress tracker — last processed sequence per projection"
+        governance_tier: operational
+        classification: internal
+        pii: false
+      sem_reg_authoring.validation_reports:
+        description: "Append-only validation results per changeset (Stage 1 artifact + Stage 2 dry-run)"
+        governance_tier: operational
+        classification: internal
+        pii: false
+      sem_reg_authoring.governance_audit_log:
+        description: "Permanent audit trail for all governance verbs (propose/validate/publish/rollback)"
+        governance_tier: governed
+        classification: internal
+        pii: false
+      sem_reg_authoring.publish_batches:
+        description: "Atomic batch publish records with topologically-sorted changeset IDs"
+        governance_tier: governed
+        classification: internal
+        pii: false
+      sem_reg_authoring.change_set_artifacts:
+        description: "Stored artifacts (SQL, YAML, JSON) associated with changesets"
+        governance_tier: operational
+        classification: internal
+        pii: false
+      sem_reg_authoring.change_sets_archive:
+        description: "Archive for expired/orphan changesets (rejected >90d, orphan draft >30d)"
+        governance_tier: operational
+        classification: internal
+        pii: false
+      sem_reg_authoring.change_set_artifacts_archive:
+        description: "Archive for artifacts belonging to archived changesets"
+        governance_tier: operational
+        classification: internal
+        pii: false
     verb_data_footprint:
-      registry.describe:
+      # === changeset domain (14 verbs) ===
+      changeset.compose:
+        reads: []
+        writes: [sem_reg.changesets, sem_reg.events]
+      changeset.add-item:
+        reads: [sem_reg.changesets]
+        writes: [sem_reg.changeset_entries]
+      changeset.remove-item:
+        reads: [sem_reg.changesets, sem_reg.changeset_entries]
+        writes: [sem_reg.changeset_entries]
+      changeset.refine-item:
+        reads: [sem_reg.changesets, sem_reg.changeset_entries]
+        writes: [sem_reg.changeset_entries]
+      changeset.suggest:
+        reads: [sem_reg.changesets, sem_reg.changeset_entries, sem_reg.snapshots]
+        writes: []
+      changeset.apply-template:
+        reads: [sem_reg.changesets, sem_reg.templates]
+        writes: [sem_reg.changeset_entries]
+      changeset.attach-basis:
+        reads: [sem_reg.changesets, sem_reg.changeset_entries]
+        writes: [sem_reg.basis_records, sem_reg.basis_claims]
+      changeset.validate-edit:
+        reads: [sem_reg.changesets, sem_reg.changeset_entries, sem_reg.snapshots]
+        writes: []
+      changeset.cross-reference:
+        reads: [sem_reg.changesets, sem_reg.changeset_entries, sem_reg.snapshots]
+        writes: []
+      changeset.impact-analysis:
+        reads: [sem_reg.changesets, sem_reg.changeset_entries, sem_reg.snapshots, sem_reg.derivation_edges]
+        writes: []
+      changeset.resolve-conflict:
+        reads: [sem_reg.conflict_records]
+        writes: [sem_reg.conflict_records]
+      changeset.list:
+        reads: [sem_reg.changesets]
+        writes: []
+      changeset.get:
+        reads: [sem_reg.changesets, sem_reg.changeset_entries]
+        writes: []
+      changeset.diff:
+        reads: [sem_reg.changesets, sem_reg.changeset_entries, sem_reg.snapshots]
+        writes: []
+
+      # === governance domain (9 verbs) ===
+      governance.gate-precheck:
+        reads: [sem_reg.changesets, sem_reg.changeset_entries, sem_reg_authoring.validation_reports]
+        writes: []
+      governance.submit-for-review:
+        reads: [sem_reg.changesets]
+        writes: [sem_reg.changesets, sem_reg.events]
+      governance.record-review:
+        reads: [sem_reg.changesets]
+        writes: [sem_reg.changesets, sem_reg.changeset_reviews, sem_reg.events]
+      governance.validate:
+        reads: [sem_reg.changesets, sem_reg.changeset_entries]
+        writes: [sem_reg.changesets, sem_reg_authoring.validation_reports, sem_reg_authoring.governance_audit_log]
+      governance.dry-run:
+        reads: [sem_reg.changesets, sem_reg.changeset_entries, sem_reg.snapshots]
+        writes: [sem_reg.changesets, sem_reg_authoring.validation_reports, sem_reg_authoring.governance_audit_log]
+      governance.plan-publish:
+        reads: [sem_reg.changesets, sem_reg.changeset_entries, sem_reg.snapshots, sem_reg.snapshot_sets]
+        writes: []
+      governance.publish:
+        reads: [sem_reg.changesets, sem_reg.changeset_entries, sem_reg.snapshots]
+        writes: [sem_reg.snapshots, sem_reg.snapshot_sets, sem_reg.changesets, sem_reg.outbox_events, sem_reg_authoring.publish_batches, sem_reg_authoring.governance_audit_log]
+      governance.publish-batch:
+        reads: [sem_reg.changesets, sem_reg.changeset_entries, sem_reg.snapshots]
+        writes: [sem_reg.snapshots, sem_reg.snapshot_sets, sem_reg.changesets, sem_reg.outbox_events, sem_reg_authoring.publish_batches, sem_reg_authoring.governance_audit_log]
+      governance.rollback:
+        reads: [sem_reg.snapshot_sets, sem_reg.snapshots]
+        writes: [sem_reg.snapshot_sets, sem_reg_authoring.governance_audit_log]
+
+      # === focus domain (6 verbs) ===
+      focus.get:
+        reads: [sem_reg.focus_states]
+        writes: []
+      focus.set:
+        reads: []
+        writes: [sem_reg.focus_states]
+      focus.render:
+        reads: [sem_reg.focus_states, sem_reg.snapshots]
+        writes: []
+      focus.viewport:
+        reads: [sem_reg.focus_states, sem_reg.viewport_manifests]
+        writes: []
+      focus.diff:
+        reads: [sem_reg.focus_states, sem_reg.viewport_manifests, sem_reg.snapshots]
+        writes: []
+      focus.capture-manifest:
+        reads: [sem_reg.focus_states]
+        writes: [sem_reg.viewport_manifests]
+
+      # === audit domain (8 verbs) ===
+      audit.create-plan:
+        reads: []
+        writes: [sem_reg.agent_plans]
+      audit.add-plan-step:
+        reads: [sem_reg.agent_plans]
+        writes: [sem_reg.plan_steps]
+      audit.validate-plan:
+        reads: [sem_reg.agent_plans, sem_reg.plan_steps]
+        writes: []
+      audit.execute-plan-step:
+        reads: [sem_reg.agent_plans, sem_reg.plan_steps]
+        writes: [sem_reg.plan_steps, sem_reg.run_records]
+      audit.record-decision:
+        reads: [sem_reg.plan_steps]
+        writes: [sem_reg.decision_records]
+      audit.record-escalation:
+        reads: [sem_reg.decision_records]
+        writes: [sem_reg.escalation_records]
+      audit.record-disambiguation:
+        reads: [sem_reg.decision_records]
+        writes: [sem_reg.disambiguation_prompts]
+      audit.record-observation:
         reads: [sem_reg.snapshots]
+        writes: [sem_reg.derivation_edges, sem_reg.run_records]
+
+      # === registry domain (26 verbs) — all read-only ===
+      registry.describe-object:
+        reads: [sem_reg.snapshots]
+        writes: []
       registry.search:
         reads: [sem_reg.snapshots, sem_reg.embedding_records]
-      registry.list-verbs:
+        writes: []
+      registry.list-objects:
         reads: [sem_reg.snapshots]
-      registry.list-attributes:
+        writes: []
+      registry.resolve-context:
         reads: [sem_reg.snapshots]
-      changeset.propose:
+        writes: []
+      registry.verb-surface:
+        reads: [sem_reg.snapshots, sem_reg_pub.active_verb_contracts]
+        writes: []
+      registry.attribute-producers:
+        reads: [sem_reg.snapshots]
+        writes: []
+      registry.lineage:
+        reads: [sem_reg.snapshots, sem_reg.derivation_edges, sem_reg.run_records]
+        writes: []
+      registry.regulation-trace:
+        reads: [sem_reg.snapshots]
+        writes: []
+      registry.taxonomy-tree:
+        reads: [sem_reg.snapshots]
+        writes: []
+      registry.taxonomy-members:
+        reads: [sem_reg.snapshots]
+        writes: []
+      registry.classify:
+        reads: [sem_reg.snapshots]
+        writes: []
+      registry.describe-view:
+        reads: [sem_reg.snapshots]
+        writes: []
+      registry.apply-view:
+        reads: [sem_reg.snapshots]
+        writes: []
+      registry.describe-policy:
+        reads: [sem_reg.snapshots]
+        writes: []
+      registry.coverage-report:
+        reads: [sem_reg.snapshots]
+        writes: []
+      registry.evidence-freshness:
+        reads: [sem_reg.snapshots]
+        writes: []
+      registry.evidence-gaps:
+        reads: [sem_reg.snapshots]
+        writes: []
+      registry.snapshot-history:
+        reads: [sem_reg.snapshots]
+        writes: []
+      registry.snapshot-diff:
+        reads: [sem_reg.snapshots]
+        writes: []
+      registry.active-manifest:
+        reads: [sem_reg.snapshot_sets, sem_reg.snapshots]
+        writes: []
+      registry.adjacent-verbs:
+        reads: [sem_reg.snapshots]
+        writes: []
+      registry.data-for-verb:
+        reads: [sem_reg.snapshots]
+        writes: []
+      registry.discover-dsl:
+        reads: [sem_reg.snapshots, sem_reg_pub.active_verb_contracts]
+        writes: []
+      registry.governance-gaps:
+        reads: [sem_reg.snapshots]
+        writes: []
+      registry.verbs-for-attribute:
+        reads: [sem_reg.snapshots]
+        writes: []
+      registry.verbs-for-table:
+        reads: [sem_reg.snapshots]
+        writes: []
+
+      # === schema domain (13 verbs) — all read-only ===
+      schema.introspect:
+        reads: [sem_reg.snapshots]
+        writes: []
+      schema.domain.describe:
+        reads: [sem_reg.snapshots]
+        writes: []
+      schema.entity.describe:
+        reads: [sem_reg.snapshots]
+        writes: []
+      schema.entity.list-fields:
+        reads: [sem_reg.snapshots]
+        writes: []
+      schema.entity.list-relationships:
+        reads: [sem_reg.snapshots]
+        writes: []
+      schema.entity.list-verbs:
+        reads: [sem_reg.snapshots, sem_reg_pub.active_verb_contracts]
+        writes: []
+      schema.extract-attributes:
+        reads: [sem_reg.snapshots]
+        writes: []
+      schema.extract-entities:
+        reads: [sem_reg.snapshots]
+        writes: []
+      schema.extract-verbs:
+        reads: [sem_reg.snapshots]
+        writes: []
+      schema.cross-reference:
+        reads: [sem_reg.snapshots]
+        writes: []
+      schema.generate-erd:
+        reads: [sem_reg.snapshots]
+        writes: []
+      schema.generate-verb-flow:
+        reads: [sem_reg.snapshots, sem_reg.derivation_edges]
+        writes: []
+      schema.generate-discovery-map:
+        reads: [sem_reg.snapshots]
+        writes: []
+
+      # === maintenance domain (7 verbs) ===
+      maintenance.health-pending:
+        reads: [sem_reg.outbox_events, sem_reg_pub.projection_watermark]
+        writes: []
+      maintenance.health-stale-dryruns:
+        reads: [sem_reg.changesets, sem_reg_authoring.validation_reports]
+        writes: []
+      maintenance.cleanup:
         reads: [sem_reg.changesets]
-        writes: [sem_reg.changesets, sem_reg.changeset_entries]
-      changeset.validate:
-        reads: [sem_reg.changesets, sem_reg.changeset_entries]
-        writes: [sem_reg.changesets]
-      changeset.publish:
-        reads:
-          [sem_reg.changesets, sem_reg.changeset_entries, sem_reg.snapshots]
-        writes: [sem_reg.snapshots, sem_reg.snapshot_sets, sem_reg.changesets]
+        writes: [sem_reg.changesets, sem_reg_authoring.change_sets_archive, sem_reg_authoring.change_set_artifacts_archive]
+      maintenance.bootstrap-seeds:
+        reads: [sem_reg.bootstrap_audit]
+        writes: [sem_reg.snapshots, sem_reg.snapshot_sets, sem_reg.bootstrap_audit]
+      maintenance.drain-outbox:
+        reads: [sem_reg.outbox_events]
+        writes: [sem_reg.outbox_events, sem_reg_pub.active_verb_contracts, sem_reg_pub.active_entity_types, sem_reg_pub.active_taxonomies, sem_reg_pub.projection_watermark]
+      maintenance.reindex-embeddings:
+        reads: [sem_reg.snapshots, sem_reg.embedding_records]
+        writes: [sem_reg.embedding_records]
+      maintenance.validate-schema-sync:
+        reads: [sem_reg.snapshots, sem_reg_pub.active_verb_contracts]
+        writes: []
 
   # ---------------------------------------------------------------------------
   # STEWARDSHIP — Changeset Authoring & Show Loop
@@ -1797,28 +2489,7 @@ domains:
         governance_tier: governed
         classification: internal
         pii: false
-    verb_data_footprint:
-      stew.compose-changeset:
-        writes: [sem_reg.events, sem_reg.changesets]
-      stew.submit-for-review:
-        reads: [sem_reg.changesets]
-        writes: [sem_reg.changesets, sem_reg.events]
-      stew.approve-changeset:
-        reads: [sem_reg.changesets]
-        writes: [sem_reg.changesets, sem_reg.events]
-      stew.publish-changeset:
-        reads: [sem_reg.changesets, sem_reg.changeset_entries]
-        writes: [sem_reg.snapshots, sem_reg.snapshot_sets, sem_reg.events]
-      stew.attach-basis:
-        reads: [sem_reg.basis_records]
-        writes: [sem_reg.basis_records, sem_reg.basis_claims]
-      stew.resolve-conflict:
-        reads: [sem_reg.conflict_records]
-        writes: [sem_reg.conflict_records]
-      stew.set-focus:
-        writes: [sem_reg.focus_states]
-      stew.show:
-        reads: [sem_reg.focus_states, sem_reg.snapshots]
+    verb_data_footprint: {}
 
   # ---------------------------------------------------------------------------
   # REFERENCE — Taxonomies & Reference Data
@@ -1871,6 +2542,31 @@ domains:
         governance_tier: governed
         classification: public
         pii: false
+      crud_operations:
+        description: "CRUD operation taxonomy for registry and DSL tooling"
+        governance_tier: governed
+        classification: internal
+        pii: false
+      dictionary:
+        description: "Reference dictionary entries used by semantic and registry tooling"
+        governance_tier: governed
+        classification: internal
+        pii: false
+      edge_types:
+        description: "Reference edge type taxonomy for graph and relationship tooling"
+        governance_tier: governed
+        classification: internal
+        pii: false
+      node_types:
+        description: "Reference node type taxonomy for graph and relationship tooling"
+        governance_tier: governed
+        classification: internal
+        pii: false
+      srdef_discovery_reasons:
+        description: "Reference reasons explaining service-resource discovery outcomes"
+        governance_tier: governed
+        classification: internal
+        pii: false
     verb_data_footprint: {}
 
   # ---------------------------------------------------------------------------
@@ -1879,35 +2575,189 @@ domains:
   client-portal:
     description: "Client portal — credentials, submissions, escalations"
     tables:
-      client_portal.clients:
+      clients:
         description: "Portal client records"
         governance_tier: operational
         classification: confidential
         pii: true
-      client_portal.credentials:
+      credentials:
         description: "Portal credentials"
         governance_tier: operational
         classification: restricted
         pii: true
-      client_portal.sessions:
-        description: "Portal session records"
+      client_portal_sessions:
+        description: "Business-facing portal session ledger after schema consolidation"
         governance_tier: operational
         classification: confidential
         pii: false
-      client_portal.submissions:
+      submissions:
         description: "Client document/data submissions"
         governance_tier: operational
         classification: confidential
         pii: true
-      client_portal.commitments:
+      commitments:
         description: "Client commitments"
         governance_tier: operational
         classification: confidential
         pii: false
-      client_portal.escalations:
+      escalations:
         description: "Portal escalations"
         governance_tier: operational
         classification: confidential
+        pii: false
+      client_allegations:
+        description: "Client-submitted allegations or issue claims from the portal surface"
+        governance_tier: operational
+        classification: confidential
+        pii: true
+      client_types:
+        description: "Client type taxonomy for onboarding and portal segmentation"
+        governance_tier: governed
+        classification: internal
+        pii: false
+    verb_data_footprint: {}
+
+  # ---------------------------------------------------------------------------
+  # VIEW — Layout & View Configuration
+  # ---------------------------------------------------------------------------
+  view:
+    description: "Layout and view-mode configuration for UI composition and caching"
+    tables:
+      layout_cache:
+        description: "Cached rendered layout state for view composition"
+        governance_tier: operational
+        classification: internal
+        pii: false
+      layout_config:
+        description: "Persisted layout configuration definitions"
+        governance_tier: operational
+        classification: internal
+        pii: false
+      view_modes:
+        description: "Supported view mode definitions for UI rendering"
+        governance_tier: operational
+        classification: internal
+        pii: false
+    verb_data_footprint: {}
+
+  # ---------------------------------------------------------------------------
+  # LIFECYCLE — Resource Lifecycle Reference Data
+  # ---------------------------------------------------------------------------
+  lifecycle:
+    description: "Lifecycle definitions and lifecycle-specific resource capability metadata"
+    tables:
+      lifecycles:
+        description: "Lifecycle definitions for service and delivery orchestration"
+        governance_tier: governed
+        classification: internal
+        pii: false
+      lifecycle_resource_capabilities:
+        description: "Capabilities available for each lifecycle resource type"
+        governance_tier: governed
+        classification: internal
+        pii: false
+      lifecycle_resource_types:
+        description: "Lifecycle-scoped resource type taxonomy"
+        governance_tier: governed
+        classification: internal
+        pii: false
+    verb_data_footprint: {}
+
+  # ---------------------------------------------------------------------------
+  # WORKFLOW — Workflow Definitions & Audit
+  # ---------------------------------------------------------------------------
+  workflow:
+    description: "Workflow definitions, runtime instances, and workflow audit trail"
+    tables:
+      workflow_definitions:
+        description: "Workflow definition registry for orchestrated business flows"
+        governance_tier: governed
+        classification: internal
+        pii: false
+      workflow_instances:
+        description: "Runtime workflow instances with state and correlation"
+        governance_tier: operational
+        classification: internal
+        pii: false
+      workflow_audit_log:
+        description: "Workflow audit log of transitions and operator actions"
+        governance_tier: operational
+        classification: internal
+        pii: false
+    verb_data_footprint: {}
+
+  # ---------------------------------------------------------------------------
+  # BODS — Ownership Taxonomy Reference Data
+  # ---------------------------------------------------------------------------
+  bods:
+    description: "BODS reference taxonomies used by ownership transparency exports"
+    tables:
+      bods_entity_types:
+        description: "BODS entity type reference taxonomy"
+        governance_tier: governed
+        classification: internal
+        pii: false
+      bods_interest_types:
+        description: "BODS interest type reference taxonomy"
+        governance_tier: governed
+        classification: internal
+        pii: false
+    verb_data_footprint: {}
+
+  # ---------------------------------------------------------------------------
+  # OBSERVATION — Data Quality Observation Tracking
+  # ---------------------------------------------------------------------------
+  observation:
+    description: "Observation discrepancy tracking for evidence and registry quality control"
+    tables:
+      observation_discrepancies:
+        description: "Recorded discrepancies between observations, assertions, and evidence"
+        governance_tier: operational
+        classification: confidential
+        pii: false
+    verb_data_footprint: {}
+
+  # ---------------------------------------------------------------------------
+  # RESEARCH — Research Corrections & Anomalies
+  # ---------------------------------------------------------------------------
+  research:
+    description: "Research anomaly and correction tracking for curated corporate structure data"
+    tables:
+      research_anomalies:
+        description: "Anomalies detected during research and enrichment workflows"
+        governance_tier: operational
+        classification: internal
+        pii: false
+      research_corrections:
+        description: "Applied research corrections with provenance and review status"
+        governance_tier: operational
+        classification: internal
+        pii: false
+    verb_data_footprint: {}
+
+  # ---------------------------------------------------------------------------
+  # GRAPH — Graph Import Audit
+  # ---------------------------------------------------------------------------
+  graph:
+    description: "Graph import and synchronization audit records"
+    tables:
+      graph_import_runs:
+        description: "Graph import run records with scope, status, and metrics"
+        governance_tier: operational
+        classification: internal
+        pii: false
+    verb_data_footprint: {}
+
+  # ---------------------------------------------------------------------------
+  # SCHEMA ADMIN — Consolidation & Mapping Metadata
+  # ---------------------------------------------------------------------------
+  schema-admin:
+    description: "Administrative mapping metadata used during schema consolidation and cutover"
+    tables:
+      schema_consolidation_table_map:
+        description: "Mapping of legacy schema tables to consolidated destination tables"
+        governance_tier: governed
+        classification: internal
         pii: false
     verb_data_footprint: {}
 

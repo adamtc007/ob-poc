@@ -9,6 +9,10 @@
 > **Pre-Java-port cleanup (2026-02-27):** 25-issue cleanup pass across all 6 sem_os crates (~21,005 LOC). Key changes: strum-based enum derives (eliminates manual `as_str()`/`from_str()`/`Display`), dead code removal (~600 LOC), `CoreService` trait extracted from impl, `Principal` builder + validation hardened, serde round-trip tests for all body types + proto types, `#[must_use]` on decision types, clippy clean. Test count: 60 → 321 unit tests (sem_os_core) + 50 adapter tests.
 
 > **Current downstream state (2026-03-08):** `ob-poc` has completed the Sage Phase 1 skeleton and Coder Phase 2 rewrite on top of the Semantic OS governance/discovery architecture. The live comparative harness shows the legacy pipeline still outperforming Sage+Coder (`58/134` vs `6/134` deterministic and `7/134` LLM-backed), so the active follow-on work moved to Phase 0 vocabulary rationalization. Batches 1-3 are complete: domain merges/deletions, type-parameterized canonical verb merges, and unified `refdata.*`.
+>
+> **Schema state after consolidation (2026-03-08):** business runtime data has been collapsed into `"ob-poc"` and Semantic OS data into `sem_reg`, `sem_reg_authoring`, and `sem_reg_pub`. The legacy schemas `stewardship`, `agent`, `teams`, `feedback`, `events`, `sessions`, `ob_ref`, and `ob_kyc` are no longer live runtime schemas.
+>
+> **Metadata state after remediation (2026-03-08):** `rust/config/sem_os_seeds/domain_metadata.yaml` now covers `306/306` live `"ob-poc"` tables. The `sem-reg` footprint metadata has been expanded for authoring/publication tables and the orphan `stewardship`/legacy verb footprints have been removed.
 
 ---
 

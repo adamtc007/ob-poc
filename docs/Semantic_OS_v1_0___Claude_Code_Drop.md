@@ -9,6 +9,10 @@
 > **Implementation Summary:** 6 workspace crates (`sem_os_core`, `sem_os_postgres`, `sem_os_server`, `sem_os_client`, `sem_os_harness`, `sem_os_obpoc_adapter`), 9 migrations (092-100), ~101 MCP tools total (~32 sem_reg + 23 stewardship + rest), 3 test suites (core, projections, permissions), stewardship agent Phase 0-1 (changeset workflow + Show Loop), governed authoring pipeline (7 governance verbs, Research/Governed AgentMode gating, 60 unit + 26 integration tests), `db_introspect` MCP tool, `AttributeSource` real (schema, table, column) triples. Adapter wires into ob-poc via `SemOsClient` trait in both inprocess and remote modes.
 
 > **ob-poc integration status (2026-03-08):** Semantic OS is now the architecture base for the governed registry, SessionVerbSurface, discovery pipeline, and Sage/Coder intent work in `ob-poc`. Sage Phase 1 and Coder Phase 2 are implemented, including `SAGE_FAST_PATH=1` for data-management read+structure schema introspection. Comparative coverage has been run live against `ob-poc-web`: existing pipeline `58/134` (`43.28%`), deterministic Sage+Coder `6/134` (`4.48%`), LLM-backed Sage+Coder `7/134` (`5.22%`). That result shifted the next optimization priority to vocabulary rationalization, and Phase 0 Batches 1-3 are now complete (domain merges/deletions, type-parameterized verb merges, unified `refdata.*`).
+>
+> **Database integration status (2026-03-08):** the runtime database has now been consolidated to two live schema families: `"ob-poc"` for business data and `sem_reg*` for Semantic OS. Stewardship storage was folded into `sem_reg`, and the retired schemas `agent`, `teams`, `feedback`, `events`, `sessions`, `ob_ref`, and `ob_kyc` have been removed from the live runtime path.
+>
+> **Metadata integration status (2026-03-08):** `rust/config/sem_os_seeds/domain_metadata.yaml` now covers `306/306` live `"ob-poc"` tables, and the Semantic OS footprint metadata has been remediated to include `sem_reg_pub.*`, `sem_reg_authoring.*`, and the current `sem_reg` stewardship tables without legacy orphan footprints.
 
 ---
 
