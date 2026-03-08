@@ -153,7 +153,7 @@ impl SessionLogger {
 
         let id = sqlx::query_scalar!(
             r#"
-            INSERT INTO sessions.log (session_id, entry_type, content, event_id, source, metadata)
+            INSERT INTO "ob-poc".session_log (session_id, entry_type, content, event_id, source, metadata)
             VALUES ($1, $2, $3, $4, $5, $6)
             RETURNING id
             "#,
@@ -176,7 +176,7 @@ impl SessionLogger {
             SessionLogEntry,
             r#"
             SELECT id, session_id, timestamp, entry_type, content, event_id, source, metadata
-            FROM sessions.log
+            FROM "ob-poc".session_log
             WHERE session_id = $1
             ORDER BY timestamp ASC
             "#,
@@ -194,7 +194,7 @@ impl SessionLogger {
             SessionLogEntry,
             r#"
             SELECT id, session_id, timestamp, entry_type, content, event_id, source, metadata
-            FROM sessions.log
+            FROM "ob-poc".session_log
             WHERE session_id = $1 AND entry_type = $2
             ORDER BY timestamp ASC
             "#,
@@ -237,7 +237,7 @@ impl SessionLogQuery {
             SessionLogEntry,
             r#"
             SELECT id, session_id, timestamp, entry_type, content, event_id, source, metadata
-            FROM sessions.log
+            FROM "ob-poc".session_log
             WHERE session_id = $1
             ORDER BY timestamp ASC
             "#,
@@ -255,7 +255,7 @@ impl SessionLogQuery {
             SessionLogEntry,
             r#"
             SELECT id, session_id, timestamp, entry_type, content, event_id, source, metadata
-            FROM sessions.log
+            FROM "ob-poc".session_log
             WHERE event_id = $1
             ORDER BY timestamp ASC
             "#,
@@ -273,7 +273,7 @@ impl SessionLogQuery {
             SessionLogEntry,
             r#"
             SELECT id, session_id, timestamp, entry_type, content, event_id, source, metadata
-            FROM sessions.log
+            FROM "ob-poc".session_log
             WHERE entry_type = 'error'
             ORDER BY timestamp DESC
             LIMIT $1
@@ -297,7 +297,7 @@ impl SessionLogQuery {
             SessionLogEntry,
             r#"
             SELECT id, session_id, timestamp, entry_type, content, event_id, source, metadata
-            FROM sessions.log
+            FROM "ob-poc".session_log
             WHERE event_id = $1
             LIMIT 1
             "#,
@@ -315,7 +315,7 @@ impl SessionLogQuery {
             SessionLogEntry,
             r#"
             SELECT id, session_id, timestamp, entry_type, content, event_id, source, metadata
-            FROM sessions.log
+            FROM "ob-poc".session_log
             WHERE session_id = $1
             ORDER BY timestamp ASC
             "#,

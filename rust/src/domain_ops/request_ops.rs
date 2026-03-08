@@ -100,7 +100,7 @@ impl CustomOperation for RequestCreateOp {
         let config = sqlx::query!(
             r#"
             SELECT default_due_days, default_grace_days, blocks_by_default, max_reminders
-            FROM ob_ref.request_types
+            FROM "ob-poc".request_types
             WHERE request_type = $1 AND request_subtype = $2
             "#,
             request_type,
@@ -1088,7 +1088,7 @@ impl CustomOperation for DocumentRequestOp {
         let config = sqlx::query!(
             r#"
             SELECT default_due_days, default_grace_days, blocks_by_default, max_reminders, description
-            FROM ob_ref.request_types
+            FROM "ob-poc".request_types
             WHERE request_type = 'DOCUMENT' AND request_subtype = $1
             "#,
             doc_type

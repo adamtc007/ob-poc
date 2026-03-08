@@ -1,4 +1,4 @@
-//! StewardshipStore — DB operations for `stewardship.*` tables.
+//! StewardshipStore — DB operations for `sem_reg.*` stewardship tables.
 //!
 //! Follows the unit-struct pattern from `SnapshotStore`.
 //! All event writes are append-only (immutable audit chain).
@@ -21,7 +21,7 @@ impl StewardshipStore {
         let payload = serde_json::to_value(&record.event_type)?;
         sqlx::query(
             r#"
-            INSERT INTO stewardship.events (
+            INSERT INTO sem_reg.events (
                 event_id, changeset_id, event_type, actor_id,
                 payload, viewport_manifest_id, created_at
             ) VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -49,7 +49,7 @@ impl StewardshipStore {
             r#"
             SELECT event_id, changeset_id, event_type, actor_id,
                    payload, viewport_manifest_id, created_at
-            FROM stewardship.events
+            FROM sem_reg.events
             WHERE changeset_id = $1
             ORDER BY created_at ASC
             LIMIT $2
@@ -69,7 +69,7 @@ impl StewardshipStore {
     pub async fn insert_basis(pool: &PgPool, basis: &BasisRecord) -> Result<()> {
         sqlx::query(
             r#"
-            INSERT INTO stewardship.basis_records (
+            INSERT INTO sem_reg.basis_records (
                 basis_id, changeset_id, entry_id, kind,
                 title, narrative, created_by, created_at
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
@@ -94,7 +94,7 @@ impl StewardshipStore {
             r#"
             SELECT basis_id, changeset_id, entry_id, kind,
                    title, narrative, created_by, created_at
-            FROM stewardship.basis_records
+            FROM sem_reg.basis_records
             WHERE changeset_id = $1
             ORDER BY created_at ASC
             "#,
@@ -110,7 +110,7 @@ impl StewardshipStore {
     pub async fn insert_claim(pool: &PgPool, claim: &BasisClaim) -> Result<()> {
         sqlx::query(
             r#"
-            INSERT INTO stewardship.basis_claims (
+            INSERT INTO sem_reg.basis_claims (
                 claim_id, basis_id, claim_text, reference_uri,
                 excerpt, confidence, flagged_as_open_question
             ) VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -134,7 +134,7 @@ impl StewardshipStore {
             r#"
             SELECT claim_id, basis_id, claim_text, reference_uri,
                    excerpt, confidence, flagged_as_open_question
-            FROM stewardship.basis_claims
+            FROM sem_reg.basis_claims
             WHERE basis_id = $1
             ORDER BY created_at ASC
             "#,
@@ -163,7 +163,7 @@ impl StewardshipStore {
     pub async fn insert_conflict(pool: &PgPool, conflict: &ConflictRecord) -> Result<()> {
         sqlx::query(
             r#"
-            INSERT INTO stewardship.conflict_records (
+            INSERT INTO sem_reg.conflict_records (
                 conflict_id, changeset_id, competing_changeset_id,
                 fqn, detected_at
             ) VALUES ($1, $2, $3, $4, $5)
@@ -186,7 +186,7 @@ impl StewardshipStore {
             SELECT conflict_id, changeset_id, competing_changeset_id,
                    fqn, detected_at, resolution_strategy,
                    resolution_rationale, resolved_by, resolved_at
-            FROM stewardship.conflict_records
+            FROM sem_reg.conflict_records
             WHERE changeset_id = $1
             ORDER BY detected_at ASC
             "#,
@@ -208,7 +208,7 @@ impl StewardshipStore {
     ) -> Result<()> {
         let rows = sqlx::query(
             r#"
-            UPDATE stewardship.conflict_records
+            UPDATE sem_reg.conflict_records
             SET resolution_strategy = $2,
                 resolution_rationale = $3,
                 resolved_by = $4,
@@ -238,7 +238,7 @@ impl StewardshipStore {
 
         sqlx::query(
             r#"
-            INSERT INTO stewardship.templates (
+            INSERT INTO sem_reg.templates (
                 template_id, fqn, display_name,
                 version_major, version_minor, version_patch,
                 domain, scope, items, steward, basis_ref,
@@ -276,7 +276,7 @@ impl StewardshipStore {
                    version_major, version_minor, version_patch,
                    domain, scope, items, steward, basis_ref,
                    status, created_by, created_at
-            FROM stewardship.templates
+            FROM sem_reg.templates
             WHERE fqn = $1 AND status = 'active'
             LIMIT 1
             "#,
@@ -300,7 +300,7 @@ impl StewardshipStore {
                        version_major, version_minor, version_patch,
                        domain, scope, items, steward, basis_ref,
                        status, created_by, created_at
-                FROM stewardship.templates
+                FROM sem_reg.templates
                 WHERE status = $1
                 ORDER BY fqn ASC
                 "#,
@@ -315,7 +315,7 @@ impl StewardshipStore {
                        version_major, version_minor, version_patch,
                        domain, scope, items, steward, basis_ref,
                        status, created_by, created_at
-                FROM stewardship.templates
+                FROM sem_reg.templates
                 ORDER BY fqn ASC
                 "#,
             )
@@ -334,7 +334,7 @@ impl StewardshipStore {
 
         sqlx::query(
             r#"
-            INSERT INTO stewardship.verb_implementation_bindings (
+            INSERT INTO sem_reg.verb_implementation_bindings (
                 binding_id, verb_fqn, binding_kind, binding_ref,
                 exec_modes, status, last_verified_at, notes
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
@@ -362,7 +362,7 @@ impl StewardshipStore {
             r#"
             SELECT binding_id, verb_fqn, binding_kind, binding_ref,
                    exec_modes, status, last_verified_at, notes
-            FROM stewardship.verb_implementation_bindings
+            FROM sem_reg.verb_implementation_bindings
             WHERE verb_fqn = $1 AND status = 'active'
             LIMIT 1
             "#,
@@ -384,7 +384,7 @@ impl StewardshipStore {
                 r#"
                 SELECT binding_id, verb_fqn, binding_kind, binding_ref,
                        exec_modes, status, last_verified_at, notes
-                FROM stewardship.verb_implementation_bindings
+                FROM sem_reg.verb_implementation_bindings
                 WHERE status = $1
                 ORDER BY verb_fqn ASC
                 "#,
@@ -397,7 +397,7 @@ impl StewardshipStore {
                 r#"
                 SELECT binding_id, verb_fqn, binding_kind, binding_ref,
                        exec_modes, status, last_verified_at, notes
-                FROM stewardship.verb_implementation_bindings
+                FROM sem_reg.verb_implementation_bindings
                 ORDER BY verb_fqn ASC
                 "#,
             )
@@ -417,7 +417,7 @@ impl StewardshipStore {
     ) -> Result<Option<serde_json::Value>> {
         let row = sqlx::query_scalar::<_, serde_json::Value>(
             r#"
-            SELECT result FROM stewardship.idempotency_keys
+            SELECT result FROM sem_reg.idempotency_keys
             WHERE client_request_id = $1
             "#,
         )
@@ -436,7 +436,7 @@ impl StewardshipStore {
     ) -> Result<()> {
         sqlx::query(
             r#"
-            INSERT INTO stewardship.idempotency_keys (
+            INSERT INTO sem_reg.idempotency_keys (
                 client_request_id, tool_name, result
             ) VALUES ($1, $2, $3)
             ON CONFLICT (client_request_id) DO NOTHING
@@ -466,7 +466,7 @@ impl StewardshipStore {
 
         sqlx::query(
             r#"
-            INSERT INTO stewardship.viewport_manifests (
+            INSERT INTO sem_reg.viewport_manifests (
                 manifest_id, session_id, changeset_id,
                 focus_state, overlay_mode, assumed_principal,
                 viewport_refs, created_at

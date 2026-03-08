@@ -65,14 +65,14 @@ impl ToolHandlers {
 
         let id = sqlx::query_scalar::<_, Uuid>(
             r#"
-            INSERT INTO agent.phrase_blocklist
+            INSERT INTO "ob-poc".phrase_blocklist
                 (phrase, blocked_verb, embedding, reason, user_id, expires_at)
             VALUES ($1, $2, $3::vector, $4, $5, $6)
             ON CONFLICT (phrase, blocked_verb, COALESCE(user_id, '00000000-0000-0000-0000-000000000000'::uuid))
             DO UPDATE SET
-                reason = COALESCE($4, agent.phrase_blocklist.reason),
+                reason = COALESCE($4, "ob-poc".phrase_blocklist.reason),
                 expires_at = $6,
-                embedding = COALESCE($3::vector, agent.phrase_blocklist.embedding)
+                embedding = COALESCE($3::vector, "ob-poc".phrase_blocklist.embedding)
             RETURNING id
             "#,
         )
@@ -186,11 +186,11 @@ impl ToolHandlers {
             let result = if user_id.is_some() {
                 sqlx::query(
                     r#"
-                    INSERT INTO agent.user_learned_phrases
+                    INSERT INTO "ob-poc".user_learned_phrases
                         (user_id, phrase, verb, embedding, source)
                     VALUES ($1, $2, $3, $4::vector, 'bulk_import')
                     ON CONFLICT (user_id, phrase) DO UPDATE
-                    SET verb = $3, embedding = COALESCE($4::vector, agent.user_learned_phrases.embedding), updated_at = now()
+                    SET verb = $3, embedding = COALESCE($4::vector, "ob-poc".user_learned_phrases.embedding), updated_at = now()
                     "#,
                 )
                 .bind(user_id)
@@ -202,11 +202,11 @@ impl ToolHandlers {
             } else {
                 sqlx::query(
                     r#"
-                    INSERT INTO agent.invocation_phrases
+                    INSERT INTO "ob-poc".invocation_phrases
                         (phrase, verb, embedding, source)
                     VALUES ($1, $2, $3::vector, 'bulk_import')
                     ON CONFLICT (phrase) DO UPDATE
-                    SET verb = $2, embedding = COALESCE($3::vector, agent.invocation_phrases.embedding), updated_at = now()
+                    SET verb = $2, embedding = COALESCE($3::vector, "ob-poc".invocation_phrases.embedding), updated_at = now()
                     "#,
                 )
                 .bind(&phrase_data.phrase)
@@ -257,7 +257,7 @@ impl ToolHandlers {
             r#"
             SELECT id, learning_type, input_pattern, suggested_output, previous_output,
                    occurrence_count, risk_level, status, user_explanation, created_at
-            FROM agent.learning_candidates
+            FROM "ob-poc".learning_candidates
             WHERE ($1 = 'all' OR status = $1)
               AND ($2 = 'all' OR learning_type = $2)
               AND occurrence_count >= $3
@@ -323,7 +323,7 @@ impl ToolHandlers {
 
         // Get candidate
         let candidate = sqlx::query_as::<_, LearningCandidateRow>(
-            "SELECT id, learning_type, input_pattern, suggested_output FROM agent.learning_candidates WHERE id = $1",
+            r#"SELECT id, learning_type, input_pattern, suggested_output FROM "ob-poc".learning_candidates WHERE id = $1"#,
         )
         .bind(candidate_id)
         .fetch_optional(pool)
@@ -331,7 +331,9 @@ impl ToolHandlers {
         .ok_or_else(|| anyhow!("Candidate not found"))?;
 
         // Update status
-        sqlx::query("UPDATE agent.learning_candidates SET status = 'approved', updated_at = now() WHERE id = $1")
+        sqlx::query(
+            r#"UPDATE "ob-poc".learning_candidates SET status = 'approved', updated_at = now() WHERE id = $1"#,
+        )
             .bind(candidate_id)
             .execute(pool)
             .await?;
@@ -349,10 +351,10 @@ impl ToolHandlers {
                 "invocation_phrase" => {
                     sqlx::query(
                         r#"
-                        INSERT INTO agent.invocation_phrases (phrase, verb, embedding, source)
+                        INSERT INTO "ob-poc".invocation_phrases (phrase, verb, embedding, source)
                         VALUES ($1, $2, $3::vector, 'approved_candidate')
                         ON CONFLICT (phrase) DO UPDATE
-                        SET verb = $2, embedding = COALESCE($3::vector, agent.invocation_phrases.embedding), updated_at = now()
+                        SET verb = $2, embedding = COALESCE($3::vector, "ob-poc".invocation_phrases.embedding), updated_at = now()
                         "#,
                     )
                     .bind(&candidate.input_pattern)
@@ -364,10 +366,10 @@ impl ToolHandlers {
                 "entity_alias" => {
                     sqlx::query(
                         r#"
-                        INSERT INTO agent.entity_aliases (alias, canonical_name, embedding, source)
+                        INSERT INTO "ob-poc".entity_aliases (alias, canonical_name, embedding, source)
                         VALUES ($1, $2, $3::vector, 'approved_candidate')
                         ON CONFLICT (alias) DO UPDATE
-                        SET canonical_name = $2, embedding = COALESCE($3::vector, agent.entity_aliases.embedding), updated_at = now()
+                        SET canonical_name = $2, embedding = COALESCE($3::vector, "ob-poc".entity_aliases.embedding), updated_at = now()
                         "#,
                     )
                     .bind(&candidate.input_pattern)
@@ -380,7 +382,9 @@ impl ToolHandlers {
             };
 
             if result.is_ok() {
-                sqlx::query("UPDATE agent.learning_candidates SET status = 'applied', applied_at = now() WHERE id = $1")
+                sqlx::query(
+                    r#"UPDATE "ob-poc".learning_candidates SET status = 'applied', applied_at = now() WHERE id = $1"#,
+                )
                     .bind(candidate_id)
                     .execute(pool)
                     .await?;
@@ -416,7 +420,7 @@ impl ToolHandlers {
 
         // Get candidate
         let candidate = sqlx::query_as::<_, LearningCandidateRow>(
-            "SELECT id, learning_type, input_pattern, suggested_output FROM agent.learning_candidates WHERE id = $1",
+            r#"SELECT id, learning_type, input_pattern, suggested_output FROM "ob-poc".learning_candidates WHERE id = $1"#,
         )
         .bind(candidate_id)
         .fetch_optional(pool)
@@ -425,7 +429,7 @@ impl ToolHandlers {
 
         // Update status
         sqlx::query(
-            "UPDATE agent.learning_candidates SET status = 'rejected', user_explanation = COALESCE($2, user_explanation), updated_at = now() WHERE id = $1",
+            r#"UPDATE "ob-poc".learning_candidates SET status = 'rejected', user_explanation = COALESCE($2, user_explanation), updated_at = now() WHERE id = $1"#,
         )
         .bind(candidate_id)
         .bind(reason)
@@ -442,7 +446,7 @@ impl ToolHandlers {
 
             sqlx::query(
                 r#"
-                INSERT INTO agent.phrase_blocklist (phrase, blocked_verb, embedding, reason, source)
+                INSERT INTO "ob-poc".phrase_blocklist (phrase, blocked_verb, embedding, reason, source)
                 VALUES ($1, $2, $3::vector, $4, 'rejected_candidate')
                 ON CONFLICT (phrase, blocked_verb, COALESCE(user_id, '00000000-0000-0000-0000-000000000000'::uuid)) DO NOTHING
                 "#,
@@ -481,32 +485,36 @@ impl ToolHandlers {
 
         // Get counts
         let phrase_count =
-            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM agent.invocation_phrases")
+            sqlx::query_scalar::<_, i64>(r#"SELECT COUNT(*) FROM "ob-poc".invocation_phrases"#)
                 .fetch_one(pool)
                 .await
                 .unwrap_or(0);
 
-        let alias_count = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM agent.entity_aliases")
-            .fetch_one(pool)
-            .await
-            .unwrap_or(0);
+        let alias_count =
+            sqlx::query_scalar::<_, i64>(r#"SELECT COUNT(*) FROM "ob-poc".entity_aliases"#)
+                .fetch_one(pool)
+                .await
+                .unwrap_or(0);
 
-        let blocklist_count = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM agent.phrase_blocklist WHERE expires_at IS NULL OR expires_at > now()")
-            .fetch_one(pool)
-            .await
-            .unwrap_or(0);
+        let blocklist_count = sqlx::query_scalar::<_, i64>(
+            r#"SELECT COUNT(*) FROM "ob-poc".phrase_blocklist WHERE expires_at IS NULL OR expires_at > now()"#,
+        )
+        .fetch_one(pool)
+        .await
+        .unwrap_or(0);
 
         let pending_count = sqlx::query_scalar::<_, i64>(
-            "SELECT COUNT(*) FROM agent.learning_candidates WHERE status = 'pending'",
+            r#"SELECT COUNT(*) FROM "ob-poc".learning_candidates WHERE status = 'pending'"#,
         )
         .fetch_one(pool)
         .await
         .unwrap_or(0);
 
         // Get recent activity
-        let recent_applied = sqlx::query_scalar::<_, i64>(
-            &format!("SELECT COUNT(*) FROM agent.learning_candidates WHERE status = 'applied' AND applied_at > now() - interval '{}'", interval)
-        )
+        let recent_applied = sqlx::query_scalar::<_, i64>(&format!(
+            r#"SELECT COUNT(*) FROM "ob-poc".learning_candidates WHERE status = 'applied' AND applied_at > now() - interval '{}'"#,
+            interval
+        ))
         .fetch_one(pool)
         .await
         .unwrap_or(0);
@@ -516,7 +524,7 @@ impl ToolHandlers {
             let rows = sqlx::query_as::<_, TopCorrectionRow>(&format!(
                 r#"
                     SELECT input_pattern, suggested_output, occurrence_count
-                    FROM agent.learning_candidates
+                    FROM "ob-poc".learning_candidates
                     WHERE created_at > now() - interval '{}'
                     ORDER BY occurrence_count DESC
                     LIMIT 10

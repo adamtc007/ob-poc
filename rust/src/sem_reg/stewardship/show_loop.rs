@@ -322,7 +322,7 @@ impl ShowLoop {
 
         sqlx::query(
             r#"
-            INSERT INTO stewardship.viewport_manifests (
+            INSERT INTO sem_reg.viewport_manifests (
                 manifest_id, session_id, changeset_id, focus_state,
                 overlay_mode, assumed_principal, viewport_refs, created_at
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)

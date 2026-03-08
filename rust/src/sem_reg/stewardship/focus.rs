@@ -23,7 +23,7 @@ impl FocusStore {
             SELECT session_id, changeset_id, overlay_mode, overlay_changeset_id,
                    object_refs, taxonomy_focus, resolution_context,
                    updated_at, updated_by
-            FROM stewardship.focus_states
+            FROM sem_reg.focus_states
             WHERE session_id = $1
             "#,
         )
@@ -58,7 +58,7 @@ impl FocusStore {
 
         sqlx::query(
             r#"
-            INSERT INTO stewardship.focus_states (
+            INSERT INTO sem_reg.focus_states (
                 session_id, changeset_id, overlay_mode, overlay_changeset_id,
                 object_refs, taxonomy_focus, resolution_context,
                 updated_at, updated_by
@@ -109,7 +109,7 @@ impl FocusStore {
 
     /// Delete focus state for a session.
     pub async fn delete(pool: &PgPool, session_id: Uuid) -> Result<()> {
-        sqlx::query("DELETE FROM stewardship.focus_states WHERE session_id = $1")
+        sqlx::query("DELETE FROM sem_reg.focus_states WHERE session_id = $1")
             .bind(session_id)
             .execute(pool)
             .await?;

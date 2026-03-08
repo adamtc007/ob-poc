@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict xcqx9V2X78YGGQMkFwmsArFfHRkMLRZCL7BBMZtrWZNVPNvdMNSEaBtPBx4ZzQy
+\restrict hlCjzDMalYqcG4GNOUAquPHEx1yjJqkuzHf2RXxkJjKxWOG9W5cVmxxFDE5RBM3
 
 -- Dumped from database version 18.1 (Homebrew)
 -- Dumped by pg_dump version 18.1 (Homebrew)
@@ -27,41 +27,6 @@ CREATE SCHEMA _sqlx_test;
 
 
 --
--- Name: agent; Type: SCHEMA; Schema: -; Owner: -
---
-
-CREATE SCHEMA agent;
-
-
---
--- Name: SCHEMA agent; Type: COMMENT; Schema: -; Owner: -
---
-
-COMMENT ON SCHEMA agent IS 'Agent learning schema. Embeddings: 384-dim all-MiniLM-L6-v2 (Candle, local)';
-
-
---
--- Name: events; Type: SCHEMA; Schema: -; Owner: -
---
-
-CREATE SCHEMA events;
-
-
---
--- Name: feedback; Type: SCHEMA; Schema: -; Owner: -
---
-
-CREATE SCHEMA feedback;
-
-
---
--- Name: SCHEMA feedback; Type: COMMENT; Schema: -; Owner: -
---
-
-COMMENT ON SCHEMA feedback IS 'Feedback Inspector: failure analysis, repro generation, audit trail';
-
-
---
 -- Name: ob-poc; Type: SCHEMA; Schema: -; Owner: -
 --
 
@@ -73,20 +38,6 @@ CREATE SCHEMA "ob-poc";
 --
 
 COMMENT ON SCHEMA "ob-poc" IS 'OB-POC schema with config-driven visualization. Phase 2 adds layout persistence and caching.';
-
-
---
--- Name: ob_kyc; Type: SCHEMA; Schema: -; Owner: -
---
-
-CREATE SCHEMA ob_kyc;
-
-
---
--- Name: ob_ref; Type: SCHEMA; Schema: -; Owner: -
---
-
-CREATE SCHEMA ob_ref;
 
 
 --
@@ -122,27 +73,6 @@ CREATE SCHEMA sem_reg_authoring;
 --
 
 CREATE SCHEMA sem_reg_pub;
-
-
---
--- Name: sessions; Type: SCHEMA; Schema: -; Owner: -
---
-
-CREATE SCHEMA sessions;
-
-
---
--- Name: stewardship; Type: SCHEMA; Schema: -; Owner: -
---
-
-CREATE SCHEMA stewardship;
-
-
---
--- Name: teams; Type: SCHEMA; Schema: -; Owner: -
---
-
-CREATE SCHEMA teams;
 
 
 --
@@ -216,10 +146,10 @@ COMMENT ON EXTENSION vector IS 'vector data type and ivfflat and hnsw access met
 
 
 --
--- Name: actor_type; Type: TYPE; Schema: feedback; Owner: -
+-- Name: actor_type; Type: TYPE; Schema: ob-poc; Owner: -
 --
 
-CREATE TYPE feedback.actor_type AS ENUM (
+CREATE TYPE "ob-poc".actor_type AS ENUM (
     'SYSTEM',
     'MCP_AGENT',
     'REPL_USER',
@@ -231,10 +161,10 @@ CREATE TYPE feedback.actor_type AS ENUM (
 
 
 --
--- Name: audit_action; Type: TYPE; Schema: feedback; Owner: -
+-- Name: audit_action; Type: TYPE; Schema: ob-poc; Owner: -
 --
 
-CREATE TYPE feedback.audit_action AS ENUM (
+CREATE TYPE "ob-poc".audit_action AS ENUM (
     'CAPTURED',
     'CLASSIFIED',
     'DEDUPLICATED',
@@ -260,10 +190,10 @@ CREATE TYPE feedback.audit_action AS ENUM (
 
 
 --
--- Name: error_type; Type: TYPE; Schema: feedback; Owner: -
+-- Name: error_type; Type: TYPE; Schema: ob-poc; Owner: -
 --
 
-CREATE TYPE feedback.error_type AS ENUM (
+CREATE TYPE "ob-poc".error_type AS ENUM (
     'TIMEOUT',
     'RATE_LIMITED',
     'CONNECTION_RESET',
@@ -283,10 +213,23 @@ CREATE TYPE feedback.error_type AS ENUM (
 
 
 --
--- Name: issue_status; Type: TYPE; Schema: feedback; Owner: -
+-- Name: execution_status; Type: TYPE; Schema: ob-poc; Owner: -
 --
 
-CREATE TYPE feedback.issue_status AS ENUM (
+CREATE TYPE "ob-poc".execution_status AS ENUM (
+    'pending',
+    'executed',
+    'failed',
+    'cancelled',
+    'skipped'
+);
+
+
+--
+-- Name: issue_status; Type: TYPE; Schema: ob-poc; Owner: -
+--
+
+CREATE TYPE "ob-poc".issue_status AS ENUM (
     'NEW',
     'RUNTIME_RESOLVED',
     'RUNTIME_ESCALATED',
@@ -306,26 +249,13 @@ CREATE TYPE feedback.issue_status AS ENUM (
 
 
 --
--- Name: remediation_path; Type: TYPE; Schema: feedback; Owner: -
+-- Name: remediation_path; Type: TYPE; Schema: ob-poc; Owner: -
 --
 
-CREATE TYPE feedback.remediation_path AS ENUM (
+CREATE TYPE "ob-poc".remediation_path AS ENUM (
     'RUNTIME',
     'CODE',
     'LOG_ONLY'
-);
-
-
---
--- Name: execution_status; Type: TYPE; Schema: ob-poc; Owner: -
---
-
-CREATE TYPE "ob-poc".execution_status AS ENUM (
-    'pending',
-    'executed',
-    'failed',
-    'cancelled',
-    'skipped'
 );
 
 
@@ -421,980 +351,6 @@ CREATE TYPE sem_reg.trust_class AS ENUM (
     'decision_support',
     'convenience'
 );
-
-
---
--- Name: apply_promotion(bigint, text); Type: FUNCTION; Schema: agent; Owner: -
---
-
-CREATE FUNCTION agent.apply_promotion(p_candidate_id bigint, p_actor text DEFAULT 'system_auto'::text) RETURNS boolean
-    LANGUAGE plpgsql
-    AS $$
-DECLARE
-    v_phrase TEXT;
-    v_verb TEXT;
-    v_added BOOLEAN;
-BEGIN
-    -- Get candidate
-    SELECT input_pattern, suggested_output
-    INTO v_phrase, v_verb
-    FROM agent.learning_candidates
-    WHERE id = p_candidate_id
-      AND status = 'pending';
-
-    IF v_phrase IS NULL THEN
-        RETURN FALSE;
-    END IF;
-
-    -- Add to dsl_verbs.intent_patterns using existing function
-    SELECT "ob-poc".add_learned_pattern(v_verb, v_phrase) INTO v_added;
-
-    IF v_added THEN
-        -- Update candidate status
-        UPDATE agent.learning_candidates
-        SET status = 'applied',
-            applied_at = NOW()
-        WHERE id = p_candidate_id;
-
-        -- Audit log
-        INSERT INTO agent.learning_audit (
-            action, learning_type, candidate_id, actor, details
-        ) VALUES (
-            'applied',
-            'invocation_phrase',
-            p_candidate_id,
-            p_actor,
-            jsonb_build_object(
-                'phrase', v_phrase,
-                'verb', v_verb
-            )
-        );
-
-        RETURN TRUE;
-    END IF;
-
-    RETURN FALSE;
-END;
-$$;
-
-
---
--- Name: FUNCTION apply_promotion(p_candidate_id bigint, p_actor text); Type: COMMENT; Schema: agent; Owner: -
---
-
-COMMENT ON FUNCTION agent.apply_promotion(p_candidate_id bigint, p_actor text) IS 'Promote a learning candidate to dsl_verbs.intent_patterns with audit trail';
-
-
---
--- Name: batch_upsert_invocation_phrases(text[], text[], public.vector[], text); Type: FUNCTION; Schema: agent; Owner: -
---
-
-CREATE FUNCTION agent.batch_upsert_invocation_phrases(p_phrases text[], p_verbs text[], p_embeddings public.vector[], p_source text DEFAULT 'yaml_sync'::text) RETURNS integer
-    LANGUAGE plpgsql
-    AS $$
-DECLARE
-    v_count INT := 0;
-    i INT;
-BEGIN
-    FOR i IN 1..array_length(p_phrases, 1) LOOP
-        INSERT INTO agent.invocation_phrases (phrase, verb, embedding, source, embedding_model)
-        VALUES (LOWER(TRIM(p_phrases[i])), p_verbs[i], p_embeddings[i], p_source, 'all-MiniLM-L6-v2')
-        ON CONFLICT (phrase, verb) DO UPDATE SET
-            embedding = EXCLUDED.embedding,
-            embedding_model = 'all-MiniLM-L6-v2',
-            updated_at = NOW();
-        v_count := v_count + 1;
-    END LOOP;
-
-    RETURN v_count;
-END;
-$$;
-
-
---
--- Name: FUNCTION batch_upsert_invocation_phrases(p_phrases text[], p_verbs text[], p_embeddings public.vector[], p_source text); Type: COMMENT; Schema: agent; Owner: -
---
-
-COMMENT ON FUNCTION agent.batch_upsert_invocation_phrases(p_phrases text[], p_verbs text[], p_embeddings public.vector[], p_source text) IS 'Bulk phrase upsert for YAML sync';
-
-
---
--- Name: check_blocklist_semantic(public.vector, text, uuid, real); Type: FUNCTION; Schema: agent; Owner: -
---
-
-CREATE FUNCTION agent.check_blocklist_semantic(query_embedding public.vector, verb_to_check text, p_user_id uuid DEFAULT NULL::uuid, similarity_threshold real DEFAULT 0.85) RETURNS boolean
-    LANGUAGE plpgsql
-    AS $$
-DECLARE
-    is_blocked BOOLEAN;
-BEGIN
-    SELECT EXISTS (
-        SELECT 1
-        FROM agent.phrase_blocklist pb
-        WHERE pb.blocked_verb = verb_to_check
-          AND pb.embedding IS NOT NULL
-          AND (pb.user_id IS NULL OR pb.user_id = p_user_id)
-          AND (pb.expires_at IS NULL OR pb.expires_at > now())
-          AND (1 - (pb.embedding <=> query_embedding)) > similarity_threshold
-    ) INTO is_blocked;
-
-    RETURN is_blocked;
-END;
-$$;
-
-
---
--- Name: check_pattern_collision_basic(bigint); Type: FUNCTION; Schema: agent; Owner: -
---
-
-CREATE FUNCTION agent.check_pattern_collision_basic(p_candidate_id bigint) RETURNS boolean
-    LANGUAGE plpgsql
-    AS $$
-DECLARE
-    v_phrase TEXT;
-    v_verb TEXT;
-BEGIN
-    -- Get candidate details
-    SELECT input_pattern, suggested_output
-    INTO v_phrase, v_verb
-    FROM agent.learning_candidates
-    WHERE id = p_candidate_id;
-
-    IF v_phrase IS NULL THEN
-        RETURN FALSE;
-    END IF;
-
-    -- Check if phrase already exists for this verb (exact match)
-    IF EXISTS (
-        SELECT 1 FROM "ob-poc".verb_pattern_embeddings
-        WHERE verb_name = v_verb
-          AND pattern_normalized = v_phrase
-    ) THEN
-        -- Already a pattern, mark as duplicate
-        UPDATE agent.learning_candidates
-        SET status = 'duplicate',
-            collision_safe = FALSE,
-            collision_check_at = NOW()
-        WHERE id = p_candidate_id;
-        RETURN FALSE;
-    END IF;
-
-    -- Basic check passed; semantic check done in Rust
-    RETURN TRUE;
-END;
-$$;
-
-
---
--- Name: expire_pending_outcomes(integer); Type: FUNCTION; Schema: agent; Owner: -
---
-
-CREATE FUNCTION agent.expire_pending_outcomes(p_older_than_minutes integer DEFAULT 30) RETURNS integer
-    LANGUAGE plpgsql
-    AS $$
-DECLARE
-    v_count INT;
-BEGIN
-    UPDATE "ob-poc".intent_feedback
-    SET outcome = 'abandoned'
-    WHERE outcome IS NULL
-      AND created_at < NOW() - make_interval(mins => p_older_than_minutes);
-
-    GET DIAGNOSTICS v_count = ROW_COUNT;
-    RETURN v_count;
-END;
-$$;
-
-
---
--- Name: FUNCTION expire_pending_outcomes(p_older_than_minutes integer); Type: COMMENT; Schema: agent; Owner: -
---
-
-COMMENT ON FUNCTION agent.expire_pending_outcomes(p_older_than_minutes integer) IS 'Mark stale pending outcomes as abandoned (no user action after N minutes)';
-
-
---
--- Name: get_auto_applicable_candidates(); Type: FUNCTION; Schema: agent; Owner: -
---
-
-CREATE FUNCTION agent.get_auto_applicable_candidates() RETURNS TABLE(id bigint, learning_type text, input_pattern text, suggested_output text, occurrence_count integer)
-    LANGUAGE plpgsql
-    AS $$
-BEGIN
-    RETURN QUERY
-    SELECT
-        lc.id,
-        lc.learning_type,
-        lc.input_pattern,
-        lc.suggested_output,
-        lc.occurrence_count
-    FROM agent.learning_candidates lc
-    WHERE lc.status = 'pending'
-      AND lc.auto_applicable = TRUE
-      AND lc.occurrence_count >= 3
-      AND lc.risk_level = 'low'
-    ORDER BY lc.occurrence_count DESC;
-END;
-$$;
-
-
---
--- Name: get_promotable_candidates(integer, real, integer, integer); Type: FUNCTION; Schema: agent; Owner: -
---
-
-CREATE FUNCTION agent.get_promotable_candidates(p_min_occurrences integer DEFAULT 5, p_min_success_rate real DEFAULT 0.80, p_min_age_hours integer DEFAULT 24, p_limit integer DEFAULT 50) RETURNS TABLE(id bigint, phrase text, verb text, occurrence_count integer, success_count integer, total_count integer, success_rate real, domain_hint text, first_seen timestamp with time zone, age_hours real)
-    LANGUAGE plpgsql
-    AS $$
-BEGIN
-    RETURN QUERY
-    SELECT 
-        lc.id,
-        lc.input_pattern as phrase,
-        lc.suggested_output as verb,
-        lc.occurrence_count,
-        lc.success_count,
-        lc.total_count,
-        (lc.success_count::real / NULLIF(lc.total_count, 0))::real as success_rate,
-        lc.domain_hint,
-        lc.first_seen,
-        (EXTRACT(EPOCH FROM (NOW() - lc.first_seen)) / 3600)::real as age_hours
-    FROM agent.learning_candidates lc
-    WHERE lc.status = 'pending'
-      AND lc.learning_type = 'invocation_phrase'
-      AND lc.occurrence_count >= p_min_occurrences
-      AND lc.total_count > 0
-      AND (lc.success_count::real / lc.total_count) >= p_min_success_rate
-      AND lc.first_seen < NOW() - make_interval(hours => p_min_age_hours)
-      AND (lc.collision_safe IS NULL OR lc.collision_safe = TRUE)
-      AND NOT EXISTS (
-          SELECT 1 FROM agent.phrase_blocklist bl
-          WHERE bl.blocked_verb = lc.suggested_output
-            AND lower(bl.phrase) = lc.input_pattern
-            AND (bl.expires_at IS NULL OR bl.expires_at > NOW())
-      )
-    ORDER BY 
-        lc.occurrence_count DESC,
-        (lc.success_count::real / NULLIF(lc.total_count, 0)) DESC
-    LIMIT p_limit;
-END;
-$$;
-
-
---
--- Name: get_review_candidates(integer, integer, integer); Type: FUNCTION; Schema: agent; Owner: -
---
-
-CREATE FUNCTION agent.get_review_candidates(p_min_occurrences integer DEFAULT 3, p_min_age_days integer DEFAULT 7, p_limit integer DEFAULT 100) RETURNS TABLE(id bigint, phrase text, verb text, occurrence_count integer, success_count integer, total_count integer, success_rate real, domain_hint text, first_seen timestamp with time zone, last_seen timestamp with time zone, collision_verb text)
-    LANGUAGE plpgsql
-    AS $$
-BEGIN
-    RETURN QUERY
-    SELECT
-        lc.id,
-        lc.input_pattern as phrase,
-        lc.suggested_output as verb,
-        lc.occurrence_count,
-        lc.success_count,
-        lc.total_count,
-        CASE WHEN lc.total_count > 0
-             THEN (lc.success_count::real / lc.total_count)
-             ELSE 0 END as success_rate,
-        lc.domain_hint,
-        lc.first_seen,
-        lc.last_seen,
-        lc.collision_verb
-    FROM agent.learning_candidates lc
-    WHERE lc.status = 'pending'
-      AND lc.learning_type = 'invocation_phrase'
-      AND lc.occurrence_count >= p_min_occurrences
-      AND lc.first_seen < NOW() - make_interval(days => p_min_age_days)
-      -- Either failed auto-promotion criteria or collision detected
-      AND (
-          -- Low success rate
-          (lc.total_count > 0 AND (lc.success_count::real / lc.total_count) < 0.80)
-          -- Collision detected
-          OR lc.collision_safe = FALSE
-          -- Not enough occurrences for auto-promote but old enough for review
-          OR lc.occurrence_count < 5
-      )
-    ORDER BY lc.occurrence_count DESC
-    LIMIT p_limit;
-END;
-$$;
-
-
---
--- Name: FUNCTION get_review_candidates(p_min_occurrences integer, p_min_age_days integer, p_limit integer); Type: COMMENT; Schema: agent; Owner: -
---
-
-COMMENT ON FUNCTION agent.get_review_candidates(p_min_occurrences integer, p_min_age_days integer, p_limit integer) IS 'Get candidates that need manual review (failed auto-promotion but have signal)';
-
-
---
--- Name: get_taught_pending_embeddings(); Type: FUNCTION; Schema: agent; Owner: -
---
-
-CREATE FUNCTION agent.get_taught_pending_embeddings() RETURNS TABLE(verb text, phrase text, taught_at timestamp with time zone)
-    LANGUAGE plpgsql
-    AS $$
-BEGIN
-    RETURN QUERY
-    SELECT
-        la.details->>'verb' as verb,
-        la.details->>'phrase' as phrase,
-        la.timestamp as taught_at
-    FROM agent.learning_audit la
-    WHERE la.action = 'taught'
-      AND la.learning_type = 'invocation_phrase'
-      AND NOT EXISTS (
-          SELECT 1 FROM "ob-poc".verb_pattern_embeddings vpe
-          WHERE vpe.verb_name = la.details->>'verb'
-            AND vpe.pattern_normalized = la.details->>'phrase'
-            AND vpe.embedding IS NOT NULL
-      )
-    ORDER BY la.timestamp DESC;
-END;
-$$;
-
-
---
--- Name: FUNCTION get_taught_pending_embeddings(); Type: COMMENT; Schema: agent; Owner: -
---
-
-COMMENT ON FUNCTION agent.get_taught_pending_embeddings() IS 'Get taught patterns that are awaiting populate_embeddings to create vectors.';
-
-
---
--- Name: is_verb_blocked(public.vector, text, uuid, real); Type: FUNCTION; Schema: agent; Owner: -
---
-
-CREATE FUNCTION agent.is_verb_blocked(p_query_embedding public.vector, p_verb text, p_user_id uuid DEFAULT NULL::uuid, p_similarity_threshold real DEFAULT 0.85) RETURNS boolean
-    LANGUAGE plpgsql
-    AS $$
-BEGIN
-    RETURN EXISTS (
-        SELECT 1
-        FROM agent.phrase_blocklist pb
-        WHERE pb.blocked_verb = p_verb
-          AND pb.embedding IS NOT NULL
-          AND (pb.user_id IS NULL OR pb.user_id = p_user_id)
-          AND (pb.expires_at IS NULL OR pb.expires_at > NOW())
-          AND (1 - (pb.embedding <=> p_query_embedding)) > p_similarity_threshold
-    );
-END;
-$$;
-
-
---
--- Name: learn_user_phrase(uuid, text, text, public.vector); Type: FUNCTION; Schema: agent; Owner: -
---
-
-CREATE FUNCTION agent.learn_user_phrase(p_user_id uuid, p_phrase text, p_verb text, p_embedding public.vector) RETURNS bigint
-    LANGUAGE plpgsql
-    AS $$
-DECLARE
-    v_id BIGINT;
-BEGIN
-    INSERT INTO agent.user_learned_phrases (user_id, phrase, verb, embedding, embedding_model)
-    VALUES (p_user_id, LOWER(TRIM(p_phrase)), p_verb, p_embedding, 'all-MiniLM-L6-v2')
-    ON CONFLICT (user_id, phrase) DO UPDATE SET
-        verb = EXCLUDED.verb,
-        embedding = EXCLUDED.embedding,
-        occurrence_count = agent.user_learned_phrases.occurrence_count + 1,
-        updated_at = NOW()
-    RETURNING id INTO v_id;
-
-    RETURN v_id;
-END;
-$$;
-
-
---
--- Name: record_learning_signal(text, text, boolean, text, text); Type: FUNCTION; Schema: agent; Owner: -
---
-
-CREATE FUNCTION agent.record_learning_signal(p_phrase text, p_verb text, p_is_success boolean, p_signal_type text, p_domain_hint text DEFAULT NULL::text) RETURNS bigint
-    LANGUAGE plpgsql
-    AS $$
-DECLARE
-    v_normalized TEXT;
-    v_fingerprint TEXT;
-    v_word_count INT;
-    v_stopword_ratio REAL;
-    v_id BIGINT;
-BEGIN
-    -- Normalize phrase
-    v_normalized := lower(trim(regexp_replace(p_phrase, '\s+', ' ', 'g')));
-    v_fingerprint := md5(v_normalized || '|' || p_verb);
-
-    -- Quality gate: word count (3-15 words)
-    v_word_count := array_length(string_to_array(v_normalized, ' '), 1);
-    IF v_word_count IS NULL OR v_word_count < 3 OR v_word_count > 15 THEN
-        RETURN NULL;  -- Reject too short or too long
-    END IF;
-
-    -- Quality gate: stopword ratio (reject if >70% stopwords)
-    SELECT
-        COALESCE(COUNT(*) FILTER (WHERE s.word IS NOT NULL)::real / NULLIF(v_word_count, 0), 0)
-    INTO v_stopword_ratio
-    FROM unnest(string_to_array(v_normalized, ' ')) AS w(word)
-    LEFT JOIN agent.stopwords s ON s.word = w.word;
-
-    IF v_stopword_ratio > 0.70 THEN
-        RETURN NULL;  -- Reject (too generic)
-    END IF;
-
-    -- Upsert candidate
-    INSERT INTO agent.learning_candidates (
-        fingerprint,
-        learning_type,
-        input_pattern,
-        suggested_output,
-        occurrence_count,
-        success_count,
-        total_count,
-        first_seen,
-        last_seen,
-        last_success_at,
-        domain_hint,
-        status
-    ) VALUES (
-        v_fingerprint,
-        'invocation_phrase',
-        v_normalized,
-        p_verb,
-        1,
-        CASE WHEN p_is_success THEN 1 ELSE 0 END,
-        1,
-        NOW(),
-        NOW(),
-        CASE WHEN p_is_success THEN NOW() ELSE NULL END,
-        COALESCE(p_domain_hint, (
-            SELECT category FROM "ob-poc".dsl_verbs WHERE full_name = p_verb
-        )),
-        'pending'
-    )
-    ON CONFLICT (fingerprint) DO UPDATE SET
-        occurrence_count = agent.learning_candidates.occurrence_count + 1,
-        success_count = agent.learning_candidates.success_count +
-            CASE WHEN p_is_success THEN 1 ELSE 0 END,
-        total_count = agent.learning_candidates.total_count + 1,
-        last_seen = NOW(),
-        last_success_at = CASE
-            WHEN p_is_success THEN NOW()
-            ELSE agent.learning_candidates.last_success_at
-        END,
-        -- Reset collision check if we get new signals (may have changed)
-        collision_safe = NULL,
-        collision_check_at = NULL
-    RETURNING id INTO v_id;
-
-    RETURN v_id;
-END;
-$$;
-
-
---
--- Name: FUNCTION record_learning_signal(p_phrase text, p_verb text, p_is_success boolean, p_signal_type text, p_domain_hint text); Type: COMMENT; Schema: agent; Owner: -
---
-
-COMMENT ON FUNCTION agent.record_learning_signal(p_phrase text, p_verb text, p_is_success boolean, p_signal_type text, p_domain_hint text) IS 'Record a learning signal with quality gates. Returns NULL if phrase rejected.';
-
-
---
--- Name: reject_candidate(bigint, text, text); Type: FUNCTION; Schema: agent; Owner: -
---
-
-CREATE FUNCTION agent.reject_candidate(p_candidate_id bigint, p_reason text, p_actor text DEFAULT 'manual_review'::text) RETURNS boolean
-    LANGUAGE plpgsql
-    AS $$
-DECLARE
-    v_phrase TEXT;
-    v_verb TEXT;
-BEGIN
-    -- Get candidate
-    SELECT input_pattern, suggested_output
-    INTO v_phrase, v_verb
-    FROM agent.learning_candidates
-    WHERE id = p_candidate_id
-      AND status = 'pending';
-
-    IF v_phrase IS NULL THEN
-        RETURN FALSE;
-    END IF;
-
-    -- Add to blocklist
-    INSERT INTO agent.phrase_blocklist (phrase, blocked_verb, reason)
-    VALUES (v_phrase, v_verb, p_reason)
-    ON CONFLICT DO NOTHING;
-
-    -- Update candidate status
-    UPDATE agent.learning_candidates
-    SET status = 'rejected',
-        reviewed_by = p_actor,
-        reviewed_at = NOW()
-    WHERE id = p_candidate_id;
-
-    -- Audit log
-    INSERT INTO agent.learning_audit (
-        action, learning_type, candidate_id, actor, details
-    ) VALUES (
-        'rejected',
-        'invocation_phrase',
-        p_candidate_id,
-        p_actor,
-        jsonb_build_object(
-            'phrase', v_phrase,
-            'verb', v_verb,
-            'reason', p_reason
-        )
-    );
-
-    RETURN TRUE;
-END;
-$$;
-
-
---
--- Name: FUNCTION reject_candidate(p_candidate_id bigint, p_reason text, p_actor text); Type: COMMENT; Schema: agent; Owner: -
---
-
-COMMENT ON FUNCTION agent.reject_candidate(p_candidate_id bigint, p_reason text, p_actor text) IS 'Reject a learning candidate and add to blocklist';
-
-
---
--- Name: search_learned_phrases_semantic(public.vector, real, integer); Type: FUNCTION; Schema: agent; Owner: -
---
-
-CREATE FUNCTION agent.search_learned_phrases_semantic(query_embedding public.vector, similarity_threshold real DEFAULT 0.75, max_results integer DEFAULT 5) RETURNS TABLE(phrase text, verb text, similarity real)
-    LANGUAGE plpgsql
-    AS $$
-BEGIN
-    RETURN QUERY
-    SELECT
-        ip.phrase,
-        ip.verb,
-        (1 - (ip.embedding <=> query_embedding))::REAL as similarity
-    FROM agent.invocation_phrases ip
-    WHERE ip.embedding IS NOT NULL
-      AND (1 - (ip.embedding <=> query_embedding)) > similarity_threshold
-    ORDER BY ip.embedding <=> query_embedding
-    LIMIT max_results;
-END;
-$$;
-
-
---
--- Name: search_user_phrases_semantic(uuid, public.vector, real, integer); Type: FUNCTION; Schema: agent; Owner: -
---
-
-CREATE FUNCTION agent.search_user_phrases_semantic(p_user_id uuid, query_embedding public.vector, similarity_threshold real DEFAULT 0.75, max_results integer DEFAULT 5) RETURNS TABLE(phrase text, verb text, confidence real, similarity real)
-    LANGUAGE plpgsql
-    AS $$
-BEGIN
-    RETURN QUERY
-    SELECT
-        up.phrase,
-        up.verb,
-        up.confidence,
-        (1 - (up.embedding <=> query_embedding))::REAL as similarity
-    FROM agent.user_learned_phrases up
-    WHERE up.user_id = p_user_id
-      AND up.embedding IS NOT NULL
-      AND (1 - (up.embedding <=> query_embedding)) > similarity_threshold
-    ORDER BY up.embedding <=> query_embedding
-    LIMIT max_results;
-END;
-$$;
-
-
---
--- Name: search_verbs_semantic(public.vector, uuid, real, integer); Type: FUNCTION; Schema: agent; Owner: -
---
-
-CREATE FUNCTION agent.search_verbs_semantic(p_query_embedding public.vector, p_user_id uuid DEFAULT NULL::uuid, p_similarity_threshold real DEFAULT 0.75, p_max_results integer DEFAULT 5) RETURNS TABLE(verb text, phrase text, similarity real, source text)
-    LANGUAGE plpgsql
-    AS $$
-BEGIN
-    RETURN QUERY
-    -- User-specific phrases first (higher priority)
-    SELECT
-        ulp.verb,
-        ulp.phrase,
-        (1 - (ulp.embedding <=> p_query_embedding))::REAL as similarity,
-        'user_learned'::TEXT as source
-    FROM agent.user_learned_phrases ulp
-    WHERE p_user_id IS NOT NULL
-      AND ulp.user_id = p_user_id
-      AND ulp.embedding IS NOT NULL
-      AND (1 - (ulp.embedding <=> p_query_embedding)) > p_similarity_threshold
-
-    UNION ALL
-
-    -- Global invocation phrases
-    SELECT
-        ip.verb,
-        ip.phrase,
-        (1 - (ip.embedding <=> p_query_embedding))::REAL as similarity,
-        COALESCE(ip.source, 'global')::TEXT as source
-    FROM agent.invocation_phrases ip
-    WHERE ip.embedding IS NOT NULL
-      AND (1 - (ip.embedding <=> p_query_embedding)) > p_similarity_threshold
-
-    ORDER BY similarity DESC
-    LIMIT p_max_results;
-END;
-$$;
-
-
---
--- Name: FUNCTION search_verbs_semantic(p_query_embedding public.vector, p_user_id uuid, p_similarity_threshold real, p_max_results integer); Type: COMMENT; Schema: agent; Owner: -
---
-
-COMMENT ON FUNCTION agent.search_verbs_semantic(p_query_embedding public.vector, p_user_id uuid, p_similarity_threshold real, p_max_results integer) IS 'Primary semantic verb discovery - combines user + global phrases';
-
-
---
--- Name: teach_phrase(text, text, text); Type: FUNCTION; Schema: agent; Owner: -
---
-
-CREATE FUNCTION agent.teach_phrase(p_phrase text, p_verb text, p_source text DEFAULT 'direct_teaching'::text) RETURNS boolean
-    LANGUAGE plpgsql
-    AS $$
-DECLARE
-    v_normalized TEXT;
-    v_added BOOLEAN;
-    v_word_count INT;
-BEGIN
-    -- Normalize phrase
-    v_normalized := lower(trim(regexp_replace(p_phrase, '\s+', ' ', 'g')));
-
-    -- Basic validation: not empty
-    IF v_normalized = '' OR v_normalized IS NULL THEN
-        RAISE EXCEPTION 'Phrase cannot be empty';
-    END IF;
-
-    -- Basic validation: verb exists
-    IF NOT EXISTS (SELECT 1 FROM "ob-poc".dsl_verbs WHERE full_name = p_verb) THEN
-        RAISE EXCEPTION 'Unknown verb: %. Use verbs.list to see available verbs.', p_verb;
-    END IF;
-
-    -- Word count check (warn but don't block for teaching)
-    v_word_count := array_length(string_to_array(v_normalized, ' '), 1);
-    IF v_word_count < 2 THEN
-        RAISE WARNING 'Very short phrase (% words) - may cause false positives', v_word_count;
-    END IF;
-
-    -- Add to dsl_verbs.intent_patterns using existing function
-    SELECT "ob-poc".add_learned_pattern(p_verb, v_normalized) INTO v_added;
-
-    IF v_added THEN
-        -- Audit the teaching
-        INSERT INTO agent.learning_audit (
-            action,
-            learning_type,
-            actor,
-            details
-        ) VALUES (
-            'taught',
-            'invocation_phrase',
-            p_source,
-            jsonb_build_object(
-                'phrase', v_normalized,
-                'verb', p_verb,
-                'word_count', v_word_count
-            )
-        );
-    END IF;
-
-    RETURN v_added;
-END;
-$$;
-
-
---
--- Name: FUNCTION teach_phrase(p_phrase text, p_verb text, p_source text); Type: COMMENT; Schema: agent; Owner: -
---
-
-COMMENT ON FUNCTION agent.teach_phrase(p_phrase text, p_verb text, p_source text) IS 'Directly teach a phrase→verb mapping. Bypasses candidate staging (trusted source).';
-
-
---
--- Name: teach_phrases_batch(jsonb, text); Type: FUNCTION; Schema: agent; Owner: -
---
-
-CREATE FUNCTION agent.teach_phrases_batch(p_phrases jsonb, p_source text DEFAULT 'batch_teaching'::text) RETURNS TABLE(phrase text, verb text, success boolean, message text)
-    LANGUAGE plpgsql
-    AS $$
-DECLARE
-    v_item JSONB;
-    v_phrase TEXT;
-    v_verb TEXT;
-    v_added BOOLEAN;
-BEGIN
-    FOR v_item IN SELECT * FROM jsonb_array_elements(p_phrases)
-    LOOP
-        v_phrase := v_item->>'phrase';
-        v_verb := v_item->>'verb';
-
-        BEGIN
-            SELECT agent.teach_phrase(v_phrase, v_verb, p_source) INTO v_added;
-
-            phrase := v_phrase;
-            verb := v_verb;
-            success := v_added;
-            message := CASE
-                WHEN v_added THEN 'Learned'
-                ELSE 'Already exists'
-            END;
-            RETURN NEXT;
-
-        EXCEPTION WHEN OTHERS THEN
-            phrase := v_phrase;
-            verb := v_verb;
-            success := FALSE;
-            message := SQLERRM;
-            RETURN NEXT;
-        END;
-    END LOOP;
-END;
-$$;
-
-
---
--- Name: FUNCTION teach_phrases_batch(p_phrases jsonb, p_source text); Type: COMMENT; Schema: agent; Owner: -
---
-
-COMMENT ON FUNCTION agent.teach_phrases_batch(p_phrases jsonb, p_source text) IS 'Batch teach multiple phrase→verb mappings from JSON array.';
-
-
---
--- Name: unteach_phrase(text, text, text, text); Type: FUNCTION; Schema: agent; Owner: -
---
-
-CREATE FUNCTION agent.unteach_phrase(p_phrase text, p_verb text, p_reason text DEFAULT NULL::text, p_actor text DEFAULT 'manual'::text) RETURNS boolean
-    LANGUAGE plpgsql
-    AS $$
-DECLARE
-    v_normalized TEXT;
-    v_removed BOOLEAN := FALSE;
-BEGIN
-    v_normalized := lower(trim(regexp_replace(p_phrase, '\s+', ' ', 'g')));
-
-    -- Remove from dsl_verbs.intent_patterns
-    UPDATE "ob-poc".dsl_verbs
-    SET intent_patterns = array_remove(intent_patterns, v_normalized),
-        updated_at = NOW()
-    WHERE full_name = p_verb
-      AND v_normalized = ANY(intent_patterns);
-
-    v_removed := FOUND;
-
-    IF v_removed THEN
-        -- Remove from embeddings cache
-        DELETE FROM "ob-poc".verb_pattern_embeddings
-        WHERE verb_name = p_verb
-          AND pattern_normalized = v_normalized;
-
-        -- Audit
-        INSERT INTO agent.learning_audit (
-            action, learning_type, actor, details
-        ) VALUES (
-            'untaught',
-            'invocation_phrase',
-            p_actor,
-            jsonb_build_object(
-                'phrase', v_normalized,
-                'verb', p_verb,
-                'reason', p_reason
-            )
-        );
-    END IF;
-
-    RETURN v_removed;
-END;
-$$;
-
-
---
--- Name: FUNCTION unteach_phrase(p_phrase text, p_verb text, p_reason text, p_actor text); Type: COMMENT; Schema: agent; Owner: -
---
-
-COMMENT ON FUNCTION agent.unteach_phrase(p_phrase text, p_verb text, p_reason text, p_actor text) IS 'Remove a taught pattern (with audit). Use when a pattern causes problems.';
-
-
---
--- Name: upsert_entity_alias(text, text, uuid, text); Type: FUNCTION; Schema: agent; Owner: -
---
-
-CREATE FUNCTION agent.upsert_entity_alias(p_alias text, p_canonical_name text, p_entity_id uuid DEFAULT NULL::uuid, p_source text DEFAULT 'user_correction'::text) RETURNS bigint
-    LANGUAGE plpgsql
-    AS $$
-DECLARE
-    v_id BIGINT;
-BEGIN
-    INSERT INTO agent.entity_aliases (alias, canonical_name, entity_id, source)
-    VALUES (LOWER(TRIM(p_alias)), p_canonical_name, p_entity_id, p_source)
-    ON CONFLICT (alias, canonical_name) DO UPDATE SET
-        occurrence_count = agent.entity_aliases.occurrence_count + 1,
-        updated_at = NOW()
-    RETURNING id INTO v_id;
-
-    RETURN v_id;
-END;
-$$;
-
-
---
--- Name: upsert_invocation_phrase(text, text, public.vector, text); Type: FUNCTION; Schema: agent; Owner: -
---
-
-CREATE FUNCTION agent.upsert_invocation_phrase(p_phrase text, p_verb text, p_embedding public.vector, p_source text DEFAULT 'yaml_sync'::text) RETURNS bigint
-    LANGUAGE plpgsql
-    AS $$
-DECLARE
-    v_id BIGINT;
-BEGIN
-    INSERT INTO agent.invocation_phrases (phrase, verb, embedding, source, embedding_model)
-    VALUES (LOWER(TRIM(p_phrase)), p_verb, p_embedding, p_source, 'all-MiniLM-L6-v2')
-    ON CONFLICT (phrase, verb) DO UPDATE SET
-        embedding = EXCLUDED.embedding,
-        embedding_model = 'all-MiniLM-L6-v2',
-        updated_at = NOW()
-    RETURNING id INTO v_id;
-
-    RETURN v_id;
-END;
-$$;
-
-
---
--- Name: FUNCTION upsert_invocation_phrase(p_phrase text, p_verb text, p_embedding public.vector, p_source text); Type: COMMENT; Schema: agent; Owner: -
---
-
-COMMENT ON FUNCTION agent.upsert_invocation_phrase(p_phrase text, p_verb text, p_embedding public.vector, p_source text) IS 'Single phrase upsert with embedding';
-
-
---
--- Name: upsert_lexicon_token(text, text, text, text); Type: FUNCTION; Schema: agent; Owner: -
---
-
-CREATE FUNCTION agent.upsert_lexicon_token(p_token text, p_token_type text, p_token_subtype text DEFAULT NULL::text, p_source text DEFAULT 'user_correction'::text) RETURNS bigint
-    LANGUAGE plpgsql
-    AS $$
-DECLARE
-    v_id BIGINT;
-BEGIN
-    INSERT INTO agent.lexicon_tokens (token, token_type, token_subtype, source)
-    VALUES (LOWER(TRIM(p_token)), p_token_type, p_token_subtype, p_source)
-    ON CONFLICT (token, token_type) DO UPDATE SET
-        occurrence_count = agent.lexicon_tokens.occurrence_count + 1,
-        updated_at = NOW()
-    RETURNING id INTO v_id;
-
-    RETURN v_id;
-END;
-$$;
-
-
---
--- Name: cleanup_old_events(integer); Type: FUNCTION; Schema: events; Owner: -
---
-
-CREATE FUNCTION events.cleanup_old_events(retention_days integer DEFAULT 30) RETURNS integer
-    LANGUAGE plpgsql
-    AS $$
-DECLARE
-    deleted_count INTEGER;
-BEGIN
-    DELETE FROM events.log
-    WHERE timestamp < NOW() - (retention_days || ' days')::INTERVAL;
-
-    GET DIAGNOSTICS deleted_count = ROW_COUNT;
-    RETURN deleted_count;
-END;
-$$;
-
-
---
--- Name: FUNCTION cleanup_old_events(retention_days integer); Type: COMMENT; Schema: events; Owner: -
---
-
-COMMENT ON FUNCTION events.cleanup_old_events(retention_days integer) IS 'Delete events older than retention_days (default 30)';
-
-
---
--- Name: cleanup_old_resolved(); Type: FUNCTION; Schema: feedback; Owner: -
---
-
-CREATE FUNCTION feedback.cleanup_old_resolved() RETURNS integer
-    LANGUAGE plpgsql
-    AS $$
-DECLARE
-    v_deleted INTEGER;
-BEGIN
-    DELETE FROM feedback.failures
-    WHERE status = 'RESOLVED'
-      AND resolved_at < NOW() - INTERVAL '90 days';
-
-    GET DIAGNOSTICS v_deleted = ROW_COUNT;
-    RETURN v_deleted;
-END;
-$$;
-
-
---
--- Name: record_occurrence(text, uuid, timestamp with time zone, uuid, text, bigint, text, text); Type: FUNCTION; Schema: feedback; Owner: -
---
-
-CREATE FUNCTION feedback.record_occurrence(p_fingerprint text, p_event_id uuid, p_event_timestamp timestamp with time zone, p_session_id uuid, p_verb text, p_duration_ms bigint, p_error_message text, p_error_backtrace text) RETURNS uuid
-    LANGUAGE plpgsql
-    AS $$
-DECLARE
-    v_failure_id UUID;
-    v_occurrence_id UUID;
-BEGIN
-    -- Get failure ID
-    SELECT id INTO v_failure_id
-    FROM feedback.failures
-    WHERE fingerprint = p_fingerprint;
-
-    IF v_failure_id IS NULL THEN
-        RAISE EXCEPTION 'Failure not found for fingerprint: %', p_fingerprint;
-    END IF;
-
-    -- Insert occurrence
-    INSERT INTO feedback.occurrences (
-        failure_id, event_id, event_timestamp, session_id,
-        verb, duration_ms, error_message, error_backtrace
-    ) VALUES (
-        v_failure_id, p_event_id, p_event_timestamp, p_session_id,
-        p_verb, p_duration_ms, p_error_message, p_error_backtrace
-    ) RETURNING id INTO v_occurrence_id;
-
-    -- Update failure counts
-    UPDATE feedback.failures
-    SET occurrence_count = occurrence_count + 1,
-        last_seen_at = p_event_timestamp
-    WHERE id = v_failure_id;
-
-    RETURN v_occurrence_id;
-END;
-$$;
-
-
---
--- Name: update_timestamps(); Type: FUNCTION; Schema: feedback; Owner: -
---
-
-CREATE FUNCTION feedback.update_timestamps() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-BEGIN
-    NEW.updated_at = NOW();
-    RETURN NEW;
-END;
-$$;
 
 
 --
@@ -1573,6 +529,101 @@ $$;
 --
 
 COMMENT ON FUNCTION "ob-poc".apply_case_decision(p_case_id uuid, p_decision character varying, p_decided_by character varying, p_notes text) IS 'Applies decision to case with validation';
+
+
+--
+-- Name: apply_promotion(bigint, text); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".apply_promotion(p_candidate_id bigint, p_actor text DEFAULT 'system_auto'::text) RETURNS boolean
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_phrase TEXT;
+    v_verb TEXT;
+    v_added BOOLEAN;
+BEGIN
+    -- Get candidate
+    SELECT input_pattern, suggested_output
+    INTO v_phrase, v_verb
+    FROM agent.learning_candidates
+    WHERE id = p_candidate_id
+      AND status = 'pending';
+
+    IF v_phrase IS NULL THEN
+        RETURN FALSE;
+    END IF;
+
+    -- Add to dsl_verbs.intent_patterns using existing function
+    SELECT "ob-poc".add_learned_pattern(v_verb, v_phrase) INTO v_added;
+
+    IF v_added THEN
+        -- Update candidate status
+        UPDATE agent.learning_candidates
+        SET status = 'applied',
+            applied_at = NOW()
+        WHERE id = p_candidate_id;
+
+        -- Audit log
+        INSERT INTO agent.learning_audit (
+            action, learning_type, candidate_id, actor, details
+        ) VALUES (
+            'applied',
+            'invocation_phrase',
+            p_candidate_id,
+            p_actor,
+            jsonb_build_object(
+                'phrase', v_phrase,
+                'verb', v_verb
+            )
+        );
+
+        RETURN TRUE;
+    END IF;
+
+    RETURN FALSE;
+END;
+$$;
+
+
+--
+-- Name: FUNCTION apply_promotion(p_candidate_id bigint, p_actor text); Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON FUNCTION "ob-poc".apply_promotion(p_candidate_id bigint, p_actor text) IS 'Promote a learning candidate to dsl_verbs.intent_patterns with audit trail';
+
+
+--
+-- Name: batch_upsert_invocation_phrases(text[], text[], public.vector[], text); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".batch_upsert_invocation_phrases(p_phrases text[], p_verbs text[], p_embeddings public.vector[], p_source text DEFAULT 'yaml_sync'::text) RETURNS integer
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_count INT := 0;
+    i INT;
+BEGIN
+    FOR i IN 1..array_length(p_phrases, 1) LOOP
+        INSERT INTO agent.invocation_phrases (phrase, verb, embedding, source, embedding_model)
+        VALUES (LOWER(TRIM(p_phrases[i])), p_verbs[i], p_embeddings[i], p_source, 'all-MiniLM-L6-v2')
+        ON CONFLICT (phrase, verb) DO UPDATE SET
+            embedding = EXCLUDED.embedding,
+            embedding_model = 'all-MiniLM-L6-v2',
+            updated_at = NOW();
+        v_count := v_count + 1;
+    END LOOP;
+
+    RETURN v_count;
+END;
+$$;
+
+
+--
+-- Name: FUNCTION batch_upsert_invocation_phrases(p_phrases text[], p_verbs text[], p_embeddings public.vector[], p_source text); Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON FUNCTION "ob-poc".batch_upsert_invocation_phrases(p_phrases text[], p_verbs text[], p_embeddings public.vector[], p_source text) IS 'Bulk phrase upsert for YAML sync';
 
 
 --
@@ -1931,6 +982,31 @@ $$;
 
 
 --
+-- Name: check_blocklist_semantic(public.vector, text, uuid, real); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".check_blocklist_semantic(query_embedding public.vector, verb_to_check text, p_user_id uuid DEFAULT NULL::uuid, similarity_threshold real DEFAULT 0.85) RETURNS boolean
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    is_blocked BOOLEAN;
+BEGIN
+    SELECT EXISTS (
+        SELECT 1
+        FROM agent.phrase_blocklist pb
+        WHERE pb.blocked_verb = verb_to_check
+          AND pb.embedding IS NOT NULL
+          AND (pb.user_id IS NULL OR pb.user_id = p_user_id)
+          AND (pb.expires_at IS NULL OR pb.expires_at > now())
+          AND (1 - (pb.embedding <=> query_embedding)) > similarity_threshold
+    ) INTO is_blocked;
+
+    RETURN is_blocked;
+END;
+$$;
+
+
+--
 -- Name: check_cbu_evidence_completeness(uuid); Type: FUNCTION; Schema: ob-poc; Owner: -
 --
 
@@ -2092,6 +1168,48 @@ $$;
 --
 
 COMMENT ON FUNCTION "ob-poc".check_cbu_role_requirements(p_cbu_id uuid) IS 'Checks if all role requirements are satisfied for a CBU (e.g., feeder needs master).';
+
+
+--
+-- Name: check_pattern_collision_basic(bigint); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".check_pattern_collision_basic(p_candidate_id bigint) RETURNS boolean
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_phrase TEXT;
+    v_verb TEXT;
+BEGIN
+    -- Get candidate details
+    SELECT input_pattern, suggested_output
+    INTO v_phrase, v_verb
+    FROM agent.learning_candidates
+    WHERE id = p_candidate_id;
+
+    IF v_phrase IS NULL THEN
+        RETURN FALSE;
+    END IF;
+
+    -- Check if phrase already exists for this verb (exact match)
+    IF EXISTS (
+        SELECT 1 FROM "ob-poc".verb_pattern_embeddings
+        WHERE verb_name = v_verb
+          AND pattern_normalized = v_phrase
+    ) THEN
+        -- Already a pattern, mark as duplicate
+        UPDATE agent.learning_candidates
+        SET status = 'duplicate',
+            collision_safe = FALSE,
+            collision_check_at = NOW()
+        WHERE id = p_candidate_id;
+        RETURN FALSE;
+    END IF;
+
+    -- Basic check passed; semantic check done in Rust
+    RETURN TRUE;
+END;
+$$;
 
 
 --
@@ -2355,6 +1473,78 @@ BEGIN
     RETURN cleaned;
 END;
 $$;
+
+
+--
+-- Name: cleanup_old_events(integer); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".cleanup_old_events(retention_days integer DEFAULT 30) RETURNS integer
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    deleted_count INTEGER;
+BEGIN
+    DELETE FROM events.log
+    WHERE timestamp < NOW() - (retention_days || ' days')::INTERVAL;
+
+    GET DIAGNOSTICS deleted_count = ROW_COUNT;
+    RETURN deleted_count;
+END;
+$$;
+
+
+--
+-- Name: FUNCTION cleanup_old_events(retention_days integer); Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON FUNCTION "ob-poc".cleanup_old_events(retention_days integer) IS 'Delete events older than retention_days (default 30)';
+
+
+--
+-- Name: cleanup_old_resolved(); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".cleanup_old_resolved() RETURNS integer
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_deleted INTEGER;
+BEGIN
+    DELETE FROM feedback.failures
+    WHERE status = 'RESOLVED'
+      AND resolved_at < NOW() - INTERVAL '90 days';
+
+    GET DIAGNOSTICS v_deleted = ROW_COUNT;
+    RETURN v_deleted;
+END;
+$$;
+
+
+--
+-- Name: cleanup_old_session_logs(integer); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".cleanup_old_session_logs(retention_days integer DEFAULT 30) RETURNS integer
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    deleted_count INTEGER;
+BEGIN
+    DELETE FROM sessions.log
+    WHERE timestamp < NOW() - (retention_days || ' days')::INTERVAL;
+
+    GET DIAGNOSTICS deleted_count = ROW_COUNT;
+    RETURN deleted_count;
+END;
+$$;
+
+
+--
+-- Name: FUNCTION cleanup_old_session_logs(retention_days integer); Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON FUNCTION "ob-poc".cleanup_old_session_logs(retention_days integer) IS 'Delete session logs older than retention_days (default 30)';
 
 
 --
@@ -2646,6 +1836,28 @@ COMMENT ON FUNCTION "ob-poc".compute_service_readiness(p_cbu_id uuid) IS 'Stub f
 
 
 --
+-- Name: entity_allows_simplified_dd(uuid); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".entity_allows_simplified_dd(p_entity_id uuid) RETURNS boolean
+    LANGUAGE plpgsql STABLE
+    AS $$
+BEGIN
+    RETURN EXISTS (
+        SELECT 1
+        FROM "ob-poc".entity_regulatory_registrations r
+        JOIN "ob-poc".regulators reg ON r.regulator_code = reg.regulator_code
+        WHERE r.entity_id = p_entity_id
+          AND r.status = 'ACTIVE'
+          AND r.registration_verified = TRUE
+          AND reg.tier IN ('EQUIVALENT', 'ACCEPTABLE')
+          AND COALESCE(reg.active, TRUE)
+    );
+END;
+$$;
+
+
+--
 -- Name: entity_relationships_history_trigger(); Type: FUNCTION; Schema: ob-poc; Owner: -
 --
 
@@ -2758,6 +1970,34 @@ $$;
 --
 
 COMMENT ON FUNCTION "ob-poc".evaluate_case_decision(p_case_id uuid, p_evaluator character varying) IS 'Evaluates case and creates recommendation snapshot';
+
+
+--
+-- Name: expire_pending_outcomes(integer); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".expire_pending_outcomes(p_older_than_minutes integer DEFAULT 30) RETURNS integer
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_count INT;
+BEGIN
+    UPDATE "ob-poc".intent_feedback
+    SET outcome = 'abandoned'
+    WHERE outcome IS NULL
+      AND created_at < NOW() - make_interval(mins => p_older_than_minutes);
+
+    GET DIAGNOSTICS v_count = ROW_COUNT;
+    RETURN v_count;
+END;
+$$;
+
+
+--
+-- Name: FUNCTION expire_pending_outcomes(p_older_than_minutes integer); Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON FUNCTION "ob-poc".expire_pending_outcomes(p_older_than_minutes integer) IS 'Mark stale pending outcomes as abandoned (no user action after N minutes)';
 
 
 --
@@ -3417,6 +2657,27 @@ COMMENT ON FUNCTION "ob-poc".fn_manco_group_control_chain(p_manco_entity_id uuid
 
 
 --
+-- Name: generate_attestation_signature(uuid, uuid, uuid[], text, timestamp with time zone); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".generate_attestation_signature(p_attester_id uuid, p_campaign_id uuid, p_item_ids uuid[], p_attestation_text text, p_timestamp timestamp with time zone) RETURNS text
+    LANGUAGE plpgsql IMMUTABLE
+    AS $$
+DECLARE
+    v_input TEXT;
+BEGIN
+    v_input := p_attester_id::text || '|' ||
+               p_campaign_id::text || '|' ||
+               array_to_string(p_item_ids, ',') || '|' ||
+               p_attestation_text || '|' ||
+               p_timestamp::text;
+
+    RETURN 'sha256:' || encode(sha256(v_input::bytea), 'hex');
+END;
+$$;
+
+
+--
 -- Name: generate_case_ref(); Type: FUNCTION; Schema: ob-poc; Owner: -
 --
 
@@ -3456,6 +2717,31 @@ CREATE FUNCTION "ob-poc".get_attribute_value(p_entity_id uuid, p_attribute_id te
       AND effective_to IS NULL
     ORDER BY effective_from DESC
     LIMIT 1;
+$$;
+
+
+--
+-- Name: get_auto_applicable_candidates(); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".get_auto_applicable_candidates() RETURNS TABLE(id bigint, learning_type text, input_pattern text, suggested_output text, occurrence_count integer)
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    RETURN QUERY
+    SELECT
+        lc.id,
+        lc.learning_type,
+        lc.input_pattern,
+        lc.suggested_output,
+        lc.occurrence_count
+    FROM agent.learning_candidates lc
+    WHERE lc.status = 'pending'
+      AND lc.auto_applicable = TRUE
+      AND lc.occurrence_count >= 3
+      AND lc.risk_level = 'low'
+    ORDER BY lc.occurrence_count DESC;
+END;
 $$;
 
 
@@ -3676,6 +2962,98 @@ $$;
 
 
 --
+-- Name: get_promotable_candidates(integer, real, integer, integer); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".get_promotable_candidates(p_min_occurrences integer DEFAULT 5, p_min_success_rate real DEFAULT 0.80, p_min_age_hours integer DEFAULT 24, p_limit integer DEFAULT 50) RETURNS TABLE(id bigint, phrase text, verb text, occurrence_count integer, success_count integer, total_count integer, success_rate real, domain_hint text, first_seen timestamp with time zone, age_hours real)
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        lc.id,
+        lc.input_pattern as phrase,
+        lc.suggested_output as verb,
+        lc.occurrence_count,
+        lc.success_count,
+        lc.total_count,
+        (lc.success_count::real / NULLIF(lc.total_count, 0))::real as success_rate,
+        lc.domain_hint,
+        lc.first_seen,
+        (EXTRACT(EPOCH FROM (NOW() - lc.first_seen)) / 3600)::real as age_hours
+    FROM agent.learning_candidates lc
+    WHERE lc.status = 'pending'
+      AND lc.learning_type = 'invocation_phrase'
+      AND lc.occurrence_count >= p_min_occurrences
+      AND lc.total_count > 0
+      AND (lc.success_count::real / lc.total_count) >= p_min_success_rate
+      AND lc.first_seen < NOW() - make_interval(hours => p_min_age_hours)
+      AND (lc.collision_safe IS NULL OR lc.collision_safe = TRUE)
+      AND NOT EXISTS (
+          SELECT 1 FROM agent.phrase_blocklist bl
+          WHERE bl.blocked_verb = lc.suggested_output
+            AND lower(bl.phrase) = lc.input_pattern
+            AND (bl.expires_at IS NULL OR bl.expires_at > NOW())
+      )
+    ORDER BY 
+        lc.occurrence_count DESC,
+        (lc.success_count::real / NULLIF(lc.total_count, 0)) DESC
+    LIMIT p_limit;
+END;
+$$;
+
+
+--
+-- Name: get_review_candidates(integer, integer, integer); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".get_review_candidates(p_min_occurrences integer DEFAULT 3, p_min_age_days integer DEFAULT 7, p_limit integer DEFAULT 100) RETURNS TABLE(id bigint, phrase text, verb text, occurrence_count integer, success_count integer, total_count integer, success_rate real, domain_hint text, first_seen timestamp with time zone, last_seen timestamp with time zone, collision_verb text)
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    RETURN QUERY
+    SELECT
+        lc.id,
+        lc.input_pattern as phrase,
+        lc.suggested_output as verb,
+        lc.occurrence_count,
+        lc.success_count,
+        lc.total_count,
+        CASE WHEN lc.total_count > 0
+             THEN (lc.success_count::real / lc.total_count)
+             ELSE 0 END as success_rate,
+        lc.domain_hint,
+        lc.first_seen,
+        lc.last_seen,
+        lc.collision_verb
+    FROM agent.learning_candidates lc
+    WHERE lc.status = 'pending'
+      AND lc.learning_type = 'invocation_phrase'
+      AND lc.occurrence_count >= p_min_occurrences
+      AND lc.first_seen < NOW() - make_interval(days => p_min_age_days)
+      -- Either failed auto-promotion criteria or collision detected
+      AND (
+          -- Low success rate
+          (lc.total_count > 0 AND (lc.success_count::real / lc.total_count) < 0.80)
+          -- Collision detected
+          OR lc.collision_safe = FALSE
+          -- Not enough occurrences for auto-promote but old enough for review
+          OR lc.occurrence_count < 5
+      )
+    ORDER BY lc.occurrence_count DESC
+    LIMIT p_limit;
+END;
+$$;
+
+
+--
+-- Name: FUNCTION get_review_candidates(p_min_occurrences integer, p_min_age_days integer, p_limit integer); Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON FUNCTION "ob-poc".get_review_candidates(p_min_occurrences integer, p_min_age_days integer, p_limit integer) IS 'Get candidates that need manual review (failed auto-promotion but have signal)';
+
+
+--
 -- Name: get_role_profile_as_of(uuid, uuid, date, uuid); Type: FUNCTION; Schema: ob-poc; Owner: -
 --
 
@@ -3731,6 +3109,67 @@ $$;
 --
 
 COMMENT ON FUNCTION "ob-poc".get_source_confidence(p_source character varying) IS 'Returns default confidence score for ownership sources. Priority: regulatory filings > settlement systems > registries > client-provided.';
+
+
+--
+-- Name: get_taught_pending_embeddings(); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".get_taught_pending_embeddings() RETURNS TABLE(verb text, phrase text, taught_at timestamp with time zone)
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    RETURN QUERY
+    SELECT
+        la.details->>'verb' as verb,
+        la.details->>'phrase' as phrase,
+        la.timestamp as taught_at
+    FROM agent.learning_audit la
+    WHERE la.action = 'taught'
+      AND la.learning_type = 'invocation_phrase'
+      AND NOT EXISTS (
+          SELECT 1 FROM "ob-poc".verb_pattern_embeddings vpe
+          WHERE vpe.verb_name = la.details->>'verb'
+            AND vpe.pattern_normalized = la.details->>'phrase'
+            AND vpe.embedding IS NOT NULL
+      )
+    ORDER BY la.timestamp DESC;
+END;
+$$;
+
+
+--
+-- Name: FUNCTION get_taught_pending_embeddings(); Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON FUNCTION "ob-poc".get_taught_pending_embeddings() IS 'Get taught patterns that are awaiting populate_embeddings to create vectors.';
+
+
+--
+-- Name: get_user_access_domains(uuid); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".get_user_access_domains(p_user_id uuid) RETURNS character varying[]
+    LANGUAGE sql STABLE
+    AS $$
+    SELECT array_agg(DISTINCT unnest_domain)
+    FROM teams.v_effective_memberships m
+    CROSS JOIN LATERAL unnest(COALESCE(m.access_domains, ARRAY[]::varchar[])) as unnest_domain
+    WHERE m.user_id = p_user_id;
+$$;
+
+
+--
+-- Name: get_user_cbu_access(uuid); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".get_user_cbu_access(p_user_id uuid) RETURNS TABLE(cbu_id uuid, cbu_name character varying, access_domains character varying[], via_teams uuid[], roles character varying[])
+    LANGUAGE sql STABLE
+    AS $$
+    SELECT cbu_id, cbu_name, access_domains, via_teams, roles
+    FROM teams.v_user_cbu_access
+    WHERE user_id = p_user_id;
+$$;
 
 
 --
@@ -3946,6 +3385,51 @@ $$;
 --
 
 COMMENT ON FUNCTION "ob-poc".is_valid_ubo_transition(p_from_status character varying, p_to_status character varying) IS 'Validates UBO verification status transitions';
+
+
+--
+-- Name: is_verb_blocked(public.vector, text, uuid, real); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".is_verb_blocked(p_query_embedding public.vector, p_verb text, p_user_id uuid DEFAULT NULL::uuid, p_similarity_threshold real DEFAULT 0.85) RETURNS boolean
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    RETURN EXISTS (
+        SELECT 1
+        FROM agent.phrase_blocklist pb
+        WHERE pb.blocked_verb = p_verb
+          AND pb.embedding IS NOT NULL
+          AND (pb.user_id IS NULL OR pb.user_id = p_user_id)
+          AND (pb.expires_at IS NULL OR pb.expires_at > NOW())
+          AND (1 - (pb.embedding <=> p_query_embedding)) > p_similarity_threshold
+    );
+END;
+$$;
+
+
+--
+-- Name: learn_user_phrase(uuid, text, text, public.vector); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".learn_user_phrase(p_user_id uuid, p_phrase text, p_verb text, p_embedding public.vector) RETURNS bigint
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_id BIGINT;
+BEGIN
+    INSERT INTO agent.user_learned_phrases (user_id, phrase, verb, embedding, embedding_model)
+    VALUES (p_user_id, LOWER(TRIM(p_phrase)), p_verb, p_embedding, 'all-MiniLM-L6-v2')
+    ON CONFLICT (user_id, phrase) DO UPDATE SET
+        verb = EXCLUDED.verb,
+        embedding = EXCLUDED.embedding,
+        occurrence_count = agent.user_learned_phrases.occurrence_count + 1,
+        updated_at = NOW()
+    RETURNING id INTO v_id;
+
+    RETURN v_id;
+END;
+$$;
 
 
 --
@@ -4664,6 +4148,138 @@ COMMENT ON FUNCTION "ob-poc".record_execution_with_view_state(p_idempotency_key 
 
 
 --
+-- Name: record_learning_signal(text, text, boolean, text, text); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".record_learning_signal(p_phrase text, p_verb text, p_is_success boolean, p_signal_type text, p_domain_hint text DEFAULT NULL::text) RETURNS bigint
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_normalized TEXT;
+    v_fingerprint TEXT;
+    v_word_count INT;
+    v_stopword_ratio REAL;
+    v_id BIGINT;
+BEGIN
+    -- Normalize phrase
+    v_normalized := lower(trim(regexp_replace(p_phrase, '\s+', ' ', 'g')));
+    v_fingerprint := md5(v_normalized || '|' || p_verb);
+
+    -- Quality gate: word count (3-15 words)
+    v_word_count := array_length(string_to_array(v_normalized, ' '), 1);
+    IF v_word_count IS NULL OR v_word_count < 3 OR v_word_count > 15 THEN
+        RETURN NULL;  -- Reject too short or too long
+    END IF;
+
+    -- Quality gate: stopword ratio (reject if >70% stopwords)
+    SELECT
+        COALESCE(COUNT(*) FILTER (WHERE s.word IS NOT NULL)::real / NULLIF(v_word_count, 0), 0)
+    INTO v_stopword_ratio
+    FROM unnest(string_to_array(v_normalized, ' ')) AS w(word)
+    LEFT JOIN agent.stopwords s ON s.word = w.word;
+
+    IF v_stopword_ratio > 0.70 THEN
+        RETURN NULL;  -- Reject (too generic)
+    END IF;
+
+    -- Upsert candidate
+    INSERT INTO agent.learning_candidates (
+        fingerprint,
+        learning_type,
+        input_pattern,
+        suggested_output,
+        occurrence_count,
+        success_count,
+        total_count,
+        first_seen,
+        last_seen,
+        last_success_at,
+        domain_hint,
+        status
+    ) VALUES (
+        v_fingerprint,
+        'invocation_phrase',
+        v_normalized,
+        p_verb,
+        1,
+        CASE WHEN p_is_success THEN 1 ELSE 0 END,
+        1,
+        NOW(),
+        NOW(),
+        CASE WHEN p_is_success THEN NOW() ELSE NULL END,
+        COALESCE(p_domain_hint, (
+            SELECT category FROM "ob-poc".dsl_verbs WHERE full_name = p_verb
+        )),
+        'pending'
+    )
+    ON CONFLICT (fingerprint) DO UPDATE SET
+        occurrence_count = agent.learning_candidates.occurrence_count + 1,
+        success_count = agent.learning_candidates.success_count +
+            CASE WHEN p_is_success THEN 1 ELSE 0 END,
+        total_count = agent.learning_candidates.total_count + 1,
+        last_seen = NOW(),
+        last_success_at = CASE
+            WHEN p_is_success THEN NOW()
+            ELSE agent.learning_candidates.last_success_at
+        END,
+        -- Reset collision check if we get new signals (may have changed)
+        collision_safe = NULL,
+        collision_check_at = NULL
+    RETURNING id INTO v_id;
+
+    RETURN v_id;
+END;
+$$;
+
+
+--
+-- Name: FUNCTION record_learning_signal(p_phrase text, p_verb text, p_is_success boolean, p_signal_type text, p_domain_hint text); Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON FUNCTION "ob-poc".record_learning_signal(p_phrase text, p_verb text, p_is_success boolean, p_signal_type text, p_domain_hint text) IS 'Record a learning signal with quality gates. Returns NULL if phrase rejected.';
+
+
+--
+-- Name: record_occurrence(text, uuid, timestamp with time zone, uuid, text, bigint, text, text); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".record_occurrence(p_fingerprint text, p_event_id uuid, p_event_timestamp timestamp with time zone, p_session_id uuid, p_verb text, p_duration_ms bigint, p_error_message text, p_error_backtrace text) RETURNS uuid
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_failure_id UUID;
+    v_occurrence_id UUID;
+BEGIN
+    -- Get failure ID
+    SELECT id INTO v_failure_id
+    FROM feedback.failures
+    WHERE fingerprint = p_fingerprint;
+
+    IF v_failure_id IS NULL THEN
+        RAISE EXCEPTION 'Failure not found for fingerprint: %', p_fingerprint;
+    END IF;
+
+    -- Insert occurrence
+    INSERT INTO feedback.occurrences (
+        failure_id, event_id, event_timestamp, session_id,
+        verb, duration_ms, error_message, error_backtrace
+    ) VALUES (
+        v_failure_id, p_event_id, p_event_timestamp, p_session_id,
+        p_verb, p_duration_ms, p_error_message, p_error_backtrace
+    ) RETURNING id INTO v_occurrence_id;
+
+    -- Update failure counts
+    UPDATE feedback.failures
+    SET occurrence_count = occurrence_count + 1,
+        last_seen_at = p_event_timestamp
+    WHERE id = v_failure_id;
+
+    RETURN v_occurrence_id;
+END;
+$$;
+
+
+--
 -- Name: record_view_state_change(text, uuid, character varying, jsonb, uuid[], jsonb, integer, jsonb, uuid); Type: FUNCTION; Schema: ob-poc; Owner: -
 --
 
@@ -4757,6 +4373,67 @@ BEGIN
         expires_at = NOW() + INTERVAL '7 days';
 END;
 $$;
+
+
+--
+-- Name: reject_candidate(bigint, text, text); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".reject_candidate(p_candidate_id bigint, p_reason text, p_actor text DEFAULT 'manual_review'::text) RETURNS boolean
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_phrase TEXT;
+    v_verb TEXT;
+BEGIN
+    -- Get candidate
+    SELECT input_pattern, suggested_output
+    INTO v_phrase, v_verb
+    FROM agent.learning_candidates
+    WHERE id = p_candidate_id
+      AND status = 'pending';
+
+    IF v_phrase IS NULL THEN
+        RETURN FALSE;
+    END IF;
+
+    -- Add to blocklist
+    INSERT INTO agent.phrase_blocklist (phrase, blocked_verb, reason)
+    VALUES (v_phrase, v_verb, p_reason)
+    ON CONFLICT DO NOTHING;
+
+    -- Update candidate status
+    UPDATE agent.learning_candidates
+    SET status = 'rejected',
+        reviewed_by = p_actor,
+        reviewed_at = NOW()
+    WHERE id = p_candidate_id;
+
+    -- Audit log
+    INSERT INTO agent.learning_audit (
+        action, learning_type, candidate_id, actor, details
+    ) VALUES (
+        'rejected',
+        'invocation_phrase',
+        p_candidate_id,
+        p_actor,
+        jsonb_build_object(
+            'phrase', v_phrase,
+            'verb', v_verb,
+            'reason', p_reason
+        )
+    );
+
+    RETURN TRUE;
+END;
+$$;
+
+
+--
+-- Name: FUNCTION reject_candidate(p_candidate_id bigint, p_reason text, p_actor text); Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON FUNCTION "ob-poc".reject_candidate(p_candidate_id bigint, p_reason text, p_actor text) IS 'Reject a learning candidate and add to blocklist';
 
 
 --
@@ -5041,6 +4718,52 @@ COMMENT ON FUNCTION "ob-poc".search_entity_tags_semantic(p_group_id uuid, p_quer
 
 
 --
+-- Name: search_learned_phrases_semantic(public.vector, real, integer); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".search_learned_phrases_semantic(query_embedding public.vector, similarity_threshold real DEFAULT 0.75, max_results integer DEFAULT 5) RETURNS TABLE(phrase text, verb text, similarity real)
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    RETURN QUERY
+    SELECT
+        ip.phrase,
+        ip.verb,
+        (1 - (ip.embedding <=> query_embedding))::REAL as similarity
+    FROM agent.invocation_phrases ip
+    WHERE ip.embedding IS NOT NULL
+      AND (1 - (ip.embedding <=> query_embedding)) > similarity_threshold
+    ORDER BY ip.embedding <=> query_embedding
+    LIMIT max_results;
+END;
+$$;
+
+
+--
+-- Name: search_user_phrases_semantic(uuid, public.vector, real, integer); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".search_user_phrases_semantic(p_user_id uuid, query_embedding public.vector, similarity_threshold real DEFAULT 0.75, max_results integer DEFAULT 5) RETURNS TABLE(phrase text, verb text, confidence real, similarity real)
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    RETURN QUERY
+    SELECT
+        up.phrase,
+        up.verb,
+        up.confidence,
+        (1 - (up.embedding <=> query_embedding))::REAL as similarity
+    FROM agent.user_learned_phrases up
+    WHERE up.user_id = p_user_id
+      AND up.embedding IS NOT NULL
+      AND (1 - (up.embedding <=> query_embedding)) > similarity_threshold
+    ORDER BY up.embedding <=> query_embedding
+    LIMIT max_results;
+END;
+$$;
+
+
+--
 -- Name: search_verbs_semantic(public.vector, real, integer); Type: FUNCTION; Schema: ob-poc; Owner: -
 --
 
@@ -5070,6 +4793,52 @@ $$;
 --
 
 COMMENT ON FUNCTION "ob-poc".search_verbs_semantic(p_query_embedding public.vector, p_similarity_threshold real, p_max_results integer) IS 'Semantic verb discovery - returns ranked matches from verb_pattern_embeddings';
+
+
+--
+-- Name: search_verbs_semantic(public.vector, uuid, real, integer); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".search_verbs_semantic(p_query_embedding public.vector, p_user_id uuid DEFAULT NULL::uuid, p_similarity_threshold real DEFAULT 0.75, p_max_results integer DEFAULT 5) RETURNS TABLE(verb text, phrase text, similarity real, source text)
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    RETURN QUERY
+    -- User-specific phrases first (higher priority)
+    SELECT
+        ulp.verb,
+        ulp.phrase,
+        (1 - (ulp.embedding <=> p_query_embedding))::REAL as similarity,
+        'user_learned'::TEXT as source
+    FROM agent.user_learned_phrases ulp
+    WHERE p_user_id IS NOT NULL
+      AND ulp.user_id = p_user_id
+      AND ulp.embedding IS NOT NULL
+      AND (1 - (ulp.embedding <=> p_query_embedding)) > p_similarity_threshold
+
+    UNION ALL
+
+    -- Global invocation phrases
+    SELECT
+        ip.verb,
+        ip.phrase,
+        (1 - (ip.embedding <=> p_query_embedding))::REAL as similarity,
+        COALESCE(ip.source, 'global')::TEXT as source
+    FROM agent.invocation_phrases ip
+    WHERE ip.embedding IS NOT NULL
+      AND (1 - (ip.embedding <=> p_query_embedding)) > p_similarity_threshold
+
+    ORDER BY similarity DESC
+    LIMIT p_max_results;
+END;
+$$;
+
+
+--
+-- Name: FUNCTION search_verbs_semantic(p_query_embedding public.vector, p_user_id uuid, p_similarity_threshold real, p_max_results integer); Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON FUNCTION "ob-poc".search_verbs_semantic(p_query_embedding public.vector, p_user_id uuid, p_similarity_threshold real, p_max_results integer) IS 'Primary semantic verb discovery - combines user + global phrases';
 
 
 --
@@ -5507,6 +5276,166 @@ COMMENT ON FUNCTION "ob-poc".sync_holding_to_ubo_relationship() IS 'Sync UBO hol
 
 
 --
+-- Name: teach_phrase(text, text, text); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".teach_phrase(p_phrase text, p_verb text, p_source text DEFAULT 'direct_teaching'::text) RETURNS boolean
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_normalized TEXT;
+    v_added BOOLEAN;
+    v_word_count INT;
+BEGIN
+    -- Normalize phrase
+    v_normalized := lower(trim(regexp_replace(p_phrase, '\s+', ' ', 'g')));
+
+    -- Basic validation: not empty
+    IF v_normalized = '' OR v_normalized IS NULL THEN
+        RAISE EXCEPTION 'Phrase cannot be empty';
+    END IF;
+
+    -- Basic validation: verb exists
+    IF NOT EXISTS (SELECT 1 FROM "ob-poc".dsl_verbs WHERE full_name = p_verb) THEN
+        RAISE EXCEPTION 'Unknown verb: %. Use verbs.list to see available verbs.', p_verb;
+    END IF;
+
+    -- Word count check (warn but don't block for teaching)
+    v_word_count := array_length(string_to_array(v_normalized, ' '), 1);
+    IF v_word_count < 2 THEN
+        RAISE WARNING 'Very short phrase (% words) - may cause false positives', v_word_count;
+    END IF;
+
+    -- Add to dsl_verbs.intent_patterns using existing function
+    SELECT "ob-poc".add_learned_pattern(p_verb, v_normalized) INTO v_added;
+
+    IF v_added THEN
+        -- Audit the teaching
+        INSERT INTO agent.learning_audit (
+            action,
+            learning_type,
+            actor,
+            details
+        ) VALUES (
+            'taught',
+            'invocation_phrase',
+            p_source,
+            jsonb_build_object(
+                'phrase', v_normalized,
+                'verb', p_verb,
+                'word_count', v_word_count
+            )
+        );
+    END IF;
+
+    RETURN v_added;
+END;
+$$;
+
+
+--
+-- Name: FUNCTION teach_phrase(p_phrase text, p_verb text, p_source text); Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON FUNCTION "ob-poc".teach_phrase(p_phrase text, p_verb text, p_source text) IS 'Directly teach a phrase→verb mapping. Bypasses candidate staging (trusted source).';
+
+
+--
+-- Name: teach_phrases_batch(jsonb, text); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".teach_phrases_batch(p_phrases jsonb, p_source text DEFAULT 'batch_teaching'::text) RETURNS TABLE(phrase text, verb text, success boolean, message text)
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_item JSONB;
+    v_phrase TEXT;
+    v_verb TEXT;
+    v_added BOOLEAN;
+BEGIN
+    FOR v_item IN SELECT * FROM jsonb_array_elements(p_phrases)
+    LOOP
+        v_phrase := v_item->>'phrase';
+        v_verb := v_item->>'verb';
+
+        BEGIN
+            SELECT agent.teach_phrase(v_phrase, v_verb, p_source) INTO v_added;
+
+            phrase := v_phrase;
+            verb := v_verb;
+            success := v_added;
+            message := CASE
+                WHEN v_added THEN 'Learned'
+                ELSE 'Already exists'
+            END;
+            RETURN NEXT;
+
+        EXCEPTION WHEN OTHERS THEN
+            phrase := v_phrase;
+            verb := v_verb;
+            success := FALSE;
+            message := SQLERRM;
+            RETURN NEXT;
+        END;
+    END LOOP;
+END;
+$$;
+
+
+--
+-- Name: FUNCTION teach_phrases_batch(p_phrases jsonb, p_source text); Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON FUNCTION "ob-poc".teach_phrases_batch(p_phrases jsonb, p_source text) IS 'Batch teach multiple phrase→verb mappings from JSON array.';
+
+
+--
+-- Name: teams_log_membership_change(); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".teams_log_membership_change() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    IF TG_OP = 'INSERT' THEN
+        INSERT INTO teams.membership_history
+            (membership_id, team_id, user_id, action, new_role_key, changed_by_user_id)
+        VALUES
+            (NEW.membership_id, NEW.team_id, NEW.user_id, 'ADDED', NEW.role_key, NEW.delegated_by_user_id);
+    ELSIF TG_OP = 'UPDATE' THEN
+        IF OLD.role_key != NEW.role_key THEN
+            INSERT INTO teams.membership_history
+                (membership_id, team_id, user_id, action, old_role_key, new_role_key)
+            VALUES
+                (NEW.membership_id, NEW.team_id, NEW.user_id, 'UPDATED', OLD.role_key, NEW.role_key);
+        END IF;
+        IF NEW.effective_to IS NOT NULL AND OLD.effective_to IS NULL THEN
+            INSERT INTO teams.membership_history
+                (membership_id, team_id, user_id, action, old_role_key)
+            VALUES
+                (NEW.membership_id, NEW.team_id, NEW.user_id, 'REMOVED', OLD.role_key);
+        END IF;
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+
+--
+-- Name: teams_update_timestamp(); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".teams_update_timestamp() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$;
+
+
+--
 -- Name: track_provisioning_status_change(); Type: FUNCTION; Schema: ob-poc; Owner: -
 --
 
@@ -5640,6 +5569,61 @@ BEGIN
     ORDER BY oc.cumulative_pct DESC;
 END;
 $$;
+
+
+--
+-- Name: unteach_phrase(text, text, text, text); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".unteach_phrase(p_phrase text, p_verb text, p_reason text DEFAULT NULL::text, p_actor text DEFAULT 'manual'::text) RETURNS boolean
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_normalized TEXT;
+    v_removed BOOLEAN := FALSE;
+BEGIN
+    v_normalized := lower(trim(regexp_replace(p_phrase, '\s+', ' ', 'g')));
+
+    -- Remove from dsl_verbs.intent_patterns
+    UPDATE "ob-poc".dsl_verbs
+    SET intent_patterns = array_remove(intent_patterns, v_normalized),
+        updated_at = NOW()
+    WHERE full_name = p_verb
+      AND v_normalized = ANY(intent_patterns);
+
+    v_removed := FOUND;
+
+    IF v_removed THEN
+        -- Remove from embeddings cache
+        DELETE FROM "ob-poc".verb_pattern_embeddings
+        WHERE verb_name = p_verb
+          AND pattern_normalized = v_normalized;
+
+        -- Audit
+        INSERT INTO agent.learning_audit (
+            action, learning_type, actor, details
+        ) VALUES (
+            'untaught',
+            'invocation_phrase',
+            p_actor,
+            jsonb_build_object(
+                'phrase', v_normalized,
+                'verb', p_verb,
+                'reason', p_reason
+            )
+        );
+    END IF;
+
+    RETURN v_removed;
+END;
+$$;
+
+
+--
+-- Name: FUNCTION unteach_phrase(p_phrase text, p_verb text, p_reason text, p_actor text); Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON FUNCTION "ob-poc".unteach_phrase(p_phrase text, p_verb text, p_reason text, p_actor text) IS 'Remove a taught pattern (with audit). Use when a pattern causes problems.';
 
 
 --
@@ -5817,6 +5801,20 @@ $$;
 
 
 --
+-- Name: update_timestamps(); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".update_timestamps() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$;
+
+
+--
 -- Name: update_ubo_edges_timestamp(); Type: FUNCTION; Schema: ob-poc; Owner: -
 --
 
@@ -5857,6 +5855,80 @@ CREATE FUNCTION "ob-poc".update_workflow_timestamp() RETURNS trigger
 BEGIN
     NEW.updated_at = NOW();
     RETURN NEW;
+END;
+$$;
+
+
+--
+-- Name: upsert_entity_alias(text, text, uuid, text); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".upsert_entity_alias(p_alias text, p_canonical_name text, p_entity_id uuid DEFAULT NULL::uuid, p_source text DEFAULT 'user_correction'::text) RETURNS bigint
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_id BIGINT;
+BEGIN
+    INSERT INTO agent.entity_aliases (alias, canonical_name, entity_id, source)
+    VALUES (LOWER(TRIM(p_alias)), p_canonical_name, p_entity_id, p_source)
+    ON CONFLICT (alias, canonical_name) DO UPDATE SET
+        occurrence_count = agent.entity_aliases.occurrence_count + 1,
+        updated_at = NOW()
+    RETURNING id INTO v_id;
+
+    RETURN v_id;
+END;
+$$;
+
+
+--
+-- Name: upsert_invocation_phrase(text, text, public.vector, text); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".upsert_invocation_phrase(p_phrase text, p_verb text, p_embedding public.vector, p_source text DEFAULT 'yaml_sync'::text) RETURNS bigint
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_id BIGINT;
+BEGIN
+    INSERT INTO agent.invocation_phrases (phrase, verb, embedding, source, embedding_model)
+    VALUES (LOWER(TRIM(p_phrase)), p_verb, p_embedding, p_source, 'all-MiniLM-L6-v2')
+    ON CONFLICT (phrase, verb) DO UPDATE SET
+        embedding = EXCLUDED.embedding,
+        embedding_model = 'all-MiniLM-L6-v2',
+        updated_at = NOW()
+    RETURNING id INTO v_id;
+
+    RETURN v_id;
+END;
+$$;
+
+
+--
+-- Name: FUNCTION upsert_invocation_phrase(p_phrase text, p_verb text, p_embedding public.vector, p_source text); Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON FUNCTION "ob-poc".upsert_invocation_phrase(p_phrase text, p_verb text, p_embedding public.vector, p_source text) IS 'Single phrase upsert with embedding';
+
+
+--
+-- Name: upsert_lexicon_token(text, text, text, text); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".upsert_lexicon_token(p_token text, p_token_type text, p_token_subtype text DEFAULT NULL::text, p_source text DEFAULT 'user_correction'::text) RETURNS bigint
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_id BIGINT;
+BEGIN
+    INSERT INTO agent.lexicon_tokens (token, token_type, token_subtype, source)
+    VALUES (LOWER(TRIM(p_token)), p_token_type, p_token_subtype, p_source)
+    ON CONFLICT (token, token_type) DO UPDATE SET
+        occurrence_count = agent.lexicon_tokens.occurrence_count + 1,
+        updated_at = NOW()
+    RETURNING id INTO v_id;
+
+    RETURN v_id;
 END;
 $$;
 
@@ -5965,6 +6037,31 @@ $$;
 --
 
 COMMENT ON FUNCTION "ob-poc".upsert_role_profile(p_issuer_entity_id uuid, p_holder_entity_id uuid, p_role_type character varying, p_lookthrough_policy character varying, p_holder_affiliation character varying, p_beneficial_owner_data_available boolean, p_is_ubo_eligible boolean, p_share_class_id uuid, p_group_container_entity_id uuid, p_group_label text, p_effective_from date, p_source character varying, p_source_reference text, p_notes text, p_created_by character varying) IS 'Create or update a role profile with temporal versioning by closing active version and inserting a new one.';
+
+
+--
+-- Name: user_can_access_cbu(uuid, uuid); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".user_can_access_cbu(p_user_id uuid, p_cbu_id uuid) RETURNS boolean
+    LANGUAGE sql STABLE
+    AS $$
+    SELECT EXISTS (
+        SELECT 1 FROM teams.v_user_cbu_access
+        WHERE user_id = p_user_id AND cbu_id = p_cbu_id
+    );
+$$;
+
+
+--
+-- Name: user_has_domain(uuid, character varying); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".user_has_domain(p_user_id uuid, p_domain character varying) RETURNS boolean
+    LANGUAGE sql STABLE
+    AS $$
+    SELECT p_domain = ANY(COALESCE(teams.get_user_access_domains(p_user_id), ARRAY[]::varchar[]));
+$$;
 
 
 --
@@ -6227,28 +6324,6 @@ $$;
 
 
 --
--- Name: entity_allows_simplified_dd(uuid); Type: FUNCTION; Schema: ob_kyc; Owner: -
---
-
-CREATE FUNCTION ob_kyc.entity_allows_simplified_dd(p_entity_id uuid) RETURNS boolean
-    LANGUAGE plpgsql STABLE
-    AS $$
-BEGIN
-    RETURN EXISTS (
-        SELECT 1
-        FROM ob_kyc.entity_regulatory_registrations r
-        JOIN ob_ref.regulators reg ON r.regulator_code = reg.regulator_code
-        JOIN ob_ref.regulatory_tiers rt ON reg.regulatory_tier = rt.tier_code
-        WHERE r.entity_id = p_entity_id
-          AND r.status = 'ACTIVE'
-          AND r.registration_verified = TRUE
-          AND rt.allows_simplified_dd = TRUE
-    );
-END;
-$$;
-
-
---
 -- Name: ensure_entity_exists(character varying, character varying, character varying); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -6489,151 +6564,6 @@ $$;
 
 
 --
--- Name: cleanup_old_logs(integer); Type: FUNCTION; Schema: sessions; Owner: -
---
-
-CREATE FUNCTION sessions.cleanup_old_logs(retention_days integer DEFAULT 30) RETURNS integer
-    LANGUAGE plpgsql
-    AS $$
-DECLARE
-    deleted_count INTEGER;
-BEGIN
-    DELETE FROM sessions.log
-    WHERE timestamp < NOW() - (retention_days || ' days')::INTERVAL;
-
-    GET DIAGNOSTICS deleted_count = ROW_COUNT;
-    RETURN deleted_count;
-END;
-$$;
-
-
---
--- Name: FUNCTION cleanup_old_logs(retention_days integer); Type: COMMENT; Schema: sessions; Owner: -
---
-
-COMMENT ON FUNCTION sessions.cleanup_old_logs(retention_days integer) IS 'Delete session logs older than retention_days (default 30)';
-
-
---
--- Name: generate_attestation_signature(uuid, uuid, uuid[], text, timestamp with time zone); Type: FUNCTION; Schema: teams; Owner: -
---
-
-CREATE FUNCTION teams.generate_attestation_signature(p_attester_id uuid, p_campaign_id uuid, p_item_ids uuid[], p_attestation_text text, p_timestamp timestamp with time zone) RETURNS text
-    LANGUAGE plpgsql IMMUTABLE
-    AS $$
-DECLARE
-    v_input TEXT;
-BEGIN
-    v_input := p_attester_id::text || '|' ||
-               p_campaign_id::text || '|' ||
-               array_to_string(p_item_ids, ',') || '|' ||
-               p_attestation_text || '|' ||
-               p_timestamp::text;
-
-    RETURN 'sha256:' || encode(sha256(v_input::bytea), 'hex');
-END;
-$$;
-
-
---
--- Name: get_user_access_domains(uuid); Type: FUNCTION; Schema: teams; Owner: -
---
-
-CREATE FUNCTION teams.get_user_access_domains(p_user_id uuid) RETURNS character varying[]
-    LANGUAGE sql STABLE
-    AS $$
-    SELECT array_agg(DISTINCT unnest_domain)
-    FROM teams.v_effective_memberships m
-    CROSS JOIN LATERAL unnest(COALESCE(m.access_domains, ARRAY[]::varchar[])) as unnest_domain
-    WHERE m.user_id = p_user_id;
-$$;
-
-
---
--- Name: get_user_cbu_access(uuid); Type: FUNCTION; Schema: teams; Owner: -
---
-
-CREATE FUNCTION teams.get_user_cbu_access(p_user_id uuid) RETURNS TABLE(cbu_id uuid, cbu_name character varying, access_domains character varying[], via_teams uuid[], roles character varying[])
-    LANGUAGE sql STABLE
-    AS $$
-    SELECT cbu_id, cbu_name, access_domains, via_teams, roles
-    FROM teams.v_user_cbu_access
-    WHERE user_id = p_user_id;
-$$;
-
-
---
--- Name: log_membership_change(); Type: FUNCTION; Schema: teams; Owner: -
---
-
-CREATE FUNCTION teams.log_membership_change() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-BEGIN
-    IF TG_OP = 'INSERT' THEN
-        INSERT INTO teams.membership_history
-            (membership_id, team_id, user_id, action, new_role_key, changed_by_user_id)
-        VALUES
-            (NEW.membership_id, NEW.team_id, NEW.user_id, 'ADDED', NEW.role_key, NEW.delegated_by_user_id);
-    ELSIF TG_OP = 'UPDATE' THEN
-        IF OLD.role_key != NEW.role_key THEN
-            INSERT INTO teams.membership_history
-                (membership_id, team_id, user_id, action, old_role_key, new_role_key)
-            VALUES
-                (NEW.membership_id, NEW.team_id, NEW.user_id, 'UPDATED', OLD.role_key, NEW.role_key);
-        END IF;
-        IF NEW.effective_to IS NOT NULL AND OLD.effective_to IS NULL THEN
-            INSERT INTO teams.membership_history
-                (membership_id, team_id, user_id, action, old_role_key)
-            VALUES
-                (NEW.membership_id, NEW.team_id, NEW.user_id, 'REMOVED', OLD.role_key);
-        END IF;
-    END IF;
-    RETURN NEW;
-END;
-$$;
-
-
---
--- Name: update_timestamp(); Type: FUNCTION; Schema: teams; Owner: -
---
-
-CREATE FUNCTION teams.update_timestamp() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-BEGIN
-    NEW.updated_at = NOW();
-    RETURN NEW;
-END;
-$$;
-
-
---
--- Name: user_can_access_cbu(uuid, uuid); Type: FUNCTION; Schema: teams; Owner: -
---
-
-CREATE FUNCTION teams.user_can_access_cbu(p_user_id uuid, p_cbu_id uuid) RETURNS boolean
-    LANGUAGE sql STABLE
-    AS $$
-    SELECT EXISTS (
-        SELECT 1 FROM teams.v_user_cbu_access
-        WHERE user_id = p_user_id AND cbu_id = p_cbu_id
-    );
-$$;
-
-
---
--- Name: user_has_domain(uuid, character varying); Type: FUNCTION; Schema: teams; Owner: -
---
-
-CREATE FUNCTION teams.user_has_domain(p_user_id uuid, p_domain character varying) RETURNS boolean
-    LANGUAGE sql STABLE
-    AS $$
-    SELECT p_domain = ANY(COALESCE(teams.get_user_access_domains(p_user_id), ARRAY[]::varchar[]));
-$$;
-
-
---
 -- Name: database_ids; Type: SEQUENCE; Schema: _sqlx_test; Owner: -
 --
 
@@ -6657,903 +6587,133 @@ CREATE TABLE _sqlx_test.databases (
 
 
 --
--- Name: entity_aliases; Type: TABLE; Schema: agent; Owner: -
+-- Name: access_attestations; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
-CREATE TABLE agent.entity_aliases (
-    id bigint NOT NULL,
-    alias text NOT NULL,
-    canonical_name text NOT NULL,
-    entity_id uuid,
-    confidence numeric(3,2) DEFAULT 1.0,
-    occurrence_count integer DEFAULT 1,
-    source text DEFAULT 'user_correction'::text,
-    created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now(),
-    embedding public.vector(384),
-    embedding_model text DEFAULT 'all-MiniLM-L6-v2'::text
-);
-
-
---
--- Name: TABLE entity_aliases; Type: COMMENT; Schema: agent; Owner: -
---
-
-COMMENT ON TABLE agent.entity_aliases IS 'Learned mappings from user terms to canonical entity names';
-
-
---
--- Name: entity_aliases_id_seq; Type: SEQUENCE; Schema: agent; Owner: -
---
-
-CREATE SEQUENCE agent.entity_aliases_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: entity_aliases_id_seq; Type: SEQUENCE OWNED BY; Schema: agent; Owner: -
---
-
-ALTER SEQUENCE agent.entity_aliases_id_seq OWNED BY agent.entity_aliases.id;
-
-
---
--- Name: events; Type: TABLE; Schema: agent; Owner: -
---
-
-CREATE TABLE agent.events (
-    id bigint NOT NULL,
+CREATE TABLE "ob-poc".access_attestations (
+    attestation_id uuid DEFAULT uuidv7() NOT NULL,
+    campaign_id uuid NOT NULL,
+    attester_user_id uuid NOT NULL,
+    attester_name character varying(255) NOT NULL,
+    attester_email character varying(255) NOT NULL,
+    attester_role character varying(100),
+    attestation_scope character varying(50) NOT NULL,
+    team_id uuid,
+    item_ids uuid[],
+    items_count integer NOT NULL,
+    attestation_text text NOT NULL,
+    attestation_version character varying(20) DEFAULT 'v1'::character varying,
+    attested_at timestamp with time zone DEFAULT now() NOT NULL,
+    signature_hash text NOT NULL,
+    signature_input text,
+    ip_address inet,
+    user_agent text,
     session_id uuid,
-    "timestamp" timestamp with time zone DEFAULT now(),
-    event_type text NOT NULL,
-    user_message text,
-    parsed_intents jsonb,
-    selected_verb text,
-    generated_dsl text,
-    was_corrected boolean DEFAULT false,
-    corrected_dsl text,
-    correction_type text,
-    entities_resolved jsonb,
-    resolution_failures jsonb,
-    execution_success boolean,
-    error_message text,
-    duration_ms integer,
-    llm_model text,
-    llm_tokens_used integer
+    CONSTRAINT chk_attestation_scope CHECK (((attestation_scope)::text = ANY (ARRAY[('FULL_CAMPAIGN'::character varying)::text, ('MY_REVIEWS'::character varying)::text, ('SPECIFIC_TEAM'::character varying)::text, ('SPECIFIC_ITEMS'::character varying)::text])))
 );
 
 
 --
--- Name: TABLE events; Type: COMMENT; Schema: agent; Owner: -
+-- Name: access_review_campaigns; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
-COMMENT ON TABLE agent.events IS 'Agent interaction events for learning analysis';
-
-
---
--- Name: events_id_seq; Type: SEQUENCE; Schema: agent; Owner: -
---
-
-CREATE SEQUENCE agent.events_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: events_id_seq; Type: SEQUENCE OWNED BY; Schema: agent; Owner: -
---
-
-ALTER SEQUENCE agent.events_id_seq OWNED BY agent.events.id;
-
-
---
--- Name: invocation_phrases; Type: TABLE; Schema: agent; Owner: -
---
-
-CREATE TABLE agent.invocation_phrases (
-    id bigint NOT NULL,
-    phrase text NOT NULL,
-    verb text NOT NULL,
-    confidence numeric(3,2) DEFAULT 1.0,
-    occurrence_count integer DEFAULT 1,
-    source text DEFAULT 'user_correction'::text,
+CREATE TABLE "ob-poc".access_review_campaigns (
+    campaign_id uuid DEFAULT uuidv7() NOT NULL,
+    name character varying(255) NOT NULL,
+    review_type character varying(50) NOT NULL,
+    scope_type character varying(50) NOT NULL,
+    scope_filter jsonb,
+    review_period_start date DEFAULT CURRENT_DATE NOT NULL,
+    review_period_end date DEFAULT CURRENT_DATE NOT NULL,
+    deadline date NOT NULL,
+    reminder_days integer[] DEFAULT ARRAY[7, 3, 1],
+    status character varying(50) DEFAULT 'DRAFT'::character varying,
+    total_items integer DEFAULT 0,
+    reviewed_items integer DEFAULT 0,
+    confirmed_items integer DEFAULT 0,
+    revoked_items integer DEFAULT 0,
+    extended_items integer DEFAULT 0,
+    escalated_items integer DEFAULT 0,
+    pending_items integer DEFAULT 0,
     created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now(),
-    embedding public.vector(384),
-    embedding_model text DEFAULT 'all-MiniLM-L6-v2'::text
-);
-
-
---
--- Name: TABLE invocation_phrases; Type: COMMENT; Schema: agent; Owner: -
---
-
-COMMENT ON TABLE agent.invocation_phrases IS 'Natural language phrases mapped to DSL verbs';
-
-
---
--- Name: invocation_phrases_id_seq; Type: SEQUENCE; Schema: agent; Owner: -
---
-
-CREATE SEQUENCE agent.invocation_phrases_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: invocation_phrases_id_seq; Type: SEQUENCE OWNED BY; Schema: agent; Owner: -
---
-
-ALTER SEQUENCE agent.invocation_phrases_id_seq OWNED BY agent.invocation_phrases.id;
-
-
---
--- Name: learning_audit; Type: TABLE; Schema: agent; Owner: -
---
-
-CREATE TABLE agent.learning_audit (
-    id bigint NOT NULL,
-    "timestamp" timestamp with time zone DEFAULT now(),
-    action text NOT NULL,
-    learning_type text NOT NULL,
-    learning_id bigint,
-    candidate_id bigint,
-    actor text NOT NULL,
-    details jsonb,
-    previous_state jsonb,
-    can_rollback boolean DEFAULT true
-);
-
-
---
--- Name: TABLE learning_audit; Type: COMMENT; Schema: agent; Owner: -
---
-
-COMMENT ON TABLE agent.learning_audit IS 'Audit trail of all learning applications and reversions';
-
-
---
--- Name: learning_audit_id_seq; Type: SEQUENCE; Schema: agent; Owner: -
---
-
-CREATE SEQUENCE agent.learning_audit_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: learning_audit_id_seq; Type: SEQUENCE OWNED BY; Schema: agent; Owner: -
---
-
-ALTER SEQUENCE agent.learning_audit_id_seq OWNED BY agent.learning_audit.id;
-
-
---
--- Name: learning_candidates; Type: TABLE; Schema: agent; Owner: -
---
-
-CREATE TABLE agent.learning_candidates (
-    id bigint NOT NULL,
-    fingerprint text NOT NULL,
-    learning_type text NOT NULL,
-    input_pattern text NOT NULL,
-    suggested_output text NOT NULL,
-    occurrence_count integer DEFAULT 1,
-    first_seen timestamp with time zone DEFAULT now(),
-    last_seen timestamp with time zone DEFAULT now(),
-    example_events bigint[],
-    risk_level text DEFAULT 'low'::text,
-    auto_applicable boolean DEFAULT false,
-    status text DEFAULT 'pending'::text,
-    reviewed_by text,
-    reviewed_at timestamp with time zone,
-    applied_at timestamp with time zone,
-    created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now(),
-    success_count integer DEFAULT 0,
-    total_count integer DEFAULT 0,
-    last_success_at timestamp with time zone,
-    domain_hint text,
-    collision_safe boolean,
-    collision_check_at timestamp with time zone,
-    collision_verb text
-);
-
-
---
--- Name: TABLE learning_candidates; Type: COMMENT; Schema: agent; Owner: -
---
-
-COMMENT ON TABLE agent.learning_candidates IS 'Pending learnings awaiting approval or auto-apply';
-
-
---
--- Name: COLUMN learning_candidates.success_count; Type: COMMENT; Schema: agent; Owner: -
---
-
-COMMENT ON COLUMN agent.learning_candidates.success_count IS 'Count of successful outcomes (executed + DSL succeeded, or user selected this verb)';
-
-
---
--- Name: COLUMN learning_candidates.total_count; Type: COMMENT; Schema: agent; Owner: -
---
-
-COMMENT ON COLUMN agent.learning_candidates.total_count IS 'Total signals received (success + failure)';
-
-
---
--- Name: COLUMN learning_candidates.collision_safe; Type: COMMENT; Schema: agent; Owner: -
---
-
-COMMENT ON COLUMN agent.learning_candidates.collision_safe IS 'Whether pattern passed semantic collision check (NULL = not checked)';
-
-
---
--- Name: COLUMN learning_candidates.collision_verb; Type: COMMENT; Schema: agent; Owner: -
---
-
-COMMENT ON COLUMN agent.learning_candidates.collision_verb IS 'If collision detected, which verb it conflicts with';
-
-
---
--- Name: learning_candidates_id_seq; Type: SEQUENCE; Schema: agent; Owner: -
---
-
-CREATE SEQUENCE agent.learning_candidates_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: learning_candidates_id_seq; Type: SEQUENCE OWNED BY; Schema: agent; Owner: -
---
-
-ALTER SEQUENCE agent.learning_candidates_id_seq OWNED BY agent.learning_candidates.id;
-
-
---
--- Name: lexicon_tokens; Type: TABLE; Schema: agent; Owner: -
---
-
-CREATE TABLE agent.lexicon_tokens (
-    id bigint NOT NULL,
-    token text NOT NULL,
-    token_type text NOT NULL,
-    token_subtype text,
-    occurrence_count integer DEFAULT 1,
-    confidence numeric(3,2) DEFAULT 1.0,
-    source text DEFAULT 'user_correction'::text,
-    created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now()
-);
-
-
---
--- Name: TABLE lexicon_tokens; Type: COMMENT; Schema: agent; Owner: -
---
-
-COMMENT ON TABLE agent.lexicon_tokens IS 'Vocabulary learned from user inputs for intent parsing';
-
-
---
--- Name: lexicon_tokens_id_seq; Type: SEQUENCE; Schema: agent; Owner: -
---
-
-CREATE SEQUENCE agent.lexicon_tokens_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: lexicon_tokens_id_seq; Type: SEQUENCE OWNED BY; Schema: agent; Owner: -
---
-
-ALTER SEQUENCE agent.lexicon_tokens_id_seq OWNED BY agent.lexicon_tokens.id;
-
-
---
--- Name: phrase_blocklist; Type: TABLE; Schema: agent; Owner: -
---
-
-CREATE TABLE agent.phrase_blocklist (
-    id bigint NOT NULL,
-    phrase text NOT NULL,
-    blocked_verb text NOT NULL,
-    user_id uuid,
-    reason text,
-    embedding public.vector(384),
-    embedding_model text DEFAULT 'all-MiniLM-L6-v2'::text,
-    expires_at timestamp with time zone,
-    created_at timestamp with time zone DEFAULT now()
-);
-
-
---
--- Name: TABLE phrase_blocklist; Type: COMMENT; Schema: agent; Owner: -
---
-
-COMMENT ON TABLE agent.phrase_blocklist IS 'Negative examples to prevent semantic false positives';
-
-
---
--- Name: phrase_blocklist_id_seq; Type: SEQUENCE; Schema: agent; Owner: -
---
-
-CREATE SEQUENCE agent.phrase_blocklist_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: phrase_blocklist_id_seq; Type: SEQUENCE OWNED BY; Schema: agent; Owner: -
---
-
-ALTER SEQUENCE agent.phrase_blocklist_id_seq OWNED BY agent.phrase_blocklist.id;
-
-
---
--- Name: user_learned_phrases; Type: TABLE; Schema: agent; Owner: -
---
-
-CREATE TABLE agent.user_learned_phrases (
-    id bigint NOT NULL,
-    user_id uuid NOT NULL,
-    phrase text NOT NULL,
-    verb text NOT NULL,
-    confidence numeric(3,2) DEFAULT 1.0,
-    occurrence_count integer DEFAULT 1,
-    embedding public.vector(384),
-    embedding_model text DEFAULT 'all-MiniLM-L6-v2'::text,
-    source text DEFAULT 'user_correction'::text,
-    created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now()
-);
-
-
---
--- Name: TABLE user_learned_phrases; Type: COMMENT; Schema: agent; Owner: -
---
-
-COMMENT ON TABLE agent.user_learned_phrases IS 'Per-user phrase → verb mappings with Candle embeddings (384-dim)';
-
-
---
--- Name: user_learned_phrases_id_seq; Type: SEQUENCE; Schema: agent; Owner: -
---
-
-CREATE SEQUENCE agent.user_learned_phrases_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: user_learned_phrases_id_seq; Type: SEQUENCE OWNED BY; Schema: agent; Owner: -
---
-
-ALTER SEQUENCE agent.user_learned_phrases_id_seq OWNED BY agent.user_learned_phrases.id;
-
-
---
--- Name: v_candidate_pipeline; Type: VIEW; Schema: agent; Owner: -
---
-
-CREATE VIEW agent.v_candidate_pipeline AS
- SELECT status,
-    count(*) AS count,
-    round(avg(occurrence_count), 1) AS avg_occurrences,
-    round((avg(
-        CASE
-            WHEN (total_count > 0) THEN ((success_count)::real / (total_count)::double precision)
-            ELSE (0)::double precision
-        END))::numeric, 2) AS avg_success_rate,
-    min(first_seen) AS oldest,
-    max(last_seen) AS newest
-   FROM agent.learning_candidates
-  WHERE (learning_type = 'invocation_phrase'::text)
-  GROUP BY status
-  ORDER BY (count(*)) DESC;
-
-
---
--- Name: VIEW v_candidate_pipeline; Type: COMMENT; Schema: agent; Owner: -
---
-
-COMMENT ON VIEW agent.v_candidate_pipeline IS 'Summary of candidate statuses in the learning pipeline';
-
-
---
--- Name: dsl_generation_log; Type: TABLE; Schema: ob-poc; Owner: -
---
-
-CREATE TABLE "ob-poc".dsl_generation_log (
-    log_id uuid DEFAULT uuidv7() NOT NULL,
-    instance_id uuid,
-    user_intent text NOT NULL,
-    final_valid_dsl text,
-    iterations jsonb DEFAULT '[]'::jsonb NOT NULL,
-    domain_name character varying(50) NOT NULL,
-    session_id uuid,
-    cbu_id uuid,
-    model_used character varying(100),
-    total_attempts integer DEFAULT 1 NOT NULL,
-    success boolean DEFAULT false NOT NULL,
-    total_latency_ms integer,
-    total_input_tokens integer,
-    total_output_tokens integer,
-    created_at timestamp with time zone DEFAULT now(),
+    created_by_user_id uuid,
+    launched_at timestamp with time zone,
     completed_at timestamp with time zone,
-    intent_feedback_id bigint,
-    execution_status "ob-poc".execution_status DEFAULT 'pending'::"ob-poc".execution_status,
-    execution_error text,
-    executed_at timestamp with time zone,
-    affected_entity_ids uuid[]
+    CONSTRAINT chk_campaign_status CHECK (((status)::text = ANY (ARRAY[('DRAFT'::character varying)::text, ('POPULATING'::character varying)::text, ('ACTIVE'::character varying)::text, ('IN_REVIEW'::character varying)::text, ('PAST_DEADLINE'::character varying)::text, ('COMPLETED'::character varying)::text, ('CANCELLED'::character varying)::text]))),
+    CONSTRAINT chk_review_type CHECK (((review_type)::text = ANY (ARRAY[('QUARTERLY'::character varying)::text, ('ANNUAL'::character varying)::text, ('TRIGGERED'::character varying)::text, ('JOINER_MOVER_LEAVER'::character varying)::text]))),
+    CONSTRAINT chk_scope_type CHECK (((scope_type)::text = ANY (ARRAY[('ALL'::character varying)::text, ('BY_TEAM_TYPE'::character varying)::text, ('BY_DELEGATING_ENTITY'::character varying)::text, ('SPECIFIC_TEAMS'::character varying)::text, ('GOVERNANCE_ONLY'::character varying)::text])))
 );
 
 
 --
--- Name: TABLE dsl_generation_log; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: access_review_items; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
-COMMENT ON TABLE "ob-poc".dsl_generation_log IS 'Captures agent DSL generation iterations for training data extraction and audit trail';
-
-
---
--- Name: COLUMN dsl_generation_log.user_intent; Type: COMMENT; Schema: ob-poc; Owner: -
---
-
-COMMENT ON COLUMN "ob-poc".dsl_generation_log.user_intent IS 'Natural language description of what user wanted - the input side of training pairs';
-
-
---
--- Name: COLUMN dsl_generation_log.final_valid_dsl; Type: COMMENT; Schema: ob-poc; Owner: -
---
-
-COMMENT ON COLUMN "ob-poc".dsl_generation_log.final_valid_dsl IS 'Successfully validated DSL - the output side of training pairs';
-
-
---
--- Name: COLUMN dsl_generation_log.iterations; Type: COMMENT; Schema: ob-poc; Owner: -
---
-
-COMMENT ON COLUMN "ob-poc".dsl_generation_log.iterations IS 'JSONB array of each generation attempt with prompts, responses, and validation results';
-
-
---
--- Name: COLUMN dsl_generation_log.domain_name; Type: COMMENT; Schema: ob-poc; Owner: -
---
-
-COMMENT ON COLUMN "ob-poc".dsl_generation_log.domain_name IS 'Primary domain for this generation: cbu, entity, document, etc.';
-
-
---
--- Name: COLUMN dsl_generation_log.model_used; Type: COMMENT; Schema: ob-poc; Owner: -
---
-
-COMMENT ON COLUMN "ob-poc".dsl_generation_log.model_used IS 'LLM model identifier used for generation';
-
-
---
--- Name: COLUMN dsl_generation_log.total_attempts; Type: COMMENT; Schema: ob-poc; Owner: -
---
-
-COMMENT ON COLUMN "ob-poc".dsl_generation_log.total_attempts IS 'Number of generation attempts before success or failure';
-
-
---
--- Name: COLUMN dsl_generation_log.success; Type: COMMENT; Schema: ob-poc; Owner: -
---
-
-COMMENT ON COLUMN "ob-poc".dsl_generation_log.success IS 'Whether generation ultimately succeeded';
-
-
---
--- Name: COLUMN dsl_generation_log.intent_feedback_id; Type: COMMENT; Schema: ob-poc; Owner: -
---
-
-COMMENT ON COLUMN "ob-poc".dsl_generation_log.intent_feedback_id IS 'Links to intent_feedback for learning loop. NULL for direct DSL execution without chat.';
-
-
---
--- Name: COLUMN dsl_generation_log.execution_status; Type: COMMENT; Schema: ob-poc; Owner: -
---
-
-COMMENT ON COLUMN "ob-poc".dsl_generation_log.execution_status IS 'Outcome of DSL execution: pending, executed, failed, cancelled, skipped';
-
-
---
--- Name: COLUMN dsl_generation_log.execution_error; Type: COMMENT; Schema: ob-poc; Owner: -
---
-
-COMMENT ON COLUMN "ob-poc".dsl_generation_log.execution_error IS 'Error message if execution_status = failed';
-
-
---
--- Name: COLUMN dsl_generation_log.executed_at; Type: COMMENT; Schema: ob-poc; Owner: -
---
-
-COMMENT ON COLUMN "ob-poc".dsl_generation_log.executed_at IS 'Timestamp when DSL was executed (NULL if pending/cancelled)';
-
-
---
--- Name: COLUMN dsl_generation_log.affected_entity_ids; Type: COMMENT; Schema: ob-poc; Owner: -
---
-
-COMMENT ON COLUMN "ob-poc".dsl_generation_log.affected_entity_ids IS 'Entity UUIDs created/modified by this DSL execution';
-
-
---
--- Name: intent_feedback; Type: TABLE; Schema: ob-poc; Owner: -
---
-
-CREATE TABLE "ob-poc".intent_feedback (
-    id bigint NOT NULL,
-    session_id uuid NOT NULL,
-    interaction_id uuid DEFAULT uuidv7() NOT NULL,
-    user_input text NOT NULL,
-    user_input_hash text NOT NULL,
-    input_source text DEFAULT 'chat'::text NOT NULL,
-    matched_verb text,
-    match_score real,
-    match_confidence text,
-    semantic_score real,
-    phonetic_score real,
-    alternatives jsonb,
-    outcome text,
-    outcome_verb text,
-    correction_input text,
-    time_to_outcome_ms integer,
-    graph_context text,
-    workflow_phase text,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT valid_confidence CHECK (((match_confidence = ANY (ARRAY['high'::text, 'medium'::text, 'low'::text, 'none'::text])) OR (match_confidence IS NULL))),
-    CONSTRAINT valid_outcome CHECK (((outcome = ANY (ARRAY['executed'::text, 'selected_alt'::text, 'corrected'::text, 'rephrased'::text, 'abandoned'::text])) OR (outcome IS NULL))),
-    CONSTRAINT valid_source CHECK ((input_source = ANY (ARRAY['chat'::text, 'voice'::text, 'command'::text])))
+CREATE TABLE "ob-poc".access_review_items (
+    item_id uuid DEFAULT uuidv7() NOT NULL,
+    campaign_id uuid NOT NULL,
+    membership_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    team_id uuid NOT NULL,
+    role_key character varying(100) NOT NULL,
+    user_name character varying(255),
+    user_email character varying(255),
+    user_employer character varying(255),
+    team_name character varying(255),
+    team_type character varying(50),
+    delegating_entity_name character varying(255),
+    access_domains character varying(50)[],
+    legal_appointment_id uuid,
+    legal_position character varying(100),
+    legal_entity_name character varying(255),
+    legal_effective_from date,
+    legal_effective_to date,
+    last_login_at timestamp with time zone,
+    days_since_login integer,
+    membership_created_at timestamp with time zone,
+    membership_age_days integer,
+    flag_no_legal_link boolean DEFAULT false,
+    flag_legal_expired boolean DEFAULT false,
+    flag_legal_expiring_soon boolean DEFAULT false,
+    flag_dormant_account boolean DEFAULT false,
+    flag_never_logged_in boolean DEFAULT false,
+    flag_role_mismatch boolean DEFAULT false,
+    flag_orphaned_membership boolean DEFAULT false,
+    flags_json jsonb DEFAULT '{}'::jsonb,
+    recommendation character varying(50),
+    recommendation_reason text,
+    risk_score integer DEFAULT 0,
+    reviewer_user_id uuid,
+    reviewer_email character varying(255),
+    reviewer_name character varying(255),
+    status character varying(50) DEFAULT 'PENDING'::character varying,
+    reviewed_at timestamp with time zone,
+    reviewer_notes text,
+    extended_to date,
+    extension_reason text,
+    escalated_to_user_id uuid,
+    escalation_reason text,
+    escalated_at timestamp with time zone,
+    auto_action_at timestamp with time zone,
+    auto_action_reason text,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now(),
+    CONSTRAINT chk_item_status CHECK (((status)::text = ANY (ARRAY[('PENDING'::character varying)::text, ('CONFIRMED'::character varying)::text, ('REVOKED'::character varying)::text, ('EXTENDED'::character varying)::text, ('ESCALATED'::character varying)::text, ('AUTO_SUSPENDED'::character varying)::text, ('SKIPPED'::character varying)::text]))),
+    CONSTRAINT chk_recommendation CHECK (((recommendation)::text = ANY (ARRAY[('CONFIRM'::character varying)::text, ('REVOKE'::character varying)::text, ('EXTEND'::character varying)::text, ('REVIEW'::character varying)::text, ('ESCALATE'::character varying)::text])))
 );
 
 
 --
--- Name: TABLE intent_feedback; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: failures; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
-COMMENT ON TABLE "ob-poc".intent_feedback IS 'ML feedback capture for intent matching continuous learning. Append-only, batch analysis.';
-
-
---
--- Name: v_learning_feedback; Type: VIEW; Schema: ob-poc; Owner: -
---
-
-CREATE VIEW "ob-poc".v_learning_feedback AS
- SELECT f.id AS feedback_id,
-    f.interaction_id,
-    f.session_id,
-    f.user_input,
-    f.input_source,
-    f.matched_verb,
-    f.match_score,
-    f.match_confidence,
-    f.alternatives,
-    f.outcome AS feedback_outcome,
-    f.outcome_verb,
-    f.created_at AS feedback_at,
-    g.log_id AS generation_log_id,
-    g.user_intent AS generation_intent,
-    g.final_valid_dsl,
-    g.model_used,
-    g.total_attempts,
-    g.success AS generation_success,
-    g.execution_status,
-    g.execution_error,
-    g.executed_at,
-    g.affected_entity_ids,
-    g.total_latency_ms,
-    g.total_input_tokens,
-    g.total_output_tokens,
-        CASE
-            WHEN ((f.outcome = 'executed'::text) AND (g.execution_status = 'executed'::"ob-poc".execution_status)) THEN 'success'::text
-            WHEN ((f.outcome = 'executed'::text) AND (g.execution_status = 'failed'::"ob-poc".execution_status)) THEN 'false_positive'::text
-            WHEN (f.outcome = 'selected_alt'::text) THEN 'wrong_match'::text
-            WHEN (f.outcome = 'corrected'::text) THEN 'correction_needed'::text
-            WHEN (f.outcome = 'abandoned'::text) THEN 'no_match'::text
-            ELSE 'pending'::text
-        END AS learning_signal,
-    (EXTRACT(epoch FROM (g.executed_at - f.created_at)) * (1000)::numeric) AS phrase_to_execution_ms
-   FROM ("ob-poc".intent_feedback f
-     LEFT JOIN "ob-poc".dsl_generation_log g ON ((g.intent_feedback_id = f.id)))
-  ORDER BY f.created_at DESC;
-
-
---
--- Name: VIEW v_learning_feedback; Type: COMMENT; Schema: ob-poc; Owner: -
---
-
-COMMENT ON VIEW "ob-poc".v_learning_feedback IS 'Unified view joining feedback capture with DSL generation outcomes for learning analysis';
-
-
---
--- Name: v_learning_health_weekly; Type: VIEW; Schema: agent; Owner: -
---
-
-CREATE VIEW agent.v_learning_health_weekly AS
- SELECT date_trunc('week'::text, f.created_at) AS week,
-    count(*) AS total_interactions,
-    count(*) FILTER (WHERE (v.learning_signal = 'success'::text)) AS successes,
-    count(*) FILTER (WHERE (v.learning_signal = ANY (ARRAY['wrong_match'::text, 'correction_needed'::text]))) AS corrections,
-    count(*) FILTER (WHERE (v.learning_signal = 'no_match'::text)) AS no_matches,
-    count(*) FILTER (WHERE (v.learning_signal = 'false_positive'::text)) AS false_positives,
-    round(((100.0 * (count(*) FILTER (WHERE (v.learning_signal = 'success'::text)))::numeric) / (NULLIF(count(*), 0))::numeric), 1) AS top1_hit_rate_pct,
-    round((avg(f.match_score) FILTER (WHERE (v.learning_signal = 'success'::text)))::numeric, 3) AS avg_success_score,
-    round((avg(f.match_score) FILTER (WHERE (v.learning_signal = ANY (ARRAY['wrong_match'::text, 'correction_needed'::text]))))::numeric, 3) AS avg_correction_score,
-    count(*) FILTER (WHERE (f.match_confidence = 'high'::text)) AS high_confidence,
-    count(*) FILTER (WHERE (f.match_confidence = 'medium'::text)) AS medium_confidence,
-    count(*) FILTER (WHERE (f.match_confidence = 'low'::text)) AS low_confidence,
-    count(*) FILTER (WHERE (f.match_confidence = 'none'::text)) AS no_match_confidence
-   FROM ("ob-poc".intent_feedback f
-     LEFT JOIN "ob-poc".v_learning_feedback v ON ((v.feedback_id = f.id)))
-  WHERE (f.created_at > (now() - '84 days'::interval))
-  GROUP BY (date_trunc('week'::text, f.created_at))
-  ORDER BY (date_trunc('week'::text, f.created_at)) DESC;
-
-
---
--- Name: VIEW v_learning_health_weekly; Type: COMMENT; Schema: agent; Owner: -
---
-
-COMMENT ON VIEW agent.v_learning_health_weekly IS 'Weekly metrics for learning pipeline health monitoring';
-
-
---
--- Name: verb_pattern_embeddings; Type: TABLE; Schema: ob-poc; Owner: -
---
-
-CREATE TABLE "ob-poc".verb_pattern_embeddings (
-    id uuid DEFAULT uuidv7() NOT NULL,
-    verb_name character varying(100) NOT NULL,
-    pattern_phrase text NOT NULL,
-    pattern_normalized text NOT NULL,
-    phonetic_codes text[] DEFAULT '{}'::text[] NOT NULL,
-    embedding public.vector(384) NOT NULL,
-    category character varying(50) DEFAULT 'navigation'::character varying NOT NULL,
-    is_agent_bound boolean DEFAULT false NOT NULL,
-    priority integer DEFAULT 50 NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    match_method text DEFAULT 'semantic'::text
-);
-
-
---
--- Name: TABLE verb_pattern_embeddings; Type: COMMENT; Schema: ob-poc; Owner: -
---
-
-COMMENT ON TABLE "ob-poc".verb_pattern_embeddings IS 'Pre-computed embeddings for voice command patterns. Used for semantic similarity matching of voice transcripts to DSL verbs.';
-
-
---
--- Name: COLUMN verb_pattern_embeddings.phonetic_codes; Type: COMMENT; Schema: ob-poc; Owner: -
---
-
-COMMENT ON COLUMN "ob-poc".verb_pattern_embeddings.phonetic_codes IS 'Double Metaphone codes for phonetic fallback matching. Handles "enhawnce" → "enhance".';
-
-
---
--- Name: COLUMN verb_pattern_embeddings.embedding; Type: COMMENT; Schema: ob-poc; Owner: -
---
-
-COMMENT ON COLUMN "ob-poc".verb_pattern_embeddings.embedding IS 'all-MiniLM-L6-v2 embedding (384 dimensions). Captures semantic meaning of pattern phrase.';
-
-
---
--- Name: v_recently_taught; Type: VIEW; Schema: agent; Owner: -
---
-
-CREATE VIEW agent.v_recently_taught AS
- SELECT id,
-    (details ->> 'phrase'::text) AS phrase,
-    (details ->> 'verb'::text) AS verb,
-    actor AS source,
-    "timestamp" AS taught_at,
-    (EXISTS ( SELECT 1
-           FROM "ob-poc".verb_pattern_embeddings vpe
-          WHERE (((vpe.verb_name)::text = (la.details ->> 'verb'::text)) AND (vpe.pattern_normalized = (la.details ->> 'phrase'::text)) AND (vpe.embedding IS NOT NULL)))) AS has_embedding
-   FROM agent.learning_audit la
-  WHERE ((action = 'taught'::text) AND (learning_type = 'invocation_phrase'::text))
-  ORDER BY "timestamp" DESC
- LIMIT 100;
-
-
---
--- Name: VIEW v_recently_taught; Type: COMMENT; Schema: agent; Owner: -
---
-
-COMMENT ON VIEW agent.v_recently_taught IS 'Recently taught patterns with embedding status. Run populate_embeddings to activate patterns without embeddings.';
-
-
---
--- Name: v_teaching_stats; Type: VIEW; Schema: agent; Owner: -
---
-
-CREATE VIEW agent.v_teaching_stats AS
- SELECT date_trunc('day'::text, "timestamp") AS day,
-    actor AS source,
-    count(*) FILTER (WHERE (action = 'taught'::text)) AS patterns_taught,
-    count(*) FILTER (WHERE (action = 'untaught'::text)) AS patterns_untaught,
-    count(DISTINCT (details ->> 'verb'::text)) AS verbs_affected
-   FROM agent.learning_audit la
-  WHERE ((action = ANY (ARRAY['taught'::text, 'untaught'::text])) AND (learning_type = 'invocation_phrase'::text) AND ("timestamp" > (now() - '30 days'::interval)))
-  GROUP BY (date_trunc('day'::text, "timestamp")), actor
-  ORDER BY (date_trunc('day'::text, "timestamp")) DESC, (count(*) FILTER (WHERE (action = 'taught'::text))) DESC;
-
-
---
--- Name: VIEW v_teaching_stats; Type: COMMENT; Schema: agent; Owner: -
---
-
-COMMENT ON VIEW agent.v_teaching_stats IS 'Teaching activity over the last 30 days by source.';
-
-
---
--- Name: v_top_pending_candidates; Type: VIEW; Schema: agent; Owner: -
---
-
-CREATE VIEW agent.v_top_pending_candidates AS
- SELECT id,
-    input_pattern AS phrase,
-    suggested_output AS verb,
-    occurrence_count,
-    success_count,
-    total_count,
-        CASE
-            WHEN (total_count > 0) THEN round((((success_count)::real / (total_count)::double precision))::numeric, 2)
-            ELSE (0)::numeric
-        END AS success_rate,
-    domain_hint,
-    collision_safe,
-    collision_verb,
-    first_seen,
-    last_seen,
-    (EXTRACT(day FROM (now() - first_seen)))::integer AS age_days
-   FROM agent.learning_candidates
-  WHERE ((status = 'pending'::text) AND (learning_type = 'invocation_phrase'::text))
-  ORDER BY occurrence_count DESC,
-        CASE
-            WHEN (total_count > 0) THEN round((((success_count)::real / (total_count)::double precision))::numeric, 2)
-            ELSE (0)::numeric
-        END DESC
- LIMIT 100;
-
-
---
--- Name: VIEW v_top_pending_candidates; Type: COMMENT; Schema: agent; Owner: -
---
-
-COMMENT ON VIEW agent.v_top_pending_candidates IS 'Top 100 pending candidates by occurrence count';
-
-
---
--- Name: log; Type: TABLE; Schema: events; Owner: -
---
-
-CREATE TABLE events.log (
-    id bigint NOT NULL,
-    "timestamp" timestamp with time zone DEFAULT now() NOT NULL,
-    session_id uuid,
-    event_type text NOT NULL,
-    payload jsonb NOT NULL,
-    CONSTRAINT valid_event_type CHECK ((event_type = ANY (ARRAY['command_succeeded'::text, 'command_failed'::text, 'session_started'::text, 'session_ended'::text])))
-);
-
-
---
--- Name: TABLE log; Type: COMMENT; Schema: events; Owner: -
---
-
-COMMENT ON TABLE events.log IS 'Append-only DSL execution events for observability and failure analysis';
-
-
---
--- Name: log_id_seq; Type: SEQUENCE; Schema: events; Owner: -
---
-
-CREATE SEQUENCE events.log_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: log_id_seq; Type: SEQUENCE OWNED BY; Schema: events; Owner: -
---
-
-ALTER SEQUENCE events.log_id_seq OWNED BY events.log.id;
-
-
---
--- Name: recent_failures; Type: VIEW; Schema: events; Owner: -
---
-
-CREATE VIEW events.recent_failures AS
- SELECT id AS event_id,
-    "timestamp",
-    session_id,
-    (payload ->> 'verb'::text) AS verb,
-    ((payload -> 'error'::text) ->> 'message'::text) AS error_message,
-    ((payload -> 'error'::text) ->> 'error_type'::text) AS error_type,
-    ((payload ->> 'duration_ms'::text))::integer AS duration_ms
-   FROM events.log e
-  WHERE (event_type = 'command_failed'::text)
-  ORDER BY "timestamp" DESC
- LIMIT 100;
-
-
---
--- Name: VIEW recent_failures; Type: COMMENT; Schema: events; Owner: -
---
-
-COMMENT ON VIEW events.recent_failures IS 'Recent command failures for quick inspection';
-
-
---
--- Name: session_summary; Type: VIEW; Schema: events; Owner: -
---
-
-CREATE VIEW events.session_summary AS
- SELECT session_id,
-    min("timestamp") AS started_at,
-    max("timestamp") AS last_activity,
-    count(*) FILTER (WHERE (event_type = 'command_succeeded'::text)) AS success_count,
-    count(*) FILTER (WHERE (event_type = 'command_failed'::text)) AS failure_count,
-    count(*) AS total_events
-   FROM events.log
-  WHERE (session_id IS NOT NULL)
-  GROUP BY session_id
-  ORDER BY (max("timestamp")) DESC;
-
-
---
--- Name: VIEW session_summary; Type: COMMENT; Schema: events; Owner: -
---
-
-COMMENT ON VIEW events.session_summary IS 'Per-session event summary';
-
-
---
--- Name: failures; Type: TABLE; Schema: feedback; Owner: -
---
-
-CREATE TABLE feedback.failures (
+CREATE TABLE "ob-poc".failures (
     id uuid DEFAULT uuidv7() NOT NULL,
     fingerprint text NOT NULL,
     fingerprint_version smallint DEFAULT 1 NOT NULL,
-    error_type feedback.error_type NOT NULL,
-    remediation_path feedback.remediation_path NOT NULL,
-    status feedback.issue_status DEFAULT 'NEW'::feedback.issue_status NOT NULL,
+    error_type "ob-poc".error_type NOT NULL,
+    remediation_path "ob-poc".remediation_path NOT NULL,
+    status "ob-poc".issue_status DEFAULT 'NEW'::"ob-poc".issue_status NOT NULL,
     verb text NOT NULL,
     source text,
     error_message text NOT NULL,
@@ -7575,17 +6735,17 @@ CREATE TABLE feedback.failures (
 
 
 --
--- Name: TABLE failures; Type: COMMENT; Schema: feedback; Owner: -
+-- Name: TABLE failures; Type: COMMENT; Schema: ob-poc; Owner: -
 --
 
-COMMENT ON TABLE feedback.failures IS 'Deduplicated failure records, keyed by fingerprint';
+COMMENT ON TABLE "ob-poc".failures IS 'Deduplicated failure records, keyed by fingerprint';
 
 
 --
--- Name: active_issues; Type: VIEW; Schema: feedback; Owner: -
+-- Name: active_issues; Type: VIEW; Schema: ob-poc; Owner: -
 --
 
-CREATE VIEW feedback.active_issues AS
+CREATE VIEW "ob-poc".active_issues AS
  SELECT id,
     fingerprint,
     error_type,
@@ -7599,118 +6759,21 @@ CREATE VIEW feedback.active_issues AS
     first_seen_at,
     last_seen_at,
     repro_verified
-   FROM feedback.failures f
-  WHERE (status <> ALL (ARRAY['RESOLVED'::feedback.issue_status, 'WONT_FIX'::feedback.issue_status, 'DUPLICATE'::feedback.issue_status, 'INVALID'::feedback.issue_status]))
+   FROM "ob-poc".failures f
+  WHERE (status <> ALL (ARRAY['RESOLVED'::"ob-poc".issue_status, 'WONT_FIX'::"ob-poc".issue_status, 'DUPLICATE'::"ob-poc".issue_status, 'INVALID'::"ob-poc".issue_status]))
   ORDER BY
         CASE remediation_path
-            WHEN 'CODE'::feedback.remediation_path THEN 1
-            WHEN 'RUNTIME'::feedback.remediation_path THEN 2
+            WHEN 'CODE'::"ob-poc".remediation_path THEN 1
+            WHEN 'RUNTIME'::"ob-poc".remediation_path THEN 2
             ELSE 3
         END, occurrence_count DESC, last_seen_at DESC;
 
 
 --
--- Name: VIEW active_issues; Type: COMMENT; Schema: feedback; Owner: -
+-- Name: VIEW active_issues; Type: COMMENT; Schema: ob-poc; Owner: -
 --
 
-COMMENT ON VIEW feedback.active_issues IS 'Issues needing attention, prioritized by remediation path';
-
-
---
--- Name: audit_log; Type: TABLE; Schema: feedback; Owner: -
---
-
-CREATE TABLE feedback.audit_log (
-    id uuid DEFAULT uuidv7() NOT NULL,
-    failure_id uuid NOT NULL,
-    action feedback.audit_action NOT NULL,
-    actor_type feedback.actor_type NOT NULL,
-    actor_id text,
-    details jsonb,
-    evidence text,
-    evidence_hash text,
-    previous_status feedback.issue_status,
-    new_status feedback.issue_status,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
-);
-
-
---
--- Name: TABLE audit_log; Type: COMMENT; Schema: feedback; Owner: -
---
-
-COMMENT ON TABLE feedback.audit_log IS 'Full audit trail of all state transitions';
-
-
---
--- Name: occurrences; Type: TABLE; Schema: feedback; Owner: -
---
-
-CREATE TABLE feedback.occurrences (
-    id uuid DEFAULT uuidv7() NOT NULL,
-    failure_id uuid NOT NULL,
-    event_id uuid,
-    event_timestamp timestamp with time zone NOT NULL,
-    session_id uuid,
-    verb text NOT NULL,
-    duration_ms bigint,
-    error_message text NOT NULL,
-    error_backtrace text,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
-);
-
-
---
--- Name: TABLE occurrences; Type: COMMENT; Schema: feedback; Owner: -
---
-
-COMMENT ON TABLE feedback.occurrences IS 'Individual occurrences of each failure';
-
-
---
--- Name: ready_for_todo; Type: VIEW; Schema: feedback; Owner: -
---
-
-CREATE VIEW feedback.ready_for_todo AS
- SELECT id,
-    fingerprint,
-    error_type,
-    verb,
-    source,
-    error_message,
-    user_intent,
-    repro_path,
-    occurrence_count
-   FROM feedback.failures f
-  WHERE ((status = 'REPRO_VERIFIED'::feedback.issue_status) AND (repro_verified = true))
-  ORDER BY occurrence_count DESC;
-
-
---
--- Name: VIEW ready_for_todo; Type: COMMENT; Schema: feedback; Owner: -
---
-
-COMMENT ON VIEW feedback.ready_for_todo IS 'Issues with verified repro, ready for TODO generation';
-
-
---
--- Name: recent_activity; Type: VIEW; Schema: feedback; Owner: -
---
-
-CREATE VIEW feedback.recent_activity AS
- SELECT a.id,
-    a.failure_id,
-    f.fingerprint,
-    a.action,
-    a.actor_type,
-    a.actor_id,
-    a.previous_status,
-    a.new_status,
-    a.created_at
-   FROM (feedback.audit_log a
-     JOIN feedback.failures f ON ((f.id = a.failure_id)))
-  ORDER BY a.created_at DESC
- LIMIT 100;
+COMMENT ON VIEW "ob-poc".active_issues IS 'Issues needing attention, prioritized by remediation path';
 
 
 --
@@ -7921,6 +6984,32 @@ CREATE SEQUENCE "ob-poc".attribute_values_typed_id_seq
 --
 
 ALTER SEQUENCE "ob-poc".attribute_values_typed_id_seq OWNED BY "ob-poc".attribute_values_typed.id;
+
+
+--
+-- Name: audit_log; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".audit_log (
+    id uuid DEFAULT uuidv7() NOT NULL,
+    failure_id uuid NOT NULL,
+    action "ob-poc".audit_action NOT NULL,
+    actor_type "ob-poc".actor_type NOT NULL,
+    actor_id text,
+    details jsonb,
+    evidence text,
+    evidence_hash text,
+    previous_status "ob-poc".issue_status,
+    new_status "ob-poc".issue_status,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: TABLE audit_log; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".audit_log IS 'Full audit trail of all state transitions';
 
 
 --
@@ -11305,6 +10394,126 @@ COMMENT ON COLUMN "ob-poc".document_types.embedding IS 'OpenAI ada-002 or equiva
 
 
 --
+-- Name: dsl_generation_log; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".dsl_generation_log (
+    log_id uuid DEFAULT uuidv7() NOT NULL,
+    instance_id uuid,
+    user_intent text NOT NULL,
+    final_valid_dsl text,
+    iterations jsonb DEFAULT '[]'::jsonb NOT NULL,
+    domain_name character varying(50) NOT NULL,
+    session_id uuid,
+    cbu_id uuid,
+    model_used character varying(100),
+    total_attempts integer DEFAULT 1 NOT NULL,
+    success boolean DEFAULT false NOT NULL,
+    total_latency_ms integer,
+    total_input_tokens integer,
+    total_output_tokens integer,
+    created_at timestamp with time zone DEFAULT now(),
+    completed_at timestamp with time zone,
+    intent_feedback_id bigint,
+    execution_status "ob-poc".execution_status DEFAULT 'pending'::"ob-poc".execution_status,
+    execution_error text,
+    executed_at timestamp with time zone,
+    affected_entity_ids uuid[]
+);
+
+
+--
+-- Name: TABLE dsl_generation_log; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".dsl_generation_log IS 'Captures agent DSL generation iterations for training data extraction and audit trail';
+
+
+--
+-- Name: COLUMN dsl_generation_log.user_intent; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".dsl_generation_log.user_intent IS 'Natural language description of what user wanted - the input side of training pairs';
+
+
+--
+-- Name: COLUMN dsl_generation_log.final_valid_dsl; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".dsl_generation_log.final_valid_dsl IS 'Successfully validated DSL - the output side of training pairs';
+
+
+--
+-- Name: COLUMN dsl_generation_log.iterations; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".dsl_generation_log.iterations IS 'JSONB array of each generation attempt with prompts, responses, and validation results';
+
+
+--
+-- Name: COLUMN dsl_generation_log.domain_name; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".dsl_generation_log.domain_name IS 'Primary domain for this generation: cbu, entity, document, etc.';
+
+
+--
+-- Name: COLUMN dsl_generation_log.model_used; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".dsl_generation_log.model_used IS 'LLM model identifier used for generation';
+
+
+--
+-- Name: COLUMN dsl_generation_log.total_attempts; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".dsl_generation_log.total_attempts IS 'Number of generation attempts before success or failure';
+
+
+--
+-- Name: COLUMN dsl_generation_log.success; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".dsl_generation_log.success IS 'Whether generation ultimately succeeded';
+
+
+--
+-- Name: COLUMN dsl_generation_log.intent_feedback_id; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".dsl_generation_log.intent_feedback_id IS 'Links to intent_feedback for learning loop. NULL for direct DSL execution without chat.';
+
+
+--
+-- Name: COLUMN dsl_generation_log.execution_status; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".dsl_generation_log.execution_status IS 'Outcome of DSL execution: pending, executed, failed, cancelled, skipped';
+
+
+--
+-- Name: COLUMN dsl_generation_log.execution_error; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".dsl_generation_log.execution_error IS 'Error message if execution_status = failed';
+
+
+--
+-- Name: COLUMN dsl_generation_log.executed_at; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".dsl_generation_log.executed_at IS 'Timestamp when DSL was executed (NULL if pending/cancelled)';
+
+
+--
+-- Name: COLUMN dsl_generation_log.affected_entity_ids; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".dsl_generation_log.affected_entity_ids IS 'Entity UUIDs created/modified by this DSL execution';
+
+
+--
 -- Name: dsl_idempotency; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -11900,6 +11109,51 @@ COMMENT ON TABLE "ob-poc".entity_addresses IS 'Structured address data from GLEI
 
 
 --
+-- Name: entity_aliases; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".entity_aliases (
+    id bigint NOT NULL,
+    alias text NOT NULL,
+    canonical_name text NOT NULL,
+    entity_id uuid,
+    confidence numeric(3,2) DEFAULT 1.0,
+    occurrence_count integer DEFAULT 1,
+    source text DEFAULT 'user_correction'::text,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now(),
+    embedding public.vector(384),
+    embedding_model text DEFAULT 'all-MiniLM-L6-v2'::text
+);
+
+
+--
+-- Name: TABLE entity_aliases; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".entity_aliases IS 'Learned mappings from user terms to canonical entity names';
+
+
+--
+-- Name: entity_aliases_id_seq; Type: SEQUENCE; Schema: ob-poc; Owner: -
+--
+
+CREATE SEQUENCE "ob-poc".entity_aliases_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: entity_aliases_id_seq; Type: SEQUENCE OWNED BY; Schema: ob-poc; Owner: -
+--
+
+ALTER SEQUENCE "ob-poc".entity_aliases_id_seq OWNED BY "ob-poc".entity_aliases.id;
+
+
+--
 -- Name: entity_bods_links; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -12288,6 +11542,34 @@ COMMENT ON COLUMN "ob-poc".entity_proper_persons.person_state IS 'Person entity 
 
 
 --
+-- Name: entity_regulatory_registrations; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".entity_regulatory_registrations (
+    registration_id uuid DEFAULT uuidv7() NOT NULL,
+    entity_id uuid NOT NULL,
+    regulator_code character varying(50) NOT NULL,
+    registration_number character varying(100),
+    registration_type character varying(50) NOT NULL,
+    activity_scope text,
+    home_regulator_code character varying(50),
+    passport_reference character varying(100),
+    registration_verified boolean DEFAULT false,
+    verification_date date,
+    verification_method character varying(50),
+    verification_reference character varying(500),
+    verification_expires date,
+    status character varying(50) DEFAULT 'ACTIVE'::character varying,
+    effective_date date DEFAULT CURRENT_DATE,
+    expiry_date date,
+    created_at timestamp without time zone DEFAULT now(),
+    updated_at timestamp without time zone DEFAULT now(),
+    created_by uuid,
+    updated_by uuid
+);
+
+
+--
 -- Name: entity_relationships_current; Type: VIEW; Schema: ob-poc; Owner: -
 --
 
@@ -12673,6 +11955,98 @@ CREATE TABLE "ob-poc".escalations (
     CONSTRAINT escalations_preferred_contact_check CHECK (((preferred_contact)::text = ANY (ARRAY[('CALL'::character varying)::text, ('EMAIL'::character varying)::text, ('VIDEO'::character varying)::text]))),
     CONSTRAINT escalations_status_check CHECK (((status)::text = ANY (ARRAY[('OPEN'::character varying)::text, ('ASSIGNED'::character varying)::text, ('IN_PROGRESS'::character varying)::text, ('RESOLVED'::character varying)::text, ('CLOSED'::character varying)::text])))
 );
+
+
+--
+-- Name: event_log; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".event_log (
+    id bigint NOT NULL,
+    "timestamp" timestamp with time zone DEFAULT now() NOT NULL,
+    session_id uuid,
+    event_type text NOT NULL,
+    payload jsonb NOT NULL,
+    CONSTRAINT event_log_valid_event_type CHECK ((event_type = ANY (ARRAY['command_succeeded'::text, 'command_failed'::text, 'session_started'::text, 'session_ended'::text])))
+);
+
+
+--
+-- Name: TABLE event_log; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".event_log IS 'Append-only DSL execution events for observability and failure analysis';
+
+
+--
+-- Name: event_log_id_seq; Type: SEQUENCE; Schema: ob-poc; Owner: -
+--
+
+CREATE SEQUENCE "ob-poc".event_log_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: event_log_id_seq; Type: SEQUENCE OWNED BY; Schema: ob-poc; Owner: -
+--
+
+ALTER SEQUENCE "ob-poc".event_log_id_seq OWNED BY "ob-poc".event_log.id;
+
+
+--
+-- Name: events; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".events (
+    id bigint NOT NULL,
+    session_id uuid,
+    "timestamp" timestamp with time zone DEFAULT now(),
+    event_type text NOT NULL,
+    user_message text,
+    parsed_intents jsonb,
+    selected_verb text,
+    generated_dsl text,
+    was_corrected boolean DEFAULT false,
+    corrected_dsl text,
+    correction_type text,
+    entities_resolved jsonb,
+    resolution_failures jsonb,
+    execution_success boolean,
+    error_message text,
+    duration_ms integer,
+    llm_model text,
+    llm_tokens_used integer
+);
+
+
+--
+-- Name: TABLE events; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".events IS 'Agent interaction events for learning analysis';
+
+
+--
+-- Name: events_id_seq; Type: SEQUENCE; Schema: ob-poc; Owner: -
+--
+
+CREATE SEQUENCE "ob-poc".events_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: events_id_seq; Type: SEQUENCE OWNED BY; Schema: ob-poc; Owner: -
+--
+
+ALTER SEQUENCE "ob-poc".events_id_seq OWNED BY "ob-poc".events.id;
 
 
 --
@@ -13240,6 +12614,83 @@ COMMENT ON TABLE "ob-poc".instrument_lifecycles IS 'Junction: which lifecycles a
 
 
 --
+-- Name: intent_events; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".intent_events (
+    event_id uuid NOT NULL,
+    ts timestamp with time zone DEFAULT now() NOT NULL,
+    session_id uuid NOT NULL,
+    actor_id text NOT NULL,
+    entrypoint text NOT NULL,
+    utterance_hash text NOT NULL,
+    utterance_preview text,
+    scope text,
+    subject_ref_type text,
+    subject_ref_id uuid,
+    semreg_mode text NOT NULL,
+    semreg_denied_verbs jsonb,
+    verb_candidates_pre jsonb,
+    verb_candidates_post jsonb,
+    chosen_verb_fqn text,
+    selection_source text,
+    forced_verb_fqn text,
+    outcome text NOT NULL,
+    dsl_hash text,
+    run_sheet_entry_id uuid,
+    macro_semreg_checked boolean DEFAULT false NOT NULL,
+    macro_denied_verbs jsonb,
+    prompt_version text,
+    error_code text,
+    dominant_entity_id uuid,
+    dominant_entity_kind text,
+    entity_kind_filtered boolean DEFAULT false NOT NULL,
+    allowed_verbs_fingerprint character varying(70),
+    pruned_verbs_count integer,
+    toctou_recheck_performed boolean DEFAULT false,
+    toctou_result character varying(30),
+    toctou_new_fingerprint character varying(70)
+);
+
+
+--
+-- Name: intent_feedback; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".intent_feedback (
+    id bigint NOT NULL,
+    session_id uuid NOT NULL,
+    interaction_id uuid DEFAULT uuidv7() NOT NULL,
+    user_input text NOT NULL,
+    user_input_hash text NOT NULL,
+    input_source text DEFAULT 'chat'::text NOT NULL,
+    matched_verb text,
+    match_score real,
+    match_confidence text,
+    semantic_score real,
+    phonetic_score real,
+    alternatives jsonb,
+    outcome text,
+    outcome_verb text,
+    correction_input text,
+    time_to_outcome_ms integer,
+    graph_context text,
+    workflow_phase text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT valid_confidence CHECK (((match_confidence = ANY (ARRAY['high'::text, 'medium'::text, 'low'::text, 'none'::text])) OR (match_confidence IS NULL))),
+    CONSTRAINT valid_outcome CHECK (((outcome = ANY (ARRAY['executed'::text, 'selected_alt'::text, 'corrected'::text, 'rephrased'::text, 'abandoned'::text])) OR (outcome IS NULL))),
+    CONSTRAINT valid_source CHECK ((input_source = ANY (ARRAY['chat'::text, 'voice'::text, 'command'::text])))
+);
+
+
+--
+-- Name: TABLE intent_feedback; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".intent_feedback IS 'ML feedback capture for intent matching continuous learning. Append-only, batch analysis.';
+
+
+--
 -- Name: intent_feedback_analysis; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -13389,6 +12840,50 @@ COMMENT ON COLUMN "ob-poc".investors.provider IS 'CLEARSTREAM, EUROCLEAR, CSV_IM
 --
 
 COMMENT ON COLUMN "ob-poc".investors.owning_cbu_id IS 'The BNY client (fund manager) who owns this investor relationship';
+
+
+--
+-- Name: invocation_phrases; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".invocation_phrases (
+    id bigint NOT NULL,
+    phrase text NOT NULL,
+    verb text NOT NULL,
+    confidence numeric(3,2) DEFAULT 1.0,
+    occurrence_count integer DEFAULT 1,
+    source text DEFAULT 'user_correction'::text,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now(),
+    embedding public.vector(384),
+    embedding_model text DEFAULT 'all-MiniLM-L6-v2'::text
+);
+
+
+--
+-- Name: TABLE invocation_phrases; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".invocation_phrases IS 'Natural language phrases mapped to DSL verbs';
+
+
+--
+-- Name: invocation_phrases_id_seq; Type: SEQUENCE; Schema: ob-poc; Owner: -
+--
+
+CREATE SEQUENCE "ob-poc".invocation_phrases_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: invocation_phrases_id_seq; Type: SEQUENCE OWNED BY; Schema: ob-poc; Owner: -
+--
+
+ALTER SEQUENCE "ob-poc".invocation_phrases_id_seq OWNED BY "ob-poc".invocation_phrases.id;
 
 
 --
@@ -13710,6 +13205,136 @@ COMMENT ON TABLE "ob-poc".layout_config IS 'Global layout configuration settings
 
 
 --
+-- Name: learning_audit; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".learning_audit (
+    id bigint NOT NULL,
+    "timestamp" timestamp with time zone DEFAULT now(),
+    action text NOT NULL,
+    learning_type text NOT NULL,
+    learning_id bigint,
+    candidate_id bigint,
+    actor text NOT NULL,
+    details jsonb,
+    previous_state jsonb,
+    can_rollback boolean DEFAULT true
+);
+
+
+--
+-- Name: TABLE learning_audit; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".learning_audit IS 'Audit trail of all learning applications and reversions';
+
+
+--
+-- Name: learning_audit_id_seq; Type: SEQUENCE; Schema: ob-poc; Owner: -
+--
+
+CREATE SEQUENCE "ob-poc".learning_audit_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: learning_audit_id_seq; Type: SEQUENCE OWNED BY; Schema: ob-poc; Owner: -
+--
+
+ALTER SEQUENCE "ob-poc".learning_audit_id_seq OWNED BY "ob-poc".learning_audit.id;
+
+
+--
+-- Name: learning_candidates; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".learning_candidates (
+    id bigint NOT NULL,
+    fingerprint text NOT NULL,
+    learning_type text NOT NULL,
+    input_pattern text NOT NULL,
+    suggested_output text NOT NULL,
+    occurrence_count integer DEFAULT 1,
+    first_seen timestamp with time zone DEFAULT now(),
+    last_seen timestamp with time zone DEFAULT now(),
+    example_events bigint[],
+    risk_level text DEFAULT 'low'::text,
+    auto_applicable boolean DEFAULT false,
+    status text DEFAULT 'pending'::text,
+    reviewed_by text,
+    reviewed_at timestamp with time zone,
+    applied_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now(),
+    success_count integer DEFAULT 0,
+    total_count integer DEFAULT 0,
+    last_success_at timestamp with time zone,
+    domain_hint text,
+    collision_safe boolean,
+    collision_check_at timestamp with time zone,
+    collision_verb text
+);
+
+
+--
+-- Name: TABLE learning_candidates; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".learning_candidates IS 'Pending learnings awaiting approval or auto-apply';
+
+
+--
+-- Name: COLUMN learning_candidates.success_count; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".learning_candidates.success_count IS 'Count of successful outcomes (executed + DSL succeeded, or user selected this verb)';
+
+
+--
+-- Name: COLUMN learning_candidates.total_count; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".learning_candidates.total_count IS 'Total signals received (success + failure)';
+
+
+--
+-- Name: COLUMN learning_candidates.collision_safe; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".learning_candidates.collision_safe IS 'Whether pattern passed semantic collision check (NULL = not checked)';
+
+
+--
+-- Name: COLUMN learning_candidates.collision_verb; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".learning_candidates.collision_verb IS 'If collision detected, which verb it conflicts with';
+
+
+--
+-- Name: learning_candidates_id_seq; Type: SEQUENCE; Schema: ob-poc; Owner: -
+--
+
+CREATE SEQUENCE "ob-poc".learning_candidates_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: learning_candidates_id_seq; Type: SEQUENCE OWNED BY; Schema: ob-poc; Owner: -
+--
+
+ALTER SEQUENCE "ob-poc".learning_candidates_id_seq OWNED BY "ob-poc".learning_candidates.id;
+
+
+--
 -- Name: legal_contracts; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -13749,6 +13374,49 @@ CREATE TABLE "ob-poc".legal_entity (
 --
 
 COMMENT ON TABLE "ob-poc".legal_entity IS 'BNY legal entities that can sign contracts. Curated reference set, not the general entity universe.';
+
+
+--
+-- Name: lexicon_tokens; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".lexicon_tokens (
+    id bigint NOT NULL,
+    token text NOT NULL,
+    token_type text NOT NULL,
+    token_subtype text,
+    occurrence_count integer DEFAULT 1,
+    confidence numeric(3,2) DEFAULT 1.0,
+    source text DEFAULT 'user_correction'::text,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now()
+);
+
+
+--
+-- Name: TABLE lexicon_tokens; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".lexicon_tokens IS 'Vocabulary learned from user inputs for intent parsing';
+
+
+--
+-- Name: lexicon_tokens_id_seq; Type: SEQUENCE; Schema: ob-poc; Owner: -
+--
+
+CREATE SEQUENCE "ob-poc".lexicon_tokens_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: lexicon_tokens_id_seq; Type: SEQUENCE OWNED BY; Schema: ob-poc; Owner: -
+--
+
+ALTER SEQUENCE "ob-poc".lexicon_tokens_id_seq OWNED BY "ob-poc".lexicon_tokens.id;
 
 
 --
@@ -13851,6 +13519,43 @@ CREATE TABLE "ob-poc".markets (
     created_at timestamp with time zone DEFAULT now(),
     updated_at timestamp with time zone DEFAULT now()
 );
+
+
+--
+-- Name: memberships; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".memberships (
+    membership_id uuid DEFAULT uuidv7() NOT NULL,
+    team_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    role_key character varying(100) NOT NULL,
+    team_type character varying(50) GENERATED ALWAYS AS (split_part((role_key)::text, '.'::text, 1)) STORED,
+    function_name character varying(50) GENERATED ALWAYS AS (split_part(split_part((role_key)::text, '.'::text, 2), ':'::text, 1)) STORED,
+    role_level character varying(50) GENERATED ALWAYS AS (split_part((role_key)::text, ':'::text, 2)) STORED,
+    effective_from date DEFAULT CURRENT_DATE NOT NULL,
+    effective_to date,
+    permission_overrides jsonb DEFAULT '{}'::jsonb,
+    legal_appointment_id uuid,
+    requires_legal_appointment boolean DEFAULT false,
+    delegated_by_user_id uuid,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now()
+);
+
+
+--
+-- Name: COLUMN memberships.legal_appointment_id; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".memberships.legal_appointment_id IS 'Links portal access to legal appointment (DIRECTOR, CONDUCTING_OFFICER, etc.)';
+
+
+--
+-- Name: COLUMN memberships.requires_legal_appointment; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".memberships.requires_legal_appointment IS 'If true, warns when no legal appointment linked';
 
 
 --
@@ -14010,6 +13715,31 @@ CREATE TABLE "ob-poc".observation_discrepancies (
 --
 
 COMMENT ON TABLE "ob-poc".observation_discrepancies IS 'Tracks discrepancies detected between attribute observations during KYC reconciliation.';
+
+
+--
+-- Name: occurrences; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".occurrences (
+    id uuid DEFAULT uuidv7() NOT NULL,
+    failure_id uuid NOT NULL,
+    event_id uuid,
+    event_timestamp timestamp with time zone NOT NULL,
+    session_id uuid,
+    verb text NOT NULL,
+    duration_ms bigint,
+    error_message text NOT NULL,
+    error_backtrace text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: TABLE occurrences; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".occurrences IS 'Individual occurrences of each failure';
 
 
 --
@@ -14390,6 +14120,49 @@ COMMENT ON TABLE "ob-poc".person_pep_status IS 'BODS-compliant PEP status tracki
 
 
 --
+-- Name: phrase_blocklist; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".phrase_blocklist (
+    id bigint NOT NULL,
+    phrase text NOT NULL,
+    blocked_verb text NOT NULL,
+    user_id uuid,
+    reason text,
+    embedding public.vector(384),
+    embedding_model text DEFAULT 'all-MiniLM-L6-v2'::text,
+    expires_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now()
+);
+
+
+--
+-- Name: TABLE phrase_blocklist; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".phrase_blocklist IS 'Negative examples to prevent semantic false positives';
+
+
+--
+-- Name: phrase_blocklist_id_seq; Type: SEQUENCE; Schema: ob-poc; Owner: -
+--
+
+CREATE SEQUENCE "ob-poc".phrase_blocklist_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: phrase_blocklist_id_seq; Type: SEQUENCE OWNED BY; Schema: ob-poc; Owner: -
+--
+
+ALTER SEQUENCE "ob-poc".phrase_blocklist_id_seq OWNED BY "ob-poc".phrase_blocklist.id;
+
+
+--
 -- Name: product_services; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -14604,6 +14377,77 @@ CREATE TABLE "ob-poc".rate_cards (
 
 
 --
+-- Name: ready_for_todo; Type: VIEW; Schema: ob-poc; Owner: -
+--
+
+CREATE VIEW "ob-poc".ready_for_todo AS
+ SELECT id,
+    fingerprint,
+    error_type,
+    verb,
+    source,
+    error_message,
+    user_intent,
+    repro_path,
+    occurrence_count
+   FROM "ob-poc".failures f
+  WHERE ((status = 'REPRO_VERIFIED'::"ob-poc".issue_status) AND (repro_verified = true))
+  ORDER BY occurrence_count DESC;
+
+
+--
+-- Name: VIEW ready_for_todo; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON VIEW "ob-poc".ready_for_todo IS 'Issues with verified repro, ready for TODO generation';
+
+
+--
+-- Name: recent_activity; Type: VIEW; Schema: ob-poc; Owner: -
+--
+
+CREATE VIEW "ob-poc".recent_activity AS
+ SELECT a.id,
+    a.failure_id,
+    f.fingerprint,
+    a.action,
+    a.actor_type,
+    a.actor_id,
+    a.previous_status,
+    a.new_status,
+    a.created_at
+   FROM ("ob-poc".audit_log a
+     JOIN "ob-poc".failures f ON ((f.id = a.failure_id)))
+  ORDER BY a.created_at DESC
+ LIMIT 100;
+
+
+--
+-- Name: recent_failures; Type: VIEW; Schema: ob-poc; Owner: -
+--
+
+CREATE VIEW "ob-poc".recent_failures AS
+ SELECT id AS event_id,
+    "timestamp",
+    session_id,
+    (payload ->> 'verb'::text) AS verb,
+    ((payload -> 'error'::text) ->> 'message'::text) AS error_message,
+    ((payload -> 'error'::text) ->> 'error_type'::text) AS error_type,
+    ((payload ->> 'duration_ms'::text))::integer AS duration_ms
+   FROM "ob-poc".event_log e
+  WHERE (event_type = 'command_failed'::text)
+  ORDER BY "timestamp" DESC
+ LIMIT 100;
+
+
+--
+-- Name: VIEW recent_failures; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON VIEW "ob-poc".recent_failures IS 'Recent command failures for quick inspection';
+
+
+--
 -- Name: red_flags; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -14650,7 +14494,9 @@ CREATE TABLE "ob-poc".regulators (
     tier character varying(20) DEFAULT 'NONE'::character varying NOT NULL,
     registry_url character varying(500),
     created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now()
+    updated_at timestamp with time zone DEFAULT now(),
+    regulator_type character varying,
+    active boolean DEFAULT true NOT NULL
 );
 
 
@@ -14691,6 +14537,55 @@ CREATE TABLE "ob-poc".repl_sessions_v2 (
     park_expires_at timestamp with time zone,
     version bigint DEFAULT 0 NOT NULL
 );
+
+
+--
+-- Name: request_types; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".request_types (
+    request_type character varying(50) NOT NULL,
+    request_subtype character varying(100) NOT NULL,
+    description character varying(255),
+    default_due_days integer DEFAULT 7,
+    default_grace_days integer DEFAULT 3,
+    max_reminders integer DEFAULT 3,
+    blocks_by_default boolean DEFAULT true,
+    fulfillment_sources character varying(50)[] DEFAULT ARRAY['CLIENT'::text, 'USER'::text],
+    auto_fulfill_on_upload boolean DEFAULT true,
+    escalation_enabled boolean DEFAULT true,
+    escalation_after_days integer DEFAULT 10,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now()
+);
+
+
+--
+-- Name: TABLE request_types; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".request_types IS 'Configuration for different request types and subtypes';
+
+
+--
+-- Name: COLUMN request_types.fulfillment_sources; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".request_types.fulfillment_sources IS 'Who can fulfill this request: CLIENT, USER, SYSTEM, EXTERNAL_PROVIDER';
+
+
+--
+-- Name: COLUMN request_types.auto_fulfill_on_upload; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".request_types.auto_fulfill_on_upload IS 'Whether uploading a matching document auto-fulfills the request';
+
+
+--
+-- Name: COLUMN request_types.escalation_after_days; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".request_types.escalation_after_days IS 'Days past due date before auto-escalation';
 
 
 --
@@ -15036,7 +14931,10 @@ CREATE TABLE "ob-poc".role_types (
     if_regulated_obligation character varying(50),
     cascade_to_entity_ubos boolean DEFAULT false,
     threshold_based boolean DEFAULT false,
-    created_at timestamp with time zone DEFAULT now()
+    created_at timestamp with time zone DEFAULT now(),
+    category character varying,
+    active boolean DEFAULT true NOT NULL,
+    updated_at timestamp with time zone
 );
 
 
@@ -15527,6 +15425,74 @@ CREATE TABLE "ob-poc".services (
     is_active boolean DEFAULT true,
     lifecycle_tags text[] DEFAULT '{}'::text[]
 );
+
+
+--
+-- Name: session_log; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".session_log (
+    id bigint NOT NULL,
+    session_id uuid NOT NULL,
+    "timestamp" timestamp with time zone DEFAULT now() NOT NULL,
+    entry_type text NOT NULL,
+    content text NOT NULL,
+    event_id bigint,
+    source text NOT NULL,
+    metadata jsonb DEFAULT '{}'::jsonb,
+    CONSTRAINT session_log_valid_entry_type CHECK ((entry_type = ANY (ARRAY['user_input'::text, 'agent_thought'::text, 'dsl_command'::text, 'response'::text, 'error'::text]))),
+    CONSTRAINT session_log_valid_source CHECK ((source = ANY (ARRAY['repl'::text, 'egui'::text, 'mcp'::text, 'api'::text])))
+);
+
+
+--
+-- Name: TABLE session_log; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".session_log IS 'Conversation context log for session replay and failure analysis';
+
+
+--
+-- Name: session_log_id_seq; Type: SEQUENCE; Schema: ob-poc; Owner: -
+--
+
+CREATE SEQUENCE "ob-poc".session_log_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: session_log_id_seq; Type: SEQUENCE OWNED BY; Schema: ob-poc; Owner: -
+--
+
+ALTER SEQUENCE "ob-poc".session_log_id_seq OWNED BY "ob-poc".session_log.id;
+
+
+--
+-- Name: session_summary; Type: VIEW; Schema: ob-poc; Owner: -
+--
+
+CREATE VIEW "ob-poc".session_summary AS
+ SELECT session_id,
+    min("timestamp") AS started_at,
+    max("timestamp") AS last_activity,
+    count(*) FILTER (WHERE (event_type = 'command_succeeded'::text)) AS success_count,
+    count(*) FILTER (WHERE (event_type = 'command_failed'::text)) AS failure_count,
+    count(*) AS total_events
+   FROM "ob-poc".event_log
+  WHERE (session_id IS NOT NULL)
+  GROUP BY session_id
+  ORDER BY (max("timestamp")) DESC;
+
+
+--
+-- Name: VIEW session_summary; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON VIEW "ob-poc".session_summary IS 'Per-session event summary';
 
 
 --
@@ -16292,6 +16258,42 @@ COMMENT ON TABLE "ob-poc".staged_runbook IS 'Session-scoped staged runbook. Accu
 
 
 --
+-- Name: standards_mappings; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".standards_mappings (
+    mapping_id integer NOT NULL,
+    standard character varying(20) NOT NULL,
+    our_value character varying(50) NOT NULL,
+    standard_value character varying(100) NOT NULL,
+    standard_version character varying(20) NOT NULL,
+    notes text,
+    effective_from date DEFAULT CURRENT_DATE NOT NULL,
+    effective_to date
+);
+
+
+--
+-- Name: standards_mappings_mapping_id_seq; Type: SEQUENCE; Schema: ob-poc; Owner: -
+--
+
+CREATE SEQUENCE "ob-poc".standards_mappings_mapping_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: standards_mappings_mapping_id_seq; Type: SEQUENCE OWNED BY; Schema: ob-poc; Owner: -
+--
+
+ALTER SEQUENCE "ob-poc".standards_mappings_mapping_id_seq OWNED BY "ob-poc".standards_mappings.mapping_id;
+
+
+--
 -- Name: subcustodian_network; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -16404,6 +16406,62 @@ COMMENT ON TABLE "ob-poc".tax_treaty_rates IS 'Bilateral tax treaty rates betwee
 
 
 --
+-- Name: team_cbu_access; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".team_cbu_access (
+    access_id uuid DEFAULT uuidv7() NOT NULL,
+    team_id uuid NOT NULL,
+    cbu_id uuid NOT NULL,
+    access_restrictions jsonb DEFAULT '{}'::jsonb,
+    granted_at timestamp with time zone DEFAULT now(),
+    granted_by_user_id uuid
+);
+
+
+--
+-- Name: team_service_entitlements; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".team_service_entitlements (
+    entitlement_id uuid DEFAULT uuidv7() NOT NULL,
+    team_id uuid NOT NULL,
+    service_code character varying(100) NOT NULL,
+    config jsonb DEFAULT '{}'::jsonb,
+    granted_at timestamp with time zone DEFAULT now(),
+    granted_by_user_id uuid,
+    updated_at timestamp with time zone DEFAULT now()
+);
+
+
+--
+-- Name: teams; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".teams (
+    team_id uuid DEFAULT uuidv7() NOT NULL,
+    name character varying(255) NOT NULL,
+    team_type character varying(50) NOT NULL,
+    delegating_entity_id uuid NOT NULL,
+    authority_type character varying(50) NOT NULL,
+    authority_scope jsonb DEFAULT '{}'::jsonb,
+    access_mode character varying(50) NOT NULL,
+    explicit_cbus uuid[],
+    scope_filter jsonb,
+    service_entitlements jsonb DEFAULT '{}'::jsonb,
+    is_active boolean DEFAULT true,
+    archived_at timestamp with time zone,
+    archive_reason text,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now(),
+    created_by_user_id uuid,
+    CONSTRAINT chk_access_mode CHECK (((access_mode)::text = ANY (ARRAY[('explicit'::character varying)::text, ('by-manco'::character varying)::text, ('by-im'::character varying)::text, ('by-filter'::character varying)::text]))),
+    CONSTRAINT chk_authority_type CHECK (((authority_type)::text = ANY (ARRAY[('operational'::character varying)::text, ('oversight'::character varying)::text, ('trading'::character varying)::text, ('administrative'::character varying)::text, ('governance'::character varying)::text]))),
+    CONSTRAINT chk_team_type CHECK (((team_type)::text = ANY (ARRAY[('fund-ops'::character varying)::text, ('manco-oversight'::character varying)::text, ('im-trading'::character varying)::text, ('spv-admin'::character varying)::text, ('client-service'::character varying)::text, ('accounting'::character varying)::text, ('reporting'::character varying)::text, ('board'::character varying)::text, ('investment-committee'::character varying)::text, ('conducting-officers'::character varying)::text, ('executive'::character varying)::text])))
+);
+
+
+--
 -- Name: threshold_factors; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -16462,6 +16520,24 @@ CREATE TABLE "ob-poc".threshold_requirements (
 --
 
 COMMENT ON TABLE "ob-poc".threshold_requirements IS 'KYC attribute requirements per entity role and risk band';
+
+
+--
+-- Name: tollgate_definitions; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".tollgate_definitions (
+    tollgate_id character varying(30) NOT NULL,
+    display_name character varying(100) NOT NULL,
+    description text,
+    applies_to character varying(20) NOT NULL,
+    required_status character varying(20),
+    default_thresholds jsonb NOT NULL,
+    override_permitted boolean DEFAULT true,
+    override_authority character varying(30),
+    override_max_days integer,
+    CONSTRAINT chk_td_applies CHECK (((applies_to)::text = ANY ((ARRAY['CASE'::character varying, 'WORKSTREAM'::character varying])::text[])))
+);
 
 
 --
@@ -16801,6 +16877,51 @@ COMMENT ON TABLE "ob-poc".ubo_snapshots IS 'Point-in-time snapshots of UBO owner
 
 
 --
+-- Name: user_learned_phrases; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".user_learned_phrases (
+    id bigint NOT NULL,
+    user_id uuid NOT NULL,
+    phrase text NOT NULL,
+    verb text NOT NULL,
+    confidence numeric(3,2) DEFAULT 1.0,
+    occurrence_count integer DEFAULT 1,
+    embedding public.vector(384),
+    embedding_model text DEFAULT 'all-MiniLM-L6-v2'::text,
+    source text DEFAULT 'user_correction'::text,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now()
+);
+
+
+--
+-- Name: TABLE user_learned_phrases; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".user_learned_phrases IS 'Per-user phrase → verb mappings with Candle embeddings (384-dim)';
+
+
+--
+-- Name: user_learned_phrases_id_seq; Type: SEQUENCE; Schema: ob-poc; Owner: -
+--
+
+CREATE SEQUENCE "ob-poc".user_learned_phrases_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: user_learned_phrases_id_seq; Type: SEQUENCE OWNED BY; Schema: ob-poc; Owner: -
+--
+
+ALTER SEQUENCE "ob-poc".user_learned_phrases_id_seq OWNED BY "ob-poc".user_learned_phrases.id;
+
+
+--
 -- Name: v_active_rate_cards; Type: VIEW; Schema: ob-poc; Owner: -
 --
 
@@ -16957,6 +17078,72 @@ CREATE VIEW "ob-poc".v_blocking_reasons_expanded AS
 --
 
 COMMENT ON VIEW "ob-poc".v_blocking_reasons_expanded IS 'Flattened view of all blocking reasons for analysis.';
+
+
+--
+-- Name: v_campaign_dashboard; Type: VIEW; Schema: ob-poc; Owner: -
+--
+
+CREATE VIEW "ob-poc".v_campaign_dashboard AS
+ SELECT campaign_id,
+    name,
+    review_type,
+    scope_type,
+    scope_filter,
+    review_period_start,
+    review_period_end,
+    deadline,
+    reminder_days,
+    status,
+    total_items,
+    reviewed_items,
+    confirmed_items,
+    revoked_items,
+    extended_items,
+    escalated_items,
+    pending_items,
+    created_at,
+    created_by_user_id,
+    launched_at,
+    completed_at,
+    round((((reviewed_items)::numeric / (NULLIF(total_items, 0))::numeric) * (100)::numeric), 1) AS progress_percent,
+    (deadline - CURRENT_DATE) AS days_until_deadline,
+        CASE
+            WHEN ((status)::text = 'COMPLETED'::text) THEN 'COMPLETED'::text
+            WHEN (CURRENT_DATE > deadline) THEN 'OVERDUE'::text
+            WHEN ((deadline - CURRENT_DATE) <= 3) THEN 'URGENT'::text
+            WHEN ((deadline - CURRENT_DATE) <= 7) THEN 'DUE_SOON'::text
+            ELSE 'ON_TRACK'::text
+        END AS urgency
+   FROM "ob-poc".access_review_campaigns c;
+
+
+--
+-- Name: v_candidate_pipeline; Type: VIEW; Schema: ob-poc; Owner: -
+--
+
+CREATE VIEW "ob-poc".v_candidate_pipeline AS
+ SELECT status,
+    count(*) AS count,
+    round(avg(occurrence_count), 1) AS avg_occurrences,
+    round((avg(
+        CASE
+            WHEN (total_count > 0) THEN ((success_count)::real / (total_count)::double precision)
+            ELSE (0)::double precision
+        END))::numeric, 2) AS avg_success_rate,
+    min(first_seen) AS oldest,
+    max(last_seen) AS newest
+   FROM "ob-poc".learning_candidates
+  WHERE (learning_type = 'invocation_phrase'::text)
+  GROUP BY status
+  ORDER BY (count(*)) DESC;
+
+
+--
+-- Name: VIEW v_candidate_pipeline; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON VIEW "ob-poc".v_candidate_pipeline IS 'Summary of candidate statuses in the learning pipeline';
 
 
 --
@@ -18224,7 +18411,7 @@ UNION ALL
     lower(TRIM(BOTH FROM regexp_replace(ea.alias, '[^a-zA-Z0-9 ]'::text, ' '::text, 'g'::text))) AS alias_norm,
     (COALESCE(ea.confidence, 1.0))::real AS weight,
     'agent_aliases'::text AS source
-   FROM agent.entity_aliases ea
+   FROM "ob-poc".entity_aliases ea
   WHERE (ea.entity_id IS NOT NULL);
 
 
@@ -18267,7 +18454,7 @@ CREATE VIEW "ob-poc".v_entity_linking_stats AS
     ( SELECT count(*) AS count
            FROM "ob-poc".entity_names) AS total_names,
     ( SELECT count(*) AS count
-           FROM agent.entity_aliases
+           FROM "ob-poc".entity_aliases
           WHERE (entity_aliases.entity_id IS NOT NULL)) AS total_agent_aliases,
     ( SELECT count(*) AS count
            FROM "ob-poc".entity_concept_link) AS total_concept_links,
@@ -18284,6 +18471,29 @@ CREATE VIEW "ob-poc".v_entity_linking_stats AS
 --
 
 COMMENT ON VIEW "ob-poc".v_entity_linking_stats IS 'Statistics for entity linking data';
+
+
+--
+-- Name: v_entity_regulatory_summary; Type: VIEW; Schema: ob-poc; Owner: -
+--
+
+CREATE VIEW "ob-poc".v_entity_regulatory_summary AS
+ SELECT e.entity_id,
+    e.name AS entity_name,
+    count(r.registration_id) AS registration_count,
+    count(r.registration_id) FILTER (WHERE (r.registration_verified AND ((r.status)::text = 'ACTIVE'::text))) AS verified_count,
+    (EXISTS ( SELECT 1
+           FROM ("ob-poc".entity_regulatory_registrations verified
+             JOIN "ob-poc".regulators reg_1 ON (((verified.regulator_code)::text = (reg_1.regulator_code)::text)))
+          WHERE ((verified.entity_id = e.entity_id) AND ((verified.status)::text = 'ACTIVE'::text) AND (verified.registration_verified = true) AND ((reg_1.tier)::text = ANY ((ARRAY['EQUIVALENT'::character varying, 'ACCEPTABLE'::character varying])::text[])) AND COALESCE(reg_1.active, true)))) AS allows_simplified_dd,
+    array_agg(DISTINCT r.regulator_code) FILTER (WHERE ((r.status)::text = 'ACTIVE'::text)) AS active_regulators,
+    array_agg(DISTINCT r.regulator_code) FILTER (WHERE (r.registration_verified AND ((r.status)::text = 'ACTIVE'::text))) AS verified_regulators,
+    max(r.verification_date) AS last_verified,
+    min(r.verification_expires) FILTER (WHERE (r.verification_expires > CURRENT_DATE)) AS next_expiry
+   FROM (("ob-poc".entities e
+     LEFT JOIN "ob-poc".entity_regulatory_registrations r ON ((e.entity_id = r.entity_id)))
+     LEFT JOIN "ob-poc".regulators reg ON (((r.regulator_code)::text = (reg.regulator_code)::text)))
+  GROUP BY e.entity_id, e.name;
 
 
 --
@@ -18317,6 +18527,25 @@ CREATE VIEW "ob-poc".v_execution_audit_with_view AS
 --
 
 COMMENT ON VIEW "ob-poc".v_execution_audit_with_view IS 'Complete execution audit trail with view state and source attribution';
+
+
+--
+-- Name: v_flagged_items_summary; Type: VIEW; Schema: ob-poc; Owner: -
+--
+
+CREATE VIEW "ob-poc".v_flagged_items_summary AS
+ SELECT campaign_id,
+    count(*) FILTER (WHERE flag_legal_expired) AS legal_expired_count,
+    count(*) FILTER (WHERE flag_legal_expiring_soon) AS legal_expiring_count,
+    count(*) FILTER (WHERE flag_no_legal_link) AS no_legal_link_count,
+    count(*) FILTER (WHERE flag_dormant_account) AS dormant_count,
+    count(*) FILTER (WHERE flag_never_logged_in) AS never_logged_in_count,
+    count(*) FILTER (WHERE flag_role_mismatch) AS role_mismatch_count,
+    count(*) FILTER (WHERE (risk_score >= 70)) AS high_risk_count,
+    count(*) FILTER (WHERE ((risk_score >= 40) AND (risk_score <= 69))) AS medium_risk_count,
+    count(*) FILTER (WHERE (risk_score < 40)) AS low_risk_count
+   FROM "ob-poc".access_review_items
+  GROUP BY campaign_id;
 
 
 --
@@ -18374,6 +18603,89 @@ CREATE VIEW "ob-poc".v_gleif_hierarchy AS
      JOIN "ob-poc".entities parent ON ((parent.entity_id = gr.parent_entity_id)))
      JOIN "ob-poc".entities child ON ((child.entity_id = gr.child_entity_id)))
   WHERE (((gr.relationship_status)::text = 'ACTIVE'::text) OR (gr.relationship_status IS NULL));
+
+
+--
+-- Name: v_learning_feedback; Type: VIEW; Schema: ob-poc; Owner: -
+--
+
+CREATE VIEW "ob-poc".v_learning_feedback AS
+ SELECT f.id AS feedback_id,
+    f.interaction_id,
+    f.session_id,
+    f.user_input,
+    f.input_source,
+    f.matched_verb,
+    f.match_score,
+    f.match_confidence,
+    f.alternatives,
+    f.outcome AS feedback_outcome,
+    f.outcome_verb,
+    f.created_at AS feedback_at,
+    g.log_id AS generation_log_id,
+    g.user_intent AS generation_intent,
+    g.final_valid_dsl,
+    g.model_used,
+    g.total_attempts,
+    g.success AS generation_success,
+    g.execution_status,
+    g.execution_error,
+    g.executed_at,
+    g.affected_entity_ids,
+    g.total_latency_ms,
+    g.total_input_tokens,
+    g.total_output_tokens,
+        CASE
+            WHEN ((f.outcome = 'executed'::text) AND (g.execution_status = 'executed'::"ob-poc".execution_status)) THEN 'success'::text
+            WHEN ((f.outcome = 'executed'::text) AND (g.execution_status = 'failed'::"ob-poc".execution_status)) THEN 'false_positive'::text
+            WHEN (f.outcome = 'selected_alt'::text) THEN 'wrong_match'::text
+            WHEN (f.outcome = 'corrected'::text) THEN 'correction_needed'::text
+            WHEN (f.outcome = 'abandoned'::text) THEN 'no_match'::text
+            ELSE 'pending'::text
+        END AS learning_signal,
+    (EXTRACT(epoch FROM (g.executed_at - f.created_at)) * (1000)::numeric) AS phrase_to_execution_ms
+   FROM ("ob-poc".intent_feedback f
+     LEFT JOIN "ob-poc".dsl_generation_log g ON ((g.intent_feedback_id = f.id)))
+  ORDER BY f.created_at DESC;
+
+
+--
+-- Name: VIEW v_learning_feedback; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON VIEW "ob-poc".v_learning_feedback IS 'Unified view joining feedback capture with DSL generation outcomes for learning analysis';
+
+
+--
+-- Name: v_learning_health_weekly; Type: VIEW; Schema: ob-poc; Owner: -
+--
+
+CREATE VIEW "ob-poc".v_learning_health_weekly AS
+ SELECT date_trunc('week'::text, f.created_at) AS week,
+    count(*) AS total_interactions,
+    count(*) FILTER (WHERE (v.learning_signal = 'success'::text)) AS successes,
+    count(*) FILTER (WHERE (v.learning_signal = ANY (ARRAY['wrong_match'::text, 'correction_needed'::text]))) AS corrections,
+    count(*) FILTER (WHERE (v.learning_signal = 'no_match'::text)) AS no_matches,
+    count(*) FILTER (WHERE (v.learning_signal = 'false_positive'::text)) AS false_positives,
+    round(((100.0 * (count(*) FILTER (WHERE (v.learning_signal = 'success'::text)))::numeric) / (NULLIF(count(*), 0))::numeric), 1) AS top1_hit_rate_pct,
+    round((avg(f.match_score) FILTER (WHERE (v.learning_signal = 'success'::text)))::numeric, 3) AS avg_success_score,
+    round((avg(f.match_score) FILTER (WHERE (v.learning_signal = ANY (ARRAY['wrong_match'::text, 'correction_needed'::text]))))::numeric, 3) AS avg_correction_score,
+    count(*) FILTER (WHERE (f.match_confidence = 'high'::text)) AS high_confidence,
+    count(*) FILTER (WHERE (f.match_confidence = 'medium'::text)) AS medium_confidence,
+    count(*) FILTER (WHERE (f.match_confidence = 'low'::text)) AS low_confidence,
+    count(*) FILTER (WHERE (f.match_confidence = 'none'::text)) AS no_match_confidence
+   FROM ("ob-poc".intent_feedback f
+     LEFT JOIN "ob-poc".v_learning_feedback v ON ((v.feedback_id = f.id)))
+  WHERE (f.created_at > (now() - '84 days'::interval))
+  GROUP BY (date_trunc('week'::text, f.created_at))
+  ORDER BY (date_trunc('week'::text, f.created_at)) DESC;
+
+
+--
+-- Name: VIEW v_learning_health_weekly; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON VIEW "ob-poc".v_learning_health_weekly IS 'Weekly metrics for learning pipeline health monitoring';
 
 
 --
@@ -18616,6 +18928,73 @@ COMMENT ON VIEW "ob-poc".v_rate_card_history IS 'Full rate card history with sup
 
 
 --
+-- Name: verb_pattern_embeddings; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".verb_pattern_embeddings (
+    id uuid DEFAULT uuidv7() NOT NULL,
+    verb_name character varying(100) NOT NULL,
+    pattern_phrase text NOT NULL,
+    pattern_normalized text NOT NULL,
+    phonetic_codes text[] DEFAULT '{}'::text[] NOT NULL,
+    embedding public.vector(384) NOT NULL,
+    category character varying(50) DEFAULT 'navigation'::character varying NOT NULL,
+    is_agent_bound boolean DEFAULT false NOT NULL,
+    priority integer DEFAULT 50 NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    match_method text DEFAULT 'semantic'::text
+);
+
+
+--
+-- Name: TABLE verb_pattern_embeddings; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".verb_pattern_embeddings IS 'Pre-computed embeddings for voice command patterns. Used for semantic similarity matching of voice transcripts to DSL verbs.';
+
+
+--
+-- Name: COLUMN verb_pattern_embeddings.phonetic_codes; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".verb_pattern_embeddings.phonetic_codes IS 'Double Metaphone codes for phonetic fallback matching. Handles "enhawnce" → "enhance".';
+
+
+--
+-- Name: COLUMN verb_pattern_embeddings.embedding; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".verb_pattern_embeddings.embedding IS 'all-MiniLM-L6-v2 embedding (384 dimensions). Captures semantic meaning of pattern phrase.';
+
+
+--
+-- Name: v_recently_taught; Type: VIEW; Schema: ob-poc; Owner: -
+--
+
+CREATE VIEW "ob-poc".v_recently_taught AS
+ SELECT id,
+    (details ->> 'phrase'::text) AS phrase,
+    (details ->> 'verb'::text) AS verb,
+    actor AS source,
+    "timestamp" AS taught_at,
+    (EXISTS ( SELECT 1
+           FROM "ob-poc".verb_pattern_embeddings vpe
+          WHERE (((vpe.verb_name)::text = (la.details ->> 'verb'::text)) AND (vpe.pattern_normalized = (la.details ->> 'phrase'::text)) AND (vpe.embedding IS NOT NULL)))) AS has_embedding
+   FROM "ob-poc".learning_audit la
+  WHERE ((action = 'taught'::text) AND (learning_type = 'invocation_phrase'::text))
+  ORDER BY "timestamp" DESC
+ LIMIT 100;
+
+
+--
+-- Name: VIEW v_recently_taught; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON VIEW "ob-poc".v_recently_taught IS 'Recently taught patterns with embedding status. Run populate_embeddings to activate patterns without embeddings.';
+
+
+--
 -- Name: v_regulatory_gaps; Type: VIEW; Schema: ob-poc; Owner: -
 --
 
@@ -18662,6 +19041,27 @@ CREATE VIEW "ob-poc".v_request_execution_trace AS
 --
 
 COMMENT ON VIEW "ob-poc".v_request_execution_trace IS 'Trace all executions and view state changes for a single request';
+
+
+--
+-- Name: v_reviewer_workload; Type: VIEW; Schema: ob-poc; Owner: -
+--
+
+CREATE VIEW "ob-poc".v_reviewer_workload AS
+ SELECT campaign_id,
+    reviewer_user_id,
+    reviewer_email,
+    reviewer_name,
+    count(*) AS total_items,
+    count(*) FILTER (WHERE ((status)::text = 'PENDING'::text)) AS pending_items,
+    count(*) FILTER (WHERE ((status)::text = 'CONFIRMED'::text)) AS confirmed_items,
+    count(*) FILTER (WHERE ((status)::text = 'REVOKED'::text)) AS revoked_items,
+    count(*) FILTER (WHERE (flag_legal_expired OR flag_no_legal_link OR flag_dormant_account)) AS flagged_items,
+    (EXISTS ( SELECT 1
+           FROM "ob-poc".access_attestations a
+          WHERE ((a.campaign_id = i.campaign_id) AND (a.attester_user_id = i.reviewer_user_id)))) AS has_attested
+   FROM "ob-poc".access_review_items i
+  GROUP BY campaign_id, reviewer_user_id, reviewer_email, reviewer_name;
 
 
 --
@@ -18826,6 +19226,67 @@ CREATE VIEW "ob-poc".v_staged_runbook AS
 --
 
 COMMENT ON VIEW "ob-poc".v_staged_runbook IS 'Full runbook state with commands, entity footprint, and picker candidates. Primary query for MCP runbook_show.';
+
+
+--
+-- Name: v_teaching_stats; Type: VIEW; Schema: ob-poc; Owner: -
+--
+
+CREATE VIEW "ob-poc".v_teaching_stats AS
+ SELECT date_trunc('day'::text, "timestamp") AS day,
+    actor AS source,
+    count(*) FILTER (WHERE (action = 'taught'::text)) AS patterns_taught,
+    count(*) FILTER (WHERE (action = 'untaught'::text)) AS patterns_untaught,
+    count(DISTINCT (details ->> 'verb'::text)) AS verbs_affected
+   FROM "ob-poc".learning_audit la
+  WHERE ((action = ANY (ARRAY['taught'::text, 'untaught'::text])) AND (learning_type = 'invocation_phrase'::text) AND ("timestamp" > (now() - '30 days'::interval)))
+  GROUP BY (date_trunc('day'::text, "timestamp")), actor
+  ORDER BY (date_trunc('day'::text, "timestamp")) DESC, (count(*) FILTER (WHERE (action = 'taught'::text))) DESC;
+
+
+--
+-- Name: VIEW v_teaching_stats; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON VIEW "ob-poc".v_teaching_stats IS 'Teaching activity over the last 30 days by source.';
+
+
+--
+-- Name: v_top_pending_candidates; Type: VIEW; Schema: ob-poc; Owner: -
+--
+
+CREATE VIEW "ob-poc".v_top_pending_candidates AS
+ SELECT id,
+    input_pattern AS phrase,
+    suggested_output AS verb,
+    occurrence_count,
+    success_count,
+    total_count,
+        CASE
+            WHEN (total_count > 0) THEN round((((success_count)::real / (total_count)::double precision))::numeric, 2)
+            ELSE (0)::numeric
+        END AS success_rate,
+    domain_hint,
+    collision_safe,
+    collision_verb,
+    first_seen,
+    last_seen,
+    (EXTRACT(day FROM (now() - first_seen)))::integer AS age_days
+   FROM "ob-poc".learning_candidates
+  WHERE ((status = 'pending'::text) AND (learning_type = 'invocation_phrase'::text))
+  ORDER BY occurrence_count DESC,
+        CASE
+            WHEN (total_count > 0) THEN round((((success_count)::real / (total_count)::double precision))::numeric, 2)
+            ELSE (0)::numeric
+        END DESC
+ LIMIT 100;
+
+
+--
+-- Name: VIEW v_top_pending_candidates; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON VIEW "ob-poc".v_top_pending_candidates IS 'Top 100 pending candidates by occurrence count';
 
 
 --
@@ -19365,197 +19826,6 @@ COMMENT ON COLUMN "ob-poc".workflow_instances.blockers IS 'JSON array of current
 
 
 --
--- Name: entity_regulatory_registrations; Type: TABLE; Schema: ob_kyc; Owner: -
---
-
-CREATE TABLE ob_kyc.entity_regulatory_registrations (
-    registration_id uuid DEFAULT uuidv7() NOT NULL,
-    entity_id uuid NOT NULL,
-    regulator_code character varying(50) NOT NULL,
-    registration_number character varying(100),
-    registration_type character varying(50) NOT NULL,
-    activity_scope text,
-    home_regulator_code character varying(50),
-    passport_reference character varying(100),
-    registration_verified boolean DEFAULT false,
-    verification_date date,
-    verification_method character varying(50),
-    verification_reference character varying(500),
-    verification_expires date,
-    status character varying(50) DEFAULT 'ACTIVE'::character varying,
-    effective_date date DEFAULT CURRENT_DATE,
-    expiry_date date,
-    created_at timestamp without time zone DEFAULT now(),
-    updated_at timestamp without time zone DEFAULT now(),
-    created_by uuid,
-    updated_by uuid
-);
-
-
---
--- Name: regulators; Type: TABLE; Schema: ob_ref; Owner: -
---
-
-CREATE TABLE ob_ref.regulators (
-    regulator_code character varying(50) NOT NULL,
-    regulator_name character varying(255) NOT NULL,
-    jurisdiction character varying(2) NOT NULL,
-    regulatory_tier character varying(50) NOT NULL,
-    regulator_type character varying(50) DEFAULT 'GOVERNMENT'::character varying,
-    registry_url character varying(500),
-    active boolean DEFAULT true,
-    created_at timestamp without time zone DEFAULT now(),
-    updated_at timestamp without time zone DEFAULT now()
-);
-
-
---
--- Name: v_entity_regulatory_summary; Type: VIEW; Schema: ob_kyc; Owner: -
---
-
-CREATE VIEW ob_kyc.v_entity_regulatory_summary AS
- SELECT e.entity_id,
-    e.name AS entity_name,
-    count(r.registration_id) AS registration_count,
-    count(r.registration_id) FILTER (WHERE (r.registration_verified AND ((r.status)::text = 'ACTIVE'::text))) AS verified_count,
-    false AS allows_simplified_dd,
-    array_agg(DISTINCT r.regulator_code) FILTER (WHERE ((r.status)::text = 'ACTIVE'::text)) AS active_regulators,
-    array_agg(DISTINCT r.regulator_code) FILTER (WHERE (r.registration_verified AND ((r.status)::text = 'ACTIVE'::text))) AS verified_regulators,
-    max(r.verification_date) AS last_verified,
-    min(r.verification_expires) FILTER (WHERE (r.verification_expires > CURRENT_DATE)) AS next_expiry
-   FROM (("ob-poc".entities e
-     LEFT JOIN ob_kyc.entity_regulatory_registrations r ON ((e.entity_id = r.entity_id)))
-     LEFT JOIN ob_ref.regulators reg ON (((r.regulator_code)::text = (reg.regulator_code)::text)))
-  GROUP BY e.entity_id, e.name;
-
-
---
--- Name: request_types; Type: TABLE; Schema: ob_ref; Owner: -
---
-
-CREATE TABLE ob_ref.request_types (
-    request_type character varying(50) NOT NULL,
-    request_subtype character varying(100) NOT NULL,
-    description character varying(255),
-    default_due_days integer DEFAULT 7,
-    default_grace_days integer DEFAULT 3,
-    max_reminders integer DEFAULT 3,
-    blocks_by_default boolean DEFAULT true,
-    fulfillment_sources character varying(50)[] DEFAULT ARRAY['CLIENT'::text, 'USER'::text],
-    auto_fulfill_on_upload boolean DEFAULT true,
-    escalation_enabled boolean DEFAULT true,
-    escalation_after_days integer DEFAULT 10,
-    created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now()
-);
-
-
---
--- Name: TABLE request_types; Type: COMMENT; Schema: ob_ref; Owner: -
---
-
-COMMENT ON TABLE ob_ref.request_types IS 'Configuration for different request types and subtypes';
-
-
---
--- Name: COLUMN request_types.fulfillment_sources; Type: COMMENT; Schema: ob_ref; Owner: -
---
-
-COMMENT ON COLUMN ob_ref.request_types.fulfillment_sources IS 'Who can fulfill this request: CLIENT, USER, SYSTEM, EXTERNAL_PROVIDER';
-
-
---
--- Name: COLUMN request_types.auto_fulfill_on_upload; Type: COMMENT; Schema: ob_ref; Owner: -
---
-
-COMMENT ON COLUMN ob_ref.request_types.auto_fulfill_on_upload IS 'Whether uploading a matching document auto-fulfills the request';
-
-
---
--- Name: COLUMN request_types.escalation_after_days; Type: COMMENT; Schema: ob_ref; Owner: -
---
-
-COMMENT ON COLUMN ob_ref.request_types.escalation_after_days IS 'Days past due date before auto-escalation';
-
-
---
--- Name: role_types; Type: TABLE; Schema: ob_ref; Owner: -
---
-
-CREATE TABLE ob_ref.role_types (
-    role_type_id uuid DEFAULT uuidv7() NOT NULL,
-    code character varying(50) NOT NULL,
-    name character varying(255) NOT NULL,
-    description text,
-    category character varying(50),
-    triggers_full_kyc boolean DEFAULT false,
-    triggers_screening boolean DEFAULT false,
-    triggers_id_verification boolean DEFAULT false,
-    check_regulatory_status boolean DEFAULT false,
-    if_regulated_obligation character varying(50),
-    cascade_to_entity_ubos boolean DEFAULT false,
-    threshold_based boolean DEFAULT false,
-    active boolean DEFAULT true,
-    created_at timestamp without time zone DEFAULT now(),
-    updated_at timestamp without time zone DEFAULT now()
-);
-
-
---
--- Name: standards_mappings; Type: TABLE; Schema: ob_ref; Owner: -
---
-
-CREATE TABLE ob_ref.standards_mappings (
-    mapping_id integer NOT NULL,
-    standard character varying(20) NOT NULL,
-    our_value character varying(50) NOT NULL,
-    standard_value character varying(100) NOT NULL,
-    standard_version character varying(20) NOT NULL,
-    notes text,
-    effective_from date DEFAULT CURRENT_DATE NOT NULL,
-    effective_to date
-);
-
-
---
--- Name: standards_mappings_mapping_id_seq; Type: SEQUENCE; Schema: ob_ref; Owner: -
---
-
-CREATE SEQUENCE ob_ref.standards_mappings_mapping_id_seq
-    AS integer
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: standards_mappings_mapping_id_seq; Type: SEQUENCE OWNED BY; Schema: ob_ref; Owner: -
---
-
-ALTER SEQUENCE ob_ref.standards_mappings_mapping_id_seq OWNED BY ob_ref.standards_mappings.mapping_id;
-
-
---
--- Name: tollgate_definitions; Type: TABLE; Schema: ob_ref; Owner: -
---
-
-CREATE TABLE ob_ref.tollgate_definitions (
-    tollgate_id character varying(30) NOT NULL,
-    display_name character varying(100) NOT NULL,
-    description text,
-    applies_to character varying(20) NOT NULL,
-    required_status character varying(20),
-    default_thresholds jsonb NOT NULL,
-    override_permitted boolean DEFAULT true,
-    override_authority character varying(30),
-    override_max_days integer,
-    CONSTRAINT chk_td_applies CHECK (((applies_to)::text = ANY ((ARRAY['CASE'::character varying, 'WORKSTREAM'::character varying])::text[])))
-);
-
-
---
 -- Name: _sqlx_migrations; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -19587,6 +19857,40 @@ CREATE TABLE sem_reg.agent_plans (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone,
     CONSTRAINT agent_plans_status_check CHECK (((status)::text = ANY ((ARRAY['draft'::character varying, 'active'::character varying, 'completed'::character varying, 'failed'::character varying, 'cancelled'::character varying])::text[])))
+);
+
+
+--
+-- Name: basis_claims; Type: TABLE; Schema: sem_reg; Owner: -
+--
+
+CREATE TABLE sem_reg.basis_claims (
+    claim_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    basis_id uuid NOT NULL,
+    claim_text text NOT NULL,
+    reference_uri text,
+    excerpt text,
+    confidence double precision,
+    flagged_as_open_question boolean DEFAULT false NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT basis_claims_confidence_check CHECK (((confidence >= (0.0)::double precision) AND (confidence <= (1.0)::double precision)))
+);
+
+
+--
+-- Name: basis_records; Type: TABLE; Schema: sem_reg; Owner: -
+--
+
+CREATE TABLE sem_reg.basis_records (
+    basis_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    changeset_id uuid NOT NULL,
+    entry_id uuid,
+    kind character varying(40) NOT NULL,
+    title text NOT NULL,
+    narrative text,
+    created_by character varying(200) NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT basis_records_kind_check CHECK (((kind)::text = ANY ((ARRAY['regulatory_fact'::character varying, 'market_practice'::character varying, 'platform_convention'::character varying, 'client_requirement'::character varying, 'precedent'::character varying])::text[])))
 );
 
 
@@ -19707,6 +20011,24 @@ ALTER SEQUENCE sem_reg.classification_levels_level_id_seq OWNED BY sem_reg.class
 
 
 --
+-- Name: conflict_records; Type: TABLE; Schema: sem_reg; Owner: -
+--
+
+CREATE TABLE sem_reg.conflict_records (
+    conflict_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    changeset_id uuid NOT NULL,
+    competing_changeset_id uuid NOT NULL,
+    fqn character varying(300) NOT NULL,
+    detected_at timestamp with time zone DEFAULT now() NOT NULL,
+    resolution_strategy character varying(20),
+    resolution_rationale text,
+    resolved_by character varying(200),
+    resolved_at timestamp with time zone,
+    CONSTRAINT conflict_records_resolution_strategy_check CHECK (((resolution_strategy)::text = ANY ((ARRAY['merge'::character varying, 'rebase'::character varying, 'supersede'::character varying])::text[])))
+);
+
+
+--
 -- Name: decision_records; Type: TABLE; Schema: sem_reg; Owner: -
 --
 
@@ -19803,6 +20125,53 @@ CREATE TABLE sem_reg.escalation_records (
 
 
 --
+-- Name: events; Type: TABLE; Schema: sem_reg; Owner: -
+--
+
+CREATE TABLE sem_reg.events (
+    event_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    changeset_id uuid NOT NULL,
+    event_type character varying(60) NOT NULL,
+    actor_id character varying(200) NOT NULL,
+    payload jsonb DEFAULT '{}'::jsonb NOT NULL,
+    viewport_manifest_id uuid,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT events_event_type_check CHECK (((event_type)::text = ANY ((ARRAY['changeset_created'::character varying, 'item_added'::character varying, 'item_removed'::character varying, 'item_refined'::character varying, 'basis_attached'::character varying, 'guardrail_fired'::character varying, 'gate_prechecked'::character varying, 'submitted_for_review'::character varying, 'review_note_added'::character varying, 'review_decision_recorded'::character varying, 'focus_changed'::character varying, 'published'::character varying, 'rejected'::character varying])::text[])))
+);
+
+
+--
+-- Name: focus_states; Type: TABLE; Schema: sem_reg; Owner: -
+--
+
+CREATE TABLE sem_reg.focus_states (
+    session_id uuid NOT NULL,
+    changeset_id uuid,
+    overlay_mode character varying(20) DEFAULT 'active_only'::character varying NOT NULL,
+    overlay_changeset_id uuid,
+    object_refs jsonb DEFAULT '[]'::jsonb NOT NULL,
+    taxonomy_focus jsonb,
+    resolution_context jsonb,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_by character varying(20) DEFAULT 'agent'::character varying NOT NULL,
+    CONSTRAINT focus_states_overlay_mode_check CHECK (((overlay_mode)::text = ANY ((ARRAY['active_only'::character varying, 'draft_overlay'::character varying])::text[]))),
+    CONSTRAINT focus_states_updated_by_check CHECK (((updated_by)::text = ANY ((ARRAY['agent'::character varying, 'user_navigation'::character varying])::text[])))
+);
+
+
+--
+-- Name: idempotency_keys; Type: TABLE; Schema: sem_reg; Owner: -
+--
+
+CREATE TABLE sem_reg.idempotency_keys (
+    client_request_id uuid NOT NULL,
+    tool_name character varying(100) NOT NULL,
+    result jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: outbox_events; Type: TABLE; Schema: sem_reg; Owner: -
 --
 
@@ -19891,6 +20260,30 @@ CREATE TABLE sem_reg.snapshot_sets (
     description text,
     created_by text NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: templates; Type: TABLE; Schema: sem_reg; Owner: -
+--
+
+CREATE TABLE sem_reg.templates (
+    template_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    fqn character varying(300) NOT NULL,
+    display_name character varying(200) NOT NULL,
+    version_major integer DEFAULT 1 NOT NULL,
+    version_minor integer DEFAULT 0 NOT NULL,
+    version_patch integer DEFAULT 0 NOT NULL,
+    domain character varying(100) NOT NULL,
+    scope jsonb DEFAULT '[]'::jsonb NOT NULL,
+    items jsonb DEFAULT '[]'::jsonb NOT NULL,
+    steward character varying(200) NOT NULL,
+    basis_ref uuid,
+    status character varying(20) DEFAULT 'draft'::character varying NOT NULL,
+    created_by character varying(200) NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT templates_status_check CHECK (((status)::text = ANY ((ARRAY['draft'::character varying, 'active'::character varying, 'deprecated'::character varying])::text[])))
 );
 
 
@@ -20246,6 +20639,41 @@ COMMENT ON VIEW sem_reg.v_view_attribute_columns IS 'Flattened view columns with
 
 
 --
+-- Name: verb_implementation_bindings; Type: TABLE; Schema: sem_reg; Owner: -
+--
+
+CREATE TABLE sem_reg.verb_implementation_bindings (
+    binding_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    verb_fqn character varying(300) NOT NULL,
+    binding_kind character varying(40) NOT NULL,
+    binding_ref text NOT NULL,
+    exec_modes jsonb DEFAULT '[]'::jsonb NOT NULL,
+    status character varying(20) DEFAULT 'draft'::character varying NOT NULL,
+    last_verified_at timestamp with time zone,
+    notes text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT verb_implementation_bindings_binding_kind_check CHECK (((binding_kind)::text = ANY ((ARRAY['rust_handler'::character varying, 'bpmn_process'::character varying, 'remote_http'::character varying, 'macro_expansion'::character varying])::text[]))),
+    CONSTRAINT verb_implementation_bindings_status_check CHECK (((status)::text = ANY ((ARRAY['draft'::character varying, 'active'::character varying, 'deprecated'::character varying])::text[])))
+);
+
+
+--
+-- Name: viewport_manifests; Type: TABLE; Schema: sem_reg; Owner: -
+--
+
+CREATE TABLE sem_reg.viewport_manifests (
+    manifest_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    session_id uuid NOT NULL,
+    changeset_id uuid,
+    focus_state jsonb NOT NULL,
+    overlay_mode character varying(20) NOT NULL,
+    assumed_principal character varying(200),
+    viewport_refs jsonb DEFAULT '[]'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: change_set_artifacts; Type: TABLE; Schema: sem_reg_authoring; Owner: -
 --
 
@@ -20403,559 +20831,6 @@ CREATE TABLE sem_reg_pub.projection_watermark (
 
 
 --
--- Name: log; Type: TABLE; Schema: sessions; Owner: -
---
-
-CREATE TABLE sessions.log (
-    id bigint NOT NULL,
-    session_id uuid NOT NULL,
-    "timestamp" timestamp with time zone DEFAULT now() NOT NULL,
-    entry_type text NOT NULL,
-    content text NOT NULL,
-    event_id bigint,
-    source text NOT NULL,
-    metadata jsonb DEFAULT '{}'::jsonb,
-    CONSTRAINT valid_entry_type CHECK ((entry_type = ANY (ARRAY['user_input'::text, 'agent_thought'::text, 'dsl_command'::text, 'response'::text, 'error'::text]))),
-    CONSTRAINT valid_source CHECK ((source = ANY (ARRAY['repl'::text, 'egui'::text, 'mcp'::text, 'api'::text])))
-);
-
-
---
--- Name: TABLE log; Type: COMMENT; Schema: sessions; Owner: -
---
-
-COMMENT ON TABLE sessions.log IS 'Conversation context log for session replay and failure analysis';
-
-
---
--- Name: log_id_seq; Type: SEQUENCE; Schema: sessions; Owner: -
---
-
-CREATE SEQUENCE sessions.log_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: log_id_seq; Type: SEQUENCE OWNED BY; Schema: sessions; Owner: -
---
-
-ALTER SEQUENCE sessions.log_id_seq OWNED BY sessions.log.id;
-
-
---
--- Name: basis_claims; Type: TABLE; Schema: stewardship; Owner: -
---
-
-CREATE TABLE stewardship.basis_claims (
-    claim_id uuid DEFAULT gen_random_uuid() NOT NULL,
-    basis_id uuid NOT NULL,
-    claim_text text NOT NULL,
-    reference_uri text,
-    excerpt text,
-    confidence double precision,
-    flagged_as_open_question boolean DEFAULT false NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT basis_claims_confidence_check CHECK (((confidence >= (0.0)::double precision) AND (confidence <= (1.0)::double precision)))
-);
-
-
---
--- Name: basis_records; Type: TABLE; Schema: stewardship; Owner: -
---
-
-CREATE TABLE stewardship.basis_records (
-    basis_id uuid DEFAULT gen_random_uuid() NOT NULL,
-    changeset_id uuid NOT NULL,
-    entry_id uuid,
-    kind character varying(40) NOT NULL,
-    title text NOT NULL,
-    narrative text,
-    created_by character varying(200) NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT basis_records_kind_check CHECK (((kind)::text = ANY ((ARRAY['regulatory_fact'::character varying, 'market_practice'::character varying, 'platform_convention'::character varying, 'client_requirement'::character varying, 'precedent'::character varying])::text[])))
-);
-
-
---
--- Name: conflict_records; Type: TABLE; Schema: stewardship; Owner: -
---
-
-CREATE TABLE stewardship.conflict_records (
-    conflict_id uuid DEFAULT gen_random_uuid() NOT NULL,
-    changeset_id uuid NOT NULL,
-    competing_changeset_id uuid NOT NULL,
-    fqn character varying(300) NOT NULL,
-    detected_at timestamp with time zone DEFAULT now() NOT NULL,
-    resolution_strategy character varying(20),
-    resolution_rationale text,
-    resolved_by character varying(200),
-    resolved_at timestamp with time zone,
-    CONSTRAINT conflict_records_resolution_strategy_check CHECK (((resolution_strategy)::text = ANY ((ARRAY['merge'::character varying, 'rebase'::character varying, 'supersede'::character varying])::text[])))
-);
-
-
---
--- Name: events; Type: TABLE; Schema: stewardship; Owner: -
---
-
-CREATE TABLE stewardship.events (
-    event_id uuid DEFAULT gen_random_uuid() NOT NULL,
-    changeset_id uuid NOT NULL,
-    event_type character varying(60) NOT NULL,
-    actor_id character varying(200) NOT NULL,
-    payload jsonb DEFAULT '{}'::jsonb NOT NULL,
-    viewport_manifest_id uuid,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT events_event_type_check CHECK (((event_type)::text = ANY ((ARRAY['changeset_created'::character varying, 'item_added'::character varying, 'item_removed'::character varying, 'item_refined'::character varying, 'basis_attached'::character varying, 'guardrail_fired'::character varying, 'gate_prechecked'::character varying, 'submitted_for_review'::character varying, 'review_note_added'::character varying, 'review_decision_recorded'::character varying, 'focus_changed'::character varying, 'published'::character varying, 'rejected'::character varying])::text[])))
-);
-
-
---
--- Name: focus_states; Type: TABLE; Schema: stewardship; Owner: -
---
-
-CREATE TABLE stewardship.focus_states (
-    session_id uuid NOT NULL,
-    changeset_id uuid,
-    overlay_mode character varying(20) DEFAULT 'active_only'::character varying NOT NULL,
-    overlay_changeset_id uuid,
-    object_refs jsonb DEFAULT '[]'::jsonb NOT NULL,
-    taxonomy_focus jsonb,
-    resolution_context jsonb,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_by character varying(20) DEFAULT 'agent'::character varying NOT NULL,
-    CONSTRAINT focus_states_overlay_mode_check CHECK (((overlay_mode)::text = ANY ((ARRAY['active_only'::character varying, 'draft_overlay'::character varying])::text[]))),
-    CONSTRAINT focus_states_updated_by_check CHECK (((updated_by)::text = ANY ((ARRAY['agent'::character varying, 'user_navigation'::character varying])::text[])))
-);
-
-
---
--- Name: idempotency_keys; Type: TABLE; Schema: stewardship; Owner: -
---
-
-CREATE TABLE stewardship.idempotency_keys (
-    client_request_id uuid NOT NULL,
-    tool_name character varying(100) NOT NULL,
-    result jsonb NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
-);
-
-
---
--- Name: templates; Type: TABLE; Schema: stewardship; Owner: -
---
-
-CREATE TABLE stewardship.templates (
-    template_id uuid DEFAULT gen_random_uuid() NOT NULL,
-    fqn character varying(300) NOT NULL,
-    display_name character varying(200) NOT NULL,
-    version_major integer DEFAULT 1 NOT NULL,
-    version_minor integer DEFAULT 0 NOT NULL,
-    version_patch integer DEFAULT 0 NOT NULL,
-    domain character varying(100) NOT NULL,
-    scope jsonb DEFAULT '[]'::jsonb NOT NULL,
-    items jsonb DEFAULT '[]'::jsonb NOT NULL,
-    steward character varying(200) NOT NULL,
-    basis_ref uuid,
-    status character varying(20) DEFAULT 'draft'::character varying NOT NULL,
-    created_by character varying(200) NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT templates_status_check CHECK (((status)::text = ANY ((ARRAY['draft'::character varying, 'active'::character varying, 'deprecated'::character varying])::text[])))
-);
-
-
---
--- Name: verb_implementation_bindings; Type: TABLE; Schema: stewardship; Owner: -
---
-
-CREATE TABLE stewardship.verb_implementation_bindings (
-    binding_id uuid DEFAULT gen_random_uuid() NOT NULL,
-    verb_fqn character varying(300) NOT NULL,
-    binding_kind character varying(40) NOT NULL,
-    binding_ref text NOT NULL,
-    exec_modes jsonb DEFAULT '[]'::jsonb NOT NULL,
-    status character varying(20) DEFAULT 'draft'::character varying NOT NULL,
-    last_verified_at timestamp with time zone,
-    notes text,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT verb_implementation_bindings_binding_kind_check CHECK (((binding_kind)::text = ANY ((ARRAY['rust_handler'::character varying, 'bpmn_process'::character varying, 'remote_http'::character varying, 'macro_expansion'::character varying])::text[]))),
-    CONSTRAINT verb_implementation_bindings_status_check CHECK (((status)::text = ANY ((ARRAY['draft'::character varying, 'active'::character varying, 'deprecated'::character varying])::text[])))
-);
-
-
---
--- Name: viewport_manifests; Type: TABLE; Schema: stewardship; Owner: -
---
-
-CREATE TABLE stewardship.viewport_manifests (
-    manifest_id uuid DEFAULT gen_random_uuid() NOT NULL,
-    session_id uuid NOT NULL,
-    changeset_id uuid,
-    focus_state jsonb NOT NULL,
-    overlay_mode character varying(20) NOT NULL,
-    assumed_principal character varying(200),
-    viewport_refs jsonb DEFAULT '[]'::jsonb NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
-);
-
-
---
--- Name: access_attestations; Type: TABLE; Schema: teams; Owner: -
---
-
-CREATE TABLE teams.access_attestations (
-    attestation_id uuid DEFAULT uuidv7() NOT NULL,
-    campaign_id uuid NOT NULL,
-    attester_user_id uuid NOT NULL,
-    attester_name character varying(255) NOT NULL,
-    attester_email character varying(255) NOT NULL,
-    attester_role character varying(100),
-    attestation_scope character varying(50) NOT NULL,
-    team_id uuid,
-    item_ids uuid[],
-    items_count integer NOT NULL,
-    attestation_text text NOT NULL,
-    attestation_version character varying(20) DEFAULT 'v1'::character varying,
-    attested_at timestamp with time zone DEFAULT now() NOT NULL,
-    signature_hash text NOT NULL,
-    signature_input text,
-    ip_address inet,
-    user_agent text,
-    session_id uuid,
-    CONSTRAINT chk_attestation_scope CHECK (((attestation_scope)::text = ANY (ARRAY[('FULL_CAMPAIGN'::character varying)::text, ('MY_REVIEWS'::character varying)::text, ('SPECIFIC_TEAM'::character varying)::text, ('SPECIFIC_ITEMS'::character varying)::text])))
-);
-
-
---
--- Name: access_review_campaigns; Type: TABLE; Schema: teams; Owner: -
---
-
-CREATE TABLE teams.access_review_campaigns (
-    campaign_id uuid DEFAULT uuidv7() NOT NULL,
-    name character varying(255) NOT NULL,
-    review_type character varying(50) NOT NULL,
-    scope_type character varying(50) NOT NULL,
-    scope_filter jsonb,
-    review_period_start date DEFAULT CURRENT_DATE NOT NULL,
-    review_period_end date DEFAULT CURRENT_DATE NOT NULL,
-    deadline date NOT NULL,
-    reminder_days integer[] DEFAULT ARRAY[7, 3, 1],
-    status character varying(50) DEFAULT 'DRAFT'::character varying,
-    total_items integer DEFAULT 0,
-    reviewed_items integer DEFAULT 0,
-    confirmed_items integer DEFAULT 0,
-    revoked_items integer DEFAULT 0,
-    extended_items integer DEFAULT 0,
-    escalated_items integer DEFAULT 0,
-    pending_items integer DEFAULT 0,
-    created_at timestamp with time zone DEFAULT now(),
-    created_by_user_id uuid,
-    launched_at timestamp with time zone,
-    completed_at timestamp with time zone,
-    CONSTRAINT chk_campaign_status CHECK (((status)::text = ANY (ARRAY[('DRAFT'::character varying)::text, ('POPULATING'::character varying)::text, ('ACTIVE'::character varying)::text, ('IN_REVIEW'::character varying)::text, ('PAST_DEADLINE'::character varying)::text, ('COMPLETED'::character varying)::text, ('CANCELLED'::character varying)::text]))),
-    CONSTRAINT chk_review_type CHECK (((review_type)::text = ANY (ARRAY[('QUARTERLY'::character varying)::text, ('ANNUAL'::character varying)::text, ('TRIGGERED'::character varying)::text, ('JOINER_MOVER_LEAVER'::character varying)::text]))),
-    CONSTRAINT chk_scope_type CHECK (((scope_type)::text = ANY (ARRAY[('ALL'::character varying)::text, ('BY_TEAM_TYPE'::character varying)::text, ('BY_DELEGATING_ENTITY'::character varying)::text, ('SPECIFIC_TEAMS'::character varying)::text, ('GOVERNANCE_ONLY'::character varying)::text])))
-);
-
-
---
--- Name: access_review_items; Type: TABLE; Schema: teams; Owner: -
---
-
-CREATE TABLE teams.access_review_items (
-    item_id uuid DEFAULT uuidv7() NOT NULL,
-    campaign_id uuid NOT NULL,
-    membership_id uuid NOT NULL,
-    user_id uuid NOT NULL,
-    team_id uuid NOT NULL,
-    role_key character varying(100) NOT NULL,
-    user_name character varying(255),
-    user_email character varying(255),
-    user_employer character varying(255),
-    team_name character varying(255),
-    team_type character varying(50),
-    delegating_entity_name character varying(255),
-    access_domains character varying(50)[],
-    legal_appointment_id uuid,
-    legal_position character varying(100),
-    legal_entity_name character varying(255),
-    legal_effective_from date,
-    legal_effective_to date,
-    last_login_at timestamp with time zone,
-    days_since_login integer,
-    membership_created_at timestamp with time zone,
-    membership_age_days integer,
-    flag_no_legal_link boolean DEFAULT false,
-    flag_legal_expired boolean DEFAULT false,
-    flag_legal_expiring_soon boolean DEFAULT false,
-    flag_dormant_account boolean DEFAULT false,
-    flag_never_logged_in boolean DEFAULT false,
-    flag_role_mismatch boolean DEFAULT false,
-    flag_orphaned_membership boolean DEFAULT false,
-    flags_json jsonb DEFAULT '{}'::jsonb,
-    recommendation character varying(50),
-    recommendation_reason text,
-    risk_score integer DEFAULT 0,
-    reviewer_user_id uuid,
-    reviewer_email character varying(255),
-    reviewer_name character varying(255),
-    status character varying(50) DEFAULT 'PENDING'::character varying,
-    reviewed_at timestamp with time zone,
-    reviewer_notes text,
-    extended_to date,
-    extension_reason text,
-    escalated_to_user_id uuid,
-    escalation_reason text,
-    escalated_at timestamp with time zone,
-    auto_action_at timestamp with time zone,
-    auto_action_reason text,
-    created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now(),
-    CONSTRAINT chk_item_status CHECK (((status)::text = ANY (ARRAY[('PENDING'::character varying)::text, ('CONFIRMED'::character varying)::text, ('REVOKED'::character varying)::text, ('EXTENDED'::character varying)::text, ('ESCALATED'::character varying)::text, ('AUTO_SUSPENDED'::character varying)::text, ('SKIPPED'::character varying)::text]))),
-    CONSTRAINT chk_recommendation CHECK (((recommendation)::text = ANY (ARRAY[('CONFIRM'::character varying)::text, ('REVOKE'::character varying)::text, ('EXTEND'::character varying)::text, ('REVIEW'::character varying)::text, ('ESCALATE'::character varying)::text])))
-);
-
-
---
--- Name: memberships; Type: TABLE; Schema: teams; Owner: -
---
-
-CREATE TABLE teams.memberships (
-    membership_id uuid DEFAULT uuidv7() NOT NULL,
-    team_id uuid NOT NULL,
-    user_id uuid NOT NULL,
-    role_key character varying(100) NOT NULL,
-    team_type character varying(50) GENERATED ALWAYS AS (split_part((role_key)::text, '.'::text, 1)) STORED,
-    function_name character varying(50) GENERATED ALWAYS AS (split_part(split_part((role_key)::text, '.'::text, 2), ':'::text, 1)) STORED,
-    role_level character varying(50) GENERATED ALWAYS AS (split_part((role_key)::text, ':'::text, 2)) STORED,
-    effective_from date DEFAULT CURRENT_DATE NOT NULL,
-    effective_to date,
-    permission_overrides jsonb DEFAULT '{}'::jsonb,
-    legal_appointment_id uuid,
-    requires_legal_appointment boolean DEFAULT false,
-    delegated_by_user_id uuid,
-    created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now()
-);
-
-
---
--- Name: COLUMN memberships.legal_appointment_id; Type: COMMENT; Schema: teams; Owner: -
---
-
-COMMENT ON COLUMN teams.memberships.legal_appointment_id IS 'Links portal access to legal appointment (DIRECTOR, CONDUCTING_OFFICER, etc.)';
-
-
---
--- Name: COLUMN memberships.requires_legal_appointment; Type: COMMENT; Schema: teams; Owner: -
---
-
-COMMENT ON COLUMN teams.memberships.requires_legal_appointment IS 'If true, warns when no legal appointment linked';
-
-
---
--- Name: team_cbu_access; Type: TABLE; Schema: teams; Owner: -
---
-
-CREATE TABLE teams.team_cbu_access (
-    access_id uuid DEFAULT uuidv7() NOT NULL,
-    team_id uuid NOT NULL,
-    cbu_id uuid NOT NULL,
-    access_restrictions jsonb DEFAULT '{}'::jsonb,
-    granted_at timestamp with time zone DEFAULT now(),
-    granted_by_user_id uuid
-);
-
-
---
--- Name: team_service_entitlements; Type: TABLE; Schema: teams; Owner: -
---
-
-CREATE TABLE teams.team_service_entitlements (
-    entitlement_id uuid DEFAULT uuidv7() NOT NULL,
-    team_id uuid NOT NULL,
-    service_code character varying(100) NOT NULL,
-    config jsonb DEFAULT '{}'::jsonb,
-    granted_at timestamp with time zone DEFAULT now(),
-    granted_by_user_id uuid,
-    updated_at timestamp with time zone DEFAULT now()
-);
-
-
---
--- Name: teams; Type: TABLE; Schema: teams; Owner: -
---
-
-CREATE TABLE teams.teams (
-    team_id uuid DEFAULT uuidv7() NOT NULL,
-    name character varying(255) NOT NULL,
-    team_type character varying(50) NOT NULL,
-    delegating_entity_id uuid NOT NULL,
-    authority_type character varying(50) NOT NULL,
-    authority_scope jsonb DEFAULT '{}'::jsonb,
-    access_mode character varying(50) NOT NULL,
-    explicit_cbus uuid[],
-    scope_filter jsonb,
-    service_entitlements jsonb DEFAULT '{}'::jsonb,
-    is_active boolean DEFAULT true,
-    archived_at timestamp with time zone,
-    archive_reason text,
-    created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now(),
-    created_by_user_id uuid,
-    CONSTRAINT chk_access_mode CHECK (((access_mode)::text = ANY (ARRAY[('explicit'::character varying)::text, ('by-manco'::character varying)::text, ('by-im'::character varying)::text, ('by-filter'::character varying)::text]))),
-    CONSTRAINT chk_authority_type CHECK (((authority_type)::text = ANY (ARRAY[('operational'::character varying)::text, ('oversight'::character varying)::text, ('trading'::character varying)::text, ('administrative'::character varying)::text, ('governance'::character varying)::text]))),
-    CONSTRAINT chk_team_type CHECK (((team_type)::text = ANY (ARRAY[('fund-ops'::character varying)::text, ('manco-oversight'::character varying)::text, ('im-trading'::character varying)::text, ('spv-admin'::character varying)::text, ('client-service'::character varying)::text, ('accounting'::character varying)::text, ('reporting'::character varying)::text, ('board'::character varying)::text, ('investment-committee'::character varying)::text, ('conducting-officers'::character varying)::text, ('executive'::character varying)::text])))
-);
-
-
---
--- Name: v_campaign_dashboard; Type: VIEW; Schema: teams; Owner: -
---
-
-CREATE VIEW teams.v_campaign_dashboard AS
- SELECT campaign_id,
-    name,
-    review_type,
-    scope_type,
-    scope_filter,
-    review_period_start,
-    review_period_end,
-    deadline,
-    reminder_days,
-    status,
-    total_items,
-    reviewed_items,
-    confirmed_items,
-    revoked_items,
-    extended_items,
-    escalated_items,
-    pending_items,
-    created_at,
-    created_by_user_id,
-    launched_at,
-    completed_at,
-    round((((reviewed_items)::numeric / (NULLIF(total_items, 0))::numeric) * (100)::numeric), 1) AS progress_percent,
-    (deadline - CURRENT_DATE) AS days_until_deadline,
-        CASE
-            WHEN ((status)::text = 'COMPLETED'::text) THEN 'COMPLETED'::text
-            WHEN (CURRENT_DATE > deadline) THEN 'OVERDUE'::text
-            WHEN ((deadline - CURRENT_DATE) <= 3) THEN 'URGENT'::text
-            WHEN ((deadline - CURRENT_DATE) <= 7) THEN 'DUE_SOON'::text
-            ELSE 'ON_TRACK'::text
-        END AS urgency
-   FROM teams.access_review_campaigns c;
-
-
---
--- Name: v_flagged_items_summary; Type: VIEW; Schema: teams; Owner: -
---
-
-CREATE VIEW teams.v_flagged_items_summary AS
- SELECT campaign_id,
-    count(*) FILTER (WHERE flag_legal_expired) AS legal_expired_count,
-    count(*) FILTER (WHERE flag_legal_expiring_soon) AS legal_expiring_count,
-    count(*) FILTER (WHERE flag_no_legal_link) AS no_legal_link_count,
-    count(*) FILTER (WHERE flag_dormant_account) AS dormant_count,
-    count(*) FILTER (WHERE flag_never_logged_in) AS never_logged_in_count,
-    count(*) FILTER (WHERE flag_role_mismatch) AS role_mismatch_count,
-    count(*) FILTER (WHERE (risk_score >= 70)) AS high_risk_count,
-    count(*) FILTER (WHERE ((risk_score >= 40) AND (risk_score <= 69))) AS medium_risk_count,
-    count(*) FILTER (WHERE (risk_score < 40)) AS low_risk_count
-   FROM teams.access_review_items
-  GROUP BY campaign_id;
-
-
---
--- Name: v_reviewer_workload; Type: VIEW; Schema: teams; Owner: -
---
-
-CREATE VIEW teams.v_reviewer_workload AS
- SELECT campaign_id,
-    reviewer_user_id,
-    reviewer_email,
-    reviewer_name,
-    count(*) AS total_items,
-    count(*) FILTER (WHERE ((status)::text = 'PENDING'::text)) AS pending_items,
-    count(*) FILTER (WHERE ((status)::text = 'CONFIRMED'::text)) AS confirmed_items,
-    count(*) FILTER (WHERE ((status)::text = 'REVOKED'::text)) AS revoked_items,
-    count(*) FILTER (WHERE (flag_legal_expired OR flag_no_legal_link OR flag_dormant_account)) AS flagged_items,
-    (EXISTS ( SELECT 1
-           FROM teams.access_attestations a
-          WHERE ((a.campaign_id = i.campaign_id) AND (a.attester_user_id = i.reviewer_user_id)))) AS has_attested
-   FROM teams.access_review_items i
-  GROUP BY campaign_id, reviewer_user_id, reviewer_email, reviewer_name;
-
-
---
--- Name: entity_aliases id; Type: DEFAULT; Schema: agent; Owner: -
---
-
-ALTER TABLE ONLY agent.entity_aliases ALTER COLUMN id SET DEFAULT nextval('agent.entity_aliases_id_seq'::regclass);
-
-
---
--- Name: events id; Type: DEFAULT; Schema: agent; Owner: -
---
-
-ALTER TABLE ONLY agent.events ALTER COLUMN id SET DEFAULT nextval('agent.events_id_seq'::regclass);
-
-
---
--- Name: invocation_phrases id; Type: DEFAULT; Schema: agent; Owner: -
---
-
-ALTER TABLE ONLY agent.invocation_phrases ALTER COLUMN id SET DEFAULT nextval('agent.invocation_phrases_id_seq'::regclass);
-
-
---
--- Name: learning_audit id; Type: DEFAULT; Schema: agent; Owner: -
---
-
-ALTER TABLE ONLY agent.learning_audit ALTER COLUMN id SET DEFAULT nextval('agent.learning_audit_id_seq'::regclass);
-
-
---
--- Name: learning_candidates id; Type: DEFAULT; Schema: agent; Owner: -
---
-
-ALTER TABLE ONLY agent.learning_candidates ALTER COLUMN id SET DEFAULT nextval('agent.learning_candidates_id_seq'::regclass);
-
-
---
--- Name: lexicon_tokens id; Type: DEFAULT; Schema: agent; Owner: -
---
-
-ALTER TABLE ONLY agent.lexicon_tokens ALTER COLUMN id SET DEFAULT nextval('agent.lexicon_tokens_id_seq'::regclass);
-
-
---
--- Name: phrase_blocklist id; Type: DEFAULT; Schema: agent; Owner: -
---
-
-ALTER TABLE ONLY agent.phrase_blocklist ALTER COLUMN id SET DEFAULT nextval('agent.phrase_blocklist_id_seq'::regclass);
-
-
---
--- Name: user_learned_phrases id; Type: DEFAULT; Schema: agent; Owner: -
---
-
-ALTER TABLE ONLY agent.user_learned_phrases ALTER COLUMN id SET DEFAULT nextval('agent.user_learned_phrases_id_seq'::regclass);
-
-
---
--- Name: log id; Type: DEFAULT; Schema: events; Owner: -
---
-
-ALTER TABLE ONLY events.log ALTER COLUMN id SET DEFAULT nextval('events.log_id_seq'::regclass);
-
-
---
 -- Name: attribute_values_typed id; Type: DEFAULT; Schema: ob-poc; Owner: -
 --
 
@@ -20967,6 +20842,27 @@ ALTER TABLE ONLY "ob-poc".attribute_values_typed ALTER COLUMN id SET DEFAULT nex
 --
 
 ALTER TABLE ONLY "ob-poc".dsl_instances ALTER COLUMN id SET DEFAULT nextval('"ob-poc".dsl_instances_id_seq'::regclass);
+
+
+--
+-- Name: entity_aliases id; Type: DEFAULT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".entity_aliases ALTER COLUMN id SET DEFAULT nextval('"ob-poc".entity_aliases_id_seq'::regclass);
+
+
+--
+-- Name: event_log id; Type: DEFAULT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".event_log ALTER COLUMN id SET DEFAULT nextval('"ob-poc".event_log_id_seq'::regclass);
+
+
+--
+-- Name: events id; Type: DEFAULT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".events ALTER COLUMN id SET DEFAULT nextval('"ob-poc".events_id_seq'::regclass);
 
 
 --
@@ -20984,10 +20880,59 @@ ALTER TABLE ONLY "ob-poc".intent_feedback_analysis ALTER COLUMN id SET DEFAULT n
 
 
 --
--- Name: standards_mappings mapping_id; Type: DEFAULT; Schema: ob_ref; Owner: -
+-- Name: invocation_phrases id; Type: DEFAULT; Schema: ob-poc; Owner: -
 --
 
-ALTER TABLE ONLY ob_ref.standards_mappings ALTER COLUMN mapping_id SET DEFAULT nextval('ob_ref.standards_mappings_mapping_id_seq'::regclass);
+ALTER TABLE ONLY "ob-poc".invocation_phrases ALTER COLUMN id SET DEFAULT nextval('"ob-poc".invocation_phrases_id_seq'::regclass);
+
+
+--
+-- Name: learning_audit id; Type: DEFAULT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".learning_audit ALTER COLUMN id SET DEFAULT nextval('"ob-poc".learning_audit_id_seq'::regclass);
+
+
+--
+-- Name: learning_candidates id; Type: DEFAULT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".learning_candidates ALTER COLUMN id SET DEFAULT nextval('"ob-poc".learning_candidates_id_seq'::regclass);
+
+
+--
+-- Name: lexicon_tokens id; Type: DEFAULT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".lexicon_tokens ALTER COLUMN id SET DEFAULT nextval('"ob-poc".lexicon_tokens_id_seq'::regclass);
+
+
+--
+-- Name: phrase_blocklist id; Type: DEFAULT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".phrase_blocklist ALTER COLUMN id SET DEFAULT nextval('"ob-poc".phrase_blocklist_id_seq'::regclass);
+
+
+--
+-- Name: session_log id; Type: DEFAULT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".session_log ALTER COLUMN id SET DEFAULT nextval('"ob-poc".session_log_id_seq'::regclass);
+
+
+--
+-- Name: standards_mappings mapping_id; Type: DEFAULT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".standards_mappings ALTER COLUMN mapping_id SET DEFAULT nextval('"ob-poc".standards_mappings_mapping_id_seq'::regclass);
+
+
+--
+-- Name: user_learned_phrases id; Type: DEFAULT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".user_learned_phrases ALTER COLUMN id SET DEFAULT nextval('"ob-poc".user_learned_phrases_id_seq'::regclass);
 
 
 --
@@ -20995,13 +20940,6 @@ ALTER TABLE ONLY ob_ref.standards_mappings ALTER COLUMN mapping_id SET DEFAULT n
 --
 
 ALTER TABLE ONLY sem_reg.classification_levels ALTER COLUMN level_id SET DEFAULT nextval('sem_reg.classification_levels_level_id_seq'::regclass);
-
-
---
--- Name: log id; Type: DEFAULT; Schema: sessions; Owner: -
---
-
-ALTER TABLE ONLY sessions.log ALTER COLUMN id SET DEFAULT nextval('sessions.log_id_seq'::regclass);
 
 
 --
@@ -21013,147 +20951,27 @@ ALTER TABLE ONLY _sqlx_test.databases
 
 
 --
--- Name: entity_aliases entity_aliases_alias_canonical_name_key; Type: CONSTRAINT; Schema: agent; Owner: -
+-- Name: access_attestations access_attestations_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
-ALTER TABLE ONLY agent.entity_aliases
-    ADD CONSTRAINT entity_aliases_alias_canonical_name_key UNIQUE (alias, canonical_name);
-
-
---
--- Name: entity_aliases entity_aliases_pkey; Type: CONSTRAINT; Schema: agent; Owner: -
---
-
-ALTER TABLE ONLY agent.entity_aliases
-    ADD CONSTRAINT entity_aliases_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY "ob-poc".access_attestations
+    ADD CONSTRAINT access_attestations_pkey PRIMARY KEY (attestation_id);
 
 
 --
--- Name: events events_pkey; Type: CONSTRAINT; Schema: agent; Owner: -
+-- Name: access_review_campaigns access_review_campaigns_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
-ALTER TABLE ONLY agent.events
-    ADD CONSTRAINT events_pkey PRIMARY KEY (id);
-
-
---
--- Name: invocation_phrases invocation_phrases_phrase_verb_key; Type: CONSTRAINT; Schema: agent; Owner: -
---
-
-ALTER TABLE ONLY agent.invocation_phrases
-    ADD CONSTRAINT invocation_phrases_phrase_verb_key UNIQUE (phrase, verb);
+ALTER TABLE ONLY "ob-poc".access_review_campaigns
+    ADD CONSTRAINT access_review_campaigns_pkey PRIMARY KEY (campaign_id);
 
 
 --
--- Name: invocation_phrases invocation_phrases_pkey; Type: CONSTRAINT; Schema: agent; Owner: -
+-- Name: access_review_items access_review_items_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
-ALTER TABLE ONLY agent.invocation_phrases
-    ADD CONSTRAINT invocation_phrases_pkey PRIMARY KEY (id);
-
-
---
--- Name: learning_audit learning_audit_pkey; Type: CONSTRAINT; Schema: agent; Owner: -
---
-
-ALTER TABLE ONLY agent.learning_audit
-    ADD CONSTRAINT learning_audit_pkey PRIMARY KEY (id);
-
-
---
--- Name: learning_candidates learning_candidates_fingerprint_key; Type: CONSTRAINT; Schema: agent; Owner: -
---
-
-ALTER TABLE ONLY agent.learning_candidates
-    ADD CONSTRAINT learning_candidates_fingerprint_key UNIQUE (fingerprint);
-
-
---
--- Name: learning_candidates learning_candidates_pkey; Type: CONSTRAINT; Schema: agent; Owner: -
---
-
-ALTER TABLE ONLY agent.learning_candidates
-    ADD CONSTRAINT learning_candidates_pkey PRIMARY KEY (id);
-
-
---
--- Name: lexicon_tokens lexicon_tokens_pkey; Type: CONSTRAINT; Schema: agent; Owner: -
---
-
-ALTER TABLE ONLY agent.lexicon_tokens
-    ADD CONSTRAINT lexicon_tokens_pkey PRIMARY KEY (id);
-
-
---
--- Name: lexicon_tokens lexicon_tokens_token_token_type_key; Type: CONSTRAINT; Schema: agent; Owner: -
---
-
-ALTER TABLE ONLY agent.lexicon_tokens
-    ADD CONSTRAINT lexicon_tokens_token_token_type_key UNIQUE (token, token_type);
-
-
---
--- Name: phrase_blocklist phrase_blocklist_pkey; Type: CONSTRAINT; Schema: agent; Owner: -
---
-
-ALTER TABLE ONLY agent.phrase_blocklist
-    ADD CONSTRAINT phrase_blocklist_pkey PRIMARY KEY (id);
-
-
---
--- Name: user_learned_phrases user_learned_phrases_pkey; Type: CONSTRAINT; Schema: agent; Owner: -
---
-
-ALTER TABLE ONLY agent.user_learned_phrases
-    ADD CONSTRAINT user_learned_phrases_pkey PRIMARY KEY (id);
-
-
---
--- Name: user_learned_phrases user_learned_phrases_user_id_phrase_key; Type: CONSTRAINT; Schema: agent; Owner: -
---
-
-ALTER TABLE ONLY agent.user_learned_phrases
-    ADD CONSTRAINT user_learned_phrases_user_id_phrase_key UNIQUE (user_id, phrase);
-
-
---
--- Name: log log_pkey; Type: CONSTRAINT; Schema: events; Owner: -
---
-
-ALTER TABLE ONLY events.log
-    ADD CONSTRAINT log_pkey PRIMARY KEY (id);
-
-
---
--- Name: audit_log audit_log_pkey; Type: CONSTRAINT; Schema: feedback; Owner: -
---
-
-ALTER TABLE ONLY feedback.audit_log
-    ADD CONSTRAINT audit_log_pkey PRIMARY KEY (id);
-
-
---
--- Name: failures failures_fingerprint_key; Type: CONSTRAINT; Schema: feedback; Owner: -
---
-
-ALTER TABLE ONLY feedback.failures
-    ADD CONSTRAINT failures_fingerprint_key UNIQUE (fingerprint);
-
-
---
--- Name: failures failures_pkey; Type: CONSTRAINT; Schema: feedback; Owner: -
---
-
-ALTER TABLE ONLY feedback.failures
-    ADD CONSTRAINT failures_pkey PRIMARY KEY (id);
-
-
---
--- Name: occurrences occurrences_pkey; Type: CONSTRAINT; Schema: feedback; Owner: -
---
-
-ALTER TABLE ONLY feedback.occurrences
-    ADD CONSTRAINT occurrences_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY "ob-poc".access_review_items
+    ADD CONSTRAINT access_review_items_pkey PRIMARY KEY (item_id);
 
 
 --
@@ -21178,6 +20996,14 @@ ALTER TABLE ONLY "ob-poc".attribute_registry
 
 ALTER TABLE ONLY "ob-poc".attribute_values_typed
     ADD CONSTRAINT attribute_values_typed_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: audit_log audit_log_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".audit_log
+    ADD CONSTRAINT audit_log_pkey PRIMARY KEY (id);
 
 
 --
@@ -22581,6 +22407,22 @@ ALTER TABLE ONLY "ob-poc".entity_addresses
 
 
 --
+-- Name: entity_aliases entity_aliases_alias_canonical_name_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".entity_aliases
+    ADD CONSTRAINT entity_aliases_alias_canonical_name_key UNIQUE (alias, canonical_name);
+
+
+--
+-- Name: entity_aliases entity_aliases_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".entity_aliases
+    ADD CONSTRAINT entity_aliases_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: entity_bods_links entity_bods_links_entity_id_bods_entity_statement_id_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -22749,6 +22591,14 @@ ALTER TABLE ONLY "ob-poc".entity_proper_persons
 
 
 --
+-- Name: entity_regulatory_registrations entity_regulatory_registrations_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".entity_regulatory_registrations
+    ADD CONSTRAINT entity_regulatory_registrations_pkey PRIMARY KEY (registration_id);
+
+
+--
 -- Name: entity_relationships_history entity_relationships_history_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -22901,11 +22751,43 @@ ALTER TABLE ONLY "ob-poc".escalations
 
 
 --
+-- Name: event_log event_log_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".event_log
+    ADD CONSTRAINT event_log_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: events events_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".events
+    ADD CONSTRAINT events_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: expansion_reports expansion_reports_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
 ALTER TABLE ONLY "ob-poc".expansion_reports
     ADD CONSTRAINT expansion_reports_pkey PRIMARY KEY (expansion_id);
+
+
+--
+-- Name: failures failures_fingerprint_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".failures
+    ADD CONSTRAINT failures_fingerprint_key UNIQUE (fingerprint);
+
+
+--
+-- Name: failures failures_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".failures
+    ADD CONSTRAINT failures_pkey PRIMARY KEY (id);
 
 
 --
@@ -23101,6 +22983,14 @@ ALTER TABLE ONLY "ob-poc".instrument_lifecycles
 
 
 --
+-- Name: intent_events intent_events_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".intent_events
+    ADD CONSTRAINT intent_events_pkey PRIMARY KEY (event_id);
+
+
+--
 -- Name: intent_feedback_analysis intent_feedback_analysis_analysis_type_analysis_date_data_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -23146,6 +23036,22 @@ ALTER TABLE ONLY "ob-poc".investors
 
 ALTER TABLE ONLY "ob-poc".investors
     ADD CONSTRAINT investors_pkey PRIMARY KEY (investor_id);
+
+
+--
+-- Name: invocation_phrases invocation_phrases_phrase_verb_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".invocation_phrases
+    ADD CONSTRAINT invocation_phrases_phrase_verb_key UNIQUE (phrase, verb);
+
+
+--
+-- Name: invocation_phrases invocation_phrases_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".invocation_phrases
+    ADD CONSTRAINT invocation_phrases_pkey PRIMARY KEY (id);
 
 
 --
@@ -23269,6 +23175,30 @@ ALTER TABLE ONLY "ob-poc".layout_config
 
 
 --
+-- Name: learning_audit learning_audit_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".learning_audit
+    ADD CONSTRAINT learning_audit_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: learning_candidates learning_candidates_fingerprint_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".learning_candidates
+    ADD CONSTRAINT learning_candidates_fingerprint_key UNIQUE (fingerprint);
+
+
+--
+-- Name: learning_candidates learning_candidates_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".learning_candidates
+    ADD CONSTRAINT learning_candidates_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: legal_contracts legal_contracts_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -23290,6 +23220,22 @@ ALTER TABLE ONLY "ob-poc".legal_entity
 
 ALTER TABLE ONLY "ob-poc".legal_entity
     ADD CONSTRAINT legal_entity_pkey PRIMARY KEY (legal_entity_id);
+
+
+--
+-- Name: lexicon_tokens lexicon_tokens_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".lexicon_tokens
+    ADD CONSTRAINT lexicon_tokens_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: lexicon_tokens lexicon_tokens_token_token_type_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".lexicon_tokens
+    ADD CONSTRAINT lexicon_tokens_token_token_type_key UNIQUE (token, token_type);
 
 
 --
@@ -23365,6 +23311,22 @@ ALTER TABLE ONLY "ob-poc".master_jurisdictions
 
 
 --
+-- Name: memberships memberships_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".memberships
+    ADD CONSTRAINT memberships_pkey PRIMARY KEY (membership_id);
+
+
+--
+-- Name: memberships memberships_team_id_user_id_role_key_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".memberships
+    ADD CONSTRAINT memberships_team_id_user_id_role_key_key UNIQUE (team_id, user_id, role_key);
+
+
+--
 -- Name: movements movements_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -23386,6 +23348,14 @@ ALTER TABLE ONLY "ob-poc".node_types
 
 ALTER TABLE ONLY "ob-poc".observation_discrepancies
     ADD CONSTRAINT observation_discrepancies_pkey PRIMARY KEY (discrepancy_id);
+
+
+--
+-- Name: occurrences occurrences_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".occurrences
+    ADD CONSTRAINT occurrences_pkey PRIMARY KEY (id);
 
 
 --
@@ -23466,6 +23436,14 @@ ALTER TABLE ONLY "ob-poc".ownership_snapshots
 
 ALTER TABLE ONLY "ob-poc".person_pep_status
     ADD CONSTRAINT person_pep_status_pkey PRIMARY KEY (pep_status_id);
+
+
+--
+-- Name: phrase_blocklist phrase_blocklist_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".phrase_blocklist
+    ADD CONSTRAINT phrase_blocklist_pkey PRIMARY KEY (id);
 
 
 --
@@ -23578,6 +23556,14 @@ ALTER TABLE ONLY "ob-poc".repl_invocation_records
 
 ALTER TABLE ONLY "ob-poc".repl_sessions_v2
     ADD CONSTRAINT repl_sessions_v2_pkey PRIMARY KEY (session_id);
+
+
+--
+-- Name: request_types request_types_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".request_types
+    ADD CONSTRAINT request_types_pkey PRIMARY KEY (request_type, request_subtype);
 
 
 --
@@ -23941,6 +23927,14 @@ ALTER TABLE ONLY "ob-poc".services
 
 
 --
+-- Name: session_log session_log_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".session_log
+    ADD CONSTRAINT session_log_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: sessions sessions_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -24189,6 +24183,14 @@ ALTER TABLE ONLY "ob-poc".staged_runbook
 
 
 --
+-- Name: standards_mappings standards_mappings_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".standards_mappings
+    ADD CONSTRAINT standards_mappings_pkey PRIMARY KEY (mapping_id);
+
+
+--
 -- Name: subcustodian_network subcustodian_network_market_id_currency_subcustodian_bic_ef_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -24245,6 +24247,46 @@ ALTER TABLE ONLY "ob-poc".tax_treaty_rates
 
 
 --
+-- Name: team_cbu_access team_cbu_access_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".team_cbu_access
+    ADD CONSTRAINT team_cbu_access_pkey PRIMARY KEY (access_id);
+
+
+--
+-- Name: team_cbu_access team_cbu_access_team_id_cbu_id_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".team_cbu_access
+    ADD CONSTRAINT team_cbu_access_team_id_cbu_id_key UNIQUE (team_id, cbu_id);
+
+
+--
+-- Name: team_service_entitlements team_service_entitlements_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".team_service_entitlements
+    ADD CONSTRAINT team_service_entitlements_pkey PRIMARY KEY (entitlement_id);
+
+
+--
+-- Name: team_service_entitlements team_service_entitlements_team_id_service_code_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".team_service_entitlements
+    ADD CONSTRAINT team_service_entitlements_team_id_service_code_key UNIQUE (team_id, service_code);
+
+
+--
+-- Name: teams teams_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".teams
+    ADD CONSTRAINT teams_pkey PRIMARY KEY (team_id);
+
+
+--
 -- Name: threshold_factors threshold_factors_factor_type_factor_code_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -24274,6 +24316,14 @@ ALTER TABLE ONLY "ob-poc".threshold_requirements
 
 ALTER TABLE ONLY "ob-poc".threshold_requirements
     ADD CONSTRAINT threshold_requirements_pkey PRIMARY KEY (requirement_id);
+
+
+--
+-- Name: tollgate_definitions tollgate_definitions_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".tollgate_definitions
+    ADD CONSTRAINT tollgate_definitions_pkey PRIMARY KEY (tollgate_id);
 
 
 --
@@ -24405,6 +24455,14 @@ ALTER TABLE ONLY "ob-poc".cbu_entity_roles
 
 
 --
+-- Name: entity_regulatory_registrations uq_entity_regulator; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".entity_regulatory_registrations
+    ADD CONSTRAINT uq_entity_regulator UNIQUE (entity_id, regulator_code);
+
+
+--
 -- Name: issuer_control_config uq_issuer_control_config; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -24434,6 +24492,22 @@ ALTER TABLE ONLY "ob-poc".workflow_instances
 
 ALTER TABLE ONLY "ob-poc".workflow_definitions
     ADD CONSTRAINT uq_workflow_version UNIQUE (workflow_id, version);
+
+
+--
+-- Name: user_learned_phrases user_learned_phrases_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".user_learned_phrases
+    ADD CONSTRAINT user_learned_phrases_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: user_learned_phrases user_learned_phrases_user_id_phrase_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".user_learned_phrases
+    ADD CONSTRAINT user_learned_phrases_user_id_phrase_key UNIQUE (user_id, phrase);
 
 
 --
@@ -24509,70 +24583,6 @@ ALTER TABLE ONLY "ob-poc".workflow_instances
 
 
 --
--- Name: entity_regulatory_registrations entity_regulatory_registrations_pkey; Type: CONSTRAINT; Schema: ob_kyc; Owner: -
---
-
-ALTER TABLE ONLY ob_kyc.entity_regulatory_registrations
-    ADD CONSTRAINT entity_regulatory_registrations_pkey PRIMARY KEY (registration_id);
-
-
---
--- Name: entity_regulatory_registrations uq_entity_regulator; Type: CONSTRAINT; Schema: ob_kyc; Owner: -
---
-
-ALTER TABLE ONLY ob_kyc.entity_regulatory_registrations
-    ADD CONSTRAINT uq_entity_regulator UNIQUE (entity_id, regulator_code);
-
-
---
--- Name: regulators regulators_pkey; Type: CONSTRAINT; Schema: ob_ref; Owner: -
---
-
-ALTER TABLE ONLY ob_ref.regulators
-    ADD CONSTRAINT regulators_pkey PRIMARY KEY (regulator_code);
-
-
---
--- Name: request_types request_types_pkey; Type: CONSTRAINT; Schema: ob_ref; Owner: -
---
-
-ALTER TABLE ONLY ob_ref.request_types
-    ADD CONSTRAINT request_types_pkey PRIMARY KEY (request_type, request_subtype);
-
-
---
--- Name: role_types role_types_code_key; Type: CONSTRAINT; Schema: ob_ref; Owner: -
---
-
-ALTER TABLE ONLY ob_ref.role_types
-    ADD CONSTRAINT role_types_code_key UNIQUE (code);
-
-
---
--- Name: role_types role_types_pkey; Type: CONSTRAINT; Schema: ob_ref; Owner: -
---
-
-ALTER TABLE ONLY ob_ref.role_types
-    ADD CONSTRAINT role_types_pkey PRIMARY KEY (role_type_id);
-
-
---
--- Name: standards_mappings standards_mappings_pkey; Type: CONSTRAINT; Schema: ob_ref; Owner: -
---
-
-ALTER TABLE ONLY ob_ref.standards_mappings
-    ADD CONSTRAINT standards_mappings_pkey PRIMARY KEY (mapping_id);
-
-
---
--- Name: tollgate_definitions tollgate_definitions_pkey; Type: CONSTRAINT; Schema: ob_ref; Owner: -
---
-
-ALTER TABLE ONLY ob_ref.tollgate_definitions
-    ADD CONSTRAINT tollgate_definitions_pkey PRIMARY KEY (tollgate_id);
-
-
---
 -- Name: _sqlx_migrations _sqlx_migrations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -24586,6 +24596,22 @@ ALTER TABLE ONLY public._sqlx_migrations
 
 ALTER TABLE ONLY sem_reg.agent_plans
     ADD CONSTRAINT agent_plans_pkey PRIMARY KEY (plan_id);
+
+
+--
+-- Name: basis_claims basis_claims_pkey; Type: CONSTRAINT; Schema: sem_reg; Owner: -
+--
+
+ALTER TABLE ONLY sem_reg.basis_claims
+    ADD CONSTRAINT basis_claims_pkey PRIMARY KEY (claim_id);
+
+
+--
+-- Name: basis_records basis_records_pkey; Type: CONSTRAINT; Schema: sem_reg; Owner: -
+--
+
+ALTER TABLE ONLY sem_reg.basis_records
+    ADD CONSTRAINT basis_records_pkey PRIMARY KEY (basis_id);
 
 
 --
@@ -24645,6 +24671,14 @@ ALTER TABLE ONLY sem_reg.classification_levels
 
 
 --
+-- Name: conflict_records conflict_records_pkey; Type: CONSTRAINT; Schema: sem_reg; Owner: -
+--
+
+ALTER TABLE ONLY sem_reg.conflict_records
+    ADD CONSTRAINT conflict_records_pkey PRIMARY KEY (conflict_id);
+
+
+--
 -- Name: decision_records decision_records_pkey; Type: CONSTRAINT; Schema: sem_reg; Owner: -
 --
 
@@ -24690,6 +24724,30 @@ ALTER TABLE ONLY sem_reg.embedding_records
 
 ALTER TABLE ONLY sem_reg.escalation_records
     ADD CONSTRAINT escalation_records_pkey PRIMARY KEY (escalation_id);
+
+
+--
+-- Name: events events_pkey; Type: CONSTRAINT; Schema: sem_reg; Owner: -
+--
+
+ALTER TABLE ONLY sem_reg.events
+    ADD CONSTRAINT events_pkey PRIMARY KEY (event_id);
+
+
+--
+-- Name: focus_states focus_states_pkey; Type: CONSTRAINT; Schema: sem_reg; Owner: -
+--
+
+ALTER TABLE ONLY sem_reg.focus_states
+    ADD CONSTRAINT focus_states_pkey PRIMARY KEY (session_id);
+
+
+--
+-- Name: idempotency_keys idempotency_keys_pkey; Type: CONSTRAINT; Schema: sem_reg; Owner: -
+--
+
+ALTER TABLE ONLY sem_reg.idempotency_keys
+    ADD CONSTRAINT idempotency_keys_pkey PRIMARY KEY (client_request_id);
 
 
 --
@@ -24746,6 +24804,30 @@ ALTER TABLE ONLY sem_reg.snapshot_sets
 
 ALTER TABLE ONLY sem_reg.snapshots
     ADD CONSTRAINT snapshots_pkey PRIMARY KEY (snapshot_id);
+
+
+--
+-- Name: templates templates_pkey; Type: CONSTRAINT; Schema: sem_reg; Owner: -
+--
+
+ALTER TABLE ONLY sem_reg.templates
+    ADD CONSTRAINT templates_pkey PRIMARY KEY (template_id);
+
+
+--
+-- Name: verb_implementation_bindings verb_implementation_bindings_pkey; Type: CONSTRAINT; Schema: sem_reg; Owner: -
+--
+
+ALTER TABLE ONLY sem_reg.verb_implementation_bindings
+    ADD CONSTRAINT verb_implementation_bindings_pkey PRIMARY KEY (binding_id);
+
+
+--
+-- Name: viewport_manifests viewport_manifests_pkey; Type: CONSTRAINT; Schema: sem_reg; Owner: -
+--
+
+ALTER TABLE ONLY sem_reg.viewport_manifests
+    ADD CONSTRAINT viewport_manifests_pkey PRIMARY KEY (manifest_id);
 
 
 --
@@ -24829,443 +24911,10 @@ ALTER TABLE ONLY sem_reg_pub.projection_watermark
 
 
 --
--- Name: log log_pkey; Type: CONSTRAINT; Schema: sessions; Owner: -
---
-
-ALTER TABLE ONLY sessions.log
-    ADD CONSTRAINT log_pkey PRIMARY KEY (id);
-
-
---
--- Name: basis_claims basis_claims_pkey; Type: CONSTRAINT; Schema: stewardship; Owner: -
---
-
-ALTER TABLE ONLY stewardship.basis_claims
-    ADD CONSTRAINT basis_claims_pkey PRIMARY KEY (claim_id);
-
-
---
--- Name: basis_records basis_records_pkey; Type: CONSTRAINT; Schema: stewardship; Owner: -
---
-
-ALTER TABLE ONLY stewardship.basis_records
-    ADD CONSTRAINT basis_records_pkey PRIMARY KEY (basis_id);
-
-
---
--- Name: conflict_records conflict_records_pkey; Type: CONSTRAINT; Schema: stewardship; Owner: -
---
-
-ALTER TABLE ONLY stewardship.conflict_records
-    ADD CONSTRAINT conflict_records_pkey PRIMARY KEY (conflict_id);
-
-
---
--- Name: events events_pkey; Type: CONSTRAINT; Schema: stewardship; Owner: -
---
-
-ALTER TABLE ONLY stewardship.events
-    ADD CONSTRAINT events_pkey PRIMARY KEY (event_id);
-
-
---
--- Name: focus_states focus_states_pkey; Type: CONSTRAINT; Schema: stewardship; Owner: -
---
-
-ALTER TABLE ONLY stewardship.focus_states
-    ADD CONSTRAINT focus_states_pkey PRIMARY KEY (session_id);
-
-
---
--- Name: idempotency_keys idempotency_keys_pkey; Type: CONSTRAINT; Schema: stewardship; Owner: -
---
-
-ALTER TABLE ONLY stewardship.idempotency_keys
-    ADD CONSTRAINT idempotency_keys_pkey PRIMARY KEY (client_request_id);
-
-
---
--- Name: templates templates_pkey; Type: CONSTRAINT; Schema: stewardship; Owner: -
---
-
-ALTER TABLE ONLY stewardship.templates
-    ADD CONSTRAINT templates_pkey PRIMARY KEY (template_id);
-
-
---
--- Name: verb_implementation_bindings verb_implementation_bindings_pkey; Type: CONSTRAINT; Schema: stewardship; Owner: -
---
-
-ALTER TABLE ONLY stewardship.verb_implementation_bindings
-    ADD CONSTRAINT verb_implementation_bindings_pkey PRIMARY KEY (binding_id);
-
-
---
--- Name: viewport_manifests viewport_manifests_pkey; Type: CONSTRAINT; Schema: stewardship; Owner: -
---
-
-ALTER TABLE ONLY stewardship.viewport_manifests
-    ADD CONSTRAINT viewport_manifests_pkey PRIMARY KEY (manifest_id);
-
-
---
--- Name: access_attestations access_attestations_pkey; Type: CONSTRAINT; Schema: teams; Owner: -
---
-
-ALTER TABLE ONLY teams.access_attestations
-    ADD CONSTRAINT access_attestations_pkey PRIMARY KEY (attestation_id);
-
-
---
--- Name: access_review_campaigns access_review_campaigns_pkey; Type: CONSTRAINT; Schema: teams; Owner: -
---
-
-ALTER TABLE ONLY teams.access_review_campaigns
-    ADD CONSTRAINT access_review_campaigns_pkey PRIMARY KEY (campaign_id);
-
-
---
--- Name: access_review_items access_review_items_pkey; Type: CONSTRAINT; Schema: teams; Owner: -
---
-
-ALTER TABLE ONLY teams.access_review_items
-    ADD CONSTRAINT access_review_items_pkey PRIMARY KEY (item_id);
-
-
---
--- Name: memberships memberships_pkey; Type: CONSTRAINT; Schema: teams; Owner: -
---
-
-ALTER TABLE ONLY teams.memberships
-    ADD CONSTRAINT memberships_pkey PRIMARY KEY (membership_id);
-
-
---
--- Name: memberships memberships_team_id_user_id_role_key_key; Type: CONSTRAINT; Schema: teams; Owner: -
---
-
-ALTER TABLE ONLY teams.memberships
-    ADD CONSTRAINT memberships_team_id_user_id_role_key_key UNIQUE (team_id, user_id, role_key);
-
-
---
--- Name: team_cbu_access team_cbu_access_pkey; Type: CONSTRAINT; Schema: teams; Owner: -
---
-
-ALTER TABLE ONLY teams.team_cbu_access
-    ADD CONSTRAINT team_cbu_access_pkey PRIMARY KEY (access_id);
-
-
---
--- Name: team_cbu_access team_cbu_access_team_id_cbu_id_key; Type: CONSTRAINT; Schema: teams; Owner: -
---
-
-ALTER TABLE ONLY teams.team_cbu_access
-    ADD CONSTRAINT team_cbu_access_team_id_cbu_id_key UNIQUE (team_id, cbu_id);
-
-
---
--- Name: team_service_entitlements team_service_entitlements_pkey; Type: CONSTRAINT; Schema: teams; Owner: -
---
-
-ALTER TABLE ONLY teams.team_service_entitlements
-    ADD CONSTRAINT team_service_entitlements_pkey PRIMARY KEY (entitlement_id);
-
-
---
--- Name: team_service_entitlements team_service_entitlements_team_id_service_code_key; Type: CONSTRAINT; Schema: teams; Owner: -
---
-
-ALTER TABLE ONLY teams.team_service_entitlements
-    ADD CONSTRAINT team_service_entitlements_team_id_service_code_key UNIQUE (team_id, service_code);
-
-
---
--- Name: teams teams_pkey; Type: CONSTRAINT; Schema: teams; Owner: -
---
-
-ALTER TABLE ONLY teams.teams
-    ADD CONSTRAINT teams_pkey PRIMARY KEY (team_id);
-
-
---
 -- Name: databases_created_at; Type: INDEX; Schema: _sqlx_test; Owner: -
 --
 
 CREATE INDEX databases_created_at ON _sqlx_test.databases USING btree (created_at);
-
-
---
--- Name: idx_agent_events_corrected; Type: INDEX; Schema: agent; Owner: -
---
-
-CREATE INDEX idx_agent_events_corrected ON agent.events USING btree (was_corrected) WHERE (was_corrected = true);
-
-
---
--- Name: idx_agent_events_session; Type: INDEX; Schema: agent; Owner: -
---
-
-CREATE INDEX idx_agent_events_session ON agent.events USING btree (session_id);
-
-
---
--- Name: idx_agent_events_timestamp; Type: INDEX; Schema: agent; Owner: -
---
-
-CREATE INDEX idx_agent_events_timestamp ON agent.events USING btree ("timestamp");
-
-
---
--- Name: idx_agent_events_type; Type: INDEX; Schema: agent; Owner: -
---
-
-CREATE INDEX idx_agent_events_type ON agent.events USING btree (event_type);
-
-
---
--- Name: idx_agent_events_verb; Type: INDEX; Schema: agent; Owner: -
---
-
-CREATE INDEX idx_agent_events_verb ON agent.events USING btree (selected_verb);
-
-
---
--- Name: idx_entity_aliases_alias; Type: INDEX; Schema: agent; Owner: -
---
-
-CREATE INDEX idx_entity_aliases_alias ON agent.entity_aliases USING btree (lower(alias));
-
-
---
--- Name: idx_entity_aliases_embedding; Type: INDEX; Schema: agent; Owner: -
---
-
-CREATE INDEX idx_entity_aliases_embedding ON agent.entity_aliases USING ivfflat (embedding public.vector_cosine_ops) WITH (lists='100');
-
-
---
--- Name: idx_entity_aliases_entity; Type: INDEX; Schema: agent; Owner: -
---
-
-CREATE INDEX idx_entity_aliases_entity ON agent.entity_aliases USING btree (entity_id);
-
-
---
--- Name: idx_invocation_phrases_embedding; Type: INDEX; Schema: agent; Owner: -
---
-
-CREATE INDEX idx_invocation_phrases_embedding ON agent.invocation_phrases USING ivfflat (embedding public.vector_cosine_ops) WITH (lists='100');
-
-
---
--- Name: idx_invocation_phrases_phrase; Type: INDEX; Schema: agent; Owner: -
---
-
-CREATE INDEX idx_invocation_phrases_phrase ON agent.invocation_phrases USING gin (to_tsvector('english'::regconfig, phrase));
-
-
---
--- Name: idx_learning_audit_timestamp; Type: INDEX; Schema: agent; Owner: -
---
-
-CREATE INDEX idx_learning_audit_timestamp ON agent.learning_audit USING btree ("timestamp");
-
-
---
--- Name: idx_learning_audit_type; Type: INDEX; Schema: agent; Owner: -
---
-
-CREATE INDEX idx_learning_audit_type ON agent.learning_audit USING btree (learning_type);
-
-
---
--- Name: idx_learning_candidates_auto; Type: INDEX; Schema: agent; Owner: -
---
-
-CREATE INDEX idx_learning_candidates_auto ON agent.learning_candidates USING btree (auto_applicable) WHERE ((auto_applicable = true) AND (status = 'pending'::text));
-
-
---
--- Name: idx_learning_candidates_fingerprint; Type: INDEX; Schema: agent; Owner: -
---
-
-CREATE INDEX idx_learning_candidates_fingerprint ON agent.learning_candidates USING btree (fingerprint);
-
-
---
--- Name: idx_learning_candidates_promotable; Type: INDEX; Schema: agent; Owner: -
---
-
-CREATE INDEX idx_learning_candidates_promotable ON agent.learning_candidates USING btree (occurrence_count DESC, status) WHERE ((status = 'pending'::text) AND (learning_type = 'invocation_phrase'::text));
-
-
---
--- Name: idx_learning_candidates_status; Type: INDEX; Schema: agent; Owner: -
---
-
-CREATE INDEX idx_learning_candidates_status ON agent.learning_candidates USING btree (status);
-
-
---
--- Name: idx_learning_candidates_success_tracking; Type: INDEX; Schema: agent; Owner: -
---
-
-CREATE INDEX idx_learning_candidates_success_tracking ON agent.learning_candidates USING btree (total_count, success_count) WHERE (status = 'pending'::text);
-
-
---
--- Name: idx_learning_candidates_type; Type: INDEX; Schema: agent; Owner: -
---
-
-CREATE INDEX idx_learning_candidates_type ON agent.learning_candidates USING btree (learning_type);
-
-
---
--- Name: idx_lexicon_tokens_token; Type: INDEX; Schema: agent; Owner: -
---
-
-CREATE INDEX idx_lexicon_tokens_token ON agent.lexicon_tokens USING btree (lower(token));
-
-
---
--- Name: idx_phrase_blocklist_embedding; Type: INDEX; Schema: agent; Owner: -
---
-
-CREATE INDEX idx_phrase_blocklist_embedding ON agent.phrase_blocklist USING ivfflat (embedding public.vector_cosine_ops) WITH (lists='50');
-
-
---
--- Name: idx_phrase_blocklist_unique; Type: INDEX; Schema: agent; Owner: -
---
-
-CREATE UNIQUE INDEX idx_phrase_blocklist_unique ON agent.phrase_blocklist USING btree (phrase, blocked_verb, COALESCE(user_id, '00000000-0000-0000-0000-000000000000'::uuid));
-
-
---
--- Name: idx_user_learned_phrases_embedding; Type: INDEX; Schema: agent; Owner: -
---
-
-CREATE INDEX idx_user_learned_phrases_embedding ON agent.user_learned_phrases USING ivfflat (embedding public.vector_cosine_ops) WITH (lists='100');
-
-
---
--- Name: idx_user_learned_phrases_user; Type: INDEX; Schema: agent; Owner: -
---
-
-CREATE INDEX idx_user_learned_phrases_user ON agent.user_learned_phrases USING btree (user_id);
-
-
---
--- Name: idx_events_log_failures; Type: INDEX; Schema: events; Owner: -
---
-
-CREATE INDEX idx_events_log_failures ON events.log USING btree ("timestamp") WHERE (event_type = 'command_failed'::text);
-
-
---
--- Name: idx_events_log_session; Type: INDEX; Schema: events; Owner: -
---
-
-CREATE INDEX idx_events_log_session ON events.log USING btree (session_id, "timestamp") WHERE (session_id IS NOT NULL);
-
-
---
--- Name: idx_events_log_timestamp; Type: INDEX; Schema: events; Owner: -
---
-
-CREATE INDEX idx_events_log_timestamp ON events.log USING btree ("timestamp");
-
-
---
--- Name: idx_audit_action; Type: INDEX; Schema: feedback; Owner: -
---
-
-CREATE INDEX idx_audit_action ON feedback.audit_log USING btree (action);
-
-
---
--- Name: idx_audit_created_at; Type: INDEX; Schema: feedback; Owner: -
---
-
-CREATE INDEX idx_audit_created_at ON feedback.audit_log USING btree (created_at DESC);
-
-
---
--- Name: idx_audit_failure_id; Type: INDEX; Schema: feedback; Owner: -
---
-
-CREATE INDEX idx_audit_failure_id ON feedback.audit_log USING btree (failure_id);
-
-
---
--- Name: idx_failures_fingerprint; Type: INDEX; Schema: feedback; Owner: -
---
-
-CREATE INDEX idx_failures_fingerprint ON feedback.failures USING btree (fingerprint);
-
-
---
--- Name: idx_failures_first_seen; Type: INDEX; Schema: feedback; Owner: -
---
-
-CREATE INDEX idx_failures_first_seen ON feedback.failures USING btree (first_seen_at DESC);
-
-
---
--- Name: idx_failures_last_seen; Type: INDEX; Schema: feedback; Owner: -
---
-
-CREATE INDEX idx_failures_last_seen ON feedback.failures USING btree (last_seen_at DESC);
-
-
---
--- Name: idx_failures_source; Type: INDEX; Schema: feedback; Owner: -
---
-
-CREATE INDEX idx_failures_source ON feedback.failures USING btree (source) WHERE (source IS NOT NULL);
-
-
---
--- Name: idx_failures_status; Type: INDEX; Schema: feedback; Owner: -
---
-
-CREATE INDEX idx_failures_status ON feedback.failures USING btree (status);
-
-
---
--- Name: idx_failures_status_error_type; Type: INDEX; Schema: feedback; Owner: -
---
-
-CREATE INDEX idx_failures_status_error_type ON feedback.failures USING btree (status, error_type);
-
-
---
--- Name: idx_failures_verb; Type: INDEX; Schema: feedback; Owner: -
---
-
-CREATE INDEX idx_failures_verb ON feedback.failures USING btree (verb);
-
-
---
--- Name: idx_occurrences_failure_id; Type: INDEX; Schema: feedback; Owner: -
---
-
-CREATE INDEX idx_occurrences_failure_id ON feedback.occurrences USING btree (failure_id);
-
-
---
--- Name: idx_occurrences_session_id; Type: INDEX; Schema: feedback; Owner: -
---
-
-CREATE INDEX idx_occurrences_session_id ON feedback.occurrences USING btree (session_id) WHERE (session_id IS NOT NULL);
-
-
---
--- Name: idx_occurrences_timestamp; Type: INDEX; Schema: feedback; Owner: -
---
-
-CREATE INDEX idx_occurrences_timestamp ON feedback.occurrences USING btree (event_timestamp DESC);
 
 
 --
@@ -25395,6 +25044,41 @@ CREATE INDEX holding_control_links_idx_control_links_issuer ON "ob-poc".holding_
 
 
 --
+-- Name: idx_agent_events_corrected; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_agent_events_corrected ON "ob-poc".events USING btree (was_corrected) WHERE (was_corrected = true);
+
+
+--
+-- Name: idx_agent_events_session; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_agent_events_session ON "ob-poc".events USING btree (session_id);
+
+
+--
+-- Name: idx_agent_events_timestamp; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_agent_events_timestamp ON "ob-poc".events USING btree ("timestamp");
+
+
+--
+-- Name: idx_agent_events_type; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_agent_events_type ON "ob-poc".events USING btree (event_type);
+
+
+--
+-- Name: idx_agent_events_verb; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_agent_events_verb ON "ob-poc".events USING btree (selected_verb);
+
+
+--
 -- Name: idx_alleg_case; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -25465,6 +25149,20 @@ CREATE INDEX idx_assertion_log_type ON "ob-poc".ubo_assertion_log USING btree (a
 
 
 --
+-- Name: idx_attestations_attester; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_attestations_attester ON "ob-poc".access_attestations USING btree (attester_user_id);
+
+
+--
+-- Name: idx_attestations_campaign; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_attestations_campaign ON "ob-poc".access_attestations USING btree (campaign_id);
+
+
+--
 -- Name: idx_attr_uuid; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -25525,6 +25223,27 @@ CREATE INDEX idx_attribute_values_typed_entity ON "ob-poc".attribute_values_type
 --
 
 CREATE INDEX idx_attribute_values_typed_entity_attribute ON "ob-poc".attribute_values_typed USING btree (entity_id, attribute_id);
+
+
+--
+-- Name: idx_audit_action; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_audit_action ON "ob-poc".audit_log USING btree (action);
+
+
+--
+-- Name: idx_audit_created_at; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_audit_created_at ON "ob-poc".audit_log USING btree (created_at DESC);
+
+
+--
+-- Name: idx_audit_failure_id; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_audit_failure_id ON "ob-poc".audit_log USING btree (failure_id);
 
 
 --
@@ -25693,6 +25412,20 @@ CREATE INDEX idx_ca_ssi_cbu ON "ob-poc".cbu_ca_ssi_mappings USING btree (cbu_id)
 --
 
 CREATE INDEX idx_ca_windows_cbu ON "ob-poc".cbu_ca_instruction_windows USING btree (cbu_id);
+
+
+--
+-- Name: idx_campaigns_deadline; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_campaigns_deadline ON "ob-poc".access_review_campaigns USING btree (deadline);
+
+
+--
+-- Name: idx_campaigns_status; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_campaigns_status ON "ob-poc".access_review_campaigns USING btree (status);
 
 
 --
@@ -27418,6 +27151,27 @@ CREATE INDEX idx_entity_addresses_entity ON "ob-poc".entity_addresses USING btre
 
 
 --
+-- Name: idx_entity_aliases_alias; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_entity_aliases_alias ON "ob-poc".entity_aliases USING btree (lower(alias));
+
+
+--
+-- Name: idx_entity_aliases_embedding; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_entity_aliases_embedding ON "ob-poc".entity_aliases USING ivfflat (embedding public.vector_cosine_ops) WITH (lists='100');
+
+
+--
+-- Name: idx_entity_aliases_entity; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_entity_aliases_entity ON "ob-poc".entity_aliases USING btree (entity_id);
+
+
+--
 -- Name: idx_entity_deps_from; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -27663,6 +27417,48 @@ CREATE INDEX idx_er_import_run ON "ob-poc".entity_relationships USING btree (imp
 
 
 --
+-- Name: idx_ereg_entity; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_ereg_entity ON "ob-poc".entity_regulatory_registrations USING btree (entity_id);
+
+
+--
+-- Name: idx_ereg_expires; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_ereg_expires ON "ob-poc".entity_regulatory_registrations USING btree (verification_expires);
+
+
+--
+-- Name: idx_ereg_regulator; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_ereg_regulator ON "ob-poc".entity_regulatory_registrations USING btree (regulator_code);
+
+
+--
+-- Name: idx_ereg_status; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_ereg_status ON "ob-poc".entity_regulatory_registrations USING btree (status);
+
+
+--
+-- Name: idx_ereg_type; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_ereg_type ON "ob-poc".entity_regulatory_registrations USING btree (registration_type);
+
+
+--
+-- Name: idx_ereg_verified; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_ereg_verified ON "ob-poc".entity_regulatory_registrations USING btree (registration_verified);
+
+
+--
 -- Name: idx_escalations_client; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -27723,6 +27519,55 @@ CREATE INDEX idx_expansion_reports_session ON "ob-poc".expansion_reports USING b
 --
 
 CREATE INDEX idx_expansion_reports_source_digest ON "ob-poc".expansion_reports USING btree (source_digest);
+
+
+--
+-- Name: idx_failures_fingerprint; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_failures_fingerprint ON "ob-poc".failures USING btree (fingerprint);
+
+
+--
+-- Name: idx_failures_first_seen; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_failures_first_seen ON "ob-poc".failures USING btree (first_seen_at DESC);
+
+
+--
+-- Name: idx_failures_last_seen; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_failures_last_seen ON "ob-poc".failures USING btree (last_seen_at DESC);
+
+
+--
+-- Name: idx_failures_source; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_failures_source ON "ob-poc".failures USING btree (source) WHERE (source IS NOT NULL);
+
+
+--
+-- Name: idx_failures_status; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_failures_status ON "ob-poc".failures USING btree (status);
+
+
+--
+-- Name: idx_failures_status_error_type; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_failures_status_error_type ON "ob-poc".failures USING btree (status, error_type);
+
+
+--
+-- Name: idx_failures_verb; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_failures_verb ON "ob-poc".failures USING btree (verb);
 
 
 --
@@ -28188,6 +28033,20 @@ CREATE INDEX idx_investors_provider ON "ob-poc".investors USING btree (provider,
 
 
 --
+-- Name: idx_invocation_phrases_embedding; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_invocation_phrases_embedding ON "ob-poc".invocation_phrases USING ivfflat (embedding public.vector_cosine_ops) WITH (lists='100');
+
+
+--
+-- Name: idx_invocation_phrases_phrase; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_invocation_phrases_phrase ON "ob-poc".invocation_phrases USING gin (to_tsvector('english'::regconfig, phrase));
+
+
+--
 -- Name: idx_kyc_agreement_sponsor; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -28237,6 +28096,62 @@ CREATE UNIQUE INDEX idx_layout_cache_unique ON "ob-poc".layout_cache USING btree
 
 
 --
+-- Name: idx_learning_audit_timestamp; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_learning_audit_timestamp ON "ob-poc".learning_audit USING btree ("timestamp");
+
+
+--
+-- Name: idx_learning_audit_type; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_learning_audit_type ON "ob-poc".learning_audit USING btree (learning_type);
+
+
+--
+-- Name: idx_learning_candidates_auto; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_learning_candidates_auto ON "ob-poc".learning_candidates USING btree (auto_applicable) WHERE ((auto_applicable = true) AND (status = 'pending'::text));
+
+
+--
+-- Name: idx_learning_candidates_fingerprint; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_learning_candidates_fingerprint ON "ob-poc".learning_candidates USING btree (fingerprint);
+
+
+--
+-- Name: idx_learning_candidates_promotable; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_learning_candidates_promotable ON "ob-poc".learning_candidates USING btree (occurrence_count DESC, status) WHERE ((status = 'pending'::text) AND (learning_type = 'invocation_phrase'::text));
+
+
+--
+-- Name: idx_learning_candidates_status; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_learning_candidates_status ON "ob-poc".learning_candidates USING btree (status);
+
+
+--
+-- Name: idx_learning_candidates_success_tracking; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_learning_candidates_success_tracking ON "ob-poc".learning_candidates USING btree (total_count, success_count) WHERE (status = 'pending'::text);
+
+
+--
+-- Name: idx_learning_candidates_type; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_learning_candidates_type ON "ob-poc".learning_candidates USING btree (learning_type);
+
+
+--
 -- Name: idx_legal_contracts_client_label; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -28248,6 +28163,13 @@ CREATE INDEX idx_legal_contracts_client_label ON "ob-poc".legal_contracts USING 
 --
 
 CREATE INDEX idx_legal_contracts_status ON "ob-poc".legal_contracts USING btree (status);
+
+
+--
+-- Name: idx_lexicon_tokens_token; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_lexicon_tokens_token ON "ob-poc".lexicon_tokens USING btree (lower(token));
 
 
 --
@@ -28377,6 +28299,41 @@ CREATE INDEX idx_matrix_overlay_subscription ON "ob-poc".cbu_matrix_product_over
 
 
 --
+-- Name: idx_membership_active; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_membership_active ON "ob-poc".memberships USING btree (effective_from, effective_to) WHERE (effective_to IS NULL);
+
+
+--
+-- Name: idx_membership_function; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_membership_function ON "ob-poc".memberships USING btree (function_name);
+
+
+--
+-- Name: idx_membership_team; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_membership_team ON "ob-poc".memberships USING btree (team_id);
+
+
+--
+-- Name: idx_membership_type; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_membership_type ON "ob-poc".memberships USING btree (team_type);
+
+
+--
+-- Name: idx_membership_user; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_membership_user ON "ob-poc".memberships USING btree (user_id);
+
+
+--
 -- Name: idx_movements_commitment; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -28426,6 +28383,41 @@ CREATE INDEX idx_node_types_ubo ON "ob-poc".node_types USING btree (show_in_ubo_
 
 
 --
+-- Name: idx_ob_poc_event_log_failures; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_ob_poc_event_log_failures ON "ob-poc".event_log USING btree ("timestamp") WHERE (event_type = 'command_failed'::text);
+
+
+--
+-- Name: idx_ob_poc_event_log_session; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_ob_poc_event_log_session ON "ob-poc".event_log USING btree (session_id, "timestamp") WHERE (session_id IS NOT NULL);
+
+
+--
+-- Name: idx_ob_poc_event_log_timestamp; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_ob_poc_event_log_timestamp ON "ob-poc".event_log USING btree ("timestamp");
+
+
+--
+-- Name: idx_ob_poc_session_log_event; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_ob_poc_session_log_event ON "ob-poc".session_log USING btree (event_id) WHERE (event_id IS NOT NULL);
+
+
+--
+-- Name: idx_ob_poc_session_log_session; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_ob_poc_session_log_session ON "ob-poc".session_log USING btree (session_id, "timestamp");
+
+
+--
 -- Name: idx_obs_attribute; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -28458,6 +28450,27 @@ CREATE INDEX idx_obs_source_doc ON "ob-poc".attribute_observations USING btree (
 --
 
 CREATE INDEX idx_obs_source_type ON "ob-poc".attribute_observations USING btree (source_type);
+
+
+--
+-- Name: idx_occurrences_failure_id; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_occurrences_failure_id ON "ob-poc".occurrences USING btree (failure_id);
+
+
+--
+-- Name: idx_occurrences_session_id; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_occurrences_session_id ON "ob-poc".occurrences USING btree (session_id) WHERE (session_id IS NOT NULL);
+
+
+--
+-- Name: idx_occurrences_timestamp; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_occurrences_timestamp ON "ob-poc".occurrences USING btree (event_timestamp DESC);
 
 
 --
@@ -28549,6 +28562,20 @@ CREATE INDEX idx_persons_last_name_trgm ON "ob-poc".entity_proper_persons USING 
 --
 
 CREATE INDEX idx_persons_search_name_trgm ON "ob-poc".entity_proper_persons USING gin (search_name public.gin_trgm_ops);
+
+
+--
+-- Name: idx_phrase_blocklist_embedding; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_phrase_blocklist_embedding ON "ob-poc".phrase_blocklist USING ivfflat (embedding public.vector_cosine_ops) WITH (lists='50');
+
+
+--
+-- Name: idx_phrase_blocklist_unique; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_phrase_blocklist_unique ON "ob-poc".phrase_blocklist USING btree (phrase, blocked_verb, COALESCE(user_id, '00000000-0000-0000-0000-000000000000'::uuid));
 
 
 --
@@ -28706,6 +28733,20 @@ CREATE INDEX idx_red_flags_workstream ON "ob-poc".red_flags USING btree (workstr
 
 
 --
+-- Name: idx_regulators_jurisdiction; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_regulators_jurisdiction ON "ob-poc".regulators USING btree (jurisdiction);
+
+
+--
+-- Name: idx_regulators_tier; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_regulators_tier ON "ob-poc".regulators USING btree (tier);
+
+
+--
 -- Name: idx_rel_history_changed_at; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -28839,6 +28880,48 @@ CREATE INDEX idx_resource_requirements_resource ON "ob-poc".resource_attribute_r
 
 
 --
+-- Name: idx_review_items_campaign; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_review_items_campaign ON "ob-poc".access_review_items USING btree (campaign_id);
+
+
+--
+-- Name: idx_review_items_flagged; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_review_items_flagged ON "ob-poc".access_review_items USING btree (campaign_id) WHERE (flag_no_legal_link OR flag_legal_expired OR flag_dormant_account);
+
+
+--
+-- Name: idx_review_items_membership; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_review_items_membership ON "ob-poc".access_review_items USING btree (membership_id);
+
+
+--
+-- Name: idx_review_items_pending; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_review_items_pending ON "ob-poc".access_review_items USING btree (campaign_id, status) WHERE ((status)::text = 'PENDING'::text);
+
+
+--
+-- Name: idx_review_items_reviewer; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_review_items_reviewer ON "ob-poc".access_review_items USING btree (reviewer_user_id);
+
+
+--
+-- Name: idx_review_items_status; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_review_items_status ON "ob-poc".access_review_items USING btree (status);
+
+
+--
 -- Name: idx_ria_attribute; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -28850,6 +28933,13 @@ CREATE INDEX idx_ria_attribute ON "ob-poc".resource_instance_attributes USING bt
 --
 
 CREATE INDEX idx_ria_instance ON "ob-poc".resource_instance_attributes USING btree (instance_id);
+
+
+--
+-- Name: idx_role_types_category; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_role_types_category ON "ob-poc".role_types USING btree (category);
 
 
 --
@@ -29210,6 +29300,13 @@ CREATE INDEX idx_sla_meas_period ON "ob-poc".sla_measurements USING btree (perio
 
 
 --
+-- Name: idx_sm_standard; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_sm_standard ON "ob-poc".standards_mappings USING btree (standard, our_value);
+
+
+--
 -- Name: idx_special_rights_class; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -29312,6 +29409,27 @@ CREATE INDEX idx_tax_treaty_investor ON "ob-poc".tax_treaty_rates USING btree (i
 --
 
 CREATE INDEX idx_tax_treaty_source ON "ob-poc".tax_treaty_rates USING btree (source_jurisdiction_id);
+
+
+--
+-- Name: idx_teams_active; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_teams_active ON "ob-poc".teams USING btree (is_active) WHERE (is_active = true);
+
+
+--
+-- Name: idx_teams_entity; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_teams_entity ON "ob-poc".teams USING btree (delegating_entity_id);
+
+
+--
+-- Name: idx_teams_type; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_teams_type ON "ob-poc".teams USING btree (team_type);
 
 
 --
@@ -29522,6 +29640,20 @@ CREATE INDEX idx_ubo_snapshots_case_id ON "ob-poc".ubo_snapshots USING btree (ca
 --
 
 CREATE INDEX idx_ubo_snapshots_cbu_id ON "ob-poc".ubo_snapshots USING btree (cbu_id);
+
+
+--
+-- Name: idx_user_learned_phrases_embedding; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_user_learned_phrases_embedding ON "ob-poc".user_learned_phrases USING ivfflat (embedding public.vector_cosine_ops) WITH (lists='100');
+
+
+--
+-- Name: idx_user_learned_phrases_user; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_user_learned_phrases_user ON "ob-poc".user_learned_phrases USING btree (user_id);
 
 
 --
@@ -29798,6 +29930,41 @@ CREATE INDEX kyc_ubo_registry_idx_ubr_status ON "ob-poc".kyc_ubo_registry USING 
 
 
 --
+-- Name: ob_poc_intent_events_chosen_verb_idx; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX ob_poc_intent_events_chosen_verb_idx ON "ob-poc".intent_events USING btree (chosen_verb_fqn);
+
+
+--
+-- Name: ob_poc_intent_events_dominant_entity_idx; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX ob_poc_intent_events_dominant_entity_idx ON "ob-poc".intent_events USING btree (dominant_entity_id) WHERE (dominant_entity_id IS NOT NULL);
+
+
+--
+-- Name: ob_poc_intent_events_session_idx; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX ob_poc_intent_events_session_idx ON "ob-poc".intent_events USING btree (session_id, ts);
+
+
+--
+-- Name: ob_poc_intent_events_ts_idx; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX ob_poc_intent_events_ts_idx ON "ob-poc".intent_events USING btree (ts);
+
+
+--
+-- Name: ob_poc_intent_events_utter_hash_idx; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX ob_poc_intent_events_utter_hash_idx ON "ob-poc".intent_events USING btree (utterance_hash);
+
+
+--
 -- Name: outreach_items_idx_oi_plan; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -30057,83 +30224,6 @@ CREATE UNIQUE INDEX uq_entity_rel_natural_key_null_from ON "ob-poc".entity_relat
 
 
 --
--- Name: idx_ereg_entity; Type: INDEX; Schema: ob_kyc; Owner: -
---
-
-CREATE INDEX idx_ereg_entity ON ob_kyc.entity_regulatory_registrations USING btree (entity_id);
-
-
---
--- Name: idx_ereg_expires; Type: INDEX; Schema: ob_kyc; Owner: -
---
-
-CREATE INDEX idx_ereg_expires ON ob_kyc.entity_regulatory_registrations USING btree (verification_expires);
-
-
---
--- Name: idx_ereg_regulator; Type: INDEX; Schema: ob_kyc; Owner: -
---
-
-CREATE INDEX idx_ereg_regulator ON ob_kyc.entity_regulatory_registrations USING btree (regulator_code);
-
-
---
--- Name: idx_ereg_status; Type: INDEX; Schema: ob_kyc; Owner: -
---
-
-CREATE INDEX idx_ereg_status ON ob_kyc.entity_regulatory_registrations USING btree (status);
-
-
---
--- Name: idx_ereg_type; Type: INDEX; Schema: ob_kyc; Owner: -
---
-
-CREATE INDEX idx_ereg_type ON ob_kyc.entity_regulatory_registrations USING btree (registration_type);
-
-
---
--- Name: idx_ereg_verified; Type: INDEX; Schema: ob_kyc; Owner: -
---
-
-CREATE INDEX idx_ereg_verified ON ob_kyc.entity_regulatory_registrations USING btree (registration_verified);
-
-
---
--- Name: idx_ob_ref_regulators_jurisdiction; Type: INDEX; Schema: ob_ref; Owner: -
---
-
-CREATE INDEX idx_ob_ref_regulators_jurisdiction ON ob_ref.regulators USING btree (jurisdiction);
-
-
---
--- Name: idx_ob_ref_regulators_tier; Type: INDEX; Schema: ob_ref; Owner: -
---
-
-CREATE INDEX idx_ob_ref_regulators_tier ON ob_ref.regulators USING btree (regulatory_tier);
-
-
---
--- Name: idx_ob_ref_role_types_category; Type: INDEX; Schema: ob_ref; Owner: -
---
-
-CREATE INDEX idx_ob_ref_role_types_category ON ob_ref.role_types USING btree (category);
-
-
---
--- Name: idx_ob_ref_role_types_code; Type: INDEX; Schema: ob_ref; Owner: -
---
-
-CREATE INDEX idx_ob_ref_role_types_code ON ob_ref.role_types USING btree (code);
-
-
---
--- Name: idx_sm_standard; Type: INDEX; Schema: ob_ref; Owner: -
---
-
-CREATE INDEX idx_sm_standard ON ob_ref.standards_mappings USING btree (standard, our_value);
-
-
---
 -- Name: idx_agent_plans_case_id; Type: INDEX; Schema: sem_reg; Owner: -
 --
 
@@ -30145,6 +30235,13 @@ CREATE INDEX idx_agent_plans_case_id ON sem_reg.agent_plans USING btree (case_id
 --
 
 CREATE INDEX idx_agent_plans_status ON sem_reg.agent_plans USING btree (status) WHERE ((status)::text = ANY ((ARRAY['draft'::character varying, 'active'::character varying])::text[]));
+
+
+--
+-- Name: idx_basis_changeset; Type: INDEX; Schema: sem_reg; Owner: -
+--
+
+CREATE INDEX idx_basis_changeset ON sem_reg.basis_records USING btree (changeset_id);
 
 
 --
@@ -30173,6 +30270,20 @@ CREATE INDEX idx_changesets_owner ON sem_reg.changesets USING btree (owner_actor
 --
 
 CREATE INDEX idx_changesets_status ON sem_reg.changesets USING btree (status);
+
+
+--
+-- Name: idx_claims_basis; Type: INDEX; Schema: sem_reg; Owner: -
+--
+
+CREATE INDEX idx_claims_basis ON sem_reg.basis_claims USING btree (basis_id);
+
+
+--
+-- Name: idx_conflicts_changeset; Type: INDEX; Schema: sem_reg; Owner: -
+--
+
+CREATE INDEX idx_conflicts_changeset ON sem_reg.conflict_records USING btree (changeset_id);
 
 
 --
@@ -30236,6 +30347,13 @@ CREATE INDEX idx_embedding_records_object_type ON sem_reg.embedding_records USIN
 --
 
 CREATE INDEX idx_escalation_unresolved ON sem_reg.escalation_records USING btree (created_at DESC) WHERE (resolved_at IS NULL);
+
+
+--
+-- Name: idx_idempotency_created; Type: INDEX; Schema: sem_reg; Owner: -
+--
+
+CREATE INDEX idx_idempotency_created ON sem_reg.idempotency_keys USING btree (created_at);
 
 
 --
@@ -30400,6 +30518,34 @@ CREATE INDEX idx_snapshots_view_def_fqn ON sem_reg.snapshots USING btree (((defi
 
 
 --
+-- Name: idx_stew_events_changeset; Type: INDEX; Schema: sem_reg; Owner: -
+--
+
+CREATE INDEX idx_stew_events_changeset ON sem_reg.events USING btree (changeset_id, created_at);
+
+
+--
+-- Name: idx_template_fqn_active; Type: INDEX; Schema: sem_reg; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_template_fqn_active ON sem_reg.templates USING btree (fqn) WHERE ((status)::text = 'active'::text);
+
+
+--
+-- Name: idx_verb_binding_active; Type: INDEX; Schema: sem_reg; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_verb_binding_active ON sem_reg.verb_implementation_bindings USING btree (verb_fqn) WHERE ((status)::text = 'active'::text);
+
+
+--
+-- Name: idx_viewport_manifests_session; Type: INDEX; Schema: sem_reg; Owner: -
+--
+
+CREATE INDEX idx_viewport_manifests_session ON sem_reg.viewport_manifests USING btree (session_id, created_at DESC);
+
+
+--
 -- Name: ix_snapshots_history; Type: INDEX; Schema: sem_reg; Owner: -
 --
 
@@ -30491,202 +30637,6 @@ CREATE INDEX idx_val_reports_cs ON sem_reg_authoring.validation_reports USING bt
 
 
 --
--- Name: idx_sessions_log_event; Type: INDEX; Schema: sessions; Owner: -
---
-
-CREATE INDEX idx_sessions_log_event ON sessions.log USING btree (event_id) WHERE (event_id IS NOT NULL);
-
-
---
--- Name: idx_sessions_log_session; Type: INDEX; Schema: sessions; Owner: -
---
-
-CREATE INDEX idx_sessions_log_session ON sessions.log USING btree (session_id, "timestamp");
-
-
---
--- Name: idx_basis_changeset; Type: INDEX; Schema: stewardship; Owner: -
---
-
-CREATE INDEX idx_basis_changeset ON stewardship.basis_records USING btree (changeset_id);
-
-
---
--- Name: idx_claims_basis; Type: INDEX; Schema: stewardship; Owner: -
---
-
-CREATE INDEX idx_claims_basis ON stewardship.basis_claims USING btree (basis_id);
-
-
---
--- Name: idx_conflicts_changeset; Type: INDEX; Schema: stewardship; Owner: -
---
-
-CREATE INDEX idx_conflicts_changeset ON stewardship.conflict_records USING btree (changeset_id);
-
-
---
--- Name: idx_idempotency_created; Type: INDEX; Schema: stewardship; Owner: -
---
-
-CREATE INDEX idx_idempotency_created ON stewardship.idempotency_keys USING btree (created_at);
-
-
---
--- Name: idx_stew_events_changeset; Type: INDEX; Schema: stewardship; Owner: -
---
-
-CREATE INDEX idx_stew_events_changeset ON stewardship.events USING btree (changeset_id, created_at);
-
-
---
--- Name: idx_template_fqn_active; Type: INDEX; Schema: stewardship; Owner: -
---
-
-CREATE UNIQUE INDEX idx_template_fqn_active ON stewardship.templates USING btree (fqn) WHERE ((status)::text = 'active'::text);
-
-
---
--- Name: idx_verb_binding_active; Type: INDEX; Schema: stewardship; Owner: -
---
-
-CREATE UNIQUE INDEX idx_verb_binding_active ON stewardship.verb_implementation_bindings USING btree (verb_fqn) WHERE ((status)::text = 'active'::text);
-
-
---
--- Name: idx_viewport_manifests_session; Type: INDEX; Schema: stewardship; Owner: -
---
-
-CREATE INDEX idx_viewport_manifests_session ON stewardship.viewport_manifests USING btree (session_id, created_at DESC);
-
-
---
--- Name: idx_attestations_attester; Type: INDEX; Schema: teams; Owner: -
---
-
-CREATE INDEX idx_attestations_attester ON teams.access_attestations USING btree (attester_user_id);
-
-
---
--- Name: idx_attestations_campaign; Type: INDEX; Schema: teams; Owner: -
---
-
-CREATE INDEX idx_attestations_campaign ON teams.access_attestations USING btree (campaign_id);
-
-
---
--- Name: idx_campaigns_deadline; Type: INDEX; Schema: teams; Owner: -
---
-
-CREATE INDEX idx_campaigns_deadline ON teams.access_review_campaigns USING btree (deadline);
-
-
---
--- Name: idx_campaigns_status; Type: INDEX; Schema: teams; Owner: -
---
-
-CREATE INDEX idx_campaigns_status ON teams.access_review_campaigns USING btree (status);
-
-
---
--- Name: idx_membership_active; Type: INDEX; Schema: teams; Owner: -
---
-
-CREATE INDEX idx_membership_active ON teams.memberships USING btree (effective_from, effective_to) WHERE (effective_to IS NULL);
-
-
---
--- Name: idx_membership_function; Type: INDEX; Schema: teams; Owner: -
---
-
-CREATE INDEX idx_membership_function ON teams.memberships USING btree (function_name);
-
-
---
--- Name: idx_membership_team; Type: INDEX; Schema: teams; Owner: -
---
-
-CREATE INDEX idx_membership_team ON teams.memberships USING btree (team_id);
-
-
---
--- Name: idx_membership_type; Type: INDEX; Schema: teams; Owner: -
---
-
-CREATE INDEX idx_membership_type ON teams.memberships USING btree (team_type);
-
-
---
--- Name: idx_membership_user; Type: INDEX; Schema: teams; Owner: -
---
-
-CREATE INDEX idx_membership_user ON teams.memberships USING btree (user_id);
-
-
---
--- Name: idx_review_items_campaign; Type: INDEX; Schema: teams; Owner: -
---
-
-CREATE INDEX idx_review_items_campaign ON teams.access_review_items USING btree (campaign_id);
-
-
---
--- Name: idx_review_items_flagged; Type: INDEX; Schema: teams; Owner: -
---
-
-CREATE INDEX idx_review_items_flagged ON teams.access_review_items USING btree (campaign_id) WHERE (flag_no_legal_link OR flag_legal_expired OR flag_dormant_account);
-
-
---
--- Name: idx_review_items_membership; Type: INDEX; Schema: teams; Owner: -
---
-
-CREATE INDEX idx_review_items_membership ON teams.access_review_items USING btree (membership_id);
-
-
---
--- Name: idx_review_items_pending; Type: INDEX; Schema: teams; Owner: -
---
-
-CREATE INDEX idx_review_items_pending ON teams.access_review_items USING btree (campaign_id, status) WHERE ((status)::text = 'PENDING'::text);
-
-
---
--- Name: idx_review_items_reviewer; Type: INDEX; Schema: teams; Owner: -
---
-
-CREATE INDEX idx_review_items_reviewer ON teams.access_review_items USING btree (reviewer_user_id);
-
-
---
--- Name: idx_review_items_status; Type: INDEX; Schema: teams; Owner: -
---
-
-CREATE INDEX idx_review_items_status ON teams.access_review_items USING btree (status);
-
-
---
--- Name: idx_teams_active; Type: INDEX; Schema: teams; Owner: -
---
-
-CREATE INDEX idx_teams_active ON teams.teams USING btree (is_active) WHERE (is_active = true);
-
-
---
--- Name: idx_teams_entity; Type: INDEX; Schema: teams; Owner: -
---
-
-CREATE INDEX idx_teams_entity ON teams.teams USING btree (delegating_entity_id);
-
-
---
--- Name: idx_teams_type; Type: INDEX; Schema: teams; Owner: -
---
-
-CREATE INDEX idx_teams_type ON teams.teams USING btree (team_type);
-
-
---
 -- Name: v_runbook_summary _RETURN; Type: RULE; Schema: ob-poc; Owner: -
 --
 
@@ -30729,10 +30679,10 @@ CREATE OR REPLACE VIEW "ob-poc".v_runbook_summary AS
 
 
 --
--- Name: failures failures_update_timestamps; Type: TRIGGER; Schema: feedback; Owner: -
+-- Name: failures failures_update_timestamps; Type: TRIGGER; Schema: ob-poc; Owner: -
 --
 
-CREATE TRIGGER failures_update_timestamps BEFORE UPDATE ON feedback.failures FOR EACH ROW EXECUTE FUNCTION feedback.update_timestamps();
+CREATE TRIGGER failures_update_timestamps BEFORE UPDATE ON "ob-poc".failures FOR EACH ROW EXECUTE FUNCTION "ob-poc".update_timestamps();
 
 
 --
@@ -30876,6 +30826,20 @@ CREATE TRIGGER trg_issuer_control_config_updated BEFORE UPDATE ON "ob-poc".issue
 
 
 --
+-- Name: memberships trg_membership_history; Type: TRIGGER; Schema: ob-poc; Owner: -
+--
+
+CREATE TRIGGER trg_membership_history AFTER INSERT OR UPDATE ON "ob-poc".memberships FOR EACH ROW EXECUTE FUNCTION "ob-poc".teams_log_membership_change();
+
+
+--
+-- Name: memberships trg_memberships_updated; Type: TRIGGER; Schema: ob-poc; Owner: -
+--
+
+CREATE TRIGGER trg_memberships_updated BEFORE UPDATE ON "ob-poc".memberships FOR EACH ROW EXECUTE FUNCTION "ob-poc".teams_update_timestamp();
+
+
+--
 -- Name: proofs trg_proofs_updated; Type: TRIGGER; Schema: ob-poc; Owner: -
 --
 
@@ -30939,6 +30903,13 @@ CREATE TRIGGER trg_sync_holding_to_ubo AFTER INSERT OR UPDATE OF units, holding_
 
 
 --
+-- Name: teams trg_teams_updated; Type: TRIGGER; Schema: ob-poc; Owner: -
+--
+
+CREATE TRIGGER trg_teams_updated BEFORE UPDATE ON "ob-poc".teams FOR EACH ROW EXECUTE FUNCTION "ob-poc".teams_update_timestamp();
+
+
+--
 -- Name: ubo_registry trg_ubo_status_transition; Type: TRIGGER; Schema: ob-poc; Owner: -
 --
 
@@ -30974,56 +30945,27 @@ CREATE TRIGGER trigger_update_attribute_registry_timestamp BEFORE UPDATE ON "ob-
 
 
 --
--- Name: memberships trg_membership_history; Type: TRIGGER; Schema: teams; Owner: -
+-- Name: access_attestations access_attestations_campaign_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
-CREATE TRIGGER trg_membership_history AFTER INSERT OR UPDATE ON teams.memberships FOR EACH ROW EXECUTE FUNCTION teams.log_membership_change();
-
-
---
--- Name: memberships trg_memberships_updated; Type: TRIGGER; Schema: teams; Owner: -
---
-
-CREATE TRIGGER trg_memberships_updated BEFORE UPDATE ON teams.memberships FOR EACH ROW EXECUTE FUNCTION teams.update_timestamp();
+ALTER TABLE ONLY "ob-poc".access_attestations
+    ADD CONSTRAINT access_attestations_campaign_id_fkey FOREIGN KEY (campaign_id) REFERENCES "ob-poc".access_review_campaigns(campaign_id);
 
 
 --
--- Name: teams trg_teams_updated; Type: TRIGGER; Schema: teams; Owner: -
+-- Name: access_review_items access_review_items_campaign_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
-CREATE TRIGGER trg_teams_updated BEFORE UPDATE ON teams.teams FOR EACH ROW EXECUTE FUNCTION teams.update_timestamp();
-
-
---
--- Name: entity_aliases entity_aliases_entity_id_fkey; Type: FK CONSTRAINT; Schema: agent; Owner: -
---
-
-ALTER TABLE ONLY agent.entity_aliases
-    ADD CONSTRAINT entity_aliases_entity_id_fkey FOREIGN KEY (entity_id) REFERENCES "ob-poc".entities(entity_id);
+ALTER TABLE ONLY "ob-poc".access_review_items
+    ADD CONSTRAINT access_review_items_campaign_id_fkey FOREIGN KEY (campaign_id) REFERENCES "ob-poc".access_review_campaigns(campaign_id);
 
 
 --
--- Name: learning_audit learning_audit_candidate_id_fkey; Type: FK CONSTRAINT; Schema: agent; Owner: -
+-- Name: access_review_items access_review_items_membership_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
-ALTER TABLE ONLY agent.learning_audit
-    ADD CONSTRAINT learning_audit_candidate_id_fkey FOREIGN KEY (candidate_id) REFERENCES agent.learning_candidates(id);
-
-
---
--- Name: audit_log audit_log_failure_id_fkey; Type: FK CONSTRAINT; Schema: feedback; Owner: -
---
-
-ALTER TABLE ONLY feedback.audit_log
-    ADD CONSTRAINT audit_log_failure_id_fkey FOREIGN KEY (failure_id) REFERENCES feedback.failures(id) ON DELETE CASCADE;
-
-
---
--- Name: occurrences occurrences_failure_id_fkey; Type: FK CONSTRAINT; Schema: feedback; Owner: -
---
-
-ALTER TABLE ONLY feedback.occurrences
-    ADD CONSTRAINT occurrences_failure_id_fkey FOREIGN KEY (failure_id) REFERENCES feedback.failures(id) ON DELETE CASCADE;
+ALTER TABLE ONLY "ob-poc".access_review_items
+    ADD CONSTRAINT access_review_items_membership_id_fkey FOREIGN KEY (membership_id) REFERENCES "ob-poc".memberships(membership_id);
 
 
 --
@@ -31080,6 +31022,14 @@ ALTER TABLE ONLY "ob-poc".attribute_observations
 
 ALTER TABLE ONLY "ob-poc".attribute_values_typed
     ADD CONSTRAINT attribute_values_typed_attribute_id_fkey FOREIGN KEY (attribute_id) REFERENCES "ob-poc".attribute_registry(id);
+
+
+--
+-- Name: audit_log audit_log_failure_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".audit_log
+    ADD CONSTRAINT audit_log_failure_id_fkey FOREIGN KEY (failure_id) REFERENCES "ob-poc".failures(id) ON DELETE CASCADE;
 
 
 --
@@ -32771,6 +32721,14 @@ ALTER TABLE ONLY "ob-poc".entity_addresses
 
 
 --
+-- Name: entity_aliases entity_aliases_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".entity_aliases
+    ADD CONSTRAINT entity_aliases_entity_id_fkey FOREIGN KEY (entity_id) REFERENCES "ob-poc".entities(entity_id);
+
+
+--
 -- Name: entity_bods_links entity_bods_links_bods_entity_statement_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -32896,6 +32854,30 @@ ALTER TABLE ONLY "ob-poc".entity_partnerships
 
 ALTER TABLE ONLY "ob-poc".entity_proper_persons
     ADD CONSTRAINT entity_proper_persons_entity_id_fkey FOREIGN KEY (entity_id) REFERENCES "ob-poc".entities(entity_id) ON DELETE CASCADE;
+
+
+--
+-- Name: entity_regulatory_registrations entity_regulatory_registrations_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".entity_regulatory_registrations
+    ADD CONSTRAINT entity_regulatory_registrations_entity_id_fkey FOREIGN KEY (entity_id) REFERENCES "ob-poc".entities(entity_id) ON DELETE CASCADE;
+
+
+--
+-- Name: entity_regulatory_registrations entity_regulatory_registrations_home_regulator_code_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".entity_regulatory_registrations
+    ADD CONSTRAINT entity_regulatory_registrations_home_regulator_code_fkey FOREIGN KEY (home_regulator_code) REFERENCES "ob-poc".regulators(regulator_code);
+
+
+--
+-- Name: entity_regulatory_registrations entity_regulatory_registrations_regulator_code_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".entity_regulatory_registrations
+    ADD CONSTRAINT entity_regulatory_registrations_regulator_code_fkey FOREIGN KEY (regulator_code) REFERENCES "ob-poc".regulators(regulator_code);
 
 
 --
@@ -33699,6 +33681,14 @@ ALTER TABLE ONLY "ob-poc".kyc_ubo_registry
 
 
 --
+-- Name: learning_audit learning_audit_candidate_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".learning_audit
+    ADD CONSTRAINT learning_audit_candidate_id_fkey FOREIGN KEY (candidate_id) REFERENCES "ob-poc".learning_candidates(id);
+
+
+--
 -- Name: legal_entity legal_entity_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -33720,6 +33710,22 @@ ALTER TABLE ONLY "ob-poc".lifecycle_resource_capabilities
 
 ALTER TABLE ONLY "ob-poc".lifecycle_resource_capabilities
     ADD CONSTRAINT lifecycle_resource_capabilities_resource_fk FOREIGN KEY (resource_type_id) REFERENCES "ob-poc".lifecycle_resource_types(resource_type_id);
+
+
+--
+-- Name: memberships memberships_team_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".memberships
+    ADD CONSTRAINT memberships_team_id_fkey FOREIGN KEY (team_id) REFERENCES "ob-poc".teams(team_id);
+
+
+--
+-- Name: memberships memberships_user_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".memberships
+    ADD CONSTRAINT memberships_user_id_fkey FOREIGN KEY (user_id) REFERENCES "ob-poc".clients(client_id);
 
 
 --
@@ -33792,6 +33798,14 @@ ALTER TABLE ONLY "ob-poc".observation_discrepancies
 
 ALTER TABLE ONLY "ob-poc".observation_discrepancies
     ADD CONSTRAINT observation_discrepancies_workstream_id_fkey FOREIGN KEY (workstream_id) REFERENCES "ob-poc".entity_workstreams(workstream_id);
+
+
+--
+-- Name: occurrences occurrences_failure_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".occurrences
+    ADD CONSTRAINT occurrences_failure_id_fkey FOREIGN KEY (failure_id) REFERENCES "ob-poc".failures(id) ON DELETE CASCADE;
 
 
 --
@@ -34315,6 +34329,14 @@ ALTER TABLE ONLY "ob-poc".service_resource_capabilities
 
 
 --
+-- Name: session_log session_log_event_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".session_log
+    ADD CONSTRAINT session_log_event_id_fkey FOREIGN KEY (event_id) REFERENCES "ob-poc".event_log(id);
+
+
+--
 -- Name: settlement_chain_hops settlement_chain_hops_chain_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -34611,6 +34633,38 @@ ALTER TABLE ONLY "ob-poc".tax_treaty_rates
 
 
 --
+-- Name: team_cbu_access team_cbu_access_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".team_cbu_access
+    ADD CONSTRAINT team_cbu_access_cbu_id_fkey FOREIGN KEY (cbu_id) REFERENCES "ob-poc".cbus(cbu_id);
+
+
+--
+-- Name: team_cbu_access team_cbu_access_team_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".team_cbu_access
+    ADD CONSTRAINT team_cbu_access_team_id_fkey FOREIGN KEY (team_id) REFERENCES "ob-poc".teams(team_id);
+
+
+--
+-- Name: team_service_entitlements team_service_entitlements_team_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".team_service_entitlements
+    ADD CONSTRAINT team_service_entitlements_team_id_fkey FOREIGN KEY (team_id) REFERENCES "ob-poc".teams(team_id);
+
+
+--
+-- Name: teams teams_delegating_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".teams
+    ADD CONSTRAINT teams_delegating_entity_id_fkey FOREIGN KEY (delegating_entity_id) REFERENCES "ob-poc".entities(entity_id);
+
+
+--
 -- Name: threshold_requirements threshold_requirements_risk_band_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -34631,7 +34685,7 @@ ALTER TABLE ONLY "ob-poc".tollgate_evaluations
 --
 
 ALTER TABLE ONLY "ob-poc".tollgate_evaluations
-    ADD CONSTRAINT tollgate_evaluations_tollgate_id_fkey FOREIGN KEY (tollgate_id) REFERENCES ob_ref.tollgate_definitions(tollgate_id);
+    ADD CONSTRAINT tollgate_evaluations_tollgate_id_fkey FOREIGN KEY (tollgate_id) REFERENCES "ob-poc".tollgate_definitions(tollgate_id);
 
 
 --
@@ -34883,27 +34937,27 @@ ALTER TABLE ONLY "ob-poc".workflow_audit_log
 
 
 --
--- Name: entity_regulatory_registrations entity_regulatory_registrations_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob_kyc; Owner: -
+-- Name: basis_claims basis_claims_basis_id_fkey; Type: FK CONSTRAINT; Schema: sem_reg; Owner: -
 --
 
-ALTER TABLE ONLY ob_kyc.entity_regulatory_registrations
-    ADD CONSTRAINT entity_regulatory_registrations_entity_id_fkey FOREIGN KEY (entity_id) REFERENCES "ob-poc".entities(entity_id) ON DELETE CASCADE;
-
-
---
--- Name: entity_regulatory_registrations entity_regulatory_registrations_home_regulator_code_fkey; Type: FK CONSTRAINT; Schema: ob_kyc; Owner: -
---
-
-ALTER TABLE ONLY ob_kyc.entity_regulatory_registrations
-    ADD CONSTRAINT entity_regulatory_registrations_home_regulator_code_fkey FOREIGN KEY (home_regulator_code) REFERENCES ob_ref.regulators(regulator_code);
+ALTER TABLE ONLY sem_reg.basis_claims
+    ADD CONSTRAINT basis_claims_basis_id_fkey FOREIGN KEY (basis_id) REFERENCES sem_reg.basis_records(basis_id);
 
 
 --
--- Name: entity_regulatory_registrations entity_regulatory_registrations_regulator_code_fkey; Type: FK CONSTRAINT; Schema: ob_kyc; Owner: -
+-- Name: basis_records basis_records_changeset_id_fkey; Type: FK CONSTRAINT; Schema: sem_reg; Owner: -
 --
 
-ALTER TABLE ONLY ob_kyc.entity_regulatory_registrations
-    ADD CONSTRAINT entity_regulatory_registrations_regulator_code_fkey FOREIGN KEY (regulator_code) REFERENCES ob_ref.regulators(regulator_code);
+ALTER TABLE ONLY sem_reg.basis_records
+    ADD CONSTRAINT basis_records_changeset_id_fkey FOREIGN KEY (changeset_id) REFERENCES sem_reg.changesets(changeset_id);
+
+
+--
+-- Name: basis_records basis_records_entry_id_fkey; Type: FK CONSTRAINT; Schema: sem_reg; Owner: -
+--
+
+ALTER TABLE ONLY sem_reg.basis_records
+    ADD CONSTRAINT basis_records_entry_id_fkey FOREIGN KEY (entry_id) REFERENCES sem_reg.changeset_entries(entry_id);
 
 
 --
@@ -34944,6 +34998,22 @@ ALTER TABLE ONLY sem_reg.changesets
 
 ALTER TABLE ONLY sem_reg.changesets
     ADD CONSTRAINT changesets_supersedes_change_set_id_fkey FOREIGN KEY (supersedes_change_set_id) REFERENCES sem_reg.changesets(changeset_id);
+
+
+--
+-- Name: conflict_records conflict_records_changeset_id_fkey; Type: FK CONSTRAINT; Schema: sem_reg; Owner: -
+--
+
+ALTER TABLE ONLY sem_reg.conflict_records
+    ADD CONSTRAINT conflict_records_changeset_id_fkey FOREIGN KEY (changeset_id) REFERENCES sem_reg.changesets(changeset_id);
+
+
+--
+-- Name: conflict_records conflict_records_competing_changeset_id_fkey; Type: FK CONSTRAINT; Schema: sem_reg; Owner: -
+--
+
+ALTER TABLE ONLY sem_reg.conflict_records
+    ADD CONSTRAINT conflict_records_competing_changeset_id_fkey FOREIGN KEY (competing_changeset_id) REFERENCES sem_reg.changesets(changeset_id);
 
 
 --
@@ -35003,11 +35073,27 @@ ALTER TABLE ONLY sem_reg.escalation_records
 
 
 --
+-- Name: events events_changeset_id_fkey; Type: FK CONSTRAINT; Schema: sem_reg; Owner: -
+--
+
+ALTER TABLE ONLY sem_reg.events
+    ADD CONSTRAINT events_changeset_id_fkey FOREIGN KEY (changeset_id) REFERENCES sem_reg.changesets(changeset_id);
+
+
+--
 -- Name: derivation_edges fk_derivation_edges_run; Type: FK CONSTRAINT; Schema: sem_reg; Owner: -
 --
 
 ALTER TABLE ONLY sem_reg.derivation_edges
     ADD CONSTRAINT fk_derivation_edges_run FOREIGN KEY (run_id) REFERENCES sem_reg.run_records(run_id);
+
+
+--
+-- Name: focus_states focus_states_changeset_id_fkey; Type: FK CONSTRAINT; Schema: sem_reg; Owner: -
+--
+
+ALTER TABLE ONLY sem_reg.focus_states
+    ADD CONSTRAINT focus_states_changeset_id_fkey FOREIGN KEY (changeset_id) REFERENCES sem_reg.changesets(changeset_id);
 
 
 --
@@ -35059,144 +35145,8 @@ ALTER TABLE ONLY sem_reg_authoring.validation_reports
 
 
 --
--- Name: log log_event_id_fkey; Type: FK CONSTRAINT; Schema: sessions; Owner: -
---
-
-ALTER TABLE ONLY sessions.log
-    ADD CONSTRAINT log_event_id_fkey FOREIGN KEY (event_id) REFERENCES events.log(id);
-
-
---
--- Name: basis_claims basis_claims_basis_id_fkey; Type: FK CONSTRAINT; Schema: stewardship; Owner: -
---
-
-ALTER TABLE ONLY stewardship.basis_claims
-    ADD CONSTRAINT basis_claims_basis_id_fkey FOREIGN KEY (basis_id) REFERENCES stewardship.basis_records(basis_id);
-
-
---
--- Name: basis_records basis_records_changeset_id_fkey; Type: FK CONSTRAINT; Schema: stewardship; Owner: -
---
-
-ALTER TABLE ONLY stewardship.basis_records
-    ADD CONSTRAINT basis_records_changeset_id_fkey FOREIGN KEY (changeset_id) REFERENCES sem_reg.changesets(changeset_id);
-
-
---
--- Name: basis_records basis_records_entry_id_fkey; Type: FK CONSTRAINT; Schema: stewardship; Owner: -
---
-
-ALTER TABLE ONLY stewardship.basis_records
-    ADD CONSTRAINT basis_records_entry_id_fkey FOREIGN KEY (entry_id) REFERENCES sem_reg.changeset_entries(entry_id);
-
-
---
--- Name: conflict_records conflict_records_changeset_id_fkey; Type: FK CONSTRAINT; Schema: stewardship; Owner: -
---
-
-ALTER TABLE ONLY stewardship.conflict_records
-    ADD CONSTRAINT conflict_records_changeset_id_fkey FOREIGN KEY (changeset_id) REFERENCES sem_reg.changesets(changeset_id);
-
-
---
--- Name: conflict_records conflict_records_competing_changeset_id_fkey; Type: FK CONSTRAINT; Schema: stewardship; Owner: -
---
-
-ALTER TABLE ONLY stewardship.conflict_records
-    ADD CONSTRAINT conflict_records_competing_changeset_id_fkey FOREIGN KEY (competing_changeset_id) REFERENCES sem_reg.changesets(changeset_id);
-
-
---
--- Name: events events_changeset_id_fkey; Type: FK CONSTRAINT; Schema: stewardship; Owner: -
---
-
-ALTER TABLE ONLY stewardship.events
-    ADD CONSTRAINT events_changeset_id_fkey FOREIGN KEY (changeset_id) REFERENCES sem_reg.changesets(changeset_id);
-
-
---
--- Name: focus_states focus_states_changeset_id_fkey; Type: FK CONSTRAINT; Schema: stewardship; Owner: -
---
-
-ALTER TABLE ONLY stewardship.focus_states
-    ADD CONSTRAINT focus_states_changeset_id_fkey FOREIGN KEY (changeset_id) REFERENCES sem_reg.changesets(changeset_id);
-
-
---
--- Name: access_attestations access_attestations_campaign_id_fkey; Type: FK CONSTRAINT; Schema: teams; Owner: -
---
-
-ALTER TABLE ONLY teams.access_attestations
-    ADD CONSTRAINT access_attestations_campaign_id_fkey FOREIGN KEY (campaign_id) REFERENCES teams.access_review_campaigns(campaign_id);
-
-
---
--- Name: access_review_items access_review_items_campaign_id_fkey; Type: FK CONSTRAINT; Schema: teams; Owner: -
---
-
-ALTER TABLE ONLY teams.access_review_items
-    ADD CONSTRAINT access_review_items_campaign_id_fkey FOREIGN KEY (campaign_id) REFERENCES teams.access_review_campaigns(campaign_id);
-
-
---
--- Name: access_review_items access_review_items_membership_id_fkey; Type: FK CONSTRAINT; Schema: teams; Owner: -
---
-
-ALTER TABLE ONLY teams.access_review_items
-    ADD CONSTRAINT access_review_items_membership_id_fkey FOREIGN KEY (membership_id) REFERENCES teams.memberships(membership_id);
-
-
---
--- Name: memberships memberships_team_id_fkey; Type: FK CONSTRAINT; Schema: teams; Owner: -
---
-
-ALTER TABLE ONLY teams.memberships
-    ADD CONSTRAINT memberships_team_id_fkey FOREIGN KEY (team_id) REFERENCES teams.teams(team_id);
-
-
---
--- Name: memberships memberships_user_id_fkey; Type: FK CONSTRAINT; Schema: teams; Owner: -
---
-
-ALTER TABLE ONLY teams.memberships
-    ADD CONSTRAINT memberships_user_id_fkey FOREIGN KEY (user_id) REFERENCES "ob-poc".clients(client_id);
-
-
---
--- Name: team_cbu_access team_cbu_access_cbu_id_fkey; Type: FK CONSTRAINT; Schema: teams; Owner: -
---
-
-ALTER TABLE ONLY teams.team_cbu_access
-    ADD CONSTRAINT team_cbu_access_cbu_id_fkey FOREIGN KEY (cbu_id) REFERENCES "ob-poc".cbus(cbu_id);
-
-
---
--- Name: team_cbu_access team_cbu_access_team_id_fkey; Type: FK CONSTRAINT; Schema: teams; Owner: -
---
-
-ALTER TABLE ONLY teams.team_cbu_access
-    ADD CONSTRAINT team_cbu_access_team_id_fkey FOREIGN KEY (team_id) REFERENCES teams.teams(team_id);
-
-
---
--- Name: team_service_entitlements team_service_entitlements_team_id_fkey; Type: FK CONSTRAINT; Schema: teams; Owner: -
---
-
-ALTER TABLE ONLY teams.team_service_entitlements
-    ADD CONSTRAINT team_service_entitlements_team_id_fkey FOREIGN KEY (team_id) REFERENCES teams.teams(team_id);
-
-
---
--- Name: teams teams_delegating_entity_id_fkey; Type: FK CONSTRAINT; Schema: teams; Owner: -
---
-
-ALTER TABLE ONLY teams.teams
-    ADD CONSTRAINT teams_delegating_entity_id_fkey FOREIGN KEY (delegating_entity_id) REFERENCES "ob-poc".entities(entity_id);
-
-
---
 -- PostgreSQL database dump complete
 --
 
-\unrestrict xcqx9V2X78YGGQMkFwmsArFfHRkMLRZCL7BBMZtrWZNVPNvdMNSEaBtPBx4ZzQy
+\unrestrict hlCjzDMalYqcG4GNOUAquPHEx1yjJqkuzHf2RXxkJjKxWOG9W5cVmxxFDE5RBM3
 

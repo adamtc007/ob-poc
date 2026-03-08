@@ -55,7 +55,7 @@ impl CustomOperation for AccessReviewPopulateOp {
         let campaign = sqlx::query!(
             r#"
             SELECT scope_type, scope_filter
-            FROM teams.access_review_campaigns
+            FROM "ob-poc".access_review_campaigns
             WHERE campaign_id = $1
             "#,
             campaign_id
@@ -66,7 +66,7 @@ impl CustomOperation for AccessReviewPopulateOp {
 
         // Update status to POPULATING
         sqlx::query!(
-            r#"UPDATE teams.access_review_campaigns SET status = 'POPULATING' WHERE campaign_id = $1"#,
+            r#"UPDATE "ob-poc".access_review_campaigns SET status = 'POPULATING' WHERE campaign_id = $1"#,
             campaign_id
         )
         .execute(pool)
@@ -76,7 +76,7 @@ impl CustomOperation for AccessReviewPopulateOp {
         // Note: This is a complex insert that joins multiple tables and computes flags
         let inserted = sqlx::query!(
             r#"
-            INSERT INTO teams.access_review_items (
+            INSERT INTO "ob-poc".access_review_items (
                 campaign_id, membership_id, user_id, team_id, role_key,
                 reviewer_user_id,
                 flag_no_legal_link, flag_dormant_account, flag_never_logged_in,
@@ -111,8 +111,8 @@ impl CustomOperation for AccessReviewPopulateOp {
                     ELSE 10
                 END,
                 'PENDING'
-            FROM teams.memberships m
-            JOIN teams.teams t ON m.team_id = t.team_id
+            FROM "ob-poc".memberships m
+            JOIN "ob-poc".teams t ON m.team_id = t.team_id
             JOIN "ob-poc".clients c ON m.user_id = c.client_id
             WHERE m.effective_to IS NULL
               AND t.is_active = true
@@ -135,7 +135,7 @@ impl CustomOperation for AccessReviewPopulateOp {
         let flagged: i64 = sqlx::query_scalar!(
             r#"
             SELECT COUNT(*) as "count!"
-            FROM teams.access_review_items
+            FROM "ob-poc".access_review_items
             WHERE campaign_id = $1
               AND (flag_no_legal_link = true OR flag_dormant_account = true OR flag_never_logged_in = true)
             "#,
@@ -147,7 +147,7 @@ impl CustomOperation for AccessReviewPopulateOp {
         // Update campaign with stats
         sqlx::query!(
             r#"
-            UPDATE teams.access_review_campaigns
+            UPDATE "ob-poc".access_review_campaigns
             SET total_items = $2, pending_items = $2, status = 'READY'
             WHERE campaign_id = $1
             "#,
@@ -204,7 +204,7 @@ impl CustomOperation for AccessReviewLaunchOp {
         // Update status and launch time
         let result = sqlx::query!(
             r#"
-            UPDATE teams.access_review_campaigns
+            UPDATE "ob-poc".access_review_campaigns
             SET status = 'ACTIVE', launched_at = NOW()
             WHERE campaign_id = $1 AND status IN ('DRAFT', 'READY')
             RETURNING name, total_items
@@ -283,7 +283,7 @@ impl CustomOperation for AccessReviewRevokeOp {
         let item = sqlx::query!(
             r#"
             SELECT membership_id, campaign_id
-            FROM teams.access_review_items
+            FROM "ob-poc".access_review_items
             WHERE item_id = $1
             "#,
             item_id
@@ -295,7 +295,7 @@ impl CustomOperation for AccessReviewRevokeOp {
         // End membership
         sqlx::query!(
             r#"
-            UPDATE teams.memberships
+            UPDATE "ob-poc".memberships
             SET effective_to = CURRENT_DATE
             WHERE membership_id = $1
             "#,
@@ -307,7 +307,7 @@ impl CustomOperation for AccessReviewRevokeOp {
         // Update review item
         sqlx::query!(
             r#"
-            UPDATE teams.access_review_items
+            UPDATE "ob-poc".access_review_items
             SET status = 'REVOKED', reviewed_at = NOW(), reviewer_notes = $2
             WHERE item_id = $1
             "#,
@@ -320,7 +320,7 @@ impl CustomOperation for AccessReviewRevokeOp {
         // Update campaign stats
         sqlx::query!(
             r#"
-            UPDATE teams.access_review_campaigns
+            UPDATE "ob-poc".access_review_campaigns
             SET revoked_items = COALESCE(revoked_items, 0) + 1,
                 reviewed_items = COALESCE(reviewed_items, 0) + 1,
                 pending_items = GREATEST(COALESCE(pending_items, 0) - 1, 0)
@@ -412,7 +412,7 @@ impl CustomOperation for AccessReviewBulkConfirmOp {
         // Update items and get campaign_id
         let updated = sqlx::query!(
             r#"
-            UPDATE teams.access_review_items
+            UPDATE "ob-poc".access_review_items
             SET status = 'CONFIRMED', reviewed_at = NOW(), reviewer_notes = $2
             WHERE item_id = ANY($1) AND status = 'PENDING'
             RETURNING campaign_id
@@ -429,7 +429,7 @@ impl CustomOperation for AccessReviewBulkConfirmOp {
         if let Some(first) = updated.first() {
             sqlx::query!(
                 r#"
-                UPDATE teams.access_review_campaigns
+                UPDATE "ob-poc".access_review_campaigns
                 SET confirmed_items = COALESCE(confirmed_items, 0) + $2,
                     reviewed_items = COALESCE(reviewed_items, 0) + $2,
                     pending_items = GREATEST(COALESCE(pending_items, 0) - $2, 0)
@@ -491,7 +491,7 @@ impl CustomOperation for AccessReviewConfirmCleanOp {
         // Confirm all unflagged, low-risk items
         let result = sqlx::query!(
             r#"
-            UPDATE teams.access_review_items
+            UPDATE "ob-poc".access_review_items
             SET status = 'CONFIRMED', reviewed_at = NOW(),
                 reviewer_notes = 'Auto-confirmed: no issues detected'
             WHERE campaign_id = $1
@@ -511,7 +511,7 @@ impl CustomOperation for AccessReviewConfirmCleanOp {
         // Update campaign stats
         sqlx::query!(
             r#"
-            UPDATE teams.access_review_campaigns
+            UPDATE "ob-poc".access_review_campaigns
             SET confirmed_items = COALESCE(confirmed_items, 0) + $2,
                 reviewed_items = COALESCE(reviewed_items, 0) + $2,
                 pending_items = GREATEST(COALESCE(pending_items, 0) - $2, 0)
@@ -525,7 +525,7 @@ impl CustomOperation for AccessReviewConfirmCleanOp {
 
         // Get remaining pending count
         let remaining: i64 = sqlx::query_scalar!(
-            r#"SELECT COUNT(*) as "count!" FROM teams.access_review_items
+            r#"SELECT COUNT(*) as "count!" FROM "ob-poc".access_review_items
                WHERE campaign_id = $1 AND status = 'PENDING'"#,
             campaign_id
         )
@@ -602,7 +602,7 @@ impl CustomOperation for AccessReviewAttestOp {
 
         // Get reviewed items in scope
         let item_ids: Vec<Uuid> = sqlx::query_scalar!(
-            r#"SELECT item_id FROM teams.access_review_items
+            r#"SELECT item_id FROM "ob-poc".access_review_items
                WHERE campaign_id = $1 AND status != 'PENDING'"#,
             campaign_id
         )
@@ -628,7 +628,7 @@ impl CustomOperation for AccessReviewAttestOp {
         // For now, we'll use placeholder values - in production these come from auth context
         let attestation_id: Uuid = sqlx::query_scalar!(
             r#"
-            INSERT INTO teams.access_attestations (
+            INSERT INTO "ob-poc".access_attestations (
                 campaign_id, attester_user_id, attester_name, attester_email,
                 attestation_scope, items_count,
                 attestation_text, attested_at, signature_hash
@@ -707,9 +707,9 @@ impl CustomOperation for AccessReviewProcessDeadlineOp {
                 // End memberships for unreviewed items
                 sqlx::query!(
                     r#"
-                    UPDATE teams.memberships m
+                    UPDATE "ob-poc".memberships m
                     SET effective_to = CURRENT_DATE
-                    FROM teams.access_review_items i
+                    FROM "ob-poc".access_review_items i
                     WHERE i.membership_id = m.membership_id
                       AND i.campaign_id = $1
                       AND i.status = 'PENDING'
@@ -722,7 +722,7 @@ impl CustomOperation for AccessReviewProcessDeadlineOp {
                 // Mark items as auto-suspended
                 let result = sqlx::query!(
                     r#"
-                    UPDATE teams.access_review_items
+                    UPDATE "ob-poc".access_review_items
                     SET status = 'AUTO_SUSPENDED', reviewed_at = NOW(),
                         reviewer_notes = 'Auto-suspended: unreviewed past deadline'
                     WHERE campaign_id = $1 AND status = 'PENDING'
@@ -737,7 +737,7 @@ impl CustomOperation for AccessReviewProcessDeadlineOp {
             "escalate" => {
                 let result = sqlx::query!(
                     r#"
-                    UPDATE teams.access_review_items
+                    UPDATE "ob-poc".access_review_items
                     SET status = 'ESCALATED', escalated_at = NOW(),
                         reviewer_notes = 'Escalated: unreviewed past deadline'
                     WHERE campaign_id = $1 AND status = 'PENDING'
@@ -751,7 +751,7 @@ impl CustomOperation for AccessReviewProcessDeadlineOp {
             }
             "report-only" => {
                 sqlx::query_scalar!(
-                    r#"SELECT COUNT(*) as "count!" FROM teams.access_review_items
+                    r#"SELECT COUNT(*) as "count!" FROM "ob-poc".access_review_items
                        WHERE campaign_id = $1 AND status = 'PENDING'"#,
                     campaign_id
                 )
@@ -765,7 +765,7 @@ impl CustomOperation for AccessReviewProcessDeadlineOp {
         if action != "report-only" {
             sqlx::query!(
                 r#"
-                UPDATE teams.access_review_campaigns
+                UPDATE "ob-poc".access_review_campaigns
                 SET status = 'COMPLETED', completed_at = NOW()
                 WHERE campaign_id = $1
                 "#,
@@ -824,7 +824,7 @@ impl CustomOperation for AccessReviewSendRemindersOp {
         let pending_count: i64 = sqlx::query_scalar!(
             r#"
             SELECT COUNT(DISTINCT reviewer_user_id) as "count!"
-            FROM teams.access_review_items
+            FROM "ob-poc".access_review_items
             WHERE campaign_id = $1 AND status = 'PENDING'
             "#,
             campaign_id

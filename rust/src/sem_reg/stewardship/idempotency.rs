@@ -1,7 +1,7 @@
 //! Idempotency Service — ensures mutating tools are at-most-once.
 //!
 //! Spec §6.2: All mutating tools accept `client_request_id: Option<Uuid>`.
-//! If present, we check `stewardship.idempotency_keys` before executing.
+//! If present, we check `sem_reg.idempotency_keys` before executing.
 //! If a cached result exists, return it. Otherwise execute and cache.
 
 use anyhow::Result;

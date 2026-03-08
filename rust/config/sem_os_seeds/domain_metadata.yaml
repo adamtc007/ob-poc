@@ -1445,56 +1445,56 @@ domains:
   team:
     description: "Team management — teams, memberships, CBU access grants, service entitlements"
     tables:
-      teams.teams:
+      teams:
         description: "Team definitions"
         governance_tier: governed
         classification: internal
         pii: false
-      teams.memberships:
+      memberships:
         description: "Team membership assignments"
         governance_tier: governed
         classification: internal
         pii: false
-      teams.team_cbu_access:
+      team_cbu_access:
         description: "Team-to-CBU access grants"
         governance_tier: governed
         classification: internal
         pii: false
-      teams.team_service_entitlements:
+      team_service_entitlements:
         description: "Service entitlements per team"
         governance_tier: governed
         classification: internal
         pii: false
-      teams.access_review_campaigns:
+      access_review_campaigns:
         description: "Access review campaign definitions"
         governance_tier: governed
         classification: internal
         pii: false
-      teams.access_review_items:
+      access_review_items:
         description: "Individual access review decisions"
         governance_tier: governed
         classification: internal
         pii: false
-      teams.access_attestations:
+      access_attestations:
         description: "Access attestation records"
         governance_tier: governed
         classification: internal
         pii: false
     verb_data_footprint:
       team.create:
-        writes: [teams.teams]
+        writes: [teams]
       team.add-member:
-        reads: [teams.teams]
-        writes: [teams.memberships]
+        reads: [teams]
+        writes: [memberships]
       team.remove-member:
-        reads: [teams.memberships]
-        writes: [teams.memberships]
+        reads: [memberships]
+        writes: [memberships]
       team.grant-cbu-access:
-        reads: [teams.teams, cbus]
-        writes: [teams.team_cbu_access]
+        reads: [teams, cbus]
+        writes: [team_cbu_access]
       team.revoke-cbu-access:
-        reads: [teams.team_cbu_access]
-        writes: [teams.team_cbu_access]
+        reads: [team_cbu_access]
+        writes: [team_cbu_access]
 
   # ---------------------------------------------------------------------------
   # AGENT — Learning & Semantic Pipeline
@@ -1502,37 +1502,37 @@ domains:
   agent:
     description: "Agent learning pipeline — invocation phrases, learned patterns, blocklist, teaching, and promotion"
     tables:
-      agent.invocation_phrases:
+      invocation_phrases:
         description: "Global invocation phrase patterns"
         governance_tier: operational
         classification: internal
         pii: false
-      agent.user_learned_phrases:
+      user_learned_phrases:
         description: "Per-user learned phrase patterns"
         governance_tier: operational
         classification: internal
         pii: false
-      agent.phrase_blocklist:
+      phrase_blocklist:
         description: "Blocked verb mappings"
         governance_tier: operational
         classification: internal
         pii: false
-      agent.learning_candidates:
+      learning_candidates:
         description: "Staged promotion candidates with success tracking"
         governance_tier: operational
         classification: internal
         pii: false
-      agent.learning_audit:
+      learning_audit:
         description: "Audit trail of promotions/rejections"
         governance_tier: operational
         classification: internal
         pii: false
-      agent.entity_aliases:
+      entity_aliases:
         description: "Entity aliases for entity linking"
         governance_tier: operational
         classification: internal
         pii: false
-      agent.lexicon_tokens:
+      lexicon_tokens:
         description: "Lexicon tokens for formal grammar parsing"
         governance_tier: operational
         classification: internal
@@ -1752,73 +1752,73 @@ domains:
   stewardship:
     description: "Stewardship layer — changeset workflow, basis records, conflict detection, focus states, viewports"
     tables:
-      stewardship.events:
+      sem_reg.events:
         description: "Immutable event log (changeset_created, submitted, review_recorded, published)"
         governance_tier: governed
         classification: internal
         pii: false
-      stewardship.basis_records:
+      sem_reg.basis_records:
         description: "Basis of record (assertion, confidence, verified_by, source)"
         governance_tier: governed
         classification: internal
         pii: false
-      stewardship.basis_claims:
+      sem_reg.basis_claims:
         description: "Claims within basis records"
         governance_tier: governed
         classification: internal
         pii: false
-      stewardship.conflict_records:
+      sem_reg.conflict_records:
         description: "Competing change conflicts (detected → resolved → archived)"
         governance_tier: governed
         classification: internal
         pii: false
-      stewardship.focus_states:
+      sem_reg.focus_states:
         description: "Session focus state for Show Loop viewports"
         governance_tier: operational
         classification: internal
         pii: false
-      stewardship.viewport_manifests:
+      sem_reg.viewport_manifests:
         description: "Captured viewport state snapshots"
         governance_tier: operational
         classification: internal
         pii: false
-      stewardship.idempotency_keys:
+      sem_reg.idempotency_keys:
         description: "Idempotency keys for stewardship operations"
         governance_tier: operational
         classification: internal
         pii: false
-      stewardship.templates:
+      sem_reg.templates:
         description: "Stewardship template definitions"
         governance_tier: governed
         classification: internal
         pii: false
-      stewardship.verb_implementation_bindings:
+      sem_reg.verb_implementation_bindings:
         description: "Verb implementation bindings for stewardship tools"
         governance_tier: governed
         classification: internal
         pii: false
     verb_data_footprint:
       stew.compose-changeset:
-        writes: [stewardship.events, sem_reg.changesets]
+        writes: [sem_reg.events, sem_reg.changesets]
       stew.submit-for-review:
         reads: [sem_reg.changesets]
-        writes: [sem_reg.changesets, stewardship.events]
+        writes: [sem_reg.changesets, sem_reg.events]
       stew.approve-changeset:
         reads: [sem_reg.changesets]
-        writes: [sem_reg.changesets, stewardship.events]
+        writes: [sem_reg.changesets, sem_reg.events]
       stew.publish-changeset:
         reads: [sem_reg.changesets, sem_reg.changeset_entries]
-        writes: [sem_reg.snapshots, sem_reg.snapshot_sets, stewardship.events]
+        writes: [sem_reg.snapshots, sem_reg.snapshot_sets, sem_reg.events]
       stew.attach-basis:
-        reads: [stewardship.basis_records]
-        writes: [stewardship.basis_records, stewardship.basis_claims]
+        reads: [sem_reg.basis_records]
+        writes: [sem_reg.basis_records, sem_reg.basis_claims]
       stew.resolve-conflict:
-        reads: [stewardship.conflict_records]
-        writes: [stewardship.conflict_records]
+        reads: [sem_reg.conflict_records]
+        writes: [sem_reg.conflict_records]
       stew.set-focus:
-        writes: [stewardship.focus_states]
+        writes: [sem_reg.focus_states]
       stew.show:
-        reads: [stewardship.focus_states, sem_reg.snapshots]
+        reads: [sem_reg.focus_states, sem_reg.snapshots]
 
   # ---------------------------------------------------------------------------
   # REFERENCE — Taxonomies & Reference Data
@@ -1851,27 +1851,22 @@ domains:
         governance_tier: governed
         classification: public
         pii: false
-      ob_ref.regulators:
+      regulators:
         description: "Regulatory body definitions"
         governance_tier: governed
         classification: public
         pii: false
-      ob_ref.role_types:
-        description: "Reference role types"
-        governance_tier: governed
-        classification: public
-        pii: false
-      ob_ref.request_types:
+      request_types:
         description: "Request type taxonomy"
         governance_tier: governed
         classification: public
         pii: false
-      ob_ref.tollgate_definitions:
+      tollgate_definitions:
         description: "Tollgate definitions for workflow gates"
         governance_tier: governed
         classification: internal
         pii: false
-      ob_ref.standards_mappings:
+      standards_mappings:
         description: "Standards mapping (ISO, regulatory frameworks)"
         governance_tier: governed
         classification: public
@@ -1922,17 +1917,17 @@ domains:
   feedback:
     description: "Outcome feedback tracking for intent matching and learning pipeline"
     tables:
-      feedback.occurrences:
+      occurrences:
         description: "Outcome occurrences from intent matching"
         governance_tier: operational
         classification: internal
         pii: false
-      feedback.failures:
+      failures:
         description: "Failed intent matching records"
         governance_tier: operational
         classification: internal
         pii: false
-      feedback.audit_log:
+      audit_log:
         description: "Feedback audit trail"
         governance_tier: operational
         classification: internal

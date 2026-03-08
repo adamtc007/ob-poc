@@ -1006,7 +1006,7 @@ impl CustomOperation for AgentTeachOp {
             get_optional_string(verb_call, "source").unwrap_or_else(|| "dsl_teaching".to_string());
 
         // Call the database function
-        let result: (bool,) = sqlx::query_as(r#"SELECT agent.teach_phrase($1, $2, $3)"#)
+        let result: (bool,) = sqlx::query_as(r#"SELECT "ob-poc".teach_phrase($1, $2, $3)"#)
             .bind(&phrase)
             .bind(&verb)
             .bind(&source)
@@ -1077,7 +1077,7 @@ impl CustomOperation for AgentUnteachOp {
             get_optional_string(verb_call, "reason").unwrap_or_else(|| "dsl_unteach".to_string());
 
         // Call the database function
-        let result: (i32,) = sqlx::query_as(r#"SELECT agent.unteach_phrase($1, $2, $3)"#)
+        let result: (i32,) = sqlx::query_as(r#"SELECT "ob-poc".unteach_phrase($1, $2, $3)"#)
             .bind(&phrase)
             .bind(verb.as_deref())
             .bind(&reason)
@@ -1150,7 +1150,7 @@ impl CustomOperation for AgentTeachingStatusOp {
         let recent: Vec<(String, String, String, chrono::DateTime<chrono::Utc>)> = sqlx::query_as(
             r#"
             SELECT phrase, verb, source, taught_at
-            FROM agent.v_recently_taught
+            FROM "ob-poc".v_recently_taught
             ORDER BY taught_at DESC
             LIMIT $1
             "#,
@@ -1182,7 +1182,7 @@ impl CustomOperation for AgentTeachingStatusOp {
                         taught_today,
                         taught_this_week,
                         most_recent
-                    FROM agent.v_teaching_stats
+                    FROM "ob-poc".v_teaching_stats
                     "#,
                 )
                 .fetch_optional(pool)
@@ -1448,7 +1448,7 @@ impl CustomOperation for AgentTelemetrySummaryOp {
         let clarify_rows: Vec<(String, i64)> = sqlx::query_as(
             r#"
             SELECT chosen_verb_fqn, count(*) AS clarify_count
-            FROM agent.intent_events
+            FROM "ob-poc".intent_events
             WHERE outcome = 'needs_clarification'
               AND chosen_verb_fqn IS NOT NULL
               AND ts > now() - make_interval(days => $1)
@@ -1468,7 +1468,7 @@ impl CustomOperation for AgentTelemetrySummaryOp {
         let failure_rows: Vec<(String, Option<String>, i64)> = sqlx::query_as(
             r#"
             SELECT outcome, error_code, count(*) AS event_count
-            FROM agent.intent_events
+            FROM "ob-poc".intent_events
             WHERE outcome NOT IN ('ready', 'scope_resolved', 'macro_expanded')
               AND ts > now() - make_interval(days => $1)
             GROUP BY outcome, error_code
@@ -1489,7 +1489,7 @@ impl CustomOperation for AgentTelemetrySummaryOp {
             SELECT denied_verb, count(*) AS deny_count
             FROM (
                 SELECT jsonb_array_elements_text(semreg_denied_verbs) AS denied_verb
-                FROM agent.intent_events
+                FROM "ob-poc".intent_events
                 WHERE semreg_denied_verbs IS NOT NULL
                   AND jsonb_array_length(semreg_denied_verbs) > 0
                   AND ts > now() - make_interval(days => $1)
@@ -1509,7 +1509,7 @@ impl CustomOperation for AgentTelemetrySummaryOp {
         // Total event count for the period
         let total: (i64,) = sqlx::query_as(
             r#"
-            SELECT count(*) FROM agent.intent_events
+            SELECT count(*) FROM "ob-poc".intent_events
             WHERE ts > now() - make_interval(days => $1)
             "#,
         )
@@ -1541,7 +1541,7 @@ impl CustomOperation for AgentTelemetrySummaryOp {
                     count(*) FILTER (WHERE allowed_verbs_fingerprint IS NOT NULL) AS fingerprinted,
                     coalesce(avg(pruned_verbs_count) FILTER (WHERE pruned_verbs_count IS NOT NULL), 0)::bigint AS avg_pruned,
                     count(*) FILTER (WHERE toctou_recheck_performed = true) AS toctou_rechecks
-                FROM agent.intent_events
+                FROM "ob-poc".intent_events
                 WHERE ts > now() - make_interval(days => $1)
                 "#,
             )
@@ -1608,7 +1608,7 @@ impl CustomOperation for AgentLearnOp {
         // Count pending patterns before
         let pending_before: (i64,) = sqlx::query_as(
             r#"
-            SELECT COUNT(*) FROM agent.v_recently_taught rt
+            SELECT COUNT(*) FROM "ob-poc".v_recently_taught rt
             WHERE NOT EXISTS (
                 SELECT 1 FROM "ob-poc".verb_pattern_embeddings vpe
                 WHERE vpe.phrase = rt.phrase AND vpe.verb_name = rt.verb
@@ -1658,7 +1658,7 @@ impl CustomOperation for AgentLearnOp {
         // Count how many were actually embedded
         let pending_after: (i64,) = sqlx::query_as(
             r#"
-            SELECT COUNT(*) FROM agent.v_recently_taught rt
+            SELECT COUNT(*) FROM "ob-poc".v_recently_taught rt
             WHERE NOT EXISTS (
                 SELECT 1 FROM "ob-poc".verb_pattern_embeddings vpe
                 WHERE vpe.phrase = rt.phrase AND vpe.verb_name = rt.verb

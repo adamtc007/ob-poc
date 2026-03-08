@@ -1795,13 +1795,13 @@ impl ToolHandlers {
         // Insert or increment learning candidate
         let row = sqlx::query_as::<_, LearningCandidateUpsertRow>(
             r#"
-            INSERT INTO agent.learning_candidates (
+            INSERT INTO "ob-poc".learning_candidates (
                 fingerprint, learning_type, input_pattern, suggested_output,
                 risk_level, auto_applicable
             )
             VALUES ($1, $2, $3, $4, $5, $6)
             ON CONFLICT (fingerprint) DO UPDATE SET
-                occurrence_count = agent.learning_candidates.occurrence_count + 1,
+                occurrence_count = "ob-poc".learning_candidates.occurrence_count + 1,
                 last_seen = NOW(),
                 updated_at = NOW()
             RETURNING id, occurrence_count, (xmax = 0) as was_created
@@ -1824,7 +1824,7 @@ impl ToolHandlers {
         let auto_applied = if risk_level == "low" {
             sqlx::query(
                 r#"
-                INSERT INTO agent.entity_aliases (alias, canonical_name, source)
+                INSERT INTO "ob-poc".entity_aliases (alias, canonical_name, source)
                 VALUES ($1, $2, 'explicit_feedback')
                 ON CONFLICT (alias) DO UPDATE SET
                     canonical_name = $2,
@@ -1855,10 +1855,10 @@ impl ToolHandlers {
         let threshold_applied = if risk_level == "medium" && occurrence_count >= 3 {
             let applied = sqlx::query(
                 r#"
-                INSERT INTO agent.invocation_phrases (phrase, verb, source)
+                INSERT INTO "ob-poc".invocation_phrases (phrase, verb, source)
                 VALUES ($1, $2, 'threshold_auto')
                 ON CONFLICT (phrase, verb) DO UPDATE SET
-                    occurrence_count = agent.invocation_phrases.occurrence_count + 1,
+                    occurrence_count = "ob-poc".invocation_phrases.occurrence_count + 1,
                     updated_at = NOW()
                 "#,
             )
@@ -1871,7 +1871,7 @@ impl ToolHandlers {
             if applied {
                 // Mark candidate as applied
                 let _ = sqlx::query(
-                    "UPDATE agent.learning_candidates SET status = 'applied', applied_at = NOW() WHERE id = $1"
+                    r#"UPDATE "ob-poc".learning_candidates SET status = 'applied', applied_at = NOW() WHERE id = $1"#,
                 )
                 .bind(candidate_id)
                 .execute(pool)

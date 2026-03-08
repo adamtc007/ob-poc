@@ -80,7 +80,7 @@ async fn load_entities(pool: &PgPool) -> Result<Vec<EntityRow>> {
         .collect())
 }
 
-/// Build alias and name indexes from entity_names and agent.entity_aliases
+/// Build alias and name indexes from entity_names and "ob-poc".entity_aliases
 async fn build_alias_indexes(
     pool: &PgPool,
     entities: &[EntityRow],
@@ -116,12 +116,12 @@ async fn build_alias_indexes(
         alias_idx.entry(norm).or_default().push(n.entity_id);
     }
 
-    // Load from agent.entity_aliases table
+    // Load from "ob-poc".entity_aliases table
     let aliases = sqlx::query!(
         r#"SELECT
             entity_id,
             alias
-        FROM agent.entity_aliases
+        FROM "ob-poc".entity_aliases
         WHERE entity_id IS NOT NULL
         ORDER BY entity_id"#
     )
@@ -315,7 +315,7 @@ pub async fn lint_entity_data(pool: &PgPool) -> Result<Vec<LintWarning>> {
             FROM "ob-poc".entity_names
             UNION ALL
             SELECT LOWER(TRIM(REGEXP_REPLACE(alias, '[^a-zA-Z0-9 ]', ' ', 'g'))) as alias_norm, entity_id
-            FROM agent.entity_aliases WHERE entity_id IS NOT NULL
+            FROM "ob-poc".entity_aliases WHERE entity_id IS NOT NULL
         ) combined
         GROUP BY alias_norm
         HAVING COUNT(DISTINCT entity_id) > 1

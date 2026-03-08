@@ -148,7 +148,7 @@ impl DbEventStore {
 
         sqlx::query!(
             r#"
-            INSERT INTO events.log (timestamp, session_id, event_type, payload)
+            INSERT INTO "ob-poc".event_log (timestamp, session_id, event_type, payload)
             VALUES ($1, $2, $3, $4)
             "#,
             event.timestamp,

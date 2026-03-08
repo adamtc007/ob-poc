@@ -171,7 +171,7 @@ impl FeedbackInspector {
                 id, fingerprint, error_type, remediation_path, status,
                 verb, source, error_message, user_intent,
                 occurrence_count, first_seen_at, last_seen_at, repro_verified
-            FROM feedback.failures
+            FROM "ob-poc".failures
             WHERE 1=1
             "#,
         );
@@ -234,7 +234,7 @@ impl FeedbackInspector {
                 verb, source, error_message, user_intent,
                 occurrence_count, first_seen_at, last_seen_at,
                 repro_verified
-            FROM feedback.failures
+            FROM "ob-poc".failures
             ORDER BY last_seen_at DESC
             LIMIT 100
             "#
@@ -278,7 +278,7 @@ impl FeedbackInspector {
             SessionEntryRow,
             r#"
             SELECT entry_type, content, timestamp as created_at
-            FROM sessions.log
+            FROM "ob-poc".session_log
             WHERE session_id = $1
               AND timestamp <= $2
             ORDER BY timestamp DESC
@@ -334,7 +334,7 @@ impl FeedbackInspector {
                 fix_commit, fix_notes,
                 occurrence_count, first_seen_at, last_seen_at, resolved_at,
                 created_at, updated_at
-            FROM feedback.failures
+            FROM "ob-poc".failures
             WHERE fingerprint = $1
             "#,
             fingerprint
@@ -369,7 +369,7 @@ impl FeedbackInspector {
 
         let id = sqlx::query_scalar!(
             r#"
-            INSERT INTO feedback.failures (
+            INSERT INTO "ob-poc".failures (
                 fingerprint, fingerprint_version,
                 error_type, remediation_path, status,
                 verb, source, error_message, error_context,
@@ -413,7 +413,7 @@ impl FeedbackInspector {
     ) -> Result<Uuid> {
         let id = sqlx::query_scalar!(
             r#"
-            INSERT INTO feedback.occurrences (
+            INSERT INTO "ob-poc".occurrences (
                 failure_id, event_id, event_timestamp, session_id,
                 verb, error_message
             ) VALUES ($1, $2, $3, $4, $5, $6)
@@ -432,7 +432,7 @@ impl FeedbackInspector {
         // Update failure counts
         sqlx::query!(
             r#"
-            UPDATE feedback.failures
+            UPDATE "ob-poc".failures
             SET occurrence_count = occurrence_count + 1,
                 last_seen_at = $2
             WHERE id = $1
@@ -453,7 +453,7 @@ impl FeedbackInspector {
             SELECT
                 id, failure_id, event_id, event_timestamp, session_id,
                 verb, duration_ms, error_message, error_backtrace, created_at
-            FROM feedback.occurrences
+            FROM "ob-poc".occurrences
             WHERE failure_id = $1
             ORDER BY event_timestamp DESC
             LIMIT 50
@@ -475,7 +475,7 @@ impl FeedbackInspector {
     ) -> Result<()> {
         let result = sqlx::query!(
             r#"
-            UPDATE feedback.failures
+            UPDATE "ob-poc".failures
             SET repro_type = $2, repro_path = $3, status = 'REPRO_GENERATED'
             WHERE fingerprint = $1
             "#,
@@ -497,7 +497,7 @@ impl FeedbackInspector {
     pub async fn verify_repro(&self, fingerprint: &str) -> Result<()> {
         let result = sqlx::query!(
             r#"
-            UPDATE feedback.failures
+            UPDATE "ob-poc".failures
             SET repro_verified = true, status = 'REPRO_VERIFIED'
             WHERE fingerprint = $1
             "#,
@@ -523,7 +523,7 @@ impl FeedbackInspector {
 
         let result = sqlx::query!(
             r#"
-            UPDATE feedback.failures
+            UPDATE "ob-poc".failures
             SET status = $2, resolved_at = $3
             WHERE fingerprint = $1
             "#,
@@ -550,7 +550,7 @@ impl FeedbackInspector {
     ) -> Result<()> {
         let result = sqlx::query!(
             r#"
-            UPDATE feedback.failures
+            UPDATE "ob-poc".failures
             SET status = 'FIX_COMMITTED', fix_commit = $2, fix_notes = $3
             WHERE fingerprint = $1
             "#,
@@ -579,7 +579,7 @@ impl FeedbackInspector {
 
         let id = sqlx::query_scalar!(
             r#"
-            INSERT INTO feedback.audit_log (
+            INSERT INTO "ob-poc".audit_log (
                 failure_id, action, actor_type, actor_id,
                 details, evidence, evidence_hash,
                 previous_status, new_status
@@ -625,7 +625,7 @@ impl FeedbackInspector {
                 previous_status as "previous_status: IssueStatus",
                 new_status as "new_status: IssueStatus",
                 created_at
-            FROM feedback.audit_log
+            FROM "ob-poc".audit_log
             WHERE failure_id = $1
             ORDER BY created_at ASC
             "#,

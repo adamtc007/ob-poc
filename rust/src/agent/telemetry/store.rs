@@ -12,7 +12,7 @@ use super::IntentEventRow;
 pub async fn insert_intent_event(pool: &PgPool, row: &IntentEventRow) -> bool {
     let result = sqlx::query(
         r#"
-        INSERT INTO agent.intent_events (
+        INSERT INTO "ob-poc".intent_events (
             event_id, session_id, actor_id, entrypoint,
             utterance_hash, utterance_preview, scope,
             subject_ref_type, subject_ref_id,

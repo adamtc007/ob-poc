@@ -176,7 +176,7 @@ async fn store_correction_event(
 
     let event_id = sqlx::query_scalar!(
         r#"
-        INSERT INTO agent.events (
+        INSERT INTO "ob-poc".events (
             session_id, event_type, user_message, generated_dsl,
             corrected_dsl, correction_type, was_corrected
         )
@@ -223,7 +223,7 @@ pub(crate) async fn select_verb_disambiguation(
 /// - User explicitly clicked one
 /// - This is an active correction, not passive acceptance
 ///
-/// Uses agent.user_learned_phrases table for immediate effect on verb search.
+/// Uses "ob-poc".user_learned_phrases table for immediate effect on verb search.
 /// Uses a "global" user_id (all zeros) since this is system-wide learning.
 ///
 /// Also generates and stores phrase variants (confidence=0.85) to make learning
@@ -241,7 +241,7 @@ pub async fn record_verb_selection_signal(
     // Insert primary phrase with gold-standard confidence (0.95)
     sqlx::query!(
         r#"
-        INSERT INTO agent.user_learned_phrases (
+        INSERT INTO "ob-poc".user_learned_phrases (
             user_id,
             phrase,
             verb,
@@ -254,8 +254,8 @@ pub async fn record_verb_selection_signal(
         VALUES ($1, $2, $3, 1, 0.95, 'user_disambiguation', NOW(), NOW())
         ON CONFLICT (user_id, phrase)
         DO UPDATE SET
-            occurrence_count = agent.user_learned_phrases.occurrence_count + 1,
-            confidence = GREATEST(agent.user_learned_phrases.confidence, 0.95),
+            occurrence_count = "ob-poc".user_learned_phrases.occurrence_count + 1,
+            confidence = GREATEST("ob-poc".user_learned_phrases.confidence, 0.95),
             verb = EXCLUDED.verb,
             updated_at = NOW()
         "#,
@@ -274,7 +274,7 @@ pub async fn record_verb_selection_signal(
         if variant != original_input {
             sqlx::query!(
                 r#"
-                INSERT INTO agent.user_learned_phrases (
+                INSERT INTO "ob-poc".user_learned_phrases (
                     user_id,
                     phrase,
                     verb,
@@ -287,8 +287,8 @@ pub async fn record_verb_selection_signal(
                 VALUES ($1, $2, $3, 1, 0.85, 'generated_variant', NOW(), NOW())
                 ON CONFLICT (user_id, phrase)
                 DO UPDATE SET
-                    occurrence_count = agent.user_learned_phrases.occurrence_count + 1,
-                    confidence = GREATEST(agent.user_learned_phrases.confidence, 0.85),
+                    occurrence_count = "ob-poc".user_learned_phrases.occurrence_count + 1,
+                    confidence = GREATEST("ob-poc".user_learned_phrases.confidence, 0.85),
                     updated_at = NOW()
                 "#,
                 global_user_id,
@@ -309,7 +309,7 @@ pub async fn record_verb_selection_signal(
             // Schema: phrase, blocked_verb, user_id, reason, embedding, embedding_model, expires_at, created_at
             sqlx::query!(
                 r#"
-                INSERT INTO agent.phrase_blocklist (
+                INSERT INTO "ob-poc".phrase_blocklist (
                     phrase,
                     blocked_verb,
                     reason,

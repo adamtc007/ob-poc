@@ -135,7 +135,7 @@ impl VerbService {
         let row = sqlx::query_as::<_, UserLearnedExactRow>(
             r#"
             SELECT phrase, verb, confidence
-            FROM agent.user_learned_phrases
+            FROM "ob-poc".user_learned_phrases
             WHERE user_id = $1 AND LOWER(phrase) = $2
             "#,
         )
@@ -163,7 +163,7 @@ impl VerbService {
         let row = sqlx::query_as::<_, UserLearnedSemanticRow>(
             r#"
             SELECT phrase, verb, confidence, 1 - (embedding <=> $1::vector) as similarity
-            FROM agent.user_learned_phrases
+            FROM "ob-poc".user_learned_phrases
             WHERE user_id = $2
               AND embedding IS NOT NULL
             ORDER BY embedding <=> $1::vector
@@ -200,7 +200,7 @@ impl VerbService {
         let rows = sqlx::query_as::<_, UserLearnedSemanticRow>(
             r#"
             SELECT phrase, verb, confidence, 1 - (embedding <=> $1::vector) as similarity
-            FROM agent.user_learned_phrases
+            FROM "ob-poc".user_learned_phrases
             WHERE user_id = $2
               AND embedding IS NOT NULL
               AND 1 - (embedding <=> $1::vector) > $4
@@ -329,7 +329,7 @@ impl VerbService {
         let row = sqlx::query_as::<_, GlobalLearnedSemanticRow>(
             r#"
             SELECT phrase, verb, 1 - (embedding <=> $1::vector) as similarity
-            FROM agent.invocation_phrases
+            FROM "ob-poc".invocation_phrases
             WHERE embedding IS NOT NULL
             ORDER BY embedding <=> $1::vector
             LIMIT 1
@@ -363,7 +363,7 @@ impl VerbService {
         let rows = sqlx::query_as::<_, GlobalLearnedSemanticRow>(
             r#"
             SELECT phrase, verb, 1 - (embedding <=> $1::vector) as similarity
-            FROM agent.invocation_phrases
+            FROM "ob-poc".invocation_phrases
             WHERE embedding IS NOT NULL
               AND 1 - (embedding <=> $1::vector) > $3
             ORDER BY embedding <=> $1::vector
@@ -477,7 +477,7 @@ impl VerbService {
         let blocked = sqlx::query_scalar::<_, bool>(
             r#"
             SELECT EXISTS (
-                SELECT 1 FROM agent.phrase_blocklist
+                SELECT 1 FROM "ob-poc".phrase_blocklist
                 WHERE blocked_verb = $1
                   AND (user_id IS NULL OR user_id = $2)
                   AND (expires_at IS NULL OR expires_at > now())

@@ -67,7 +67,7 @@ impl ConfidenceDecay {
         if let Some(uid) = user_id {
             let result = sqlx::query_as::<_, (f32,)>(
                 r#"
-                UPDATE agent.user_learned_phrases
+                UPDATE "ob-poc".user_learned_phrases
                 SET confidence = GREATEST($1, confidence * $2),
                     updated_at = now()
                 WHERE user_id = $3
@@ -98,7 +98,7 @@ impl ConfidenceDecay {
         // Fall back to global table - reduce occurrence count
         let result = sqlx::query_as::<_, (i32,)>(
             r#"
-            UPDATE agent.invocation_phrases
+            UPDATE "ob-poc".invocation_phrases
             SET occurrence_count = GREATEST(1, occurrence_count - 1),
                 updated_at = now()
             WHERE LOWER(phrase) = $1 AND verb = $2
@@ -142,13 +142,13 @@ impl ConfidenceDecay {
         if let Some(uid) = user_id {
             let result = sqlx::query_as::<_, (f32,)>(
                 r#"
-                INSERT INTO agent.user_learned_phrases
+                INSERT INTO "ob-poc".user_learned_phrases
                     (user_id, phrase, verb, confidence, source)
                 VALUES ($1, $2, $3, $4, 'confidence_boost')
                 ON CONFLICT (user_id, phrase) DO UPDATE
                 SET verb = EXCLUDED.verb,
-                    confidence = LEAST($5, agent.user_learned_phrases.confidence + $4),
-                    occurrence_count = agent.user_learned_phrases.occurrence_count + 1,
+                    confidence = LEAST($5, "ob-poc".user_learned_phrases.confidence + $4),
+                    occurrence_count = "ob-poc".user_learned_phrases.occurrence_count + 1,
                     updated_at = now()
                 RETURNING confidence
                 "#,
@@ -173,12 +173,12 @@ impl ConfidenceDecay {
         // Global table - increase occurrence count
         let result = sqlx::query_as::<_, (i32,)>(
             r#"
-            INSERT INTO agent.invocation_phrases
+            INSERT INTO "ob-poc".invocation_phrases
                 (phrase, verb, occurrence_count, source)
             VALUES ($1, $2, 1, 'confidence_boost')
             ON CONFLICT (phrase) DO UPDATE
             SET verb = EXCLUDED.verb,
-                occurrence_count = agent.invocation_phrases.occurrence_count + 1,
+                occurrence_count = "ob-poc".invocation_phrases.occurrence_count + 1,
                 updated_at = now()
             RETURNING occurrence_count
             "#,

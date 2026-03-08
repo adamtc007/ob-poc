@@ -97,7 +97,7 @@ impl CustomOperation for RegistrationVerifyOp {
         // Update the registration
         let result = sqlx::query!(
             r#"
-            UPDATE ob_kyc.entity_regulatory_registrations
+            UPDATE "ob-poc".entity_regulatory_registrations
             SET
                 registration_verified = TRUE,
                 verification_date = CURRENT_DATE,
@@ -200,7 +200,7 @@ impl CustomOperation for RegulatoryStatusCheckOp {
                 verified_regulators,
                 last_verified,
                 next_expiry
-            FROM ob_kyc.v_entity_regulatory_summary
+            FROM "ob-poc".v_entity_regulatory_summary
             WHERE entity_id = $1
             "#,
             entity_id
@@ -219,10 +219,10 @@ impl CustomOperation for RegulatoryStatusCheckOp {
                 r.verification_date,
                 r.verification_expires,
                 r.status,
-                reg.regulator_name,
-                reg.regulatory_tier
-            FROM ob_kyc.entity_regulatory_registrations r
-            JOIN ob_ref.regulators reg ON r.regulator_code = reg.regulator_code
+                reg.name AS regulator_name,
+                reg.tier AS regulatory_tier
+            FROM "ob-poc".entity_regulatory_registrations r
+            JOIN "ob-poc".regulators reg ON r.regulator_code = reg.regulator_code
             WHERE r.entity_id = $1 AND r.status = 'ACTIVE'
             ORDER BY r.registration_type
             "#,

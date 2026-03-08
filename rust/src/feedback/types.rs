@@ -15,7 +15,10 @@ use uuid::Uuid;
 
 /// Classification of error types for remediation routing
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Type)]
-#[sqlx(type_name = "feedback.error_type", rename_all = "SCREAMING_SNAKE_CASE")]
+#[sqlx(
+    type_name = "\"ob-poc\".error_type",
+    rename_all = "SCREAMING_SNAKE_CASE"
+)]
 pub enum ErrorType {
     // Transient (runtime retry candidates)
     Timeout,
@@ -106,7 +109,7 @@ impl std::fmt::Display for ErrorType {
 /// How an error should be remediated
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Type)]
 #[sqlx(
-    type_name = "feedback.remediation_path",
+    type_name = "\"ob-poc\".remediation_path",
     rename_all = "SCREAMING_SNAKE_CASE"
 )]
 pub enum RemediationPath {
@@ -141,7 +144,7 @@ impl std::fmt::Display for RemediationPath {
 /// Lifecycle status of an issue
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Type)]
 #[sqlx(
-    type_name = "feedback.issue_status",
+    type_name = "\"ob-poc\".issue_status",
     rename_all = "SCREAMING_SNAKE_CASE"
 )]
 pub enum IssueStatus {
@@ -222,7 +225,10 @@ impl std::fmt::Display for IssueStatus {
 
 /// Type of actor performing an action
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Type)]
-#[sqlx(type_name = "feedback.actor_type", rename_all = "SCREAMING_SNAKE_CASE")]
+#[sqlx(
+    type_name = "\"ob-poc\".actor_type",
+    rename_all = "SCREAMING_SNAKE_CASE"
+)]
 pub enum ActorType {
     System,
     McpAgent,
@@ -260,7 +266,7 @@ impl std::fmt::Display for ActorType {
 /// Actions that can be recorded in the audit trail
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Type)]
 #[sqlx(
-    type_name = "feedback.audit_action",
+    type_name = "\"ob-poc\".audit_action",
     rename_all = "SCREAMING_SNAKE_CASE"
 )]
 pub enum AuditAction {

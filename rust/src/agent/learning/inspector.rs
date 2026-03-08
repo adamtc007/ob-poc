@@ -326,7 +326,7 @@ impl AgentLearningInspector {
 
         let id = sqlx::query_scalar!(
             r#"
-            INSERT INTO agent.events (
+            INSERT INTO "ob-poc".events (
                 event_type, user_message, parsed_intents, selected_verb,
                 generated_dsl, was_corrected, corrected_dsl, correction_type,
                 entities_resolved, resolution_failures, execution_success,
@@ -399,7 +399,7 @@ impl AgentLearningInspector {
         let rows = sqlx::query!(
             r#"
             SELECT id, session_id, user_message, generated_dsl, corrected_dsl, correction_type
-            FROM agent.events
+            FROM "ob-poc".events
             WHERE was_corrected = TRUE
               AND timestamp >= $1
             ORDER BY timestamp DESC
@@ -473,16 +473,16 @@ impl AgentLearningInspector {
 
         let result = sqlx::query!(
             r#"
-            INSERT INTO agent.learning_candidates (
+            INSERT INTO "ob-poc".learning_candidates (
                 fingerprint, learning_type, input_pattern, suggested_output,
                 risk_level, auto_applicable, example_events
             )
             VALUES ($1, $2, $3, $4, $5, $6, ARRAY[$7]::BIGINT[])
             ON CONFLICT (fingerprint) DO UPDATE SET
-                occurrence_count = agent.learning_candidates.occurrence_count + 1,
+                occurrence_count = "ob-poc".learning_candidates.occurrence_count + 1,
                 last_seen = NOW(),
                 example_events = array_append(
-                    agent.learning_candidates.example_events[1:9],
+                    "ob-poc".learning_candidates.example_events[1:9],
                     $7
                 ),
                 updated_at = NOW()
@@ -512,7 +512,7 @@ impl AgentLearningInspector {
         let candidates = sqlx::query!(
             r#"
             SELECT id, learning_type, input_pattern, suggested_output
-            FROM agent.learning_candidates
+            FROM "ob-poc".learning_candidates
             WHERE status = 'pending'
               AND auto_applicable = TRUE
               AND occurrence_count >= $1
@@ -551,7 +551,7 @@ impl AgentLearningInspector {
             // Mark as applied
             sqlx::query!(
                 r#"
-                UPDATE agent.learning_candidates
+                UPDATE "ob-poc".learning_candidates
                 SET status = 'applied', applied_at = NOW()
                 WHERE id = $1
                 "#,
@@ -573,7 +573,7 @@ impl AgentLearningInspector {
     /// Apply an entity alias learning.
     async fn apply_entity_alias(&self, alias: &str, canonical: &str) -> Result<()> {
         sqlx::query_scalar!(
-            r#"SELECT agent.upsert_entity_alias($1, $2, NULL, 'threshold_auto')"#,
+            r#"SELECT "ob-poc".upsert_entity_alias($1, $2, NULL, 'threshold_auto')"#,
             alias,
             canonical
         )
@@ -585,7 +585,7 @@ impl AgentLearningInspector {
     /// Apply a lexicon token learning.
     async fn apply_lexicon_token(&self, token: &str, token_type: &str) -> Result<()> {
         sqlx::query_scalar!(
-            r#"SELECT agent.upsert_lexicon_token($1, $2, NULL, 'threshold_auto')"#,
+            r#"SELECT "ob-poc".upsert_lexicon_token($1, $2, NULL, 'threshold_auto')"#,
             token,
             token_type
         )
@@ -603,7 +603,7 @@ impl AgentLearningInspector {
     ) -> Result<()> {
         sqlx::query!(
             r#"
-            INSERT INTO agent.learning_audit (action, learning_type, candidate_id, actor)
+            INSERT INTO "ob-poc".learning_audit (action, learning_type, candidate_id, actor)
             VALUES ('applied', $1, $2, $3)
             "#,
             learning_type,
@@ -620,7 +620,7 @@ impl AgentLearningInspector {
         let count = sqlx::query_scalar!(
             r#"
             SELECT COUNT(*) as "count!"
-            FROM agent.learning_candidates
+            FROM "ob-poc".learning_candidates
             WHERE status = 'pending'
               AND (auto_applicable = FALSE OR risk_level != 'low')
             "#
@@ -649,7 +649,7 @@ impl AgentLearningInspector {
             r#"
             SELECT id, fingerprint, learning_type, input_pattern, suggested_output,
                    occurrence_count, risk_level, status, first_seen, last_seen
-            FROM agent.learning_candidates
+            FROM "ob-poc".learning_candidates
             WHERE ($1::TEXT IS NULL OR status = $1)
               AND ($2::TEXT IS NULL OR learning_type = $2)
             ORDER BY occurrence_count DESC, last_seen DESC
@@ -698,7 +698,7 @@ impl AgentLearningInspector {
         let candidate = sqlx::query!(
             r#"
             SELECT id, learning_type, input_pattern, suggested_output
-            FROM agent.learning_candidates
+            FROM "ob-poc".learning_candidates
             WHERE fingerprint = $1 AND status = 'pending'
             "#,
             fingerprint
@@ -723,10 +723,10 @@ impl AgentLearningInspector {
             LearningType::InvocationPhrase => {
                 sqlx::query!(
                     r#"
-                    INSERT INTO agent.invocation_phrases (phrase, verb, source)
+                    INSERT INTO "ob-poc".invocation_phrases (phrase, verb, source)
                     VALUES ($1, $2, 'manual_approval')
                     ON CONFLICT (phrase, verb) DO UPDATE SET
-                        occurrence_count = agent.invocation_phrases.occurrence_count + 1,
+                        occurrence_count = "ob-poc".invocation_phrases.occurrence_count + 1,
                         updated_at = NOW()
                     "#,
                     candidate.input_pattern,
@@ -748,7 +748,7 @@ impl AgentLearningInspector {
         // Mark as applied
         sqlx::query!(
             r#"
-            UPDATE agent.learning_candidates
+            UPDATE "ob-poc".learning_candidates
             SET status = 'applied', applied_at = NOW(), reviewed_by = $2, reviewed_at = NOW()
             WHERE id = $1
             "#,
@@ -775,7 +775,7 @@ impl AgentLearningInspector {
     pub async fn reject_candidate(&self, fingerprint: &str, actor: &str) -> Result<()> {
         sqlx::query!(
             r#"
-            UPDATE agent.learning_candidates
+            UPDATE "ob-poc".learning_candidates
             SET status = 'rejected', reviewed_by = $2, reviewed_at = NOW()
             WHERE fingerprint = $1 AND status = 'pending'
             "#,
@@ -797,7 +797,7 @@ impl AgentLearningInspector {
         let rows = sqlx::query!(
             r#"
             SELECT alias, canonical_name, entity_id
-            FROM agent.entity_aliases
+            FROM "ob-poc".entity_aliases
             ORDER BY occurrence_count DESC
             "#
         )
@@ -815,7 +815,7 @@ impl AgentLearningInspector {
         let rows = sqlx::query!(
             r#"
             SELECT token, token_type, token_subtype
-            FROM agent.lexicon_tokens
+            FROM "ob-poc".lexicon_tokens
             ORDER BY occurrence_count DESC
             "#
         )
@@ -833,7 +833,7 @@ impl AgentLearningInspector {
         let rows = sqlx::query!(
             r#"
             SELECT phrase, verb
-            FROM agent.invocation_phrases
+            FROM "ob-poc".invocation_phrases
             ORDER BY occurrence_count DESC
             "#
         )

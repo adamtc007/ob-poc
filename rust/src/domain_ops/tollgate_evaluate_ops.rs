@@ -1,7 +1,7 @@
 //! Tollgate Gate Evaluation Operations (Phase 2.6)
 //!
 //! Evaluates a specific named tollgate gate against the current case state.
-//! Loads the gate definition from `ob_ref.tollgate_definitions`, computes
+//! Loads the gate definition from `"ob-poc".tollgate_definitions`, computes
 //! pass/fail against case data, and records the result in
 //! `"ob-poc".tollgate_evaluations`.
 //!
@@ -41,7 +41,7 @@ pub struct TollgateEvaluationResult {
 // Internal Types
 // =============================================================================
 
-/// Gate definition loaded from `ob_ref.tollgate_definitions`.
+/// Gate definition loaded from `"ob-poc".tollgate_definitions`.
 #[cfg(feature = "database")]
 #[derive(Debug, Clone)]
 struct GateDefinition {
@@ -528,7 +528,7 @@ async fn evaluate_review_complete(
 
 /// Evaluate a specific named tollgate gate against the current case state.
 ///
-/// Loads gate definition from `ob_ref.tollgate_definitions`, dispatches to
+/// Loads gate definition from `"ob-poc".tollgate_definitions`, dispatches to
 /// gate-specific evaluation logic, and records the result in
 /// `"ob-poc".tollgate_evaluations`.
 #[register_custom_op]
@@ -594,7 +594,7 @@ impl CustomOperation for TollgateEvaluateGateOp {
         let gate_row: GateRow = sqlx::query_as(
             r#"
             SELECT tollgate_id, display_name, required_status, default_thresholds
-            FROM ob_ref.tollgate_definitions
+            FROM "ob-poc".tollgate_definitions
             WHERE tollgate_id = $1
             "#,
         )

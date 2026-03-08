@@ -1313,7 +1313,7 @@ pub async fn run_outreach_plan(
 // Step 6: Tollgate Evaluate — SKELETON_READY gate evaluation
 //
 // Mirrors tollgate_evaluate_ops.rs evaluate_skeleton_ready():
-//   1. Load gate definition from ob_ref.tollgate_definitions
+//   1. Load gate definition from "ob-poc".tollgate_definitions
 //   2. Check ownership coverage >= threshold (default 70%)
 //   3. Check all entities have at least one ownership edge
 //   4. Record evaluation in "ob-poc".tollgate_evaluations
@@ -1330,7 +1330,7 @@ pub async fn run_tollgate_evaluate(
     // 1. Load gate definition (with fallback defaults if ref data not seeded)
     let gate_row: Option<(String, serde_json::Value)> = sqlx::query_as(
         r#"SELECT tollgate_id, default_thresholds
-           FROM ob_ref.tollgate_definitions
+           FROM "ob-poc".tollgate_definitions
            WHERE tollgate_id = 'SKELETON_READY'"#,
     )
     .bind(case_id)

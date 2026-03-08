@@ -70,7 +70,7 @@ impl CustomOperation for TeamTransferMemberOp {
         // Step 1: Verify user exists in source team
         let existing = sqlx::query_scalar!(
             r#"
-            SELECT membership_id FROM teams.memberships
+            SELECT membership_id FROM "ob-poc".memberships
             WHERE team_id = $1 AND user_id = $2 AND effective_to IS NULL
             LIMIT 1
             "#,
@@ -89,7 +89,7 @@ impl CustomOperation for TeamTransferMemberOp {
         // Step 2: End all memberships in source team (set effective_to)
         let _removed_count = sqlx::query!(
             r#"
-            UPDATE teams.memberships
+            UPDATE "ob-poc".memberships
             SET effective_to = CURRENT_DATE
             WHERE team_id = $1 AND user_id = $2 AND effective_to IS NULL
             "#,
@@ -103,7 +103,7 @@ impl CustomOperation for TeamTransferMemberOp {
         // Step 3: Create membership in target team
         let new_membership_id: Uuid = sqlx::query_scalar!(
             r#"
-            INSERT INTO teams.memberships (team_id, user_id, role_key, effective_from)
+            INSERT INTO "ob-poc".memberships (team_id, user_id, role_key, effective_from)
             VALUES ($1, $2, $3, CURRENT_DATE)
             RETURNING membership_id
             "#,
