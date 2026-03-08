@@ -81,13 +81,12 @@ fn classify_plane(utterance: &str, ctx: &SageContext) -> ObservationPlane {
     }
 
     // Data management focus → Structure plane (unless instance targeted)
-    if stage_focus.contains("data-management")
+    if (stage_focus.contains("data-management")
         || stage_focus.contains("semos-data")
-        || stage_focus == "data"
+        || stage_focus == "data")
+        && !has_explicit_instance_targeting(utterance)
     {
-        if !has_explicit_instance_targeting(utterance) {
-            return ObservationPlane::Structure;
-        }
+        return ObservationPlane::Structure;
     }
 
     // Check for explicit schema/structure vocabulary in utterance (even outside data-management focus)

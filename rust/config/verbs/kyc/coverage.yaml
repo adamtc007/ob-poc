@@ -15,13 +15,13 @@ domains:
       compute:
         description: "Compute per-prong coverage for a UBO determination run"
         invocation_phrases:
-          - "compute coverage"
-          - "calculate coverage"
-          - "check coverage"
-          - "coverage analysis"
-          - "what's the coverage"
-          - "compute prong coverage"
-          - "gap analysis"
+        - "compute coverage"
+        - "calculate coverage"
+        - "check coverage"
+        - "coverage analysis"
+        - "what's the coverage"
+        - "compute prong coverage"
+        - "gap analysis"
         metadata:
           tier: intent
           source_of_truth: operational
@@ -30,39 +30,40 @@ domains:
           tags: [kyc]
           subject_kinds: []
           phase_tags: [stewardship]
+          side_effects: state_write
         behavior: plugin
         plugin:
           handler: CoverageComputeOp
         args:
-          - name: case-id
-            type: uuid
-            required: true
-            description: "KYC case to compute coverage for"
-            lookup:
-              table: cases
-              schema: kyc
-              search_key: case_id
-              primary_key: case_id
-          - name: determination-run-id
-            type: uuid
-            required: true
-            description: "Determination run to compute coverage against"
+        - name: case-id
+          type: uuid
+          required: true
+          description: "KYC case to compute coverage for"
+          lookup:
+            table: cases
+            schema: kyc
+            search_key: case_id
+            primary_key: case_id
+        - name: determination-run-id
+          type: uuid
+          required: true
+          description: "Determination run to compute coverage against"
         returns:
           type: record
           fields:
-            - name: run_id
-              type: uuid
-            - name: case_id
-              type: uuid
-            - name: overall_coverage_pct
-              type: decimal
-              description: "Overall coverage percentage (average across prongs)"
-            - name: prong_coverage
-              type: array
-              description: "Per-prong coverage summaries"
-            - name: gaps
-              type: array
-              description: "Coverage gaps with stable gap_id identifiers"
-            - name: gaps_blocking_skeleton
-              type: integer
-              description: "Number of gaps blocking SKELETON_READY gate"
+          - name: run_id
+            type: uuid
+          - name: case_id
+            type: uuid
+          - name: overall_coverage_pct
+            type: decimal
+            description: "Overall coverage percentage (average across prongs)"
+          - name: prong_coverage
+            type: array
+            description: "Per-prong coverage summaries"
+          - name: gaps
+            type: array
+            description: "Coverage gaps with stable gap_id identifiers"
+          - name: gaps_blocking_skeleton
+            type: integer
+            description: "Number of gaps blocking SKELETON_READY gate"

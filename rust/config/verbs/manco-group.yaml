@@ -2,12 +2,12 @@ domains:
   manco:
     description: Governance controller group management and control chain operations
     invocation_hints:
-      - manco
-      - governance controller
-      - primary controller
-      - book
-      - control chain
-      - who controls
+    - manco
+    - governance controller
+    - primary controller
+    - book
+    - control chain
+    - who controls
     verbs:
       # ========================================================================
       # Group Discovery
@@ -18,10 +18,10 @@ domains:
           Creates groups and memberships based on computed control signals.
         behavior: plugin
         invocation_phrases:
-          - derive groups
-          - compute groups
-          - auto-derive CBU groups
-          - refresh governance groups
+        - derive groups
+        - compute groups
+        - auto-derive CBU groups
+        - refresh governance groups
         metadata:
           tier: composite
           source_of_truth: operational
@@ -29,19 +29,20 @@ domains:
           noun: cbu_group
           tags: [governance, compute, batch]
           phase_tags: [onboarding]
+          side_effects: state_write
         args:
-          - name: as-of
-            type: date
-            required: false
-            default: today
-            description: As-of date for derivation
+        - name: as-of
+          type: date
+          required: false
+          default: today
+          description: As-of date for derivation
         returns:
           type: record
           fields:
-            - name: groups_created
-              type: integer
-            - name: memberships_created
-              type: integer
+          - name: groups_created
+            type: integer
+          - name: memberships_created
+            type: integer
 
       group.list:
         description: |
@@ -49,10 +50,10 @@ domains:
           Includes CBU counts and names for each group.
         behavior: crud
         invocation_phrases:
-          - list groups
-          - show all books
-          - get governance groups
-          - manco books
+        - list groups
+        - show all books
+        - get governance groups
+        - manco books
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -60,32 +61,25 @@ domains:
           noun: cbu_group
           tags: [read, query]
           phase_tags: [onboarding]
+          side_effects: facts_only
         crud:
           operation: select
           table: v_manco_group_summary
           schema: ob-poc
         args:
-          - name: jurisdiction
-            type: string
-            required: false
-            description: Filter by jurisdiction (e.g., "LU", "DE")
-          - name: group-type
-            type: string
-            required: false
-            description: Filter by group type (GOVERNANCE_BOOK, MANCO_BOOK, etc.)
-            valid_values:
-              [
-                GOVERNANCE_BOOK,
-                MANCO_BOOK,
-                CORPORATE_GROUP,
-                INVESTMENT_MANAGER,
-                UMBRELLA_SICAV,
-                CUSTOM,
-              ]
-          - name: min-cbu-count
-            type: integer
-            required: false
-            description: Minimum number of CBUs in group
+        - name: jurisdiction
+          type: string
+          required: false
+          description: Filter by jurisdiction (e.g., "LU", "DE")
+        - name: group-type
+          type: string
+          required: false
+          description: Filter by group type (GOVERNANCE_BOOK, MANCO_BOOK, etc.)
+          valid_values: [GOVERNANCE_BOOK, MANCO_BOOK, CORPORATE_GROUP, INVESTMENT_MANAGER, UMBRELLA_SICAV, CUSTOM]
+        - name: min-cbu-count
+          type: integer
+          required: false
+          description: Minimum number of CBUs in group
         returns:
           type: record_set
 
@@ -95,10 +89,10 @@ domains:
           Returns CBU details including fund entity and membership source.
         behavior: plugin
         invocation_phrases:
-          - get CBUs for controller
-          - list book CBUs
-          - show group members
-          - CBUs managed by
+        - get CBUs for controller
+        - list book CBUs
+        - show group members
+        - CBUs managed by
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -106,17 +100,18 @@ domains:
           noun: cbu
           tags: [read, query]
           phase_tags: [onboarding]
+          side_effects: state_write
         args:
-          - name: manco-entity-id
-            type: uuid
-            required: true
-            description: The governance controller entity ID
-            lookup:
-              table: entities
-              entity_type: entity
-              schema: ob-poc
-              search_key: name
-              primary_key: entity_id
+        - name: manco-entity-id
+          type: uuid
+          required: true
+          description: The governance controller entity ID
+          lookup:
+            table: entities
+            entity_type: entity
+            schema: ob-poc
+            search_key: name
+            primary_key: entity_id
         returns:
           type: record_set
 
@@ -126,10 +121,10 @@ domains:
           Returns controller details and group information.
         behavior: plugin
         invocation_phrases:
-          - find controller for CBU
-          - who manages this CBU
-          - get CBU group
-          - which book
+        - find controller for CBU
+        - who manages this CBU
+        - get CBU group
+        - which book
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -137,17 +132,18 @@ domains:
           noun: cbu_group
           tags: [read, query]
           phase_tags: [onboarding]
+          side_effects: state_write
         args:
-          - name: cbu-id
-            type: uuid
-            required: true
-            description: The CBU ID
-            lookup:
-              table: cbus
-              entity_type: cbu
-              schema: ob-poc
-              search_key: name
-              primary_key: cbu_id
+        - name: cbu-id
+          type: uuid
+          required: true
+          description: The CBU ID
+          lookup:
+            table: cbus
+            entity_type: cbu
+            schema: ob-poc
+            search_key: name
+            primary_key: cbu_id
         returns:
           type: record
 
@@ -160,11 +156,11 @@ domains:
           Returns single deterministic winner based on: board rights > voting control > significant influence.
         behavior: plugin
         invocation_phrases:
-          - who controls
-          - primary controller
-          - governance controller for
-          - who appoints the board
-          - control share class holder
+        - who controls
+        - primary controller
+        - governance controller for
+        - who appoints the board
+        - control share class holder
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -172,37 +168,38 @@ domains:
           noun: governance_controller
           tags: [read, query, control]
           phase_tags: [onboarding]
+          side_effects: state_write
         args:
-          - name: issuer-entity-id
-            type: uuid
-            required: true
-            description: The issuer entity ID
-            lookup:
-              table: entities
-              entity_type: entity
-              schema: ob-poc
-              search_key: name
-              primary_key: entity_id
-          - name: as-of
-            type: date
-            required: false
-            default: today
-            description: As-of date for computation
+        - name: issuer-entity-id
+          type: uuid
+          required: true
+          description: The issuer entity ID
+          lookup:
+            table: entities
+            entity_type: entity
+            schema: ob-poc
+            search_key: name
+            primary_key: entity_id
+        - name: as-of
+          type: date
+          required: false
+          default: today
+          description: As-of date for computation
         returns:
           type: record
           fields:
-            - name: primary_controller_entity_id
-              type: uuid
-            - name: governance_controller_entity_id
-              type: uuid
-            - name: basis
-              type: string
-            - name: board_seats
-              type: integer
-            - name: voting_pct
-              type: decimal
-            - name: has_control
-              type: boolean
+          - name: primary_controller_entity_id
+            type: uuid
+          - name: governance_controller_entity_id
+            type: uuid
+          - name: basis
+            type: string
+          - name: board_seats
+            type: integer
+          - name: voting_pct
+            type: decimal
+          - name: has_control
+            type: boolean
 
       # ========================================================================
       # Control Chain Traversal
@@ -213,11 +210,11 @@ domains:
           Returns the chain of controlling entities up to the ultimate parent.
         behavior: plugin
         invocation_phrases:
-          - control chain
-          - who controls the controller
-          - ultimate parent
-          - trace ownership upward
-          - ownership chain
+        - control chain
+        - who controls the controller
+        - ultimate parent
+        - trace ownership upward
+        - ownership chain
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -225,22 +222,23 @@ domains:
           noun: control_chain
           tags: [read, query, ubo]
           phase_tags: [onboarding]
+          side_effects: state_write
         args:
-          - name: manco-entity-id
-            type: uuid
-            required: true
-            description: The controller entity ID to start from
-            lookup:
-              table: entities
-              entity_type: entity
-              schema: ob-poc
-              search_key: name
-              primary_key: entity_id
-          - name: max-depth
-            type: integer
-            required: false
-            default: 5
-            description: Maximum chain depth to traverse
+        - name: manco-entity-id
+          type: uuid
+          required: true
+          description: The controller entity ID to start from
+          lookup:
+            table: entities
+            entity_type: entity
+            schema: ob-poc
+            search_key: name
+            primary_key: entity_id
+        - name: max-depth
+          type: integer
+          required: false
+          default: 5
+          description: Maximum chain depth to traverse
         returns:
           type: record_set
 
@@ -253,10 +251,10 @@ domains:
           Use for groups that can't be auto-derived from control signals.
         behavior: crud
         invocation_phrases:
-          - create group
-          - create book
-          - new CBU group
-          - manual group
+        - create group
+        - create book
+        - new CBU group
+        - manual group
         metadata:
           tier: intent
           source_of_truth: operational
@@ -264,64 +262,57 @@ domains:
           noun: cbu_group
           tags: [lifecycle, write]
           phase_tags: [onboarding]
+          side_effects: state_write
         crud:
           operation: insert
           table: cbu_groups
           schema: ob-poc
           returning: group_id
         args:
-          - name: manco-entity-id
-            type: uuid
-            required: true
-            description: The governance controller entity that anchors this group
-            maps_to: manco_entity_id
-            lookup:
-              table: entities
-              entity_type: entity
-              schema: ob-poc
-              search_key: name
-              primary_key: entity_id
-          - name: group-name
-            type: string
-            required: true
-            description: Human-readable group name
-            maps_to: group_name
-          - name: group-code
-            type: string
-            required: false
-            description: Short code (e.g., "ALLIANZ_LUX")
-            maps_to: group_code
-          - name: group-type
-            type: string
-            required: false
-            default: CUSTOM
-            description: Type of group
-            maps_to: group_type
-            valid_values:
-              [
-                GOVERNANCE_BOOK,
-                MANCO_BOOK,
-                CORPORATE_GROUP,
-                INVESTMENT_MANAGER,
-                UMBRELLA_SICAV,
-                CUSTOM,
-              ]
-          - name: jurisdiction
-            type: string
-            required: false
-            description: Jurisdiction scope
-            maps_to: jurisdiction
-          - name: ultimate-parent-entity-id
-            type: uuid
-            required: false
-            description: Ultimate parent entity
-            maps_to: ultimate_parent_entity_id
-            lookup:
-              table: entities
-              entity_type: entity
-              schema: ob-poc
-              search_key: name
-              primary_key: entity_id
+        - name: manco-entity-id
+          type: uuid
+          required: true
+          description: The governance controller entity that anchors this group
+          maps_to: manco_entity_id
+          lookup:
+            table: entities
+            entity_type: entity
+            schema: ob-poc
+            search_key: name
+            primary_key: entity_id
+        - name: group-name
+          type: string
+          required: true
+          description: Human-readable group name
+          maps_to: group_name
+        - name: group-code
+          type: string
+          required: false
+          description: Short code (e.g., "ALLIANZ_LUX")
+          maps_to: group_code
+        - name: group-type
+          type: string
+          required: false
+          default: CUSTOM
+          description: Type of group
+          maps_to: group_type
+          valid_values: [GOVERNANCE_BOOK, MANCO_BOOK, CORPORATE_GROUP, INVESTMENT_MANAGER, UMBRELLA_SICAV, CUSTOM]
+        - name: jurisdiction
+          type: string
+          required: false
+          description: Jurisdiction scope
+          maps_to: jurisdiction
+        - name: ultimate-parent-entity-id
+          type: uuid
+          required: false
+          description: Ultimate parent entity
+          maps_to: ultimate_parent_entity_id
+          lookup:
+            table: entities
+            entity_type: entity
+            schema: ob-poc
+            search_key: name
+            primary_key: entity_id
         returns:
           type: uuid
           name: group_id
@@ -330,9 +321,9 @@ domains:
         description: Add a CBU to a governance controller group
         behavior: crud
         invocation_phrases:
-          - add CBU to group
-          - add member
-          - assign CBU to book
+        - add CBU to group
+        - add member
+        - assign CBU to book
         metadata:
           tier: intent
           source_of_truth: operational
@@ -340,46 +331,40 @@ domains:
           noun: group_membership
           tags: [lifecycle, write]
           phase_tags: [onboarding]
+          side_effects: state_write
         crud:
           operation: upsert
           table: cbu_group_members
           schema: ob-poc
           returning: membership_id
           conflict_keys:
-            - group_id
-            - cbu_id
-            - effective_to
+          - group_id
+          - cbu_id
+          - effective_to
         args:
-          - name: group-id
-            type: uuid
-            required: true
-            description: The group ID
-            maps_to: group_id
-          - name: cbu-id
-            type: uuid
-            required: true
-            description: The CBU to add
-            maps_to: cbu_id
-            lookup:
-              table: cbus
-              entity_type: cbu
-              schema: ob-poc
-              search_key: name
-              primary_key: cbu_id
-          - name: source
-            type: string
-            required: false
-            default: MANUAL
-            description: Source of membership
-            maps_to: source
-            valid_values:
-              [
-                GOVERNANCE_CONTROLLER,
-                MANCO_ROLE,
-                GLEIF_MANAGED,
-                SHAREHOLDING,
-                MANUAL,
-              ]
+        - name: group-id
+          type: uuid
+          required: true
+          description: The group ID
+          maps_to: group_id
+        - name: cbu-id
+          type: uuid
+          required: true
+          description: The CBU to add
+          maps_to: cbu_id
+          lookup:
+            table: cbus
+            entity_type: cbu
+            schema: ob-poc
+            search_key: name
+            primary_key: cbu_id
+        - name: source
+          type: string
+          required: false
+          default: MANUAL
+          description: Source of membership
+          maps_to: source
+          valid_values: [GOVERNANCE_CONTROLLER, MANCO_ROLE, GLEIF_MANAGED, SHAREHOLDING, MANUAL]
         returns:
           type: uuid
           name: membership_id
@@ -388,9 +373,9 @@ domains:
         description: Remove a CBU from a governance controller group (sets effective_to)
         behavior: crud
         invocation_phrases:
-          - remove CBU from group
-          - remove member
-          - unassign CBU
+        - remove CBU from group
+        - remove member
+        - unassign CBU
         metadata:
           tier: intent
           source_of_truth: operational
@@ -398,25 +383,26 @@ domains:
           noun: group_membership
           tags: [lifecycle, write]
           phase_tags: [onboarding]
+          side_effects: state_write
         crud:
           operation: update
           table: cbu_group_members
           schema: ob-poc
         args:
-          - name: group-id
-            type: uuid
-            required: true
-            description: The group ID
-          - name: cbu-id
-            type: uuid
-            required: true
-            description: The CBU to remove
-            lookup:
-              table: cbus
-              entity_type: cbu
-              schema: ob-poc
-              search_key: name
-              primary_key: cbu_id
+        - name: group-id
+          type: uuid
+          required: true
+          description: The group ID
+        - name: cbu-id
+          type: uuid
+          required: true
+          description: The CBU to remove
+          lookup:
+            table: cbus
+            entity_type: cbu
+            schema: ob-poc
+            search_key: name
+            primary_key: cbu_id
         returns:
           type: void
 
@@ -429,10 +415,10 @@ domains:
           Includes group info, all CBUs, and control chain.
         behavior: plugin
         invocation_phrases:
-          - book summary
-          - full group info
-          - comprehensive book report
-          - group with control chain
+        - book summary
+        - full group info
+        - comprehensive book report
+        - group with control chain
         metadata:
           tier: composite
           source_of_truth: operational
@@ -440,33 +426,34 @@ domains:
           noun: book_summary
           tags: [read, composite]
           phase_tags: [onboarding]
+          side_effects: facts_only
         args:
-          - name: manco-entity-id
-            type: uuid
-            required: true
-            description: The governance controller entity ID
-            lookup:
-              table: entities
-              entity_type: entity
-              schema: ob-poc
-              search_key: name
-              primary_key: entity_id
+        - name: manco-entity-id
+          type: uuid
+          required: true
+          description: The governance controller entity ID
+          lookup:
+            table: entities
+            entity_type: entity
+            schema: ob-poc
+            search_key: name
+            primary_key: entity_id
         returns:
           type: record
           fields:
-            - name: group
-              type: record
-            - name: cbus
-              type: record_set
-            - name: control_chain
-              type: record_set
+          - name: group
+            type: record
+          - name: cbus
+            type: record_set
+          - name: control_chain
+            type: record_set
 
   ownership:
     description: Ownership control link operations
     invocation_hints:
-      - control links
-      - shareholding control
-      - ownership
+    - control links
+    - shareholding control
+    - ownership
     verbs:
       control-links.compute:
         description: |
@@ -474,9 +461,9 @@ domains:
           Materializes shareholding control relationships for efficient queries.
         behavior: plugin
         invocation_phrases:
-          - compute control links
-          - refresh ownership links
-          - materialize shareholding control
+        - compute control links
+        - refresh ownership links
+        - materialize shareholding control
         metadata:
           tier: composite
           source_of_truth: operational
@@ -484,22 +471,23 @@ domains:
           noun: holding_control_link
           tags: [compute, batch]
           phase_tags: [kyc]
+          side_effects: state_write
         args:
-          - name: issuer-entity-id
-            type: uuid
-            required: false
-            description: Scope to specific issuer (null = all issuers)
-            lookup:
-              table: entities
-              entity_type: entity
-              schema: ob-poc
-              search_key: name
-              primary_key: entity_id
-          - name: as-of
-            type: date
-            required: false
-            default: today
-            description: As-of date for computation
+        - name: issuer-entity-id
+          type: uuid
+          required: false
+          description: Scope to specific issuer (null = all issuers)
+          lookup:
+            table: entities
+            entity_type: entity
+            schema: ob-poc
+            search_key: name
+            primary_key: entity_id
+        - name: as-of
+          type: date
+          required: false
+          default: today
+          description: As-of date for computation
         returns:
           type: affected
           description: Number of control links created
@@ -510,10 +498,10 @@ domains:
           Shows all shareholdings that establish control/influence.
         behavior: crud
         invocation_phrases:
-          - list control links
-          - show shareholding control
-          - who controls what
-          - controlling shareholders
+        - list control links
+        - show shareholding control
+        - who controls what
+        - controlling shareholders
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -521,48 +509,42 @@ domains:
           noun: holding_control_link
           tags: [read, query]
           phase_tags: [kyc]
+          side_effects: facts_only
         crud:
           operation: select
           table: holding_control_links
           schema: kyc
         args:
-          - name: issuer-entity-id
-            type: uuid
-            required: false
-            description: Filter by issuer (controlled entity)
-            lookup:
-              table: entities
-              entity_type: entity
-              schema: ob-poc
-              search_key: name
-              primary_key: entity_id
-          - name: holder-entity-id
-            type: uuid
-            required: false
-            description: Filter by holder (controller)
-            lookup:
-              table: entities
-              entity_type: entity
-              schema: ob-poc
-              search_key: name
-              primary_key: entity_id
-          - name: control-type
-            type: string
-            required: false
-            description: Filter by control type
-            valid_values:
-              [
-                CONTROLLING,
-                SIGNIFICANT_INFLUENCE,
-                MATERIAL,
-                NOTIFIABLE,
-                MINORITY,
-              ]
-          - name: as-of
-            type: date
-            required: false
-            default: today
-            description: As-of date filter
+        - name: issuer-entity-id
+          type: uuid
+          required: false
+          description: Filter by issuer (controlled entity)
+          lookup:
+            table: entities
+            entity_type: entity
+            schema: ob-poc
+            search_key: name
+            primary_key: entity_id
+        - name: holder-entity-id
+          type: uuid
+          required: false
+          description: Filter by holder (controller)
+          lookup:
+            table: entities
+            entity_type: entity
+            schema: ob-poc
+            search_key: name
+            primary_key: entity_id
+        - name: control-type
+          type: string
+          required: false
+          description: Filter by control type
+          valid_values: [CONTROLLING, SIGNIFICANT_INFLUENCE, MATERIAL, NOTIFIABLE, MINORITY]
+        - name: as-of
+          type: date
+          required: false
+          default: today
+          description: As-of date filter
         returns:
           type: record_set
 
@@ -575,9 +557,9 @@ domains:
           Enables governance controller to fire for CBUs with ManCo roles assigned.
         behavior: plugin
         invocation_phrases:
-          - bridge manco roles
-          - convert roles to rights
-          - manco to board rights
+        - bridge manco roles
+        - convert roles to rights
+        - manco to board rights
         metadata:
           tier: composite
           source_of_truth: operational
@@ -585,18 +567,19 @@ domains:
           noun: special_right
           tags: [bridge, batch]
           phase_tags: [kyc]
+          side_effects: state_write
         args:
-          - name: as-of
-            type: date
-            required: false
-            default: today
+        - name: as-of
+          type: date
+          required: false
+          default: today
         returns:
           type: record
           fields:
-            - name: rights_created
-              type: integer
-            - name: rights_updated
-              type: integer
+          - name: rights_created
+            type: integer
+          - name: rights_updated
+            type: integer
 
       bridge.gleif-fund-managers:
         description: |
@@ -604,9 +587,9 @@ domains:
           Run after GLEIF import to enable governance controller for fund entities.
         behavior: plugin
         invocation_phrases:
-          - bridge gleif managers
-          - gleif to board rights
-          - fund manager rights
+        - bridge gleif managers
+        - gleif to board rights
+        - fund manager rights
         metadata:
           tier: composite
           source_of_truth: operational
@@ -614,18 +597,19 @@ domains:
           noun: special_right
           tags: [bridge, batch, gleif]
           phase_tags: [kyc]
+          side_effects: state_write
         args:
-          - name: as-of
-            type: date
-            required: false
-            default: today
+        - name: as-of
+          type: date
+          required: false
+          default: today
         returns:
           type: record
           fields:
-            - name: rights_created
-              type: integer
-            - name: rights_updated
-              type: integer
+          - name: rights_created
+            type: integer
+          - name: rights_updated
+            type: integer
 
       bridge.bods-ownership:
         description: |
@@ -633,9 +617,9 @@ domains:
           Run after BODS import to enable governance controller from ownership percentages.
         behavior: plugin
         invocation_phrases:
-          - bridge bods ownership
-          - bods to holdings
-          - convert ownership statements
+        - bridge bods ownership
+        - bods to holdings
+        - convert ownership statements
         metadata:
           tier: composite
           source_of_truth: operational
@@ -643,20 +627,21 @@ domains:
           noun: holding
           tags: [bridge, batch, bods]
           phase_tags: [kyc]
+          side_effects: state_write
         args:
-          - name: as-of
-            type: date
-            required: false
-            default: today
+        - name: as-of
+          type: date
+          required: false
+          default: today
         returns:
           type: record
           fields:
-            - name: holdings_created
-              type: integer
-            - name: holdings_updated
-              type: integer
-            - name: entities_linked
-              type: integer
+          - name: holdings_created
+            type: integer
+          - name: holdings_updated
+            type: integer
+          - name: entities_linked
+            type: integer
 
       # ========================================================================
       # MASTER MACRO: Full governance refresh pipeline
@@ -675,11 +660,11 @@ domains:
           Idempotent - safe to run repeatedly.
         behavior: plugin
         invocation_phrases:
-          - refresh governance
-          - full governance refresh
-          - recompute all groups
-          - run governance pipeline
-          - manco refresh
+        - refresh governance
+        - full governance refresh
+        - recompute all groups
+        - run governance pipeline
+        - manco refresh
         metadata:
           tier: composite
           source_of_truth: operational
@@ -687,25 +672,26 @@ domains:
           noun: governance
           tags: [macro, pipeline, batch]
           phase_tags: [kyc]
+          side_effects: state_write
         args:
-          - name: as-of
-            type: date
-            required: false
-            default: today
-            description: As-of date for all computations
+        - name: as-of
+          type: date
+          required: false
+          default: today
+          description: As-of date for all computations
         returns:
           type: record
           fields:
-            - name: manco_bridge
-              type: record
-            - name: gleif_bridge
-              type: record
-            - name: bods_bridge
-              type: record
-            - name: control_links
-              type: integer
-            - name: groups
-              type: record
+          - name: manco_bridge
+            type: record
+          - name: gleif_bridge
+            type: record
+          - name: bods_bridge
+            type: record
+          - name: control_links
+            type: integer
+          - name: groups
+            type: record
 
 # Aliases for convenience
 aliases:

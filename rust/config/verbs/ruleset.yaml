@@ -3,10 +3,10 @@ domains:
     description: "Ruleset management — boundary-owned policy containers for eligibility rules"
 
     invocation_hints:
-      - "ruleset"
-      - "policy"
-      - "eligibility rules"
-      - "booking rules"
+    - "ruleset"
+    - "policy"
+    - "eligibility rules"
+    - "booking rules"
 
     verbs:
       create:
@@ -18,32 +18,33 @@ domains:
           scope: global
           noun: ruleset
           phase_tags: [stewardship]
+          side_effects: state_write
         invocation_phrases:
-          - "create ruleset"
-          - "new ruleset"
-          - "add eligibility ruleset"
-          - "create policy"
+        - "create ruleset"
+        - "new ruleset"
+        - "add eligibility ruleset"
+        - "create policy"
         args:
-          - name: name
-            type: string
-            required: true
-            maps_to: name
-            description: "Ruleset name"
-          - name: owner-type
-            type: string
-            required: true
-            maps_to: owner_type
-            description: "global, offering, or principal"
-          - name: owner-id
-            type: uuid
-            required: false
-            maps_to: owner_id
-            description: "ID of the owning entity (required for offering/principal)"
-          - name: boundary
-            type: string
-            required: true
-            maps_to: ruleset_boundary
-            description: "regulatory, commercial, or operational"
+        - name: name
+          type: string
+          required: true
+          maps_to: name
+          description: "Ruleset name"
+        - name: owner-type
+          type: string
+          required: true
+          maps_to: owner_type
+          description: "global, offering, or principal"
+        - name: owner-id
+          type: uuid
+          required: false
+          maps_to: owner_id
+          description: "ID of the owning entity (required for offering/principal)"
+        - name: boundary
+          type: string
+          required: true
+          maps_to: ruleset_boundary
+          description: "regulatory, commercial, or operational"
         returns:
           type: record
           name: ruleset
@@ -53,23 +54,24 @@ domains:
         behavior: plugin
         lifecycle:
           precondition_checks:
-            - "requires_prior:rule.add"
+          - "requires_prior:rule.add"
         metadata:
           tier: intent
           source_of_truth: operational
           scope: global
           noun: ruleset
           phase_tags: [stewardship]
+          side_effects: state_write
         invocation_phrases:
-          - "publish ruleset"
-          - "activate ruleset"
-          - "make ruleset active"
-          - "deploy rules"
+        - "publish ruleset"
+        - "activate ruleset"
+        - "make ruleset active"
+        - "deploy rules"
         args:
-          - name: ruleset-id
-            type: uuid
-            required: true
-            maps_to: ruleset_id
+        - name: ruleset-id
+          type: uuid
+          required: true
+          maps_to: ruleset_id
         returns:
           type: uuid
           name: ruleset_id
@@ -83,15 +85,16 @@ domains:
           scope: global
           noun: ruleset
           phase_tags: [stewardship]
+          side_effects: state_write
         invocation_phrases:
-          - "retire ruleset"
-          - "deactivate ruleset"
-          - "disable policy"
+        - "retire ruleset"
+        - "deactivate ruleset"
+        - "disable policy"
         args:
-          - name: ruleset-id
-            type: uuid
-            required: true
-            maps_to: ruleset_id
+        - name: ruleset-id
+          type: uuid
+          required: true
+          maps_to: ruleset_id
         returns:
           type: uuid
           name: ruleset_id

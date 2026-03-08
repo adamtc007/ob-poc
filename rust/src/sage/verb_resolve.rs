@@ -7,6 +7,7 @@
 use std::collections::HashSet;
 
 use super::outcome::OutcomeIntent;
+use super::polarity::IntentPolarity;
 use super::verb_index::{VerbMeta, VerbMetadataIndex};
 
 /// Ranked candidate returned by the structured scorer.
@@ -71,9 +72,9 @@ impl StructuredVerbScorer {
         let domain_hint = (!intent.domain_concept.trim().is_empty())
             .then_some(intent.domain_concept.as_str());
         let metas = {
-            let filtered = self.index.query(intent.plane, intent.polarity, domain_hint);
+            let filtered = self.query_by_side_effects(intent, domain_hint);
             if filtered.is_empty() && domain_hint.is_some() {
-                self.index.query(intent.plane, intent.polarity, None)
+                self.query_by_side_effects(intent, None)
             } else {
                 filtered
             }
@@ -84,7 +85,8 @@ impl StructuredVerbScorer {
             .map(|meta| {
                 let action_score = action_score(meta, &requested_action, &intent_keywords);
                 let param_overlap_score = param_overlap_score(meta, &requested_params);
-                let score = 0.6 * action_score + 0.4 * param_overlap_score;
+                let inventory_bias = inventory_read_bias(meta, intent);
+                let score = 0.6 * action_score + 0.4 * param_overlap_score + inventory_bias;
                 ScoredVerbCandidate {
                     fqn: meta.fqn.clone(),
                     score,
@@ -118,11 +120,48 @@ impl StructuredVerbScorer {
     pub fn index(&self) -> &VerbMetadataIndex {
         &self.index
     }
+
+    fn query_by_side_effects<'a>(
+        &'a self,
+        intent: &OutcomeIntent,
+        domain_hint: Option<&str>,
+    ) -> Vec<&'a VerbMeta> {
+        let filter_domain = |meta: &&VerbMeta| match domain_hint {
+            Some(hint) => self
+                .index
+                .query(intent.plane, intent.polarity, Some(hint))
+                .iter()
+                .any(|candidate| candidate.fqn == meta.fqn),
+            None => true,
+        };
+
+        match intent.polarity {
+            IntentPolarity::Read | IntentPolarity::Ambiguous => self
+                .index
+                .facts_only_verbs()
+                .filter(|meta| meta.planes.contains(&intent.plane))
+                .filter(filter_domain)
+                .collect(),
+            IntentPolarity::Write => self
+                .index
+                .state_write_verbs()
+                .filter(|meta| meta.planes.contains(&intent.plane))
+                .filter(filter_domain)
+                .collect(),
+        }
+    }
 }
 
 fn normalized_action_tags(intent: &OutcomeIntent) -> HashSet<String> {
     let mut tags = HashSet::new();
     tags.insert(intent.action.as_str().to_string());
+    if matches!(
+        intent.polarity,
+        IntentPolarity::Read | IntentPolarity::Ambiguous
+    ) && summary_suggests_collection(intent)
+    {
+        tags.insert("list".to_string());
+    }
     if !intent.domain_concept.is_empty() {
         tags.insert(intent.domain_concept.clone());
     }
@@ -133,6 +172,50 @@ fn normalized_action_tags(intent: &OutcomeIntent) -> HashSet<String> {
         }
     }
     tags
+}
+
+fn summary_suggests_collection(intent: &OutcomeIntent) -> bool {
+    let normalized = intent.summary.trim().to_ascii_lowercase();
+    if normalized.is_empty() {
+        return false;
+    }
+
+    let domain = intent.domain_concept.trim().to_ascii_lowercase();
+    let plural_domain = pluralize_domain(&domain);
+
+    normalized.contains(" all ")
+        || normalized.starts_with("all ")
+        || normalized.starts_with("list ")
+        || normalized.starts_with("show ")
+        || normalized.starts_with("show me ")
+        || normalized.contains(&format!(" {} ", plural_domain))
+        || normalized.ends_with(&format!(" {}", plural_domain))
+        || normalized.contains(&plural_domain)
+}
+
+fn summary_is_inventory_question(intent: &OutcomeIntent) -> bool {
+    let normalized = intent.summary.trim().to_ascii_lowercase();
+    if normalized.is_empty() {
+        return false;
+    }
+
+    summary_suggests_collection(intent)
+        && (normalized.starts_with("what ")
+            || normalized.starts_with("show ")
+            || normalized.starts_with("show me ")
+            || normalized.starts_with("list ")
+            || normalized.contains(" do ")
+            || normalized.contains(" have"))
+}
+
+fn pluralize_domain(domain: &str) -> String {
+    if domain.ends_with('y') && domain.len() > 1 {
+        format!("{}ies", &domain[..domain.len() - 1])
+    } else if domain.ends_with('s') {
+        domain.to_string()
+    } else {
+        format!("{domain}s")
+    }
 }
 
 fn requested_param_keys(intent: &OutcomeIntent) -> HashSet<String> {
@@ -192,8 +275,36 @@ fn action_score(
     0.0
 }
 
+fn inventory_read_bias(meta: &VerbMeta, intent: &OutcomeIntent) -> f32 {
+    if !matches!(
+        intent.polarity,
+        IntentPolarity::Read | IntentPolarity::Ambiguous
+    ) || !summary_is_inventory_question(intent)
+    {
+        return 0.0;
+    }
+
+    let verb_name = meta.verb_name.to_ascii_lowercase();
+    if verb_name.starts_with("list") {
+        return 0.2;
+    }
+    if verb_name.starts_with("search") {
+        return -0.1;
+    }
+
+    0.0
+}
+
 fn param_overlap_score(meta: &VerbMeta, requested_params: &HashSet<String>) -> f32 {
-    if requested_params.is_empty() || meta.param_names.is_empty() {
+    if requested_params.is_empty() {
+        return if meta.required_params.is_empty() {
+            0.2
+        } else {
+            0.0
+        };
+    }
+
+    if meta.param_names.is_empty() {
         return 0.0;
     }
 
@@ -250,6 +361,13 @@ mod tests {
             domain: domain.to_string(),
             verb_name: verb_name.to_string(),
             polarity,
+            side_effects: Some(
+                match polarity {
+                    IntentPolarity::Read | IntentPolarity::Ambiguous => "facts_only",
+                    IntentPolarity::Write => "state_write",
+                }
+                .to_string(),
+            ),
             planes,
             action_tags: action_tags.iter().map(|s| s.to_string()).collect(),
             param_names: params.iter().map(|s| s.to_string()).collect(),
@@ -308,6 +426,44 @@ mod tests {
     }
 
     #[test]
+    fn scorer_never_offers_write_verbs_for_read_intents() {
+        let scorer = StructuredVerbScorer::new(index_with(vec![
+            sample_meta(
+                "cbu.list",
+                IntentPolarity::Read,
+                vec![ObservationPlane::Instance],
+                &["list", "cbu"],
+                &[],
+                "List CBUs",
+            ),
+            sample_meta(
+                "cbu.create",
+                IntentPolarity::Write,
+                vec![ObservationPlane::Instance],
+                &["create", "cbu"],
+                &["client-id"],
+                "Create a CBU",
+            ),
+        ]));
+
+        let intent = OutcomeIntent {
+            summary: "show me the cbus".to_string(),
+            plane: ObservationPlane::Instance,
+            polarity: IntentPolarity::Read,
+            domain_concept: "cbu".to_string(),
+            action: OutcomeAction::Read,
+            subject: None,
+            steps: vec![],
+            confidence: SageConfidence::Medium,
+            pending_clarifications: vec![],
+        };
+
+        let candidates = scorer.score(&intent, 5);
+        assert_eq!(candidates.len(), 1);
+        assert_eq!(candidates[0].fqn, "cbu.list");
+    }
+
+    #[test]
     fn scorer_prefers_exact_action_and_param_overlap() {
         let scorer = StructuredVerbScorer::new(index_with(vec![
             sample_meta(
@@ -331,6 +487,43 @@ mod tests {
         let candidates = scorer.score(&sample_intent(), 5);
         assert_eq!(candidates[0].fqn, "cbu.create");
         assert!(candidates[0].score > candidates[1].score);
+    }
+
+    #[test]
+    fn scorer_prefers_deal_list_for_inventory_question() {
+        let scorer = StructuredVerbScorer::new(index_with(vec![
+            sample_meta(
+                "deal.list",
+                IntentPolarity::Read,
+                vec![ObservationPlane::Instance],
+                &["list", "deal"],
+                &[],
+                "List deals with optional filters",
+            ),
+            sample_meta(
+                "deal.search",
+                IntentPolarity::Read,
+                vec![ObservationPlane::Instance],
+                &["search", "deal"],
+                &["query"],
+                "Search deals by name or reference",
+            ),
+        ]));
+
+        let intent = OutcomeIntent {
+            summary: "what deals does Allianz have?".to_string(),
+            plane: ObservationPlane::Instance,
+            polarity: IntentPolarity::Read,
+            domain_concept: "deal".to_string(),
+            action: OutcomeAction::Read,
+            subject: None,
+            steps: vec![],
+            confidence: SageConfidence::Medium,
+            pending_clarifications: vec![],
+        };
+
+        let candidates = scorer.score(&intent, 5);
+        assert_eq!(candidates[0].fqn, "deal.list");
     }
 
     #[test]

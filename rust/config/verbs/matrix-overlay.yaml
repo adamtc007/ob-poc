@@ -21,98 +21,99 @@ domains:
           scope: cbu
           noun: matrix_overlay
           phase_tags: [trading]
+          side_effects: state_write
         invocation_phrases:
-          - "add product overlay"
-          - "apply overlay to matrix"
-          - "add services to matrix entry"
-          - "overlay product on trading matrix"
-          - "attach product to instrument class"
-          - "layer product onto matrix"
-          - "add SLA overlay"
-          - "extend matrix with product"
+        - "add product overlay"
+        - "apply overlay to matrix"
+        - "add services to matrix entry"
+        - "overlay product on trading matrix"
+        - "attach product to instrument class"
+        - "layer product onto matrix"
+        - "add SLA overlay"
+        - "extend matrix with product"
         behavior: crud
         crud:
           operation: upsert
           table: cbu_matrix_product_overlay
           schema: ob-poc
           unique_cols:
-            - cbu_id
-            - subscription_id
-            - instrument_class_id
-            - market_id
-            - currency
-            - counterparty_entity_id
+          - cbu_id
+          - subscription_id
+          - instrument_class_id
+          - market_id
+          - currency
+          - counterparty_entity_id
           returning: overlay_id
         args:
-          - name: cbu-id
-            type: uuid
-            required: true
-            maps_to: cbu_id
-            lookup:
-              table: cbus
-              entity_type: cbu
-              schema: ob-poc
-              search_key: name
-              primary_key: cbu_id
-          - name: subscription-id
-            type: uuid
-            required: true
-            maps_to: subscription_id
+        - name: cbu-id
+          type: uuid
+          required: true
+          maps_to: cbu_id
+          lookup:
+            table: cbus
+            entity_type: cbu
+            schema: ob-poc
+            search_key: name
+            primary_key: cbu_id
+        - name: subscription-id
+          type: uuid
+          required: true
+          maps_to: subscription_id
           # Context scoping (NULL = applies to all)
-          - name: instrument-class
-            type: lookup
-            required: false
-            maps_to: instrument_class_id
-            lookup:
-              table: instrument_classes
-              entity_type: instrument_class
-              schema: custody
-              code_column: code
-              id_column: class_id
-          - name: market
-            type: lookup
-            required: false
-            maps_to: market_id
-            lookup:
-              table: markets
-              entity_type: market
-              schema: custody
-              code_column: mic
-              id_column: market_id
-          - name: currency
-            type: string
-            required: false
-            maps_to: currency
-          - name: counterparty
-            type: uuid
-            required: false
-            maps_to: counterparty_entity_id
-            lookup:
-              table: entities
-              entity_type: entity
-              schema: ob-poc
-              search_key: name
-              primary_key: entity_id
+        - name: instrument-class
+          type: lookup
+          required: false
+          maps_to: instrument_class_id
+          lookup:
+            table: instrument_classes
+            entity_type: instrument_class
+            schema: custody
+            code_column: code
+            id_column: class_id
+        - name: market
+          type: lookup
+          required: false
+          maps_to: market_id
+          lookup:
+            table: markets
+            entity_type: market
+            schema: custody
+            code_column: mic
+            id_column: market_id
+        - name: currency
+          type: string
+          required: false
+          maps_to: currency
+        - name: counterparty
+          type: uuid
+          required: false
+          maps_to: counterparty_entity_id
+          lookup:
+            table: entities
+            entity_type: entity
+            schema: ob-poc
+            search_key: name
+            primary_key: entity_id
           # Attributes this overlay adds
-          - name: additional-services
-            type: json
-            required: false
-            maps_to: additional_services
-            description: "Array of service codes to add"
-          - name: additional-slas
-            type: json
-            required: false
-            maps_to: additional_slas
-            description: "Array of SLA template codes"
-          - name: additional-resources
-            type: json
-            required: false
-            maps_to: additional_resources
-            description: "Array of extra resource requirements"
-          - name: config
-            type: json
-            required: false
-            maps_to: product_specific_config
+        - name: additional-services
+          type: json
+          required: false
+          maps_to: additional_services
+          description: "Array of service codes to add"
+        - name: additional-slas
+          type: json
+          required: false
+          maps_to: additional_slas
+          description: "Array of SLA template codes"
+        - name: additional-resources
+          type: json
+          required: false
+          maps_to: additional_resources
+          description: "Array of extra resource requirements"
+        - name: config
+          type: json
+          required: false
+          maps_to: product_specific_config
         returns:
           type: uuid
           name: overlay_id
@@ -126,15 +127,16 @@ domains:
           scope: cbu
           noun: matrix_overlay
           phase_tags: [trading]
+          side_effects: state_write
         invocation_phrases:
-          - "remove product overlay"
-          - "delete overlay from matrix"
-          - "strip product from matrix entry"
-          - "detach overlay"
-          - "remove services from matrix"
-          - "clear product overlay"
-          - "drop overlay for instrument"
-          - "unlink product from matrix"
+        - "remove product overlay"
+        - "delete overlay from matrix"
+        - "strip product from matrix entry"
+        - "detach overlay"
+        - "remove services from matrix"
+        - "clear product overlay"
+        - "drop overlay for instrument"
+        - "unlink product from matrix"
         behavior: crud
         crud:
           operation: delete
@@ -142,10 +144,10 @@ domains:
           schema: ob-poc
           key: overlay_id
         args:
-          - name: overlay-id
-            type: uuid
-            required: true
-            maps_to: overlay_id
+        - name: overlay-id
+          type: uuid
+          required: true
+          maps_to: overlay_id
         returns:
           type: affected
 
@@ -157,15 +159,16 @@ domains:
           scope: cbu
           noun: matrix_overlay
           phase_tags: [trading]
+          side_effects: state_write
         invocation_phrases:
-          - "suspend matrix overlay"
-          - "pause product overlay"
-          - "hold overlay temporarily"
-          - "freeze overlay on matrix"
-          - "disable overlay entry"
-          - "temporarily suspend overlay"
-          - "put overlay on hold"
-          - "deactivate matrix overlay"
+        - "suspend matrix overlay"
+        - "pause product overlay"
+        - "hold overlay temporarily"
+        - "freeze overlay on matrix"
+        - "disable overlay entry"
+        - "temporarily suspend overlay"
+        - "put overlay on hold"
+        - "deactivate matrix overlay"
         behavior: crud
         crud:
           operation: update
@@ -175,10 +178,10 @@ domains:
           set_values:
             status: SUSPENDED
         args:
-          - name: overlay-id
-            type: uuid
-            required: true
-            maps_to: overlay_id
+        - name: overlay-id
+          type: uuid
+          required: true
+          maps_to: overlay_id
         returns:
           type: affected
 
@@ -190,15 +193,16 @@ domains:
           scope: cbu
           noun: matrix_overlay
           phase_tags: [trading]
+          side_effects: state_write
         invocation_phrases:
-          - "activate matrix overlay"
-          - "resume suspended overlay"
-          - "re-enable overlay"
-          - "restore overlay on matrix"
-          - "bring overlay back online"
-          - "unsuspend product overlay"
-          - "reactivate overlay entry"
-          - "turn overlay back on"
+        - "activate matrix overlay"
+        - "resume suspended overlay"
+        - "re-enable overlay"
+        - "restore overlay on matrix"
+        - "bring overlay back online"
+        - "unsuspend product overlay"
+        - "reactivate overlay entry"
+        - "turn overlay back on"
         behavior: crud
         crud:
           operation: update
@@ -208,10 +212,10 @@ domains:
           set_values:
             status: ACTIVE
         args:
-          - name: overlay-id
-            type: uuid
-            required: true
-            maps_to: overlay_id
+        - name: overlay-id
+          type: uuid
+          required: true
+          maps_to: overlay_id
         returns:
           type: affected
 
@@ -223,15 +227,16 @@ domains:
           scope: cbu
           noun: matrix_overlay
           phase_tags: [trading]
+          side_effects: facts_only
         invocation_phrases:
-          - "list matrix overlays"
-          - "show product overlays for CBU"
-          - "what overlays are applied"
-          - "display overlay entries"
-          - "get all overlays"
-          - "show active overlays"
-          - "list overlays on matrix"
-          - "which overlays are on this CBU"
+        - "list matrix overlays"
+        - "show product overlays for CBU"
+        - "what overlays are applied"
+        - "display overlay entries"
+        - "get all overlays"
+        - "show active overlays"
+        - "list overlays on matrix"
+        - "which overlays are on this CBU"
         behavior: crud
         crud:
           operation: list_by_fk
@@ -239,23 +244,23 @@ domains:
           schema: ob-poc
           fk_col: cbu_id
         args:
-          - name: cbu-id
-            type: uuid
-            required: true
-            lookup:
-              table: cbus
-              entity_type: cbu
-              schema: ob-poc
-              search_key: name
-              primary_key: cbu_id
-          - name: subscription-id
-            type: uuid
-            required: false
-            maps_to: subscription_id
-          - name: status
-            type: string
-            required: false
-            maps_to: status
+        - name: cbu-id
+          type: uuid
+          required: true
+          lookup:
+            table: cbus
+            entity_type: cbu
+            schema: ob-poc
+            search_key: name
+            primary_key: cbu_id
+        - name: subscription-id
+          type: uuid
+          required: false
+          maps_to: subscription_id
+        - name: status
+          type: string
+          required: false
+          maps_to: status
         returns:
           type: record_set
 
@@ -267,15 +272,16 @@ domains:
           scope: cbu
           noun: matrix_overlay
           phase_tags: [trading]
+          side_effects: facts_only
         invocation_phrases:
-          - "list overlays for subscription"
-          - "show overlays by product"
-          - "what overlays does subscription have"
-          - "get overlays for product subscription"
-          - "display subscription overlays"
-          - "which overlays apply to subscription"
-          - "show product-level overlays"
-          - "list overlays under subscription"
+        - "list overlays for subscription"
+        - "show overlays by product"
+        - "what overlays does subscription have"
+        - "get overlays for product subscription"
+        - "display subscription overlays"
+        - "which overlays apply to subscription"
+        - "show product-level overlays"
+        - "list overlays under subscription"
         behavior: crud
         crud:
           operation: list_by_fk
@@ -283,10 +289,10 @@ domains:
           schema: ob-poc
           fk_col: subscription_id
         args:
-          - name: subscription-id
-            type: uuid
-            required: true
-            maps_to: subscription_id
+        - name: subscription-id
+          type: uuid
+          required: true
+          maps_to: subscription_id
         returns:
           type: record_set
 
@@ -302,46 +308,47 @@ domains:
           scope: cbu
           noun: matrix_overlay
           phase_tags: [trading]
+          side_effects: state_write
         invocation_phrases:
-          - "show effective trading matrix"
-          - "get combined matrix view"
-          - "what is the effective matrix"
-          - "display matrix with overlays"
-          - "show merged product matrix"
-          - "compute effective matrix"
-          - "view trading matrix with products"
-          - "render full matrix"
+        - "show effective trading matrix"
+        - "get combined matrix view"
+        - "what is the effective matrix"
+        - "display matrix with overlays"
+        - "show merged product matrix"
+        - "compute effective matrix"
+        - "view trading matrix with products"
+        - "render full matrix"
         behavior: plugin
         plugin:
           handler: MatrixEffectiveOp
         args:
-          - name: cbu-id
-            type: uuid
-            required: true
-            lookup:
-              table: cbus
-              entity_type: cbu
-              schema: ob-poc
-              search_key: name
-              primary_key: cbu_id
-          - name: instrument-class
-            type: lookup
-            required: false
-            lookup:
-              table: instrument_classes
-              entity_type: instrument_class
-              schema: custody
-              code_column: code
-              id_column: class_id
-          - name: market
-            type: lookup
-            required: false
-            lookup:
-              table: markets
-              entity_type: market
-              schema: custody
-              code_column: mic
-              id_column: market_id
+        - name: cbu-id
+          type: uuid
+          required: true
+          lookup:
+            table: cbus
+            entity_type: cbu
+            schema: ob-poc
+            search_key: name
+            primary_key: cbu_id
+        - name: instrument-class
+          type: lookup
+          required: false
+          lookup:
+            table: instrument_classes
+            entity_type: instrument_class
+            schema: custody
+            code_column: code
+            id_column: class_id
+        - name: market
+          type: lookup
+          required: false
+          lookup:
+            table: markets
+            entity_type: market
+            schema: custody
+            code_column: mic
+            id_column: market_id
         returns:
           type: record_set
           description: |
@@ -364,36 +371,37 @@ domains:
           scope: cbu
           noun: matrix_overlay
           phase_tags: [trading]
+          side_effects: facts_only
         invocation_phrases:
-          - "show matrix gaps"
-          - "find missing resources"
-          - "what is incomplete in matrix"
-          - "identify coverage gaps"
-          - "show service gaps"
-          - "find lifecycle gaps"
-          - "detect missing SSIs or connections"
-          - "run gap analysis on matrix"
+        - "show matrix gaps"
+        - "find missing resources"
+        - "what is incomplete in matrix"
+        - "identify coverage gaps"
+        - "show service gaps"
+        - "find lifecycle gaps"
+        - "detect missing SSIs or connections"
+        - "run gap analysis on matrix"
         behavior: plugin
         plugin:
           handler: MatrixUnifiedGapsOp
         args:
-          - name: cbu-id
-            type: uuid
-            required: true
-            lookup:
-              table: cbus
-              entity_type: cbu
-              schema: ob-poc
-              search_key: name
-              primary_key: cbu_id
-          - name: domain
-            type: string
-            required: false
-            valid_values:
-              - ALL
-              - LIFECYCLE
-              - SERVICE
-            default: ALL
+        - name: cbu-id
+          type: uuid
+          required: true
+          lookup:
+            table: cbus
+            entity_type: cbu
+            schema: ob-poc
+            search_key: name
+            primary_key: cbu_id
+        - name: domain
+          type: string
+          required: false
+          valid_values:
+          - ALL
+          - LIFECYCLE
+          - SERVICE
+          default: ALL
         returns:
           type: record_set
           description: |
@@ -411,41 +419,42 @@ domains:
           scope: cbu
           noun: matrix_overlay
           phase_tags: [trading]
+          side_effects: state_write
         invocation_phrases:
-          - "compare product offerings"
-          - "diff products on matrix"
-          - "what does each product add"
-          - "compare custody vs prime brokerage"
-          - "show product differences"
-          - "side-by-side product comparison"
-          - "contrast product services"
-          - "compare product SLAs"
+        - "compare product offerings"
+        - "diff products on matrix"
+        - "what does each product add"
+        - "compare custody vs prime brokerage"
+        - "show product differences"
+        - "side-by-side product comparison"
+        - "contrast product services"
+        - "compare product SLAs"
         behavior: plugin
         plugin:
           handler: MatrixCompareProductsOp
         args:
-          - name: cbu-id
-            type: uuid
-            required: true
-            lookup:
-              table: cbus
-              entity_type: cbu
-              schema: ob-poc
-              search_key: name
-              primary_key: cbu_id
-          - name: instrument-class
-            type: lookup
-            required: true
-            lookup:
-              table: instrument_classes
-              entity_type: instrument_class
-              schema: custody
-              code_column: code
-              id_column: class_id
-          - name: products
-            type: string_list
-            required: true
-            description: "Product codes to compare"
+        - name: cbu-id
+          type: uuid
+          required: true
+          lookup:
+            table: cbus
+            entity_type: cbu
+            schema: ob-poc
+            search_key: name
+            primary_key: cbu_id
+        - name: instrument-class
+          type: lookup
+          required: true
+          lookup:
+            table: instrument_classes
+            entity_type: instrument_class
+            schema: custody
+            code_column: code
+            id_column: class_id
+        - name: products
+          type: string_list
+          required: true
+          description: "Product codes to compare"
         returns:
           type: record
           description: |

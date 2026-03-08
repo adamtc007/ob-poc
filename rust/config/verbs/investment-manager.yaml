@@ -15,15 +15,16 @@ domains:
           scope: cbu
           noun: investment_manager
           phase_tags: [trading]
+          side_effects: state_write
         invocation_phrases:
-          - "assign investment manager"
-          - "add IM to structure"
-          - "link manager to CBU"
-          - "set investment manager for fund"
-          - "appoint sub-advisor"
-          - "register IM assignment"
-          - "assign portfolio manager"
-          - "add trading manager to CBU"
+        - "assign investment manager"
+        - "add IM to structure"
+        - "link manager to CBU"
+        - "set investment manager for fund"
+        - "appoint sub-advisor"
+        - "register IM assignment"
+        - "assign portfolio manager"
+        - "add trading manager to CBU"
         behavior: crud
         crud:
           operation: upsert
@@ -31,117 +32,117 @@ domains:
           schema: custody
           returning: assignment_id
           conflict_keys:
-            - cbu_id
-            - manager_lei
-            - manager_role
+          - cbu_id
+          - manager_lei
+          - manager_role
         args:
-          - name: cbu-id
-            type: uuid
-            required: true
-            maps_to: cbu_id
-            lookup:
-              table: cbus
-              entity_type: cbu
-              schema: ob-poc
-              search_key: name
-              primary_key: cbu_id
-          - name: profile-id
-            type: uuid
-            required: false
-            maps_to: profile_id
-            lookup:
-              table: cbu_trading_profiles
-              schema: ob-poc
-              search_key: profile_id
-              primary_key: profile_id
-          - name: manager-lei
-            type: string
-            required: true
-            maps_to: manager_lei
-          - name: manager-bic
-            type: string
-            required: false
-            maps_to: manager_bic
-          - name: manager-name
-            type: string
-            required: false
-            maps_to: manager_name
-          - name: manager-entity-id
-            type: uuid
-            required: false
-            maps_to: manager_entity_id
-            lookup:
-              table: entities
-              entity_type: entity
-              schema: ob-poc
-              search_key: name
-              primary_key: entity_id
-          - name: priority
-            type: integer
-            required: true
-            maps_to: priority
-          - name: role
-            type: string
-            required: false
-            default: INVESTMENT_MANAGER
-            maps_to: manager_role
-            valid_values:
-              - INVESTMENT_MANAGER
-              - SUB_ADVISOR
-              - OVERLAY_MANAGER
-              - TRANSITION_MANAGER
-              - EXECUTION_BROKER
-          - name: scope-all
-            type: boolean
-            required: false
-            default: false
-            maps_to: scope_all
-          - name: scope-markets
-            type: string_list
-            required: false
-            maps_to: scope_markets
-          - name: scope-instrument-classes
-            type: string_list
-            required: false
-            maps_to: scope_instrument_classes
-          - name: scope-currencies
-            type: string_list
-            required: false
-            maps_to: scope_currencies
-          - name: scope-isda-asset-classes
-            type: string_list
-            required: false
-            maps_to: scope_isda_asset_classes
-          - name: instruction-method
-            type: string
-            required: true
-            maps_to: instruction_method
-            valid_values:
-              - SWIFT
-              - CTM
-              - FIX
-              - API
-              - ALERT
-              - MANUAL
-          - name: can-trade
-            type: boolean
-            required: false
-            default: true
-            maps_to: can_trade
-          - name: can-settle
-            type: boolean
-            required: false
-            default: true
-            maps_to: can_settle
-          - name: can-affirm
-            type: boolean
-            required: false
-            default: false
-            maps_to: can_affirm
-          - name: effective-date
-            type: date
-            required: false
-            maps_to: effective_date
+        - name: cbu-id
+          type: uuid
+          required: true
+          maps_to: cbu_id
+          lookup:
+            table: cbus
+            entity_type: cbu
+            schema: ob-poc
+            search_key: name
+            primary_key: cbu_id
+        - name: profile-id
+          type: uuid
+          required: false
+          maps_to: profile_id
+          lookup:
+            table: cbu_trading_profiles
+            schema: ob-poc
+            search_key: profile_id
+            primary_key: profile_id
+        - name: manager-lei
+          type: string
+          required: true
+          maps_to: manager_lei
+        - name: manager-bic
+          type: string
+          required: false
+          maps_to: manager_bic
+        - name: manager-name
+          type: string
+          required: false
+          maps_to: manager_name
+        - name: manager-entity-id
+          type: uuid
+          required: false
+          maps_to: manager_entity_id
+          lookup:
+            table: entities
+            entity_type: entity
+            schema: ob-poc
+            search_key: name
+            primary_key: entity_id
+        - name: priority
+          type: integer
+          required: true
+          maps_to: priority
+        - name: role
+          type: string
+          required: false
+          default: INVESTMENT_MANAGER
+          maps_to: manager_role
+          valid_values:
+          - INVESTMENT_MANAGER
+          - SUB_ADVISOR
+          - OVERLAY_MANAGER
+          - TRANSITION_MANAGER
+          - EXECUTION_BROKER
+        - name: scope-all
+          type: boolean
+          required: false
+          default: false
+          maps_to: scope_all
+        - name: scope-markets
+          type: string_list
+          required: false
+          maps_to: scope_markets
+        - name: scope-instrument-classes
+          type: string_list
+          required: false
+          maps_to: scope_instrument_classes
+        - name: scope-currencies
+          type: string_list
+          required: false
+          maps_to: scope_currencies
+        - name: scope-isda-asset-classes
+          type: string_list
+          required: false
+          maps_to: scope_isda_asset_classes
+        - name: instruction-method
+          type: string
+          required: true
+          maps_to: instruction_method
+          valid_values:
+          - SWIFT
+          - CTM
+          - FIX
+          - API
+          - ALERT
+          - MANUAL
+        - name: can-trade
+          type: boolean
+          required: false
+          default: true
+          maps_to: can_trade
+        - name: can-settle
+          type: boolean
+          required: false
+          default: true
+          maps_to: can_settle
+        - name: can-affirm
+          type: boolean
+          required: false
+          default: false
+          maps_to: can_affirm
+        - name: effective-date
+          type: date
+          required: false
+          maps_to: effective_date
         returns:
           type: uuid
           name: assignment_id
@@ -155,15 +156,16 @@ domains:
           scope: cbu
           noun: investment_manager
           phase_tags: [trading]
+          side_effects: state_write
         invocation_phrases:
-          - "set IM trading scope"
-          - "update manager scope"
-          - "change IM market scope"
-          - "restrict manager to markets"
-          - "set instrument scope for IM"
-          - "modify investment manager scope"
-          - "update IM currency scope"
-          - "adjust manager trading permissions"
+        - "set IM trading scope"
+        - "update manager scope"
+        - "change IM market scope"
+        - "restrict manager to markets"
+        - "set instrument scope for IM"
+        - "modify investment manager scope"
+        - "update IM currency scope"
+        - "adjust manager trading permissions"
         behavior: crud
         crud:
           operation: update
@@ -171,30 +173,30 @@ domains:
           schema: custody
           key: assignment_id
         args:
-          - name: assignment-id
-            type: uuid
-            required: true
-            maps_to: assignment_id
-          - name: scope-all
-            type: boolean
-            required: false
-            maps_to: scope_all
-          - name: scope-markets
-            type: string_list
-            required: false
-            maps_to: scope_markets
-          - name: scope-instrument-classes
-            type: string_list
-            required: false
-            maps_to: scope_instrument_classes
-          - name: scope-currencies
-            type: string_list
-            required: false
-            maps_to: scope_currencies
-          - name: scope-isda-asset-classes
-            type: string_list
-            required: false
-            maps_to: scope_isda_asset_classes
+        - name: assignment-id
+          type: uuid
+          required: true
+          maps_to: assignment_id
+        - name: scope-all
+          type: boolean
+          required: false
+          maps_to: scope_all
+        - name: scope-markets
+          type: string_list
+          required: false
+          maps_to: scope_markets
+        - name: scope-instrument-classes
+          type: string_list
+          required: false
+          maps_to: scope_instrument_classes
+        - name: scope-currencies
+          type: string_list
+          required: false
+          maps_to: scope_currencies
+        - name: scope-isda-asset-classes
+          type: string_list
+          required: false
+          maps_to: scope_isda_asset_classes
         returns:
           type: affected
 
@@ -206,15 +208,16 @@ domains:
           scope: cbu
           noun: investment_manager
           phase_tags: [trading]
+          side_effects: state_write
         invocation_phrases:
-          - "link IM to SWIFT connection"
-          - "set instruction delivery"
-          - "connect IM to messaging resource"
-          - "wire IM to connectivity"
-          - "link manager to FIX connection"
-          - "assign instruction channel"
-          - "set IM delivery method"
-          - "connect trading instructions"
+        - "link IM to SWIFT connection"
+        - "set instruction delivery"
+        - "connect IM to messaging resource"
+        - "wire IM to connectivity"
+        - "link manager to FIX connection"
+        - "assign instruction channel"
+        - "set IM delivery method"
+        - "connect trading instructions"
         behavior: crud
         crud:
           operation: update
@@ -222,20 +225,20 @@ domains:
           schema: custody
           key: assignment_id
         args:
-          - name: assignment-id
-            type: uuid
-            required: true
-            maps_to: assignment_id
-          - name: resource-instance-id
-            type: uuid
-            required: true
-            maps_to: instruction_resource_id
-            lookup:
-              table: cbu_resource_instances
-              entity_type: resource_instance
-              schema: ob-poc
-              search_key: instance_name
-              primary_key: instance_id
+        - name: assignment-id
+          type: uuid
+          required: true
+          maps_to: assignment_id
+        - name: resource-instance-id
+          type: uuid
+          required: true
+          maps_to: instruction_resource_id
+          lookup:
+            table: cbu_resource_instances
+            entity_type: resource_instance
+            schema: ob-poc
+            search_key: instance_name
+            primary_key: instance_id
         returns:
           type: affected
 
@@ -247,15 +250,16 @@ domains:
           scope: cbu
           noun: investment_manager
           phase_tags: [trading]
+          side_effects: facts_only
         invocation_phrases:
-          - "list investment managers"
-          - "show IM assignments"
-          - "who manages this CBU"
-          - "display assigned managers"
-          - "get all IMs for fund"
-          - "show portfolio managers"
-          - "list manager assignments"
-          - "which IMs are on this structure"
+        - "list investment managers"
+        - "show IM assignments"
+        - "who manages this CBU"
+        - "display assigned managers"
+        - "get all IMs for fund"
+        - "show portfolio managers"
+        - "list manager assignments"
+        - "which IMs are on this structure"
         behavior: crud
         crud:
           operation: list_by_fk
@@ -264,19 +268,19 @@ domains:
           fk_col: cbu_id
           order_by: priority
         args:
-          - name: cbu-id
-            type: uuid
-            required: true
-            lookup:
-              table: cbus
-              entity_type: cbu
-              schema: ob-poc
-              search_key: name
-              primary_key: cbu_id
-          - name: status
-            type: string
-            required: false
-            maps_to: status
+        - name: cbu-id
+          type: uuid
+          required: true
+          lookup:
+            table: cbus
+            entity_type: cbu
+            schema: ob-poc
+            search_key: name
+            primary_key: cbu_id
+        - name: status
+          type: string
+          required: false
+          maps_to: status
         returns:
           type: record_set
 
@@ -288,15 +292,16 @@ domains:
           scope: cbu
           noun: investment_manager
           phase_tags: [trading]
+          side_effects: state_write
         invocation_phrases:
-          - "suspend investment manager"
-          - "pause IM assignment"
-          - "temporarily disable manager"
-          - "hold IM trading access"
-          - "freeze IM assignment"
-          - "suspend manager from CBU"
-          - "pause portfolio manager"
-          - "deactivate IM temporarily"
+        - "suspend investment manager"
+        - "pause IM assignment"
+        - "temporarily disable manager"
+        - "hold IM trading access"
+        - "freeze IM assignment"
+        - "suspend manager from CBU"
+        - "pause portfolio manager"
+        - "deactivate IM temporarily"
         behavior: crud
         crud:
           operation: update
@@ -306,10 +311,10 @@ domains:
           set_values:
             status: SUSPENDED
         args:
-          - name: assignment-id
-            type: uuid
-            required: true
-            maps_to: assignment_id
+        - name: assignment-id
+          type: uuid
+          required: true
+          maps_to: assignment_id
         returns:
           type: affected
 
@@ -321,15 +326,16 @@ domains:
           scope: cbu
           noun: investment_manager
           phase_tags: [trading]
+          side_effects: state_write
         invocation_phrases:
-          - "terminate investment manager"
-          - "end IM assignment"
-          - "remove manager from CBU"
-          - "off-board investment manager"
-          - "close IM relationship"
-          - "revoke manager assignment"
-          - "terminate portfolio manager"
-          - "end manager trading access"
+        - "terminate investment manager"
+        - "end IM assignment"
+        - "remove manager from CBU"
+        - "off-board investment manager"
+        - "close IM relationship"
+        - "revoke manager assignment"
+        - "terminate portfolio manager"
+        - "end manager trading access"
         behavior: crud
         crud:
           operation: update
@@ -339,14 +345,14 @@ domains:
           set_values:
             status: TERMINATED
         args:
-          - name: assignment-id
-            type: uuid
-            required: true
-            maps_to: assignment_id
-          - name: termination-date
-            type: date
-            required: false
-            maps_to: termination_date
+        - name: assignment-id
+          type: uuid
+          required: true
+          maps_to: assignment_id
+        - name: termination-date
+          type: date
+          required: false
+          maps_to: termination_date
         returns:
           type: affected
 
@@ -358,33 +364,34 @@ domains:
           scope: cbu
           noun: investment_manager
           phase_tags: [trading]
+          side_effects: facts_only
         invocation_phrases:
-          - "find manager for trade"
-          - "which IM handles this market"
-          - "resolve IM for instrument class"
-          - "who trades equities for this CBU"
-          - "match trade to manager"
-          - "find IM by market scope"
-          - "which manager covers this currency"
-          - "look up IM for trade"
+        - "find manager for trade"
+        - "which IM handles this market"
+        - "resolve IM for instrument class"
+        - "who trades equities for this CBU"
+        - "match trade to manager"
+        - "find IM by market scope"
+        - "which manager covers this currency"
+        - "look up IM for trade"
         behavior: plugin
         handler: find_im_for_trade
         args:
-          - name: cbu-id
-            type: uuid
-            required: true
-          - name: market
-            type: string
-            required: false
-          - name: instrument-class
-            type: string
-            required: true
-          - name: currency
-            type: string
-            required: false
-          - name: isda-asset-class
-            type: string
-            required: false
+        - name: cbu-id
+          type: uuid
+          required: true
+        - name: market
+          type: string
+          required: false
+        - name: instrument-class
+          type: string
+          required: true
+        - name: currency
+          type: string
+          required: false
+        - name: isda-asset-class
+          type: string
+          required: false
         returns:
           type: record
           description: Matching IM assignment with instruction method

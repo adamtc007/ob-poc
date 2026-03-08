@@ -11,15 +11,16 @@ domains:
           noun: red_flag
           tags: [kyc]
           phase_tags: [kyc]
+          side_effects: state_write
         invocation_phrases:
-          - "raise a red flag"
-          - "flag compliance risk on case"
-          - "report AML concern"
-          - "create KYC risk indicator"
-          - "log sanctions match finding"
-          - "raise adverse media alert"
-          - "flag opaque ownership structure"
-          - "escalate suspicious finding"
+        - "raise a red flag"
+        - "flag compliance risk on case"
+        - "report AML concern"
+        - "create KYC risk indicator"
+        - "log sanctions match finding"
+        - "raise adverse media alert"
+        - "flag opaque ownership structure"
+        - "escalate suspicious finding"
         behavior: crud
         crud:
           operation: insert
@@ -110,15 +111,16 @@ domains:
           noun: red_flag
           tags: [kyc]
           phase_tags: [kyc]
+          side_effects: state_write
         invocation_phrases:
-          - "mitigate red flag"
-          - "resolve compliance concern"
-          - "mark risk indicator as mitigated"
-          - "close red flag with mitigation"
-          - "address AML red flag"
-          - "record mitigation action taken"
-          - "resolve KYC risk finding"
-          - "clear red flag with evidence"
+        - "mitigate red flag"
+        - "resolve compliance concern"
+        - "mark risk indicator as mitigated"
+        - "close red flag with mitigation"
+        - "address AML red flag"
+        - "record mitigation action taken"
+        - "resolve KYC risk finding"
+        - "clear red flag with evidence"
         behavior: crud
         crud:
           operation: update
@@ -156,15 +158,16 @@ domains:
           noun: red_flag
           tags: [kyc]
           phase_tags: [kyc]
+          side_effects: state_write
         invocation_phrases:
-          - "waive red flag with justification"
-          - "approve red flag waiver"
-          - "accept risk with rationale"
-          - "override red flag finding"
-          - "grant compliance exception"
-          - "waive KYC risk indicator"
-          - "approve proceeding despite red flag"
-          - "senior approval for risk acceptance"
+        - "waive red flag with justification"
+        - "approve red flag waiver"
+        - "accept risk with rationale"
+        - "override red flag finding"
+        - "grant compliance exception"
+        - "waive KYC risk indicator"
+        - "approve proceeding despite red flag"
+        - "senior approval for risk acceptance"
         behavior: crud
         crud:
           operation: update
@@ -206,15 +209,16 @@ domains:
           noun: red_flag
           tags: [kyc]
           phase_tags: [kyc]
+          side_effects: state_write
         invocation_phrases:
-          - "dismiss red flag as false positive"
-          - "close red flag not confirmed"
-          - "mark finding as false match"
-          - "dismiss screening false positive"
-          - "reject red flag after review"
-          - "discard unsubstantiated risk flag"
-          - "clear false positive alert"
-          - "close red flag no action required"
+        - "dismiss red flag as false positive"
+        - "close red flag not confirmed"
+        - "mark finding as false match"
+        - "dismiss screening false positive"
+        - "reject red flag after review"
+        - "discard unsubstantiated risk flag"
+        - "clear false positive alert"
+        - "close red flag no action required"
         behavior: crud
         crud:
           operation: update
@@ -252,15 +256,16 @@ domains:
           noun: red_flag
           tags: [kyc]
           phase_tags: [kyc]
+          side_effects: state_write
         invocation_phrases:
-          - "set red flag as blocking"
-          - "block case on red flag"
-          - "mark risk as case blocker"
-          - "prevent case progression"
-          - "hard stop on compliance finding"
-          - "escalate red flag to blocking"
-          - "halt case until flag resolved"
-          - "make red flag a gate blocker"
+        - "set red flag as blocking"
+        - "block case on red flag"
+        - "mark risk as case blocker"
+        - "prevent case progression"
+        - "hard stop on compliance finding"
+        - "escalate red flag to blocking"
+        - "halt case until flag resolved"
+        - "make red flag a gate blocker"
         behavior: crud
         crud:
           operation: update
@@ -292,15 +297,16 @@ domains:
           noun: red_flag
           tags: [kyc]
           phase_tags: [kyc]
+          side_effects: facts_only
         invocation_phrases:
-          - "list red flags for case"
-          - "show all risk indicators"
-          - "what red flags are open"
-          - "get case risk findings"
-          - "display compliance concerns"
-          - "view blocking red flags"
-          - "show unresolved risk flags"
-          - "list AML findings on case"
+        - "list red flags for case"
+        - "show all risk indicators"
+        - "what red flags are open"
+        - "get case risk findings"
+        - "display compliance concerns"
+        - "view blocking red flags"
+        - "show unresolved risk flags"
+        - "list AML findings on case"
         behavior: crud
         crud:
           operation: list_by_fk
@@ -336,15 +342,16 @@ domains:
           noun: red_flag
           tags: [kyc]
           phase_tags: [kyc]
+          side_effects: facts_only
         invocation_phrases:
-          - "list red flags for workstream"
-          - "show entity-level risk flags"
-          - "get workstream risk findings"
-          - "display compliance issues for entity"
-          - "what risks were found on workstream"
-          - "view red flags by entity"
-          - "show screening alerts for workstream"
-          - "list CDD risk indicators"
+        - "list red flags for workstream"
+        - "show entity-level risk flags"
+        - "get workstream risk findings"
+        - "display compliance issues for entity"
+        - "what risks were found on workstream"
+        - "view red flags by entity"
+        - "show screening alerts for workstream"
+        - "list CDD risk indicators"
         behavior: crud
         crud:
           operation: list_by_fk

@@ -21,6 +21,7 @@ pub struct VerbMeta {
     pub domain: String,
     pub verb_name: String,
     pub polarity: IntentPolarity,
+    pub side_effects: Option<String>,
     pub planes: Vec<ObservationPlane>,
     pub action_tags: Vec<String>,
     pub param_names: Vec<String>,
@@ -103,6 +104,36 @@ impl VerbMetadataIndex {
     /// ```
     pub fn iter(&self) -> impl Iterator<Item = &VerbMeta> {
         self.by_fqn.values()
+    }
+
+    /// Iterate only verbs that are safe to serve directly.
+    ///
+    /// # Examples
+    /// ```ignore
+    /// use ob_poc::sage::verb_index::VerbMetadataIndex;
+    ///
+    /// let index = VerbMetadataIndex::load()?;
+    /// assert!(index.facts_only_verbs().count() > 0);
+    /// # Ok::<(), anyhow::Error>(())
+    /// ```
+    pub fn facts_only_verbs(&self) -> impl Iterator<Item = &VerbMeta> {
+        self.iter()
+            .filter(|meta| meta.side_effects.as_deref() == Some("facts_only"))
+    }
+
+    /// Iterate only verbs that mutate state and require confirmation.
+    ///
+    /// # Examples
+    /// ```ignore
+    /// use ob_poc::sage::verb_index::VerbMetadataIndex;
+    ///
+    /// let index = VerbMetadataIndex::load()?;
+    /// assert!(index.state_write_verbs().count() > 0);
+    /// # Ok::<(), anyhow::Error>(())
+    /// ```
+    pub fn state_write_verbs(&self) -> impl Iterator<Item = &VerbMeta> {
+        self.iter()
+            .filter(|meta| meta.side_effects.as_deref() == Some("state_write"))
     }
 
     /// Query verbs by plane, polarity, and optional domain hint.
@@ -203,6 +234,10 @@ impl VerbMetadataIndex {
             domain: domain.to_string(),
             verb_name: verb_name.to_string(),
             polarity,
+            side_effects: config
+                .metadata
+                .as_ref()
+                .and_then(|metadata| metadata.side_effects.clone()),
             planes,
             action_tags,
             param_names,

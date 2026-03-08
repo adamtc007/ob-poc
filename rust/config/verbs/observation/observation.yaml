@@ -10,15 +10,16 @@ domains:
           scope: cbu
           noun: observation
           phase_tags: [kyc]
+          side_effects: state_write
         invocation_phrases:
-          - "record attribute observation"
-          - "log observed value for entity"
-          - "capture data point from source"
-          - "add observation for attribute"
-          - "enter evidence observation"
-          - "submit attribute finding"
-          - "note observed entity data"
-          - "create new observation record"
+        - "record attribute observation"
+        - "log observed value for entity"
+        - "capture data point from source"
+        - "add observation for attribute"
+        - "enter evidence observation"
+        - "submit attribute finding"
+        - "note observed entity data"
+        - "create new observation record"
         behavior: crud
         crud:
           operation: insert
@@ -104,15 +105,16 @@ domains:
           scope: cbu
           noun: observation
           phase_tags: [kyc]
+          side_effects: state_write
         invocation_phrases:
-          - "extract observation from document"
-          - "record data from document"
-          - "capture value from uploaded file"
-          - "log attribute from passport"
-          - "pull data from submitted document"
-          - "document based observation"
-          - "observation sourced from evidence"
-          - "add finding from document review"
+        - "extract observation from document"
+        - "record data from document"
+        - "capture value from uploaded file"
+        - "log attribute from passport"
+        - "pull data from submitted document"
+        - "document based observation"
+        - "observation sourced from evidence"
+        - "add finding from document review"
         behavior: plugin
         handler: observation_from_document
         args:
@@ -158,15 +160,16 @@ domains:
           scope: cbu
           noun: observation
           phase_tags: [kyc]
+          side_effects: state_write
         invocation_phrases:
-          - "supersede old observation"
-          - "replace outdated observation"
-          - "update observation with newer"
-          - "mark observation as superseded"
-          - "newer evidence replaces old"
-          - "override previous observation"
-          - "retire stale observation"
-          - "observation has been replaced"
+        - "supersede old observation"
+        - "replace outdated observation"
+        - "update observation with newer"
+        - "mark observation as superseded"
+        - "newer evidence replaces old"
+        - "override previous observation"
+        - "retire stale observation"
+        - "observation has been replaced"
         behavior: crud
         crud:
           operation: update
@@ -201,15 +204,16 @@ domains:
           scope: cbu
           noun: observation
           phase_tags: [kyc]
+          side_effects: facts_only
         invocation_phrases:
-          - "list observations for entity"
-          - "show all entity observations"
-          - "what observations exist for person"
-          - "get observation history"
-          - "display entity evidence trail"
-          - "pull up all observations"
-          - "review entity data points"
-          - "observations on file for entity"
+        - "list observations for entity"
+        - "show all entity observations"
+        - "what observations exist for person"
+        - "get observation history"
+        - "display entity evidence trail"
+        - "pull up all observations"
+        - "review entity data points"
+        - "observations on file for entity"
         behavior: crud
         crud:
           operation: list_by_fk
@@ -240,15 +244,16 @@ domains:
           scope: cbu
           noun: observation
           phase_tags: [kyc]
+          side_effects: facts_only
         invocation_phrases:
-          - "list observations for attribute"
-          - "show attribute observation history"
-          - "what values recorded for field"
-          - "get observations of specific attribute"
-          - "display attribute evidence sources"
-          - "observations for this data point"
-          - "review attribute across sources"
-          - "all recorded values for attribute"
+        - "list observations for attribute"
+        - "show attribute observation history"
+        - "what values recorded for field"
+        - "get observations of specific attribute"
+        - "display attribute evidence sources"
+        - "observations for this data point"
+        - "review attribute across sources"
+        - "all recorded values for attribute"
         behavior: crud
         crud:
           operation: select
@@ -289,15 +294,16 @@ domains:
           scope: cbu
           noun: observation
           phase_tags: [kyc]
+          side_effects: facts_only
         invocation_phrases:
-          - "get current observation"
-          - "what is the latest value"
-          - "show best observation for attribute"
-          - "current authoritative value"
-          - "most recent observation"
-          - "fetch active observation"
-          - "what do we know about attribute"
-          - "latest data point for field"
+        - "get current observation"
+        - "what is the latest value"
+        - "show best observation for attribute"
+        - "current authoritative value"
+        - "most recent observation"
+        - "fetch active observation"
+        - "what do we know about attribute"
+        - "latest data point for field"
         behavior: plugin
         handler: observation_get_current
         args:
@@ -323,15 +329,16 @@ domains:
           scope: cbu
           noun: observation
           phase_tags: [kyc]
+          side_effects: state_write
         invocation_phrases:
-          - "reconcile observations for entity"
-          - "compare attribute observations"
-          - "find observation conflicts"
-          - "check for data discrepancies"
-          - "run reconciliation on attribute"
-          - "detect conflicting data values"
-          - "cross-check observation sources"
-          - "auto-detect data mismatches"
+        - "reconcile observations for entity"
+        - "compare attribute observations"
+        - "find observation conflicts"
+        - "check for data discrepancies"
+        - "run reconciliation on attribute"
+        - "detect conflicting data values"
+        - "cross-check observation sources"
+        - "auto-detect data mismatches"
         behavior: plugin
         handler: observation_reconcile
         args:
@@ -370,15 +377,16 @@ domains:
           scope: cbu
           noun: observation
           phase_tags: [kyc]
+          side_effects: state_write
         invocation_phrases:
-          - "verify allegations against observations"
-          - "batch check allegations"
-          - "validate pending client claims"
-          - "run allegation verification"
-          - "match allegations to evidence"
-          - "confirm or reject allegations"
-          - "auto-verify outstanding allegations"
-          - "check all allegations for entity"
+        - "verify allegations against observations"
+        - "batch check allegations"
+        - "validate pending client claims"
+        - "run allegation verification"
+        - "match allegations to evidence"
+        - "confirm or reject allegations"
+        - "auto-verify outstanding allegations"
+        - "check all allegations for entity"
         behavior: plugin
         handler: observation_verify_allegations
         args:

@@ -15,15 +15,16 @@ domains:
           noun: capital
           tags: [kyc]
           phase_tags: [onboarding]
+          side_effects: state_write
         invocation_phrases:
-          - "define share class for company"
-          - "create new share class"
-          - "add ordinary shares"
-          - "set up preference shares"
-          - "register capital share class"
-          - "configure voting share class"
-          - "establish share structure"
-          - "record share class from articles"
+        - "define share class for company"
+        - "create new share class"
+        - "add ordinary shares"
+        - "set up preference shares"
+        - "register capital share class"
+        - "configure voting share class"
+        - "establish share structure"
+        - "record share class from articles"
         behavior: crud
         crud:
           operation: upsert
@@ -31,87 +32,87 @@ domains:
           schema: kyc
           returning: id
           conflict_keys:
-            - cbu_id
-            - name
+          - cbu_id
+          - name
         args:
-          - name: cbu-id
-            type: uuid
-            required: true
-            maps_to: cbu_id
-            lookup:
-              table: cbus
-              entity_type: cbu
-              schema: ob-poc
-              search_key: name
-              primary_key: cbu_id
-          - name: issuer-entity-id
-            type: uuid
-            required: true
-            maps_to: issuer_entity_id
-            description: The entity (company) that issues these shares
-            lookup:
-              table: entities
-              entity_type: entity
-              schema: ob-poc
-              search_key: name
-              primary_key: entity_id
-          - name: name
-            type: string
-            required: true
-            maps_to: name
-            description: Share class name (e.g., 'Ordinary Shares', 'A Preference')
-          - name: share-type
-            type: string
-            required: true
-            maps_to: share_type
-            valid_values:
-              - ORDINARY
-              - PREFERENCE_A
-              - PREFERENCE_B
-              - DEFERRED
-              - REDEEMABLE
-              - GROWTH
-              - MANAGEMENT
-              - CONVERTIBLE
-              - COMMON
-              - PREFERRED
-              - RESTRICTED
-              - FOUNDERS
-          - name: authorized-shares
-            type: integer
-            required: false
-            maps_to: authorized_shares
-            description: Maximum shares authorized in articles
-          - name: issued-shares
-            type: integer
-            required: true
-            maps_to: issued_shares
-            description: Actually issued shares
-          - name: voting-rights-per-share
-            type: decimal
-            required: false
-            maps_to: voting_rights_per_share
-            default: 1.0
-            description: 0 = non-voting, >1 = super-voting
-          - name: par-value
-            type: decimal
-            required: false
-            maps_to: par_value
-          - name: par-value-currency
-            type: string
-            required: false
-            maps_to: par_value_currency
-            default: GBP
-          - name: dividend-rights
-            type: boolean
-            required: false
-            maps_to: dividend_rights
-            default: true
-          - name: liquidation-preference
-            type: decimal
-            required: false
-            maps_to: liquidation_preference
-            description: Priority claim amount on liquidation
+        - name: cbu-id
+          type: uuid
+          required: true
+          maps_to: cbu_id
+          lookup:
+            table: cbus
+            entity_type: cbu
+            schema: ob-poc
+            search_key: name
+            primary_key: cbu_id
+        - name: issuer-entity-id
+          type: uuid
+          required: true
+          maps_to: issuer_entity_id
+          description: The entity (company) that issues these shares
+          lookup:
+            table: entities
+            entity_type: entity
+            schema: ob-poc
+            search_key: name
+            primary_key: entity_id
+        - name: name
+          type: string
+          required: true
+          maps_to: name
+          description: Share class name (e.g., 'Ordinary Shares', 'A Preference')
+        - name: share-type
+          type: string
+          required: true
+          maps_to: share_type
+          valid_values:
+          - ORDINARY
+          - PREFERENCE_A
+          - PREFERENCE_B
+          - DEFERRED
+          - REDEEMABLE
+          - GROWTH
+          - MANAGEMENT
+          - CONVERTIBLE
+          - COMMON
+          - PREFERRED
+          - RESTRICTED
+          - FOUNDERS
+        - name: authorized-shares
+          type: integer
+          required: false
+          maps_to: authorized_shares
+          description: Maximum shares authorized in articles
+        - name: issued-shares
+          type: integer
+          required: true
+          maps_to: issued_shares
+          description: Actually issued shares
+        - name: voting-rights-per-share
+          type: decimal
+          required: false
+          maps_to: voting_rights_per_share
+          default: 1.0
+          description: 0 = non-voting, >1 = super-voting
+        - name: par-value
+          type: decimal
+          required: false
+          maps_to: par_value
+        - name: par-value-currency
+          type: string
+          required: false
+          maps_to: par_value_currency
+          default: GBP
+        - name: dividend-rights
+          type: boolean
+          required: false
+          maps_to: dividend_rights
+          default: true
+        - name: liquidation-preference
+          type: decimal
+          required: false
+          maps_to: liquidation_preference
+          description: Priority claim amount on liquidation
         set_values:
           class_category: CORPORATE
           status: active
@@ -131,15 +132,16 @@ domains:
           noun: capital
           tags: [kyc]
           phase_tags: [onboarding]
+          side_effects: state_write
         invocation_phrases:
-          - "allocate shares to shareholder"
-          - "assign share holding"
-          - "record beneficial ownership stake"
-          - "give shares to entity"
-          - "create shareholder holding record"
-          - "register share allocation"
-          - "add shares to PSC register"
-          - "record equity ownership"
+        - "allocate shares to shareholder"
+        - "assign share holding"
+        - "record beneficial ownership stake"
+        - "give shares to entity"
+        - "create shareholder holding record"
+        - "register share allocation"
+        - "add shares to PSC register"
+        - "record equity ownership"
         behavior: crud
         crud:
           operation: upsert
@@ -147,41 +149,41 @@ domains:
           schema: kyc
           returning: id
           conflict_keys:
-            - share_class_id
-            - investor_entity_id
+          - share_class_id
+          - investor_entity_id
         args:
-          - name: share-class-id
-            type: uuid
-            required: true
-            maps_to: share_class_id
-            lookup:
-              table: share_classes
-              entity_type: share_class
-              schema: kyc
-              search_key: name
-              primary_key: id
-          - name: shareholder-entity-id
-            type: uuid
-            required: true
-            maps_to: investor_entity_id
-            lookup:
-              table: entities
-              entity_type: entity
-              schema: ob-poc
-              search_key: name
-              primary_key: entity_id
-          - name: units
-            type: decimal
-            required: true
-            maps_to: units
-          - name: acquisition-date
-            type: date
-            required: false
-            maps_to: acquisition_date
-          - name: cost-basis
-            type: decimal
-            required: false
-            maps_to: cost_basis
+        - name: share-class-id
+          type: uuid
+          required: true
+          maps_to: share_class_id
+          lookup:
+            table: share_classes
+            entity_type: share_class
+            schema: kyc
+            search_key: name
+            primary_key: id
+        - name: shareholder-entity-id
+          type: uuid
+          required: true
+          maps_to: investor_entity_id
+          lookup:
+            table: entities
+            entity_type: entity
+            schema: ob-poc
+            search_key: name
+            primary_key: entity_id
+        - name: units
+          type: decimal
+          required: true
+          maps_to: units
+        - name: acquisition-date
+          type: date
+          required: false
+          maps_to: acquisition_date
+        - name: cost-basis
+          type: decimal
+          required: false
+          maps_to: cost_basis
         set_values:
           status: active
         returns:
@@ -198,58 +200,59 @@ domains:
           noun: capital
           tags: [kyc]
           phase_tags: [onboarding]
+          side_effects: state_write
         invocation_phrases:
-          - "transfer shares between holders"
-          - "record share transfer"
-          - "move shares to new owner"
-          - "change of ownership on register"
-          - "log equity transfer"
-          - "process share sale transaction"
-          - "register share movement"
-          - "update beneficial owner after transfer"
+        - "transfer shares between holders"
+        - "record share transfer"
+        - "move shares to new owner"
+        - "change of ownership on register"
+        - "log equity transfer"
+        - "process share sale transaction"
+        - "register share movement"
+        - "update beneficial owner after transfer"
         behavior: plugin
         plugin:
           handler: CapitalTransferOp
         args:
-          - name: share-class-id
-            type: uuid
-            required: true
-            lookup:
-              table: share_classes
-              entity_type: share_class
-              schema: kyc
-              search_key: name
-              primary_key: id
-          - name: from-entity-id
-            type: uuid
-            required: true
-            lookup:
-              table: entities
-              entity_type: entity
-              schema: ob-poc
-              search_key: name
-              primary_key: entity_id
-          - name: to-entity-id
-            type: uuid
-            required: true
-            lookup:
-              table: entities
-              entity_type: entity
-              schema: ob-poc
-              search_key: name
-              primary_key: entity_id
-          - name: units
-            type: decimal
-            required: true
-          - name: transfer-date
-            type: date
-            required: true
-          - name: price-per-unit
-            type: decimal
-            required: false
-          - name: reference
-            type: string
-            required: true
+        - name: share-class-id
+          type: uuid
+          required: true
+          lookup:
+            table: share_classes
+            entity_type: share_class
+            schema: kyc
+            search_key: name
+            primary_key: id
+        - name: from-entity-id
+          type: uuid
+          required: true
+          lookup:
+            table: entities
+            entity_type: entity
+            schema: ob-poc
+            search_key: name
+            primary_key: entity_id
+        - name: to-entity-id
+          type: uuid
+          required: true
+          lookup:
+            table: entities
+            entity_type: entity
+            schema: ob-poc
+            search_key: name
+            primary_key: entity_id
+        - name: units
+          type: decimal
+          required: true
+        - name: transfer-date
+          type: date
+          required: true
+        - name: price-per-unit
+          type: decimal
+          required: false
+        - name: reference
+          type: string
+          required: true
         returns:
           type: uuid
           name: transfer_id
@@ -267,42 +270,43 @@ domains:
           noun: capital
           tags: [kyc]
           phase_tags: [onboarding]
+          side_effects: state_write
         invocation_phrases:
-          - "reconcile capital structure"
-          - "verify shareholding totals"
-          - "check ownership percentages match"
-          - "validate share register integrity"
-          - "do holdings add up"
-          - "run capital reconciliation check"
-          - "confirm issued shares match allocated"
-          - "audit share class balances"
+        - "reconcile capital structure"
+        - "verify shareholding totals"
+        - "check ownership percentages match"
+        - "validate share register integrity"
+        - "do holdings add up"
+        - "run capital reconciliation check"
+        - "confirm issued shares match allocated"
+        - "audit share class balances"
         behavior: plugin
         plugin:
           handler: CapitalReconcileOp
         args:
-          - name: entity-id
-            type: uuid
-            required: true
-            description: The issuing entity to reconcile
-            lookup:
-              table: entities
-              entity_type: entity
-              schema: ob-poc
-              search_key: name
-              primary_key: entity_id
+        - name: entity-id
+          type: uuid
+          required: true
+          description: The issuing entity to reconcile
+          lookup:
+            table: entities
+            entity_type: entity
+            schema: ob-poc
+            search_key: name
+            primary_key: entity_id
         returns:
           type: record
           fields:
-            - name: is_reconciled
-              type: boolean
-            - name: issued_shares
-              type: integer
-            - name: allocated_shares
-              type: integer
-            - name: unallocated_shares
-              type: integer
-            - name: shareholders
-              type: array
+          - name: is_reconciled
+            type: boolean
+          - name: issued_shares
+            type: integer
+          - name: allocated_shares
+            type: integer
+          - name: unallocated_shares
+            type: integer
+          - name: shareholders
+            type: array
 
       get-ownership-chain:
         description: |
@@ -315,33 +319,34 @@ domains:
           noun: capital
           tags: [kyc]
           phase_tags: [onboarding]
+          side_effects: facts_only
         invocation_phrases:
-          - "trace ownership chain upward"
-          - "get UBO ownership path"
-          - "show beneficial ownership chain"
-          - "compute indirect ownership percentage"
-          - "follow ownership to ultimate parent"
-          - "who ultimately owns this entity"
-          - "traverse equity control chain"
-          - "map ownership hierarchy for CDD"
+        - "trace ownership chain upward"
+        - "get UBO ownership path"
+        - "show beneficial ownership chain"
+        - "compute indirect ownership percentage"
+        - "follow ownership to ultimate parent"
+        - "who ultimately owns this entity"
+        - "traverse equity control chain"
+        - "map ownership hierarchy for CDD"
         behavior: plugin
         plugin:
           handler: CapitalOwnershipChainOp
         args:
-          - name: entity-id
-            type: uuid
-            required: true
-            lookup:
-              table: entities
-              entity_type: entity
-              schema: ob-poc
-              search_key: name
-              primary_key: entity_id
-          - name: min-ownership-pct
-            type: decimal
-            required: false
-            default: 0.01
-            description: Minimum ownership % to include in chain
+        - name: entity-id
+          type: uuid
+          required: true
+          lookup:
+            table: entities
+            entity_type: entity
+            schema: ob-poc
+            search_key: name
+            primary_key: entity_id
+        - name: min-ownership-pct
+          type: decimal
+          required: false
+          default: 0.01
+          description: Minimum ownership % to include in chain
         returns:
           type: record_set
           description: Array of ownership paths with computed indirect %
@@ -355,37 +360,38 @@ domains:
           noun: capital
           tags: [kyc]
           phase_tags: [onboarding]
+          side_effects: state_write
         invocation_phrases:
-          - "issue new shares"
-          - "increase issued share capital"
-          - "add more shares to class"
-          - "record new share issuance"
-          - "expand authorized capital"
-          - "dilute existing shareholders"
-          - "allot additional shares"
-          - "register share issuance event"
+        - "issue new shares"
+        - "increase issued share capital"
+        - "add more shares to class"
+        - "record new share issuance"
+        - "expand authorized capital"
+        - "dilute existing shareholders"
+        - "allot additional shares"
+        - "register share issuance event"
         behavior: plugin
         plugin:
           handler: CapitalIssueSharesOp
         args:
-          - name: share-class-id
-            type: uuid
-            required: true
-            lookup:
-              table: share_classes
-              entity_type: share_class
-              schema: kyc
-              search_key: name
-              primary_key: id
-          - name: additional-shares
-            type: integer
-            required: true
-          - name: issue-date
-            type: date
-            required: true
-          - name: reason
-            type: string
-            required: false
+        - name: share-class-id
+          type: uuid
+          required: true
+          lookup:
+            table: share_classes
+            entity_type: share_class
+            schema: kyc
+            search_key: name
+            primary_key: id
+        - name: additional-shares
+          type: integer
+          required: true
+        - name: issue-date
+          type: date
+          required: true
+        - name: reason
+          type: string
+          required: false
         returns:
           type: affected
 
@@ -398,37 +404,38 @@ domains:
           noun: capital
           tags: [kyc]
           phase_tags: [onboarding]
+          side_effects: state_write
         invocation_phrases:
-          - "cancel shares from register"
-          - "record share buyback"
-          - "reduce issued share capital"
-          - "retire shares from class"
-          - "process share cancellation"
-          - "remove shares from issuance"
-          - "record capital reduction"
-          - "buy back and cancel shares"
+        - "cancel shares from register"
+        - "record share buyback"
+        - "reduce issued share capital"
+        - "retire shares from class"
+        - "process share cancellation"
+        - "remove shares from issuance"
+        - "record capital reduction"
+        - "buy back and cancel shares"
         behavior: plugin
         plugin:
           handler: CapitalCancelSharesOp
         args:
-          - name: share-class-id
-            type: uuid
-            required: true
-            lookup:
-              table: share_classes
-              entity_type: share_class
-              schema: kyc
-              search_key: name
-              primary_key: id
-          - name: shares-to-cancel
-            type: integer
-            required: true
-          - name: cancel-date
-            type: date
-            required: true
-          - name: reason
-            type: string
-            required: false
+        - name: share-class-id
+          type: uuid
+          required: true
+          lookup:
+            table: share_classes
+            entity_type: share_class
+            schema: kyc
+            search_key: name
+            primary_key: id
+        - name: shares-to-cancel
+          type: integer
+          required: true
+        - name: cancel-date
+          type: date
+          required: true
+        - name: reason
+          type: string
+          required: false
         returns:
           type: affected
 
@@ -441,15 +448,16 @@ domains:
           noun: capital
           tags: [kyc]
           phase_tags: [onboarding]
+          side_effects: facts_only
         invocation_phrases:
-          - "list share classes for issuer"
-          - "show capital structure"
-          - "what share classes exist"
-          - "get all share types"
-          - "display company equity classes"
-          - "view share register summary"
-          - "show authorized share classes"
-          - "list voting and non-voting shares"
+        - "list share classes for issuer"
+        - "show capital structure"
+        - "what share classes exist"
+        - "get all share types"
+        - "display company equity classes"
+        - "view share register summary"
+        - "show authorized share classes"
+        - "list voting and non-voting shares"
         behavior: crud
         crud:
           operation: list_by_fk
@@ -457,15 +465,15 @@ domains:
           schema: kyc
           fk_col: issuer_entity_id
         args:
-          - name: issuer-entity-id
-            type: uuid
-            required: true
-            lookup:
-              table: entities
-              entity_type: entity
-              schema: ob-poc
-              search_key: name
-              primary_key: entity_id
+        - name: issuer-entity-id
+          type: uuid
+          required: true
+          lookup:
+            table: entities
+            entity_type: entity
+            schema: ob-poc
+            search_key: name
+            primary_key: entity_id
         returns:
           type: record_set
 
@@ -478,15 +486,16 @@ domains:
           noun: capital
           tags: [kyc]
           phase_tags: [onboarding]
+          side_effects: facts_only
         invocation_phrases:
-          - "list shareholders for class"
-          - "show PSC register entries"
-          - "who holds these shares"
-          - "get beneficial owners of shares"
-          - "display shareholder register"
-          - "view share ownership breakdown"
-          - "show holders for equity class"
-          - "list persons with significant control"
+        - "list shareholders for class"
+        - "show PSC register entries"
+        - "who holds these shares"
+        - "get beneficial owners of shares"
+        - "display shareholder register"
+        - "view share ownership breakdown"
+        - "show holders for equity class"
+        - "list persons with significant control"
         behavior: crud
         crud:
           operation: list_by_fk
@@ -494,18 +503,18 @@ domains:
           schema: kyc
           fk_col: share_class_id
         args:
-          - name: share-class-id
-            type: uuid
-            required: true
-            lookup:
-              table: share_classes
-              entity_type: share_class
-              schema: kyc
-              search_key: name
-              primary_key: id
-          - name: include-inactive
-            type: boolean
-            required: false
-            default: false
+        - name: share-class-id
+          type: uuid
+          required: true
+          lookup:
+            table: share_classes
+            entity_type: share_class
+            schema: kyc
+            search_key: name
+            primary_key: id
+        - name: include-inactive
+          type: boolean
+          required: false
+          default: false
         returns:
           type: record_set

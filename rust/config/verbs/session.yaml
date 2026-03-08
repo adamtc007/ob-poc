@@ -30,16 +30,16 @@ domains:
         behavior: plugin
         handler: SessionLoadUniverseOp
         invocation_phrases:
-          - "load universe"
-          - "load all"
-          - "show everything"
-          - "load all CBUs"
-          - "load entire fund universe"
-          - "show all client business units"
-          - "bring up all trading units"
-          - "load full portfolio scope"
-          - "show all structures in workspace"
-          - "open the full universe"
+        - "load universe"
+        - "load all"
+        - "show everything"
+        - "load all CBUs"
+        - "load entire fund universe"
+        - "show all client business units"
+        - "bring up all trading units"
+        - "load full portfolio scope"
+        - "show all structures in workspace"
+        - "open the full universe"
         metadata:
           tier: intent
           source_of_truth: session
@@ -47,17 +47,18 @@ domains:
           tags: [load, universe, bulk]
           subject_kinds: []
           phase_tags: [navigation]
+          side_effects: state_write
         args:
-          - name: client-id
-            type: uuid
-            required: false
-            description: Optional client filter (defaults to all)
-            lookup:
-              table: entities
-              schema: ob-poc
-              entity_type: entity
-              search_key: name
-              primary_key: entity_id
+        - name: client-id
+          type: uuid
+          required: false
+          description: Optional client filter (defaults to all)
+          lookup:
+            table: entities
+            schema: ob-poc
+            entity_type: entity
+            search_key: name
+            primary_key: entity_id
         returns:
           type: record
           fields: [count_added, total_loaded]
@@ -67,16 +68,16 @@ domains:
         behavior: plugin
         handler: SessionLoadGalaxyOp
         invocation_phrases:
-          - "load galaxy"
-          - "load jurisdiction"
-          - "show all in"
-          - "load all CBUs in"
-          - "load region"
-          - "show funds by jurisdiction"
-          - "load structures in jurisdiction"
-          - "bring up all CBUs for region"
-          - "scope to jurisdiction"
-          - "load all trading units in"
+        - "load galaxy"
+        - "load jurisdiction"
+        - "show all in"
+        - "load all CBUs in"
+        - "load region"
+        - "show funds by jurisdiction"
+        - "load structures in jurisdiction"
+        - "bring up all CBUs for region"
+        - "scope to jurisdiction"
+        - "load all trading units in"
         metadata:
           tier: intent
           source_of_truth: session
@@ -84,14 +85,15 @@ domains:
           tags: [load, galaxy, jurisdiction, bulk]
           subject_kinds: []
           phase_tags: [navigation]
+          side_effects: state_write
         args:
-          - name: jurisdiction
-            type: string
-            required: true
-            description: ISO country code (LU, IE, DE, US, etc.)
+        - name: jurisdiction
+          type: string
+          required: true
+          description: ISO country code (LU, IE, DE, US, etc.)
         sentences:
           step:
-            - "Load all CBUs in {jurisdiction}"
+          - "Load all CBUs in {jurisdiction}"
           clarify:
             jurisdiction: "Which jurisdiction? (e.g., LU, IE, DE, US)"
         confirm_policy: quick_confirm
@@ -105,56 +107,56 @@ domains:
         handler: SessionLoadClusterOp
         invocation_phrases:
           # Scope-setting trigger phrases (signal intent to set working scope)
-          - "work on"
-          - "focus on"
-          - "use"
-          - "set scope to"
-          - "set session to"
-          - "switch to"
-          - "load book for"
-          - "load all funds under"
-          - "show all CBUs for"
-          - "load group"
-          - "load cluster"
-          - "load book"
-          - "show book"
+        - "work on"
+        - "focus on"
+        - "use"
+        - "set scope to"
+        - "set session to"
+        - "switch to"
+        - "load book for"
+        - "load all funds under"
+        - "show all CBUs for"
+        - "load group"
+        - "load cluster"
+        - "load book"
+        - "show book"
           # Group-level triggers
-          - "show all cbus"
-          - "show cbu book"
-          - "cbu book"
-          - "show funds for"
-          - "all cbus for"
-          - "show cbu universe"
-          - "cbu universe"
-          - "load manco"
+        - "show all cbus"
+        - "show cbu book"
+        - "cbu book"
+        - "show funds for"
+        - "all cbus for"
+        - "show cbu universe"
+        - "cbu universe"
+        - "load manco"
           # Bare client names - direct scope selection (triggers entity resolution)
           # When user says just "allianz", treat as scope selection intent
-          - "allianz"
-          - "blackrock"
-          - "aviva"
-          - "axa"
-          - "generali"
+        - "allianz"
+        - "blackrock"
+        - "aviva"
+        - "axa"
+        - "generali"
           # Client name with context
-          - "work on allianz"
-          - "work on blackrock"
-          - "work on aviva"
-          - "use allianz"
-          - "use blackrock"
-          - "use aviva"
-          - "focus on allianz"
-          - "focus on blackrock"
-          - "allianz book"
-          - "blackrock book"
-          - "allianz group"
-          - "blackrock group"
-          - "aviva group"
+        - "work on allianz"
+        - "work on blackrock"
+        - "work on aviva"
+        - "use allianz"
+        - "use blackrock"
+        - "use aviva"
+        - "focus on allianz"
+        - "focus on blackrock"
+        - "allianz book"
+        - "blackrock book"
+        - "allianz group"
+        - "blackrock group"
+        - "aviva group"
           # Load patterns with client names
-          - "load allianz"
-          - "load blackrock"
-          - "load aviva"
-          - "load the allianz book"
-          - "load the blackrock book"
-          - "load the aviva book"
+        - "load allianz"
+        - "load blackrock"
+        - "load aviva"
+        - "load the allianz book"
+        - "load the blackrock book"
+        - "load the aviva book"
         metadata:
           tier: intent
           source_of_truth: session
@@ -162,43 +164,44 @@ domains:
           tags: [load, cluster, book, client, bulk, scope]
           subject_kinds: []
           phase_tags: [navigation]
+          side_effects: state_write
         args:
           # Primary: client nickname (e.g., "Allianz", "BlackRock")
           # Two-stage resolution: nickname → client_group_id → anchor_entity_id
-          - name: client
-            type: string
-            required: false
-            description: Client group nickname (e.g., "Allianz", "AGI", "BlackRock")
+        - name: client
+          type: string
+          required: false
+          description: Client group nickname (e.g., "Allianz", "AGI", "BlackRock")
             # Slot type enables "Allianz rule" - resolves to scope setting
-            slot_type: client_group_ref
+          slot_type: client_group_ref
             # Preferred roles for anchor resolution (in priority order)
-            preferred_roles: [governance_controller, ultimate_parent]
-            lookup:
-              table: client_group
-              entity_type: client_group
-              schema: ob-poc
-              search_key: alias
-              primary_key: id
+          preferred_roles: [governance_controller, ultimate_parent]
+          lookup:
+            table: client_group
+            entity_type: client_group
+            schema: ob-poc
+            search_key: alias
+            primary_key: id
           # Alternative: direct apex entity UUID (for programmatic use)
-          - name: apex-entity-id
-            type: uuid
-            required: false
-            description: UUID of the GROUP apex entity (alternative to client)
-            lookup:
-              table: entities
-              entity_type: group
-              schema: ob-poc
-              search_key: name
-              primary_key: entity_id
-          - name: jurisdiction
-            type: string
-            required: false
-            description: Filter to specific jurisdiction (LU, DE, IE, etc.)
+        - name: apex-entity-id
+          type: uuid
+          required: false
+          description: UUID of the GROUP apex entity (alternative to client)
+          lookup:
+            table: entities
+            entity_type: group
+            schema: ob-poc
+            search_key: name
+            primary_key: entity_id
+        - name: jurisdiction
+          type: string
+          required: false
+          description: Filter to specific jurisdiction (LU, DE, IE, etc.)
         validation:
           one_of_required: [client, apex-entity-id]
         sentences:
           step:
-            - "Load {client} book into session"
+          - "Load {client} book into session"
           clarify:
             client: "Which client book should be loaded?"
         confirm_policy: quick_confirm
@@ -211,16 +214,16 @@ domains:
         behavior: plugin
         handler: SessionLoadSystemOp
         invocation_phrases:
-          - "load system"
-          - "load cbu"
-          - "load cbu into session"
-          - "open cbu"
-          - "load fund"
-          - "switch to cbu"
-          - "show cbu"
-          - "add cbu to session"
-          - "bring up single trading unit"
-          - "load this structure into workspace"
+        - "load system"
+        - "load cbu"
+        - "load cbu into session"
+        - "open cbu"
+        - "load fund"
+        - "switch to cbu"
+        - "show cbu"
+        - "add cbu to session"
+        - "bring up single trading unit"
+        - "load this structure into workspace"
         metadata:
           tier: intent
           source_of_truth: session
@@ -228,18 +231,19 @@ domains:
           tags: [load, system, cbu]
           subject_kinds: []
           phase_tags: [navigation]
+          side_effects: state_write
         args:
-          - name: cbu-id
-            type: uuid
-            required: true
-            maps_to: cbu_id
-            description: The CBU to load
-            lookup:
-              table: cbus
-              schema: ob-poc
-              entity_type: cbu
-              search_key: name
-              primary_key: cbu_id
+        - name: cbu-id
+          type: uuid
+          required: true
+          maps_to: cbu_id
+          description: The CBU to load
+          lookup:
+            table: cbus
+            schema: ob-poc
+            entity_type: cbu
+            search_key: name
+            primary_key: cbu_id
         returns:
           type: record
           fields: [cbu_id, name, jurisdiction, total_loaded]
@@ -253,16 +257,16 @@ domains:
         behavior: plugin
         handler: SessionFilterJurisdictionOp
         invocation_phrases:
-          - "filter to jurisdiction"
-          - "narrow to"
-          - "just the"
-          - "only"
-          - "filter by jurisdiction"
-          - "now use"
-          - "keep only CBUs in jurisdiction"
-          - "narrow scope to region"
-          - "restrict session to jurisdiction"
-          - "filter workspace by country"
+        - "filter to jurisdiction"
+        - "narrow to"
+        - "just the"
+        - "only"
+        - "filter by jurisdiction"
+        - "now use"
+        - "keep only CBUs in jurisdiction"
+        - "narrow scope to region"
+        - "restrict session to jurisdiction"
+        - "filter workspace by country"
         metadata:
           tier: intent
           source_of_truth: session
@@ -270,11 +274,12 @@ domains:
           tags: [filter, narrow, jurisdiction]
           subject_kinds: []
           phase_tags: [navigation]
+          side_effects: state_write
         args:
-          - name: jurisdiction
-            type: string
-            required: true
-            description: ISO country code to keep (LU, IE, DE, US, etc.)
+        - name: jurisdiction
+          type: string
+          required: true
+          description: ISO country code to keep (LU, IE, DE, US, etc.)
         returns:
           type: record
           fields: [jurisdiction, count_kept, count_removed, total_loaded]
@@ -288,16 +293,16 @@ domains:
         behavior: plugin
         handler: SessionUnloadSystemOp
         invocation_phrases:
-          - "unload system"
-          - "unload cbu"
-          - "unload cbu from session"
-          - "remove cbu"
-          - "remove cbu from session"
-          - "close cbu"
-          - "drop cbu from scope"
-          - "take cbu out of session"
-          - "remove structure from workspace"
-          - "dismiss this trading unit"
+        - "unload system"
+        - "unload cbu"
+        - "unload cbu from session"
+        - "remove cbu"
+        - "remove cbu from session"
+        - "close cbu"
+        - "drop cbu from scope"
+        - "take cbu out of session"
+        - "remove structure from workspace"
+        - "dismiss this trading unit"
         metadata:
           tier: intent
           source_of_truth: session
@@ -305,18 +310,19 @@ domains:
           tags: [unload, system, cbu]
           subject_kinds: []
           phase_tags: [navigation]
+          side_effects: state_write
         args:
-          - name: cbu-id
-            type: uuid
-            required: true
-            maps_to: cbu_id
-            description: The CBU to unload
-            lookup:
-              table: cbus
-              schema: ob-poc
-              entity_type: cbu
-              search_key: name
-              primary_key: cbu_id
+        - name: cbu-id
+          type: uuid
+          required: true
+          maps_to: cbu_id
+          description: The CBU to unload
+          lookup:
+            table: cbus
+            schema: ob-poc
+            entity_type: cbu
+            search_key: name
+            primary_key: cbu_id
         returns:
           type: record
           fields: [cbu_id, name, total_loaded, was_present]
@@ -324,16 +330,16 @@ domains:
       clear:
         description: Remove all CBUs from session
         invocation_phrases:
-          - "clear session"
-          - "reset session"
-          - "start over"
-          - "clear all"
-          - "remove all CBUs"
-          - "empty session"
-          - "start fresh"
-          - "wipe session"
-          - "clear everything"
-          - "reset scope"
+        - "clear session"
+        - "reset session"
+        - "start over"
+        - "clear all"
+        - "remove all CBUs"
+        - "empty session"
+        - "start fresh"
+        - "wipe session"
+        - "clear everything"
+        - "reset scope"
         behavior: plugin
         handler: SessionClearOp
         metadata:
@@ -343,6 +349,7 @@ domains:
           tags: [clear, reset]
           subject_kinds: []
           phase_tags: [navigation]
+          side_effects: state_write
         args: []
         returns:
           type: record
@@ -355,16 +362,16 @@ domains:
       undo:
         description: Rollback to previous session state
         invocation_phrases:
-          - "undo"
-          - "go back"
-          - "revert"
-          - "undo last action"
-          - "step back"
-          - "rollback"
-          - "undo that"
-          - "previous state"
-          - "take that back"
-          - "reverse last change"
+        - "undo"
+        - "go back"
+        - "revert"
+        - "undo last action"
+        - "step back"
+        - "rollback"
+        - "undo that"
+        - "previous state"
+        - "take that back"
+        - "reverse last change"
         behavior: plugin
         handler: SessionUndoOp
         metadata:
@@ -374,6 +381,7 @@ domains:
           tags: [history, undo]
           subject_kinds: []
           phase_tags: [navigation]
+          side_effects: state_write
         args: []
         returns:
           type: record
@@ -382,16 +390,16 @@ domains:
       redo:
         description: Re-apply undone state change
         invocation_phrases:
-          - "redo"
-          - "go forward"
-          - "redo last action"
-          - "reapply"
-          - "redo that"
-          - "restore"
-          - "step forward"
-          - "apply again"
-          - "put it back"
-          - "undo the undo"
+        - "redo"
+        - "go forward"
+        - "redo last action"
+        - "reapply"
+        - "redo that"
+        - "restore"
+        - "step forward"
+        - "apply again"
+        - "put it back"
+        - "undo the undo"
         behavior: plugin
         handler: SessionRedoOp
         metadata:
@@ -401,6 +409,7 @@ domains:
           tags: [history, redo]
           subject_kinds: []
           phase_tags: [navigation]
+          side_effects: state_write
         args: []
         returns:
           type: record
@@ -413,16 +422,16 @@ domains:
       info:
         description: Get session summary
         invocation_phrases:
-          - "session info"
-          - "show session"
-          - "session status"
-          - "what's loaded"
-          - "session summary"
-          - "show session state"
-          - "current scope"
-          - "what am I working on"
-          - "show me the session"
-          - "session details"
+        - "session info"
+        - "show session"
+        - "session status"
+        - "what's loaded"
+        - "session summary"
+        - "show session state"
+        - "current scope"
+        - "what am I working on"
+        - "show me the session"
+        - "session details"
         behavior: plugin
         handler: SessionInfoOp
         metadata:
@@ -432,25 +441,25 @@ domains:
           tags: [read, info]
           subject_kinds: []
           phase_tags: [navigation]
+          side_effects: state_write
         args: []
         returns:
           type: record
-          fields:
-            [total_cbus, jurisdictions, galaxies, history_depth, future_depth]
+          fields: [total_cbus, jurisdictions, galaxies, history_depth, future_depth]
 
       list:
         description: List loaded CBUs
         invocation_phrases:
-          - "list CBUs"
-          - "show loaded CBUs"
-          - "what CBUs are loaded"
-          - "list loaded"
-          - "show my CBUs"
-          - "which CBUs"
-          - "list session CBUs"
-          - "show scope"
-          - "what's in scope"
-          - "display loaded CBUs"
+        - "list CBUs"
+        - "show loaded CBUs"
+        - "what CBUs are loaded"
+        - "list loaded"
+        - "show my CBUs"
+        - "which CBUs"
+        - "list session CBUs"
+        - "show scope"
+        - "what's in scope"
+        - "display loaded CBUs"
         behavior: plugin
         handler: SessionListOp
         metadata:
@@ -460,16 +469,17 @@ domains:
           tags: [read, list]
           subject_kinds: []
           phase_tags: [navigation]
+          side_effects: facts_only
         args:
-          - name: limit
-            type: integer
-            required: false
-            default: 100
-            description: Max results
-          - name: jurisdiction
-            type: string
-            required: false
-            description: Filter by jurisdiction
+        - name: limit
+          type: integer
+          required: false
+          default: 100
+          description: Max results
+        - name: jurisdiction
+          type: string
+          required: false
+          description: Filter by jurisdiction
         returns:
           type: record_set
           fields: [cbu_id, name, jurisdiction, apex_entity]
@@ -483,16 +493,16 @@ domains:
         behavior: plugin
         handler: SessionSetClientOp
         invocation_phrases:
-          - "set client context"
-          - "I'm working with"
-          - "client is"
-          - "set client to"
-          - "my client is"
-          - "switch client scope to"
-          - "change client context"
-          - "working on client"
-          - "scope to client group"
-          - "select client group"
+        - "set client context"
+        - "I'm working with"
+        - "client is"
+        - "set client to"
+        - "my client is"
+        - "switch client scope to"
+        - "change client context"
+        - "working on client"
+        - "scope to client group"
+        - "select client group"
         metadata:
           tier: intent
           source_of_truth: session
@@ -500,44 +510,45 @@ domains:
           tags: [context, client]
           subject_kinds: []
           phase_tags: [navigation]
+          side_effects: state_write
         args:
-          - name: client
-            type: string
-            required: true
-            description: "Client nickname (resolved via client_group_alias)"
+        - name: client
+          type: string
+          required: true
+          description: "Client nickname (resolved via client_group_alias)"
             # Slot type enables "Allianz rule" - resolves to scope setting
-            slot_type: client_group_ref
+          slot_type: client_group_ref
             # Preferred roles for anchor resolution (in priority order)
-            preferred_roles: [governance_controller, ultimate_parent]
-            lookup:
-              table: client_group
-              entity_type: client_group
-              schema: ob-poc
-              search_key: alias
-              primary_key: id
+          preferred_roles: [governance_controller, ultimate_parent]
+          lookup:
+            table: client_group
+            entity_type: client_group
+            schema: ob-poc
+            search_key: alias
+            primary_key: id
         returns:
           type: record
           fields: [group_id, group_name, entity_count, candidates]
         effects:
-          - "If exact match: sets client_group_id immediately"
-          - "If ambiguous (score gap < 0.10): returns top 3 candidates for user selection"
-          - "If no match above threshold: returns empty with suggestions"
+        - "If exact match: sets client_group_id immediately"
+        - "If ambiguous (score gap < 0.10): returns top 3 candidates for user selection"
+        - "If no match above threshold: returns empty with suggestions"
 
       set-persona:
         description: "Set persona context for tag filtering"
         behavior: plugin
         handler: SessionSetPersonaOp
         invocation_phrases:
-          - "I'm doing kyc"
-          - "trading view"
-          - "for kyc"
-          - "for trading"
-          - "kyc mode"
-          - "trading mode"
-          - "ops mode"
-          - "switch to onboarding persona"
-          - "set session persona"
-          - "change to operations view"
+        - "I'm doing kyc"
+        - "trading view"
+        - "for kyc"
+        - "for trading"
+        - "kyc mode"
+        - "trading mode"
+        - "ops mode"
+        - "switch to onboarding persona"
+        - "set session persona"
+        - "change to operations view"
         metadata:
           tier: intent
           source_of_truth: session
@@ -545,12 +556,13 @@ domains:
           tags: [context, persona]
           subject_kinds: []
           phase_tags: [navigation]
+          side_effects: state_write
         args:
-          - name: persona
-            type: string
-            required: true
-            valid_values: ["kyc", "trading", "ops", "onboarding"]
-            description: "Persona for tag filtering"
+        - name: persona
+          type: string
+          required: true
+          valid_values: ["kyc", "trading", "ops", "onboarding"]
+          description: "Persona for tag filtering"
         returns:
           type: affected
           description: "1 if persona was set"
@@ -565,16 +577,16 @@ domains:
         behavior: plugin
         handler: SessionSetStructureOp
         invocation_phrases:
-          - "select structure"
-          - "use structure"
-          - "work on structure"
-          - "set structure"
-          - "focus on fund"
-          - "select fund"
-          - "pick a fund structure"
-          - "set active CBU context"
-          - "choose structure to work on"
-          - "target this trading unit"
+        - "select structure"
+        - "use structure"
+        - "work on structure"
+        - "set structure"
+        - "focus on fund"
+        - "select fund"
+        - "pick a fund structure"
+        - "set active CBU context"
+        - "choose structure to work on"
+        - "target this trading unit"
         metadata:
           tier: intent
           source_of_truth: session
@@ -582,46 +594,46 @@ domains:
           tags: [context, structure, macro_target]
           subject_kinds: []
           phase_tags: [navigation]
+          side_effects: state_write
         args:
-          - name: structure-id
-            type: uuid
-            required: true
-            description: "CBU ID to set as current structure"
-            lookup:
-              table: cbus
-              entity_type: cbu
-              schema: ob-poc
-              search_key: name
-              primary_key: cbu_id
-          - name: structure-type
-            type: string
-            required: false
-            valid_values:
-              ["pe", "sicav", "hedge", "etf", "pension", "trust", "fof"]
-            description: "Structure type (PE, SICAV, etc.)"
+        - name: structure-id
+          type: uuid
+          required: true
+          description: "CBU ID to set as current structure"
+          lookup:
+            table: cbus
+            entity_type: cbu
+            schema: ob-poc
+            search_key: name
+            primary_key: cbu_id
+        - name: structure-type
+          type: string
+          required: false
+          valid_values: ["pe", "sicav", "hedge", "etf", "pension", "trust", "fof"]
+          description: "Structure type (PE, SICAV, etc.)"
         returns:
           type: record
           fields: [structure_id, structure_name, structure_type]
         effects:
-          - "Sets session.current_structure"
-          - "Sets session.structure_type if provided"
-          - "Sets dag_state flag 'structure.selected' = true"
+        - "Sets session.current_structure"
+        - "Sets session.structure_type if provided"
+        - "Sets dag_state flag 'structure.selected' = true"
 
       set-case:
         description: "Set current KYC case context for subsequent operations"
         behavior: plugin
         handler: SessionSetCaseOp
         invocation_phrases:
-          - "select case"
-          - "use case"
-          - "work on case"
-          - "set case"
-          - "focus on case"
-          - "open case"
-          - "pick kyc case to review"
-          - "set active case context"
-          - "switch to this kyc case"
-          - "target case for operations"
+        - "select case"
+        - "use case"
+        - "work on case"
+        - "set case"
+        - "focus on case"
+        - "open case"
+        - "pick kyc case to review"
+        - "set active case context"
+        - "switch to this kyc case"
+        - "target case for operations"
         metadata:
           tier: intent
           source_of_truth: session
@@ -629,39 +641,40 @@ domains:
           tags: [context, case, macro_target]
           subject_kinds: []
           phase_tags: [navigation]
+          side_effects: state_write
         args:
-          - name: case-id
-            type: uuid
-            required: true
-            description: "KYC case ID to set as current case"
-            lookup:
-              table: cases
-              entity_type: kyc_case
-              schema: kyc
-              search_key: case_id
-              primary_key: case_id
+        - name: case-id
+          type: uuid
+          required: true
+          description: "KYC case ID to set as current case"
+          lookup:
+            table: cases
+            entity_type: kyc_case
+            schema: kyc
+            search_key: case_id
+            primary_key: case_id
         returns:
           type: record
           fields: [case_id, case_reference, status]
         effects:
-          - "Sets session.current_case"
-          - "Sets dag_state flag 'case.selected' = true"
+        - "Sets session.current_case"
+        - "Sets dag_state flag 'case.selected' = true"
 
       set-mandate:
         description: "Set current mandate (trading profile) context for subsequent operations"
         behavior: plugin
         handler: SessionSetMandateOp
         invocation_phrases:
-          - "select mandate"
-          - "use mandate"
-          - "work on mandate"
-          - "set mandate"
-          - "focus on trading profile"
-          - "select trading profile"
-          - "pick mandate to configure"
-          - "set active trading profile context"
-          - "switch to this mandate"
-          - "choose investment mandate"
+        - "select mandate"
+        - "use mandate"
+        - "work on mandate"
+        - "set mandate"
+        - "focus on trading profile"
+        - "select trading profile"
+        - "pick mandate to configure"
+        - "set active trading profile context"
+        - "switch to this mandate"
+        - "choose investment mandate"
         metadata:
           tier: intent
           source_of_truth: session
@@ -669,23 +682,24 @@ domains:
           tags: [context, mandate, macro_target]
           subject_kinds: []
           phase_tags: [navigation]
+          side_effects: state_write
         args:
-          - name: mandate-id
-            type: uuid
-            required: true
-            description: "Trading profile ID to set as current mandate"
-            lookup:
-              table: cbu_trading_profiles
-              entity_type: trading_profile
-              schema: ob-poc
-              search_key: profile_id
-              primary_key: profile_id
+        - name: mandate-id
+          type: uuid
+          required: true
+          description: "Trading profile ID to set as current mandate"
+          lookup:
+            table: cbu_trading_profiles
+            entity_type: trading_profile
+            schema: ob-poc
+            search_key: profile_id
+            primary_key: profile_id
         returns:
           type: record
           fields: [mandate_id, mandate_name, structure_id]
         effects:
-          - "Sets session.current_mandate"
-          - "Sets dag_state flag 'mandate.selected' = true"
+        - "Sets session.current_mandate"
+        - "Sets dag_state flag 'mandate.selected' = true"
 
       # ============================================
       # Deal Taxonomy Navigation
@@ -696,16 +710,16 @@ domains:
         behavior: plugin
         handler: SessionLoadDealOp
         invocation_phrases:
-          - "load deal"
-          - "show deal"
-          - "open deal"
-          - "work on deal"
-          - "view deal"
-          - "select deal"
-          - "focus on deal"
-          - "deal taxonomy"
-          - "show deal taxonomy"
-          - "bring up deal record"
+        - "load deal"
+        - "show deal"
+        - "open deal"
+        - "work on deal"
+        - "view deal"
+        - "select deal"
+        - "focus on deal"
+        - "deal taxonomy"
+        - "show deal taxonomy"
+        - "bring up deal record"
         metadata:
           tier: intent
           source_of_truth: session
@@ -713,54 +727,47 @@ domains:
           tags: [context, deal, taxonomy, navigation]
           subject_kinds: []
           phase_tags: [navigation]
+          side_effects: state_write
         args:
-          - name: deal-id
-            type: uuid
-            required: false
-            description: "Deal UUID to load"
-            lookup:
-              table: deals
-              entity_type: deal
-              schema: ob-poc
-              search_key: deal_name
-              primary_key: deal_id
-          - name: deal-name
-            type: string
-            required: false
-            description: "Search by deal name (fuzzy match)"
+        - name: deal-id
+          type: uuid
+          required: false
+          description: "Deal UUID to load"
+          lookup:
+            table: deals
+            entity_type: deal
+            schema: ob-poc
+            search_key: deal_name
+            primary_key: deal_id
+        - name: deal-name
+          type: string
+          required: false
+          description: "Search by deal name (fuzzy match)"
         validation:
           one_of_required: [deal-id, deal-name]
         returns:
           type: record
-          fields:
-            [
-              deal_id,
-              deal_name,
-              deal_status,
-              client_group_name,
-              product_count,
-              rate_card_count,
-            ]
+          fields: [deal_id, deal_name, deal_status, client_group_name, product_count, rate_card_count]
         effects:
-          - "Sets session.context.deal_id"
-          - "Sets session.context.deal_name"
-          - "UI shows deal taxonomy panel"
+        - "Sets session.context.deal_id"
+        - "Sets session.context.deal_name"
+        - "UI shows deal taxonomy panel"
 
       unload-deal:
         description: "Clear deal context from session"
         behavior: plugin
         handler: SessionUnloadDealOp
         invocation_phrases:
-          - "unload deal"
-          - "close deal"
-          - "clear deal"
-          - "hide deal"
-          - "dismiss deal"
-          - "exit deal"
-          - "remove deal from session"
-          - "clear deal context"
-          - "stop working on deal"
-          - "leave deal view"
+        - "unload deal"
+        - "close deal"
+        - "clear deal"
+        - "hide deal"
+        - "dismiss deal"
+        - "exit deal"
+        - "remove deal from session"
+        - "clear deal context"
+        - "stop working on deal"
+        - "leave deal view"
         metadata:
           tier: intent
           source_of_truth: session
@@ -768,11 +775,12 @@ domains:
           tags: [context, deal, clear]
           subject_kinds: []
           phase_tags: [navigation]
+          side_effects: state_write
         args: []
         returns:
           type: record
           fields: [previous_deal_id, previous_deal_name]
         effects:
-          - "Clears session.context.deal_id"
-          - "Clears session.context.deal_name"
-          - "UI hides deal taxonomy panel"
+        - "Clears session.context.deal_id"
+        - "Clears session.context.deal_name"
+        - "UI hides deal taxonomy panel"

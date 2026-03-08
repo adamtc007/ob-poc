@@ -10,15 +10,16 @@ domains:
           scope: cbu
           noun: discrepancy
           phase_tags: [kyc]
+          side_effects: state_write
         invocation_phrases:
-          - "record observation discrepancy"
-          - "log data conflict"
-          - "flag conflicting observations"
-          - "add discrepancy between sources"
-          - "two observations disagree"
-          - "capture attribute mismatch"
-          - "create discrepancy finding"
-          - "report inconsistent data"
+        - "record observation discrepancy"
+        - "log data conflict"
+        - "flag conflicting observations"
+        - "add discrepancy between sources"
+        - "two observations disagree"
+        - "capture attribute mismatch"
+        - "create discrepancy finding"
+        - "report inconsistent data"
         behavior: crud
         crud:
           operation: insert
@@ -118,15 +119,16 @@ domains:
           scope: cbu
           noun: discrepancy
           phase_tags: [kyc]
+          side_effects: state_write
         invocation_phrases:
-          - "resolve data discrepancy"
-          - "close observation conflict"
-          - "settle conflicting data"
-          - "pick the correct observation"
-          - "mark discrepancy as resolved"
-          - "accept resolution for conflict"
-          - "fix the data mismatch"
-          - "reconcile the discrepancy"
+        - "resolve data discrepancy"
+        - "close observation conflict"
+        - "settle conflicting data"
+        - "pick the correct observation"
+        - "mark discrepancy as resolved"
+        - "accept resolution for conflict"
+        - "fix the data mismatch"
+        - "reconcile the discrepancy"
         behavior: crud
         crud:
           operation: update
@@ -179,15 +181,16 @@ domains:
           scope: cbu
           noun: discrepancy
           phase_tags: [kyc]
+          side_effects: state_write
         invocation_phrases:
-          - "escalate the discrepancy"
-          - "raise data conflict to senior"
-          - "send discrepancy for review"
-          - "escalate conflicting observations"
-          - "bump discrepancy to compliance"
-          - "flag discrepancy for escalation"
-          - "this conflict needs attention"
-          - "refer discrepancy to manager"
+        - "escalate the discrepancy"
+        - "raise data conflict to senior"
+        - "send discrepancy for review"
+        - "escalate conflicting observations"
+        - "bump discrepancy to compliance"
+        - "flag discrepancy for escalation"
+        - "this conflict needs attention"
+        - "refer discrepancy to manager"
         behavior: crud
         crud:
           operation: update
@@ -221,15 +224,16 @@ domains:
           scope: cbu
           noun: discrepancy
           phase_tags: [kyc]
+          side_effects: facts_only
         invocation_phrases:
-          - "list open discrepancies"
-          - "show unresolved data conflicts"
-          - "what discrepancies are pending"
-          - "display outstanding conflicts"
-          - "any open observation mismatches"
-          - "get unresolved discrepancies"
-          - "which conflicts need resolution"
-          - "pending data discrepancies"
+        - "list open discrepancies"
+        - "show unresolved data conflicts"
+        - "what discrepancies are pending"
+        - "display outstanding conflicts"
+        - "any open observation mismatches"
+        - "get unresolved discrepancies"
+        - "which conflicts need resolution"
+        - "pending data discrepancies"
         behavior: crud
         crud:
           operation: select

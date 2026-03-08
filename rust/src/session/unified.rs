@@ -16,6 +16,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use uuid::Uuid;
 
+use crate::sage::PendingMutation;
+
 /// The unified session - single source of truth
 ///
 /// Session = REPL DSL sheet with universe (client), CBU sets, and CBU state keys.
@@ -65,6 +67,10 @@ pub struct UnifiedSession {
     /// Eventually replaces pending_verb_disambiguation and pending_intent_tier
     #[serde(default)]
     pub pending_decision: Option<ob_poc_types::DecisionPacket>,
+
+    /// Pending mutation awaiting explicit user confirmation.
+    #[serde(default)]
+    pub pending_mutation: Option<PendingMutation>,
 
     // === Conversation ===
     pub messages: Vec<ChatMessage>,
@@ -1586,6 +1592,7 @@ impl UnifiedSession {
             pending_verb_disambiguation: None,
             pending_intent_tier: None,
             pending_decision: None,
+            pending_mutation: None,
             messages: Vec::new(),
             bindings: HashMap::new(),
             // Constraint cascade (starts empty, narrowed as user works)
@@ -1815,6 +1822,7 @@ impl UnifiedSession {
 
     /// Cancel pending DSL (user declined)
     pub fn cancel_pending(&mut self) {
+        self.pending_mutation = None;
         // Remove last draft entry from run sheet
         if let Some(idx) = self
             .run_sheet

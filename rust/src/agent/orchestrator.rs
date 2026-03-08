@@ -37,7 +37,10 @@ use crate::mcp::verb_search::{
     HybridVerbSearcher, JourneyMetadata, JourneyRoute, VerbSearchResult, VerbSearchSource,
 };
 use crate::policy::{gate::PolicySnapshot, PolicyGate};
-use crate::sage::{CoderResult, ObservationPlane, OutcomeStep, SageConfidence, SageEngine};
+use crate::sage::{
+    CoderResult, ObservationPlane, OutcomeStep, PendingMutation, SageConfidence, SageEngine,
+    UtteranceDisposition,
+};
 use crate::sem_reg::abac::ActorContext;
 
 use sem_os_client::SemOsClient;
@@ -104,6 +107,10 @@ pub struct OrchestratorOutcome {
     /// DecisionPacket for journey-level disambiguation (e.g., macro_selector needs
     /// user to pick jurisdiction before resolving the macro).
     pub journey_decision: Option<ob_poc_types::DecisionPacket>,
+    /// Pending mutation awaiting chat-layer confirmation.
+    pub pending_mutation: Option<PendingMutation>,
+    /// Whether chat should auto-execute the resulting DSL instead of staging it.
+    pub auto_execute: bool,
 }
 
 struct SageStageOutcome {
@@ -114,6 +121,192 @@ struct CoderStageOutcome {
     result: Option<CoderResult>,
     elapsed_ms: Option<u128>,
     error: Option<String>,
+}
+
+fn route(intent: &crate::sage::OutcomeIntent) -> UtteranceDisposition {
+    match intent.polarity {
+        crate::sage::IntentPolarity::Read | crate::sage::IntentPolarity::Ambiguous => {
+            UtteranceDisposition::Serve(crate::sage::ServeIntent {
+                summary: intent.summary.clone(),
+                domain: intent.domain_concept.clone(),
+                action: intent.action.clone(),
+                subject: intent.subject.clone(),
+            })
+        }
+        crate::sage::IntentPolarity::Write => {
+            UtteranceDisposition::Delegate(crate::sage::DelegateIntent {
+                summary: intent.summary.clone(),
+                outcome: intent.clone(),
+            })
+        }
+    }
+}
+
+pub(crate) fn is_confirmation(utterance: &str) -> bool {
+    matches!(
+        utterance.trim().to_ascii_lowercase().as_str(),
+        "yes"
+            | "y"
+            | "go ahead"
+            | "do it"
+            | "proceed"
+            | "confirm"
+            | "yes please"
+            | "go for it"
+            | "ok"
+            | "yep"
+            | "sure"
+            | "yes, go ahead"
+            | "yes, do it"
+            | "approved"
+    )
+}
+
+fn build_mutation_confirmation(
+    intent: &crate::sage::OutcomeIntent,
+    coder_result: &CoderResult,
+    lookup: Option<&crate::lookup::LookupResult>,
+) -> PendingMutation {
+    let action_word = match intent.action {
+        crate::sage::OutcomeAction::Create => "create",
+        crate::sage::OutcomeAction::Update => "update",
+        crate::sage::OutcomeAction::Delete => "delete",
+        crate::sage::OutcomeAction::Assign => "assign",
+        crate::sage::OutcomeAction::Import => "import",
+        crate::sage::OutcomeAction::Publish => "publish",
+        _ => "change",
+    };
+
+    let subject_name = lookup
+        .and_then(|lr| lr.dominant_entity.as_ref())
+        .map(|entity| entity.canonical_name.as_str())
+        .or_else(|| intent.subject.as_ref().map(|subject| subject.mention.as_str()))
+        .unwrap_or("this");
+
+    let mut change_summary = vec![format!("Resolved action: {}", coder_result.verb_fqn)];
+    if !coder_result.missing_args.is_empty() {
+        change_summary.push(format!(
+            "Still missing: {}",
+            coder_result.missing_args.join(", ")
+        ));
+    }
+    if !coder_result.unresolved_refs.is_empty() {
+        change_summary.push(format!(
+            "Needs entity resolution: {}",
+            coder_result.unresolved_refs.join(", ")
+        ));
+    }
+
+    PendingMutation {
+        confirmation_text: format!("So you want to {action_word} {subject_name}?"),
+        change_summary,
+        coder_result: coder_result.clone(),
+        intent: intent.clone(),
+    }
+}
+
+fn coder_result_from_pipeline_result(outcome: &OrchestratorOutcome) -> Option<CoderResult> {
+    if !outcome.pipeline_result.valid || outcome.pipeline_result.dsl.is_empty() {
+        return None;
+    }
+
+    let verb_fqn = outcome.trace.final_verb.clone()?;
+    let unresolved_refs = outcome
+        .pipeline_result
+        .unresolved_refs
+        .iter()
+        .map(|unresolved| {
+            if unresolved.search_value.is_empty() {
+                unresolved.param_name.clone()
+            } else {
+                format!("{}={}", unresolved.param_name, unresolved.search_value)
+            }
+        })
+        .collect::<Vec<_>>();
+
+    Some(CoderResult {
+        verb_fqn,
+        dsl: outcome.pipeline_result.dsl.clone(),
+        resolution: if matches!(outcome.pipeline_result.outcome, PipelineOutcome::Ready) {
+            crate::sage::coder::CoderResolution::Confident
+        } else {
+            crate::sage::coder::CoderResolution::Proposed
+        },
+        missing_args: outcome.pipeline_result.missing_required.clone(),
+        unresolved_refs,
+    })
+}
+
+fn can_use_sage_structure_fast_path(
+    ctx: &OrchestratorContext,
+    intent: &crate::sage::OutcomeIntent,
+    coder_result: &CoderResult,
+    outcome: &OrchestratorOutcome,
+) -> bool {
+    if !matches!(
+        ctx.stage_focus.as_deref(),
+        Some("semos-data-management" | "semos-data")
+    ) {
+        return false;
+    }
+
+    if intent.plane != ObservationPlane::Structure
+        || intent.polarity != crate::sage::IntentPolarity::Read
+        || !matches!(intent.confidence, SageConfidence::High | SageConfidence::Medium)
+        || !intent.pending_clarifications.is_empty()
+        || !coder_result.missing_args.is_empty()
+    {
+        return false;
+    }
+
+    if allow_data_management_structure_fast_path(
+        ctx.stage_focus.as_deref(),
+        intent,
+        &coder_result.verb_fqn,
+    ) {
+        return true;
+    }
+
+    outcome
+        .surface
+        .as_ref()
+        .map(|surface| surface.allowed_fqns().contains(&coder_result.verb_fqn))
+        .unwrap_or(false)
+}
+
+fn can_auto_execute_serve_result(verb_fqn: &str) -> bool {
+    !can_skip_fast_path_parse_validation(verb_fqn)
+}
+
+fn plural_cbu_list_fallback(
+    intent: &crate::sage::OutcomeIntent,
+    outcome: &OrchestratorOutcome,
+) -> Option<CoderResult> {
+    if intent.polarity != crate::sage::IntentPolarity::Read
+        || intent.domain_concept != "cbu"
+        || outcome.pipeline_result.valid
+    {
+        return None;
+    }
+
+    let summary = intent.summary.to_ascii_lowercase();
+    let validation_error = outcome
+        .pipeline_result
+        .validation_error
+        .as_deref()
+        .unwrap_or_default();
+
+    if summary.contains("cbus") && validation_error.contains("cbu-id") {
+        return Some(CoderResult {
+            verb_fqn: "cbu.list".to_string(),
+            dsl: "(cbu.list)".to_string(),
+            resolution: crate::sage::coder::CoderResolution::Confident,
+            missing_args: vec![],
+            unresolved_refs: vec![],
+        });
+    }
+
+    None
 }
 
 /// Structured audit trace for every utterance processed.
@@ -448,15 +641,196 @@ fn can_skip_fast_path_parse_validation(verb_fqn: &str) -> bool {
 /// 5. For matched-path outcomes: re-generate DSL via forced-verb if SemReg
 ///    changes the winning verb (ensures SemReg is binding, not cosmetic)
 /// 6. Build IntentTrace with full provenance
+fn apply_sage_trace_fields(trace: &mut IntentTrace, intent: &crate::sage::OutcomeIntent, source: &str) {
+    trace.selection_source = source.to_string();
+    trace.sage_plane = Some(format!("{:?}", intent.plane));
+    trace.sage_polarity = Some(format!("{:?}", intent.polarity));
+    trace.sage_domain_hints = if intent.domain_concept.is_empty() {
+        vec![]
+    } else {
+        vec![intent.domain_concept.clone()]
+    };
+}
+
 #[cfg(feature = "database")]
 pub async fn handle_utterance(
     ctx: &OrchestratorContext,
     utterance: &str,
 ) -> anyhow::Result<OrchestratorOutcome> {
+    let sage_stage = run_sage_stage(ctx, utterance, true).await;
+    let Some(intent) = sage_stage.intent else {
+        return legacy_handle_utterance(ctx, utterance).await;
+    };
+
+    match route(&intent) {
+        UtteranceDisposition::Serve(_) => {
+            let mut outcome = legacy_handle_utterance(ctx, utterance).await?;
+            let coder_stage = run_coder_stage(Some(&intent));
+            let serve_candidate = coder_stage
+                .result
+                .clone()
+                .or_else(|| plural_cbu_list_fallback(&intent, &outcome));
+            if let Some(coder_result) = serve_candidate.as_ref() {
+                let coder_complete =
+                    coder_result.missing_args.is_empty() && coder_result.unresolved_refs.is_empty();
+                let prefer_sage_result =
+                    can_use_sage_structure_fast_path(ctx, &intent, coder_result, &outcome)
+                        || (coder_complete && !outcome.pipeline_result.valid)
+                        || plural_cbu_list_fallback(&intent, &outcome).is_some();
+
+                if prefer_sage_result {
+                    if let Ok(fast_path_result) = build_sage_fast_path_result(
+                        utterance,
+                        ctx.scope.clone(),
+                        &intent,
+                        coder_result,
+                    ) {
+                        outcome.pipeline_result = fast_path_result;
+                        outcome.trace.final_verb = Some(coder_result.verb_fqn.clone());
+                        outcome.trace.chosen_verb_post_semreg =
+                            Some(coder_result.verb_fqn.clone());
+                        outcome.trace.dsl_generated =
+                            Some(outcome.pipeline_result.dsl.clone());
+                        outcome.trace.dsl_hash =
+                            Some(compute_dsl_hash(&outcome.pipeline_result.dsl));
+                        outcome.auto_execute = outcome.pipeline_result.valid
+                            && !outcome.pipeline_result.dsl.is_empty()
+                            && can_auto_execute_serve_result(&coder_result.verb_fqn);
+                        outcome.trace.selection_source = if intent.plane == ObservationPlane::Structure
+                        {
+                            "sage_serve_fast_path".to_string()
+                        } else {
+                            "sage_serve_coder".to_string()
+                        };
+                        outcome.trace.dsl_source = Some(outcome.trace.selection_source.clone());
+                    }
+                }
+            }
+            outcome.auto_execute =
+                outcome.pipeline_result.valid
+                    && !outcome.pipeline_result.dsl.is_empty()
+                    && (outcome.trace.final_verb.as_deref())
+                        .map(can_auto_execute_serve_result)
+                        .unwrap_or(true);
+            apply_sage_trace_fields(&mut outcome.trace, &intent, "sage_serve");
+            Ok(outcome)
+        }
+        UtteranceDisposition::Delegate(delegate) => {
+            let mut outcome = legacy_handle_utterance(ctx, utterance).await?;
+            apply_sage_trace_fields(&mut outcome.trace, &intent, "sage_delegate");
+
+            if intent.confidence == SageConfidence::Low || !intent.pending_clarifications.is_empty()
+            {
+                outcome.pipeline_result = PipelineResult {
+                    intent: StructuredIntent::empty(),
+                    verb_candidates: vec![],
+                    dsl: String::new(),
+                    dsl_hash: None,
+                    valid: false,
+                    validation_error: Some(
+                        "I need a clearer instruction before making a change.".to_string(),
+                    ),
+                    unresolved_refs: vec![],
+                    missing_required: vec![],
+                    outcome: PipelineOutcome::NeedsUserInput,
+                    scope_resolution: None,
+                    scope_context: ctx.scope.clone(),
+                };
+                outcome.pending_mutation = None;
+                outcome.auto_execute = false;
+                return Ok(outcome);
+            }
+
+            let coder_stage = run_coder_stage(Some(&delegate.outcome));
+            let coder_result = coder_stage.result.as_ref();
+            let coder_complete = coder_result
+                .map(|result| result.missing_args.is_empty() && result.unresolved_refs.is_empty())
+                .unwrap_or(false);
+
+            let confirmation = if coder_complete {
+                coder_result.map(|result| {
+                    build_mutation_confirmation(&intent, result, outcome.lookup_result.as_ref())
+                })
+            } else {
+                coder_result_from_pipeline_result(&outcome).map(|result| {
+                    build_mutation_confirmation(&intent, &result, outcome.lookup_result.as_ref())
+                })
+            };
+
+            if let Some(confirmation) = confirmation {
+                outcome.pipeline_result = PipelineResult {
+                    intent: StructuredIntent::empty(),
+                    verb_candidates: vec![],
+                    dsl: String::new(),
+                    dsl_hash: None,
+                    valid: false,
+                    validation_error: Some(confirmation.confirmation_text.clone()),
+                    unresolved_refs: vec![],
+                    missing_required: vec![],
+                    outcome: PipelineOutcome::NeedsUserInput,
+                    scope_resolution: None,
+                    scope_context: ctx.scope.clone(),
+                };
+                outcome.pending_mutation = Some(confirmation);
+                outcome.auto_execute = false;
+                return Ok(outcome);
+            }
+
+            if let Some(coder_result) = coder_result {
+                outcome.pipeline_result = PipelineResult {
+                    intent: StructuredIntent::empty(),
+                    verb_candidates: vec![],
+                    dsl: String::new(),
+                    dsl_hash: None,
+                    valid: false,
+                    validation_error: Some(
+                        "I know this is a change, but I still need a few details before I can stage it."
+                            .to_string(),
+                    ),
+                    unresolved_refs: vec![],
+                    missing_required: coder_result.missing_args.clone(),
+                    outcome: PipelineOutcome::NeedsUserInput,
+                    scope_resolution: None,
+                    scope_context: ctx.scope.clone(),
+                };
+                outcome.pending_mutation = None;
+                outcome.auto_execute = false;
+                return Ok(outcome);
+            }
+
+            outcome.pipeline_result = PipelineResult {
+                intent: StructuredIntent::empty(),
+                verb_candidates: vec![],
+                dsl: String::new(),
+                dsl_hash: None,
+                valid: false,
+                validation_error: Some(
+                    coder_stage
+                        .error
+                        .unwrap_or_else(|| "Coder could not resolve this mutation.".to_string()),
+                ),
+                unresolved_refs: vec![],
+                missing_required: vec![],
+                outcome: PipelineOutcome::NeedsUserInput,
+                scope_resolution: None,
+                scope_context: ctx.scope.clone(),
+            };
+            outcome.pending_mutation = None;
+            outcome.auto_execute = false;
+            Ok(outcome)
+        }
+    }
+}
+
+#[cfg(feature = "database")]
+pub async fn legacy_handle_utterance(
+    ctx: &OrchestratorContext,
+    utterance: &str,
+) -> anyhow::Result<OrchestratorOutcome> {
     let policy = &ctx.policy_gate;
-    let sage_shadow_enabled = std::env::var("SAGE_SHADOW").is_ok();
-    let sage_fast_path_enabled = std::env::var("SAGE_FAST_PATH").ok().as_deref() == Some("1");
-    let sage_enabled = sage_shadow_enabled || sage_fast_path_enabled;
+    let _sage_shadow_enabled = false;
+    let sage_fast_path_enabled = false;
+    let sage_enabled = false;
 
     let sage_stage = run_sage_stage(ctx, utterance, sage_enabled).await;
     let sage_intent = sage_stage.intent;
@@ -632,6 +1006,8 @@ pub async fn handle_utterance(
                     lookup_result,
                     trace,
                     journey_decision: None,
+                    pending_mutation: None,
+                    auto_execute: false,
                 };
                 emit_telemetry(ctx, utterance, &mut outcome).await;
                 return Ok(outcome);
@@ -727,6 +1103,8 @@ pub async fn handle_utterance(
             lookup_result,
             trace,
             journey_decision: None,
+            pending_mutation: None,
+            auto_execute: false,
         };
         emit_telemetry(ctx, utterance, &mut outcome).await;
         return Ok(outcome);
@@ -1094,6 +1472,8 @@ pub async fn handle_utterance(
         lookup_result,
         trace,
         journey_decision: journey_decision_out,
+        pending_mutation: None,
+        auto_execute: false,
     };
     emit_telemetry(ctx, utterance, &mut outcome).await;
     Ok(outcome)
@@ -1843,6 +2223,8 @@ pub async fn handle_utterance_with_forced_verb(
             lookup_result,
             trace,
             journey_decision: None,
+            pending_mutation: None,
+            auto_execute: false,
         };
         emit_telemetry(ctx, utterance, &mut outcome).await;
         return Ok(outcome);
@@ -1918,6 +2300,8 @@ pub async fn handle_utterance_with_forced_verb(
         lookup_result,
         trace,
         journey_decision: None,
+        pending_mutation: None,
+        auto_execute: false,
     };
     emit_telemetry(ctx, utterance, &mut outcome).await;
     Ok(outcome)
@@ -2291,6 +2675,81 @@ mod tests {
     }
 
     #[test]
+    fn test_route_reads_to_serve_and_writes_to_delegate() {
+        let read_intent = crate::sage::OutcomeIntent {
+            summary: "show me the cbus".into(),
+            plane: ObservationPlane::Instance,
+            polarity: crate::sage::IntentPolarity::Read,
+            domain_concept: "cbu".into(),
+            action: crate::sage::OutcomeAction::Read,
+            subject: None,
+            steps: vec![],
+            confidence: SageConfidence::Medium,
+            pending_clarifications: vec![],
+        };
+        assert!(matches!(route(&read_intent), UtteranceDisposition::Serve(_)));
+
+        let write_intent = crate::sage::OutcomeIntent {
+            summary: "create a new cbu".into(),
+            plane: ObservationPlane::Instance,
+            polarity: crate::sage::IntentPolarity::Write,
+            domain_concept: "cbu".into(),
+            action: crate::sage::OutcomeAction::Create,
+            subject: Some(crate::sage::EntityRef {
+                mention: "Allianz UK Fund".into(),
+                kind_hint: Some("cbu".into()),
+                uuid: None,
+            }),
+            steps: vec![],
+            confidence: SageConfidence::High,
+            pending_clarifications: vec![],
+        };
+        assert!(matches!(
+            route(&write_intent),
+            UtteranceDisposition::Delegate(_)
+        ));
+    }
+
+    #[test]
+    fn test_confirmation_words_are_narrow() {
+        assert!(is_confirmation("yes"));
+        assert!(is_confirmation("go ahead"));
+        assert!(!is_confirmation("run"));
+        assert!(!is_confirmation("show me the cbus"));
+    }
+
+    #[test]
+    fn test_build_mutation_confirmation_hides_dsl() {
+        let intent = crate::sage::OutcomeIntent {
+            summary: "create a new cbu".into(),
+            plane: ObservationPlane::Instance,
+            polarity: crate::sage::IntentPolarity::Write,
+            domain_concept: "cbu".into(),
+            action: crate::sage::OutcomeAction::Create,
+            subject: Some(crate::sage::EntityRef {
+                mention: "Allianz UK Fund".into(),
+                kind_hint: Some("cbu".into()),
+                uuid: None,
+            }),
+            steps: vec![],
+            confidence: SageConfidence::High,
+            pending_clarifications: vec![],
+        };
+        let coder_result = CoderResult {
+            verb_fqn: "cbu.create".into(),
+            dsl: "(cbu.create :name \"Allianz UK Fund\")".into(),
+            resolution: crate::sage::coder::CoderResolution::Confident,
+            missing_args: vec![],
+            unresolved_refs: vec![],
+        };
+
+        let pending = build_mutation_confirmation(&intent, &coder_result, None);
+        assert!(pending.confirmation_text.contains("create Allianz UK Fund"));
+        assert!(!pending.confirmation_text.contains("cbu.create"));
+        assert_eq!(pending.change_summary[0], "Resolved action: cbu.create");
+    }
+
+    #[test]
     fn test_is_early_exit() {
         assert!(is_early_exit(&PipelineOutcome::ScopeResolved {
             group_id: "g1".into(),
@@ -2510,6 +2969,34 @@ mod tests {
             "schema.entity.describe"
         ));
         assert!(!can_skip_fast_path_parse_validation("document.get"));
+    }
+
+    #[test]
+    fn test_build_sage_fast_path_result_for_cbu_list_is_valid() {
+        let outcome = crate::sage::OutcomeIntent {
+            summary: "show me the cbus".to_string(),
+            plane: crate::sage::ObservationPlane::Instance,
+            polarity: crate::sage::IntentPolarity::Read,
+            domain_concept: "cbu".to_string(),
+            action: crate::sage::OutcomeAction::Read,
+            subject: None,
+            steps: vec![],
+            confidence: crate::sage::SageConfidence::Medium,
+            pending_clarifications: vec![],
+        };
+        let coder_result = CoderResult {
+            verb_fqn: "cbu.list".to_string(),
+            dsl: "(cbu.list)".to_string(),
+            resolution: crate::sage::coder::CoderResolution::Confident,
+            missing_args: vec![],
+            unresolved_refs: vec![],
+        };
+
+        let result = build_sage_fast_path_result("show me the cbus", None, &outcome, &coder_result)
+            .expect("cbu list fast path should assemble");
+        assert!(result.valid);
+        assert_eq!(result.intent.verb, "cbu.list");
+        assert_eq!(result.dsl, "(cbu.list)");
     }
 
     #[test]

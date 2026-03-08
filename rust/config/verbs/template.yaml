@@ -11,27 +11,28 @@ domains:
           noun: template
           subject_kinds: []
           phase_tags: [administration]
+          side_effects: state_write
         invocation_phrases:
-          - "invoke template"
-          - "run template with parameters"
-          - "execute template"
-          - "apply template"
-          - "expand template"
-          - "use template for setup"
-          - "trigger template execution"
-          - "instantiate workflow template"
+        - "invoke template"
+        - "run template with parameters"
+        - "execute template"
+        - "apply template"
+        - "expand template"
+        - "use template for setup"
+        - "trigger template execution"
+        - "instantiate workflow template"
         behavior: plugin
         plugin:
           handler: template_invoke
         args:
-          - name: id
-            type: string
-            required: true
-            description: Template ID to invoke
-          - name: params
-            type: map
-            required: false
-            description: Explicit parameters for template expansion
+        - name: id
+          type: string
+          required: true
+          description: Template ID to invoke
+        - name: params
+          type: map
+          required: false
+          description: Explicit parameters for template expansion
         returns:
           type: template_invoke_result
           description: Template invocation result with outputs
@@ -46,44 +47,45 @@ domains:
           noun: template
           subject_kinds: []
           phase_tags: [administration]
+          side_effects: state_write
         invocation_phrases:
-          - "batch execute template"
-          - "run template across all CBUs"
-          - "apply template in bulk"
-          - "batch process with template"
-          - "execute template for each item"
-          - "bulk apply template"
-          - "iterate template over results"
-          - "run batch template operation"
+        - "batch execute template"
+        - "run template across all CBUs"
+        - "apply template in bulk"
+        - "batch process with template"
+        - "execute template for each item"
+        - "bulk apply template"
+        - "iterate template over results"
+        - "run batch template operation"
         behavior: plugin
         plugin:
           handler: template_batch
         args:
-          - name: id
-            type: string
-            required: true
-            description: Template ID to invoke for each item
-          - name: source
-            type: symbol_ref
-            required: true
-            description: Binding from entity.query result
-          - name: bind-as
-            type: string
-            required: true
-            description: Parameter name to bind each item to
-          - name: shared
-            type: map
-            required: false
-            description: Shared parameters constant across all iterations
-          - name: on-error
-            type: string
-            required: false
-            default: continue
-            description: Error handling mode (continue, stop, rollback)
-          - name: limit
-            type: integer
-            required: false
-            description: Maximum number of items to process
+        - name: id
+          type: string
+          required: true
+          description: Template ID to invoke for each item
+        - name: source
+          type: symbol_ref
+          required: true
+          description: Binding from entity.query result
+        - name: bind-as
+          type: string
+          required: true
+          description: Parameter name to bind each item to
+        - name: shared
+          type: map
+          required: false
+          description: Shared parameters constant across all iterations
+        - name: on-error
+          type: string
+          required: false
+          default: continue
+          description: Error handling mode (continue, stop, rollback)
+        - name: limit
+          type: integer
+          required: false
+          description: Maximum number of items to process
         returns:
           type: batch_result
           description: Batch execution result with accumulated outputs

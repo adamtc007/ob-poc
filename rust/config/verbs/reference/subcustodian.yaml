@@ -10,15 +10,16 @@ domains:
           scope: cbu
           noun: subcustodian
           phase_tags: [trading]
+          side_effects: state_write
         invocation_phrases:
-          - "add a subcustodian entry"
-          - "register subcustodian for market"
-          - "create subcustodian network record"
-          - "configure local agent bank"
-          - "set up subcustodian by BIC"
-          - "define subcustodian for currency"
-          - "upsert agent bank record"
-          - "add custody network entry"
+        - "add a subcustodian entry"
+        - "register subcustodian for market"
+        - "create subcustodian network record"
+        - "configure local agent bank"
+        - "set up subcustodian by BIC"
+        - "define subcustodian for currency"
+        - "upsert agent bank record"
+        - "add custody network entry"
         behavior: crud
         crud:
           operation: upsert
@@ -90,15 +91,16 @@ domains:
           scope: cbu
           noun: subcustodian
           phase_tags: [trading]
+          side_effects: facts_only
         invocation_phrases:
-          - "list subcustodians for market"
-          - "show agent banks by exchange"
-          - "what subcustodians cover this market"
-          - "display subcustodian network for MIC"
-          - "enumerate local agents for market"
-          - "get subcustodian entries by market"
-          - "which subcustodians serve this venue"
-          - "show me custody agents for market"
+        - "list subcustodians for market"
+        - "show agent banks by exchange"
+        - "what subcustodians cover this market"
+        - "display subcustodian network for MIC"
+        - "enumerate local agents for market"
+        - "get subcustodian entries by market"
+        - "which subcustodians serve this venue"
+        - "show me custody agents for market"
         behavior: crud
         crud:
           operation: list_by_fk
@@ -130,15 +132,16 @@ domains:
           scope: cbu
           noun: subcustodian
           phase_tags: [trading]
+          side_effects: facts_only
         invocation_phrases:
-          - "find subcustodian for market"
-          - "look up agent bank for currency"
-          - "which subcustodian handles this market"
-          - "resolve subcustodian by market and currency"
-          - "get active subcustodian for venue"
-          - "who is our local agent here"
-          - "subcustodian lookup by MIC"
-          - "find custody agent for settlement"
+        - "find subcustodian for market"
+        - "look up agent bank for currency"
+        - "which subcustodian handles this market"
+        - "resolve subcustodian by market and currency"
+        - "get active subcustodian for venue"
+        - "who is our local agent here"
+        - "subcustodian lookup by MIC"
+        - "find custody agent for settlement"
         behavior: plugin
         handler: subcustodian_lookup
         args:

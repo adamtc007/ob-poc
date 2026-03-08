@@ -10,35 +10,36 @@ domains:
           scope: global
           noun: service
           phase_tags: [stewardship]
+          side_effects: facts_only
         invocation_phrases:
-          - "read service details"
-          - "get service by code"
-          - "show service definition"
-          - "look up custody service"
-          - "fetch service catalog entry"
-          - "describe this service"
-          - "what is this service"
-          - "display service information"
+        - "read service details"
+        - "get service by code"
+        - "show service definition"
+        - "look up custody service"
+        - "fetch service catalog entry"
+        - "describe this service"
+        - "what is this service"
+        - "display service information"
         behavior: crud
         crud:
           operation: select
           table: services
           schema: ob-poc
         args:
-          - name: service-id
-            type: uuid
-            required: false
-            maps_to: service_id
-            lookup:
-              table: services
-              entity_type: service
-              schema: ob-poc
-              search_key: name
-              primary_key: service_id
-          - name: service-code
-            type: string
-            required: false
-            maps_to: service_code
+        - name: service-id
+          type: uuid
+          required: false
+          maps_to: service_id
+          lookup:
+            table: services
+            entity_type: service
+            schema: ob-poc
+            search_key: name
+            primary_key: service_id
+        - name: service-code
+          type: string
+          required: false
+          maps_to: service_code
         returns:
           type: record
 
@@ -50,37 +51,38 @@ domains:
           scope: global
           noun: service
           phase_tags: [stewardship]
+          side_effects: facts_only
         invocation_phrases:
-          - "list available services"
-          - "show all services in catalog"
-          - "what services are offered"
-          - "browse service catalog"
-          - "display active services"
-          - "enumerate custody services"
-          - "get service list with filters"
-          - "search services by type"
+        - "list available services"
+        - "show all services in catalog"
+        - "what services are offered"
+        - "browse service catalog"
+        - "display active services"
+        - "enumerate custody services"
+        - "get service list with filters"
+        - "search services by type"
         behavior: crud
         crud:
           operation: select
           table: services
           schema: ob-poc
         args:
-          - name: service-type
-            type: string
-            required: false
-            maps_to: service_type
-          - name: is-active
-            type: boolean
-            required: false
-            maps_to: is_active
-          - name: limit
-            type: integer
-            required: false
-            default: 100
-          - name: offset
-            type: integer
-            required: false
-            default: 0
+        - name: service-type
+          type: string
+          required: false
+          maps_to: service_type
+        - name: is-active
+          type: boolean
+          required: false
+          maps_to: is_active
+        - name: limit
+          type: integer
+          required: false
+          default: 100
+        - name: offset
+          type: integer
+          required: false
+          default: 0
         returns:
           type: record_set
 
@@ -92,15 +94,16 @@ domains:
           scope: global
           noun: service
           phase_tags: [stewardship]
+          side_effects: facts_only
         invocation_phrases:
-          - "list services for a product"
-          - "show services under this product"
-          - "what services does this product include"
-          - "get services linked to product"
-          - "which services are bundled with product"
-          - "display product service offerings"
-          - "find services by product"
-          - "enumerate mandatory services for product"
+        - "list services for a product"
+        - "show services under this product"
+        - "what services does this product include"
+        - "get services linked to product"
+        - "which services are bundled with product"
+        - "display product service offerings"
+        - "find services by product"
+        - "enumerate mandatory services for product"
         behavior: crud
         crud:
           operation: select_with_join
@@ -110,17 +113,17 @@ domains:
           filter_col: product_id
           schema: ob-poc
         args:
-          - name: product-id
-            type: uuid
-            required: true
-            lookup:
-              table: products
-              entity_type: product
-              schema: ob-poc
-              search_key: name
-              primary_key: product_id
-          - name: is-mandatory
-            type: boolean
-            required: false
+        - name: product-id
+          type: uuid
+          required: true
+          lookup:
+            table: products
+            entity_type: product
+            schema: ob-poc
+            search_key: name
+            primary_key: product_id
+        - name: is-mandatory
+          type: boolean
+          required: false
         returns:
           type: record_set

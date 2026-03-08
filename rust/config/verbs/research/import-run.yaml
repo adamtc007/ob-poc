@@ -3,19 +3,19 @@ domains:
     description: "Graph import run provenance — tracks source and scope of structural imports"
 
     invocation_hints:
-      - "import run"
-      - "begin import"
-      - "complete import"
-      - "supersede import"
-      - "rollback import"
+    - "import run"
+    - "begin import"
+    - "complete import"
+    - "supersede import"
+    - "rollback import"
 
     verbs:
       begin:
         description: "Begin a new graph import run with optional case linkage"
         invocation_phrases:
-          - "begin import run"
-          - "start graph import"
-          - "create import run"
+        - "begin import run"
+        - "start graph import"
+        - "create import run"
         metadata:
           tier: intent
           source_of_truth: operational
@@ -23,58 +23,59 @@ domains:
           noun: import_run
           tags: [import, provenance, create]
           phase_tags: [onboarding]
+          side_effects: state_write
         behavior: plugin
         handler: ImportRunBeginOp
         args:
-          - name: scope-root-entity-id
-            type: uuid
-            required: true
-            description: Root entity for the import scope
-            lookup:
-              table: entities
-              entity_type: entity
-              schema: ob-poc
-              search_key: name
-              primary_key: entity_id
-          - name: source
-            type: string
-            required: true
-            description: Source system (GLEIF, COMPANIES_HOUSE, MANUAL, etc.)
-          - name: run-kind
-            type: string
-            required: false
-            default: SKELETON_BUILD
-            valid_values:
-              - SKELETON_BUILD
-              - INCREMENTAL
-              - CORRECTION
-              - FULL_REFRESH
-          - name: source-ref
-            type: string
-            required: false
-            description: External reference ID from source system
-          - name: source-query
-            type: string
-            required: false
-            description: Query or parameters used for the import
-          - name: case-id
-            type: uuid
-            required: false
-            description: Link to KYC case if import is case-driven
-            lookup:
-              table: cases
-              entity_type: kyc_case
-              schema: kyc
-              search_key: case_id
-              primary_key: case_id
-          - name: decision-id
-            type: uuid
-            required: false
-            description: Link to research decision that triggered import
-          - name: as-of
-            type: date
-            required: false
-            description: As-of date for the graph snapshot (defaults to today)
+        - name: scope-root-entity-id
+          type: uuid
+          required: true
+          description: Root entity for the import scope
+          lookup:
+            table: entities
+            entity_type: entity
+            schema: ob-poc
+            search_key: name
+            primary_key: entity_id
+        - name: source
+          type: string
+          required: true
+          description: Source system (GLEIF, COMPANIES_HOUSE, MANUAL, etc.)
+        - name: run-kind
+          type: string
+          required: false
+          default: SKELETON_BUILD
+          valid_values:
+          - SKELETON_BUILD
+          - INCREMENTAL
+          - CORRECTION
+          - FULL_REFRESH
+        - name: source-ref
+          type: string
+          required: false
+          description: External reference ID from source system
+        - name: source-query
+          type: string
+          required: false
+          description: Query or parameters used for the import
+        - name: case-id
+          type: uuid
+          required: false
+          description: Link to KYC case if import is case-driven
+          lookup:
+            table: cases
+            entity_type: kyc_case
+            schema: kyc
+            search_key: case_id
+            primary_key: case_id
+        - name: decision-id
+          type: uuid
+          required: false
+          description: Link to research decision that triggered import
+        - name: as-of
+          type: date
+          required: false
+          description: As-of date for the graph snapshot (defaults to today)
         returns:
           type: record
           capture: true
@@ -82,9 +83,9 @@ domains:
       complete:
         description: "Mark an import run as complete with counts"
         invocation_phrases:
-          - "complete import run"
-          - "finish import"
-          - "import done"
+        - "complete import run"
+        - "finish import"
+        - "import done"
         metadata:
           tier: intent
           source_of_truth: operational
@@ -92,30 +93,31 @@ domains:
           noun: import_run
           tags: [import, provenance, lifecycle]
           phase_tags: [onboarding]
+          side_effects: state_write
         behavior: plugin
         handler: ImportRunCompleteOp
         args:
-          - name: run-id
-            type: uuid
-            required: true
-            description: Import run to complete
-          - name: status
-            type: string
-            required: false
-            default: ACTIVE
-            valid_values:
-              - ACTIVE
-              - PARTIAL
+        - name: run-id
+          type: uuid
+          required: true
+          description: Import run to complete
+        - name: status
+          type: string
+          required: false
+          default: ACTIVE
+          valid_values:
+          - ACTIVE
+          - PARTIAL
         returns:
           type: record
 
       supersede:
         description: "Supersede an import run — soft-ends edges and logs corrections"
         invocation_phrases:
-          - "supersede import run"
-          - "rollback import"
-          - "undo import"
-          - "correct import"
+        - "supersede import run"
+        - "rollback import"
+        - "undo import"
+        - "correct import"
         metadata:
           tier: intent
           source_of_truth: operational
@@ -123,20 +125,21 @@ domains:
           noun: import_run
           tags: [import, provenance, correction, rollback]
           phase_tags: [onboarding]
+          side_effects: state_write
         behavior: plugin
         handler: ImportRunSupersedeOp
         args:
-          - name: run-id
-            type: uuid
-            required: true
-            description: Import run to supersede
-          - name: reason
-            type: string
-            required: true
-            description: Reason for superseding (correction, bad source, etc.)
-          - name: superseded-by
-            type: uuid
-            required: false
-            description: Replacement run ID if this is a correction
+        - name: run-id
+          type: uuid
+          required: true
+          description: Import run to supersede
+        - name: reason
+          type: string
+          required: true
+          description: Reason for superseding (correction, bad source, etc.)
+        - name: superseded-by
+          type: uuid
+          required: false
+          description: Replacement run ID if this is a correction
         returns:
           type: record

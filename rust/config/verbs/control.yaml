@@ -5,16 +5,16 @@ domains:
       add:
         description: Add a control relationship between entities (idempotent by controller+controlled+type)
         invocation_phrases:
-          - "add control relationship"
-          - "create control link"
-          - "add controller"
-          - "add voting control"
-          - "add board control"
-          - "create control"
-          - "link controller"
-          - "add management control"
-          - "register significant influence over entity"
-          - "establish corporate governance link"
+        - "add control relationship"
+        - "create control link"
+        - "add controller"
+        - "add voting control"
+        - "add board control"
+        - "create control"
+        - "link controller"
+        - "add management control"
+        - "register significant influence over entity"
+        - "establish corporate governance link"
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -22,6 +22,7 @@ domains:
           noun: control
           tags: [data-management]
           phase_tags: [kyc]
+          side_effects: state_write
         behavior: crud
         crud:
           operation: upsert
@@ -29,64 +30,64 @@ domains:
           schema: ob-poc
           returning: relationship_id
           conflict_keys:
-            - from_entity_id
-            - to_entity_id
-            - control_type
+          - from_entity_id
+          - to_entity_id
+          - control_type
         args:
-          - name: controller-entity-id
-            type: uuid
-            required: true
-            maps_to: from_entity_id
-            lookup:
-              table: entities
-              entity_type: entity
-              schema: ob-poc
-              search_key: name
-              primary_key: entity_id
-          - name: controlled-entity-id
-            type: uuid
-            required: true
-            maps_to: to_entity_id
-            lookup:
-              table: entities
-              entity_type: entity
-              schema: ob-poc
-              search_key: name
-              primary_key: entity_id
-          - name: control-type
-            type: string
-            required: true
-            maps_to: control_type
-            validation:
-              enum:
-                - VOTING_RIGHTS
-                - BOARD_APPOINTMENT
-                - VETO_POWER
-                - MANAGEMENT_CONTROL
-                - RESERVED_MATTERS
-          - name: control-percentage
-            type: decimal
-            required: false
-            maps_to: percentage
-            description: Control percentage (may differ from ownership %)
-          - name: description
-            type: string
-            required: false
-            maps_to: notes
-          - name: effective-from
-            type: date
-            required: false
-            maps_to: effective_from
-          - name: evidence-doc-id
-            type: uuid
-            required: false
-            maps_to: source_document_id
-            lookup:
-              table: document_catalog
-              entity_type: document
-              schema: ob-poc
-              search_key: document_name
-              primary_key: doc_id
+        - name: controller-entity-id
+          type: uuid
+          required: true
+          maps_to: from_entity_id
+          lookup:
+            table: entities
+            entity_type: entity
+            schema: ob-poc
+            search_key: name
+            primary_key: entity_id
+        - name: controlled-entity-id
+          type: uuid
+          required: true
+          maps_to: to_entity_id
+          lookup:
+            table: entities
+            entity_type: entity
+            schema: ob-poc
+            search_key: name
+            primary_key: entity_id
+        - name: control-type
+          type: string
+          required: true
+          maps_to: control_type
+          validation:
+            enum:
+            - VOTING_RIGHTS
+            - BOARD_APPOINTMENT
+            - VETO_POWER
+            - MANAGEMENT_CONTROL
+            - RESERVED_MATTERS
+        - name: control-percentage
+          type: decimal
+          required: false
+          maps_to: percentage
+          description: Control percentage (may differ from ownership %)
+        - name: description
+          type: string
+          required: false
+          maps_to: notes
+        - name: effective-from
+          type: date
+          required: false
+          maps_to: effective_from
+        - name: evidence-doc-id
+          type: uuid
+          required: false
+          maps_to: source_document_id
+          lookup:
+            table: document_catalog
+            entity_type: document
+            schema: ob-poc
+            search_key: document_name
+            primary_key: doc_id
         defaults:
           relationship_type: CONTROL
           source: DSL
@@ -98,16 +99,16 @@ domains:
       end:
         description: End a control relationship
         invocation_phrases:
-          - "end control relationship"
-          - "terminate control"
-          - "end voting control"
-          - "remove controller"
-          - "control relationship ended"
-          - "end board control"
-          - "close control link"
-          - "revoke management control over entity"
-          - "discontinue significant influence"
-          - "unlink controlling party from subsidiary"
+        - "end control relationship"
+        - "terminate control"
+        - "end voting control"
+        - "remove controller"
+        - "control relationship ended"
+        - "end board control"
+        - "close control link"
+        - "revoke management control over entity"
+        - "discontinue significant influence"
+        - "unlink controlling party from subsidiary"
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -115,6 +116,7 @@ domains:
           noun: control
           tags: [data-management]
           phase_tags: [kyc]
+          side_effects: state_write
         behavior: crud
         crud:
           operation: update
@@ -122,35 +124,35 @@ domains:
           schema: ob-poc
           key: relationship_id
         args:
-          - name: relationship-id
-            type: uuid
-            required: true
-            maps_to: relationship_id
-            lookup:
-              table: entity_relationships
-              schema: ob-poc
-              search_key: relationship_id
-              primary_key: relationship_id
-          - name: effective-to
-            type: date
-            required: true
-            maps_to: effective_to
+        - name: relationship-id
+          type: uuid
+          required: true
+          maps_to: relationship_id
+          lookup:
+            table: entity_relationships
+            schema: ob-poc
+            search_key: relationship_id
+            primary_key: relationship_id
+        - name: effective-to
+          type: date
+          required: true
+          maps_to: effective_to
         returns:
           type: affected
 
       list-controllers:
         description: List who controls an entity
         invocation_phrases:
-          - "list controllers"
-          - "who controls this"
-          - "show controllers"
-          - "find controllers"
-          - "list who controls"
-          - "view control relationships"
-          - "show controlling parties"
-          - "list control sources"
-          - "which entities have voting control"
-          - "display corporate governance controllers"
+        - "list controllers"
+        - "who controls this"
+        - "show controllers"
+        - "find controllers"
+        - "list who controls"
+        - "view control relationships"
+        - "show controlling parties"
+        - "list control sources"
+        - "which entities have voting control"
+        - "display corporate governance controllers"
         metadata:
           tier: reference
           source_of_truth: workflow
@@ -158,6 +160,7 @@ domains:
           noun: control
           tags: [data-management]
           phase_tags: [kyc]
+          side_effects: facts_only
         behavior: crud
         crud:
           operation: list_by_fk
@@ -167,32 +170,32 @@ domains:
           filter:
             relationship_type: CONTROL
         args:
-          - name: entity-id
-            type: uuid
-            required: true
-            maps_to: to_entity_id
-            lookup:
-              table: entities
-              entity_type: entity
-              schema: ob-poc
-              search_key: name
-              primary_key: entity_id
+        - name: entity-id
+          type: uuid
+          required: true
+          maps_to: to_entity_id
+          lookup:
+            table: entities
+            entity_type: entity
+            schema: ob-poc
+            search_key: name
+            primary_key: entity_id
         returns:
           type: record_set
 
       list-controlled:
         description: List what an entity controls
         invocation_phrases:
-          - "list controlled entities"
-          - "what do they control"
-          - "show controlled"
-          - "list subsidiaries"
-          - "view controlled companies"
-          - "what is controlled"
-          - "show control targets"
-          - "list control targets"
-          - "which subsidiaries does this entity govern"
-          - "display entities under management control"
+        - "list controlled entities"
+        - "what do they control"
+        - "show controlled"
+        - "list subsidiaries"
+        - "view controlled companies"
+        - "what is controlled"
+        - "show control targets"
+        - "list control targets"
+        - "which subsidiaries does this entity govern"
+        - "display entities under management control"
         metadata:
           tier: reference
           source_of_truth: workflow
@@ -200,6 +203,7 @@ domains:
           noun: control
           tags: [data-management]
           phase_tags: [kyc]
+          side_effects: facts_only
         behavior: crud
         crud:
           operation: list_by_fk
@@ -209,16 +213,16 @@ domains:
           filter:
             relationship_type: CONTROL
         args:
-          - name: entity-id
-            type: uuid
-            required: true
-            maps_to: from_entity_id
-            lookup:
-              table: entities
-              entity_type: entity
-              schema: ob-poc
-              search_key: name
-              primary_key: entity_id
+        - name: entity-id
+          type: uuid
+          required: true
+          maps_to: from_entity_id
+          lookup:
+            table: entities
+            entity_type: entity
+            schema: ob-poc
+            search_key: name
+            primary_key: entity_id
         returns:
           type: record_set
 
@@ -233,16 +237,16 @@ domains:
           Routes to appropriate analyzer based on entity_type.
           Aggregates all control vectors: ownership, board, trust, partnership.
         invocation_phrases:
-          - "analyze control for entity"
-          - "run control analysis"
-          - "who has control over this"
-          - "aggregate control vectors"
-          - "assess voting and board control"
-          - "determine controlling parties"
-          - "evaluate governance control"
-          - "analyze ownership and control"
-          - "compute significant influence across all vectors"
-          - "review indirect control and subsidiaries"
+        - "analyze control for entity"
+        - "run control analysis"
+        - "who has control over this"
+        - "aggregate control vectors"
+        - "assess voting and board control"
+        - "determine controlling parties"
+        - "evaluate governance control"
+        - "analyze ownership and control"
+        - "compute significant influence across all vectors"
+        - "review indirect control and subsidiaries"
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -250,46 +254,47 @@ domains:
           noun: control
           tags: [data-management]
           phase_tags: [kyc]
+          side_effects: facts_only
         behavior: plugin
         plugin:
           handler: ControlAnalyzeOp
         args:
-          - name: entity-id
-            type: uuid
-            required: true
-            lookup:
-              table: entities
-              schema: ob-poc
-              search_key: name
-              primary_key: entity_id
-          - name: include-indirect
-            type: boolean
-            required: false
-            default: true
-            description: "Include indirect control through chains"
-          - name: control-threshold
-            type: decimal
-            required: false
-            default: 25.0
-            description: "Minimum percentage for ownership control"
+        - name: entity-id
+          type: uuid
+          required: true
+          lookup:
+            table: entities
+            schema: ob-poc
+            search_key: name
+            primary_key: entity_id
+        - name: include-indirect
+          type: boolean
+          required: false
+          default: true
+          description: "Include indirect control through chains"
+        - name: control-threshold
+          type: decimal
+          required: false
+          default: 25.0
+          description: "Minimum percentage for ownership control"
         returns:
           type: record
           fields:
-            - name: entity_type
-              type: string
-              description: "Type of entity analyzed"
-            - name: ownership_controllers
-              type: array
-              description: "Entities with ≥25% ownership"
-            - name: board_controllers
-              type: array
-              description: "Entities with board control"
-            - name: other_controllers
-              type: array
-              description: "SHA rights, trust powers, etc."
-            - name: ubo_candidates
-              type: array
-              description: "Natural persons identified as potential UBOs"
+          - name: entity_type
+            type: string
+            description: "Type of entity analyzed"
+          - name: ownership_controllers
+            type: array
+            description: "Entities with ≥25% ownership"
+          - name: board_controllers
+            type: array
+            description: "Entities with board control"
+          - name: other_controllers
+            type: array
+            description: "SHA rights, trust powers, etc."
+          - name: ubo_candidates
+            type: array
+            description: "Natural persons identified as potential UBOs"
 
       build-graph:
         description: |
@@ -297,16 +302,16 @@ domains:
           Nodes: entities, persons, positions
           Edges: OWNS, CONTROLS, APPOINTS, INFLUENCES, HOLDS_POSITION
         invocation_phrases:
-          - "build control graph"
-          - "generate ownership graph for CBU"
-          - "map control relationships"
-          - "create control structure diagram"
-          - "visualize ownership hierarchy"
-          - "show full control network"
-          - "construct entity control graph"
-          - "build governance graph for structure"
-          - "render corporate governance topology"
-          - "map subsidiary and board control links"
+        - "build control graph"
+        - "generate ownership graph for CBU"
+        - "map control relationships"
+        - "create control structure diagram"
+        - "visualize ownership hierarchy"
+        - "show full control network"
+        - "construct entity control graph"
+        - "build governance graph for structure"
+        - "render corporate governance topology"
+        - "map subsidiary and board control links"
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -314,43 +319,44 @@ domains:
           noun: control
           tags: [data-management]
           phase_tags: [kyc]
+          side_effects: state_write
         behavior: plugin
         plugin:
           handler: ControlBuildGraphOp
         args:
-          - name: cbu-id
-            type: uuid
-            required: true
-            lookup:
-              table: cbus
-              schema: ob-poc
-              search_key: name
-              primary_key: cbu_id
-          - name: depth
-            type: integer
-            required: false
-            default: 10
-            description: "Maximum traversal depth"
-          - name: include-inactive
-            type: boolean
-            required: false
-            default: false
-            description: "Include historical/inactive relationships"
+        - name: cbu-id
+          type: uuid
+          required: true
+          lookup:
+            table: cbus
+            schema: ob-poc
+            search_key: name
+            primary_key: cbu_id
+        - name: depth
+          type: integer
+          required: false
+          default: 10
+          description: "Maximum traversal depth"
+        - name: include-inactive
+          type: boolean
+          required: false
+          default: false
+          description: "Include historical/inactive relationships"
         returns:
           type: record
           fields:
-            - name: nodes
-              type: array
-              description: "All entities/persons in the control graph"
-            - name: edges
-              type: array
-              description: "All relationships between nodes"
-            - name: terminus_entities
-              type: array
-              description: "Entities with no further upstream owners"
-            - name: cycles_detected
-              type: array
-              description: "Any circular ownership/control detected"
+          - name: nodes
+            type: array
+            description: "All entities/persons in the control graph"
+          - name: edges
+            type: array
+            description: "All relationships between nodes"
+          - name: terminus_entities
+            type: array
+            description: "Entities with no further upstream owners"
+          - name: cycles_detected
+            type: array
+            description: "Any circular ownership/control detected"
 
       identify-ubos:
         description: |
@@ -360,21 +366,21 @@ domains:
           - Trust control (trustee discretion, appointor power)
           - Partnership GP control
         invocation_phrases:
-          - "who owns this company"
-          - "who owns this"
-          - "identify owners"
-          - "find ubos"
-          - "identify ubos"
-          - "who are the beneficial owners"
-          - "find ultimate beneficial owners"
-          - "discover ubos"
-          - "identify beneficial owners"
-          - "who ultimately owns"
-          - "who owns this entity"
-          - "find the ubos"
-          - "calculate ownership"
-          - "trace beneficial ownership"
-          - "who controls this company"
+        - "who owns this company"
+        - "who owns this"
+        - "identify owners"
+        - "find ubos"
+        - "identify ubos"
+        - "who are the beneficial owners"
+        - "find ultimate beneficial owners"
+        - "discover ubos"
+        - "identify beneficial owners"
+        - "who ultimately owns"
+        - "who owns this entity"
+        - "find the ubos"
+        - "calculate ownership"
+        - "trace beneficial ownership"
+        - "who controls this company"
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -382,63 +388,64 @@ domains:
           noun: control
           tags: [data-management]
           phase_tags: [kyc]
+          side_effects: state_write
         behavior: plugin
         plugin:
           handler: ControlIdentifyUbosOp
         args:
-          - name: cbu-id
-            type: uuid
-            required: true
-            lookup:
-              table: cbus
-              schema: ob-poc
-              search_key: name
-              primary_key: cbu_id
-          - name: ownership-threshold
-            type: decimal
-            required: false
-            default: 25.0
-            description: "Ownership percentage threshold for UBO"
-          - name: include-indirect
-            type: boolean
-            required: false
-            default: true
-            description: "Include indirect ownership chains"
+        - name: cbu-id
+          type: uuid
+          required: true
+          lookup:
+            table: cbus
+            schema: ob-poc
+            search_key: name
+            primary_key: cbu_id
+        - name: ownership-threshold
+          type: decimal
+          required: false
+          default: 25.0
+          description: "Ownership percentage threshold for UBO"
+        - name: include-indirect
+          type: boolean
+          required: false
+          default: true
+          description: "Include indirect ownership chains"
         returns:
           type: record_set
           fields:
-            - name: person_entity_id
-              type: uuid
-            - name: person_name
-              type: string
-            - name: control_vectors
-              type: array
-              description: "Array of {type, path, percentage}"
-            - name: highest_percentage
-              type: decimal
-              description: "Highest ownership/control percentage"
-            - name: verification_status
-              type: string
-              description: "DISCOVERED, ALLEGED, EVIDENCED, VERIFIED"
-            - name: evidence_documents
-              type: array
-              description: "Supporting document IDs"
+          - name: person_entity_id
+            type: uuid
+          - name: person_name
+            type: string
+          - name: control_vectors
+            type: array
+            description: "Array of {type, path, percentage}"
+          - name: highest_percentage
+            type: decimal
+            description: "Highest ownership/control percentage"
+          - name: verification_status
+            type: string
+            description: "DISCOVERED, ALLEGED, EVIDENCED, VERIFIED"
+          - name: evidence_documents
+            type: array
+            description: "Supporting document IDs"
 
       trace-chain:
         description: |
           Trace a specific control chain from one entity to another.
           Returns the path and cumulative control percentage.
         invocation_phrases:
-          - "show ownership chain"
-          - "trace ownership"
-          - "ownership chain"
-          - "follow ownership"
-          - "trace control chain"
-          - "show control chain"
-          - "ownership hierarchy"
-          - "trace ownership path"
-          - "follow indirect control to ultimate parent"
-          - "map control path between two entities"
+        - "show ownership chain"
+        - "trace ownership"
+        - "ownership chain"
+        - "follow ownership"
+        - "trace control chain"
+        - "show control chain"
+        - "ownership hierarchy"
+        - "trace ownership path"
+        - "follow indirect control to ultimate parent"
+        - "map control path between two entities"
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -446,47 +453,48 @@ domains:
           noun: control
           tags: [data-management]
           phase_tags: [kyc]
+          side_effects: facts_only
         behavior: plugin
         plugin:
           handler: ControlTraceChainOp
         args:
-          - name: from-entity-id
-            type: uuid
-            required: true
-            lookup:
-              table: entities
-              schema: ob-poc
-              search_key: name
-              primary_key: entity_id
-          - name: to-entity-id
-            type: uuid
-            required: true
-            lookup:
-              table: entities
-              schema: ob-poc
-              search_key: name
-              primary_key: entity_id
-          - name: relationship-types
-            type: string_list
-            required: false
-            description: "Filter by relationship types (OWNERSHIP, CONTROL, TRUST_ROLE)"
+        - name: from-entity-id
+          type: uuid
+          required: true
+          lookup:
+            table: entities
+            schema: ob-poc
+            search_key: name
+            primary_key: entity_id
+        - name: to-entity-id
+          type: uuid
+          required: true
+          lookup:
+            table: entities
+            schema: ob-poc
+            search_key: name
+            primary_key: entity_id
+        - name: relationship-types
+          type: string_list
+          required: false
+          description: "Filter by relationship types (OWNERSHIP, CONTROL, TRUST_ROLE)"
         returns:
           type: record
           fields:
-            - name: path_exists
-              type: boolean
-            - name: path
-              type: array
-              description: "Ordered list of entities in chain"
-            - name: relationships
-              type: array
-              description: "Relationship details for each hop"
-            - name: cumulative_percentage
-              type: decimal
-              description: "Multiplicative ownership through chain"
-            - name: control_basis
-              type: string
-              description: "Primary basis: OWNERSHIP, BOARD, TRUST, PARTNERSHIP"
+          - name: path_exists
+            type: boolean
+          - name: path
+            type: array
+            description: "Ordered list of entities in chain"
+          - name: relationships
+            type: array
+            description: "Relationship details for each hop"
+          - name: cumulative_percentage
+            type: decimal
+            description: "Multiplicative ownership through chain"
+          - name: control_basis
+            type: string
+            description: "Primary basis: OWNERSHIP, BOARD, TRUST, PARTNERSHIP"
 
       reconcile-ownership:
         description: |
@@ -495,16 +503,16 @@ domains:
             - Identify gaps or overlaps
             - Flag discrepancies
         invocation_phrases:
-          - "reconcile ownership percentages"
-          - "verify shares sum to 100"
-          - "check ownership totals"
-          - "find ownership gaps"
-          - "detect ownership discrepancies"
-          - "validate shareholder percentages"
-          - "reconcile voting shares"
-          - "audit ownership breakdown"
-          - "cross-check control percentages for entity"
-          - "verify voting rights allocation completeness"
+        - "reconcile ownership percentages"
+        - "verify shares sum to 100"
+        - "check ownership totals"
+        - "find ownership gaps"
+        - "detect ownership discrepancies"
+        - "validate shareholder percentages"
+        - "reconcile voting shares"
+        - "audit ownership breakdown"
+        - "cross-check control percentages for entity"
+        - "verify voting rights allocation completeness"
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -512,39 +520,40 @@ domains:
           noun: control
           tags: [data-management]
           phase_tags: [kyc]
+          side_effects: state_write
         behavior: plugin
         plugin:
           handler: ControlReconcileOwnershipOp
         args:
-          - name: entity-id
-            type: uuid
-            required: true
-            lookup:
-              table: entities
-              schema: ob-poc
-              search_key: name
-              primary_key: entity_id
+        - name: entity-id
+          type: uuid
+          required: true
+          lookup:
+            table: entities
+            schema: ob-poc
+            search_key: name
+            primary_key: entity_id
         returns:
           type: record
           fields:
-            - name: is_reconciled
-              type: boolean
-              description: "True if ownership sums to 100%"
-            - name: total_ownership_pct
-              type: decimal
-              description: "Sum of all ownership percentages"
-            - name: gap_pct
-              type: decimal
-              description: "Missing percentage (if any)"
-            - name: overlap_pct
-              type: decimal
-              description: "Overlapping claims (if any)"
-            - name: shareholders
-              type: array
-              description: "List of shareholders with percentages"
-            - name: discrepancies
-              type: array
-              description: "Any discrepancy details"
+          - name: is_reconciled
+            type: boolean
+            description: "True if ownership sums to 100%"
+          - name: total_ownership_pct
+            type: decimal
+            description: "Sum of all ownership percentages"
+          - name: gap_pct
+            type: decimal
+            description: "Missing percentage (if any)"
+          - name: overlap_pct
+            type: decimal
+            description: "Overlapping claims (if any)"
+          - name: shareholders
+            type: array
+            description: "List of shareholders with percentages"
+          - name: discrepancies
+            type: array
+            description: "Any discrepancy details"
 
       # ============================================================
       # Board Controller Verbs (Phase 2f - Control Anchors)
@@ -557,16 +566,16 @@ domains:
           Returns the natural person or entity that controls the board,
           with derivation explanation, confidence level, and data gaps.
         invocation_phrases:
-          - "show board controller"
-          - "who controls the board"
-          - "board controller for"
-          - "get board controller"
-          - "display board of directors controller"
-          - "who has board appointment rights"
-          - "identify governing board controller"
-          - "which entity controls the board"
-          - "show board governance anchor"
-          - "view controlling party for board"
+        - "show board controller"
+        - "who controls the board"
+        - "board controller for"
+        - "get board controller"
+        - "display board of directors controller"
+        - "who has board appointment rights"
+        - "identify governing board controller"
+        - "which entity controls the board"
+        - "show board governance anchor"
+        - "view controlling party for board"
         metadata:
           tier: diagnostics
           source_of_truth: workflow
@@ -574,50 +583,51 @@ domains:
           noun: board_controller
           tags: [data-management]
           phase_tags: [kyc]
+          side_effects: facts_only
         behavior: plugin
         plugin:
           handler: ShowBoardControllerOp
         args:
-          - name: cbu-id
-            type: uuid
-            required: true
-            lookup:
-              table: cbus
-              schema: ob-poc
-              search_key: name
-              primary_key: cbu_id
+        - name: cbu-id
+          type: uuid
+          required: true
+          lookup:
+            table: cbus
+            schema: ob-poc
+            search_key: name
+            primary_key: cbu_id
         returns:
           type: record
           fields:
-            - name: cbu_id
-              type: uuid
-            - name: cbu_name
-              type: string
-            - name: board_controller_entity_id
-              type: uuid
-              description: "The entity that controls the board (may be null if unknown)"
-            - name: board_controller_name
-              type: string
-            - name: board_controller_type
-              type: string
-              description: "NATURAL_PERSON, LEGAL_ENTITY, or UNKNOWN"
-            - name: confidence
-              type: string
-              description: "HIGH, MEDIUM, or LOW"
-            - name: derivation_rule
-              type: string
-              description: "Rule used to determine controller (e.g., MAJORITY_APPOINTER)"
-            - name: derivation_explanation
-              type: string
-              description: "Human-readable explanation of derivation"
-            - name: data_gaps
-              type: array
-              description: "Missing information that affects confidence"
-            - name: evidence_sources
-              type: array
-              description: "Sources used: GLEIF, PSC_REGISTER, MANUAL, COMPUTED"
-            - name: computed_at
-              type: timestamp
+          - name: cbu_id
+            type: uuid
+          - name: cbu_name
+            type: string
+          - name: board_controller_entity_id
+            type: uuid
+            description: "The entity that controls the board (may be null if unknown)"
+          - name: board_controller_name
+            type: string
+          - name: board_controller_type
+            type: string
+            description: "NATURAL_PERSON, LEGAL_ENTITY, or UNKNOWN"
+          - name: confidence
+            type: string
+            description: "HIGH, MEDIUM, or LOW"
+          - name: derivation_rule
+            type: string
+            description: "Rule used to determine controller (e.g., MAJORITY_APPOINTER)"
+          - name: derivation_explanation
+            type: string
+            description: "Human-readable explanation of derivation"
+          - name: data_gaps
+            type: array
+            description: "Missing information that affects confidence"
+          - name: evidence_sources
+            type: array
+            description: "Sources used: GLEIF, PSC_REGISTER, MANUAL, COMPUTED"
+          - name: computed_at
+            type: timestamp
 
       recompute-board-controller:
         description: |
@@ -625,16 +635,16 @@ domains:
           Traverses ownership/control graph, analyzes board compositions,
           and determines who has effective control.
         invocation_phrases:
-          - "recompute board controller"
-          - "recalculate board controller"
-          - "refresh board controller"
-          - "rederive board governance anchor"
-          - "update board control computation"
-          - "re-evaluate board appointment analysis"
-          - "recalculate who governs the board"
-          - "force board controller derivation"
-          - "rebuild board control determination"
-          - "run fresh board controller analysis"
+        - "recompute board controller"
+        - "recalculate board controller"
+        - "refresh board controller"
+        - "rederive board governance anchor"
+        - "update board control computation"
+        - "re-evaluate board appointment analysis"
+        - "recalculate who governs the board"
+        - "force board controller derivation"
+        - "rebuild board control determination"
+        - "run fresh board controller analysis"
         metadata:
           tier: composite
           source_of_truth: workflow
@@ -642,44 +652,45 @@ domains:
           noun: board_controller
           tags: [data-management]
           phase_tags: [kyc]
+          side_effects: state_write
         behavior: plugin
         plugin:
           handler: RecomputeBoardControllerOp
         args:
-          - name: cbu-id
-            type: uuid
-            required: true
-            lookup:
-              table: cbus
-              schema: ob-poc
-              search_key: name
-              primary_key: cbu_id
-          - name: force
-            type: boolean
-            required: false
-            default: false
-            description: "Force recomputation even if recently computed"
+        - name: cbu-id
+          type: uuid
+          required: true
+          lookup:
+            table: cbus
+            schema: ob-poc
+            search_key: name
+            primary_key: cbu_id
+        - name: force
+          type: boolean
+          required: false
+          default: false
+          description: "Force recomputation even if recently computed"
         returns:
           type: record
           fields:
-            - name: cbu_id
-              type: uuid
-            - name: board_controller_entity_id
-              type: uuid
-            - name: board_controller_name
-              type: string
-            - name: confidence
-              type: string
-            - name: derivation_rule
-              type: string
-            - name: previous_controller_entity_id
-              type: uuid
-              description: "Previous board controller if changed"
-            - name: changed
-              type: boolean
-              description: "True if controller changed from previous computation"
-            - name: recomputed_at
-              type: timestamp
+          - name: cbu_id
+            type: uuid
+          - name: board_controller_entity_id
+            type: uuid
+          - name: board_controller_name
+            type: string
+          - name: confidence
+            type: string
+          - name: derivation_rule
+            type: string
+          - name: previous_controller_entity_id
+            type: uuid
+            description: "Previous board controller if changed"
+          - name: changed
+            type: boolean
+            description: "True if controller changed from previous computation"
+          - name: recomputed_at
+            type: timestamp
 
       set-board-controller:
         description: |
@@ -687,16 +698,16 @@ domains:
           Creates an override that takes precedence over computed values.
           Requires justification and evidence document.
         invocation_phrases:
-          - "set board controller"
-          - "override board controller"
-          - "manually set board controller"
-          - "designate board governance controller"
-          - "assign board control to entity"
-          - "force board controller to specific party"
-          - "apply manual board controller override"
-          - "specify who controls the board"
-          - "set corporate governance controller manually"
-          - "override computed board control determination"
+        - "set board controller"
+        - "override board controller"
+        - "manually set board controller"
+        - "designate board governance controller"
+        - "assign board control to entity"
+        - "force board controller to specific party"
+        - "apply manual board controller override"
+        - "specify who controls the board"
+        - "set corporate governance controller manually"
+        - "override computed board control determination"
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -704,68 +715,69 @@ domains:
           noun: board_controller
           tags: [data-management]
           phase_tags: [kyc]
+          side_effects: state_write
         behavior: plugin
         plugin:
           handler: SetBoardControllerOp
         args:
-          - name: cbu-id
-            type: uuid
-            required: true
-            lookup:
-              table: cbus
-              schema: ob-poc
-              search_key: name
-              primary_key: cbu_id
-          - name: controller-entity-id
-            type: uuid
-            required: true
-            lookup:
-              table: entities
-              entity_type: entity
-              schema: ob-poc
-              search_key: name
-              primary_key: entity_id
-          - name: justification
-            type: string
-            required: true
-            description: "Reason for manual override"
-          - name: evidence-doc-id
-            type: uuid
-            required: false
-            lookup:
-              table: document_catalog
-              entity_type: document
-              schema: ob-poc
-              search_key: document_name
-              primary_key: doc_id
+        - name: cbu-id
+          type: uuid
+          required: true
+          lookup:
+            table: cbus
+            schema: ob-poc
+            search_key: name
+            primary_key: cbu_id
+        - name: controller-entity-id
+          type: uuid
+          required: true
+          lookup:
+            table: entities
+            entity_type: entity
+            schema: ob-poc
+            search_key: name
+            primary_key: entity_id
+        - name: justification
+          type: string
+          required: true
+          description: "Reason for manual override"
+        - name: evidence-doc-id
+          type: uuid
+          required: false
+          lookup:
+            table: document_catalog
+            entity_type: document
+            schema: ob-poc
+            search_key: document_name
+            primary_key: doc_id
         returns:
           type: record
           fields:
-            - name: cbu_id
-              type: uuid
-            - name: board_controller_entity_id
-              type: uuid
-            - name: override_id
-              type: uuid
-              description: "ID of the manual override record"
-            - name: set_at
-              type: timestamp
+          - name: cbu_id
+            type: uuid
+          - name: board_controller_entity_id
+            type: uuid
+          - name: override_id
+            type: uuid
+            description: "ID of the manual override record"
+          - name: set_at
+            type: timestamp
 
       clear-board-controller-override:
         description: |
           Clear a manual board controller override.
           Returns to computed value.
         invocation_phrases:
-          - "clear board controller override"
-          - "remove board controller override"
-          - "revert to computed board controller"
-          - "delete manual board controller designation"
-          - "undo board controller override"
-          - "restore automatic board governance derivation"
-          - "reset board controller to computed"
-          - "withdraw board control manual override"
-          - "cancel board controller override"
-          - "return to derived board controller"
+        - "clear board controller override"
+        - "remove board controller override"
+        - "revert to computed board controller"
+        - "delete manual board controller designation"
+        - "undo board controller override"
+        - "restore automatic board governance derivation"
+        - "reset board controller to computed"
+        - "withdraw board control manual override"
+        - "cancel board controller override"
+        - "return to derived board controller"
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -773,45 +785,46 @@ domains:
           noun: board_controller
           tags: [data-management]
           phase_tags: [kyc]
+          side_effects: state_write
         behavior: plugin
         plugin:
           handler: ClearBoardControllerOverrideOp
         args:
-          - name: cbu-id
-            type: uuid
-            required: true
-            lookup:
-              table: cbus
-              schema: ob-poc
-              search_key: name
-              primary_key: cbu_id
+        - name: cbu-id
+          type: uuid
+          required: true
+          lookup:
+            table: cbus
+            schema: ob-poc
+            search_key: name
+            primary_key: cbu_id
         returns:
           type: record
           fields:
-            - name: cbu_id
-              type: uuid
-            - name: override_cleared
-              type: boolean
-            - name: now_using_computed
-              type: boolean
-            - name: computed_controller_entity_id
-              type: uuid
+          - name: cbu_id
+            type: uuid
+          - name: override_cleared
+            type: boolean
+          - name: now_using_computed
+            type: boolean
+          - name: computed_controller_entity_id
+            type: uuid
 
       import-psc-register:
         description: |
           Import board controller data from a PSC (Persons with Significant Control) register.
           Supports UK Companies House PSC format.
         invocation_phrases:
-          - "import psc register"
-          - "import persons with significant control"
-          - "load psc data"
-          - "fetch companies house PSC filings"
-          - "ingest significant control register"
-          - "load UK PSC register data"
-          - "import persons of significant control"
-          - "pull PSC data from companies house"
-          - "load corporate governance from PSC register"
-          - "import significant control persons for entity"
+        - "import psc register"
+        - "import persons with significant control"
+        - "load psc data"
+        - "fetch companies house PSC filings"
+        - "ingest significant control register"
+        - "load UK PSC register data"
+        - "import persons of significant control"
+        - "pull PSC data from companies house"
+        - "load corporate governance from PSC register"
+        - "import significant control persons for entity"
         metadata:
           tier: composite
           source_of_truth: external
@@ -819,43 +832,44 @@ domains:
           noun: board_controller
           tags: [data-management]
           phase_tags: [kyc]
+          side_effects: state_write
         behavior: plugin
         plugin:
           handler: ImportPscRegisterOp
         args:
-          - name: cbu-id
-            type: uuid
-            required: true
-            lookup:
-              table: cbus
-              schema: ob-poc
-              search_key: name
-              primary_key: cbu_id
-          - name: company-number
-            type: string
-            required: true
-            description: "Companies House company number"
-          - name: source
-            type: string
-            required: false
-            default: "COMPANIES_HOUSE"
-            validation:
-              enum:
-                - COMPANIES_HOUSE
-                - MANUAL
+        - name: cbu-id
+          type: uuid
+          required: true
+          lookup:
+            table: cbus
+            schema: ob-poc
+            search_key: name
+            primary_key: cbu_id
+        - name: company-number
+          type: string
+          required: true
+          description: "Companies House company number"
+        - name: source
+          type: string
+          required: false
+          default: "COMPANIES_HOUSE"
+          validation:
+            enum:
+            - COMPANIES_HOUSE
+            - MANUAL
         returns:
           type: record
           fields:
-            - name: cbu_id
-              type: uuid
-            - name: company_number
-              type: string
-            - name: pscs_imported
-              type: integer
-            - name: board_controller_updated
-              type: boolean
-            - name: imported_at
-              type: timestamp
+          - name: cbu_id
+            type: uuid
+          - name: company_number
+            type: string
+          - name: pscs_imported
+            type: integer
+          - name: board_controller_updated
+            type: boolean
+          - name: imported_at
+            type: timestamp
 
       # ============================================================
       # Control Compute Controllers (Phase 3.1)
@@ -869,16 +883,16 @@ domains:
           bridges to cbu_entity_roles for officers, and outputs controller
           candidates with control_type and basis.
         invocation_phrases:
-          - "compute controllers"
-          - "derive governance controllers"
-          - "find who controls this entity"
-          - "calculate control hierarchy"
-          - "determine management and board controllers"
-          - "identify controlling parties for KYC case"
-          - "compute corporate governance controller candidates"
-          - "derive control from management edges"
-          - "run controller derivation for entity"
-          - "analyze who has significant control"
+        - "compute controllers"
+        - "derive governance controllers"
+        - "find who controls this entity"
+        - "calculate control hierarchy"
+        - "determine management and board controllers"
+        - "identify controlling parties for KYC case"
+        - "compute corporate governance controller candidates"
+        - "derive control from management edges"
+        - "run controller derivation for entity"
+        - "analyze who has significant control"
         metadata:
           tier: composite
           source_of_truth: workflow
@@ -886,55 +900,56 @@ domains:
           noun: control
           tags: [data-management]
           phase_tags: [kyc]
+          side_effects: state_write
         behavior: plugin
         plugin:
           handler: ControlComputeControllersOp
         args:
-          - name: case-id
-            type: uuid
-            required: true
-            description: "KYC case ID to compute controllers for"
-          - name: entity-id
-            type: uuid
-            required: true
-            description: "Target entity to analyze control for"
-            lookup:
-              table: entities
-              schema: ob-poc
-              search_key: name
-              primary_key: entity_id
+        - name: case-id
+          type: uuid
+          required: true
+          description: "KYC case ID to compute controllers for"
+        - name: entity-id
+          type: uuid
+          required: true
+          description: "Target entity to analyze control for"
+          lookup:
+            table: entities
+            schema: ob-poc
+            search_key: name
+            primary_key: entity_id
         returns:
           type: record
           fields:
-            - name: entity_id
-              type: uuid
-            - name: controllers
-              type: array
-              description: "List of controller candidates with control_type and basis"
-            - name: controller_count
-              type: integer
-            - name: primary_controller_entity_id
-              type: uuid
-              description: "Top-ranked controller entity"
-            - name: primary_control_type
-              type: string
-              description: "BOARD_APPOINTMENT, MANAGEMENT_CONTRACT, VOTING_MAJORITY, etc."
+          - name: entity_id
+            type: uuid
+          - name: controllers
+            type: array
+            description: "List of controller candidates with control_type and basis"
+          - name: controller_count
+            type: integer
+          - name: primary_controller_entity_id
+            type: uuid
+            description: "Top-ranked controller entity"
+          - name: primary_control_type
+            type: string
+            description: "BOARD_APPOINTMENT, MANAGEMENT_CONTRACT, VOTING_MAJORITY, etc."
 
       import-gleif-control:
         description: |
           Import control data from GLEIF (Global LEI Foundation).
           Uses the LEI-RR (Relationship Record) data for parent/child control.
         invocation_phrases:
-          - "import gleif control"
-          - "import lei control data"
-          - "load gleif hierarchy"
-          - "fetch GLEIF parent child relationships"
-          - "import LEI relationship records"
-          - "load corporate control from GLEIF"
-          - "pull ultimate parent from LEI data"
-          - "ingest GLEIF control hierarchy for entity"
-          - "import LEI parent subsidiary control links"
-          - "load GLEIF corporate governance relationships"
+        - "import gleif control"
+        - "import lei control data"
+        - "load gleif hierarchy"
+        - "fetch GLEIF parent child relationships"
+        - "import LEI relationship records"
+        - "load corporate control from GLEIF"
+        - "pull ultimate parent from LEI data"
+        - "ingest GLEIF control hierarchy for entity"
+        - "import LEI parent subsidiary control links"
+        - "load GLEIF corporate governance relationships"
         metadata:
           tier: composite
           source_of_truth: external
@@ -942,41 +957,42 @@ domains:
           noun: board_controller
           tags: [data-management]
           phase_tags: [kyc]
+          side_effects: state_write
         behavior: plugin
         plugin:
           handler: ImportGleifControlOp
         args:
-          - name: cbu-id
-            type: uuid
-            required: true
-            lookup:
-              table: cbus
-              schema: ob-poc
-              search_key: name
-              primary_key: cbu_id
-          - name: lei
-            type: string
-            required: true
-            description: "Legal Entity Identifier"
-          - name: include-ultimate-parent
-            type: boolean
-            required: false
-            default: true
-            description: "Also import ultimate parent chain"
+        - name: cbu-id
+          type: uuid
+          required: true
+          lookup:
+            table: cbus
+            schema: ob-poc
+            search_key: name
+            primary_key: cbu_id
+        - name: lei
+          type: string
+          required: true
+          description: "Legal Entity Identifier"
+        - name: include-ultimate-parent
+          type: boolean
+          required: false
+          default: true
+          description: "Also import ultimate parent chain"
         returns:
           type: record
           fields:
-            - name: cbu_id
-              type: uuid
-            - name: lei
-              type: string
-            - name: direct_parent_imported
-              type: boolean
-            - name: ultimate_parent_imported
-              type: boolean
-            - name: control_relationships_created
-              type: integer
-            - name: board_controller_updated
-              type: boolean
-            - name: imported_at
-              type: timestamp
+          - name: cbu_id
+            type: uuid
+          - name: lei
+            type: string
+          - name: direct_parent_imported
+            type: boolean
+          - name: ultimate_parent_imported
+            type: boolean
+          - name: control_relationships_created
+            type: integer
+          - name: board_controller_updated
+            type: boolean
+          - name: imported_at
+            type: timestamp

@@ -225,6 +225,18 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_deterministic_sage_coder_resolves_plural_cbus_to_list() {
+        let sage = DeterministicSage;
+        let ctx = empty_ctx();
+        let outcome = sage.classify("show me the cbus", &ctx).await.unwrap();
+        let coder = CoderEngine::load().unwrap();
+        let result = coder.resolve(&outcome).unwrap();
+
+        assert_eq!(outcome.domain_concept, "cbu");
+        assert_eq!(result.verb_fqn, "cbu.list");
+    }
+
+    #[tokio::test]
     async fn test_deterministic_sage_summary_truncated() {
         let sage = DeterministicSage;
         let ctx = empty_ctx();

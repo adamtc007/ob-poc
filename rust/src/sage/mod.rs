@@ -37,6 +37,7 @@
 pub mod outcome;
 pub mod plane;
 pub mod polarity;
+pub mod disposition;
 
 // Phase 1.2+
 pub mod pre_classify;
@@ -55,6 +56,7 @@ pub use arg_assembly::assemble_args_from_step;
 pub use coder::{CoderEngine, CoderResolution, CoderResult};
 pub use context::SageContext;
 pub use deterministic::DeterministicSage;
+pub use disposition::{DelegateIntent, PendingMutation, ServeIntent, UtteranceDisposition};
 pub use llm_sage::LlmSage;
 pub use outcome::{
     Clarification, EntityRef, OutcomeAction, OutcomeIntent, OutcomeStep, SageConfidence,

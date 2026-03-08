@@ -5,20 +5,21 @@ domains:
       record:
         description: Record a service delivery for a CBU (upsert by cbu+product+service)
         invocation_phrases:
-          - "record service delivery"
-          - "log delivery for CBU"
-          - "track service fulfillment"
-          - "register delivery event"
-          - "add delivery record"
-          - "capture service delivery"
-          - "record product delivery"
-          - "log service provision"
+        - "record service delivery"
+        - "log delivery for CBU"
+        - "track service fulfillment"
+        - "register delivery event"
+        - "add delivery record"
+        - "capture service delivery"
+        - "record product delivery"
+        - "log service provision"
         metadata:
           tier: intent
           source_of_truth: operational
           scope: cbu
           noun: delivery
           phase_tags: [trading]
+          side_effects: state_write
         behavior: crud
         crud:
           operation: upsert
@@ -26,54 +27,54 @@ domains:
           schema: ob-poc
           returning: delivery_id
           conflict_keys:
-            - cbu_id
-            - product_id
-            - service_id
+          - cbu_id
+          - product_id
+          - service_id
         args:
-          - name: cbu-id
-            type: uuid
-            required: true
-            maps_to: cbu_id
-            lookup:
-              table: cbus
-              entity_type: cbu
-              schema: ob-poc
-              search_key: name
-              primary_key: cbu_id
-          - name: product
-            type: lookup
-            required: true
-            maps_to: product_id
-            lookup:
-              schema: ob-poc
-              table: products
-              entity_type: product
-              code_column: product_code
-              id_column: product_id
-          - name: service
-            type: lookup
-            required: true
-            maps_to: service_id
-            lookup:
-              schema: ob-poc
-              table: services
-              entity_type: service
-              code_column: service_code
-              id_column: service_id
-          - name: instance-id
-            type: uuid
-            required: false
-            maps_to: instance_id
-            lookup:
-              table: cbu_resource_instances
-              entity_type: resource_instance
-              schema: ob-poc
-              search_key: instance_name
-              primary_key: instance_id
-          - name: config
-            type: json
-            required: false
-            maps_to: service_config
+        - name: cbu-id
+          type: uuid
+          required: true
+          maps_to: cbu_id
+          lookup:
+            table: cbus
+            entity_type: cbu
+            schema: ob-poc
+            search_key: name
+            primary_key: cbu_id
+        - name: product
+          type: lookup
+          required: true
+          maps_to: product_id
+          lookup:
+            schema: ob-poc
+            table: products
+            entity_type: product
+            code_column: product_code
+            id_column: product_id
+        - name: service
+          type: lookup
+          required: true
+          maps_to: service_id
+          lookup:
+            schema: ob-poc
+            table: services
+            entity_type: service
+            code_column: service_code
+            id_column: service_id
+        - name: instance-id
+          type: uuid
+          required: false
+          maps_to: instance_id
+          lookup:
+            table: cbu_resource_instances
+            entity_type: resource_instance
+            schema: ob-poc
+            search_key: instance_name
+            primary_key: instance_id
+        - name: config
+          type: json
+          required: false
+          maps_to: service_config
         returns:
           type: uuid
           capture: true
@@ -81,69 +82,70 @@ domains:
       complete:
         description: Mark a service delivery as complete
         invocation_phrases:
-          - "complete service delivery"
-          - "mark delivery as done"
-          - "confirm delivery completed"
-          - "finalize service delivery"
-          - "close delivery record"
-          - "delivery fulfilled for CBU"
-          - "mark service as delivered"
-          - "confirm product delivery"
+        - "complete service delivery"
+        - "mark delivery as done"
+        - "confirm delivery completed"
+        - "finalize service delivery"
+        - "close delivery record"
+        - "delivery fulfilled for CBU"
+        - "mark service as delivered"
+        - "confirm product delivery"
         metadata:
           tier: intent
           source_of_truth: operational
           scope: cbu
           noun: delivery
           phase_tags: [trading]
+          side_effects: state_write
         behavior: crud
         crud:
           operation: update
           table: service_delivery_map
           schema: ob-poc
         args:
-          - name: cbu-id
-            type: uuid
-            required: true
-            maps_to: cbu_id
-            lookup:
-              table: cbus
-              entity_type: cbu
-              schema: ob-poc
-              search_key: name
-              primary_key: cbu_id
-            is_filter: true
-          - name: product
-            type: lookup
-            required: true
-            maps_to: product_id
-            is_filter: true
-            lookup:
-              schema: ob-poc
-              table: products
-              entity_type: product
-              code_column: product_code
-              id_column: product_id
-          - name: service
-            type: lookup
-            required: true
-            maps_to: service_id
-            is_filter: true
-            lookup:
-              schema: ob-poc
-              table: services
-              entity_type: service
-              code_column: service_code
-              id_column: service_id
-          - name: instance-id
-            type: uuid
-            required: false
-            maps_to: instance_id
-            lookup:
-              table: cbu_resource_instances
-              entity_type: resource_instance
-              schema: ob-poc
-              search_key: instance_name
-              primary_key: instance_id
+        - name: cbu-id
+          type: uuid
+          required: true
+          maps_to: cbu_id
+          lookup:
+            table: cbus
+            entity_type: cbu
+            schema: ob-poc
+            search_key: name
+            primary_key: cbu_id
+          is_filter: true
+        - name: product
+          type: lookup
+          required: true
+          maps_to: product_id
+          is_filter: true
+          lookup:
+            schema: ob-poc
+            table: products
+            entity_type: product
+            code_column: product_code
+            id_column: product_id
+        - name: service
+          type: lookup
+          required: true
+          maps_to: service_id
+          is_filter: true
+          lookup:
+            schema: ob-poc
+            table: services
+            entity_type: service
+            code_column: service_code
+            id_column: service_id
+        - name: instance-id
+          type: uuid
+          required: false
+          maps_to: instance_id
+          lookup:
+            table: cbu_resource_instances
+            entity_type: resource_instance
+            schema: ob-poc
+            search_key: instance_name
+            primary_key: instance_id
         set:
           delivery_status: "DELIVERED"
           delivered_at: "now()"
@@ -153,63 +155,64 @@ domains:
       fail:
         description: Mark a service delivery as failed
         invocation_phrases:
-          - "fail service delivery"
-          - "mark delivery as failed"
-          - "report delivery failure"
-          - "flag failed delivery"
-          - "record delivery failure reason"
-          - "service delivery did not complete"
-          - "delivery failed for CBU"
-          - "log failed service provision"
+        - "fail service delivery"
+        - "mark delivery as failed"
+        - "report delivery failure"
+        - "flag failed delivery"
+        - "record delivery failure reason"
+        - "service delivery did not complete"
+        - "delivery failed for CBU"
+        - "log failed service provision"
         metadata:
           tier: intent
           source_of_truth: operational
           scope: cbu
           noun: delivery
           phase_tags: [trading]
+          side_effects: state_write
         behavior: crud
         crud:
           operation: update
           table: service_delivery_map
           schema: ob-poc
         args:
-          - name: cbu-id
-            type: uuid
-            required: true
-            maps_to: cbu_id
-            lookup:
-              table: cbus
-              entity_type: cbu
-              schema: ob-poc
-              search_key: name
-              primary_key: cbu_id
-            is_filter: true
-          - name: product
-            type: lookup
-            required: true
-            maps_to: product_id
-            is_filter: true
-            lookup:
-              schema: ob-poc
-              table: products
-              entity_type: product
-              code_column: product_code
-              id_column: product_id
-          - name: service
-            type: lookup
-            required: true
-            maps_to: service_id
-            is_filter: true
-            lookup:
-              schema: ob-poc
-              table: services
-              entity_type: service
-              code_column: service_code
-              id_column: service_id
-          - name: reason
-            type: string
-            required: true
-            maps_to: failure_reason
+        - name: cbu-id
+          type: uuid
+          required: true
+          maps_to: cbu_id
+          lookup:
+            table: cbus
+            entity_type: cbu
+            schema: ob-poc
+            search_key: name
+            primary_key: cbu_id
+          is_filter: true
+        - name: product
+          type: lookup
+          required: true
+          maps_to: product_id
+          is_filter: true
+          lookup:
+            schema: ob-poc
+            table: products
+            entity_type: product
+            code_column: product_code
+            id_column: product_id
+        - name: service
+          type: lookup
+          required: true
+          maps_to: service_id
+          is_filter: true
+          lookup:
+            schema: ob-poc
+            table: services
+            entity_type: service
+            code_column: service_code
+            id_column: service_id
+        - name: reason
+          type: string
+          required: true
+          maps_to: failure_reason
         set:
           delivery_status: "FAILED"
           failed_at: "now()"

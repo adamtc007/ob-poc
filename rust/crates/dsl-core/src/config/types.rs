@@ -297,6 +297,11 @@ pub struct VerbMetadata {
     #[serde(default)]
     pub writes_operational: bool,
 
+    /// Whether the verb is safe to serve directly (`facts_only`) or mutates
+    /// persisted/session state (`state_write`).
+    #[serde(default)]
+    pub side_effects: Option<String>,
+
     /// Primary noun this verb operates on (for grouping):
     /// e.g., "trading_matrix", "ssi", "gateway", "booking_rule", "corporate_actions"
     #[serde(default)]

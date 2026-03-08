@@ -140,6 +140,67 @@ pub struct EntityLookup {
     pub jurisdiction_hint: Option<String>,
 }
 
+#[cfg(test)]
+mod tests {
+    use super::AgentService;
+    use crate::mcp::verb_search::{VerbSearchResult, VerbSearchSource};
+
+    fn candidate(verb: &str, score: f32) -> VerbSearchResult {
+        VerbSearchResult {
+            verb: verb.to_string(),
+            score,
+            source: VerbSearchSource::PatternEmbedding,
+            matched_phrase: String::new(),
+            description: None,
+            journey: None,
+        }
+    }
+
+    #[test]
+    fn safe_inventory_reads_prefer_list_over_search() {
+        let selected = AgentService::choose_safe_inventory_read_verb(
+            "what deals does Allianz have?",
+            &[
+                candidate("deal.search", 0.6249),
+                candidate("deal.list", 0.6070),
+            ],
+        );
+
+        assert_eq!(selected.as_deref(), Some("deal.list"));
+    }
+
+    #[test]
+    fn explicit_search_queries_do_not_force_list() {
+        let selected = AgentService::choose_safe_inventory_read_verb(
+            "find deals named alpha",
+            &[
+                candidate("deal.search", 0.70),
+                candidate("deal.list", 0.55),
+            ],
+        );
+
+        assert!(selected.is_none());
+    }
+
+    #[test]
+    fn read_only_pivot_detection_catches_show_queries() {
+        assert!(AgentService::is_read_only_pivot_request(
+            "show me the cbus instead"
+        ));
+        assert!(AgentService::is_read_only_pivot_request(
+            "what deals does Allianz have?"
+        ));
+    }
+
+    #[test]
+    fn read_only_pivot_detection_excludes_write_queries() {
+        assert!(!AgentService::is_read_only_pivot_request(
+            "create a new cbu for Allianz"
+        ));
+        assert!(!AgentService::is_read_only_pivot_request("update the cbu"));
+    }
+}
+
 /// Parameters that should be resolved as codes (not raw strings) via EntityGateway.
 /// These are reference data lookups where user input needs fuzzy matching to canonical codes.
 /// UUID-based entity lookups (CBU, Entity, Document) are handled separately.
@@ -415,6 +476,48 @@ impl AgentService {
             intent_tier: None,
             decision: Some(packet),
         }
+    }
+
+    fn utterance_requires_deal_context(message: &str) -> bool {
+        let normalized = message.trim().to_ascii_lowercase();
+        if normalized.is_empty() {
+            return false;
+        }
+
+        let explicit_deal_listing = [
+            "what deals",
+            "show deals",
+            "list deals",
+            "show me the deals",
+            "show me deals",
+        ];
+        if explicit_deal_listing
+            .iter()
+            .any(|phrase| normalized.starts_with(phrase))
+        {
+            return false;
+        }
+
+        let current_deal_markers = [
+            "this deal",
+            "that deal",
+            "current deal",
+            "selected deal",
+            "deal details",
+            "deal status",
+            "deal documents",
+            "deal products",
+            "deal parties",
+            "deal timeline",
+            "deal workflow",
+            "load deal",
+            "open deal",
+            "switch deal",
+        ];
+
+        current_deal_markers
+            .iter()
+            .any(|marker| normalized.contains(marker))
     }
 
     /// Create agent service with pool and embedder
@@ -737,8 +840,39 @@ impl AgentService {
         session.add_user_message(request.message.clone());
 
         let input = request.message.trim().to_lowercase();
+        let mut pivot_feedback: Option<String> = None;
 
-        // 1. Check for RUN command - execute staged runbook
+        // 1. Check for pending mutation confirmation before anything else.
+        if let Some(pending) = session.pending_mutation.clone() {
+            if crate::agent::orchestrator::is_confirmation(&request.message) {
+                session.pending_mutation = None;
+                session.pending_decision = None;
+                session.pending_intent_tier = None;
+                session.pending_verb_disambiguation = None;
+                if session.has_pending() {
+                    session.cancel_pending();
+                }
+                let ast = parse_program(&pending.coder_result.dsl)
+                    .map(|p| p.statements)
+                    .unwrap_or_default();
+                session.set_pending_dsl(pending.coder_result.dsl.clone(), ast, None, false);
+                let mut response = self.execute_runbook(session).await?;
+                response.dsl_source = None;
+                return Ok(response);
+            }
+            session.pending_mutation = None;
+            if session.has_pending() {
+                session.cancel_pending();
+            }
+            if Self::is_read_only_pivot_request(&request.message) {
+                pivot_feedback = Some(
+                    "Cancelled the pending change and switched back to read-only mode."
+                        .to_string(),
+                );
+            }
+        }
+
+        // 2. Check for RUN command - execute staged runbook
         if matches!(
             input.as_str(),
             "run" | "execute" | "do it" | "go" | "run it" | "execute it"
@@ -746,7 +880,7 @@ impl AgentService {
             return self.execute_runbook(session).await;
         }
 
-        // 2. Check for pending verb disambiguation - numeric input selects an option
+        // 3. Check for pending verb disambiguation - numeric input selects an option
         if let Some(ref pending) = session.pending_verb_disambiguation {
             // Check if input is a number (1, 2, 3, etc.)
             if let Ok(selection) = input.trim().parse::<usize>() {
@@ -812,7 +946,7 @@ impl AgentService {
             session.pending_verb_disambiguation = None;
         }
 
-        // 3. Check for pending decision (client group or deal selection)
+        // 4. Check for pending decision (client group or deal selection)
         if let Some(pending) = session.pending_decision.take() {
             // Check if input is a number (1, 2, 3, etc.) or special keyword
             let input_upper = input.trim().to_uppercase();
@@ -921,7 +1055,7 @@ impl AgentService {
             // Optional decisions can fall through to the normal intent pipeline.
         }
 
-        // 4. Check for pending intent tier selection
+        // 5. Check for pending intent tier selection
         if let Some(ref pending_tier) = session.pending_intent_tier.clone() {
             // Check if input is a number selecting a tier option
             if let Ok(selection) = input.trim().parse::<usize>() {
@@ -1021,7 +1155,7 @@ impl AgentService {
         // If client group is set but no deal, check for existing deals and prompt.
         // This makes "deal" a first-class concept the agent understands.
         // =====================================================================
-        if let Some(decision) = self.check_session_context(session).await {
+        if let Some(decision) = self.check_session_context(session, Some(&request.message)).await {
             return Ok(decision);
         }
 
@@ -1145,17 +1279,62 @@ impl AgentService {
         );
         let orch_outcome =
             crate::agent::orchestrator::handle_utterance(&orch_ctx, &request.message).await;
-        let (result, journey_match, journey_decision) = match orch_outcome {
+        let (result, journey_match, journey_decision, pending_mutation, auto_execute) = match orch_outcome {
             Ok(o) => (
                 Ok(o.pipeline_result),
                 o.trace.journey_match,
                 o.journey_decision,
+                o.pending_mutation,
+                o.auto_execute,
             ),
-            Err(e) => (Err(e), None, None),
+            Err(e) => (Err(e), None, None, None, false),
         };
 
         match result {
             Ok(r) => {
+                if let Some(pending) = pending_mutation {
+                    session.pending_decision = None;
+                    session.pending_intent_tier = None;
+                    session.pending_verb_disambiguation = None;
+                    if session.has_pending() {
+                        session.cancel_pending();
+                    }
+                    session.pending_mutation = Some(pending.clone());
+                    let bullets = if pending.change_summary.is_empty() {
+                        String::new()
+                    } else {
+                        format!(
+                            "\n\nThis will:\n{}",
+                            pending
+                                .change_summary
+                                .iter()
+                                .map(|item| format!("• {}", item))
+                                .collect::<Vec<_>>()
+                                .join("\n")
+                        )
+                    };
+                    let msg = format!(
+                        "This would change state.\n\nPending change: {}{}\n\nReply 'yes' to confirm or ask a read-only question to cancel.",
+                        pending.confirmation_text, bullets
+                    );
+                    session.add_agent_message(msg.clone(), None, None);
+                    return Ok(AgentChatResponse {
+                        message: msg,
+                        session_state: SessionState::PendingValidation,
+                        can_execute: false,
+                        dsl_source: None,
+                        ast: None,
+                        disambiguation: None,
+                        commands: None,
+                        unresolved_refs: None,
+                        current_ref_index: None,
+                        dsl_hash: None,
+                        verb_disambiguation: None,
+                        intent_tier: None,
+                        decision: None,
+                    });
+                }
+
                 // Handle scope resolution - "work on allianz", "switch to blackrock"
                 if let PipelineOutcome::ScopeResolved {
                     ref group_id,
@@ -1212,6 +1391,22 @@ impl AgentService {
 
                 // Got valid DSL?
                 if r.valid && !r.dsl.is_empty() {
+                    if auto_execute {
+                        let ast = parse_program(&r.dsl)
+                            .map(|p| p.statements)
+                            .unwrap_or_default();
+                        session.set_pending_dsl_with_labels(
+                            r.dsl.clone(),
+                            ast,
+                            None,
+                            false,
+                            Self::build_journey_labels(&journey_match, &r.intent.verb),
+                        );
+                        let mut response = self.execute_runbook(session).await?;
+                        response.dsl_source = None;
+                        return Ok(response);
+                    }
+
                     // Stage in runbook (SINGLE LOOP - all DSL goes through here)
                     let ast = parse_program(&r.dsl)
                         .map(|p| p.statements)
@@ -1276,6 +1471,21 @@ impl AgentService {
                 if matches!(r.outcome, PipelineOutcome::NeedsClarification)
                     && r.verb_candidates.len() >= 2
                 {
+                    if let Some(selected_verb) = Self::choose_safe_inventory_read_verb(
+                        &request.message,
+                        &r.verb_candidates,
+                    ) {
+                        return self
+                            .handle_safe_read_preference(
+                                session,
+                                &request.message,
+                                &selected_verb,
+                                actor.clone(),
+                                pivot_feedback.clone(),
+                            )
+                            .await;
+                    }
+
                     // Analyze which intent tiers are represented
                     let intent_taxonomy = crate::dsl_v2::intent_tiers::intent_tier_taxonomy();
                     let verbs: Vec<&str> =
@@ -1328,6 +1538,147 @@ impl AgentService {
             return true;
         }
         false
+    }
+
+    fn choose_safe_inventory_read_verb(
+        original_input: &str,
+        candidates: &[crate::mcp::verb_search::VerbSearchResult],
+    ) -> Option<String> {
+        if !Self::is_safe_inventory_read_request(original_input) {
+            return None;
+        }
+
+        let top_candidates: Vec<&crate::mcp::verb_search::VerbSearchResult> =
+            candidates.iter().take(3).collect();
+        if top_candidates.len() < 2 {
+            return None;
+        }
+
+        let all_safe_read_shapes = top_candidates.iter().all(|candidate| {
+            candidate.verb.ends_with(".list")
+                || candidate.verb.ends_with(".search")
+                || candidate.verb.ends_with(".read")
+                || candidate.verb.ends_with(".get")
+        });
+        if !all_safe_read_shapes {
+            return None;
+        }
+
+        top_candidates
+            .iter()
+            .find(|candidate| candidate.verb.ends_with(".list"))
+            .map(|candidate| candidate.verb.clone())
+    }
+
+    fn is_safe_inventory_read_request(input: &str) -> bool {
+        let normalized = input.trim().to_ascii_lowercase();
+        if normalized.is_empty() {
+            return false;
+        }
+
+        let starts_like_read = normalized.starts_with("what ")
+            || normalized.starts_with("show ")
+            || normalized.starts_with("show me ")
+            || normalized.starts_with("list ");
+        let asks_for_inventory = normalized.contains(" have")
+            || normalized.contains(" has")
+            || normalized.contains(" show")
+            || normalized.contains(" list");
+        let has_search_term = normalized.contains("search ")
+            || normalized.contains("find ")
+            || normalized.contains("named ")
+            || normalized.contains("matching ")
+            || normalized.contains("reference ")
+            || normalized.contains("where ")
+            || normalized.contains("filter ");
+
+        starts_like_read && asks_for_inventory && !has_search_term
+    }
+
+    fn is_read_only_pivot_request(input: &str) -> bool {
+        let normalized = input.trim().to_ascii_lowercase();
+        if normalized.is_empty() {
+            return false;
+        }
+
+        normalized.starts_with("what ")
+            || normalized.starts_with("show ")
+            || normalized.starts_with("show me ")
+            || normalized.starts_with("list ")
+            || normalized.starts_with("read ")
+            || normalized.starts_with("get ")
+            || normalized.starts_with("describe ")
+            || normalized.starts_with("which ")
+            || normalized.starts_with("who ")
+            || normalized.starts_with("where ")
+            || normalized.starts_with("how many ")
+            || normalized.starts_with("status")
+            || normalized.starts_with("view ")
+    }
+
+    fn is_safe_auto_execute_read_verb(verb: &str) -> bool {
+        verb.ends_with(".list") || verb.ends_with(".read") || verb.ends_with(".get")
+    }
+
+    async fn handle_safe_read_preference(
+        &self,
+        session: &mut UnifiedSession,
+        original_input: &str,
+        selected_verb: &str,
+        actor: crate::sem_reg::abac::ActorContext,
+        pivot_feedback: Option<String>,
+    ) -> Result<AgentChatResponse, String> {
+        use crate::dsl_v2::parse_program;
+
+        let orch_ctx = self.build_orchestrator_context(
+            session,
+            actor,
+            crate::agent::orchestrator::UtteranceSource::Chat,
+        );
+        let outcome = crate::agent::orchestrator::handle_utterance_with_forced_verb(
+            &orch_ctx,
+            original_input,
+            selected_verb,
+        )
+        .await
+        .map_err(|e| format!("Pipeline error: {e}"))?;
+        let r = outcome.pipeline_result;
+
+        if r.valid && !r.dsl.is_empty() {
+            let ast = parse_program(&r.dsl)
+                .map(|program| program.statements)
+                .unwrap_or_default();
+
+            if outcome.auto_execute || Self::is_safe_auto_execute_read_verb(selected_verb) {
+                session.set_pending_dsl(r.dsl.clone(), ast, None, false);
+                let mut response = self.execute_runbook(session).await?;
+                response.dsl_source = None;
+                let prefix = match pivot_feedback {
+                    Some(note) => format!("{note}\n\nReading current state.\n\n"),
+                    None => "Reading current state.\n\n".to_string(),
+                };
+                response.message = format!("{prefix}{}", response.message);
+                return Ok(response);
+            }
+
+            session.set_pending_dsl(r.dsl.clone(), ast, None, false);
+            let msg = format!(
+                "{}Reading current state via **{}**.\n\nStaged: {}\n\nSay 'run' to execute.",
+                pivot_feedback
+                    .map(|note| format!("{note}\n\n"))
+                    .unwrap_or_default(),
+                selected_verb,
+                r.dsl
+            );
+            session.add_agent_message(msg.clone(), None, Some(r.dsl.clone()));
+            return Ok(self.staged_response(r.dsl, msg));
+        }
+
+        if let Some(err) = r.validation_error {
+            return Ok(self.fail(&err, session));
+        }
+
+        Ok(self.fail("Failed to resolve safe read path", session))
     }
 
     /// Build provenance labels from journey metadata (Tier -2 match).
@@ -1416,6 +1767,7 @@ impl AgentService {
     async fn check_session_context(
         &self,
         session: &mut UnifiedSession,
+        message: Option<&str>,
     ) -> Option<AgentChatResponse> {
         use crate::database::DealRepository;
         use ob_poc_types::{
@@ -1448,6 +1800,14 @@ impl AgentService {
             .client_group_name()
             .unwrap_or("Unknown")
             .to_string();
+
+        if let Some(message) = message {
+            if !Self::utterance_requires_deal_context(message) {
+                return None;
+            }
+        } else {
+            return None;
+        }
 
         // Client group is set but no deal - check for existing deals
         let deals =
@@ -1711,7 +2071,7 @@ impl AgentService {
                                 let scope = crate::mcp::scope_resolution::ScopeContext::new()
                                     .with_client_group(group_uuid, group.alias.clone());
                                 session.context.set_client_scope(scope);
-                                format!("Now working with client: {}. Let me check for any existing deals...", group.alias)
+                                format!("Now working with client: {}. How can I help you today?", group.alias)
                             } else {
                                 "Invalid group ID".to_string()
                             }
@@ -1786,14 +2146,6 @@ impl AgentService {
         };
 
         session.add_agent_message(message.clone(), None, None);
-
-        // After setting client group, check for deals
-        if matches!(packet.kind, DecisionKind::ClarifyGroup) {
-            if let Some(deal_decision) = self.check_session_context(session).await {
-                return Ok(deal_decision);
-            }
-        }
-
         Ok(AgentChatResponse {
             message,
 

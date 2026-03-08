@@ -3,6 +3,7 @@
 use anyhow::{anyhow, Result};
 use dsl_core::config::loader::ConfigLoader;
 use dsl_core::config::types::{VerbConfig, VerbsConfig};
+use serde::{Deserialize, Serialize};
 
 use crate::mcp::intent_pipeline::IntentArgValue;
 
@@ -12,7 +13,7 @@ use super::verb_index::VerbMetadataIndex;
 use super::verb_resolve::{ScoredVerbCandidate, StructuredVerbScorer};
 
 /// Resolution state for the Coder output.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CoderResolution {
     Confident,
     Proposed,
@@ -20,7 +21,7 @@ pub enum CoderResolution {
 }
 
 /// End-to-end Coder output.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CoderResult {
     pub verb_fqn: String,
     pub dsl: String,
@@ -136,6 +137,14 @@ impl CoderEngine {
                 score = top.score
             ));
         }
+
+        if !self.is_candidate_allowed(outcome, &top.fqn) {
+            return Err(anyhow!(
+                "coder candidate '{}' violates side_effects policy for {:?} intent",
+                top.fqn,
+                outcome.polarity
+            ));
+        }
         self.resolve_candidate(outcome, &top)
     }
 
@@ -228,6 +237,18 @@ impl CoderEngine {
             .get(domain)
             .and_then(|domain_cfg| domain_cfg.verbs.get(verb_name))
             .ok_or_else(|| anyhow!("missing verb config for '{fqn}'"))
+    }
+
+    fn is_candidate_allowed(&self, outcome: &OutcomeIntent, fqn: &str) -> bool {
+        let Some(meta) = self.verb_index.get(fqn) else {
+            return false;
+        };
+        match outcome.polarity {
+            super::IntentPolarity::Read | super::IntentPolarity::Ambiguous => {
+                meta.side_effects.as_deref() == Some("facts_only")
+            }
+            super::IntentPolarity::Write => meta.side_effects.as_deref() == Some("state_write"),
+        }
     }
 }
 
@@ -359,6 +380,30 @@ mod tests {
             result.dsl,
             "(schema.entity.describe :entity-type \"document\")"
         );
+    }
+
+    #[test]
+    fn read_plural_cbus_prefers_cbu_list() {
+        let engine = CoderEngine::load().unwrap();
+        let outcome = OutcomeIntent {
+            summary: "show me the cbus".to_string(),
+            plane: ObservationPlane::Instance,
+            polarity: IntentPolarity::Read,
+            domain_concept: "cbu".to_string(),
+            action: OutcomeAction::Read,
+            subject: None,
+            steps: vec![OutcomeStep {
+                action: OutcomeAction::Read,
+                target: "cbu".to_string(),
+                params: HashMap::new(),
+                notes: None,
+            }],
+            confidence: SageConfidence::Medium,
+            pending_clarifications: vec![],
+        };
+
+        let result = engine.resolve(&outcome).unwrap();
+        assert_eq!(result.verb_fqn, "cbu.list");
     }
 
     #[test]

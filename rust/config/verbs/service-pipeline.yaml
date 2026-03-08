@@ -21,49 +21,50 @@ domains:
           scope: cbu
           noun: service_intent
           phase_tags: [stewardship]
+          side_effects: state_write
         invocation_phrases:
-          - "create a service intent"
-          - "declare service intent for CBU"
-          - "register new service subscription"
-          - "set up service intent"
-          - "what services does this CBU need"
-          - "add service intent to structure"
-          - "initiate service delivery request"
-          - "configure service for client unit"
+        - "create a service intent"
+        - "declare service intent for CBU"
+        - "register new service subscription"
+        - "set up service intent"
+        - "what services does this CBU need"
+        - "add service intent to structure"
+        - "initiate service delivery request"
+        - "configure service for client unit"
         behavior: plugin
         handler: ServiceIntentCreateOp
         args:
-          - name: cbu-id
-            type: uuid
-            required: true
-            description: "CBU to create intent for"
-            lookup:
-              table: cbus
-              schema: ob-poc
-              search_key: name
-              primary_key: cbu_id
-          - name: product-id
-            type: uuid
-            required: true
-            description: "Product being subscribed to"
-            lookup:
-              table: products
-              schema: ob-poc
-              search_key: name
-              primary_key: product_id
-          - name: service-id
-            type: uuid
-            required: true
-            description: "Service being configured"
-            lookup:
-              table: services
-              schema: ob-poc
-              search_key: name
-              primary_key: service_id
-          - name: options
-            type: json
-            required: false
-            description: "Service configuration options"
+        - name: cbu-id
+          type: uuid
+          required: true
+          description: "CBU to create intent for"
+          lookup:
+            table: cbus
+            schema: ob-poc
+            search_key: name
+            primary_key: cbu_id
+        - name: product-id
+          type: uuid
+          required: true
+          description: "Product being subscribed to"
+          lookup:
+            table: products
+            schema: ob-poc
+            search_key: name
+            primary_key: product_id
+        - name: service-id
+          type: uuid
+          required: true
+          description: "Service being configured"
+          lookup:
+            table: services
+            schema: ob-poc
+            search_key: name
+            primary_key: service_id
+        - name: options
+          type: json
+          required: false
+          description: "Service configuration options"
         returns:
           type: uuid
           name: intent_id
@@ -77,26 +78,27 @@ domains:
           scope: cbu
           noun: service_intent
           phase_tags: [stewardship]
+          side_effects: facts_only
         invocation_phrases:
-          - "list service intents for CBU"
-          - "show all service subscriptions"
-          - "what services are configured"
-          - "display service intent list"
-          - "get service intents for structure"
-          - "which services has this CBU requested"
-          - "enumerate service delivery requests"
-          - "view current service intents"
+        - "list service intents for CBU"
+        - "show all service subscriptions"
+        - "what services are configured"
+        - "display service intent list"
+        - "get service intents for structure"
+        - "which services has this CBU requested"
+        - "enumerate service delivery requests"
+        - "view current service intents"
         behavior: plugin
         handler: ServiceIntentListOp
         args:
-          - name: cbu-id
-            type: uuid
-            required: true
-            lookup:
-              table: cbus
-              schema: ob-poc
-              search_key: name
-              primary_key: cbu_id
+        - name: cbu-id
+          type: uuid
+          required: true
+          lookup:
+            table: cbus
+            schema: ob-poc
+            search_key: name
+            primary_key: cbu_id
         returns:
           type: record_set
           name: intents
@@ -109,24 +111,25 @@ domains:
           scope: cbu
           noun: service_intent
           phase_tags: [stewardship]
+          side_effects: state_write
         invocation_phrases:
-          - "supersede service intent"
-          - "replace existing service intent"
-          - "update service intent with new options"
-          - "override service subscription"
-          - "revise service delivery configuration"
-          - "change service intent options"
-          - "amend the current service intent"
-          - "create new version of service intent"
+        - "supersede service intent"
+        - "replace existing service intent"
+        - "update service intent with new options"
+        - "override service subscription"
+        - "revise service delivery configuration"
+        - "change service intent options"
+        - "amend the current service intent"
+        - "create new version of service intent"
         behavior: plugin
         handler: ServiceIntentSupersedeOp
         args:
-          - name: intent-id
-            type: uuid
-            required: true
-          - name: options
-            type: json
-            required: true
+        - name: intent-id
+          type: uuid
+          required: true
+        - name: options
+          type: json
+          required: true
         returns:
           type: uuid
           name: new_intent_id
@@ -144,26 +147,27 @@ domains:
           noun: discovery
           subject_kinds: []
           phase_tags: [stewardship]
+          side_effects: state_write
         invocation_phrases:
-          - "run resource discovery"
-          - "discover required resources for CBU"
-          - "determine service resource definitions"
-          - "what resources does this CBU need"
-          - "execute SRDEF discovery"
-          - "identify required service resources"
-          - "map service intents to resources"
-          - "find resource requirements for structure"
+        - "run resource discovery"
+        - "discover required resources for CBU"
+        - "determine service resource definitions"
+        - "what resources does this CBU need"
+        - "execute SRDEF discovery"
+        - "identify required service resources"
+        - "map service intents to resources"
+        - "find resource requirements for structure"
         behavior: plugin
         handler: DiscoveryRunOp
         args:
-          - name: cbu-id
-            type: uuid
-            required: true
-            lookup:
-              table: cbus
-              schema: ob-poc
-              search_key: name
-              primary_key: cbu_id
+        - name: cbu-id
+          type: uuid
+          required: true
+          lookup:
+            table: cbus
+            schema: ob-poc
+            search_key: name
+            primary_key: cbu_id
         returns:
           type: record
           name: discovery_result
@@ -177,25 +181,26 @@ domains:
           noun: discovery
           subject_kinds: []
           phase_tags: [stewardship]
+          side_effects: state_write
         invocation_phrases:
-          - "explain resource discovery results"
-          - "why was this SRDEF discovered"
-          - "show discovery rationale"
-          - "explain service resource requirements"
-          - "what triggered this resource requirement"
-          - "describe discovery reasoning for CBU"
-          - "how were resources determined"
-          - "justify resource discovery output"
+        - "explain resource discovery results"
+        - "why was this SRDEF discovered"
+        - "show discovery rationale"
+        - "explain service resource requirements"
+        - "what triggered this resource requirement"
+        - "describe discovery reasoning for CBU"
+        - "how were resources determined"
+        - "justify resource discovery output"
         behavior: plugin
         handler: DiscoveryExplainOp
         args:
-          - name: cbu-id
-            type: uuid
-            required: true
-          - name: srdef-id
-            type: string
-            required: false
-            description: "Specific SRDEF to explain (or all if omitted)"
+        - name: cbu-id
+          type: uuid
+          required: true
+        - name: srdef-id
+          type: string
+          required: false
+          description: "Specific SRDEF to explain (or all if omitted)"
         returns:
           type: record_set
           name: explanations
@@ -212,26 +217,27 @@ domains:
           scope: cbu
           noun: attribute_requirements
           phase_tags: [stewardship]
+          side_effects: state_write
         invocation_phrases:
-          - "roll up attribute requirements"
-          - "merge attribute needs from SRDEFs"
-          - "consolidate resource attribute requirements"
-          - "aggregate attribute requirements for CBU"
-          - "what attributes are needed for provisioning"
-          - "compute attribute rollup for resources"
-          - "collect required attributes across services"
-          - "summarize attribute requirements"
+        - "roll up attribute requirements"
+        - "merge attribute needs from SRDEFs"
+        - "consolidate resource attribute requirements"
+        - "aggregate attribute requirements for CBU"
+        - "what attributes are needed for provisioning"
+        - "compute attribute rollup for resources"
+        - "collect required attributes across services"
+        - "summarize attribute requirements"
         behavior: plugin
         handler: AttributeRollupOp
         args:
-          - name: cbu-id
-            type: uuid
-            required: true
-            lookup:
-              table: cbus
-              schema: ob-poc
-              search_key: name
-              primary_key: cbu_id
+        - name: cbu-id
+          type: uuid
+          required: true
+          lookup:
+            table: cbus
+            schema: ob-poc
+            search_key: name
+            primary_key: cbu_id
         returns:
           type: record
           name: rollup_result
@@ -244,30 +250,31 @@ domains:
           scope: cbu
           noun: attribute_values
           phase_tags: [stewardship]
+          side_effects: state_write
         invocation_phrases:
-          - "populate attribute values automatically"
-          - "auto-fill attribute values from sources"
-          - "fill in resource attributes for CBU"
-          - "source attribute values for provisioning"
-          - "enrich attributes from entity data"
-          - "derive attribute values from documents"
-          - "pre-populate required attributes"
-          - "auto-populate service resource attributes"
+        - "populate attribute values automatically"
+        - "auto-fill attribute values from sources"
+        - "fill in resource attributes for CBU"
+        - "source attribute values for provisioning"
+        - "enrich attributes from entity data"
+        - "derive attribute values from documents"
+        - "pre-populate required attributes"
+        - "auto-populate service resource attributes"
         behavior: plugin
         handler: AttributePopulateOp
         args:
-          - name: cbu-id
-            type: uuid
-            required: true
-            lookup:
-              table: cbus
-              schema: ob-poc
-              search_key: name
-              primary_key: cbu_id
-          - name: sources
-            type: string_list
-            required: false
-            description: "Sources to try: entity, cbu, document, derived"
+        - name: cbu-id
+          type: uuid
+          required: true
+          lookup:
+            table: cbus
+            schema: ob-poc
+            search_key: name
+            primary_key: cbu_id
+        - name: sources
+          type: string_list
+          required: false
+          description: "Sources to try: entity, cbu, document, derived"
         returns:
           type: record
           name: population_result
@@ -280,30 +287,31 @@ domains:
           scope: cbu
           noun: attribute_gaps
           phase_tags: [stewardship]
+          side_effects: facts_only
         invocation_phrases:
-          - "show attribute gaps"
-          - "what attributes are still missing"
-          - "identify missing required attributes"
-          - "display attribute value gaps"
-          - "which attributes need to be filled"
-          - "check for missing provisioning data"
-          - "find unfilled attribute requirements"
-          - "list outstanding attribute gaps for CBU"
+        - "show attribute gaps"
+        - "what attributes are still missing"
+        - "identify missing required attributes"
+        - "display attribute value gaps"
+        - "which attributes need to be filled"
+        - "check for missing provisioning data"
+        - "find unfilled attribute requirements"
+        - "list outstanding attribute gaps for CBU"
         behavior: plugin
         handler: AttributeGapsOp
         args:
-          - name: cbu-id
-            type: uuid
-            required: true
-            lookup:
-              table: cbus
-              schema: ob-poc
-              search_key: name
-              primary_key: cbu_id
-          - name: srdef-id
-            type: string
-            required: false
-            description: "Filter to specific SRDEF"
+        - name: cbu-id
+          type: uuid
+          required: true
+          lookup:
+            table: cbus
+            schema: ob-poc
+            search_key: name
+            primary_key: cbu_id
+        - name: srdef-id
+          type: string
+          required: false
+          description: "Filter to specific SRDEF"
         returns:
           type: record_set
           name: gaps
@@ -316,36 +324,37 @@ domains:
           scope: cbu
           noun: attribute_value
           phase_tags: [stewardship]
+          side_effects: state_write
         invocation_phrases:
-          - "set attribute value manually"
-          - "enter attribute value for resource"
-          - "provide attribute value for CBU"
-          - "manually fill in attribute"
-          - "override attribute value with evidence"
-          - "assign value to resource attribute"
-          - "update attribute for service provisioning"
-          - "supply missing attribute value"
+        - "set attribute value manually"
+        - "enter attribute value for resource"
+        - "provide attribute value for CBU"
+        - "manually fill in attribute"
+        - "override attribute value with evidence"
+        - "assign value to resource attribute"
+        - "update attribute for service provisioning"
+        - "supply missing attribute value"
         behavior: plugin
         handler: AttributeSetOp
         args:
-          - name: cbu-id
-            type: uuid
-            required: true
-            lookup:
-              table: cbus
-              schema: ob-poc
-              search_key: name
-              primary_key: cbu_id
-          - name: attr-id
-            type: uuid
-            required: true
-          - name: value
-            type: string
-            required: true
-          - name: evidence
-            type: string_list
-            required: false
-            description: "Document references supporting this value"
+        - name: cbu-id
+          type: uuid
+          required: true
+          lookup:
+            table: cbus
+            schema: ob-poc
+            search_key: name
+            primary_key: cbu_id
+        - name: attr-id
+          type: uuid
+          required: true
+        - name: value
+          type: string
+          required: true
+        - name: evidence
+          type: string_list
+          required: false
+          description: "Document references supporting this value"
         returns:
           type: affected
           name: rows
@@ -362,30 +371,31 @@ domains:
           scope: cbu
           noun: provisioning
           phase_tags: [trading]
+          side_effects: state_write
         invocation_phrases:
-          - "run provisioning for CBU"
-          - "provision service resources"
-          - "create resources for ready SRDEFs"
-          - "execute resource provisioning"
-          - "start provisioning orchestrator"
-          - "provision all ready resources"
-          - "trigger service resource creation"
-          - "deploy resources for this structure"
+        - "run provisioning for CBU"
+        - "provision service resources"
+        - "create resources for ready SRDEFs"
+        - "execute resource provisioning"
+        - "start provisioning orchestrator"
+        - "provision all ready resources"
+        - "trigger service resource creation"
+        - "deploy resources for this structure"
         behavior: plugin
         handler: ProvisioningRunOp
         args:
-          - name: cbu-id
-            type: uuid
-            required: true
-            lookup:
-              table: cbus
-              schema: ob-poc
-              search_key: name
-              primary_key: cbu_id
-          - name: dry-run
-            type: boolean
-            required: false
-            default: false
+        - name: cbu-id
+          type: uuid
+          required: true
+          lookup:
+            table: cbus
+            schema: ob-poc
+            search_key: name
+            primary_key: cbu_id
+        - name: dry-run
+          type: boolean
+          required: false
+          default: false
         returns:
           type: record
           name: provisioning_result
@@ -398,21 +408,22 @@ domains:
           scope: cbu
           noun: provisioning_status
           phase_tags: [trading]
+          side_effects: facts_only
         invocation_phrases:
-          - "check provisioning request status"
-          - "what is the provisioning status"
-          - "show provisioning progress"
-          - "is provisioning complete"
-          - "get status of resource provisioning"
-          - "track provisioning request"
-          - "where is my provisioning request"
-          - "display provisioning outcome"
+        - "check provisioning request status"
+        - "what is the provisioning status"
+        - "show provisioning progress"
+        - "is provisioning complete"
+        - "get status of resource provisioning"
+        - "track provisioning request"
+        - "where is my provisioning request"
+        - "display provisioning outcome"
         behavior: plugin
         handler: ProvisioningStatusOp
         args:
-          - name: request-id
-            type: uuid
-            required: true
+        - name: request-id
+          type: uuid
+          required: true
         returns:
           type: record
           name: request_status
@@ -429,26 +440,27 @@ domains:
           scope: cbu
           noun: readiness
           phase_tags: [kyc]
+          side_effects: state_write
         invocation_phrases:
-          - "compute service readiness"
-          - "check if CBU is ready to transact"
-          - "determine good to transact status"
-          - "assess service readiness for structure"
-          - "is this CBU ready for business"
-          - "calculate readiness score"
-          - "evaluate transactional readiness"
-          - "run readiness check for services"
+        - "compute service readiness"
+        - "check if CBU is ready to transact"
+        - "determine good to transact status"
+        - "assess service readiness for structure"
+        - "is this CBU ready for business"
+        - "calculate readiness score"
+        - "evaluate transactional readiness"
+        - "run readiness check for services"
         behavior: plugin
         handler: ReadinessComputeOp
         args:
-          - name: cbu-id
-            type: uuid
-            required: true
-            lookup:
-              table: cbus
-              schema: ob-poc
-              search_key: name
-              primary_key: cbu_id
+        - name: cbu-id
+          type: uuid
+          required: true
+          lookup:
+            table: cbus
+            schema: ob-poc
+            search_key: name
+            primary_key: cbu_id
         returns:
           type: record
           name: readiness_result
@@ -461,35 +473,36 @@ domains:
           scope: cbu
           noun: blocking_reasons
           phase_tags: [kyc]
+          side_effects: state_write
         invocation_phrases:
-          - "explain readiness blockers"
-          - "why is this service not ready"
-          - "show blocking reasons for readiness"
-          - "what is preventing transact readiness"
-          - "list readiness failure reasons"
-          - "explain service delivery blockers"
-          - "identify readiness impediments"
-          - "why can this CBU not transact yet"
+        - "explain readiness blockers"
+        - "why is this service not ready"
+        - "show blocking reasons for readiness"
+        - "what is preventing transact readiness"
+        - "list readiness failure reasons"
+        - "explain service delivery blockers"
+        - "identify readiness impediments"
+        - "why can this CBU not transact yet"
         behavior: plugin
         handler: ReadinessExplainOp
         args:
-          - name: cbu-id
-            type: uuid
-            required: true
-            lookup:
-              table: cbus
-              schema: ob-poc
-              search_key: name
-              primary_key: cbu_id
-          - name: service-id
-            type: uuid
-            required: false
-            description: "Specific service (or all if omitted)"
-            lookup:
-              table: services
-              schema: ob-poc
-              search_key: name
-              primary_key: service_id
+        - name: cbu-id
+          type: uuid
+          required: true
+          lookup:
+            table: cbus
+            schema: ob-poc
+            search_key: name
+            primary_key: cbu_id
+        - name: service-id
+          type: uuid
+          required: false
+          description: "Specific service (or all if omitted)"
+          lookup:
+            table: services
+            schema: ob-poc
+            search_key: name
+            primary_key: service_id
         returns:
           type: record_set
           name: blocking_reasons
@@ -507,30 +520,31 @@ domains:
           noun: pipeline
           subject_kinds: []
           phase_tags: [administration]
+          side_effects: state_write
         invocation_phrases:
-          - "run the full service pipeline"
-          - "execute end-to-end provisioning pipeline"
-          - "run complete onboarding pipeline for CBU"
-          - "discovery through readiness pipeline"
-          - "provision everything for this structure"
-          - "full service delivery pipeline"
-          - "orchestrate complete resource lifecycle"
-          - "run all pipeline stages for CBU"
+        - "run the full service pipeline"
+        - "execute end-to-end provisioning pipeline"
+        - "run complete onboarding pipeline for CBU"
+        - "discovery through readiness pipeline"
+        - "provision everything for this structure"
+        - "full service delivery pipeline"
+        - "orchestrate complete resource lifecycle"
+        - "run all pipeline stages for CBU"
         behavior: plugin
         handler: PipelineFullOp
         args:
-          - name: cbu-id
-            type: uuid
-            required: true
-            lookup:
-              table: cbus
-              schema: ob-poc
-              search_key: name
-              primary_key: cbu_id
-          - name: dry-run
-            type: boolean
-            required: false
-            default: false
+        - name: cbu-id
+          type: uuid
+          required: true
+          lookup:
+            table: cbus
+            schema: ob-poc
+            search_key: name
+            primary_key: cbu_id
+        - name: dry-run
+          type: boolean
+          required: false
+          default: false
         returns:
           type: record
           name: pipeline_result

@@ -10,15 +10,16 @@ domains:
           scope: cbu
           noun: security_type
           phase_tags: [stewardship]
+          side_effects: state_write
         invocation_phrases:
-          - "add a security type"
-          - "register ALERT security type code"
-          - "create security type entry"
-          - "configure SMPG security classification"
-          - "set up new security type"
-          - "define security type with CFI"
-          - "upsert security type record"
-          - "add ALERT instrument type"
+        - "add a security type"
+        - "register ALERT security type code"
+        - "create security type entry"
+        - "configure SMPG security classification"
+        - "set up new security type"
+        - "define security type with CFI"
+        - "upsert security type record"
+        - "add ALERT instrument type"
         behavior: crud
         crud:
           operation: upsert
@@ -62,15 +63,16 @@ domains:
           scope: cbu
           noun: security_type
           phase_tags: [stewardship]
+          side_effects: facts_only
         invocation_phrases:
-          - "list security types for class"
-          - "show security types by asset class"
-          - "what security types exist"
-          - "display ALERT security type codes"
-          - "enumerate security types for instrument"
-          - "get security types for class"
-          - "which SMPG security types exist"
-          - "show me security type list"
+        - "list security types for class"
+        - "show security types by asset class"
+        - "what security types exist"
+        - "display ALERT security type codes"
+        - "enumerate security types for instrument"
+        - "get security types for class"
+        - "which SMPG security types exist"
+        - "show me security type list"
         behavior: crud
         crud:
           operation: list_by_fk

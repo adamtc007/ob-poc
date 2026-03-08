@@ -447,7 +447,7 @@ async fn ensure_refdata(
                     }
                     if value.is_some() {
                         cols.push(field.column);
-                        present_fields.push((*field, value.map(RefdataBoundValue::StringOwned)));
+                        present_fields.push((*field, value.map(RefdataBoundValue::String)));
                     }
                 }
                 RefdataArgType::Bool => {
@@ -457,7 +457,7 @@ async fn ensure_refdata(
                     }
                     if value.is_some() {
                         cols.push(field.column);
-                        present_fields.push((*field, value.map(RefdataBoundValue::BoolOwned)));
+                        present_fields.push((*field, value.map(RefdataBoundValue::Bool)));
                     }
                 }
                 RefdataArgType::Int => {
@@ -467,7 +467,7 @@ async fn ensure_refdata(
                     }
                     if value.is_some() {
                         cols.push(field.column);
-                        present_fields.push((*field, value.map(RefdataBoundValue::IntOwned)));
+                        present_fields.push((*field, value.map(RefdataBoundValue::Int)));
                     }
                 }
             }
@@ -478,13 +478,13 @@ async fn ensure_refdata(
         let mut vals = qb.separated(", ");
         for (_, value) in &present_fields {
             match value {
-                Some(RefdataBoundValue::StringOwned(v)) => {
+                Some(RefdataBoundValue::String(v)) => {
                     vals.push_bind(v);
                 }
-                Some(RefdataBoundValue::BoolOwned(v)) => {
+                Some(RefdataBoundValue::Bool(v)) => {
                     vals.push_bind(v);
                 }
-                Some(RefdataBoundValue::IntOwned(v)) => {
+                Some(RefdataBoundValue::Int(v)) => {
                     vals.push_bind(v);
                 }
                 None => {}
@@ -641,9 +641,9 @@ async fn deactivate_refdata(
 }
 
 enum RefdataBoundValue {
-    StringOwned(String),
-    BoolOwned(bool),
-    IntOwned(i64),
+    String(String),
+    Bool(bool),
+    Int(i64),
 }
 
 #[register_custom_op]

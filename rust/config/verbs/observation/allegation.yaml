@@ -10,15 +10,16 @@ domains:
           scope: cbu
           noun: allegation
           phase_tags: [kyc]
+          side_effects: state_write
         invocation_phrases:
-          - "record client allegation"
-          - "log new allegation for entity"
-          - "capture client claim"
-          - "add allegation to case"
-          - "what did the client allege"
-          - "submit unverified client statement"
-          - "enter allegation about attribute"
-          - "create allegation record"
+        - "record client allegation"
+        - "log new allegation for entity"
+        - "capture client claim"
+        - "add allegation to case"
+        - "what did the client allege"
+        - "submit unverified client statement"
+        - "enter allegation about attribute"
+        - "create allegation record"
         behavior: crud
         crud:
           operation: insert
@@ -104,15 +105,16 @@ domains:
           scope: cbu
           noun: allegation
           phase_tags: [kyc]
+          side_effects: state_write
         invocation_phrases:
-          - "verify client allegation"
-          - "confirm allegation with evidence"
-          - "mark allegation as verified"
-          - "validate allegation against observation"
-          - "is this allegation confirmed"
-          - "approve the client claim"
-          - "allegation passes verification"
-          - "corroborate client statement"
+        - "verify client allegation"
+        - "confirm allegation with evidence"
+        - "mark allegation as verified"
+        - "validate allegation against observation"
+        - "is this allegation confirmed"
+        - "approve the client claim"
+        - "allegation passes verification"
+        - "corroborate client statement"
         behavior: crud
         crud:
           operation: update
@@ -161,15 +163,16 @@ domains:
           scope: cbu
           noun: allegation
           phase_tags: [kyc]
+          side_effects: state_write
         invocation_phrases:
-          - "contradict client allegation"
-          - "mark allegation as false"
-          - "evidence disproves allegation"
-          - "flag contradicted claim"
-          - "reject allegation with proof"
-          - "allegation contradicted by observation"
-          - "dispute client statement"
-          - "refute the allegation"
+        - "contradict client allegation"
+        - "mark allegation as false"
+        - "evidence disproves allegation"
+        - "flag contradicted claim"
+        - "reject allegation with proof"
+        - "allegation contradicted by observation"
+        - "dispute client statement"
+        - "refute the allegation"
         behavior: crud
         crud:
           operation: update
@@ -218,15 +221,16 @@ domains:
           scope: cbu
           noun: allegation
           phase_tags: [kyc]
+          side_effects: state_write
         invocation_phrases:
-          - "partially verify allegation"
-          - "mark allegation as partial"
-          - "allegation partially confirmed"
-          - "incomplete verification of claim"
-          - "partial evidence for allegation"
-          - "flag partial verification"
-          - "some evidence supports claim"
-          - "allegation needs more corroboration"
+        - "partially verify allegation"
+        - "mark allegation as partial"
+        - "allegation partially confirmed"
+        - "incomplete verification of claim"
+        - "partial evidence for allegation"
+        - "flag partial verification"
+        - "some evidence supports claim"
+        - "allegation needs more corroboration"
         behavior: crud
         crud:
           operation: update
@@ -271,15 +275,16 @@ domains:
           scope: cbu
           noun: allegation
           phase_tags: [kyc]
+          side_effects: facts_only
         invocation_phrases:
-          - "list allegations for entity"
-          - "show entity allegations"
-          - "what allegations exist"
-          - "get all claims for person"
-          - "display entity client claims"
-          - "review allegations on file"
-          - "any pending allegations for entity"
-          - "pull up allegations"
+        - "list allegations for entity"
+        - "show entity allegations"
+        - "what allegations exist"
+        - "get all claims for person"
+        - "display entity client claims"
+        - "review allegations on file"
+        - "any pending allegations for entity"
+        - "pull up allegations"
         behavior: crud
         crud:
           operation: list_by_fk
@@ -310,15 +315,16 @@ domains:
           scope: cbu
           noun: allegation
           phase_tags: [kyc]
+          side_effects: facts_only
         invocation_phrases:
-          - "list pending allegations"
-          - "show unverified allegations"
-          - "what allegations need review"
-          - "outstanding claims for structure"
-          - "display pending client claims"
-          - "allegations awaiting verification"
-          - "unresolved allegations for CBU"
-          - "which allegations are open"
+        - "list pending allegations"
+        - "show unverified allegations"
+        - "what allegations need review"
+        - "outstanding claims for structure"
+        - "display pending client claims"
+        - "allegations awaiting verification"
+        - "unresolved allegations for CBU"
+        - "which allegations are open"
         behavior: crud
         crud:
           operation: select

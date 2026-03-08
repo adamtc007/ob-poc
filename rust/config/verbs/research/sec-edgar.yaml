@@ -3,24 +3,24 @@ domains:
     description: SEC EDGAR - US public company filings, 13D/13G beneficial ownership
 
     invocation_hints:
-      - "SEC"
-      - "EDGAR"
-      - "US company"
-      - "American company"
-      - "CIK"
-      - "13D"
-      - "13G"
-      - "beneficial ownership"
-      - "public company"
-      - "SEC filings"
+    - "SEC"
+    - "EDGAR"
+    - "US company"
+    - "American company"
+    - "CIK"
+    - "13D"
+    - "13G"
+    - "beneficial ownership"
+    - "public company"
+    - "SEC filings"
 
     verbs:
       search:
         description: Search SEC EDGAR for companies by name
         invocation_phrases:
-          - "search SEC"
-          - "find US public company"
-          - "look up in EDGAR"
+        - "search SEC"
+        - "find US public company"
+        - "look up in EDGAR"
         metadata:
           tier: diagnostics
           source_of_truth: external
@@ -28,27 +28,28 @@ domains:
           noun: company_search_result
           tags: [read, external-source, registry-lookup]
           phase_tags: [onboarding]
+          side_effects: facts_only
         behavior: plugin
         handler: SecSearchOp
         args:
-          - name: query
-            type: string
-            required: true
-            description: Company name or ticker symbol
-          - name: limit
-            type: integer
-            required: false
-            default: 20
-            description: Maximum results
+        - name: query
+          type: string
+          required: true
+          description: Company name or ticker symbol
+        - name: limit
+          type: integer
+          required: false
+          default: 20
+          description: Maximum results
         returns:
           type: record_set
 
       fetch-company:
         description: Fetch company information from SEC EDGAR
         invocation_phrases:
-          - "get SEC company"
-          - "fetch from EDGAR"
-          - "company from SEC"
+        - "get SEC company"
+        - "fetch from EDGAR"
+        - "company from SEC"
         metadata:
           tier: diagnostics
           source_of_truth: external
@@ -56,27 +57,28 @@ domains:
           noun: company_profile
           tags: [read, external-source, registry-fetch]
           phase_tags: [onboarding]
+          side_effects: state_write
         behavior: plugin
         handler: SecFetchCompanyOp
         args:
-          - name: cik
-            type: string
-            required: true
-            description: SEC CIK number (10 digits, zero-padded)
-          - name: decision-id
-            type: uuid
-            required: false
-            description: Research decision ID for audit trail
+        - name: cik
+          type: string
+          required: true
+          description: SEC CIK number (10 digits, zero-padded)
+        - name: decision-id
+          type: uuid
+          required: false
+          description: Research decision ID for audit trail
         returns:
           type: record
 
       fetch-beneficial-owners:
         description: Fetch 13D/13G beneficial ownership filings
         invocation_phrases:
-          - "get 13D filings"
-          - "13G beneficial owners"
-          - "who owns this US company"
-          - "SEC beneficial ownership"
+        - "get 13D filings"
+        - "13G beneficial owners"
+        - "who owns this US company"
+        - "SEC beneficial ownership"
         metadata:
           tier: diagnostics
           source_of_truth: external
@@ -84,40 +86,41 @@ domains:
           noun: beneficial_owner
           tags: [read, external-source, registry-fetch, ownership]
           phase_tags: [onboarding]
+          side_effects: state_write
         behavior: plugin
         handler: SecFetchBeneficialOwnersOp
         args:
-          - name: cik
-            type: string
-            required: true
-            description: SEC CIK number
-          - name: include-13d
-            type: boolean
-            required: false
-            default: true
-            description: Include 13D filings (activist ownership)
-          - name: include-13g
-            type: boolean
-            required: false
-            default: true
-            description: Include 13G filings (passive ownership)
-          - name: since-date
-            type: date
-            required: false
-            description: Only filings after this date
-          - name: decision-id
-            type: uuid
-            required: false
-            description: Research decision ID for audit trail
+        - name: cik
+          type: string
+          required: true
+          description: SEC CIK number
+        - name: include-13d
+          type: boolean
+          required: false
+          default: true
+          description: Include 13D filings (activist ownership)
+        - name: include-13g
+          type: boolean
+          required: false
+          default: true
+          description: Include 13G filings (passive ownership)
+        - name: since-date
+          type: date
+          required: false
+          description: Only filings after this date
+        - name: decision-id
+          type: uuid
+          required: false
+          description: Research decision ID for audit trail
         returns:
           type: record_set
 
       fetch-filings:
         description: Fetch recent SEC filings for a company
         invocation_phrases:
-          - "get SEC filings"
-          - "recent EDGAR filings"
-          - "company filings"
+        - "get SEC filings"
+        - "recent EDGAR filings"
+        - "company filings"
         metadata:
           tier: diagnostics
           source_of_truth: external
@@ -125,31 +128,32 @@ domains:
           noun: filing
           tags: [read, external-source, registry-fetch]
           phase_tags: [onboarding]
+          side_effects: state_write
         behavior: plugin
         handler: SecFetchFilingsOp
         args:
-          - name: cik
-            type: string
-            required: true
-            description: SEC CIK number
-          - name: form-types
-            type: string_list
-            required: false
-            description: Filter by form type (10-K, 10-Q, 8-K, etc.)
-          - name: limit
-            type: integer
-            required: false
-            default: 50
-            description: Maximum filings to return
+        - name: cik
+          type: string
+          required: true
+          description: SEC CIK number
+        - name: form-types
+          type: string_list
+          required: false
+          description: Filter by form type (10-K, 10-Q, 8-K, etc.)
+        - name: limit
+          type: integer
+          required: false
+          default: 50
+          description: Maximum filings to return
         returns:
           type: record_set
 
       import-company:
         description: Import SEC company and optionally beneficial owners to database
         invocation_phrases:
-          - "import from SEC"
-          - "add US company to database"
-          - "import EDGAR company"
+        - "import from SEC"
+        - "add US company to database"
+        - "import EDGAR company"
         metadata:
           tier: intent
           source_of_truth: external
@@ -157,22 +161,23 @@ domains:
           noun: entity
           tags: [write, import, registry-import]
           phase_tags: [onboarding]
+          side_effects: state_write
         behavior: plugin
         handler: SecImportCompanyOp
         args:
-          - name: cik
-            type: string
-            required: true
-            description: SEC CIK number
-          - name: include-beneficial-owners
-            type: boolean
-            required: false
-            default: true
-            description: Also import 13D/13G beneficial owners
-          - name: decision-id
-            type: uuid
-            required: false
-            description: Research decision ID for audit trail
+        - name: cik
+          type: string
+          required: true
+          description: SEC CIK number
+        - name: include-beneficial-owners
+          type: boolean
+          required: false
+          default: true
+          description: Also import 13D/13G beneficial owners
+        - name: decision-id
+          type: uuid
+          required: false
+          description: Research decision ID for audit trail
         returns:
           type: uuid
           name: entity_id

@@ -3,20 +3,20 @@ domains:
     description: "UBO registry lifecycle — track beneficial ownership determinations through approval"
 
     invocation_hints:
-      - "ubo registry"
-      - "promote candidate"
-      - "advance ubo"
-      - "waive ubo"
-      - "approve ubo"
+    - "ubo registry"
+    - "promote candidate"
+    - "advance ubo"
+    - "waive ubo"
+    - "approve ubo"
 
     verbs:
       promote:
         description: "Promote a UBO registry entry from CANDIDATE to IDENTIFIED"
         invocation_phrases:
-          - "promote ubo candidate"
-          - "identify ubo"
-          - "confirm ubo candidate"
-          - "candidate identified"
+        - "promote ubo candidate"
+        - "identify ubo"
+        - "confirm ubo candidate"
+        - "candidate identified"
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -24,27 +24,28 @@ domains:
           noun: ubo_registry
           tags: [ubo, registry, lifecycle, kyc]
           phase_tags: [kyc]
+          side_effects: state_write
         behavior: plugin
         handler: UboRegistryPromoteOp
         args:
-          - name: registry-id
-            type: uuid
-            required: true
-            description: UBO registry entry to promote
-          - name: notes
-            type: string
-            required: false
-            description: Notes on identification
+        - name: registry-id
+          type: uuid
+          required: true
+          description: UBO registry entry to promote
+        - name: notes
+          type: string
+          required: false
+          description: Notes on identification
         returns:
           type: record
 
       advance:
         description: "Advance a UBO registry entry through the state machine"
         invocation_phrases:
-          - "advance ubo status"
-          - "move ubo forward"
-          - "progress ubo review"
-          - "ubo status change"
+        - "advance ubo status"
+        - "move ubo forward"
+        - "progress ubo review"
+        - "ubo status change"
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -52,37 +53,38 @@ domains:
           noun: ubo_registry
           tags: [ubo, registry, lifecycle, kyc]
           phase_tags: [kyc]
+          side_effects: state_write
         behavior: plugin
         handler: UboRegistryAdvanceOp
         args:
-          - name: registry-id
-            type: uuid
-            required: true
-            description: UBO registry entry to advance
-          - name: new-status
-            type: string
-            required: true
-            description: Target status
-            valid_values:
-              - IDENTIFIED
-              - PROVABLE
-              - PROVED
-              - REVIEWED
-              - APPROVED
-          - name: notes
-            type: string
-            required: false
-            description: Notes on transition
+        - name: registry-id
+          type: uuid
+          required: true
+          description: UBO registry entry to advance
+        - name: new-status
+          type: string
+          required: true
+          description: Target status
+          valid_values:
+          - IDENTIFIED
+          - PROVABLE
+          - PROVED
+          - REVIEWED
+          - APPROVED
+        - name: notes
+          type: string
+          required: false
+          description: Notes on transition
         returns:
           type: record
 
       waive:
         description: "Waive a UBO registry entry with authority and reason"
         invocation_phrases:
-          - "waive ubo requirement"
-          - "waive ubo entry"
-          - "exempt from ubo review"
-          - "ubo waiver"
+        - "waive ubo requirement"
+        - "waive ubo entry"
+        - "exempt from ubo review"
+        - "ubo waiver"
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -90,31 +92,32 @@ domains:
           noun: ubo_registry
           tags: [ubo, registry, waiver]
           phase_tags: [kyc]
+          side_effects: state_write
         behavior: plugin
         handler: UboRegistryWaiveOp
         args:
-          - name: registry-id
-            type: uuid
-            required: true
-            description: UBO registry entry to waive
-          - name: reason
-            type: string
-            required: true
-            description: Justification for waiver
-          - name: authority
-            type: string
-            required: true
-            description: Authority granting the waiver
+        - name: registry-id
+          type: uuid
+          required: true
+          description: UBO registry entry to waive
+        - name: reason
+          type: string
+          required: true
+          description: Justification for waiver
+        - name: authority
+          type: string
+          required: true
+          description: Authority granting the waiver
         returns:
           type: record
 
       reject:
         description: "Reject a UBO registry entry (terminal state)"
         invocation_phrases:
-          - "reject ubo"
-          - "ubo not confirmed"
-          - "reject ubo candidate"
-          - "ubo determination rejected"
+        - "reject ubo"
+        - "ubo not confirmed"
+        - "reject ubo candidate"
+        - "ubo determination rejected"
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -122,26 +125,27 @@ domains:
           noun: ubo_registry
           tags: [ubo, registry, terminal]
           phase_tags: [kyc]
+          side_effects: state_write
         behavior: plugin
         handler: UboRegistryRejectOp
         args:
-          - name: registry-id
-            type: uuid
-            required: true
-            description: UBO registry entry to reject
-          - name: reason
-            type: string
-            required: true
-            description: Reason for rejection
+        - name: registry-id
+          type: uuid
+          required: true
+          description: UBO registry entry to reject
+        - name: reason
+          type: string
+          required: true
+          description: Reason for rejection
         returns:
           type: record
 
       expire:
         description: "Expire a UBO registry entry (terminal state)"
         invocation_phrases:
-          - "expire ubo entry"
-          - "ubo determination expired"
-          - "ubo expired"
+        - "expire ubo entry"
+        - "ubo determination expired"
+        - "ubo expired"
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -149,16 +153,17 @@ domains:
           noun: ubo_registry
           tags: [ubo, registry, terminal]
           phase_tags: [kyc]
+          side_effects: state_write
         behavior: plugin
         handler: UboRegistryExpireOp
         args:
-          - name: registry-id
-            type: uuid
-            required: true
-            description: UBO registry entry to expire
-          - name: reason
-            type: string
-            required: false
-            description: Reason for expiry
+        - name: registry-id
+          type: uuid
+          required: true
+          description: UBO registry entry to expire
+        - name: reason
+          type: string
+          required: false
+          description: Reason for expiry
         returns:
           type: record
