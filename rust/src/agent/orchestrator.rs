@@ -106,6 +106,16 @@ pub struct OrchestratorOutcome {
     pub journey_decision: Option<ob_poc_types::DecisionPacket>,
 }
 
+struct SageStageOutcome {
+    intent: Option<crate::sage::OutcomeIntent>,
+}
+
+struct CoderStageOutcome {
+    result: Option<CoderResult>,
+    elapsed_ms: Option<u128>,
+    error: Option<String>,
+}
+
 /// Structured audit trace for every utterance processed.
 #[derive(Debug, Clone, Serialize)]
 pub struct IntentTrace {
@@ -182,6 +192,71 @@ pub struct IntentTrace {
     /// Sage shadow domain hints (Stage 1.5, populated when SAGE_SHADOW=1).
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub sage_domain_hints: Vec<String>,
+}
+
+async fn run_sage_stage(
+    ctx: &OrchestratorContext,
+    utterance: &str,
+    enabled: bool,
+) -> SageStageOutcome {
+    if !enabled {
+        return SageStageOutcome { intent: None };
+    }
+
+    let sage_ctx = crate::sage::SageContext {
+        session_id: ctx.session_id,
+        stage_focus: ctx.stage_focus.clone(),
+        goals: ctx.goals.clone(),
+        entity_kind: None,
+        dominant_entity_name: None,
+        last_intents: vec![],
+    };
+    let sage_engine = ctx
+        .sage_engine
+        .clone()
+        .unwrap_or_else(|| Arc::new(crate::sage::DeterministicSage));
+
+    let intent = match sage_engine.classify(utterance, &sage_ctx).await {
+        Ok(intent) => {
+            tracing::info!(
+                sage_plane = ?intent.plane,
+                sage_polarity = ?intent.polarity,
+                sage_domain = %intent.domain_concept,
+                "Stage 1.5: Sage shadow classification"
+            );
+            Some(intent)
+        }
+        Err(e) => {
+            tracing::warn!(error = %e, "Stage 1.5: SageEngine failed (non-fatal)");
+            None
+        }
+    };
+
+    SageStageOutcome { intent }
+}
+
+fn run_coder_stage(intent: Option<&crate::sage::OutcomeIntent>) -> CoderStageOutcome {
+    let Some(intent) = intent else {
+        return CoderStageOutcome {
+            result: None,
+            elapsed_ms: None,
+            error: None,
+        };
+    };
+
+    let started_at = std::time::Instant::now();
+    match crate::sage::CoderEngine::load().and_then(|engine| engine.resolve(intent)) {
+        Ok(coder_result) => CoderStageOutcome {
+            result: Some(coder_result),
+            elapsed_ms: Some(started_at.elapsed().as_millis()),
+            error: None,
+        },
+        Err(error) => CoderStageOutcome {
+            result: None,
+            elapsed_ms: Some(started_at.elapsed().as_millis()),
+            error: Some(error.to_string()),
+        },
+    }
 }
 
 /// Returns true for pipeline outcomes that are "early exits" -- scope resolution,
@@ -383,44 +458,12 @@ pub async fn handle_utterance(
     let sage_fast_path_enabled = std::env::var("SAGE_FAST_PATH").ok().as_deref() == Some("1");
     let sage_enabled = sage_shadow_enabled || sage_fast_path_enabled;
 
-    // -- Stage 1.5: Sage shadow classification (SAGE_SHADOW=1) --
-    // Fires BEFORE entity linking (E-SAGE-1) on raw utterance only.
-    // Zero production impact: result only used for logging + trace stamping.
-    let sage_intent: Option<crate::sage::OutcomeIntent> = if sage_enabled {
-        let sage_ctx = crate::sage::SageContext {
-            session_id: ctx.session_id,
-            stage_focus: ctx.stage_focus.clone(),
-            goals: ctx.goals.clone(),
-            entity_kind: None, // E-SAGE-1: no entity resolution yet
-            dominant_entity_name: None,
-            last_intents: vec![],
-        };
-        let sage_engine = ctx
-            .sage_engine
-            .clone()
-            .unwrap_or_else(|| Arc::new(crate::sage::DeterministicSage));
-        match sage_engine.classify(utterance, &sage_ctx).await {
-            Ok(intent) => {
-                tracing::info!(
-                    sage_plane = ?intent.plane,
-                    sage_polarity = ?intent.polarity,
-                    sage_domain = %intent.domain_concept,
-                    "Stage 1.5: Sage shadow classification"
-                );
-                Some(intent)
-            }
-            Err(e) => {
-                tracing::warn!(error = %e, "Stage 1.5: SageEngine failed (non-fatal)");
-                None
-            }
-        }
-    } else {
-        None
-    };
-
-    let mut sage_coder_result: Option<CoderResult> = None;
-    let mut sage_coder_elapsed_ms: Option<u128> = None;
-    let mut sage_coder_error: Option<String> = None;
+    let sage_stage = run_sage_stage(ctx, utterance, sage_enabled).await;
+    let sage_intent = sage_stage.intent;
+    let coder_stage = run_coder_stage(sage_intent.as_ref());
+    let sage_coder_result = coder_stage.result;
+    let sage_coder_elapsed_ms = coder_stage.elapsed_ms;
+    let sage_coder_error = coder_stage.error;
 
     // -- Step 1: Entity linking --
     let lookup_result = if let Some(ref lookup_svc) = ctx.lookup_service {
@@ -507,20 +550,6 @@ pub async fn handle_utterance(
     // This consolidates SemReg + AgentMode + workflow filtering into one set.
     let surface_allowed: std::collections::HashSet<String> = surface.allowed_fqns();
     let searcher = (*ctx.verb_searcher).clone();
-
-    if let Some(ref si) = sage_intent {
-        let started_at = std::time::Instant::now();
-        match crate::sage::CoderEngine::load().and_then(|engine| engine.resolve(si)) {
-            Ok(coder_result) => {
-                sage_coder_elapsed_ms = Some(started_at.elapsed().as_millis());
-                sage_coder_result = Some(coder_result);
-            }
-            Err(error) => {
-                sage_coder_elapsed_ms = Some(started_at.elapsed().as_millis());
-                sage_coder_error = Some(error.to_string());
-            }
-        }
-    }
 
     if sage_fast_path_enabled {
         if let (Some(si), Some(coder_result)) = (sage_intent.as_ref(), sage_coder_result.as_ref()) {

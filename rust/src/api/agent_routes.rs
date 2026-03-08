@@ -4,7 +4,7 @@
 //! - POST   /api/session             - Create new session
 //! - GET    /api/session/:id         - Get session state
 //! - DELETE /api/session/:id         - Delete session
-//! - POST   /api/session/:id/execute - Execute DSL
+//! - POST   /api/session/:id/execute - Legacy raw DSL execution only
 //! - POST   /api/session/:id/clear   - Clear session
 //! - GET    /api/session/:id/context - Get session context (CBU, linked entities, symbols)
 //!
@@ -54,7 +54,7 @@ use ob_poc_types::{
 use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
-    response::Json,
+    response::{IntoResponse, Json, Response},
     routing::{delete, get, post},
     Router,
 };
@@ -400,7 +400,10 @@ pub(crate) fn create_agent_router_with_state(state: AgentState) -> Router {
         .route("/api/session/:id", delete(delete_session))
         .route("/api/session/:id/input", post(session_input))
         .route("/api/session/:id/chat", post(chat_session_legacy_blocked))
-        .route("/api/session/:id/execute", post(execute_session_dsl))
+        .route(
+            "/api/session/:id/execute",
+            post(execute_session_dsl_legacy_raw_only),
+        )
         .route("/api/session/:id/clear", post(clear_session_dsl))
         .route("/api/session/:id/bind", post(set_session_binding))
         .route("/api/session/:id/context", get(get_session_context))
@@ -598,6 +601,13 @@ async fn session_input(
             }
         }
     }
+}
+
+fn is_raw_execute_request(req: &Option<ExecuteDslRequest>) -> bool {
+    req.as_ref()
+        .and_then(|request| request.dsl.as_ref())
+        .map(|dsl| !dsl.trim().is_empty())
+        .unwrap_or(false)
 }
 
 /// POST /api/session - Create new session
@@ -2862,8 +2872,31 @@ async fn chat_session(
     }))
 }
 
-/// POST /api/session/:id/execute - Execute DSL
-async fn execute_session_dsl(
+/// POST /api/session/:id/execute - legacy raw-DSL endpoint only.
+async fn execute_session_dsl_legacy_raw_only(
+    State(state): State<AgentState>,
+    Path(session_id): Path<Uuid>,
+    headers: axum::http::HeaderMap,
+    Json(req): Json<Option<ExecuteDslRequest>>,
+) -> Response {
+    if !is_raw_execute_request(&req) {
+        return (
+            StatusCode::GONE,
+            Json(serde_json::json!({
+                "error": "Legacy execute endpoint disabled for normal session flows. Use POST /api/session/:id/input with kind=utterance and say 'run' to execute staged DSL."
+            })),
+        )
+            .into_response();
+    }
+
+    match execute_session_dsl_raw(State(state), Path(session_id), headers, Json(req)).await {
+        Ok(response) => response.into_response(),
+        Err(status) => status.into_response(),
+    }
+}
+
+/// POST /api/session/:id/execute - explicit raw DSL execution.
+async fn execute_session_dsl_raw(
     State(state): State<AgentState>,
     Path(session_id): Path<Uuid>,
     headers: axum::http::HeaderMap,
@@ -4531,5 +4564,34 @@ mod tests {
         assert!(!domains.is_empty());
         assert!(domains.iter().any(|d| d == "cbu"));
         assert!(domains.iter().any(|d| d == "entity"));
+    }
+
+    #[test]
+    fn test_execute_route_rejects_normal_session_flow_requests() {
+        assert!(!is_raw_execute_request(&None));
+        assert!(!is_raw_execute_request(&Some(ExecuteDslRequest { dsl: None })));
+        assert!(!is_raw_execute_request(&Some(ExecuteDslRequest {
+            dsl: Some("   ".to_string()),
+        })));
+        assert!(is_raw_execute_request(&Some(ExecuteDslRequest {
+            dsl: Some("(registry.discover-dsl :utterance \"show me deal record\")".to_string()),
+        })));
+    }
+
+    #[test]
+    fn test_chat_ui_uses_unified_input_not_execute() {
+        let manifest_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let chat_api_path = manifest_dir.join("../ob-poc-ui-react/src/api/chat.ts");
+        let source = std::fs::read_to_string(&chat_api_path)
+            .unwrap_or_else(|e| panic!("Failed to read {}: {}", chat_api_path.display(), e));
+
+        assert!(
+            source.contains("`/session/${sessionId}/input`"),
+            "chat UI must post utterances through the unified /input endpoint"
+        );
+        assert!(
+            !source.contains("/execute"),
+            "chat UI must not call /execute directly"
+        );
     }
 }
