@@ -2135,6 +2135,9 @@ fn deploy(sh: &Shell, release: bool, port: u16, no_run: bool, skip_frontend: boo
     step += 1;
     let _ = step; // suppress unused warning
     sh.change_dir(root.join("rust"));
+    let db_url =
+        std::env::var("DATABASE_URL").unwrap_or_else(|_| "postgresql:///data_designer".to_string());
+    sh.set_var("DATABASE_URL", &db_url);
     if release {
         cmd!(sh, "cargo build -p ob-poc-web --release")
             .run()
@@ -2169,8 +2172,6 @@ fn deploy(sh: &Shell, release: bool, port: u16, no_run: bool, skip_frontend: boo
     let bin_path_str = bin_path.to_str().context("Invalid binary path")?;
 
     // Set environment and run
-    let db_url =
-        std::env::var("DATABASE_URL").unwrap_or_else(|_| "postgresql:///data_designer".to_string());
     sh.set_var("DATABASE_URL", &db_url);
     sh.set_var("SERVER_PORT", &port_str);
     cmd!(sh, "{bin_path_str}").run()?;
