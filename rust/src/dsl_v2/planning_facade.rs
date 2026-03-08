@@ -348,7 +348,7 @@ mod tests {
         // Role assignment before entity creation - needs reordering
         let source = r#"
             (cbu.ensure :name "Fund" :as @fund)
-            (entity.create-proper-person :first-name "John" :last-name "Smith" :as @john)
+            (entity.create :entity-type "proper-person" :first-name "John" :last-name "Smith" :as @john)
             (cbu.assign-role :cbu-id @fund :entity-id @john :role "DIRECTOR")
         "#;
 

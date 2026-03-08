@@ -145,11 +145,11 @@ impl OntologyService {
             }
         }
 
-        // Check pattern match for subtypes
+        // Check legacy pattern match for subtype-driven implicit create configs
         if let Some(entity) = self.taxonomy.get(entity_type) {
             if let Some(ic) = &entity.implicit_create {
                 if let Some(pattern) = &ic.canonical_verb_pattern {
-                    // Pattern like "entity.create-{subtype}" matches "entity.create-proper_person"
+                    // Legacy subtype pattern matches verbs that share the configured prefix
                     let prefix = pattern.replace("{subtype}", "");
                     if full_verb.starts_with(&prefix) {
                         return true;

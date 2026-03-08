@@ -3,7 +3,7 @@ domains:
     description: ISDA and CSA agreement management for OTC derivatives
     verbs:
       create:
-        description: Create ISDA agreement with counterparty (idempotent by cbu+counterparty+date). Internal - use trading-profile.add-isda-config for authoring.
+        description: Create ISDA agreement with counterparty (idempotent by cbu+counterparty+date). Internal - use trading-profile.add-component for authoring.
         metadata:
           tier: projection
           source_of_truth: operational
@@ -68,7 +68,7 @@ domains:
           name: isda_id
           capture: true
       add-coverage:
-        description: Add instrument class coverage to ISDA (idempotent by isda+instrument_class). Internal - use trading-profile.add-isda-coverage for authoring.
+        description: Add instrument class coverage to ISDA (idempotent by isda+instrument_class). Internal - use trading-profile.add-component for authoring.
         metadata:
           tier: projection
           source_of_truth: operational
@@ -128,7 +128,7 @@ domains:
           type: uuid
           name: coverage_id
       add-csa:
-        description: Add CSA (Credit Support Annex) to ISDA (idempotent by isda+csa_type). Internal - use trading-profile.add-csa-config for authoring.
+        description: Add CSA (Credit Support Annex) to ISDA (idempotent by isda+csa_type). Internal - use trading-profile.add-component for authoring.
         metadata:
           tier: projection
           source_of_truth: operational
@@ -195,7 +195,7 @@ domains:
           name: csa_id
           capture: true
       remove-coverage:
-        description: Remove instrument class coverage from ISDA. Internal - use trading-profile.remove-isda-config for authoring.
+        description: Remove instrument class coverage from ISDA. Internal - use trading-profile.remove-component for authoring.
         metadata:
           tier: projection
           source_of_truth: operational
@@ -225,7 +225,7 @@ domains:
         returns:
           type: affected
       remove-csa:
-        description: Remove CSA from ISDA. Internal - use trading-profile.remove-csa-config for authoring.
+        description: Remove CSA from ISDA. Internal - use trading-profile.remove-component for authoring.
         metadata:
           tier: projection
           source_of_truth: operational

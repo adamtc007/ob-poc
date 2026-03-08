@@ -6,13 +6,13 @@
     :jurisdiction "JE"
     :as @cbu)
 
-(entity.create-trust-discretionary
+(entity.create :entity-type "trust-discretionary"
     :cbu-id @cbu
     :name "Smith Family Trust"
     :jurisdiction "JE"
     :as @trust)
 
-(entity.create-proper-person
+(entity.create :entity-type "proper-person"
     :cbu-id @cbu
     :first-name "Robert"
     :last-name "Smith"
@@ -25,7 +25,7 @@
     :role "SETTLOR"
     :target-entity-id @trust)
 
-(entity.create-limited-company
+(entity.create :entity-type "limited-company"
     :cbu-id @cbu
     :name "Jersey Trustees Ltd"
     :jurisdiction "JE"
@@ -37,7 +37,7 @@
     :role "TRUSTEE"
     :target-entity-id @trust)
 
-(entity.create-proper-person
+(entity.create :entity-type "proper-person"
     :cbu-id @cbu
     :first-name "Emma"
     :last-name "Smith"
@@ -50,7 +50,7 @@
     :role "BENEFICIARY"
     :target-entity-id @trust)
 
-(entity.create-proper-person
+(entity.create :entity-type "proper-person"
     :cbu-id @cbu
     :first-name "James"
     :last-name "Smith"
@@ -99,7 +99,7 @@
     :as @ws-ben2)
 
 ;; Run screenings via workstreams
-(case-screening.run :workstream-id @ws-settlor :screening-type "PEP")
-(case-screening.run :workstream-id @ws-ben1 :screening-type "PEP")
-(case-screening.run :workstream-id @ws-ben2 :screening-type "PEP")
-(case-screening.run :workstream-id @ws-trust :screening-type "SANCTIONS")
+(screening.run :workstream-id @ws-settlor :screening-type "PEP")
+(screening.run :workstream-id @ws-ben1 :screening-type "PEP")
+(screening.run :workstream-id @ws-ben2 :screening-type "PEP")
+(screening.run :workstream-id @ws-trust :screening-type "SANCTIONS")

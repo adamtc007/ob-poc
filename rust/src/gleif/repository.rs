@@ -575,7 +575,7 @@ impl GleifRepository {
 
     /// Create a new entity from GLEIF data
     ///
-    /// Uses DSL entity.ensure-limited-company for idempotent upsert (dedup by name)
+    /// Uses DSL entity.ensure for idempotent upsert (dedup by name)
     pub async fn create_entity_from_gleif(&self, record: &LeiRecord) -> Result<Uuid> {
         let entity = &record.attributes.entity;
         let name = &entity.legal_name.name;
@@ -584,7 +584,7 @@ impl GleifRepository {
 
         // Use DSL for idempotent entity creation (prevents duplicates)
         let dsl = format!(
-            r#"(entity.ensure-limited-company :name "{}" :jurisdiction "{}" :lei "{}" :as @entity)"#,
+            r#"(entity.ensure :entity-type "limited-company" :name "{}" :jurisdiction "{}" :lei "{}" :as @entity)"#,
             escape_dsl_string(name),
             jurisdiction,
             lei

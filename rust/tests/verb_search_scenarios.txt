@@ -40,8 +40,8 @@ list all cbus -> cbu.list
 # ENTITY VERBS
 # =============================================================================
 
-create a limited company -> entity.create-limited-company
-add a natural person -> entity.create-person
+create a limited company -> entity.create
+add a natural person -> entity.create
 find entity BlackRock -> entity.search
 show entity details -> entity.get
 

@@ -1102,13 +1102,13 @@ fn entity_scenarios() -> Vec<TestScenario> {
         TestScenario::matched(
             "create company",
             "create a limited company",
-            "entity.create-limited-company",
+            "entity.create",
         )
         .with_category("entity"),
         TestScenario::matched(
             "create person",
             "add a natural person",
-            "entity.create-proper-person",
+            "entity.create",
         )
         .with_category("entity"),
         TestScenario::matched("search entity", "find entity BlackRock", "entity.query")
@@ -1183,13 +1183,13 @@ fn hard_negative_scenarios() -> Vec<TestScenario> {
         TestScenario::matched(
             "add instrument",
             "add equity instruments",
-            "trading-profile.add-instrument-class",
+            "trading-profile.add-component",
         )
         .hard_negative(),
         TestScenario::matched(
             "remove instrument",
             "remove equity instruments",
-            "trading-profile.remove-instrument-class",
+            "trading-profile.remove-component",
         )
         .hard_negative(),
         // =====================================================================
@@ -1592,7 +1592,7 @@ fn test_ambiguity_detection() {
             journey: None,
         },
         VerbSearchResult {
-            verb: "entity.create-limited-company".to_string(),
+            verb: "entity.create".to_string(),
             score: 0.85,
             source: VerbSearchSource::PatternEmbedding,
             matched_phrase: "create company".to_string(),
@@ -1617,7 +1617,7 @@ fn test_ambiguity_detection() {
             journey: None,
         },
         VerbSearchResult {
-            verb: "entity.create-limited-company".to_string(),
+            verb: "entity.create".to_string(),
             score: 0.90,
             source: VerbSearchSource::PatternEmbedding,
             matched_phrase: "create company".to_string(),
@@ -1667,7 +1667,7 @@ fn test_normalize_candidates() {
             journey: None,
         },
         VerbSearchResult {
-            verb: "entity.create-limited-company".to_string(),
+            verb: "entity.create".to_string(),
             score: 0.85,
             source: VerbSearchSource::PatternEmbedding,
             matched_phrase: "create company".to_string(),

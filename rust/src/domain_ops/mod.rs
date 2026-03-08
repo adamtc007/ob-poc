@@ -65,6 +65,7 @@ mod pack_ops;
 mod partnership_ops;
 mod refdata_loader;
 mod regulatory_ops;
+mod refdata_ops;
 mod request_ops;
 mod requirement_ops;
 mod research_normalize_ops;
@@ -144,6 +145,7 @@ pub use request_ops::{
     RequestEscalateOp, RequestExtendOp, RequestFulfillOp, RequestOverdueOp, RequestRemindOp,
     RequestWaiveOp,
 };
+pub use refdata_ops::{RefdataDeactivateOp, RefdataEnsureOp, RefdataListOp, RefdataReadOp};
 
 pub use semantic_ops::{
     SemanticListStagesOp, SemanticMissingEntitiesOp, SemanticNextActionsOp,
@@ -161,17 +163,19 @@ pub use temporal_ops::{
 pub use trading_matrix::{FindImForTradeOp, FindPricingForInstrumentOp, ListOpenSlaBreachesOp};
 pub use trading_profile::{
     TradingProfileActivateOp, TradingProfileAddAllowedCurrencyOp, TradingProfileAddBookingRuleOp,
-    TradingProfileAddCsaCollateralOp, TradingProfileAddCsaConfigOp, TradingProfileAddImMandateOp,
+    TradingProfileAddComponentOp, TradingProfileAddCsaCollateralOp,
+    TradingProfileAddCsaConfigOp, TradingProfileAddImMandateOp,
     TradingProfileAddInstrumentClassOp, TradingProfileAddIsdaConfigOp,
     TradingProfileAddIsdaCoverageOp, TradingProfileAddMarketOp, TradingProfileAddSsiOp,
     TradingProfileApproveOp, TradingProfileArchiveOp, TradingProfileCloneToOp,
     TradingProfileCreateDraftOp, TradingProfileCreateNewVersionOp, TradingProfileDiffOp,
     TradingProfileGetActiveOp, TradingProfileImportOp, TradingProfileLinkCsaSsiOp,
     TradingProfileMaterializeOp, TradingProfileRejectOp, TradingProfileRemoveBookingRuleOp,
-    TradingProfileRemoveCsaConfigOp, TradingProfileRemoveImMandateOp,
-    TradingProfileRemoveInstrumentClassOp, TradingProfileRemoveIsdaConfigOp,
-    TradingProfileRemoveMarketOp, TradingProfileRemoveSsiOp, TradingProfileSetBaseCurrencyOp,
-    TradingProfileSubmitOp, TradingProfileUpdateImScopeOp, TradingProfileValidateCoverageOp,
+    TradingProfileRemoveComponentOp, TradingProfileRemoveCsaConfigOp,
+    TradingProfileRemoveImMandateOp, TradingProfileRemoveInstrumentClassOp,
+    TradingProfileRemoveIsdaConfigOp, TradingProfileRemoveMarketOp,
+    TradingProfileRemoveSsiOp, TradingProfileSetBaseCurrencyOp, TradingProfileSubmitOp,
+    TradingProfileUpdateImScopeOp, TradingProfileValidateCoverageOp,
     TradingProfileValidateGoLiveReadyOp,
 };
 pub use trading_profile_ca_ops::{

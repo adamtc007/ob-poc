@@ -6,14 +6,14 @@
     :jurisdiction "LU"
     :as @cbu)
 
-(entity.create-limited-company
+(entity.create :entity-type "limited-company"
     :cbu-id @cbu
     :name "Luxembourg Holdings SARL"
     :company-number "B123456"
     :jurisdiction "LU"
     :as @company)
 
-(entity.create-proper-person
+(entity.create :entity-type "proper-person"
     :cbu-id @cbu
     :first-name "Alice"
     :last-name "Johnson"
@@ -27,7 +27,7 @@
     :target-entity-id @company
     :ownership-percentage 45)
 
-(entity.create-proper-person
+(entity.create :entity-type "proper-person"
     :cbu-id @cbu
     :first-name "Bob"
     :last-name "Williams"
@@ -41,7 +41,7 @@
     :target-entity-id @company
     :ownership-percentage 35)
 
-(entity.create-proper-person
+(entity.create :entity-type "proper-person"
     :cbu-id @cbu
     :first-name "Carol"
     :last-name "Davis"
@@ -98,7 +98,7 @@
     :as @ws-ubo3)
 
 ;; Run screenings via workstreams
-(case-screening.run :workstream-id @ws-ubo1 :screening-type "PEP")
-(case-screening.run :workstream-id @ws-ubo2 :screening-type "PEP")
-(case-screening.run :workstream-id @ws-ubo3 :screening-type "PEP")
-(case-screening.run :workstream-id @ws-company :screening-type "SANCTIONS")
+(screening.run :workstream-id @ws-ubo1 :screening-type "PEP")
+(screening.run :workstream-id @ws-ubo2 :screening-type "PEP")
+(screening.run :workstream-id @ws-ubo3 :screening-type "PEP")
+(screening.run :workstream-id @ws-company :screening-type "SANCTIONS")

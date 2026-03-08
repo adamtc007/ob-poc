@@ -35,7 +35,7 @@ async fn test_passport_for_company_rejected() {
         .expect("Failed to initialize linter");
 
     let source = r#"
-        (entity.create-limited-company :name "Acme Corp" :as @company)
+        (entity.create :entity-type "limited-company" :name "Acme Corp" :as @company)
         (document.catalog :document-type "PASSPORT" :entity-id @company)
     "#;
 
@@ -70,7 +70,7 @@ async fn test_passport_for_person_accepted() {
         .expect("Failed to initialize linter");
 
     let source = r#"
-        (entity.create-proper-person :name "John Doe" :as @person)
+        (entity.create :entity-type "proper-person" :name "John Doe" :as @person)
         (document.catalog :document-type "PASSPORT" :entity-id @person)
     "#;
 
@@ -99,7 +99,7 @@ async fn test_cert_incorporation_for_company_accepted() {
         .expect("Failed to initialize linter");
 
     let source = r#"
-        (entity.create-limited-company :name "Acme Corp" :as @company)
+        (entity.create :entity-type "limited-company" :name "Acme Corp" :as @company)
         (document.catalog :document-type "ARTICLES_OF_INCORPORATION" :entity-id @company)
     "#;
 
@@ -159,7 +159,7 @@ async fn test_unused_symbol_warning() {
         .expect("Failed to initialize linter");
 
     let source = r#"
-        (entity.create-limited-company :name "Acme Corp" :as @unused_company)
+        (entity.create :entity-type "limited-company" :name "Acme Corp" :as @unused_company)
         (cbu.create :name "Test CBU" :as @cbu)
     "#;
 
@@ -194,7 +194,7 @@ async fn test_financial_statement_for_company_accepted() {
         .expect("Failed to initialize linter");
 
     let source = r#"
-        (entity.create-limited-company :name "Acme Corp" :as @company)
+        (entity.create :entity-type "limited-company" :name "Acme Corp" :as @company)
         (document.catalog :document-type "FINANCIAL_STATEMENT" :entity-id @company)
     "#;
 
@@ -223,7 +223,7 @@ async fn test_financial_statement_for_person_rejected() {
         .expect("Failed to initialize linter");
 
     let source = r#"
-        (entity.create-proper-person :name "John Doe" :as @person)
+        (entity.create :entity-type "proper-person" :name "John Doe" :as @person)
         (document.catalog :document-type "FINANCIAL_STATEMENT" :entity-id @person)
     "#;
 
@@ -286,8 +286,8 @@ async fn test_entity_type_inference() {
         .expect("Failed to initialize linter");
 
     let source = r#"
-        (entity.create-limited-company :name "Acme Corp" :as @company)
-        (entity.create-proper-person :name "John Doe" :as @person)
+        (entity.create :entity-type "limited-company" :name "Acme Corp" :as @company)
+        (entity.create :entity-type "proper-person" :name "John Doe" :as @person)
     "#;
 
     let ast = parse_program(source).expect("Failed to parse");

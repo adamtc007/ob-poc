@@ -12,7 +12,7 @@
   :as @fund)
 
 ;; --- Create Fund Entity ---
-(entity.ensure-limited-company
+(entity.ensure :entity-type "limited-company"
   :name "Phoenix Macro Master Fund Ltd"
   :jurisdiction "KY"
   :as @fund-entity)
@@ -23,7 +23,7 @@
   :role "ASSET_OWNER")
 
 ;; --- Create Investment Manager ---
-(entity.ensure-limited-company
+(entity.ensure :entity-type "limited-company"
   :name "Phoenix Capital Management LLC"
   :jurisdiction "US"
   :as @im)
@@ -34,12 +34,12 @@
   :role "INVESTMENT_MANAGER")
 
 ;; --- Create Counterparties for OTC ---
-(entity.ensure-limited-company
+(entity.ensure :entity-type "limited-company"
   :name "Goldman Sachs International"
   :jurisdiction "GB"
   :as @gs)
 
-(entity.ensure-limited-company
+(entity.ensure :entity-type "limited-company"
   :name "Morgan Stanley & Co"
   :jurisdiction "US"
   :as @ms)

@@ -224,8 +224,6 @@ domains:
         description: Create new entities
         verbs:
           - entity.create
-          - entity.create-person
-          - entity.create-company
       - id: update
         label: Update
         description: Modify entities

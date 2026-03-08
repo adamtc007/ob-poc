@@ -33,6 +33,58 @@ use ob_poc_types::trading_matrix::{
 #[cfg(feature = "database")]
 use sqlx::{PgPool, Row};
 
+fn forward_component_verb_call(verb_call: &VerbCall, verb: &str) -> VerbCall {
+    let arguments = verb_call
+        .arguments
+        .iter()
+        .filter(|arg| arg.key != "component-type")
+        .cloned()
+        .collect();
+
+    VerbCall {
+        domain: verb_call.domain.clone(),
+        verb: verb.to_string(),
+        arguments,
+        binding: verb_call.binding.clone(),
+        span: verb_call.span,
+    }
+}
+
+fn resolve_add_component_verb(component_type: &str) -> Result<&'static str> {
+    match component_type {
+        "instrument-class" => Ok("add-instrument-class"),
+        "market" => Ok("add-market"),
+        "allowed-currency" => Ok("add-allowed-currency"),
+        "standing-instruction" => Ok("add-standing-instruction"),
+        "booking-rule" => Ok("add-booking-rule"),
+        "isda-config" => Ok("add-isda-config"),
+        "isda-coverage" => Ok("add-isda-coverage"),
+        "csa-config" => Ok("add-csa-config"),
+        "csa-collateral" => Ok("add-csa-collateral"),
+        "im-mandate" => Ok("add-im-mandate"),
+        other => Err(anyhow::anyhow!(
+            "Unsupported trading-profile add-component type: {}",
+            other
+        )),
+    }
+}
+
+fn resolve_remove_component_verb(component_type: &str) -> Result<&'static str> {
+    match component_type {
+        "instrument-class" => Ok("remove-instrument-class"),
+        "market" => Ok("remove-market"),
+        "standing-instruction" => Ok("remove-standing-instruction"),
+        "booking-rule" => Ok("remove-booking-rule"),
+        "isda-config" => Ok("remove-isda-config"),
+        "csa-config" => Ok("remove-csa-config"),
+        "im-mandate" => Ok("remove-im-mandate"),
+        other => Err(anyhow::anyhow!(
+            "Unsupported trading-profile remove-component type: {}",
+            other
+        )),
+    }
+}
+
 // =============================================================================
 // IMPORT OPERATION
 // =============================================================================
@@ -1362,6 +1414,192 @@ impl CustomOperation for TradingProfileCreateDraftOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Uuid(Uuid::new_v4()))
+    }
+}
+
+// =============================================================================
+// COMPONENT DISPATCH OPERATIONS
+// =============================================================================
+
+#[register_custom_op]
+pub struct TradingProfileAddComponentOp;
+
+#[async_trait]
+impl CustomOperation for TradingProfileAddComponentOp {
+    fn domain(&self) -> &'static str {
+        "trading-profile"
+    }
+
+    fn verb(&self) -> &'static str {
+        "add-component"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Dispatches generic component additions to the existing trading-profile authoring ops"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let component_type = verb_call
+            .get_value("component-type")
+            .and_then(|value| value.as_string())
+            .ok_or_else(|| anyhow::anyhow!("Missing component-type argument"))?;
+        let forwarded = forward_component_verb_call(verb_call, resolve_add_component_verb(component_type)?);
+
+        match component_type {
+            "instrument-class" => TradingProfileAddInstrumentClassOp
+                .execute(&forwarded, ctx, pool)
+                .await,
+            "market" => TradingProfileAddMarketOp.execute(&forwarded, ctx, pool).await,
+            "allowed-currency" => TradingProfileAddAllowedCurrencyOp
+                .execute(&forwarded, ctx, pool)
+                .await,
+            "standing-instruction" => TradingProfileAddSsiOp.execute(&forwarded, ctx, pool).await,
+            "booking-rule" => TradingProfileAddBookingRuleOp
+                .execute(&forwarded, ctx, pool)
+                .await,
+            "isda-config" => TradingProfileAddIsdaConfigOp
+                .execute(&forwarded, ctx, pool)
+                .await,
+            "isda-coverage" => TradingProfileAddIsdaCoverageOp
+                .execute(&forwarded, ctx, pool)
+                .await,
+            "csa-config" => TradingProfileAddCsaConfigOp
+                .execute(&forwarded, ctx, pool)
+                .await,
+            "csa-collateral" => TradingProfileAddCsaCollateralOp
+                .execute(&forwarded, ctx, pool)
+                .await,
+            "im-mandate" => TradingProfileAddImMandateOp
+                .execute(&forwarded, ctx, pool)
+                .await,
+            other => Err(anyhow::anyhow!(
+                "Unsupported trading-profile add-component type: {}",
+                other
+            )),
+        }
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        let component_type = verb_call
+            .get_value("component-type")
+            .and_then(|value| value.as_string())
+            .ok_or_else(|| anyhow::anyhow!("Missing component-type argument"))?;
+        let forwarded = forward_component_verb_call(verb_call, resolve_add_component_verb(component_type)?);
+
+        match component_type {
+            "instrument-class" => TradingProfileAddInstrumentClassOp.execute(&forwarded, ctx).await,
+            "market" => TradingProfileAddMarketOp.execute(&forwarded, ctx).await,
+            "allowed-currency" => TradingProfileAddAllowedCurrencyOp.execute(&forwarded, ctx).await,
+            "standing-instruction" => TradingProfileAddSsiOp.execute(&forwarded, ctx).await,
+            "booking-rule" => TradingProfileAddBookingRuleOp.execute(&forwarded, ctx).await,
+            "isda-config" => TradingProfileAddIsdaConfigOp.execute(&forwarded, ctx).await,
+            "isda-coverage" => TradingProfileAddIsdaCoverageOp.execute(&forwarded, ctx).await,
+            "csa-config" => TradingProfileAddCsaConfigOp.execute(&forwarded, ctx).await,
+            "csa-collateral" => TradingProfileAddCsaCollateralOp.execute(&forwarded, ctx).await,
+            "im-mandate" => TradingProfileAddImMandateOp.execute(&forwarded, ctx).await,
+            other => Err(anyhow::anyhow!(
+                "Unsupported trading-profile add-component type: {}",
+                other
+            )),
+        }
+    }
+}
+
+#[register_custom_op]
+pub struct TradingProfileRemoveComponentOp;
+
+#[async_trait]
+impl CustomOperation for TradingProfileRemoveComponentOp {
+    fn domain(&self) -> &'static str {
+        "trading-profile"
+    }
+
+    fn verb(&self) -> &'static str {
+        "remove-component"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Dispatches generic component removals to the existing trading-profile authoring ops"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let component_type = verb_call
+            .get_value("component-type")
+            .and_then(|value| value.as_string())
+            .ok_or_else(|| anyhow::anyhow!("Missing component-type argument"))?;
+        let forwarded =
+            forward_component_verb_call(verb_call, resolve_remove_component_verb(component_type)?);
+
+        match component_type {
+            "instrument-class" => TradingProfileRemoveInstrumentClassOp
+                .execute(&forwarded, ctx, pool)
+                .await,
+            "market" => TradingProfileRemoveMarketOp.execute(&forwarded, ctx, pool).await,
+            "standing-instruction" => TradingProfileRemoveSsiOp.execute(&forwarded, ctx, pool).await,
+            "booking-rule" => TradingProfileRemoveBookingRuleOp
+                .execute(&forwarded, ctx, pool)
+                .await,
+            "isda-config" => TradingProfileRemoveIsdaConfigOp
+                .execute(&forwarded, ctx, pool)
+                .await,
+            "csa-config" => TradingProfileRemoveCsaConfigOp
+                .execute(&forwarded, ctx, pool)
+                .await,
+            "im-mandate" => TradingProfileRemoveImMandateOp
+                .execute(&forwarded, ctx, pool)
+                .await,
+            other => Err(anyhow::anyhow!(
+                "Unsupported trading-profile remove-component type: {}",
+                other
+            )),
+        }
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        let component_type = verb_call
+            .get_value("component-type")
+            .and_then(|value| value.as_string())
+            .ok_or_else(|| anyhow::anyhow!("Missing component-type argument"))?;
+        let forwarded =
+            forward_component_verb_call(verb_call, resolve_remove_component_verb(component_type)?);
+
+        match component_type {
+            "instrument-class" => TradingProfileRemoveInstrumentClassOp
+                .execute(&forwarded, ctx)
+                .await,
+            "market" => TradingProfileRemoveMarketOp.execute(&forwarded, ctx).await,
+            "standing-instruction" => TradingProfileRemoveSsiOp.execute(&forwarded, ctx).await,
+            "booking-rule" => TradingProfileRemoveBookingRuleOp.execute(&forwarded, ctx).await,
+            "isda-config" => TradingProfileRemoveIsdaConfigOp.execute(&forwarded, ctx).await,
+            "csa-config" => TradingProfileRemoveCsaConfigOp.execute(&forwarded, ctx).await,
+            "im-mandate" => TradingProfileRemoveImMandateOp.execute(&forwarded, ctx).await,
+            other => Err(anyhow::anyhow!(
+                "Unsupported trading-profile remove-component type: {}",
+                other
+            )),
+        }
     }
 }
 
@@ -3356,8 +3594,7 @@ impl CustomOperation for TradingProfileSetBaseCurrencyOp {
     }
 }
 
-/// Add allowed currency to the trading profile
-/// Verb: trading-profile.add-allowed-currency
+/// Add allowed currency to the trading profile.
 #[register_custom_op]
 pub struct TradingProfileAddAllowedCurrencyOp;
 

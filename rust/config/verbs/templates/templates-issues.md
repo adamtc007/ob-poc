@@ -26,7 +26,7 @@ All 12 templates:
 2. **Direct Execution Path** (`execute_verb` → generic executor)
    - Used for single statement execution
    - Handles ALL verbs defined in YAML with `behavior: crud`
-   - Verbs like `kyc-case.escalate`, `doc-request.create` work here
+   - Verbs like `kyc-case.escalate`, `document.create-request` work here
 
 ### Implication
 
@@ -46,8 +46,8 @@ These verbs work via generic executor but show "0 ops" in compiler:
 | `kyc-case.escalate` | Simple CRUD update |
 | `kyc-case.set-risk-rating` | Simple CRUD update |
 | `kyc-case.close` | Simple CRUD update |
-| `doc-request.create` | Simple CRUD insert |
-| `case-screening.review-hit` | Simple CRUD update |
+| `document.create-request` | Simple CRUD insert |
+| `screening.review-hit` | Simple CRUD update |
 | `ubo.trace-chains` | Plugin behavior (custom_ops) |
 
 **No action needed** - these execute correctly.

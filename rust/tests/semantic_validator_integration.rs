@@ -75,7 +75,7 @@ async fn test_valid_entity_create_with_symbol_reference() {
 
     let source = r#"
         (cbu.create :name "Test CBU" :as @cbu)
-        (entity.create-limited-company :cbu-id @cbu :name "Test Company" :as @company)
+        (entity.create :entity-type "limited-company" :cbu-id @cbu :name "Test Company" :as @company)
     "#;
 
     let request = ValidationRequest {
@@ -100,7 +100,7 @@ async fn test_valid_role_assignment() {
 
     let source = r#"
         (cbu.create :name "Test CBU" :as @cbu)
-        (entity.create-proper-person :cbu-id @cbu :first-name "John" :last-name "Doe" :as @person)
+        (entity.create :entity-type "proper-person" :cbu-id @cbu :first-name "John" :last-name "Doe" :as @person)
         (cbu.assign-role :cbu-id @cbu :entity-id @person :role "DIRECTOR")
     "#;
 
@@ -151,10 +151,10 @@ async fn test_valid_kyc_case_flow() {
 
     let source = r#"
         (cbu.create :name "Test CBU" :as @cbu)
-        (entity.create-proper-person :cbu-id @cbu :first-name "Jane" :last-name "Smith" :as @person)
+        (entity.create :entity-type "proper-person" :cbu-id @cbu :first-name "Jane" :last-name "Smith" :as @person)
         (kyc-case.create :cbu-id @cbu :case-type "NEW_CLIENT" :as @case)
         (entity-workstream.create :case-id @case :entity-id @person :as @ws)
-        (case-screening.run :workstream-id @ws :screening-type "PEP")
+        (screening.run :workstream-id @ws :screening-type "PEP")
     "#;
 
     let request = ValidationRequest {
@@ -211,7 +211,7 @@ async fn test_invalid_role_name() {
 
     let source = r#"
         (cbu.create :name "Test CBU" :as @cbu)
-        (entity.create-proper-person :cbu-id @cbu :first-name "Test" :last-name "Person" :as @person)
+        (entity.create :entity-type "proper-person" :cbu-id @cbu :first-name "Test" :last-name "Person" :as @person)
         (cbu.assign-role :cbu-id @cbu :entity-id @person :role "NONEXISTENT_ROLE_XYZ")
     "#;
 
@@ -271,10 +271,10 @@ async fn test_invalid_screening_type() {
 
     let source = r#"
         (cbu.create :name "Test CBU" :as @cbu)
-        (entity.create-proper-person :cbu-id @cbu :first-name "Test" :last-name "Person" :as @person)
+        (entity.create :entity-type "proper-person" :cbu-id @cbu :first-name "Test" :last-name "Person" :as @person)
         (kyc-case.create :cbu-id @cbu :case-type "NEW_CLIENT" :as @case)
         (entity-workstream.create :case-id @case :entity-id @person :as @ws)
-        (case-screening.run :workstream-id @ws :screening-type "INVALID_SCREENING_TYPE")
+        (screening.run :workstream-id @ws :screening-type "INVALID_SCREENING_TYPE")
     "#;
 
     let request = ValidationRequest {
@@ -302,7 +302,7 @@ async fn test_undefined_symbol_reference() {
 
     let source = r#"
         (cbu.create :name "Test CBU" :as @cbu)
-        (entity.create-proper-person :cbu-id @nonexistent :first-name "Test" :last-name "Person")
+        (entity.create :entity-type "proper-person" :cbu-id @nonexistent :first-name "Test" :last-name "Person")
     "#;
 
     let request = ValidationRequest {
@@ -333,7 +333,7 @@ async fn test_symbol_used_before_definition() {
 
     // Reference @cbu before it's defined
     let source = r#"
-        (entity.create-proper-person :cbu-id @cbu :first-name "Test" :last-name "Person")
+        (entity.create :entity-type "proper-person" :cbu-id @cbu :first-name "Test" :last-name "Person")
         (cbu.create :name "Test CBU" :as @cbu)
     "#;
 
@@ -540,7 +540,7 @@ async fn test_csg_passport_for_company_rejected() {
 
     // PASSPORT is for proper persons, not companies
     let source = r#"
-        (entity.create-limited-company :name "Test Corp" :as @company)
+        (entity.create :entity-type "limited-company" :name "Test Corp" :as @company)
         (document.catalog :doc-type "PASSPORT" :entity-id @company :title "Company Passport")
     "#;
 
@@ -569,7 +569,7 @@ async fn test_csg_passport_for_person_accepted() {
 
     // PASSPORT is valid for proper persons
     let source = r#"
-        (entity.create-proper-person :first-name "John" :last-name "Doe" :as @person)
+        (entity.create :entity-type "proper-person" :first-name "John" :last-name "Doe" :as @person)
         (document.catalog :doc-type "PASSPORT" :entity-id @person :title "John's Passport")
     "#;
 
@@ -599,7 +599,7 @@ async fn test_multiple_errors_collected() {
 
     // Multiple errors: undefined symbol, invalid jurisdiction, unknown role
     let source = r#"
-        (entity.create-proper-person :cbu-id @nonexistent :first-name "Test" :last-name "Person" :as @person)
+        (entity.create :entity-type "proper-person" :cbu-id @nonexistent :first-name "Test" :last-name "Person" :as @person)
         (cbu.create :name "Test" :jurisdiction "FAKELAND" :as @cbu)
         (cbu.assign-role :cbu-id @cbu :entity-id @person :role "FAKE_ROLE")
     "#;
@@ -722,7 +722,7 @@ async fn test_validate_dsl_with_csg_public_api() {
     let pool = get_test_pool().await;
 
     let source = r#"
-        (entity.create-proper-person :first-name "Test" :last-name "Person" :as @person)
+        (entity.create :entity-type "proper-person" :first-name "Test" :last-name "Person" :as @person)
         (document.catalog :doc-type "PASSPORT" :entity-id @person :title "Passport")
     "#;
 

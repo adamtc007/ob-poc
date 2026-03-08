@@ -12,7 +12,7 @@
   :as @fund)
 
 ;; --- Create Fund Entity ---
-(entity.ensure-limited-company
+(entity.ensure :entity-type "limited-company"
   :name "Pacific State Pension Fund"
   :jurisdiction "US"
   :as @fund-entity)
@@ -23,7 +23,7 @@
   :role "ASSET_OWNER")
 
 ;; --- Create Primary Investment Manager ---
-(entity.ensure-limited-company
+(entity.ensure :entity-type "limited-company"
   :name "Pacific Investment Management"
   :jurisdiction "US"
   :as @im-primary)
@@ -34,7 +34,7 @@
   :role "INVESTMENT_MANAGER")
 
 ;; --- Create Transition Manager (temporary) ---
-(entity.ensure-limited-company
+(entity.ensure :entity-type "limited-company"
   :name "BlackRock Transition Management"
   :jurisdiction "US"
   :as @im-transition)

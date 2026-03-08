@@ -250,82 +250,6 @@ domains:
             maps_to: notes
         returns:
           type: affected
-      end-ownership:
-        description: End an ownership relationship (soft delete - sets effective_to date)
-        invocation_phrases:
-          - "end ownership"
-          - "terminate ownership"
-          - "close ownership"
-          - "ownership has ended"
-          - "sold ownership stake"
-          - "ownership disposed"
-          - "divested ownership"
-        behavior: crud
-        metadata:
-          tier: intent
-          source_of_truth: entity
-          scope: global
-          noun: ubo
-          tags: [ownership, relationship, lifecycle, kyc]
-          phase_tags: [kyc]
-        crud:
-          operation: update
-          table: entity_relationships
-          schema: ob-poc
-          key: relationship_id
-        args:
-          - name: relationship-id
-            type: uuid
-            required: true
-            maps_to: relationship_id
-            lookup:
-              table: entity_relationships
-              entity_type: relationship
-              schema: ob-poc
-              search_key: relationship_id
-              primary_key: relationship_id
-          - name: effective-to
-            type: date
-            required: true
-            maps_to: effective_to
-        returns:
-          type: affected
-
-      delete-ownership:
-        description: Hard delete an ownership relationship (removes row from entity_relationships)
-        invocation_phrases:
-          - "delete ownership"
-          - "remove ownership record"
-          - "hard delete ownership"
-          - "erase ownership link"
-          - "permanently remove ownership"
-        behavior: crud
-        metadata:
-          tier: intent
-          source_of_truth: entity
-          scope: global
-          noun: ubo
-          tags: [ownership, relationship, delete, kyc]
-          phase_tags: [kyc]
-        crud:
-          operation: delete
-          table: entity_relationships
-          schema: ob-poc
-          key: relationship_id
-        args:
-          - name: relationship-id
-            type: uuid
-            required: true
-            maps_to: relationship_id
-            lookup:
-              table: entity_relationships
-              entity_type: relationship
-              schema: ob-poc
-              search_key: relationship_id
-              primary_key: relationship_id
-        returns:
-          type: affected
-
       add-control:
         description: Add control relationship between entities (board, voting rights, etc.)
         invocation_phrases:
@@ -401,81 +325,6 @@ domains:
           type: uuid
           name: relationship_id
           capture: true
-
-      end-control:
-        description: End a control relationship (soft delete - sets effective_to date)
-        invocation_phrases:
-          - "end control"
-          - "terminate control"
-          - "control relationship ended"
-          - "remove from board"
-          - "end executive control"
-          - "control has ceased"
-        behavior: crud
-        metadata:
-          tier: intent
-          source_of_truth: entity
-          scope: global
-          noun: ubo
-          tags: [control, relationship, lifecycle, kyc]
-          phase_tags: [kyc]
-        crud:
-          operation: update
-          table: entity_relationships
-          schema: ob-poc
-          key: relationship_id
-        args:
-          - name: relationship-id
-            type: uuid
-            required: true
-            maps_to: relationship_id
-            lookup:
-              table: entity_relationships
-              entity_type: relationship
-              schema: ob-poc
-              search_key: relationship_id
-              primary_key: relationship_id
-          - name: effective-to
-            type: date
-            required: true
-            maps_to: effective_to
-        returns:
-          type: affected
-
-      delete-control:
-        description: Hard delete a control relationship (removes row from entity_relationships)
-        invocation_phrases:
-          - "delete control"
-          - "remove control record"
-          - "hard delete control"
-          - "erase control relationship"
-          - "permanently remove control"
-        behavior: crud
-        metadata:
-          tier: intent
-          source_of_truth: entity
-          scope: global
-          noun: ubo
-          tags: [control, relationship, delete, kyc]
-          phase_tags: [kyc]
-        crud:
-          operation: delete
-          table: entity_relationships
-          schema: ob-poc
-          key: relationship_id
-        args:
-          - name: relationship-id
-            type: uuid
-            required: true
-            maps_to: relationship_id
-            lookup:
-              table: entity_relationships
-              entity_type: relationship
-              schema: ob-poc
-              search_key: relationship_id
-              primary_key: relationship_id
-        returns:
-          type: affected
 
       add-trust-role:
         description: Add trust role relationship (settlor, trustee, beneficiary, protector)
@@ -562,21 +411,23 @@ domains:
           name: relationship_id
           capture: true
 
-      end-trust-role:
-        description: End a trust role relationship (soft delete - sets effective_to date)
+      end-relationship:
+        description: End any entity relationship by ID (soft delete - sets effective_to date)
         invocation_phrases:
+          - "end relationship"
+          - "end ownership"
+          - "end control"
           - "end trust role"
-          - "terminate trust role"
-          - "remove from trust"
-          - "trust role ended"
-          - "beneficiary removed"
+          - "terminate relationship"
+          - "close relationship"
+          - "relationship has ended"
         behavior: crud
         metadata:
           tier: intent
           source_of_truth: entity
           scope: global
           noun: ubo
-          tags: [trust, relationship, lifecycle, kyc]
+          tags: [relationship, lifecycle, generic, kyc]
           phase_tags: [kyc]
         crud:
           operation: update
@@ -594,44 +445,14 @@ domains:
               schema: ob-poc
               search_key: relationship_id
               primary_key: relationship_id
+          - name: relationship-type
+            type: string
+            required: false
+            description: Optional relationship discriminator (ownership, control, trust-role)
           - name: effective-to
             type: date
             required: true
             maps_to: effective_to
-        returns:
-          type: affected
-
-      delete-trust-role:
-        description: Hard delete a trust role relationship (removes row from entity_relationships)
-        invocation_phrases:
-          - "delete trust role"
-          - "remove trust relationship"
-          - "hard delete trust role"
-          - "erase trust link"
-        behavior: crud
-        metadata:
-          tier: intent
-          source_of_truth: entity
-          scope: global
-          noun: ubo
-          tags: [trust, relationship, delete, kyc]
-          phase_tags: [kyc]
-        crud:
-          operation: delete
-          table: entity_relationships
-          schema: ob-poc
-          key: relationship_id
-        args:
-          - name: relationship-id
-            type: uuid
-            required: true
-            maps_to: relationship_id
-            lookup:
-              table: entity_relationships
-              entity_type: relationship
-              schema: ob-poc
-              search_key: relationship_id
-              primary_key: relationship_id
         returns:
           type: affected
 
@@ -667,6 +488,10 @@ domains:
               schema: ob-poc
               search_key: relationship_id
               primary_key: relationship_id
+          - name: relationship-type
+            type: string
+            required: false
+            description: Optional relationship discriminator (ownership, control, trust-role)
         returns:
           type: affected
       list-owners:

@@ -25,7 +25,19 @@ tier_1:
     - id: navigate
       label: "Set session scope / Navigate"
       description: "Load structures into your working session to browse or modify"
-      keywords: [load, show, view, browse, open, display, see, look at, switch to, go to]
+      keywords:
+        [
+          load,
+          show,
+          view,
+          browse,
+          open,
+          display,
+          see,
+          look at,
+          switch to,
+          go to,
+        ]
       hint: "You want to work with existing data"
 
     - id: create
@@ -43,13 +55,25 @@ tier_1:
     - id: analyze
       label: "Analyze / Investigate"
       description: "Trace ownership, discover UBOs, follow money flows"
-      keywords: [analyze, trace, investigate, follow, drill, discover, who owns, find, search]
+      keywords:
+        [
+          analyze,
+          trace,
+          investigate,
+          follow,
+          drill,
+          discover,
+          who owns,
+          find,
+          search,
+        ]
       hint: "You want to understand relationships or find information"
 
     - id: workflow
       label: "Workflow / Approval"
       description: "Start a case, approve, reject, or advance a workflow"
-      keywords: [approve, reject, submit, start case, open case, complete, advance]
+      keywords:
+        [approve, reject, submit, start case, open case, complete, advance]
       hint: "You want to manage a business process"
 
 # =============================================================================
@@ -88,12 +112,12 @@ tier_2:
       - id: structure
         label: "Fund / CBU / Structure"
         description: "Create a new Client Business Unit (fund, mandate, etc.)"
-        verbs: [cbu.create, structure.setup, fund.create-umbrella, fund.create-subfund]
+        verbs: [cbu.create, structure.setup, fund.create]
 
       - id: entity
         label: "Entity (person or company)"
         description: "Create a natural person or legal entity"
-        verbs: [entity.create, entity.create-natural-person, entity.create-limited-company, party.add]
+        verbs: [entity.create, entity.ensure, party.add]
 
       - id: relationship
         label: "Relationship / Role assignment"
@@ -141,7 +165,13 @@ tier_2:
       - id: ownership
         label: "Ownership / UBO"
         description: "Discover ultimate beneficial owners, trace control"
-        verbs: [ubo.discover, ubo.list-owners, control.identify-ubos, control.build-graph]
+        verbs:
+          [
+            ubo.discover,
+            ubo.list-owners,
+            control.identify-ubos,
+            control.build-graph,
+          ]
 
       - id: entity_details
         label: "Entity details"
@@ -201,12 +231,9 @@ verb_tier_mapping:
   # Create verbs
   cbu.create: [create, structure]
   structure.setup: [create, structure]
-  fund.create-umbrella: [create, structure]
-  fund.create-subfund: [create, structure]
+  fund.create: [create, structure]
   entity.create: [create, entity]
-  entity.create-natural-person: [create, entity]
-  entity.create-limited-company: [create, entity]
-  entity.create-management-company: [create, entity]
+  entity.ensure: [create, entity]
   party.add: [create, entity]
   party.add-company: [create, entity]
   cbu-role.assign: [create, relationship]
@@ -245,7 +272,7 @@ verb_tier_mapping:
   view.zoom-in: [analyze, drill_down]
   view.trace: [analyze, drill_down]
   view.xray: [analyze, drill_down]
-  view.surface: [navigate, single_structure]  # Surface up is navigation
+  view.surface: [navigate, single_structure] # Surface up is navigation
   view.back-to: [navigate, single_structure]
 
   # Workflow verbs

@@ -5,7 +5,7 @@
     :jurisdiction "GB"
     :as @cbu)
 
-(entity.create-limited-company
+(entity.create :entity-type "limited-company"
     :cbu-id @cbu
     :name "Not A Trust Ltd"
     :company-number "UK000002"

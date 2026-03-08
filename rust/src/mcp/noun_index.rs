@@ -626,7 +626,7 @@ nouns:
       - capital
       - fund
     action_verbs:
-      create: [fund.create-share-class, capital.share-class.create]
+      create: [fund.create, capital.share-class.create]
       list: [fund.list-share-classes]
 
   session:
@@ -714,9 +714,9 @@ nouns:
                 vec!["entity"],
             ),
             (
-                "fund.create-share-class",
+                "fund.create",
                 "fund",
-                "create-share-class",
+                "create",
                 "Create share class",
                 Some("fund"),
                 vec!["fund"],
@@ -895,7 +895,7 @@ nouns:
         assert_eq!(resolution.candidates.len(), 2);
         assert!(resolution
             .candidates
-            .contains(&"fund.create-share-class".to_string()));
+            .contains(&"fund.create".to_string()));
         assert!(resolution
             .candidates
             .contains(&"capital.share-class.create".to_string()));

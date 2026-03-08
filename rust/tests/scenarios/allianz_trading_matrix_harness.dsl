@@ -73,14 +73,14 @@
   :as @ic-otc-fx)
 
 ;; --- Markets (ISO 10383 MIC codes) ---
-(market.ensure :mic "XETR" :name "Deutsche Boerse Xetra" :country-code "DE" :primary-currency "EUR" :csd-bic "DAABORDC" :timezone "Europe/Berlin" :as @mkt-xetr)
-(market.ensure :mic "XLON" :name "London Stock Exchange" :country-code "GB" :primary-currency "GBP" :csd-bic "CRESTGB2" :timezone "Europe/London" :as @mkt-xlon)
-(market.ensure :mic "XNYS" :name "New York Stock Exchange" :country-code "US" :primary-currency "USD" :csd-bic "DTCYUS33" :timezone "America/New_York" :as @mkt-xnys)
-(market.ensure :mic "XNAS" :name "NASDAQ" :country-code "US" :primary-currency "USD" :csd-bic "DTCYUS33" :timezone "America/New_York" :as @mkt-xnas)
-(market.ensure :mic "XHKG" :name "Hong Kong Stock Exchange" :country-code "HK" :primary-currency "HKD" :csd-bic "CCASCHKX" :timezone "Asia/Hong_Kong" :as @mkt-xhkg)
-(market.ensure :mic "XTKS" :name "Tokyo Stock Exchange" :country-code "JP" :primary-currency "JPY" :csd-bic "JASDECJP" :timezone "Asia/Tokyo" :as @mkt-xtks)
-(market.ensure :mic "XSWX" :name "SIX Swiss Exchange" :country-code "CH" :primary-currency "CHF" :csd-bic "SABORDC1" :timezone "Europe/Zurich" :as @mkt-xswx)
-(market.ensure :mic "XPAR" :name "Euronext Paris" :country-code "FR" :primary-currency "EUR" :csd-bic "SICVFR2P" :timezone "Europe/Paris" :as @mkt-xpar)
+(refdata.ensure :domain "market" :mic "XETR" :name "Deutsche Boerse Xetra" :country-code "DE" :primary-currency "EUR" :csd-bic "DAABORDC" :timezone "Europe/Berlin" :as @mkt-xetr)
+(refdata.ensure :domain "market" :mic "XLON" :name "London Stock Exchange" :country-code "GB" :primary-currency "GBP" :csd-bic "CRESTGB2" :timezone "Europe/London" :as @mkt-xlon)
+(refdata.ensure :domain "market" :mic "XNYS" :name "New York Stock Exchange" :country-code "US" :primary-currency "USD" :csd-bic "DTCYUS33" :timezone "America/New_York" :as @mkt-xnys)
+(refdata.ensure :domain "market" :mic "XNAS" :name "NASDAQ" :country-code "US" :primary-currency "USD" :csd-bic "DTCYUS33" :timezone "America/New_York" :as @mkt-xnas)
+(refdata.ensure :domain "market" :mic "XHKG" :name "Hong Kong Stock Exchange" :country-code "HK" :primary-currency "HKD" :csd-bic "CCASCHKX" :timezone "Asia/Hong_Kong" :as @mkt-xhkg)
+(refdata.ensure :domain "market" :mic "XTKS" :name "Tokyo Stock Exchange" :country-code "JP" :primary-currency "JPY" :csd-bic "JASDECJP" :timezone "Asia/Tokyo" :as @mkt-xtks)
+(refdata.ensure :domain "market" :mic "XSWX" :name "SIX Swiss Exchange" :country-code "CH" :primary-currency "CHF" :csd-bic "SABORDC1" :timezone "Europe/Zurich" :as @mkt-xswx)
+(refdata.ensure :domain "market" :mic "XPAR" :name "Euronext Paris" :country-code "FR" :primary-currency "EUR" :csd-bic "SICVFR2P" :timezone "Europe/Paris" :as @mkt-xpar)
 
 ;; --- Tax Jurisdictions ---
 (tax-config.define-jurisdiction :code "DE" :name "Germany" :country-code "DE" :default-rate 26.375 :reclaim-available true :reclaim-deadline-days 365 :as @tax-de)

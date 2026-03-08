@@ -12,7 +12,7 @@
   :as @fund)
 
 ;; --- Create Fund Entity ---
-(entity.ensure-limited-company
+(entity.ensure :entity-type "limited-company"
   :name "Quantum Macro Master Fund LP"
   :jurisdiction "DE"
   :as @fund-entity)

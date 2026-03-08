@@ -108,37 +108,37 @@ test_execute "CBU create" "(cbu.create :name \"${PREFIX}_CBU1\" :client-type \"c
 
 test_execute "Entity create (company)" "
 (cbu.create :name \"${PREFIX}_CBU2\" :as @cbu)
-(entity.create-limited-company :cbu-id @cbu :name \"${PREFIX}_Company\" :as @company)
+(entity.create :entity-type "limited-company" :cbu-id @cbu :name \"${PREFIX}_Company\" :as @company)
 "
 
 test_execute "Entity create (person)" "
 (cbu.create :name \"${PREFIX}_CBU3\" :as @cbu)
-(entity.create-proper-person :cbu-id @cbu :first-name \"John\" :last-name \"Doe\" :as @person)
+(entity.create :entity-type "proper-person" :cbu-id @cbu :first-name \"John\" :last-name \"Doe\" :as @person)
 "
 
 test_execute "Role assignment" "
 (cbu.create :name \"${PREFIX}_CBU4\" :as @cbu)
-(entity.create-limited-company :cbu-id @cbu :name \"${PREFIX}_Company4\" :as @company)
-(entity.create-proper-person :cbu-id @cbu :first-name \"Jane\" :last-name \"Doe\" :as @person)
+(entity.create :entity-type "limited-company" :cbu-id @cbu :name \"${PREFIX}_Company4\" :as @company)
+(entity.create :entity-type "proper-person" :cbu-id @cbu :first-name \"Jane\" :last-name \"Doe\" :as @person)
 (cbu.assign-role :cbu-id @cbu :entity-id @person :target-entity-id @company :role \"BENEFICIAL_OWNER\" :ownership-percentage 100.0)
 "
 
 test_execute "Document catalog" "
 (cbu.create :name \"${PREFIX}_CBU5\" :as @cbu)
-(entity.create-proper-person :cbu-id @cbu :first-name \"Doc\" :last-name \"Test\" :as @person)
+(entity.create :entity-type "proper-person" :cbu-id @cbu :first-name \"Doc\" :last-name \"Test\" :as @person)
 (document.catalog :cbu-id @cbu :entity-id @person :document-type \"PASSPORT\")
 "
 
 test_execute "Screening (PEP)" "
 (cbu.create :name \"${PREFIX}_CBU6\" :as @cbu)
-(entity.create-proper-person :cbu-id @cbu :first-name \"Screen\" :last-name \"Test\" :as @person)
+(entity.create :entity-type "proper-person" :cbu-id @cbu :first-name \"Screen\" :last-name \"Test\" :as @person)
 (screening.pep :entity-id @person)
 "
 
 test_execute "Full scenario" "
 (cbu.create :name \"${PREFIX}_FullCBU\" :client-type \"corporate\" :as @cbu)
-(entity.create-limited-company :cbu-id @cbu :name \"${PREFIX}_FullCompany\" :as @company)
-(entity.create-proper-person :cbu-id @cbu :first-name \"Full\" :last-name \"UBO\" :as @ubo)
+(entity.create :entity-type "limited-company" :cbu-id @cbu :name \"${PREFIX}_FullCompany\" :as @company)
+(entity.create :entity-type "proper-person" :cbu-id @cbu :first-name \"Full\" :last-name \"UBO\" :as @ubo)
 (cbu.assign-role :cbu-id @cbu :entity-id @ubo :target-entity-id @company :role \"BENEFICIAL_OWNER\" :ownership-percentage 100.0)
 (document.catalog :cbu-id @cbu :entity-id @company :document-type \"CERTIFICATE_OF_INCORPORATION\")
 (document.catalog :cbu-id @cbu :entity-id @ubo :document-type \"PASSPORT\")
@@ -151,19 +151,19 @@ echo "--- Error Tests ---"
 
 test_should_fail "Invalid role" "
 (cbu.create :name \"${PREFIX}_ErrRole\" :as @cbu)
-(entity.create-limited-company :cbu-id @cbu :name \"${PREFIX}_ErrCompany\" :as @company)
-(entity.create-proper-person :cbu-id @cbu :first-name \"Err\" :last-name \"Person\" :as @person)
+(entity.create :entity-type "limited-company" :cbu-id @cbu :name \"${PREFIX}_ErrCompany\" :as @company)
+(entity.create :entity-type "proper-person" :cbu-id @cbu :first-name \"Err\" :last-name \"Person\" :as @person)
 (cbu.assign-role :cbu-id @cbu :entity-id @person :target-entity-id @company :role \"INVALID_ROLE\")
 " "role"
 
 test_should_fail "Invalid document type" "
 (cbu.create :name \"${PREFIX}_ErrDoc\" :as @cbu)
-(entity.create-proper-person :cbu-id @cbu :first-name \"Err\" :last-name \"Doc\" :as @person)
+(entity.create :entity-type "proper-person" :cbu-id @cbu :first-name \"Err\" :last-name \"Doc\" :as @person)
 (document.catalog :cbu-id @cbu :entity-id @person :document-type \"INVALID_DOC\")
 " "document"
 
 test_should_fail "Undefined symbol" "
-(entity.create-proper-person :cbu-id @nonexistent :first-name \"Test\" :last-name \"User\")
+(entity.create :entity-type "proper-person" :cbu-id @nonexistent :first-name \"Test\" :last-name \"User\")
 " "Unresolved"
 
 echo ""

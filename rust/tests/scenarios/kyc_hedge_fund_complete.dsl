@@ -21,7 +21,7 @@
 ;; =============================================================================
 
 ;; Create the commercial client (head office) - a holding company
-(entity.create-limited-company
+(entity.create :entity-type "limited-company"
   :name "Atlas Capital Holdings Ltd"
   :jurisdiction "GB"
   :as @holding-company)
@@ -36,7 +36,7 @@
   :as @fund)
 
 ;; Create the fund legal entity (issuer of shares)
-(entity.create-limited-company
+(entity.create :entity-type "limited-company"
   :name "Atlas Global Macro Fund LP"
   :jurisdiction "KY"
   :as @fund-entity)
@@ -84,14 +84,14 @@
 ;; =============================================================================
 
 ;; Create document requests for holding company
-(doc-request.create
+(document.create-request
   :workstream-id @ws-holding
   :doc-type "CERT_OF_INCORPORATION"
   :is-mandatory true
   :priority "HIGH"
   :as @doc-req-cert)
 
-(doc-request.create
+(document.create-request
   :workstream-id @ws-holding
   :doc-type "REGISTER_OF_SHAREHOLDERS"
   :is-mandatory true
@@ -112,12 +112,12 @@
   :as @doc-shareholders)
 
 ;; Mark documents as received
-(doc-request.receive :request-id @doc-req-cert :document-id @doc-cert)
-(doc-request.receive :request-id @doc-req-shareholders :document-id @doc-shareholders)
+(document.receive-request :request-id @doc-req-cert :document-id @doc-cert)
+(document.receive-request :request-id @doc-req-shareholders :document-id @doc-shareholders)
 
 ;; Verify the document requests
-(doc-request.verify :request-id @doc-req-cert :verification-notes "Certificate valid, company active")
-(doc-request.verify :request-id @doc-req-shareholders :verification-notes "Shareholder register complete")
+(document.verify-request :request-id @doc-req-cert :verification-notes "Certificate valid, company active")
+(document.verify-request :request-id @doc-req-shareholders :verification-notes "Shareholder register complete")
 
 ;; Update workstream status
 (entity-workstream.update-status :workstream-id @ws-holding :status "VERIFY")
@@ -131,12 +131,12 @@
 ;; - 30% by "Nordic Trust Services" (Jersey)
 
 ;; Create the discovered entities
-(entity.create-limited-company
+(entity.create :entity-type "limited-company"
   :name "Oceanic Investments Pte Ltd"
   :jurisdiction "SG"
   :as @oceanic)
 
-(entity.create-limited-company
+(entity.create :entity-type "limited-company"
   :name "Nordic Trust Services"
   :jurisdiction "JE"
   :as @nordic-trust)
@@ -182,33 +182,33 @@
 ;; =============================================================================
 
 ;; Screen the discovered entities
-(case-screening.run
+(screening.run
   :workstream-id @ws-oceanic
   :screening-type "SANCTIONS"
   :as @screen-oceanic-sanctions)
 
-(case-screening.run
+(screening.run
   :workstream-id @ws-oceanic
   :screening-type "ADVERSE_MEDIA"
   :as @screen-oceanic-media)
 
-(case-screening.run
+(screening.run
   :workstream-id @ws-nordic
   :screening-type "SANCTIONS"
   :as @screen-nordic-sanctions)
 
 ;; Complete screenings with results
-(case-screening.complete
+(screening.complete
   :screening-id @screen-oceanic-sanctions
   :status "CLEAR"
   :result-summary "No sanctions matches")
 
-(case-screening.complete
+(screening.complete
   :screening-id @screen-oceanic-media
   :status "HIT_PENDING_REVIEW"
   :result-summary "Minor media hit - regulatory fine 2019")
 
-(case-screening.complete
+(screening.complete
   :screening-id @screen-nordic-sanctions
   :status "CLEAR"
   :result-summary "No sanctions matches")
@@ -242,13 +242,13 @@
 ;; =============================================================================
 
 ;; Request additional documents for Oceanic
-(doc-request.create
+(document.create-request
   :workstream-id @ws-oceanic
   :doc-type "REGISTER_OF_SHAREHOLDERS"
   :is-mandatory true)
 
 ;; Discovery: Oceanic is 100% owned by "Chen Wei" (Singapore citizen)
-(entity.create-proper-person
+(entity.create :entity-type "proper-person"
   :first-name "Chen"
   :last-name "Wei"
   :as @chen-wei)
@@ -284,23 +284,23 @@
   :as @ubo-chen)
 
 ;; Screen the UBO
-(case-screening.run
+(screening.run
   :workstream-id @ws-chen
   :screening-type "PEP"
   :as @screen-chen-pep)
 
-(case-screening.run
+(screening.run
   :workstream-id @ws-chen
   :screening-type "SANCTIONS"
   :as @screen-chen-sanctions)
 
 ;; Screenings clear
-(case-screening.complete
+(screening.complete
   :screening-id @screen-chen-pep
   :status "CLEAR"
   :result-summary "Not a PEP")
 
-(case-screening.complete
+(screening.complete
   :screening-id @screen-chen-sanctions
   :status "CLEAR"
   :result-summary "No sanctions matches")

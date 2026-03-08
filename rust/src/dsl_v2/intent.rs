@@ -16,7 +16,7 @@ use std::collections::HashMap;
 /// A single DSL action intent - what the user wants to do
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DslIntent {
-    /// The verb to execute (e.g., "cbu.assign-role", "entity.create-proper-person")
+    /// The verb to execute (e.g., "cbu.assign-role", "entity.create")
     /// AI picks from known verbs, or we infer from action type
     pub verb: Option<String>,
 

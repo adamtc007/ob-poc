@@ -155,7 +155,7 @@ session.redo:
   crud_type: null
 
 # Entity Domain - Natural/legal person management
-entity.create-proper-person:
+entity.create:
   pref_label: "create entity"
   alt_labels:
     - "new entity"

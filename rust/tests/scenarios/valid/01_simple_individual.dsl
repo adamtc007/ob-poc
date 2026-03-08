@@ -6,7 +6,7 @@
     :jurisdiction "GB"
     :as @cbu)
 
-(entity.create-proper-person
+(entity.create :entity-type "proper-person"
     :cbu-id @cbu
     :first-name "John"
     :last-name "Smith"
@@ -39,12 +39,12 @@
     :as @ws)
 
 ;; Run screenings via workstream
-(case-screening.run
+(screening.run
     :workstream-id @ws
     :screening-type "PEP"
     :as @pepscreen)
 
-(case-screening.run
+(screening.run
     :workstream-id @ws
     :screening-type "SANCTIONS"
     :as @sanctionsscreen)

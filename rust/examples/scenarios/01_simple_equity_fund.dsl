@@ -12,7 +12,7 @@
   :as @fund)
 
 ;; --- Create Fund Entity ---
-(entity.ensure-limited-company
+(entity.ensure :entity-type "limited-company"
   :name "Simple US Equity Fund LLC"
   :jurisdiction "US"
   :as @fund-entity)
@@ -24,7 +24,7 @@
   :role "ASSET_OWNER")
 
 ;; --- Create Investment Manager Entity ---
-(entity.ensure-limited-company
+(entity.ensure :entity-type "limited-company"
   :name "Vanguard Asset Management Inc"
   :jurisdiction "US"
   :as @im-entity)

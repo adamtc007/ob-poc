@@ -120,8 +120,9 @@ party.add-person:
   prereqs: []
 
   expands-to:
-    - verb: entity.create-person
+    - verb: entity.create
       args:
+        entity-type: "proper-person"
         given_names: "${arg.given_names}"
         family_name: "${arg.family_name}"
         nationality: "${arg.nationality}"
@@ -198,8 +199,9 @@ party.add-company:
   prereqs: []
 
   expands-to:
-    - verb: entity.create-company
+    - verb: entity.create
       args:
+        entity-type: "limited-company"
         name: "${arg.name}"
         jurisdiction: "${arg.jurisdiction}"
         registration_number: "${arg.registration_number}"

@@ -165,6 +165,346 @@ domains:
             requirement_ids: list
 
       # ========================================================================
+      # KYC Request Tracking (merged from doc-request)
+      # ========================================================================
+      create-request:
+        description: Create a document request for a KYC workstream.
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: document_request
+          tags: [kyc]
+          phase_tags: [kyc]
+        invocation_phrases:
+          - "create document request"
+          - "request KYC document from client"
+          - "add document to collection list"
+          - "create CDD document request"
+        behavior: crud
+        crud:
+          operation: upsert
+          table: doc_requests
+          schema: kyc
+          returning: request_id
+          conflict_keys:
+            - workstream_id
+            - doc_type
+        emits_event: document.create-requestd
+        args:
+          - name: workstream-id
+            type: uuid
+            required: true
+            maps_to: workstream_id
+            lookup:
+              table: entity_workstreams
+              entity_type: entity_workstream
+              schema: kyc
+              search_key: workstream_id
+              primary_key: workstream_id
+          - name: doc-type
+            type: string
+            required: true
+            maps_to: doc_type
+            valid_values:
+              - PASSPORT
+              - NATIONAL_ID
+              - DRIVERS_LICENSE
+              - PROOF_OF_ADDRESS
+              - CERT_OF_INCORPORATION
+              - CERT_OF_GOOD_STANDING
+              - MEMORANDUM_ARTICLES
+              - REGISTER_OF_DIRECTORS
+              - REGISTER_OF_SHAREHOLDERS
+              - ANNUAL_RETURN
+              - TRUST_DEED
+              - LETTER_OF_WISHES
+              - DEED_OF_APPOINTMENT
+              - BANK_STATEMENT
+              - SOURCE_OF_WEALTH
+              - SOURCE_OF_FUNDS
+              - FINANCIAL_STATEMENTS
+              - TAX_RETURN
+              - REGULATORY_LICENSE
+              - POWER_OF_ATTORNEY
+              - BOARD_RESOLUTION
+              - SIGNATORY_LIST
+          - name: due-date
+            type: date
+            required: false
+            maps_to: due_date
+          - name: is-mandatory
+            type: boolean
+            required: false
+            maps_to: is_mandatory
+            default: true
+          - name: priority
+            type: string
+            required: false
+            maps_to: priority
+            default: NORMAL
+            valid_values:
+              - LOW
+              - NORMAL
+              - HIGH
+              - URGENT
+        returns:
+          type: uuid
+          name: request_id
+          capture: true
+
+      mark-requested:
+        description: Mark a document request as formally requested.
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: document_request
+          tags: [kyc]
+          phase_tags: [kyc]
+        invocation_phrases:
+          - "mark document as requested"
+          - "confirm document request sent"
+          - "set document status to requested"
+          - "record outreach for document"
+        behavior: crud
+        crud:
+          operation: update
+          table: doc_requests
+          schema: kyc
+          key: request_id
+          set_values:
+            status: REQUESTED
+            requested_at: now()
+        emits_event: doc-request.requested
+        args:
+          - name: request-id
+            type: uuid
+            required: true
+            maps_to: request_id
+            lookup:
+              table: doc_requests
+              entity_type: doc_request
+              schema: kyc
+              search_key: request_id
+              primary_key: request_id
+        returns:
+          type: affected
+
+      receive-request:
+        description: Record receipt against a document request.
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: document_request
+          tags: [kyc]
+          phase_tags: [kyc]
+        invocation_phrases:
+          - "record document received"
+          - "mark document as received"
+          - "update document request to received"
+          - "record KYC document intake"
+        behavior: crud
+        crud:
+          operation: update
+          table: doc_requests
+          schema: kyc
+          key: request_id
+          set_values:
+            status: RECEIVED
+            received_at: now()
+        emits_event: document.receive-requestd
+        args:
+          - name: request-id
+            type: uuid
+            required: true
+            maps_to: request_id
+            lookup:
+              table: doc_requests
+              entity_type: doc_request
+              schema: kyc
+              search_key: request_id
+              primary_key: request_id
+          - name: document-id
+            type: uuid
+            required: true
+            maps_to: document_id
+            lookup:
+              table: document_catalog
+              entity_type: document
+              schema: ob-poc
+              search_key: document_name
+              primary_key: doc_id
+        returns:
+          type: affected
+
+      verify-request:
+        description: Verify a document request as satisfied by a valid document.
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: document_request
+          tags: [kyc]
+          phase_tags: [kyc]
+        invocation_phrases:
+          - "verify KYC document request"
+          - "approve requested document as valid"
+          - "mark document request verified"
+          - "accept document for CDD"
+        behavior: crud
+        crud:
+          operation: update
+          table: doc_requests
+          schema: kyc
+          key: request_id
+          set_values:
+            status: VERIFIED
+            verified_at: now()
+        emits_event: doc-request.verified
+        args:
+          - name: request-id
+            type: uuid
+            required: true
+            maps_to: request_id
+            lookup:
+              table: doc_requests
+              entity_type: doc_request
+              schema: kyc
+              search_key: request_id
+              primary_key: request_id
+          - name: notes
+            type: string
+            required: false
+            maps_to: verification_notes
+          - name: verification-notes
+            type: string
+            required: false
+            maps_to: verification_notes
+        returns:
+          type: affected
+
+      reject-request:
+        description: Reject a document request submission.
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: document_request
+          tags: [kyc]
+          phase_tags: [kyc]
+        invocation_phrases:
+          - "reject KYC document request"
+          - "document failed quality check"
+          - "mark document request as rejected"
+          - "send document back for resubmission"
+        behavior: crud
+        crud:
+          operation: update
+          table: doc_requests
+          schema: kyc
+          key: request_id
+          set_values:
+            status: REJECTED
+        emits_event: document.reject-requested
+        args:
+          - name: request-id
+            type: uuid
+            required: true
+            maps_to: request_id
+            lookup:
+              table: doc_requests
+              entity_type: doc_request
+              schema: kyc
+              search_key: request_id
+              primary_key: request_id
+          - name: reason
+            type: string
+            required: true
+            maps_to: rejection_reason
+        returns:
+          type: affected
+
+      waive-request:
+        description: Waive a document request requirement.
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: document_request
+          tags: [kyc]
+          phase_tags: [kyc]
+        invocation_phrases:
+          - "waive document requirement"
+          - "skip this document request"
+          - "override document requirement"
+          - "approve document exemption"
+        behavior: crud
+        crud:
+          operation: update
+          table: doc_requests
+          schema: kyc
+          key: request_id
+          set_values:
+            status: WAIVED
+        emits_event: document.waive-requestd
+        args:
+          - name: request-id
+            type: uuid
+            required: true
+            maps_to: request_id
+            lookup:
+              table: doc_requests
+              entity_type: doc_request
+              schema: kyc
+              search_key: request_id
+              primary_key: request_id
+          - name: notes
+            type: string
+            required: true
+            maps_to: verification_notes
+        returns:
+          type: affected
+
+      list-requests-by-workstream:
+        description: List document requests for a workstream.
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
+          noun: document_request
+          tags: [kyc]
+          phase_tags: [kyc]
+        invocation_phrases:
+          - "list document requests for workstream"
+          - "show outstanding document requests"
+          - "what documents are still needed"
+          - "show document collection status"
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: doc_requests
+          schema: kyc
+          fk_col: workstream_id
+        args:
+          - name: workstream-id
+            type: uuid
+            required: true
+            lookup:
+              table: entity_workstreams
+              entity_type: entity_workstream
+              schema: kyc
+              search_key: workstream_id
+              primary_key: workstream_id
+          - name: status
+            type: string
+            required: false
+            maps_to: status
+        returns:
+          type: record_set
+
+      # ========================================================================
       # Document Cataloging (legacy)
       # ========================================================================
       catalog:

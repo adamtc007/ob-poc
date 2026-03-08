@@ -6,14 +6,14 @@
     :jurisdiction "NL"
     :as @cbu)
 
-(entity.create-limited-company
+(entity.create :entity-type "limited-company"
     :cbu-id @cbu
     :name "OpCo Trading BV"
     :company-number "NL123456"
     :jurisdiction "NL"
     :as @opco)
 
-(entity.create-limited-company
+(entity.create :entity-type "limited-company"
     :cbu-id @cbu
     :name "HoldCo Investments BV"
     :company-number "NL789012"
@@ -27,7 +27,7 @@
     :target-entity-id @opco
     :ownership-percentage 100)
 
-(entity.create-limited-company
+(entity.create :entity-type "limited-company"
     :cbu-id @cbu
     :name "TopCo Holdings Ltd"
     :company-number "UK456789"
@@ -41,7 +41,7 @@
     :target-entity-id @holdco
     :ownership-percentage 100)
 
-(entity.create-proper-person
+(entity.create :entity-type "proper-person"
     :cbu-id @cbu
     :first-name "Victoria"
     :last-name "Windsor"
@@ -102,8 +102,8 @@
     :as @ws-ubo)
 
 ;; Run screenings via workstreams
-(case-screening.run :workstream-id @ws-opco :screening-type "SANCTIONS")
-(case-screening.run :workstream-id @ws-holdco :screening-type "SANCTIONS")
-(case-screening.run :workstream-id @ws-topco :screening-type "SANCTIONS")
-(case-screening.run :workstream-id @ws-ubo :screening-type "PEP")
-(case-screening.run :workstream-id @ws-ubo :screening-type "SANCTIONS")
+(screening.run :workstream-id @ws-opco :screening-type "SANCTIONS")
+(screening.run :workstream-id @ws-holdco :screening-type "SANCTIONS")
+(screening.run :workstream-id @ws-topco :screening-type "SANCTIONS")
+(screening.run :workstream-id @ws-ubo :screening-type "PEP")
+(screening.run :workstream-id @ws-ubo :screening-type "SANCTIONS")

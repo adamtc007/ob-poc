@@ -4,14 +4,14 @@
     :jurisdiction "GB"
     :as @cbu)
 
-(entity.create-limited-company
+(entity.create :entity-type "limited-company"
     :cbu-id @cbu
     :name "Incomplete Docs Ltd"
     :company-number "UK999888"
     :jurisdiction "GB"
     :as @company)
 
-(entity.create-proper-person
+(entity.create :entity-type "proper-person"
     :cbu-id @cbu
     :first-name "Pending"
     :last-name "Documentation"

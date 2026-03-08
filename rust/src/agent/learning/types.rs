@@ -401,14 +401,14 @@ mod tests {
         let event = AgentEvent::verb_selected(
             Some(Uuid::new_v4()),
             "create counterparty".to_string(),
-            "entity.ensure-limited-company".to_string(),
+            "entity.ensure".to_string(),
             0.95,
             vec!["entity.create".to_string()],
         );
 
         let json = serde_json::to_string(&event).unwrap();
         assert!(json.contains("\"type\":\"VerbSelected\""));
-        assert!(json.contains("entity.ensure-limited-company"));
+        assert!(json.contains("entity.ensure"));
     }
 
     #[test]

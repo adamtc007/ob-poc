@@ -148,11 +148,11 @@ actions:
 
   ENTITY_COLLECTION:
     - action: add_person
-      verb: entity.create-proper-person
+      verb: entity.create
       description: Add a natural person
 
     - action: add_company
-      verb: entity.create-limited-company
+      verb: entity.create
       description: Add a legal entity
 
     - action: add_role
@@ -173,11 +173,11 @@ actions:
       description: Create entity workstream
 
     - action: run_screening
-      verb: case-screening.run
+      verb: screening.run
       description: Run screening on entity
 
     - action: review_hit
-      verb: case-screening.review-hit
+      verb: screening.review-hit
       description: Review a screening hit
 
   DOCUMENT_COLLECTION:

@@ -1608,16 +1608,16 @@ fn generate_commands_help() -> String {
 **Natural Language:**
 | Say | DSL |
 |-----|-----|
-| "set up trading for equities" | `(trading-profile.add-instrument-class :class EQUITY)` |
-| "add XLON market" | `(trading-profile.add-market :mic "XLON")` |
+| "set up trading for equities" | `(trading-profile.add-component :component-type "instrument-class" :class-code "EQUITY")` |
+| "add XLON market" | `(trading-profile.add-component :component-type "market" :mic "XLON")` |
 | "create SSI for USD" | `(custody.create-ssi :currency "USD" ...)` |
 | "show trading matrix" | `trading_matrix_get` |
 
 **DSL Syntax:**
 ```clojure
 (trading-profile.create :cbu-id @cbu :as @profile)
-(trading-profile.add-instrument-class :profile-id @profile :class EQUITY)
-(trading-profile.add-market :profile-id @profile :mic "XLON")
+(trading-profile.add-component :profile-id @profile :component-type "instrument-class" :class-code "EQUITY")
+(trading-profile.add-component :profile-id @profile :component-type "market" :instrument-class "EQUITY" :mic "XLON")
 (custody.create-ssi :cbu-id @cbu :currency "USD" :account "..." :as @ssi)
 ```
 

@@ -105,6 +105,40 @@ impl VerbMetadataIndex {
         self.by_fqn.values()
     }
 
+    /// Query verbs by plane, polarity, and optional domain hint.
+    ///
+    /// When `domain_hint` is `None` or empty, this returns every verb matching
+    /// the requested plane and polarity. When a domain hint is present, verbs
+    /// also match on prefix overlap and action-tag overlap so Sage noun hints do
+    /// not have to be exact domain-prefix matches.
+    ///
+    /// # Examples
+    /// ```ignore
+    /// use ob_poc::sage::{IntentPolarity, ObservationPlane};
+    /// use ob_poc::sage::verb_index::VerbMetadataIndex;
+    ///
+    /// let index = VerbMetadataIndex::load()?;
+    /// let matches = index.query(
+    ///     ObservationPlane::Instance,
+    ///     IntentPolarity::Write,
+    ///     Some("cbu"),
+    /// );
+    /// assert!(!matches.is_empty());
+    /// # Ok::<(), anyhow::Error>(())
+    /// ```
+    pub fn query(
+        &self,
+        plane: ObservationPlane,
+        polarity: IntentPolarity,
+        domain_hint: Option<&str>,
+    ) -> Vec<&VerbMeta> {
+        self.iter()
+            .filter(|meta| meta.planes.contains(&plane))
+            .filter(|meta| meta.polarity == polarity || polarity == IntentPolarity::Ambiguous)
+            .filter(|meta| self.matches_domain(meta, domain_hint))
+            .collect()
+    }
+
     /// Number of indexed verbs.
     ///
     /// # Examples
@@ -130,6 +164,25 @@ impl VerbMetadataIndex {
     /// ```
     pub fn is_empty(&self) -> bool {
         self.by_fqn.is_empty()
+    }
+
+    fn matches_domain(&self, verb: &VerbMeta, domain_hint: Option<&str>) -> bool {
+        let Some(hint) = domain_hint
+            .map(str::trim)
+            .filter(|hint| !hint.is_empty() && *hint != "unknown")
+        else {
+            return true;
+        };
+
+        let hint = hint.to_ascii_lowercase();
+        let domain = verb.domain.to_ascii_lowercase();
+        if domain == hint || domain.starts_with(&hint) || hint.starts_with(&domain) {
+            return true;
+        }
+
+        verb.action_tags
+            .iter()
+            .any(|tag| tag.eq_ignore_ascii_case(&hint))
     }
 
     fn build_meta(domain: &str, verb_name: &str, config: &VerbConfig) -> VerbMeta {
@@ -503,6 +556,60 @@ mod tests {
         assert_eq!(meta.param_names, vec!["client-id".to_string()]);
         assert!(meta.required_params.is_empty());
         assert!(meta.action_tags.iter().any(|tag| tag == "cbu"));
+    }
+
+    #[test]
+    fn query_without_domain_hint_returns_plane_and_polarity_matches() {
+        let index = VerbMetadataIndex::from_config(&sample_config());
+        let matches = index.query(ObservationPlane::Instance, IntentPolarity::Read, None);
+        assert_eq!(matches.len(), 1);
+        assert_eq!(matches[0].fqn, "cbu.list");
+    }
+
+    #[test]
+    fn query_matches_domain_prefix_and_tags() {
+        let mut config = sample_config();
+        let screening_domain = config.domains.entry("case-screening".to_string()).or_insert(
+            DomainConfig {
+                description: "Screening verbs".to_string(),
+                verbs: HashMap::new(),
+                dynamic_verbs: vec![],
+                invocation_hints: vec![],
+            },
+        );
+        screening_domain.verbs.insert(
+            "list".to_string(),
+            VerbConfig {
+                description: "List screening cases".to_string(),
+                behavior: VerbBehavior::Plugin,
+                crud: None,
+                handler: Some("case-screening.list".to_string()),
+                graph_query: None,
+                durable: None,
+                args: vec![],
+                returns: None,
+                produces: None,
+                consumes: vec![],
+                lifecycle: None,
+                metadata: Some(VerbMetadata {
+                    noun: Some("screening".to_string()),
+                    tags: vec!["screening".to_string()],
+                    ..VerbMetadata::default()
+                }),
+                invocation_phrases: vec![],
+                policy: None,
+                sentences: None,
+                confirm_policy: None,
+            },
+        );
+
+        let index = VerbMetadataIndex::from_config(&config);
+        let matches = index.query(
+            ObservationPlane::Instance,
+            IntentPolarity::Read,
+            Some("screening"),
+        );
+        assert!(matches.iter().any(|meta| meta.domain == "case-screening"));
     }
 
     #[test]

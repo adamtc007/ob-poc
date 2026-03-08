@@ -1824,16 +1824,7 @@ impl GenericCrudExecutor {
         crud: &RuntimeCrudConfig,
         args: &HashMap<String, JsonValue>,
     ) -> Result<GenericExecutionResult> {
-        // Use explicit type_code from YAML config if present,
-        // otherwise derive from verb name (e.g., "create-limited-company" -> "LIMITED_COMPANY")
-        let type_code = if let Some(tc) = &crud.type_code {
-            tc.clone()
-        } else {
-            verb.verb
-                .strip_prefix("create-")
-                .map(|s| s.to_uppercase().replace('-', "_"))
-                .ok_or_else(|| anyhow!("Invalid entity create verb name: {}", verb.verb))?
-        };
+        let type_code = self.resolve_entity_type_code(verb, crud, args, "create-")?;
 
         // Look up entity_type_id and table_name
         // First try exact match, then try prefix match for shortened verb names
@@ -2028,16 +2019,7 @@ impl GenericCrudExecutor {
         crud: &RuntimeCrudConfig,
         args: &HashMap<String, JsonValue>,
     ) -> Result<GenericExecutionResult> {
-        // Use explicit type_code from YAML config if present,
-        // otherwise derive from verb name (e.g., "ensure-limited-company" -> "LIMITED_COMPANY")
-        let type_code = if let Some(tc) = &crud.type_code {
-            tc.clone()
-        } else {
-            verb.verb
-                .strip_prefix("ensure-")
-                .map(|s| s.to_uppercase().replace('-', "_"))
-                .ok_or_else(|| anyhow!("Invalid entity ensure verb name: {}", verb.verb))?
-        };
+        let type_code = self.resolve_entity_type_code(verb, crud, args, "ensure-")?;
 
         // Look up entity_type_id and table_name
         let type_sql = format!(
@@ -3048,14 +3030,7 @@ impl GenericCrudExecutor {
         crud: &RuntimeCrudConfig,
         args: &HashMap<String, JsonValue>,
     ) -> Result<GenericExecutionResult> {
-        let type_code = if let Some(tc) = &crud.type_code {
-            tc.clone()
-        } else {
-            verb.verb
-                .strip_prefix("create-")
-                .map(|s| s.to_uppercase().replace('-', "_"))
-                .ok_or_else(|| anyhow!("Invalid entity create verb name: {}", verb.verb))?
-        };
+        let type_code = self.resolve_entity_type_code(verb, crud, args, "create-")?;
 
         // Look up entity_type_id and table_name within tx
         let type_sql = format!(
@@ -3226,14 +3201,7 @@ impl GenericCrudExecutor {
         crud: &RuntimeCrudConfig,
         args: &HashMap<String, JsonValue>,
     ) -> Result<GenericExecutionResult> {
-        let type_code = if let Some(tc) = &crud.type_code {
-            tc.clone()
-        } else {
-            verb.verb
-                .strip_prefix("ensure-")
-                .map(|s| s.to_uppercase().replace('-', "_"))
-                .ok_or_else(|| anyhow!("Invalid entity ensure verb name: {}", verb.verb))?
-        };
+        let type_code = self.resolve_entity_type_code(verb, crud, args, "ensure-")?;
 
         let type_sql = format!(
             r#"SELECT entity_type_id, table_name FROM "{}".entity_types
@@ -3385,6 +3353,34 @@ impl GenericCrudExecutor {
     // =========================================================================
     // HELPER METHODS
     // =========================================================================
+
+    fn resolve_entity_type_code(
+        &self,
+        verb: &RuntimeVerb,
+        crud: &RuntimeCrudConfig,
+        args: &HashMap<String, JsonValue>,
+        verb_prefix: &str,
+    ) -> Result<String> {
+        if let Some(tc) = &crud.type_code {
+            return Ok(tc.clone());
+        }
+
+        if let Some(entity_type) = args.get("entity-type").and_then(JsonValue::as_str) {
+            return Ok(entity_type.trim().to_uppercase().replace('-', "_"));
+        }
+
+        if let Some(fund_type) = args.get("fund-type").and_then(JsonValue::as_str) {
+            return Ok(format!(
+                "FUND_{}",
+                fund_type.trim().to_uppercase().replace('-', "_")
+            ));
+        }
+
+        verb.verb
+            .strip_prefix(verb_prefix)
+            .map(|s| s.to_uppercase().replace('-', "_"))
+            .ok_or_else(|| anyhow!("Invalid entity verb name: {}", verb.verb))
+    }
 
     /// Infer PK column name from table name (convention: singular_id)
     fn infer_pk_column(&self, table: &str) -> &'static str {
@@ -3872,7 +3868,7 @@ mod dag_tests {
     async fn test_dag_dry_run_returns_plan() {
         let source = r#"
             (cbu.ensure :name "Test Fund" :jurisdiction "LU" :as @fund)
-            (entity.create-proper-person :first-name "John" :last-name "Smith" :as @john)
+            (entity.create :entity-type "proper-person" :first-name "John" :last-name "Smith" :as @john)
             (cbu.assign-role :cbu-id @fund :entity-id @john :role "DIRECTOR")
         "#;
         let program = parse_program(source).unwrap();
@@ -3938,7 +3934,7 @@ mod dag_tests {
         // DAG should group: Phase 1 (Entities) before Phase 3 (Roles)
         let source = r#"
             (cbu.ensure :name "Test Fund" :jurisdiction "LU" :as @fund)
-            (entity.create-proper-person :first-name "John" :last-name "Smith" :as @john)
+            (entity.create :entity-type "proper-person" :first-name "John" :last-name "Smith" :as @john)
             (cbu.assign-role :cbu-id @fund :entity-id @john :role "DIRECTOR")
         "#;
         let program = parse_program(source).unwrap();
@@ -3996,8 +3992,8 @@ mod dag_tests {
     #[tokio::test]
     async fn test_dag_ownership_compile() {
         let source = r#"
-            (entity.create-limited-company :name "Parent Co" :jurisdiction "US" :as @parent)
-            (entity.create-limited-company :name "Child Co" :jurisdiction "US" :as @child)
+            (entity.create :entity-type "limited-company" :name "Parent Co" :jurisdiction "US" :as @parent)
+            (entity.create :entity-type "limited-company" :name "Child Co" :jurisdiction "US" :as @child)
             (ubo.add-ownership :owner-entity-id @parent :owned-entity-id @child :percentage 100 :ownership-type "DIRECT")
         "#;
         let program = parse_program(source).unwrap();

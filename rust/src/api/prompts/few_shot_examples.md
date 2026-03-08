@@ -41,7 +41,7 @@
 {
   "intents": [
     {
-      "verb": "entity.create-proper-person",
+      "verb": "entity.create",
       "params": {"first-name": "John", "last-name": "Smith"},
       "refs": {},
       "lookups": null
@@ -81,7 +81,7 @@
 {
   "intents": [
     {
-      "verb": "entity.create-limited-company",
+      "verb": "entity.create",
       "params": {"name": "Holdings Ltd", "jurisdiction": "JE"},
       "refs": {},
       "lookups": null

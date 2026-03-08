@@ -6,14 +6,14 @@
     :jurisdiction "GB"
     :as @cbu)
 
-(entity.create-limited-company
+(entity.create :entity-type "limited-company"
     :cbu-id @cbu
     :name "Acme Holdings Ltd"
     :company-number "12345678"
     :jurisdiction "GB"
     :as @company)
 
-(entity.create-proper-person
+(entity.create :entity-type "proper-person"
     :cbu-id @cbu
     :first-name "Jane"
     :last-name "Doe"
@@ -63,10 +63,10 @@
     :as @ws-ubo)
 
 ;; Run screenings via workstreams
-(case-screening.run
+(screening.run
     :workstream-id @ws-ubo
     :screening-type "PEP")
 
-(case-screening.run
+(screening.run
     :workstream-id @ws-company
     :screening-type "SANCTIONS")

@@ -39,12 +39,12 @@ intents:
       - "new trust"
       - "add partnership"
     verbs:
-      - entity.create-proper-person
-      - entity.create-limited-company
-      - entity.create-partnership-limited
-      - entity.create-trust-discretionary
-      - entity.ensure-proper-person
-      - entity.ensure-limited-company
+      - entity.create
+      - entity.create
+      - entity.create
+      - entity.create
+      - entity.ensure
+      - entity.ensure
     priority: 100
 
   find_entity:
@@ -182,7 +182,7 @@ intents:
       - "document request"
       - "need document"
     verbs:
-      - doc-request.create
+      - document.create-request
       - rfi.generate
     priority: 90
 
@@ -209,7 +209,7 @@ intents:
       - "adverse media"
       - "sanctions check"
     verbs:
-      - case-screening.run
+      - screening.run
       - screening.pep
       - screening.sanctions
       - screening.adverse-media
@@ -379,8 +379,7 @@ intents:
       - "reporting sla"
     verbs:
       - sla.commit
-      - sla.bind-to-service
-      - sla.bind-to-resource
+      - sla.bind
       - sla.list-templates
     context: |
       SLA commitments define WHAT service levels are promised to a client.
@@ -447,9 +446,9 @@ intents:
       - "lifecycle gaps"
       - "missing resources"
     verbs:
-      - lifecycle.analyze-gaps
-      - lifecycle.check-readiness
-      - lifecycle.discover
+      - service-resource.analyze-lifecycle-gaps
+      - service-resource.check-lifecycle-readiness
+      - service-resource.discover-lifecycles
       - matrix-overlay.unified-gaps
     context: |
       Gap analysis compares what a CBU WANTS to trade (universe) against
@@ -465,10 +464,10 @@ intents:
       - "enable trading"
       - "configure for"
     verbs:
-      - lifecycle.provision
-      - lifecycle.activate
-      - lifecycle.generate-plan
-      - lifecycle.execute-plan
+      - service-resource.provision-lifecycle
+      - service-resource.activate-lifecycle
+      - service-resource.generate-lifecycle-plan
+      - service-resource.execute-lifecycle-plan
     context: |
       Lifecycle provisioning creates the operational infrastructure for trading:
       accounts, SSIs, connectivity, data feeds, agreements. Uses dependency
@@ -486,8 +485,8 @@ intents:
       - "turn on custody"
       - "add prime brokerage"
     verbs:
-      - product-subscription.subscribe
-      - product-subscription.list
+      - cbu.add-product
+      - cbu.list-subscriptions
     context: |
       Product subscriptions link CBUs to products like Custody, Prime Brokerage,
       Fund Accounting. Products ADD capabilities to the trading matrix.
@@ -634,12 +633,12 @@ categories:
     label: "Entity Management"
     description: "Create, update, and manage legal entities"
     verbs:
-      - entity.create-proper-person
-      - entity.create-limited-company
-      - entity.create-partnership-limited
-      - entity.create-trust-discretionary
-      - entity.ensure-proper-person
-      - entity.ensure-limited-company
+      - entity.create
+      - entity.create
+      - entity.create
+      - entity.create
+      - entity.ensure
+      - entity.ensure
       - entity.read
       - entity.list
       - entity.update
@@ -667,7 +666,7 @@ categories:
     verbs:
       - ubo.add-ownership
       - ubo.update-ownership
-      - ubo.end-ownership
+      - ubo.end-relationship
       - ubo.list-owners
       - ubo.list-owned
       - ubo.trace-chains
@@ -685,9 +684,9 @@ categories:
       - document.catalog
       - document.extract
       - document.extract-to-observations
-      - doc-request.create
-      - doc-request.receive
-      - doc-request.verify
+      - document.create-request
+      - document.receive-request
+      - document.verify-request
       - rfi.generate
       - rfi.check-completion
 
@@ -711,9 +710,9 @@ categories:
     label: "Screening"
     description: "Sanctions, PEP, and adverse media screening"
     verbs:
-      - case-screening.run
-      - case-screening.complete
-      - case-screening.review-hit
+      - screening.run
+      - screening.complete
+      - screening.review-hit
       - screening.pep
       - screening.sanctions
       - screening.adverse-media
@@ -763,9 +762,7 @@ categories:
     label: "Fund Structure"
     description: "Fund hierarchy, share classes, and investor registry"
     verbs:
-      - fund.ensure-umbrella
-      - fund.ensure-subfund
-      - fund.ensure-share-class
+      - fund.ensure
       - share-class.create
       - share-class.update-nav
       - holding.create
@@ -807,8 +804,8 @@ categories:
       - pricing-config.find-for-instrument
       # SLA
       - sla.commit
-      - sla.bind-to-service
-      - sla.bind-to-resource
+      - sla.bind
+      - sla.bind
       - sla.override-target
       - sla.list-commitments
       - sla.record-measurement
@@ -820,14 +817,14 @@ categories:
       - cash-sweep.change-vehicle
       - cash-sweep.list
       # Lifecycle
-      - lifecycle.analyze-gaps
-      - lifecycle.check-readiness
-      - lifecycle.provision
-      - lifecycle.generate-plan
+      - service-resource.analyze-lifecycle-gaps
+      - service-resource.check-lifecycle-readiness
+      - service-resource.provision-lifecycle
+      - service-resource.generate-lifecycle-plan
       # Product Overlay
       - matrix-overlay.add
       - matrix-overlay.effective-matrix
-      - product-subscription.subscribe
+      - cbu.add-product
 
 # =============================================================================
 # GRAPH CONTEXT MAPPINGS
@@ -854,7 +851,7 @@ graph_context:
       - cbu.assign-role
       - ubo.add-ownership
       - document.catalog
-      - case-screening.run
+      - screening.run
       - graph.focus
       - graph.ancestors
       - entity-workstream.create
@@ -874,7 +871,7 @@ graph_context:
   cursor_on_ownership:
     verbs:
       - ubo.update-ownership
-      - ubo.end-ownership
+      - ubo.end-relationship
       - ubo.infer-chain
       - graph.ancestors
     priority: 85
@@ -902,8 +899,8 @@ graph_context:
     verbs:
       - kyc-case.state
       - entity-workstream.update-status
-      - case-screening.run
-      - doc-request.create
+      - screening.run
+      - document.create-request
       - red-flag.raise
     priority: 90
 
@@ -938,8 +935,8 @@ workflow_phases:
     verbs:
       - cbu.create
       - cbu.ensure
-      - entity.create-proper-person
-      - entity.create-limited-company
+      - entity.create
+      - entity.create
       - cbu.assign-role
       - allegation.record
       - kyc-case.create
@@ -950,8 +947,8 @@ workflow_phases:
     label: "Entity Collection"
     description: "Gathering all related entities and roles"
     verbs:
-      - entity.create-proper-person
-      - entity.create-limited-company
+      - entity.create
+      - entity.create
       - cbu.assign-role
       - ubo.add-ownership
       - ubo.trace-chains
@@ -966,9 +963,9 @@ workflow_phases:
     label: "Screening"
     description: "Running sanctions, PEP, and adverse media checks"
     verbs:
-      - case-screening.run
-      - case-screening.complete
-      - case-screening.review-hit
+      - screening.run
+      - screening.complete
+      - screening.review-hit
       - screening.pep
       - screening.sanctions
     required_before_advance:
@@ -980,10 +977,10 @@ workflow_phases:
     label: "Document Collection"
     description: "Collecting and verifying required documents"
     verbs:
-      - doc-request.create
+      - document.create-request
       - document.catalog
-      - doc-request.receive
-      - doc-request.verify
+      - document.receive-request
+      - document.verify-request
       - rfi.generate
       - rfi.check-completion
     required_before_advance:
@@ -1049,13 +1046,13 @@ examples:
     short: "Assign John Smith as director"
     dsl: '(cbu.assign-role :cbu-id @fund :entity-id @john :role "DIRECTOR")'
 
-  "entity.create-proper-person":
+  "entity.create":
     short: "Create a natural person"
-    dsl: '(entity.create-proper-person :first-name "John" :last-name "Smith" :date-of-birth "1980-01-15" :nationality "GB" :as @john)'
+    dsl: '(entity.create :entity-type "proper-person" :first-name "John" :last-name "Smith" :date-of-birth "1980-01-15" :nationality "GB" :as @john)'
 
-  "entity.create-limited-company":
-    short: "Create a UK company"
-    dsl: '(entity.create-limited-company :name "Holdings Ltd" :jurisdiction "GB" :registration-number "12345678" :as @company)'
+  "entity.ensure":
+    short: "Create or update a UK company"
+    dsl: '(entity.ensure :entity-type "limited-company" :name "Holdings Ltd" :jurisdiction "GB" :company-number "12345678" :as @company)'
 
   "ubo.add-ownership":
     short: "Record 60% ownership"
@@ -1073,9 +1070,9 @@ examples:
     short: "Create new client KYC case"
     dsl: '(kyc-case.create :cbu-id @fund :case-type "NEW_CLIENT" :as @case)'
 
-  "case-screening.run":
+  "screening.run":
     short: "Run PEP screening on entity"
-    dsl: '(case-screening.run :workstream-id @ws :screening-type "PEP")'
+    dsl: '(screening.run :workstream-id @ws :screening-type "PEP")'
 
   "graph.view":
     short: "View CBU graph in KYC mode"
@@ -1191,18 +1188,18 @@ examples:
         :sweep-timezone "America/New_York"
         :frequency "DAILY")
 
-  "lifecycle.analyze-gaps":
+  "service-resource.analyze-lifecycle-gaps":
     short: "Find missing resources for trading"
     dsl: |
-      (lifecycle.analyze-gaps
+      (service-resource.analyze-lifecycle-gaps
         :cbu-id @fund
         :instrument-class "EQUITY"
         :market "XNYS")
 
-  "lifecycle.provision":
+  "service-resource.provision-lifecycle":
     short: "Provision missing lifecycle resources"
     dsl: |
-      (lifecycle.provision
+      (service-resource.provision-lifecycle
         :cbu-id @fund
         :lifecycle-id @lifecycle
         :resources ["SSI" "BOOKING_RULE" "IM_CONNECTIVITY"])

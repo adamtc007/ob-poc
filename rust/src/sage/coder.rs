@@ -104,10 +104,38 @@ impl CoderEngine {
         }
 
         let candidates = self.scorer.score(outcome, 5);
+        let step = primary_step(outcome);
+        let threshold = acceptance_threshold(&step);
         let top = candidates
             .first()
             .cloned()
             .ok_or_else(|| anyhow!("no coder candidates for outcome"))?;
+        let verb_required = self
+            .verb_index
+            .get(&top.fqn)
+            .map(|meta| meta.required_params.len())
+            .unwrap_or_default();
+
+        tracing::debug!(
+            domain_concept = %outcome.domain_concept,
+            action = ?outcome.action,
+            plane = ?outcome.plane,
+            polarity = ?outcome.polarity,
+            candidate_count = candidates.len(),
+            top_candidate = %top.fqn,
+            top_score = top.score,
+            param_overlap_score = top.param_overlap_score,
+            step_param_count = step.params.len(),
+            verb_required_count = verb_required,
+            "Coder resolve"
+        );
+
+        if top.score < threshold {
+            return Err(anyhow!(
+                "no coder candidate met threshold ({score:.3} < {threshold:.3})",
+                score = top.score
+            ));
+        }
         self.resolve_candidate(outcome, &top)
     }
 
@@ -218,6 +246,10 @@ fn primary_step(outcome: &OutcomeIntent) -> OutcomeStep {
             params: Default::default(),
             notes: None,
         })
+}
+
+fn acceptance_threshold(step: &OutcomeStep) -> f32 {
+    if step.params.is_empty() { 0.25 } else { 0.5 }
 }
 
 #[cfg(test)]

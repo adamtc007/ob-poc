@@ -217,7 +217,7 @@ ecir_path = "fallthrough"
 
 [[test]]
 utterance = "create a legal entity for HSBC Holdings plc"
-expected_verb = "entity.create-limited-company"
+expected_verb = "entity.create"
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "entity"
@@ -227,7 +227,7 @@ ecir_path = "fallthrough"
 
 [[test]]
 utterance = "add a new company"
-expected_verb = "entity.create-limited-company"
+expected_verb = "entity.create"
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "entity"
@@ -237,7 +237,7 @@ ecir_path = "fallthrough"
 
 [[test]]
 utterance = "register John Smith as a person"
-expected_verb = "entity.create-proper-person"
+expected_verb = "entity.create"
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "entity"
@@ -248,7 +248,7 @@ ecir_path = "fallthrough"
 
 [[test]]
 utterance = "I need to add a trust -- Cayman Islands discretionary trust"
-expected_verb = "entity.create-trust-discretionary"
+expected_verb = "entity.create"
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "entity"
@@ -259,7 +259,7 @@ ecir_path = "fallthrough"
 
 [[test]]
 utterance = "add a limited partnership for the GP structure"
-expected_verb = "entity.create-partnership-limited"
+expected_verb = "entity.create"
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "entity"
@@ -387,7 +387,7 @@ expected_polarity = "write"
 expected_domain_concept = "screening"
 category = "natural"
 difficulty = "hard"
-alt_verbs = ["screening.pep", "screening.adverse-media", "case-screening.run"]
+alt_verbs = ["screening.pep", "screening.adverse-media", "screening.run"]
 notes = "'AML checks' is vague - could be sanctions, PEP, or both"
 ecir_path = "fallthrough"
 
@@ -399,7 +399,7 @@ expected_polarity = "write"
 expected_domain_concept = "screening"
 category = "natural"
 difficulty = "hard"
-alt_verbs = ["case-screening.run", "screening.pep", "screening.adverse-media"]
+alt_verbs = ["screening.run", "screening.pep", "screening.adverse-media"]
 notes = "Very terse - needs context to disambiguate"
 ecir_path = "fallthrough"
 
@@ -545,7 +545,7 @@ ecir_path = "fallthrough"
 
 [[test]]
 utterance = "create an umbrella fund -- UCITS, Luxembourg domiciled"
-expected_verb = "fund.create-umbrella"
+expected_verb = "fund.create"
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "fund"
@@ -555,7 +555,7 @@ ecir_path = "fallthrough"
 
 [[test]]
 utterance = "set up a new subfund under the umbrella"
-expected_verb = "fund.create-subfund"
+expected_verb = "fund.create"
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "fund"
@@ -565,7 +565,7 @@ ecir_path = "fallthrough"
 
 [[test]]
 utterance = "add a share class -- accumulating, EUR denominated"
-expected_verb = "fund.create-share-class"
+expected_verb = "fund.create"
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "fund"
@@ -575,13 +575,13 @@ ecir_path = "fallthrough"
 
 [[test]]
 utterance = "create a master-feeder structure"
-expected_verb = "fund.create-master"
+expected_verb = "fund.create"
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "fund"
 category = "natural"
 difficulty = "hard"
-alt_verbs = ["fund.create-feeder"]
+alt_verbs = ["fund.create"]
 notes = "Could mean either master or feeder creation"
 ecir_path = "fallthrough"
 
@@ -638,7 +638,7 @@ ecir_path = "fallthrough"
 
 [[test]]
 utterance = "create a standalone fund -- AIF, Jersey"
-expected_verb = "fund.create-standalone"
+expected_verb = "fund.create"
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "fund"
@@ -1258,7 +1258,7 @@ expected_polarity = "write"
 expected_domain_concept = "cbu"
 category = "adversarial"
 difficulty = "expert"
-alt_verbs = ["entity.create-limited-company", "fund.create-umbrella", "deal.create"]
+alt_verbs = ["entity.create", "fund.create", "deal.create"]
 notes = "Completely ambiguous without context"
 ecir_path = "fallthrough"
 
@@ -1951,7 +1951,7 @@ ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Create an umbrella fund"
-expected_verb = "fund.create-umbrella"
+expected_verb = "fund.create"
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "fund"

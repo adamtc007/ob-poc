@@ -384,7 +384,7 @@ impl RuntimeVerbRegistry {
                     name: Some("entity_id".to_string()),
                     capture: true,
                 },
-                // Dynamic entity.create-* verbs produce an entity with subtype
+                // Dynamic implicit-create registrations still produce an entity with subtype
                 produces: Some(VerbProduces {
                     produced_type: "entity".to_string(),
                     subtype: Some(type_code.clone()),

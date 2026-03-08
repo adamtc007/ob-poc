@@ -874,7 +874,7 @@ mod tests {
     fn test_already_sorted_no_reorder() {
         let source = r#"
             (cbu.ensure :name "Fund" :jurisdiction "LU" :as @fund)
-            (entity.create-proper-person :first-name "John" :last-name "Smith" :as @john)
+            (entity.create :entity-type "proper-person" :first-name "John" :last-name "Smith" :as @john)
             (cbu.assign-role :cbu-id @fund :entity-id @john :role "DIRECTOR")
         "#;
 
@@ -895,7 +895,7 @@ mod tests {
     fn test_out_of_order_reorders() {
         let source = r#"
             (cbu.assign-role :cbu-id @fund :entity-id @john :role "DIRECTOR")
-            (entity.create-proper-person :first-name "John" :last-name "Smith" :as @john)
+            (entity.create :entity-type "proper-person" :first-name "John" :last-name "Smith" :as @john)
             (cbu.ensure :name "Fund" :jurisdiction "LU" :as @fund)
         "#;
 
@@ -928,7 +928,7 @@ mod tests {
         assert!(
             first_two_verbs.contains(&"ensure")
                 && first_two_verbs.contains(&"create-proper-person"),
-            "First two should be cbu.ensure and entity.create-proper-person (any order)"
+            "First two should be cbu.ensure and entity.create (any order)"
         );
     }
 
@@ -947,7 +947,7 @@ mod tests {
         // New statement references existing @fund
         let source = r#"
             (cbu.assign-role :cbu-id @fund :entity-id @john :role "DIRECTOR")
-            (entity.create-proper-person :first-name "John" :last-name "Smith" :as @john)
+            (entity.create :entity-type "proper-person" :first-name "John" :last-name "Smith" :as @john)
         "#;
 
         let ast = parse_program(source).expect("parse");
@@ -1037,7 +1037,7 @@ mod tests {
         // Basic dataflow sorting should still work
         let source = r#"
             (cbu.assign-role :cbu-id @fund :entity-id @john :role "DIRECTOR")
-            (entity.create-proper-person :first-name "John" :last-name "Smith" :as @john)
+            (entity.create :entity-type "proper-person" :first-name "John" :last-name "Smith" :as @john)
             (cbu.ensure :name "Fund" :jurisdiction "LU" :as @fund)
         "#;
 
@@ -1062,7 +1062,7 @@ mod tests {
         let source = r#"
             (cbu.assign-role :cbu-id @fund :entity-id @john :role "DIRECTOR")
             (cbu.ensure :name "Fund" :jurisdiction "LU" :as @fund)
-            (entity.create-proper-person :first-name "John" :last-name "Smith" :as @john)
+            (entity.create :entity-type "proper-person" :first-name "John" :last-name "Smith" :as @john)
         "#;
 
         let ast = parse_program(source).expect("parse");
@@ -1090,7 +1090,7 @@ mod tests {
     fn test_lifecycle_sort_no_reorder_already_sorted() {
         let source = r#"
             (cbu.ensure :name "Fund" :jurisdiction "LU" :as @fund)
-            (entity.create-proper-person :first-name "John" :last-name "Smith" :as @john)
+            (entity.create :entity-type "proper-person" :first-name "John" :last-name "Smith" :as @john)
             (cbu.assign-role :cbu-id @fund :entity-id @john :role "DIRECTOR")
         "#;
 
@@ -1132,7 +1132,7 @@ mod tests {
 
         let source = r#"
             (cbu.assign-role :cbu-id @fund :entity-id @john :role "DIRECTOR")
-            (entity.create-proper-person :first-name "John" :last-name "Smith" :as @john)
+            (entity.create :entity-type "proper-person" :first-name "John" :last-name "Smith" :as @john)
         "#;
 
         let ast = parse_program(source).expect("parse");
@@ -1202,7 +1202,7 @@ mod tests {
         // A chain: create fund → create person → assign role
         let source = r#"
             (cbu.ensure :name "Fund" :jurisdiction "LU" :as @fund)
-            (entity.create-proper-person :first-name "John" :last-name "Smith" :as @john)
+            (entity.create :entity-type "proper-person" :first-name "John" :last-name "Smith" :as @john)
             (cbu.assign-role :cbu-id @fund :entity-id @john :role "DIRECTOR")
         "#;
 
@@ -1235,7 +1235,7 @@ mod tests {
         // Deep chain: A → B → C (each depends on previous)
         let source = r#"
             (cbu.ensure :name "Fund" :jurisdiction "LU" :as @fund)
-            (entity.create-proper-person :first-name "John" :last-name "Smith" :as @john)
+            (entity.create :entity-type "proper-person" :first-name "John" :last-name "Smith" :as @john)
             (cbu.assign-role :cbu-id @fund :entity-id @john :role "DIRECTOR" :as @role)
         "#;
 

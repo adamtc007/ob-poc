@@ -232,8 +232,8 @@ mod db_tests {
         let dsl = format!(
             r#"
             (cbu.create :name "{}" :as @cbu)
-            (entity.create-limited-company :cbu-id @cbu :name "{}" :as @company)
-            (entity.create-proper-person :cbu-id @cbu :first-name "John" :last-name "Doe" :as @person)
+            (entity.create :entity-type "limited-company" :cbu-id @cbu :name "{}" :as @company)
+            (entity.create :entity-type "proper-person" :cbu-id @cbu :first-name "John" :last-name "Doe" :as @person)
         "#,
             db.name("TypeMapCBU"),
             db.name("Company")
@@ -276,8 +276,8 @@ mod db_tests {
         let dsl = format!(
             r#"
             (cbu.create :name "{}" :as @cbu)
-            (entity.create-limited-company :cbu-id @cbu :name "{}" :as @company)
-            (entity.create-proper-person :cbu-id @cbu :first-name "Jane" :last-name "Doe" :as @ubo)
+            (entity.create :entity-type "limited-company" :cbu-id @cbu :name "{}" :as @company)
+            (entity.create :entity-type "proper-person" :cbu-id @cbu :first-name "Jane" :last-name "Doe" :as @ubo)
             (cbu.assign-role :cbu-id @cbu :entity-id @ubo :role "BENEFICIAL_OWNER")
         "#,
             db.name("FKTestCBU"),
@@ -305,7 +305,7 @@ mod db_tests {
         let db = TestDb::new().await?;
 
         let dsl = r#"
-            (entity.create-proper-person :cbu-id @nonexistent :first-name "Test" :last-name "User")
+            (entity.create :entity-type "proper-person" :cbu-id @nonexistent :first-name "Test" :last-name "User")
         "#;
 
         let result = db.execute_dsl(dsl).await;
@@ -328,8 +328,8 @@ mod db_tests {
         let dsl = format!(
             r#"
             (cbu.create :name "{}" :as @cbu)
-            (entity.create-limited-company :cbu-id @cbu :name "{}" :as @company)
-            (entity.create-proper-person :cbu-id @cbu :first-name "Test" :last-name "Person" :as @person)
+            (entity.create :entity-type "limited-company" :cbu-id @cbu :name "{}" :as @company)
+            (entity.create :entity-type "proper-person" :cbu-id @cbu :first-name "Test" :last-name "Person" :as @person)
             (cbu.assign-role :cbu-id @cbu :entity-id @person :role "INVALID_ROLE_XYZ")
         "#,
             db.name("InvalidRoleCBU"),
@@ -361,7 +361,7 @@ mod db_tests {
         let dsl = format!(
             r#"
             (cbu.create :name "{}株式会社" :jurisdiction "JP" :as @cbu)
-            (entity.create-limited-company :cbu-id @cbu :name "{}東京支店" :as @company)
+            (entity.create :entity-type "limited-company" :cbu-id @cbu :name "{}東京支店" :as @company)
         "#,
             db.name("Unicode"),
             db.name("Unicode")
@@ -690,13 +690,13 @@ mod db_tests {
         // 3. Catalog documents
         // 4. Create KYC case
         // 5. Create entity workstreams for UBOs
-        // 6. Run screenings via case-screening.run
+        // 6. Run screenings via screening.run
         let dsl = format!(
             r#"
             (cbu.create :name "{}" :client-type "corporate" :jurisdiction "GB" :as @cbu)
-            (entity.create-limited-company :cbu-id @cbu :name "{}" :as @company)
-            (entity.create-proper-person :cbu-id @cbu :first-name "Alice" :last-name "UBO1" :as @ubo1)
-            (entity.create-proper-person :cbu-id @cbu :first-name "Bob" :last-name "UBO2" :as @ubo2)
+            (entity.create :entity-type "limited-company" :cbu-id @cbu :name "{}" :as @company)
+            (entity.create :entity-type "proper-person" :cbu-id @cbu :first-name "Alice" :last-name "UBO1" :as @ubo1)
+            (entity.create :entity-type "proper-person" :cbu-id @cbu :first-name "Bob" :last-name "UBO2" :as @ubo2)
             (cbu.assign-role :cbu-id @cbu :entity-id @ubo1 :role "BENEFICIAL_OWNER")
             (cbu.assign-role :cbu-id @cbu :entity-id @ubo2 :role "BENEFICIAL_OWNER")
             (document.catalog :cbu-id @cbu :doc-type "CERTIFICATE_OF_INCORPORATION" :title "Company Certificate")
@@ -705,10 +705,10 @@ mod db_tests {
             (kyc-case.create :cbu-id @cbu :case-type "NEW_CLIENT" :as @case)
             (entity-workstream.create :case-id @case :entity-id @ubo1 :as @ws1)
             (entity-workstream.create :case-id @case :entity-id @ubo2 :as @ws2)
-            (case-screening.run :workstream-id @ws1 :screening-type "PEP")
-            (case-screening.run :workstream-id @ws1 :screening-type "SANCTIONS")
-            (case-screening.run :workstream-id @ws2 :screening-type "PEP")
-            (case-screening.run :workstream-id @ws2 :screening-type "SANCTIONS")
+            (screening.run :workstream-id @ws1 :screening-type "PEP")
+            (screening.run :workstream-id @ws1 :screening-type "SANCTIONS")
+            (screening.run :workstream-id @ws2 :screening-type "PEP")
+            (screening.run :workstream-id @ws2 :screening-type "SANCTIONS")
         "#,
             db.name("FullCBU"),
             db.name("FullCompany")
@@ -866,12 +866,12 @@ mod db_tests {
         let dsl = format!(
             r#"
             (cbu.create :name "{}" :client-type "corporate" :jurisdiction "GB" :as @cbu)
-            (entity.create-proper-person :cbu-id @cbu :first-name "Test" :last-name "UBO" :as @ubo)
+            (entity.create :entity-type "proper-person" :cbu-id @cbu :first-name "Test" :last-name "UBO" :as @ubo)
             (cbu.assign-role :cbu-id @cbu :entity-id @ubo :role "BENEFICIAL_OWNER")
             (kyc-case.create :cbu-id @cbu :case-type "NEW_CLIENT" :as @case)
             (entity-workstream.create :case-id @case :entity-id @ubo :as @ws)
-            (case-screening.run :workstream-id @ws :screening-type "SANCTIONS")
-            (case-screening.complete :screening-id @ws :status "CLEAR" :result-summary "No matches found")
+            (screening.run :workstream-id @ws :screening-type "SANCTIONS")
+            (screening.complete :screening-id @ws :status "CLEAR" :result-summary "No matches found")
             (entity-workstream.complete :workstream-id @ws)
             "#,
             db.name("DecisionCBU")

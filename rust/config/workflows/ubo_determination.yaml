@@ -136,11 +136,11 @@ actions:
       description: Add ownership relationship
 
     - action: add_owner_entity
-      verb: entity.create-limited-company
+      verb: entity.create
       description: Add corporate owner
 
     - action: add_owner_person
-      verb: entity.create-proper-person
+      verb: entity.create
       description: Add individual owner
 
     - action: set_ownership_percent
@@ -179,7 +179,7 @@ actions:
       description: Verify UBO identity
 
     - action: run_screening
-      verb: case-screening.run
+      verb: screening.run
       description: Screen UBO
 
     - action: verify_ubo

@@ -9,7 +9,7 @@
     :as @cbu)
 
 ;; Create the company
-(entity.create-limited-company
+(entity.create :entity-type "limited-company"
     :cbu-id @cbu
     :name "Test Holdings Ltd"
     :company-number "UK999888"
@@ -17,14 +17,14 @@
     :as @company)
 
 ;; Create shareholders
-(entity.create-limited-company
+(entity.create :entity-type "limited-company"
     :cbu-id @cbu
     :name "Majority Investor Ltd"
     :company-number "UK999777"
     :jurisdiction "GB"
     :as @majority-holder)
 
-(entity.create-proper-person
+(entity.create :entity-type "proper-person"
     :cbu-id @cbu
     :first-name "John"
     :last-name "Founder"
@@ -32,7 +32,7 @@
     :nationality "GB"
     :as @founder)
 
-(entity.create-proper-person
+(entity.create :entity-type "proper-person"
     :cbu-id @cbu
     :first-name "Jane"
     :last-name "Angel"

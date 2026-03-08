@@ -152,11 +152,11 @@ actions:
 
   SCREENING_REFRESH:
     - action: run_screening
-      verb: case-screening.run
+      verb: screening.run
       description: Run screening refresh
 
     - action: review_hit
-      verb: case-screening.review-hit
+      verb: screening.review-hit
       description: Review any new hits
 
   CHANGE_ANALYSIS:

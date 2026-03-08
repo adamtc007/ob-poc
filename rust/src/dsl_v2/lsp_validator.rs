@@ -716,7 +716,7 @@ mod tests {
     fn test_verb_return_type() {
         assert_eq!(verb_return_type("cbu.create"), RefType::Cbu);
         assert_eq!(
-            verb_return_type("entity.create-proper-person"),
+            verb_return_type("entity.create"),
             RefType::Entity
         );
         assert_eq!(verb_return_type("document.catalog"), RefType::Document);

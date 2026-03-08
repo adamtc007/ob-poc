@@ -8,14 +8,14 @@
     :jurisdiction "GB"
     :as @cbu)
 
-(entity.create-limited-company
+(entity.create :entity-type "limited-company"
     :cbu-id @cbu
     :name "KYC Complete Ltd"
     :company-number "UK111222"
     :jurisdiction "GB"
     :as @company)
 
-(entity.create-proper-person
+(entity.create :entity-type "proper-person"
     :cbu-id @cbu
     :first-name "Complete"
     :last-name "Review"
@@ -82,43 +82,43 @@
     :as @ws-ubo)
 
 ;; Run screenings via workstreams
-(case-screening.run
+(screening.run
     :workstream-id @ws-ubo
     :screening-type "PEP"
     :as @pep)
 
-(case-screening.run
+(screening.run
     :workstream-id @ws-ubo
     :screening-type "SANCTIONS"
     :as @ubo-sanctions)
 
-(case-screening.run
+(screening.run
     :workstream-id @ws-company
     :screening-type "SANCTIONS"
     :as @company-sanctions)
 
-(case-screening.run
+(screening.run
     :workstream-id @ws-ubo
     :screening-type "ADVERSE_MEDIA"
     :as @adverse)
 
 ;; Complete screenings with clear results
-(case-screening.complete
+(screening.complete
     :screening-id @pep
     :status "CLEAR"
     :result-summary "No PEP matches found")
 
-(case-screening.complete
+(screening.complete
     :screening-id @ubo-sanctions
     :status "CLEAR"
     :result-summary "No sanctions matches found")
 
-(case-screening.complete
+(screening.complete
     :screening-id @company-sanctions
     :status "CLEAR"
     :result-summary "No sanctions matches found")
 
-(case-screening.complete
+(screening.complete
     :screening-id @adverse
     :status "CLEAR"
     :result-summary "No adverse media found")

@@ -81,7 +81,7 @@ warnings:
     name: missing_jurisdiction
     description: "Entity created without jurisdiction"
     when:
-      verb_pattern: "entity.create-*"
+      verb: entity.create
       missing_arg: jurisdiction
     message: "Entity created without jurisdiction. Consider adding jurisdiction for compliance."
 

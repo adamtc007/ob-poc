@@ -12,7 +12,7 @@
   :as @fund)
 
 ;; --- Create Fund Entity (SICAV) ---
-(entity.ensure-limited-company
+(entity.ensure :entity-type "limited-company"
   :name "Multi-Manager Global SICAV"
   :jurisdiction "LU"
   :as @fund-entity)
@@ -23,7 +23,7 @@
   :role "ASSET_OWNER")
 
 ;; --- Create Management Company ---
-(entity.ensure-limited-company
+(entity.ensure :entity-type "limited-company"
   :name "Luxembourg Fund Management S.a r.l."
   :jurisdiction "LU"
   :as @manco)
@@ -34,7 +34,7 @@
   :role "MANAGEMENT_COMPANY")
 
 ;; --- Investment Manager 1: European Equities ---
-(entity.ensure-limited-company
+(entity.ensure :entity-type "limited-company"
   :name "European Equity Partners GmbH"
   :jurisdiction "DE"
   :as @im-europe)
@@ -45,7 +45,7 @@
   :role "INVESTMENT_MANAGER")
 
 ;; --- Investment Manager 2: US Equities ---
-(entity.ensure-limited-company
+(entity.ensure :entity-type "limited-company"
   :name "US Growth Capital LLC"
   :jurisdiction "US"
   :as @im-us)
@@ -56,7 +56,7 @@
   :role "INVESTMENT_MANAGER")
 
 ;; --- Investment Manager 3: Fixed Income ---
-(entity.ensure-limited-company
+(entity.ensure :entity-type "limited-company"
   :name "Global Fixed Income Partners Ltd"
   :jurisdiction "GB"
   :as @im-fi)

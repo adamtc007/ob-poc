@@ -21,7 +21,7 @@ lifecycle_discovery:
     intents:
       - intent: declare_trading_scope
         description: "User declares what they want to trade - triggers full lifecycle discovery"
-        canonical_verb: lifecycle.analyze-gaps
+        canonical_verb: service-resource.analyze-lifecycle-gaps
         trigger_phrases:
           - "we trade {instruments}"
           - "we want to trade {instruments}"
@@ -71,7 +71,7 @@ lifecycle_discovery:
 
       - intent: declare_otc_counterparty
         description: "User declares OTC derivative counterparty - triggers ISDA/CSA discovery"
-        canonical_verb: lifecycle.analyze-gaps
+        canonical_verb: service-resource.analyze-lifecycle-gaps
         trigger_phrases:
           - "we trade derivatives with {counterparty}"
           - "{counterparty} is our swap counterparty"
@@ -195,7 +195,7 @@ lifecycle_discovery:
     intents:
       - intent: provision_all
         description: "User approves full provisioning"
-        canonical_verb: lifecycle.execute-plan
+        canonical_verb: service-resource.execute-lifecycle-plan
         trigger_phrases:
           - "set it all up"
           - "provision everything"
@@ -207,7 +207,7 @@ lifecycle_discovery:
         
       - intent: provision_selective
         description: "User approves partial provisioning"
-        canonical_verb: lifecycle.execute-plan
+        canonical_verb: service-resource.execute-lifecycle-plan
         trigger_phrases:
           - "just set up {components}"
           - "only create {components}"
@@ -219,7 +219,7 @@ lifecycle_discovery:
 
       - intent: review_plan
         description: "User wants to review before provisioning"
-        canonical_verb: lifecycle.provision-plan
+        canonical_verb: service-resource.provision-lifecycle-plan
         trigger_phrases:
           - "show me the plan"
           - "what will be created"
@@ -236,7 +236,7 @@ lifecycle_discovery:
     intents:
       - intent: check_readiness
         description: "User asks if they're ready to trade"
-        canonical_verb: lifecycle.check-readiness
+        canonical_verb: service-resource.check-lifecycle-readiness
         trigger_phrases:
           - "are we ready to trade {instruments}"
           - "can we trade {instruments} in {market}"
@@ -252,7 +252,7 @@ lifecycle_discovery:
 
       - intent: show_gaps
         description: "User asks about gaps"
-        canonical_verb: lifecycle.analyze-gaps
+        canonical_verb: service-resource.analyze-lifecycle-gaps
         trigger_phrases:
           - "what's missing"
           - "show me the gaps"
@@ -263,7 +263,7 @@ lifecycle_discovery:
 
       - intent: visualize_coverage
         description: "User wants to see coverage map"
-        canonical_verb: lifecycle.visualize-cbu-coverage
+        canonical_verb: service-resource.analyze-lifecycle-gaps
         trigger_phrases:
           - "show coverage"
           - "visualize our setup"

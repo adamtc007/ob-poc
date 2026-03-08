@@ -58,8 +58,14 @@ nouns:
     noun_keys:
       - entity
     action_verbs:
-      create: [entity.create-limited-company, entity.create-proper-person, entity.create-trust-discretionary, entity.create-partnership-limited, entity.ensure-limited-company, entity.ensure-proper-person, entity.ensure-trust-discretionary, entity.ensure-partnership-limited]
-      list: [entity.list, entity.list-ghosts, entity.list-placeholders, entity.placeholder-summary]
+      create: [entity.create, entity.ensure]
+      list:
+        [
+          entity.list,
+          entity.list-ghosts,
+          entity.list-placeholders,
+          entity.placeholder-summary,
+        ]
       search: [entity.search, entity.query, entity.identify]
       update: [entity.update]
       delete: [entity.delete]
@@ -85,8 +91,15 @@ nouns:
       - fund
       - share_class
     action_verbs:
-      create: [fund.create-umbrella, fund.create-subfund, fund.create-share-class, fund.create-standalone, fund.ensure-umbrella, fund.ensure-subfund, fund.ensure-share-class, fund.create-master, fund.create-feeder]
-      list: [fund.list-subfunds, fund.list-share-classes, fund.list-feeders, fund.list-investments, fund.list-investors]
+      create: [fund.create, fund.ensure]
+      list:
+        [
+          fund.list-subfunds,
+          fund.list-share-classes,
+          fund.list-feeders,
+          fund.list-investments,
+          fund.list-investors,
+        ]
 
   client-group:
     aliases:
@@ -103,7 +116,15 @@ nouns:
       - client_group
     action_verbs:
       create: [client-group.entity-add, client-group.start-discovery]
-      list: [client-group.entity-list, client-group.tag-list, client-group.list-roles, client-group.list-relationships, client-group.list-unverified, client-group.list-discrepancies]
+      list:
+        [
+          client-group.entity-list,
+          client-group.tag-list,
+          client-group.list-roles,
+          client-group.list-relationships,
+          client-group.list-unverified,
+          client-group.list-discrepancies,
+        ]
       search: [client-group.search, client-group.discover-entities]
 
   # =========================================================================
@@ -126,8 +147,17 @@ nouns:
     action_verbs:
       create: [ubo.add-ownership, ubo.add-control, ubo.add-trust-role]
       search: [ubo.calculate, ubo.trace-chains, ubo.compute-chains]
-      list: [ubo.list-owners, ubo.list-owned, ubo.list-ubos, ubo.list-by-subject]
-      delete: [ubo.end-ownership, ubo.end-control, ubo.end-trust-role, ubo.delete-ownership, ubo.delete-control, ubo.delete-trust-role]
+      list:
+        [ubo.list-owners, ubo.list-owned, ubo.list-ubos, ubo.list-by-subject]
+      delete:
+        [
+          ubo.end-relationship,
+          ubo.end-relationship,
+          ubo.end-relationship,
+          ubo.delete-relationship,
+          ubo.delete-relationship,
+          ubo.delete-relationship,
+        ]
 
   kyc-case:
     aliases:
@@ -145,7 +175,15 @@ nouns:
     action_verbs:
       create: [kyc-case.create]
       list: [kyc-case.list-by-cbu, kyc-case.read, kyc-case.state]
-      update: [kyc-case.update-status, kyc-case.escalate, kyc-case.assign, kyc-case.set-risk-rating, kyc-case.close, kyc-case.reopen]
+      update:
+        [
+          kyc-case.update-status,
+          kyc-case.escalate,
+          kyc-case.assign,
+          kyc-case.set-risk-rating,
+          kyc-case.close,
+          kyc-case.reopen,
+        ]
 
   screening:
     aliases:
@@ -178,9 +216,22 @@ nouns:
       - control
       - board_controller
     action_verbs:
-      create: [control.add, control.build-graph, control.import-psc-register, control.import-gleif-control]
+      create:
+        [
+          control.add,
+          control.build-graph,
+          control.import-psc-register,
+          control.import-gleif-control,
+        ]
       list: [control.list-controllers, control.list-controlled]
-      compute: [control.analyze, control.identify-ubos, control.trace-chain, control.reconcile-ownership, control.compute-controllers]
+      compute:
+        [
+          control.analyze,
+          control.identify-ubos,
+          control.trace-chain,
+          control.reconcile-ownership,
+          control.compute-controllers,
+        ]
 
   ownership:
     aliases:
@@ -196,7 +247,14 @@ nouns:
     noun_keys:
       - ownership
     action_verbs:
-      compute: [ownership.compute, ownership.reconcile, ownership.analyze-gaps, ownership.trace-chain, ownership.refresh]
+      compute:
+        [
+          ownership.compute,
+          ownership.reconcile,
+          ownership.analyze-gaps,
+          ownership.trace-chain,
+          ownership.refresh,
+        ]
 
   # =========================================================================
   # DEAL / COMMERCIAL
@@ -217,7 +275,18 @@ nouns:
       - deal
     action_verbs:
       create: [deal.create, deal.create-rate-card]
-      list: [deal.list, deal.list-participants, deal.list-products, deal.list-contracts, deal.list-rate-cards, deal.list-slas, deal.list-documents, deal.list-onboarding-requests, deal.timeline]
+      list:
+        [
+          deal.list,
+          deal.list-participants,
+          deal.list-products,
+          deal.list-contracts,
+          deal.list-rate-cards,
+          deal.list-slas,
+          deal.list-documents,
+          deal.list-onboarding-requests,
+          deal.timeline,
+        ]
       update: [deal.update, deal.update-status]
       search: [deal.search, deal.get, deal.summary]
 
@@ -235,8 +304,21 @@ nouns:
     noun_keys:
       - contract
     action_verbs:
-      create: [contract.create, contract.create-rate-card, contract.add-product, contract.subscribe]
-      list: [contract.list, contract.list-products, contract.list-rate-cards, contract.list-subscriptions, contract.for-client]
+      create:
+        [
+          contract.create,
+          contract.create-rate-card,
+          contract.add-product,
+          contract.subscribe,
+        ]
+      list:
+        [
+          contract.list,
+          contract.list-products,
+          contract.list-rate-cards,
+          contract.list-subscriptions,
+          contract.for-client,
+        ]
       update: [contract.update, contract.terminate]
       delete: [contract.remove-product, contract.unsubscribe]
 
@@ -260,7 +342,12 @@ nouns:
     action_verbs:
       create: [billing.create-profile, billing.create-period]
       list: [billing.list-profiles, billing.list-account-targets]
-      compute: [billing.calculate-period, billing.revenue-summary, billing.period-summary]
+      compute:
+        [
+          billing.calculate-period,
+          billing.revenue-summary,
+          billing.period-summary,
+        ]
 
   sla:
     aliases:
@@ -275,8 +362,14 @@ nouns:
     noun_keys:
       - sla
     action_verbs:
-      create: [sla.commit, sla.bind-to-profile, sla.bind-to-service, sla.bind-to-resource, sla.bind-to-isda, sla.bind-to-csa]
-      list: [sla.list-templates, sla.list-commitments, sla.list-measurements, sla.list-open-breaches]
+      create: [sla.commit, sla.bind]
+      list:
+        [
+          sla.list-templates,
+          sla.list-commitments,
+          sla.list-measurements,
+          sla.list-open-breaches,
+        ]
 
   pricing-config:
     aliases:
@@ -293,8 +386,22 @@ nouns:
     noun_keys:
       - pricing_config
     action_verbs:
-      create: [pricing-config.set, pricing-config.set-valuation-schedule, pricing-config.set-fallback-chain, pricing-config.set-stale-policy, pricing-config.set-nav-threshold]
-      list: [pricing-config.list, pricing-config.list-valuation-schedules, pricing-config.list-fallback-chains, pricing-config.list-stale-policies, pricing-config.list-nav-thresholds]
+      create:
+        [
+          pricing-config.set,
+          pricing-config.set-valuation-schedule,
+          pricing-config.set-fallback-chain,
+          pricing-config.set-stale-policy,
+          pricing-config.set-nav-threshold,
+        ]
+      list:
+        [
+          pricing-config.list,
+          pricing-config.list-valuation-schedules,
+          pricing-config.list-fallback-chains,
+          pricing-config.list-stale-policies,
+          pricing-config.list-nav-thresholds,
+        ]
 
   # =========================================================================
   # TRADING / CUSTODY
@@ -349,9 +456,28 @@ nouns:
     noun_keys:
       - settlement_chain
     action_verbs:
-      create: [settlement-chain.define-location, settlement-chain.create-chain, settlement-chain.add-hop, settlement-chain.set-location-preference, settlement-chain.set-cross-border]
-      list: [settlement-chain.list-locations, settlement-chain.list-chains, settlement-chain.list-hops, settlement-chain.list-location-preferences, settlement-chain.list-cross-border]
-      delete: [settlement-chain.deactivate-chain, settlement-chain.remove-hop, settlement-chain.deactivate-cross-border]
+      create:
+        [
+          settlement-chain.define-location,
+          settlement-chain.create-chain,
+          settlement-chain.add-hop,
+          settlement-chain.set-location-preference,
+          settlement-chain.set-cross-border,
+        ]
+      list:
+        [
+          settlement-chain.list-locations,
+          settlement-chain.list-chains,
+          settlement-chain.list-hops,
+          settlement-chain.list-location-preferences,
+          settlement-chain.list-cross-border,
+        ]
+      delete:
+        [
+          settlement-chain.deactivate-chain,
+          settlement-chain.remove-hop,
+          settlement-chain.deactivate-cross-border,
+        ]
 
   investor:
     aliases:
@@ -370,7 +496,13 @@ nouns:
       - holding
     action_verbs:
       create: [investor.create, investor.ensure, investor.record-subscription]
-      list: [investor.list-by-cbu, investor.list-by-entity, investor.get-lifecycle-history, investor.count-by-state]
+      list:
+        [
+          investor.list-by-cbu,
+          investor.list-by-entity,
+          investor.get-lifecycle-history,
+          investor.count-by-state,
+        ]
 
   # =========================================================================
   # RESEARCH
@@ -390,8 +522,14 @@ nouns:
     noun_keys:
       - lei
     action_verbs:
-      search: [gleif.lookup, gleif.search, gleif.enrich, gleif.resolve-successor]
-      import: [gleif.import-tree, gleif.import-managed-funds, gleif.import-to-client-group]
+      search:
+        [gleif.lookup, gleif.search, gleif.enrich, gleif.resolve-successor]
+      import:
+        [
+          gleif.import-tree,
+          gleif.import-managed-funds,
+          gleif.import-to-client-group,
+        ]
 
   # =========================================================================
   # DOCUMENTS & EVIDENCE
@@ -414,8 +552,20 @@ nouns:
       - requirement
     action_verbs:
       create: [document.solicit, document.solicit-set, document.create]
-      list: [document.catalog, document.list-versions, document.for-entity, document.missing-for-entity]
-      update: [document.verify, document.reject, document.start-qa, document.upload-version]
+      list:
+        [
+          document.catalog,
+          document.list-versions,
+          document.for-entity,
+          document.missing-for-entity,
+        ]
+      update:
+        [
+          document.verify,
+          document.reject,
+          document.start-qa,
+          document.upload-version,
+        ]
 
   # =========================================================================
   # LIFECYCLE / MONITORING
@@ -433,8 +583,20 @@ nouns:
     noun_keys:
       - lifecycle
     action_verbs:
-      list: [lifecycle.list, lifecycle.list-by-instrument, lifecycle.read]
-      create: [lifecycle.provision, lifecycle.activate, lifecycle.suspend, lifecycle.close, lifecycle.reopen]
+      list:
+        [
+          service-resource.list-lifecycles,
+          service-resource.list-lifecycles-by-instrument,
+          service-resource.read-lifecycle,
+        ]
+      create:
+        [
+          service-resource.provision-lifecycle,
+          service-resource.activate-lifecycle,
+          service-resource.suspend-lifecycle,
+          service-resource.decommission-lifecycle,
+          service-resource.activate-lifecycle,
+        ]
 
   # =========================================================================
   # ADMINISTRATION
@@ -456,7 +618,13 @@ nouns:
       create: [team.create, team.add-governance-member]
       list: [team.list-members, team.list-cbus]
       assign: [team.add-member, team.add-cbu-access, team.grant-service]
-      delete: [team.remove-member, team.remove-cbu-access, team.revoke-service, team.archive]
+      delete:
+        [
+          team.remove-member,
+          team.remove-cbu-access,
+          team.revoke-service,
+          team.archive,
+        ]
 
   role:
     aliases:
@@ -471,7 +639,16 @@ nouns:
     noun_keys:
       - cbu_role
     action_verbs:
-      assign: [cbu.assign-role, cbu-role.assign, cbu-role.assign-ownership, cbu-role.assign-control, cbu-role.assign-fund-role, cbu-role.assign-service-provider, cbu-role.assign-signatory]
+      assign:
+        [
+          cbu.assign-role,
+          cbu-role.assign,
+          cbu-role.assign-ownership,
+          cbu-role.assign-control,
+          cbu-role.assign-fund-role,
+          cbu-role.assign-service-provider,
+          cbu-role.assign-signatory,
+        ]
       list: [cbu-role.list, cbu-role.validate]
       delete: [cbu-role.remove]
 
@@ -562,8 +739,22 @@ nouns:
     noun_keys:
       - capital
     action_verbs:
-      create: [capital.share-class-create, capital.issue-initial, capital.issue-new, capital.dilution-grant-options, capital.dilution-create-safe, capital.dilution-create-convertible-note]
-      list: [capital.share-class-list, capital.dilution-list, capital.cap-table, capital.holders]
+      create:
+        [
+          capital.share-class-create,
+          capital.issue-initial,
+          capital.issue-new,
+          capital.dilution-grant-options,
+          capital.dilution-create-safe,
+          capital.dilution-create-convertible-note,
+        ]
+      list:
+        [
+          capital.share-class-list,
+          capital.dilution-list,
+          capital.cap-table,
+          capital.holders,
+        ]
 
   # =========================================================================
   # WORKFLOW / PROCESS
@@ -581,9 +772,21 @@ nouns:
     noun_keys:
       - tollgate
     action_verbs:
-      compute: [tollgate.evaluate, tollgate.evaluate-gate, tollgate.get-decision-readiness, tollgate.get-metrics]
-      list: [tollgate.list-evaluations, tollgate.list-thresholds, tollgate.list-overrides]
-      update: [tollgate.set-threshold, tollgate.override, tollgate.expire-override]
+      compute:
+        [
+          tollgate.evaluate,
+          tollgate.evaluate-gate,
+          tollgate.get-decision-readiness,
+          tollgate.get-metrics,
+        ]
+      list:
+        [
+          tollgate.list-evaluations,
+          tollgate.list-thresholds,
+          tollgate.list-overrides,
+        ]
+      update:
+        [tollgate.set-threshold, tollgate.override, tollgate.expire-override]
 
   # =========================================================================
   # TAX & COMPLIANCE CONFIG
@@ -602,6 +805,20 @@ nouns:
     noun_keys:
       - tax_config
     action_verbs:
-      create: [tax-config.define-jurisdiction, tax-config.set-treaty-rate, tax-config.set-tax-status, tax-config.set-reclaim-config, tax-config.set-reporting]
-      list: [tax-config.list-jurisdictions, tax-config.list-treaty-rates, tax-config.list-tax-status, tax-config.list-reclaim-configs, tax-config.list-reporting]
+      create:
+        [
+          tax-config.define-jurisdiction,
+          tax-config.set-treaty-rate,
+          tax-config.set-tax-status,
+          tax-config.set-reclaim-config,
+          tax-config.set-reporting,
+        ]
+      list:
+        [
+          tax-config.list-jurisdictions,
+          tax-config.list-treaty-rates,
+          tax-config.list-tax-status,
+          tax-config.list-reclaim-configs,
+          tax-config.list-reporting,
+        ]
       delete: [tax-config.deactivate-reclaim]

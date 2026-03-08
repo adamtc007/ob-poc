@@ -68,15 +68,15 @@ params:
     prompt: "Entity workstream name or entity name"
 
 body: |
-  (case-screening.run
+  (screening.run
     :workstream-id "$workstream_name"
     :screening-type "SANCTIONS"
     :as @screening-sanctions)
-  (case-screening.run
+  (screening.run
     :workstream-id "$workstream_name"
     :screening-type "PEP"
     :as @screening-pep)
-  (case-screening.run
+  (screening.run
     :workstream-id "$workstream_name"
     :screening-type "ADVERSE_MEDIA"
     :as @screening-media)

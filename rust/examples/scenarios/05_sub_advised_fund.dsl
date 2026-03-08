@@ -12,7 +12,7 @@
   :as @fund)
 
 ;; --- Create Fund Entity ---
-(entity.ensure-limited-company
+(entity.ensure :entity-type "limited-company"
   :name "Emerald Growth ICAV"
   :jurisdiction "IE"
   :as @fund-entity)
@@ -23,7 +23,7 @@
   :role "ASSET_OWNER")
 
 ;; --- Create Management Company ---
-(entity.ensure-limited-company
+(entity.ensure :entity-type "limited-company"
   :name "Dublin Fund Services Ltd"
   :jurisdiction "IE"
   :as @manco)
@@ -34,7 +34,7 @@
   :role "MANAGEMENT_COMPANY")
 
 ;; --- Sub-Advisors (delegated IM role) ---
-(entity.ensure-limited-company
+(entity.ensure :entity-type "limited-company"
   :name "Tokyo Asset Management"
   :jurisdiction "JP"
   :as @im-japan)
@@ -44,7 +44,7 @@
   :entity-id @im-japan
   :role "INVESTMENT_MANAGER")
 
-(entity.ensure-limited-company
+(entity.ensure :entity-type "limited-company"
   :name "Singapore Growth Partners"
   :jurisdiction "SG"
   :as @im-apac)

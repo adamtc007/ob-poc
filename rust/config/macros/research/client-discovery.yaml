@@ -226,7 +226,7 @@ macro:
     (gleif.enrich :lei "{{apex_entity.lei}}" :as @apex)
     {{else}}
     ;; WARNING: No LEI found for apex entity - manual lookup required
-    (entity.ensure-limited-company :name "{{apex_entity.name}}" :jurisdiction "{{apex_entity.jurisdiction}}" :as @apex)
+    (entity.ensure :entity-type "limited-company" :name "{{apex_entity.name}}" :jurisdiction "{{apex_entity.jurisdiction}}" :as @apex)
     {{/if}}
     {{/if}}
 
@@ -235,7 +235,7 @@ macro:
     {{#if this.lei}}
     (gleif.enrich :lei "{{this.lei}}" :as @manco_{{@index}})
     {{else}}
-    (entity.ensure-limited-company :name "{{this.name}}" :jurisdiction "{{this.jurisdiction}}" :as @manco_{{@index}})
+    (entity.ensure :entity-type "limited-company" :name "{{this.name}}" :jurisdiction "{{this.jurisdiction}}" :as @manco_{{@index}})
     {{/if}}
     {{/each}}
 
@@ -244,7 +244,7 @@ macro:
     {{#if this.lei}}
     (gleif.enrich :lei "{{this.lei}}" :as @im_{{@index}})
     {{else}}
-    (entity.ensure-limited-company :name "{{this.name}}" :jurisdiction "{{this.jurisdiction}}" :as @im_{{@index}})
+    (entity.ensure :entity-type "limited-company" :name "{{this.name}}" :jurisdiction "{{this.jurisdiction}}" :as @im_{{@index}})
     {{/if}}
     {{/each}}
 

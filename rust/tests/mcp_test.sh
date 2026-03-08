@@ -151,7 +151,7 @@ fi
 # Test 7: dsl_plan
 echo ""
 echo "Test 7: dsl_plan"
-PLAN_DSL='(cbu.create :name \"PlanTest\" :as @cbu)(entity.create-proper-person :cbu-id @cbu :name \"John\" :as @person)'
+PLAN_DSL='(cbu.create :name \"PlanTest\" :as @cbu)(entity.create :entity-type "proper-person" :cbu-id @cbu :name \"John\" :as @person)'
 PLAN_REQ="{\"jsonrpc\":\"2.0\",\"id\":7,\"method\":\"tools/call\",\"params\":{\"name\":\"dsl_plan\",\"arguments\":{\"source\":\"$PLAN_DSL\"}}}"
 PLAN_RESP=$(echo "$PLAN_REQ" | DATABASE_URL="$DB_URL" "$BINARY" 2>/dev/null | head -1)
 
@@ -273,7 +273,7 @@ fi
 echo ""
 echo "Test 12: Full Scenario Execute"
 TIMESTAMP2=$(date +%s)
-FULL_DSL="(cbu.create :name \\\"MCPFull_${TIMESTAMP2}\\\" :client-type \\\"corporate\\\" :as @cbu)(entity.create-limited-company :cbu-id @cbu :name \\\"MCPCompany_${TIMESTAMP2}\\\" :as @company)(entity.create-proper-person :cbu-id @cbu :first-name \\\"John\\\" :last-name \\\"MCPPerson_${TIMESTAMP2}\\\" :as @ubo)(cbu.assign-role :cbu-id @cbu :entity-id @ubo :target-entity-id @company :role \\\"BENEFICIAL_OWNER\\\" :ownership-percentage 100.0)"
+FULL_DSL="(cbu.create :name \\\"MCPFull_${TIMESTAMP2}\\\" :client-type \\\"corporate\\\" :as @cbu)(entity.create :entity-type "limited-company" :cbu-id @cbu :name \\\"MCPCompany_${TIMESTAMP2}\\\" :as @company)(entity.create :entity-type "proper-person" :cbu-id @cbu :first-name \\\"John\\\" :last-name \\\"MCPPerson_${TIMESTAMP2}\\\" :as @ubo)(cbu.assign-role :cbu-id @cbu :entity-id @ubo :target-entity-id @company :role \\\"BENEFICIAL_OWNER\\\" :ownership-percentage 100.0)"
 FULL_REQ="{\"jsonrpc\":\"2.0\",\"id\":12,\"method\":\"tools/call\",\"params\":{\"name\":\"dsl_execute\",\"arguments\":{\"source\":\"$FULL_DSL\"}}}"
 FULL_RESP=$(echo "$FULL_REQ" | DATABASE_URL="$DB_URL" "$BINARY" 2>/dev/null | head -1)
 

@@ -138,7 +138,7 @@ mod rollback_tests {
         let dsl = format!(
             r#"
             (cbu.ensure :name "{}" :jurisdiction "LU" :as @fund)
-            (entity.create-proper-person :first-name "{}" :last-name "Smith" :as @person)
+            (entity.create :entity-type "proper-person" :first-name "{}" :last-name "Smith" :as @person)
             (cbu.assign-role :cbu-id @fund :entity-id @person :role "INVALID_ROLE_THAT_DOES_NOT_EXIST")
             "#,
             cbu_name, entity_name
@@ -194,7 +194,7 @@ mod rollback_tests {
         let dsl = format!(
             r#"
             (cbu.ensure :name "{}" :jurisdiction "LU" :as @fund)
-            (entity.create-proper-person :first-name "{}" :last-name "Jones" :as @person)
+            (entity.create :entity-type "proper-person" :first-name "{}" :last-name "Jones" :as @person)
             (cbu.assign-role :cbu-id @fund :entity-id @person :role "DIRECTOR")
             "#,
             cbu_name, entity_name
@@ -248,7 +248,7 @@ mod rollback_tests {
         let dsl = format!(
             r#"
             (cbu.ensure :name "{}" :jurisdiction "LU" :as @fund)
-            (entity.create-proper-person :first-name "{}" :last-name "Brown" :as @person)
+            (entity.create :entity-type "proper-person" :first-name "{}" :last-name "Brown" :as @person)
             (cbu.assign-role :cbu-id @fund :entity-id @person :role "INVALID_ROLE_XYZ")
             "#,
             cbu_name, entity_name
@@ -306,9 +306,9 @@ mod rollback_tests {
         let dsl = format!(
             r#"
             (cbu.ensure :name "{}" :jurisdiction "LU" :as @fund)
-            (entity.create-proper-person :first-name "{}" :last-name "One" :as @p1)
-            (entity.create-proper-person :first-name "{}" :last-name "Two" :as @p2)
-            (entity.create-proper-person :first-name "{}" :last-name "Three" :as @p3)
+            (entity.create :entity-type "proper-person" :first-name "{}" :last-name "One" :as @p1)
+            (entity.create :entity-type "proper-person" :first-name "{}" :last-name "Two" :as @p2)
+            (entity.create :entity-type "proper-person" :first-name "{}" :last-name "Three" :as @p3)
             (cbu.assign-role :cbu-id @fund :entity-id @p1 :role "DOES_NOT_EXIST")
             "#,
             cbu_name, person1, person2, person3

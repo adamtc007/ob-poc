@@ -6,13 +6,13 @@
     :jurisdiction "KY"
     :as @cbu)
 
-(entity.create-partnership-limited
+(entity.create :entity-type "partnership-limited"
     :cbu-id @cbu
     :name "Alpha Investment LP"
     :jurisdiction "KY"
     :as @partnership)
 
-(entity.create-limited-company
+(entity.create :entity-type "limited-company"
     :cbu-id @cbu
     :name "Alpha GP Ltd"
     :jurisdiction "KY"
@@ -24,7 +24,7 @@
     :role "GENERAL_PARTNER"
     :target-entity-id @partnership)
 
-(entity.create-proper-person
+(entity.create :entity-type "proper-person"
     :cbu-id @cbu
     :first-name "Michael"
     :last-name "Chen"
@@ -38,7 +38,7 @@
     :target-entity-id @gp
     :ownership-percentage 100)
 
-(entity.create-limited-company
+(entity.create :entity-type "limited-company"
     :cbu-id @cbu
     :name "Pension Fund A"
     :jurisdiction "US"
@@ -51,7 +51,7 @@
     :target-entity-id @partnership
     :ownership-percentage 60)
 
-(entity.create-limited-company
+(entity.create :entity-type "limited-company"
     :cbu-id @cbu
     :name "Endowment Fund B"
     :jurisdiction "US"
@@ -110,8 +110,8 @@
     :as @ws-lp2)
 
 ;; Run screenings via workstreams
-(case-screening.run :workstream-id @ws-gpubo :screening-type "PEP")
-(case-screening.run :workstream-id @ws-partnership :screening-type "SANCTIONS")
-(case-screening.run :workstream-id @ws-gp :screening-type "SANCTIONS")
-(case-screening.run :workstream-id @ws-lp1 :screening-type "SANCTIONS")
-(case-screening.run :workstream-id @ws-lp2 :screening-type "SANCTIONS")
+(screening.run :workstream-id @ws-gpubo :screening-type "PEP")
+(screening.run :workstream-id @ws-partnership :screening-type "SANCTIONS")
+(screening.run :workstream-id @ws-gp :screening-type "SANCTIONS")
+(screening.run :workstream-id @ws-lp1 :screening-type "SANCTIONS")
+(screening.run :workstream-id @ws-lp2 :screening-type "SANCTIONS")

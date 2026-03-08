@@ -84,20 +84,20 @@ impl OnboardingAutoCompleteOp {
             )),
 
             "cbu_instrument_universe" => Some(format!(
-                r#"(trading-profile.add-instrument-class :cbu-id "{}" :class-code "EQUITY")
-(trading-profile.add-market :cbu-id "{}" :market-code "XNYS" :currencies ["USD"])"#,
+                r#"(trading-profile.add-component :profile-id "{}" :component-type "instrument-class" :class-code "EQUITY")
+(trading-profile.add-component :profile-id "{}" :component-type "market" :instrument-class "EQUITY" :mic "XNYS")"#,
                 cbu_id, cbu_id
             )),
 
             "cbu_ssi" => Some(format!(
-                r#"(trading-profile.add-standing-instruction :cbu-id "{}" :name "Default SSI" :type "SECURITIES" :safekeeping-account "SAFE-001" :safekeeping-bic "CUSTUS33" :cash-account "CASH-001" :cash-bic "CUSTUS33" :cash-currency "USD" :pset-bic "DTCYUS33" :effective-date "2024-01-01" :as @ssi)"#,
+                r#"(trading-profile.add-component :profile-id "{}" :component-type "standing-instruction" :ssi-name "Default SSI" :ssi-type "SECURITIES" :safekeeping-account "SAFE-001" :safekeeping-bic "CUSTUS33" :cash-account "CASH-001" :cash-bic "CUSTUS33" :cash-currency "USD" :pset-bic "DTCYUS33" :as @ssi)"#,
                 cbu_id
             )),
 
             "ssi_booking_rule" => {
                 let ssi_id = existing.get("cbu_ssi").and_then(|ids| ids.first())?;
                 Some(format!(
-                    r#"(trading-profile.add-booking-rule :cbu-id "{}" :ssi-id "{}" :name "Default Rule" :priority 100)"#,
+                    r#"(trading-profile.add-component :profile-id "{}" :component-type "booking-rule" :ssi-ref "{}" :rule-name "Default Rule" :priority 100)"#,
                     cbu_id, ssi_id
                 ))
             }

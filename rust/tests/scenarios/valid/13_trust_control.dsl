@@ -9,14 +9,14 @@
     :as @cbu)
 
 ;; Create the trust
-(entity.create-trust-discretionary
+(entity.create :entity-type "trust-discretionary"
     :cbu-id @cbu
     :name "Smith Family Trust"
     :jurisdiction "JE"
     :as @trust)
 
 ;; Create trust parties
-(entity.create-proper-person
+(entity.create :entity-type "proper-person"
     :cbu-id @cbu
     :first-name "William"
     :last-name "Smith"
@@ -24,14 +24,14 @@
     :nationality "GB"
     :as @settlor)
 
-(entity.create-limited-company
+(entity.create :entity-type "limited-company"
     :cbu-id @cbu
     :name "ABC Trustees Ltd"
     :company-number "JE98765"
     :jurisdiction "JE"
     :as @trustee-co)
 
-(entity.create-proper-person
+(entity.create :entity-type "proper-person"
     :cbu-id @cbu
     :first-name "James"
     :last-name "Smith"
@@ -39,7 +39,7 @@
     :nationality "GB"
     :as @beneficiary-1)
 
-(entity.create-proper-person
+(entity.create :entity-type "proper-person"
     :cbu-id @cbu
     :first-name "Emma"
     :last-name "Smith"
@@ -47,7 +47,7 @@
     :nationality "GB"
     :as @beneficiary-2)
 
-(entity.create-proper-person
+(entity.create :entity-type "proper-person"
     :cbu-id @cbu
     :first-name "Richard"
     :last-name "Protector"

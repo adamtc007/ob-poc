@@ -188,19 +188,19 @@ domains:
           name: commitment_id
           capture: true
 
-      bind-to-profile:
-        description: Bind SLA commitment to trading profile
+      bind:
+        description: Bind SLA commitment to a target object
         invocation_phrases:
+          - "bind SLA"
           - "bind SLA to profile"
-          - "attach SLA to trading profile"
-          - "link SLA to profile"
-          - "apply SLA to mandate"
-          - "associate SLA with trading profile"
-          - "connect SLA commitment to profile"
-          - "set SLA on trading mandate"
-          - "map SLA to mandate profile"
-          - "assign service level to profile"
-          - "tie SLA to trading profile"
+          - "bind SLA to service"
+          - "bind SLA to resource"
+          - "bind SLA to ISDA"
+          - "bind SLA to CSA"
+          - "attach SLA commitment"
+          - "link SLA commitment"
+          - "apply SLA to target"
+          - "associate SLA with target"
         metadata:
           tier: intent
           source_of_truth: operational
@@ -218,51 +218,27 @@ domains:
             type: uuid
             required: true
             maps_to: commitment_id
+          - name: target-type
+            type: string
+            required: true
+            valid_values:
+              - profile
+              - service
+              - resource
+              - isda
+              - csa
           - name: profile-id
             type: uuid
-            required: true
+            required: false
             maps_to: profile_id
             lookup:
               table: cbu_trading_profiles
               schema: ob-poc
               search_key: profile_id
               primary_key: profile_id
-        returns:
-          type: affected
-
-      bind-to-service:
-        description: Bind SLA commitment to service
-        invocation_phrases:
-          - "bind SLA to service"
-          - "attach SLA to service"
-          - "link SLA to service"
-          - "apply SLA to service"
-          - "associate SLA with service"
-          - "connect commitment to service"
-          - "set service level on service"
-          - "map SLA commitment to service"
-          - "assign SLA target to service"
-          - "tie service level to service"
-        metadata:
-          tier: intent
-          source_of_truth: operational
-          scope: cbu
-          noun: sla
-          phase_tags: [deal]
-        behavior: crud
-        crud:
-          operation: update
-          table: cbu_sla_commitments
-          schema: ob-poc
-          key: commitment_id
-        args:
-          - name: commitment-id
-            type: uuid
-            required: true
-            maps_to: commitment_id
           - name: service-id
             type: uuid
-            required: true
+            required: false
             maps_to: bound_service_id
             lookup:
               table: services
@@ -270,42 +246,9 @@ domains:
               schema: ob-poc
               search_key: name
               primary_key: service_id
-        returns:
-          type: affected
-
-      bind-to-resource:
-        description: Bind SLA commitment to service resource instance
-        invocation_phrases:
-          - "bind SLA to resource"
-          - "attach SLA to resource"
-          - "link SLA to resource"
-          - "apply SLA to resource"
-          - "associate SLA with resource instance"
-          - "connect commitment to resource"
-          - "set SLA on resource instance"
-          - "assign service level to resource"
-          - "map SLA to resource instance"
-          - "tie SLA commitment to resource"
-        metadata:
-          tier: intent
-          source_of_truth: operational
-          scope: cbu
-          noun: sla
-          phase_tags: [deal]
-        behavior: crud
-        crud:
-          operation: update
-          table: cbu_sla_commitments
-          schema: ob-poc
-          key: commitment_id
-        args:
-          - name: commitment-id
-            type: uuid
-            required: true
-            maps_to: commitment_id
           - name: resource-instance-id
             type: uuid
-            required: true
+            required: false
             maps_to: bound_resource_instance_id
             lookup:
               table: cbu_resource_instances
@@ -313,79 +256,13 @@ domains:
               schema: ob-poc
               search_key: instance_name
               primary_key: instance_id
-        returns:
-          type: affected
-
-      bind-to-isda:
-        description: Bind SLA commitment to ISDA agreement
-        invocation_phrases:
-          - "bind SLA to ISDA"
-          - "attach SLA to ISDA agreement"
-          - "link SLA to ISDA"
-          - "apply SLA to ISDA"
-          - "associate SLA with ISDA"
-          - "connect SLA commitment to ISDA"
-          - "set service level on ISDA"
-          - "map SLA to ISDA agreement"
-          - "assign SLA target to ISDA"
-          - "tie service level to ISDA"
-        metadata:
-          tier: intent
-          source_of_truth: operational
-          scope: cbu
-          noun: sla
-          phase_tags: [deal]
-        behavior: crud
-        crud:
-          operation: update
-          table: cbu_sla_commitments
-          schema: ob-poc
-          key: commitment_id
-        args:
-          - name: commitment-id
-            type: uuid
-            required: true
-            maps_to: commitment_id
           - name: isda-id
             type: uuid
-            required: true
+            required: false
             maps_to: bound_isda_id
-        returns:
-          type: affected
-
-      bind-to-csa:
-        description: Bind SLA commitment to CSA agreement
-        invocation_phrases:
-          - "bind SLA to CSA"
-          - "attach SLA to credit support annex"
-          - "link SLA to CSA"
-          - "apply SLA to CSA"
-          - "associate SLA with CSA"
-          - "connect SLA commitment to CSA"
-          - "set service level on CSA"
-          - "map SLA to credit support annex"
-          - "assign SLA target to CSA"
-          - "tie service level to CSA"
-        metadata:
-          tier: intent
-          source_of_truth: operational
-          scope: cbu
-          noun: sla
-          phase_tags: [deal]
-        behavior: crud
-        crud:
-          operation: update
-          table: cbu_sla_commitments
-          schema: ob-poc
-          key: commitment_id
-        args:
-          - name: commitment-id
-            type: uuid
-            required: true
-            maps_to: commitment_id
           - name: csa-id
             type: uuid
-            required: true
+            required: false
             maps_to: bound_csa_id
         returns:
           type: affected

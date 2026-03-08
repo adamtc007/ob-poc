@@ -871,7 +871,7 @@ mod tests {
             Some("kyc".to_string())
         );
         assert_eq!(
-            detect_domain("(entity.create-limited-company :name \"X\")"),
+            detect_domain("(entity.create :entity-type \"limited-company\" :name \"X\")"),
             Some("entity".to_string())
         );
         assert_eq!(
@@ -884,7 +884,7 @@ mod tests {
     fn test_extract_domains() {
         let dsl = r#"
             (cbu.ensure :name "Test" :as @cbu)
-            (entity.create-limited-company :name "X" :as @company)
+            (entity.create :entity-type "limited-company" :name "X" :as @company)
             (kyc-case.create :cbu-id @cbu :as @case)
         "#;
 

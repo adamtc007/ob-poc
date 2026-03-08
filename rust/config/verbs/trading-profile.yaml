@@ -461,181 +461,285 @@ domains:
 
       # --- Universe Section ---
 
-      add-instrument-class:
-        description: Add instrument class to trading profile universe
+      add-component:
+        description: Add a component to the trading profile document
         invocation_phrases:
+          - "add component to trading profile"
           - "add instrument class"
-          - "add equity instruments"
-          - "add bond instruments"
-          - "enable instrument class"
-          - "add equity trading"
-          - "add bond trading"
-          - "enable instrument type"
-          - "add asset class"
-          - "permit instrument class"
-          - "include instrument in profile"
-          - "add instruments"
-          - "enable trading"
-          - "add to universe"
-          - "add equities"
-          - "add bonds"
-          - "add derivatives"
+          - "add market"
+          - "add allowed currency"
+          - "add standing instruction"
+          - "add booking rule"
+          - "add ISDA configuration"
+          - "add ISDA coverage"
+          - "add CSA configuration"
+          - "add CSA collateral"
+          - "add IM mandate"
         behavior: plugin
-        handler: add_instrument_class_to_profile
+        handler: TradingProfileAddComponentOp
         metadata:
           tier: intent
           source_of_truth: matrix
           scope: cbu
-          noun: universe
-          tags: [authoring, universe]
+          noun: trading_matrix
+          tags: [authoring, component]
           phase_tags: [trading]
         args:
           - name: profile-id
             type: uuid
             required: true
-          - name: class-code
+          - name: component-type
             type: string
             required: true
-            description: "Instrument class code (EQUITY, FIXED_INCOME, IRS, FX_FORWARD, etc.)"
+            valid_values:
+              [
+                instrument-class,
+                market,
+                allowed-currency,
+                standing-instruction,
+                booking-rule,
+                isda-config,
+                isda-coverage,
+                csa-config,
+                csa-collateral,
+                im-mandate,
+              ]
+          - name: class-code
+            type: string
+            required: false
           - name: cfi-prefixes
             type: string_list
             required: false
-            description: CFI code prefixes for matching
           - name: isda-asset-classes
             type: string_list
             required: false
-            description: ISDA taxonomy codes if OTC (RATES, CREDIT, FX, EQUITY, COMMODITY)
           - name: is-held
             type: boolean
             required: false
             default: true
-            description: Whether positions are held
           - name: is-traded
             type: boolean
             required: false
             default: true
-            description: Whether actively traded
-        returns:
-          type: record
-          description: Updated universe section
-
-      remove-instrument-class:
-        description: Remove instrument class from trading profile universe
-        invocation_phrases:
-          - "remove instrument class"
-          - "remove equity instruments"
-          - "remove bond instruments"
-          - "disable instrument class"
-          - "remove equity trading"
-          - "remove from profile"
-          - "disable asset class"
-          - "exclude instrument type"
-          - "drop instrument class"
-          - "take asset class out of universe"
-        behavior: plugin
-        handler: remove_instrument_class_from_profile
-        metadata:
-          tier: intent
-          source_of_truth: matrix
-          scope: cbu
-          noun: universe
-          tags: [authoring, universe]
-          phase_tags: [trading]
-        args:
-          - name: profile-id
-            type: uuid
-            required: true
-          - name: class-code
-            type: string
-            required: true
-        returns:
-          type: affected
-
-      add-market:
-        description: Add market to trading profile universe under an instrument class
-        invocation_phrases:
-          - "add market to profile"
-          - "enable market access"
-          - "add exchange"
-          - "add trading venue"
-          - "enable market"
-          - "add market MIC"
-          - "permit market trading"
-          - "include market"
-          - "add market"
-          - "add NYSE"
-          - "add LSE"
-          - "trade on"
-        behavior: plugin
-        handler: add_market_to_profile
-        metadata:
-          tier: intent
-          source_of_truth: matrix
-          scope: cbu
-          noun: universe
-          tags: [authoring, universe, market]
-          phase_tags: [trading]
-        args:
-          - name: profile-id
-            type: uuid
-            required: true
           - name: instrument-class
             type: string
-            required: true
-            description: "Parent instrument class code (e.g., EQUITY, GOVT_BOND)"
+            required: false
           - name: mic
             type: string
-            required: true
-            description: "Market Identifier Code (ISO 10383), e.g., XNYS, XLON"
+            required: false
           - name: market-name
             type: string
             required: false
-            description: "Human-readable market name (looked up from reference data if not provided)"
           - name: country-code
             type: string
             required: false
-            description: "ISO 2-letter country code (looked up from reference data if not provided)"
+          - name: currency
+            type: string
+            required: false
+          - name: ssi-type
+            type: string
+            required: false
+          - name: ssi-name
+            type: string
+            required: false
+          - name: safekeeping-account
+            type: string
+            required: false
+          - name: safekeeping-bic
+            type: string
+            required: false
+          - name: cash-account
+            type: string
+            required: false
+          - name: cash-bic
+            type: string
+            required: false
+          - name: cash-currency
+            type: string
+            required: false
+          - name: pset-bic
+            type: string
+            required: false
+          - name: rule-name
+            type: string
+            required: false
+          - name: priority
+            type: integer
+            required: false
+          - name: ssi-ref
+            type: string
+            required: false
+          - name: match-instrument-class
+            type: string
+            required: false
+          - name: match-security-type
+            type: string
+            required: false
+          - name: match-mic
+            type: string
+            required: false
+          - name: match-currency
+            type: string
+            required: false
+          - name: match-settlement-type
+            type: string
+            required: false
+          - name: match-counterparty-id
+            type: string
+            required: false
+          - name: counterparty-entity-id
+            type: string
+            required: false
+          - name: counterparty-name
+            type: string
+            required: false
+          - name: counterparty-lei
+            type: string
+            required: false
+          - name: governing-law
+            type: string
+            required: false
+          - name: agreement-date
+            type: string
+            required: false
+          - name: isda-ref
+            type: string
+            required: false
+          - name: asset-class
+            type: string
+            required: false
+          - name: base-products
+            type: string_list
+            required: false
+          - name: csa-type
+            type: string
+            required: false
+          - name: threshold-currency
+            type: string
+            required: false
+          - name: threshold-amount
+            type: decimal
+            required: false
+          - name: minimum-transfer-amount
+            type: decimal
+            required: false
+          - name: collateral-ssi-ref
+            type: string
+            required: false
+          - name: counterparty-ref
+            type: string
+            required: false
+          - name: collateral-type
+            type: string
+            required: false
+          - name: currencies
+            type: string_list
+            required: false
+          - name: issuers
+            type: string_list
+            required: false
+          - name: min-rating
+            type: string
+            required: false
+          - name: haircut-pct
+            type: decimal
+            required: false
+          - name: manager-ref
+            type: string
+            required: false
+          - name: manager-ref-type
+            type: string
+            required: false
+          - name: role
+            type: string
+            required: false
+          - name: scope-all
+            type: boolean
+            required: false
+          - name: scope-mics
+            type: string_list
+            required: false
+          - name: scope-instrument-classes
+            type: string_list
+            required: false
+          - name: instruction-method
+            type: string
+            required: false
+          - name: can-trade
+            type: boolean
+            required: false
+          - name: can-settle
+            type: boolean
+            required: false
         returns:
           type: record
-          description: Updated document version and status
 
-      remove-market:
-        description: Remove market from trading profile universe
+      remove-component:
+        description: Remove a component from the trading profile document
         invocation_phrases:
-          - "remove market from profile"
-          - "disable market access"
-          - "remove exchange"
-          - "exclude market"
-          - "drop trading venue"
-          - "remove market MIC"
-          - "disable market"
-          - "stop trading on this venue"
-          - "revoke market access for CBU"
-          - "take exchange out of universe"
+          - "remove component from trading profile"
+          - "remove instrument class"
+          - "remove market"
+          - "remove standing instruction"
+          - "remove booking rule"
+          - "remove ISDA configuration"
+          - "remove CSA configuration"
+          - "remove IM mandate"
         behavior: plugin
-        handler: remove_market_from_profile
+        handler: TradingProfileRemoveComponentOp
         metadata:
           tier: intent
           source_of_truth: matrix
           scope: cbu
-          noun: universe
-          tags: [authoring, universe, market]
+          noun: trading_matrix
+          tags: [authoring, component]
           phase_tags: [trading]
         args:
           - name: profile-id
             type: uuid
             required: true
+          - name: component-type
+            type: string
+            required: true
+            valid_values:
+              [
+                instrument-class,
+                market,
+                standing-instruction,
+                booking-rule,
+                isda-config,
+                csa-config,
+                im-mandate,
+              ]
+          - name: class-code
+            type: string
+            required: false
           - name: instrument-class
             type: string
-            required: true
-            description: "Parent instrument class code (e.g., EQUITY)"
+            required: false
           - name: mic
             type: string
-            required: true
-            description: "Market MIC code to remove"
+            required: false
+          - name: ssi-name
+            type: string
+            required: false
+          - name: ssi-ref
+            type: string
+            required: false
+          - name: rule-id
+            type: string
+            required: false
+          - name: counterparty-ref
+            type: string
+            required: false
+          - name: csa-type
+            type: string
+            required: false
+          - name: manager-ref
+            type: string
+            required: false
         returns:
           type: record
-          description: "Removed market info with version"
 
       set-base-currency:
         description: Set base currency for trading profile
@@ -669,447 +773,11 @@ domains:
         returns:
           type: affected
 
-      add-allowed-currency:
-        description: Add currency to allowed currencies list
-        invocation_phrases:
-          - "add allowed currency"
-          - "permit currency"
-          - "enable currency"
-          - "add settlement currency"
-          - "allow currency trading"
-          - "add currency to profile"
-          - "include currency"
-          - "authorize FX settlement in this currency"
-          - "enable safekeeping in new currency"
-          - "allow this currency for trading"
-        behavior: plugin
-        handler: add_allowed_currency_to_profile
-        metadata:
-          tier: intent
-          source_of_truth: matrix
-          scope: cbu
-          noun: trading_matrix
-          tags: [authoring, currency]
-          phase_tags: [trading]
-        args:
-          - name: profile-id
-            type: uuid
-            required: true
-          - name: currency
-            type: string
-            required: true
-        returns:
-          type: affected
-
       # --- Standing Instructions Section ---
-
-      add-standing-instruction:
-        description: Add SSI to trading profile standing instructions
-        invocation_phrases:
-          - "add standing instruction"
-          - "add SSI"
-          - "create SSI"
-          - "add settlement instruction"
-          - "configure SSI"
-          - "add new SSI"
-          - "set up standing instruction"
-          - "create settlement instruction"
-          - "register safekeeping and cash accounts"
-          - "add custody account settlement route"
-        behavior: plugin
-        handler: add_ssi_to_profile
-        metadata:
-          tier: intent
-          source_of_truth: matrix
-          scope: cbu
-          noun: ssi
-          tags: [authoring, ssi]
-          phase_tags: [trading]
-        args:
-          - name: profile-id
-            type: uuid
-            required: true
-          - name: ssi-type
-            type: string
-            required: true
-            valid_values: [SECURITIES, CASH, OTC_COLLATERAL, FUND_ACCOUNTING]
-            description: "SSI type (category)"
-          - name: ssi-name
-            type: string
-            required: true
-            description: "Unique SSI name (will be prefixed with type to create ssi-id)"
-          - name: safekeeping-account
-            type: string
-            required: false
-            description: "Securities safekeeping account number"
-          - name: safekeeping-bic
-            type: string
-            required: false
-            description: "Securities custodian BIC"
-          - name: cash-account
-            type: string
-            required: false
-            description: "Cash account number"
-          - name: cash-bic
-            type: string
-            required: false
-            description: "Cash correspondent BIC"
-          - name: cash-currency
-            type: string
-            required: false
-            description: "Settlement currency (ISO 4217)"
-          - name: pset-bic
-            type: string
-            required: false
-            description: "Place of settlement BIC (CSD/ICSD)"
-        returns:
-          type: record
-
-      remove-standing-instruction:
-        description: Remove SSI from trading profile
-        invocation_phrases:
-          - "remove standing instruction"
-          - "delete SSI"
-          - "remove SSI"
-          - "delete settlement instruction"
-          - "deactivate SSI"
-          - "remove from SSIs"
-          - "drop standing instruction"
-          - "take out settlement instruction"
-          - "retire this custody SSI"
-          - "remove safekeeping account route"
-        behavior: plugin
-        handler: remove_ssi_from_profile
-        metadata:
-          tier: intent
-          source_of_truth: matrix
-          scope: cbu
-          noun: ssi
-          tags: [authoring, ssi]
-          phase_tags: [trading]
-        args:
-          - name: profile-id
-            type: uuid
-            required: true
-          - name: ssi-name
-            type: string
-            required: true
-            description: "SSI name to remove"
-        returns:
-          type: record
-          description: "Removed SSI info with version"
 
       # --- Booking Rules Section ---
 
-      add-booking-rule:
-        description: Add ALERT-style booking rule to trading profile
-        invocation_phrases:
-          - "add booking rule"
-          - "create booking rule"
-          - "add settlement rule"
-          - "configure booking"
-          - "add SSI selection rule"
-          - "create routing rule"
-          - "add rule to profile"
-          - "define booking rule"
-          - "set up trade routing logic"
-          - "configure settlement routing for market"
-        behavior: plugin
-        handler: add_booking_rule_to_profile
-        metadata:
-          tier: intent
-          source_of_truth: matrix
-          scope: cbu
-          noun: booking_rule
-          tags: [authoring, booking-rules]
-          phase_tags: [trading]
-        args:
-          - name: profile-id
-            type: uuid
-            required: true
-          - name: rule-name
-            type: string
-            required: true
-            description: "Unique rule name (combined with ssi-ref to create rule-id)"
-          - name: priority
-            type: integer
-            required: true
-            description: "Lower priority = evaluated first"
-          - name: ssi-ref
-            type: string
-            required: true
-            description: "Reference to SSI name in standing_instructions"
-          - name: match-instrument-class
-            type: string
-            required: false
-            description: "Instrument class to match (e.g., EQUITY, GOVT_BOND)"
-          - name: match-security-type
-            type: string
-            required: false
-            description: "Security type to match"
-          - name: match-mic
-            type: string
-            required: false
-            description: "Market MIC to match"
-          - name: match-currency
-            type: string
-            required: false
-            description: "Currency to match"
-          - name: match-settlement-type
-            type: string
-            required: false
-            description: "Settlement type to match (DVP, FOP, RVP)"
-          - name: match-counterparty-id
-            type: string
-            required: false
-            description: "Counterparty entity ID for OTC matching"
-        returns:
-          type: record
-
-      remove-booking-rule:
-        description: Remove booking rule from trading profile
-        invocation_phrases:
-          - "remove booking rule"
-          - "delete booking rule"
-          - "remove settlement rule"
-          - "drop routing rule"
-          - "deactivate booking rule"
-          - "remove rule"
-          - "delete SSI selection rule"
-          - "take out booking routing logic"
-          - "clear trade routing rule"
-          - "remove settlement routing entry"
-        behavior: plugin
-        handler: remove_booking_rule_from_profile
-        metadata:
-          tier: intent
-          source_of_truth: matrix
-          scope: cbu
-          noun: booking_rule
-          tags: [authoring, booking-rules]
-          phase_tags: [trading]
-        args:
-          - name: profile-id
-            type: uuid
-            required: true
-          - name: ssi-ref
-            type: string
-            required: true
-            description: "Parent SSI name that contains this booking rule"
-          - name: rule-id
-            type: string
-            required: true
-            description: "Booking rule ID to remove"
-        returns:
-          type: record
-          description: "Removed booking rule info with version"
-
       # --- ISDA/CSA Section ---
-
-      add-isda-config:
-        description: Add ISDA master agreement to trading profile
-        invocation_phrases:
-          - "add ISDA configuration"
-          - "configure ISDA agreement"
-          - "set up ISDA"
-          - "add ISDA master"
-          - "create ISDA config"
-          - "add ISDA settings"
-          - "configure ISDA master"
-          - "add ISDA"
-          - "establish ISDA"
-          - "create ISDA"
-          - "add counterparty"
-          - "add counterparty for derivatives"
-        behavior: plugin
-        handler: add_isda_config_to_profile
-        metadata:
-          tier: intent
-          source_of_truth: matrix
-          scope: cbu
-          noun: isda
-          tags: [authoring, isda, otc]
-          phase_tags: [trading]
-        args:
-          - name: profile-id
-            type: uuid
-            required: true
-            description: "Trading profile ID"
-          - name: counterparty-entity-id
-            type: string
-            required: true
-            description: "Counterparty entity UUID"
-          - name: counterparty-name
-            type: string
-            required: true
-            description: "Counterparty display name"
-          - name: counterparty-lei
-            type: string
-            required: false
-            description: "Counterparty LEI (optional)"
-          - name: governing-law
-            type: string
-            required: false
-            valid_values: [NY, ENGLISH]
-            description: "Governing law jurisdiction"
-          - name: agreement-date
-            type: string
-            required: false
-            description: "Agreement date (YYYY-MM-DD)"
-        returns:
-          type: record
-          description: Created ISDA config with isda_id
-
-      add-isda-coverage:
-        description: Add product coverage to ISDA config
-        invocation_phrases:
-          - "add ISDA coverage"
-          - "extend ISDA coverage"
-          - "add product to ISDA"
-          - "include in ISDA scope"
-          - "add ISDA product coverage"
-          - "expand ISDA coverage"
-          - "add to ISDA products"
-          - "enable OTC asset class under ISDA"
-          - "cover derivatives product in ISDA"
-          - "authorize new product on ISDA"
-        behavior: plugin
-        handler: TradingProfileAddIsdaCoverageOp
-        metadata:
-          tier: intent
-          source_of_truth: matrix
-          scope: cbu
-          noun: isda
-          tags: [authoring, isda, otc]
-          phase_tags: [trading]
-        args:
-          - name: profile-id
-            type: uuid
-            required: true
-            description: "Trading profile ID"
-          - name: isda-ref
-            type: string
-            required: true
-            description: "ISDA counterparty name or ID to add coverage to"
-          - name: asset-class
-            type: string
-            required: true
-            description: "ISDA asset class (RATES, CREDIT, FX, EQUITY, COMMODITY)"
-          - name: base-products
-            type: string_list
-            required: false
-            description: "Specific products (IRS, CDS, FX_FORWARD, etc.)"
-        returns:
-          type: record
-          description: Created product coverage with coverage_id
-
-      add-csa-config:
-        description: Add CSA (Credit Support Annex) to ISDA agreement
-        invocation_phrases:
-          - "add CSA configuration"
-          - "configure CSA"
-          - "set up CSA agreement"
-          - "add credit support annex"
-          - "create CSA config"
-          - "add CSA settings"
-          - "configure collateral agreement"
-          - "add CSA"
-          - "add VM CSA"
-          - "add IM CSA"
-          - "add collateral agreement"
-        behavior: plugin
-        handler: add_csa_config_to_profile
-        metadata:
-          tier: intent
-          source_of_truth: matrix
-          scope: cbu
-          noun: csa
-          tags: [authoring, csa, otc, collateral]
-          phase_tags: [trading]
-        args:
-          - name: profile-id
-            type: uuid
-            required: true
-            description: "Trading profile ID"
-          - name: isda-ref
-            type: string
-            required: true
-            description: "ISDA counterparty name or ID to add CSA to"
-          - name: csa-type
-            type: string
-            required: true
-            valid_values: [VM, VM_IM, IM]
-            description: "CSA type (VM=Variation Margin, IM=Initial Margin)"
-          - name: threshold-currency
-            type: string
-            required: false
-            description: "Threshold currency (ISO 4217)"
-          - name: threshold-amount
-            type: decimal
-            required: false
-            description: "Threshold amount before margin call triggered"
-          - name: minimum-transfer-amount
-            type: decimal
-            required: false
-            description: "Minimum transfer amount (MTA)"
-          - name: collateral-ssi-ref
-            type: string
-            required: false
-            description: "Reference to SSI for collateral transfers"
-        returns:
-          type: record
-          description: Created CSA config with csa_id
-
-      add-csa-collateral:
-        description: Add eligible collateral to CSA
-        invocation_phrases:
-          - "add CSA collateral"
-          - "configure eligible collateral"
-          - "add collateral type"
-          - "set collateral eligibility"
-          - "add eligible securities"
-          - "configure CSA margin"
-          - "add collateral assets"
-          - "define accepted margin collateral"
-          - "permit government bonds as collateral"
-          - "add haircut schedule for collateral"
-        behavior: plugin
-        handler: TradingProfileAddCsaCollateralOp
-        metadata:
-          tier: intent
-          source_of_truth: matrix
-          scope: cbu
-          noun: csa
-          tags: [authoring, csa, collateral]
-          phase_tags: [trading]
-        args:
-          - name: profile-id
-            type: uuid
-            required: true
-          - name: counterparty-ref
-            type: string
-            required: true
-          - name: collateral-type
-            type: string
-            required: true
-            valid_values: [CASH, GOVT_BOND, CORP_BOND, EQUITY, MONEY_MARKET]
-          - name: currencies
-            type: string_list
-            required: false
-          - name: issuers
-            type: string_list
-            required: false
-            description: Allowed issuer countries or entities
-          - name: min-rating
-            type: string
-            required: false
-            description: "Minimum credit rating (e.g., A-)"
-          - name: haircut-pct
-            type: decimal
-            required: true
-            description: "Haircut percentage (e.g., 2.0 for 2%)"
-        returns:
-          type: affected
 
       link-csa-ssi:
         description: Link CSA to collateral SSI in standing instructions
@@ -1147,151 +815,7 @@ domains:
         returns:
           type: affected
 
-      remove-isda-config:
-        description: Remove ISDA master agreement from trading profile
-        invocation_phrases:
-          - "remove ISDA configuration"
-          - "delete ISDA config"
-          - "remove ISDA agreement"
-          - "deactivate ISDA"
-          - "drop ISDA settings"
-          - "remove ISDA from profile"
-          - "terminate ISDA master agreement"
-          - "take counterparty off ISDA"
-          - "delete OTC counterparty relationship"
-          - "remove derivatives agreement"
-        behavior: plugin
-        handler: remove_isda_config_from_profile
-        metadata:
-          tier: intent
-          source_of_truth: matrix
-          scope: cbu
-          noun: isda
-          tags: [authoring, isda, otc]
-          phase_tags: [trading]
-        args:
-          - name: profile-id
-            type: uuid
-            required: true
-            description: "Trading profile ID"
-          - name: counterparty-ref
-            type: string
-            required: true
-            description: "Counterparty entity name or ID to remove"
-        returns:
-          type: affected
-          description: Number of ISDA configs removed (0 or 1)
-
-      remove-csa-config:
-        description: Remove CSA from ISDA agreement in trading profile
-        invocation_phrases:
-          - "remove CSA configuration"
-          - "delete CSA config"
-          - "remove credit support"
-          - "deactivate CSA"
-          - "drop CSA settings"
-          - "remove CSA from profile"
-          - "terminate credit support annex"
-          - "delete collateral agreement for counterparty"
-          - "remove margin agreement from ISDA"
-          - "drop variation margin CSA"
-        behavior: plugin
-        handler: remove_csa_config_from_profile
-        metadata:
-          tier: intent
-          source_of_truth: matrix
-          scope: cbu
-          noun: csa
-          tags: [authoring, csa, otc]
-          phase_tags: [trading]
-        args:
-          - name: profile-id
-            type: uuid
-            required: true
-            description: "Trading profile ID"
-          - name: counterparty-ref
-            type: string
-            required: true
-            description: "Counterparty entity name or ID"
-          - name: csa-type
-            type: string
-            required: false
-            valid_values: [VM, VM_IM, IM]
-            description: "CSA type to remove (if omitted, removes all CSAs for this counterparty)"
-        returns:
-          type: affected
-          description: Number of CSA configs removed
-
       # --- Investment Managers Section ---
-
-      add-im-mandate:
-        description: Add investment manager mandate to trading profile
-        invocation_phrases:
-          - "add investment management mandate"
-          - "add IM mandate"
-          - "create management mandate"
-          - "add investment mandate"
-          - "configure IM relationship"
-          - "add discretionary mandate"
-          - "create IM agreement"
-          - "appoint investment manager to profile"
-          - "authorize asset manager for trading"
-          - "onboard new investment manager"
-        behavior: plugin
-        handler: add_im_mandate_to_profile
-        metadata:
-          tier: intent
-          source_of_truth: matrix
-          scope: cbu
-          noun: im_mandate
-          tags: [authoring, investment-manager]
-          phase_tags: [trading]
-        args:
-          - name: profile-id
-            type: uuid
-            required: true
-          - name: manager-ref
-            type: string
-            required: true
-            description: "Manager reference (LEI, BIC, or name)"
-          - name: manager-ref-type
-            type: string
-            required: true
-            valid_values: [LEI, BIC, NAME, UUID]
-          - name: priority
-            type: integer
-            required: true
-          - name: role
-            type: string
-            required: false
-            default: INVESTMENT_MANAGER
-          - name: scope-all
-            type: boolean
-            required: false
-            default: false
-            description: If true, IM can trade all universe
-          - name: scope-mics
-            type: string_list
-            required: false
-            description: Markets this IM can trade
-          - name: scope-instrument-classes
-            type: string_list
-            required: false
-          - name: instruction-method
-            type: string
-            required: false
-            valid_values: [SWIFT, CTM, FIX, API, ALERT, MANUAL]
-          - name: can-trade
-            type: boolean
-            required: false
-            default: true
-          - name: can-settle
-            type: boolean
-            required: false
-            default: true
-        returns:
-          type: record
-          description: Updated IM mandates list
 
       update-im-scope:
         description: Update scope for existing IM mandate
@@ -1331,38 +855,6 @@ domains:
           - name: scope-instrument-classes
             type: string_list
             required: false
-        returns:
-          type: affected
-
-      remove-im-mandate:
-        description: Remove investment manager mandate from profile
-        invocation_phrases:
-          - "remove IM mandate"
-          - "terminate mandate"
-          - "end investment mandate"
-          - "remove management mandate"
-          - "deactivate IM relationship"
-          - "delete IM mandate"
-          - "revoke investment manager appointment"
-          - "offboard asset manager"
-          - "terminate discretionary management agreement"
-          - "cancel IM authorization"
-        behavior: plugin
-        handler: remove_im_mandate_from_profile
-        metadata:
-          tier: intent
-          source_of_truth: matrix
-          scope: cbu
-          noun: im_mandate
-          tags: [authoring, investment-manager]
-          phase_tags: [trading]
-        args:
-          - name: profile-id
-            type: uuid
-            required: true
-          - name: manager-ref
-            type: string
-            required: true
         returns:
           type: affected
 

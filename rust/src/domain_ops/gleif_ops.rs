@@ -95,7 +95,7 @@ impl CustomOperation for GleifEnrichOp {
 
                         // Use DSL to create entity (idempotent by name - prevents duplicates)
                         let dsl = format!(
-                            r#"(entity.ensure-limited-company :name "{}" :jurisdiction "{}" :lei "{}" :as @entity)"#,
+                            r#"(entity.ensure :entity-type "limited-company" :name "{}" :jurisdiction "{}" :lei "{}" :as @entity)"#,
                             escape_dsl_string(name),
                             jurisdiction,
                             l
@@ -879,17 +879,17 @@ async fn get_or_create_entity_from_record(pool: &PgPool, record: &LeiRecord) -> 
     let mut ctx = ExecutionContext::new();
 
     let dsl = if is_fund {
-        // Use fund.ensure-standalone for fund entities (idempotent via upsert, minimal required fields)
+        // Use fund.ensure for fund entities (idempotent via upsert, minimal required fields)
         format!(
-            r#"(fund.ensure-standalone :name "{}" :jurisdiction "{}" :lei "{}" :as @entity)"#,
+            r#"(fund.ensure :fund-type "standalone" :name "{}" :jurisdiction "{}" :lei "{}" :as @entity)"#,
             escape_dsl_string(name),
             jurisdiction,
             lei
         )
     } else {
-        // Use entity.ensure-limited-company for non-fund entities
+        // Use entity.ensure for non-fund entities
         format!(
-            r#"(entity.ensure-limited-company :name "{}" :jurisdiction "{}" :lei "{}" :as @entity)"#,
+            r#"(entity.ensure :entity-type "limited-company" :name "{}" :jurisdiction "{}" :lei "{}" :as @entity)"#,
             escape_dsl_string(name),
             jurisdiction,
             lei

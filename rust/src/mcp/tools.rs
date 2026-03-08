@@ -238,7 +238,7 @@ pub fn get_tools() -> Vec<Tool> {
                 "properties": {
                     "verb": {
                         "type": "string",
-                        "description": "Full verb name (e.g., 'cbu.add-product', 'entity.create-proper-person')"
+                        "description": "Full verb name (e.g., 'cbu.add-product', 'entity.create')"
                     }
                 },
                 "required": ["verb"]

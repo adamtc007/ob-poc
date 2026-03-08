@@ -5,7 +5,7 @@
     :jurisdiction "GB"
     :as @cbu)
 
-(entity.create-proper-person
+(entity.create :entity-type "proper-person"
     :cbu-id @cbu
     :nationality "GB"
     :as @person)

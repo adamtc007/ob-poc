@@ -17,7 +17,7 @@
 ;; =============================================================================
 
 ;; Create the main corporate entity
-(entity.create-limited-company
+(entity.create :entity-type "limited-company"
   :name "Global Investment Holdings Ltd"
   :jurisdiction "LU"
   :as @holdco)
@@ -33,21 +33,21 @@
 (cbu.assign-role :cbu-id @cbu :entity-id @holdco :role "PRINCIPAL")
 
 ;; Create natural persons for UBO/control analysis
-(entity.create-proper-person
+(entity.create :entity-type "proper-person"
   :first-name "Hans"
   :last-name "Mueller"
   :date-of-birth "1965-03-15"
   :nationality "DE"
   :as @hans)
 
-(entity.create-proper-person
+(entity.create :entity-type "proper-person"
   :first-name "Marie"
   :last-name "Dubois"
   :date-of-birth "1972-08-22"
   :nationality "FR"
   :as @marie)
 
-(entity.create-proper-person
+(entity.create :entity-type "proper-person"
   :first-name "James"
   :last-name "Smith"
   :date-of-birth "1968-11-30"
@@ -161,32 +161,32 @@
 ;; =============================================================================
 
 ;; Run screenings on natural persons
-(case-screening.run :workstream-id @ws-hans :screening-type "PEP")
-(case-screening.run :workstream-id @ws-hans :screening-type "SANCTIONS")
-(case-screening.run :workstream-id @ws-marie :screening-type "PEP")
-(case-screening.run :workstream-id @ws-marie :screening-type "SANCTIONS")
-(case-screening.run :workstream-id @ws-james :screening-type "PEP")
-(case-screening.run :workstream-id @ws-james :screening-type "SANCTIONS")
+(screening.run :workstream-id @ws-hans :screening-type "PEP")
+(screening.run :workstream-id @ws-hans :screening-type "SANCTIONS")
+(screening.run :workstream-id @ws-marie :screening-type "PEP")
+(screening.run :workstream-id @ws-marie :screening-type "SANCTIONS")
+(screening.run :workstream-id @ws-james :screening-type "PEP")
+(screening.run :workstream-id @ws-james :screening-type "SANCTIONS")
 
 ;; Run sanctions on corporate entity
-(case-screening.run :workstream-id @ws-holdco :screening-type "SANCTIONS")
+(screening.run :workstream-id @ws-holdco :screening-type "SANCTIONS")
 
 ;; =============================================================================
 ;; PART 5: DOCUMENT REQUESTS
 ;; =============================================================================
 
 ;; Request identity documents for UBOs
-(doc-request.create :workstream-id @ws-hans :doc-type "PASSPORT" :is-mandatory true)
-(doc-request.create :workstream-id @ws-hans :doc-type "PROOF_OF_ADDRESS" :is-mandatory true)
-(doc-request.create :workstream-id @ws-marie :doc-type "PASSPORT" :is-mandatory true)
-(doc-request.create :workstream-id @ws-marie :doc-type "PROOF_OF_ADDRESS" :is-mandatory true)
-(doc-request.create :workstream-id @ws-james :doc-type "PASSPORT" :is-mandatory true)
-(doc-request.create :workstream-id @ws-james :doc-type "PROOF_OF_ADDRESS" :is-mandatory true)
+(document.create-request :workstream-id @ws-hans :doc-type "PASSPORT" :is-mandatory true)
+(document.create-request :workstream-id @ws-hans :doc-type "PROOF_OF_ADDRESS" :is-mandatory true)
+(document.create-request :workstream-id @ws-marie :doc-type "PASSPORT" :is-mandatory true)
+(document.create-request :workstream-id @ws-marie :doc-type "PROOF_OF_ADDRESS" :is-mandatory true)
+(document.create-request :workstream-id @ws-james :doc-type "PASSPORT" :is-mandatory true)
+(document.create-request :workstream-id @ws-james :doc-type "PROOF_OF_ADDRESS" :is-mandatory true)
 
 ;; Request corporate documents
-(doc-request.create :workstream-id @ws-holdco :doc-type "CERTIFICATE_OF_INCORPORATION" :is-mandatory true)
-(doc-request.create :workstream-id @ws-holdco :doc-type "REGISTER_OF_SHAREHOLDERS" :is-mandatory true)
-(doc-request.create :workstream-id @ws-holdco :doc-type "REGISTER_OF_DIRECTORS" :is-mandatory true)
+(document.create-request :workstream-id @ws-holdco :doc-type "CERTIFICATE_OF_INCORPORATION" :is-mandatory true)
+(document.create-request :workstream-id @ws-holdco :doc-type "REGISTER_OF_SHAREHOLDERS" :is-mandatory true)
+(document.create-request :workstream-id @ws-holdco :doc-type "REGISTER_OF_DIRECTORS" :is-mandatory true)
 
 ;; =============================================================================
 ;; PART 6: UBO REGISTRATION

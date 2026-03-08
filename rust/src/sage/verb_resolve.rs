@@ -8,7 +8,6 @@ use std::collections::HashSet;
 
 use super::outcome::OutcomeIntent;
 use super::verb_index::{VerbMeta, VerbMetadataIndex};
-use super::IntentPolarity;
 
 /// Ranked candidate returned by the structured scorer.
 #[derive(Debug, Clone)]
@@ -69,12 +68,19 @@ impl StructuredVerbScorer {
         let requested_action = normalized_action_tags(intent);
         let requested_params = requested_param_keys(intent);
         let intent_keywords = intent_keywords(intent);
+        let domain_hint = (!intent.domain_concept.trim().is_empty())
+            .then_some(intent.domain_concept.as_str());
+        let metas = {
+            let filtered = self.index.query(intent.plane, intent.polarity, domain_hint);
+            if filtered.is_empty() && domain_hint.is_some() {
+                self.index.query(intent.plane, intent.polarity, None)
+            } else {
+                filtered
+            }
+        };
 
-        let mut candidates = self
-            .index
-            .iter()
-            .filter(|meta| meta.planes.contains(&intent.plane))
-            .filter(|meta| matches_polarity(meta.polarity, intent.polarity))
+        let mut candidates = metas
+            .into_iter()
             .map(|meta| {
                 let action_score = action_score(meta, &requested_action, &intent_keywords);
                 let param_overlap_score = param_overlap_score(meta, &requested_params);
@@ -112,10 +118,6 @@ impl StructuredVerbScorer {
     pub fn index(&self) -> &VerbMetadataIndex {
         &self.index
     }
-}
-
-fn matches_polarity(candidate: IntentPolarity, requested: IntentPolarity) -> bool {
-    candidate == requested || requested == IntentPolarity::Ambiguous
 }
 
 fn normalized_action_tags(intent: &OutcomeIntent) -> HashSet<String> {
@@ -221,7 +223,8 @@ mod tests {
 
     use crate::sage::verb_index::VerbMeta;
     use crate::sage::{
-        Clarification, EntityRef, ObservationPlane, OutcomeAction, OutcomeStep, SageConfidence,
+        Clarification, EntityRef, IntentPolarity, ObservationPlane, OutcomeAction, OutcomeStep,
+        SageConfidence,
     };
 
     fn index_with(entries: Vec<VerbMeta>) -> VerbMetadataIndex {

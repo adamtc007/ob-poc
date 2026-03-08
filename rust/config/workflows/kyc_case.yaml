@@ -234,19 +234,19 @@ actions:
 
   SCREENING:
     - action: run_screening
-      verb: case-screening.run
+      verb: screening.run
       description: Run screening check
 
     - action: review_hit
-      verb: case-screening.review-hit
+      verb: screening.review-hit
       description: Review screening hit
 
     - action: clear_hit
-      verb: case-screening.clear-hit
+      verb: screening.clear-hit
       description: Clear hit as false positive
 
     - action: confirm_hit
-      verb: case-screening.confirm-hit
+      verb: screening.confirm-hit
       description: Confirm hit as true match
 
   ANALYSIS:

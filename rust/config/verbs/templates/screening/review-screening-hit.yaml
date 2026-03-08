@@ -83,7 +83,7 @@ params:
     example: "Name match only, different date of birth and nationality"
 
 body: |
-  (case-screening.review-hit
+  (screening.review-hit
     :screening-id "$screening_name"
     :status "$outcome"
     :review-notes "$rationale")

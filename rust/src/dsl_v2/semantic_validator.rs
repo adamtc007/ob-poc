@@ -1333,10 +1333,7 @@ mod tests {
     #[test]
     fn test_verb_return_type() {
         assert_eq!(verb_return_type("cbu.create"), RefType::Cbu);
-        assert_eq!(
-            verb_return_type("entity.create-natural-person"),
-            RefType::Entity
-        );
+        assert_eq!(verb_return_type("entity.create"), RefType::Entity);
         assert_eq!(verb_return_type("document.catalog"), RefType::Document);
     }
 

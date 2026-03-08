@@ -9,14 +9,14 @@
     :as @cbu)
 
 ;; Create corporate structure
-(entity.create-limited-company
+(entity.create :entity-type "limited-company"
     :cbu-id @cbu
     :name "Tollgate Test Ltd"
     :company-number "UK777666"
     :jurisdiction "GB"
     :as @company)
 
-(entity.create-proper-person
+(entity.create :entity-type "proper-person"
     :cbu-id @cbu
     :first-name "Test"
     :last-name "UBO"
@@ -82,23 +82,23 @@
     :units 100)
 
 ;; Run screenings on UBO
-(case-screening.run
+(screening.run
     :workstream-id @ws-ubo
     :screening-type "PEP"
     :as @pep)
 
-(case-screening.run
+(screening.run
     :workstream-id @ws-ubo
     :screening-type "SANCTIONS"
     :as @sanctions)
 
 ;; Complete screenings with clear results
-(case-screening.complete
+(screening.complete
     :screening-id @pep
     :status "CLEAR"
     :result-summary "No PEP matches found")
 
-(case-screening.complete
+(screening.complete
     :screening-id @sanctions
     :status "CLEAR"
     :result-summary "No sanctions matches found")

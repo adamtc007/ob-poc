@@ -1069,8 +1069,8 @@ User: "Create a new fund called Pacific Growth in Luxembourg and add Custody"
 ## Other DSL Examples
 
 Create entities:
-(entity.create-proper-person :first-name "John" :last-name "Smith" :date-of-birth "1980-01-15" :as @john)
-(entity.create-limited-company :name "Holdings Ltd" :jurisdiction "GB" :as @company)
+(entity.create :entity-type "proper-person" :first-name "John" :last-name "Smith" :date-of-birth "1980-01-15" :as @john)
+(entity.create :entity-type "limited-company" :name "Holdings Ltd" :jurisdiction "GB" :as @company)
 
 Assign roles (note: @fund must be defined first with cbu.ensure):
 (cbu.ensure :name "Acme Fund" :jurisdiction "LU" :client-type "fund" :as @fund)

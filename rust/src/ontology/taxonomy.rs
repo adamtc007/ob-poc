@@ -107,7 +107,7 @@ impl EntityTaxonomy {
 
     /// Get the canonical creator verb for an entity type.
     ///
-    /// Returns the verb name (e.g., "cbu.create") or a pattern (e.g., "entity.create-{subtype}").
+    /// Returns the canonical verb name (e.g., "cbu.create" or "entity.create").
     pub fn canonical_creator(&self, entity_type: &str, subtype: Option<&str>) -> Option<String> {
         let entity = self.entities.get(entity_type)?;
         let ic = entity.implicit_create.as_ref()?;
@@ -255,8 +255,8 @@ entities:
       pk: entity_id
     implicit_create:
       allowed: true
-      canonical_verb_pattern: "entity.create-{subtype}"
-      required_args: [name]
+      canonical_verb: "entity.create"
+      required_args: [entity-type, name]
 relationships:
   - parent: cbu
     child: document
@@ -286,7 +286,7 @@ reference_tables: {}
         );
         assert_eq!(
             taxonomy.canonical_creator("entity", Some("proper_person")),
-            Some("entity.create-proper_person".to_string())
+            Some("entity.create".to_string())
         );
     }
 

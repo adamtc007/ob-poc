@@ -89,7 +89,7 @@ params:
       - URGENT
 
 body: |
-  (doc-request.create
+  (document.create-request
     :workstream-id "$workstream_name"
     :doc-type "$doc_type"
     :due-date "$due_date"

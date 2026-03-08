@@ -306,7 +306,7 @@ actions:
       description: Record SOW allegation
 
     - action: request_sow_docs
-      verb: doc-request.create
+      verb: document.create-request
       params:
         doc-types: [TAX_RETURNS, AUDITED_ACCOUNTS, PROPERTY_DEEDS, INHERITANCE_DOCS]
       description: Request SOW documents
@@ -323,7 +323,7 @@ actions:
       description: Record SOF allegation
 
     - action: request_sof_docs
-      verb: doc-request.create
+      verb: document.create-request
       params:
         doc-types: [BANK_STATEMENTS, WIRE_CONFIRMATIONS, INVESTMENT_STATEMENTS]
       description: Request SOF documents
@@ -334,7 +334,7 @@ actions:
 
   EXTENDED_PROOF_COLLECTION:
     - action: request_certified_copies
-      verb: doc-request.create
+      verb: document.create-request
       params:
         certification-required: true
       description: Request certified document copies
@@ -344,7 +344,7 @@ actions:
       description: Link extended proof to edge
 
     - action: request_corroborating_doc
-      verb: doc-request.create
+      verb: document.create-request
       params:
         purpose: corroboration
       description: Request corroborating document
@@ -357,7 +357,7 @@ actions:
       description: Record public registry observation
 
     - action: run_deep_media_search
-      verb: case-screening.run
+      verb: screening.run
       params:
         screening-type: ADVERSE_MEDIA_EXTENDED
       description: Run extended adverse media search
@@ -380,7 +380,7 @@ actions:
       description: Resolve discrepancy
 
     - action: run_enhanced_screening
-      verb: case-screening.run
+      verb: screening.run
       params:
         enhanced: true
       description: Run enhanced screening

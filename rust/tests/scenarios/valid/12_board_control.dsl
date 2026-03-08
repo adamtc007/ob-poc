@@ -8,7 +8,7 @@
     :jurisdiction "GB"
     :as @cbu)
 
-(entity.create-limited-company
+(entity.create :entity-type "limited-company"
     :cbu-id @cbu
     :name "Board Test Ltd"
     :company-number "UK888777"
@@ -16,7 +16,7 @@
     :as @company)
 
 ;; Create investors with appointment rights
-(entity.create-limited-company
+(entity.create :entity-type "limited-company"
     :cbu-id @cbu
     :name "PE Fund I LP"
     :company-number "KY12345"
@@ -24,7 +24,7 @@
     :as @pe-fund)
 
 ;; Create directors
-(entity.create-proper-person
+(entity.create :entity-type "proper-person"
     :cbu-id @cbu
     :first-name "Alice"
     :last-name "Chair"
@@ -32,7 +32,7 @@
     :nationality "GB"
     :as @alice)
 
-(entity.create-proper-person
+(entity.create :entity-type "proper-person"
     :cbu-id @cbu
     :first-name "Bob"
     :last-name "Director"
@@ -40,7 +40,7 @@
     :nationality "GB"
     :as @bob)
 
-(entity.create-proper-person
+(entity.create :entity-type "proper-person"
     :cbu-id @cbu
     :first-name "Carol"
     :last-name "Nominee"

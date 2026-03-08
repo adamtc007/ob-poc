@@ -182,7 +182,7 @@ async fn test_02_binding_persistence_across_executions() {
     // Step 2: Use @cbu from step 1
     let r2 = session
         .execute(
-            r#"(entity.create-limited-company :name "Holdings Ltd" :jurisdiction "LU" :as @company)
+            r#"(entity.create :entity-type "limited-company" :name "Holdings Ltd" :jurisdiction "LU" :as @company)
 (cbu.assign-role :cbu-id @cbu :entity-id @company :role "PRINCIPAL")"#,
         )
         .await
@@ -216,7 +216,7 @@ async fn test_03_multiple_bindings_accumulated() {
 
     let r2 = session
         .execute(
-            r#"(entity.create-limited-company :name "Company A" :jurisdiction "LU" :as @companyA)"#,
+            r#"(entity.create :entity-type "limited-company" :name "Company A" :jurisdiction "LU" :as @companyA)"#,
         )
         .await
         .unwrap();
@@ -224,7 +224,7 @@ async fn test_03_multiple_bindings_accumulated() {
 
     let r3 = session
         .execute(
-            r#"(entity.create-limited-company :name "Company B" :jurisdiction "LU" :as @companyB)"#,
+            r#"(entity.create :entity-type "limited-company" :name "Company B" :jurisdiction "LU" :as @companyB)"#,
         )
         .await
         .unwrap();
@@ -284,8 +284,8 @@ async fn test_05_full_onboarding_flow() {
 
     // Step by step onboarding
     let steps = [format!(r#"(cbu.ensure :name "{}" :jurisdiction "LU" :client-type "fund" :as @cbu)"#, name),
-        r#"(entity.create-limited-company :name "HoldCo SARL" :jurisdiction "LU" :as @company)"#.to_string(),
-        r#"(entity.create-proper-person :first-name "John" :last-name "Smith" :date-of-birth "1980-01-15" :as @john)"#.to_string(),
+        r#"(entity.create :entity-type "limited-company" :name "HoldCo SARL" :jurisdiction "LU" :as @company)"#.to_string(),
+        r#"(entity.create :entity-type "proper-person" :first-name "John" :last-name "Smith" :date-of-birth "1980-01-15" :as @john)"#.to_string(),
         r#"(cbu.assign-role :cbu-id @cbu :entity-id @company :role "PRINCIPAL")"#.to_string(),
         r#"(cbu.assign-role :cbu-id @cbu :entity-id @john :role "DIRECTOR")"#.to_string(),
         r#"(cbu.assign-role :cbu-id @cbu :entity-id @john :role "BENEFICIAL_OWNER" :ownership-percentage 100)"#.to_string(),
@@ -415,7 +415,7 @@ async fn test_14_error_recovery_continues_session() {
     // Step 3: Session should still work, @cbu still available
     let r3 = session
         .execute(
-            r#"(entity.create-limited-company :name "Recovery Co" :jurisdiction "LU" :as @company)
+            r#"(entity.create :entity-type "limited-company" :name "Recovery Co" :jurisdiction "LU" :as @company)
 (cbu.assign-role :cbu-id @cbu :entity-id @company :role "PRINCIPAL")"#,
         )
         .await
@@ -531,7 +531,7 @@ async fn test_23_very_long_dsl() {
     for i in 0..20 {
         dsl.push_str(&format!(
             r#"
-(entity.create-limited-company :name "Company {}" :jurisdiction "LU" :as @company{})"#,
+(entity.create :entity-type "limited-company" :name "Company {}" :jurisdiction "LU" :as @company{})"#,
             i, i
         ));
     }
@@ -792,7 +792,7 @@ async fn test_42_cross_domain_flow() {
 
     // Entity domain
     let r2 = session
-        .execute(r#"(entity.create-proper-person :first-name "Alice" :last-name "Wonder" :date-of-birth "1990-05-20" :as @alice)"#)
+        .execute(r#"(entity.create :entity-type "proper-person" :first-name "Alice" :last-name "Wonder" :date-of-birth "1990-05-20" :as @alice)"#)
         .await.unwrap();
     assert!(r2.success);
 
@@ -842,7 +842,7 @@ async fn test_50_rapid_fire_executions() {
     // Rapid fire 20 entity creations
     for i in 0..20 {
         let result = session
-            .execute(&format!(r#"(entity.create-limited-company :name "Rapid Co {}" :jurisdiction "LU" :as @company{})"#, i, i))
+            .execute(&format!(r#"(entity.create :entity-type "limited-company" :name "Rapid Co {}" :jurisdiction "LU" :as @company{})"#, i, i))
             .await.unwrap();
         assert!(
             result.success,
@@ -876,7 +876,7 @@ async fn test_51_session_after_long_pause() {
     // Continue - @cbu should still work
     let r2 = session
         .execute(
-            r#"(entity.create-limited-company :name "Post Pause Co" :jurisdiction "LU" :as @company)
+            r#"(entity.create :entity-type "limited-company" :name "Post Pause Co" :jurisdiction "LU" :as @company)
 (cbu.assign-role :cbu-id @cbu :entity-id @company :role "PRINCIPAL")"#,
         )
         .await
@@ -1201,13 +1201,13 @@ async fn test_65_multiple_snapshots_accumulate() {
     sleep(Duration::from_millis(200)).await;
 
     session
-        .execute(r#"(entity.create-limited-company :name "Holdings A" :jurisdiction "LU" :as @companyA)"#)
+        .execute(r#"(entity.create :entity-type "limited-company" :name "Holdings A" :jurisdiction "LU" :as @companyA)"#)
         .await.unwrap();
 
     sleep(Duration::from_millis(200)).await;
 
     session
-        .execute(r#"(entity.create-limited-company :name "Holdings B" :jurisdiction "LU" :as @companyB)"#)
+        .execute(r#"(entity.create :entity-type "limited-company" :name "Holdings B" :jurisdiction "LU" :as @companyB)"#)
         .await.unwrap();
 
     // Wait for async persistence

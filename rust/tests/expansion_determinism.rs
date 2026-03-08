@@ -18,7 +18,7 @@ fn test_expansion_is_deterministic() {
     let registry = TemplateRegistry::new();
     let source = r#"
 (cbu.create :name "Test CBU" :jurisdiction "LU" :as @cbu)
-(entity.create-proper-person :name "John Doe" :date-of-birth "1980-01-01" :as @person)
+(entity.create :entity-type "proper-person" :name "John Doe" :date-of-birth "1980-01-01" :as @person)
 (cbu.assign-role :cbu-id @cbu :entity-id @person :role "DIRECTOR")
 "#;
 

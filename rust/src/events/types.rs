@@ -36,7 +36,7 @@ pub struct DslEvent {
 pub enum EventPayload {
     /// DSL command completed successfully
     CommandSucceeded {
-        /// Full verb name (e.g., "entity.create-limited-company")
+        /// Full verb name (e.g., "entity.create")
         verb: String,
         /// Execution time in milliseconds
         duration_ms: u64,

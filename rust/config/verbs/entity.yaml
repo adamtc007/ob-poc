@@ -8,46 +8,21 @@ domains:
       - counterparty
       - director
       - UBO
-    dynamic_verbs:
-      - pattern: create-{type_code}
-        source:
-          table: entity_types
-          schema: ob-poc
-          code_column: type_code
-          name_column: name
-          transform: kebab_case
-        behavior: crud
-        crud:
-          operation: entity_create
-          base_table: entities
-          schema: ob-poc
-          extension_table_column: table_name
-          type_id_column: entity_type_id
-          returning: entity_id
-        base_args:
-          - name: name
-            type: string
-            required: true
-            maps_to: name
-          - name: jurisdiction
-            type: string
-            required: false
-            maps_to: jurisdiction
     verbs:
-      create-limited-company:
-        description: Create a limited company entity
+      create:
+        description: Create an entity of the requested entity type
         behavior: crud
         invocation_phrases:
+          - "create entity"
           - "create company"
-          - "add company"
-          - "create limited company"
-          - "register company"
-          - "new company entity"
-          - "set up company"
-          - "create organisation"
-          - "add new legal entity"
-          - "register limited company"
-          - "create corporate entity"
+          - "create person"
+          - "create trust"
+          - "create partnership"
+          - "add entity"
+          - "register entity"
+          - "new entity"
+          - "set up entity"
+          - "create legal entity"
         metadata:
           tier: intent
           source_of_truth: entity
@@ -57,7 +32,6 @@ domains:
           phase_tags: [onboarding]
         produces:
           type: entity
-          subtype: limited_company
           resolved: false
         crud:
           operation: entity_create
@@ -67,10 +41,20 @@ domains:
           type_id_column: entity_type_id
           returning: entity_id
         args:
-          - name: name
+          - name: entity-type
             type: string
             required: true
-            maps_to: company_name
+          - name: name
+            type: string
+            required: false
+          - name: first-name
+            type: string
+            required: false
+            maps_to: first_name
+          - name: last-name
+            type: string
+            required: false
+            maps_to: last_name
           - name: cbu-id
             type: uuid
             required: false
@@ -88,60 +72,6 @@ domains:
             type: string
             required: false
             maps_to: jurisdiction
-        returns:
-          type: uuid
-          name: entity_id
-          capture: true
-      create-proper-person:
-        description: Create a natural person entity
-        behavior: crud
-        invocation_phrases:
-          - "create person"
-          - "add person"
-          - "add individual"
-          - "create individual"
-          - "register natural person"
-          - "new person entity"
-          - "create director"
-          - "add UBO person"
-          - "create beneficial owner"
-          - "register individual"
-        metadata:
-          tier: intent
-          source_of_truth: entity
-          scope: global
-          noun: entity
-          tags: [lifecycle, creation, onboarding]
-          phase_tags: [onboarding]
-        produces:
-          type: entity
-          subtype: proper_person
-          resolved: false
-        crud:
-          operation: entity_create
-          base_table: entities
-          schema: ob-poc
-          extension_table_column: table_name
-          type_id_column: entity_type_id
-          returning: entity_id
-        args:
-          - name: first-name
-            type: string
-            required: true
-            maps_to: first_name
-          - name: last-name
-            type: string
-            required: true
-            maps_to: last_name
-          - name: cbu-id
-            type: uuid
-            required: false
-            lookup:
-              table: cbus
-              entity_type: cbu
-              schema: ob-poc
-              search_key: name
-              primary_key: cbu_id
           - name: date-of-birth
             type: date
             required: false
@@ -150,60 +80,6 @@ domains:
             type: string
             required: false
             maps_to: nationality
-        returns:
-          type: uuid
-          name: entity_id
-          capture: true
-      create-trust-discretionary:
-        description: Create a discretionary trust entity
-        behavior: crud
-        invocation_phrases:
-          - "create trust"
-          - "add discretionary trust"
-          - "create trust entity"
-          - "register trust"
-          - "new trust"
-          - "set up discretionary trust"
-          - "create trust structure"
-          - "add trust"
-          - "establish trust"
-          - "create new trust entity"
-        metadata:
-          tier: intent
-          source_of_truth: entity
-          scope: global
-          noun: entity
-          tags: [lifecycle, creation, onboarding]
-          phase_tags: [onboarding]
-        produces:
-          type: entity
-          subtype: trust
-          resolved: false
-        crud:
-          operation: entity_create
-          base_table: entities
-          schema: ob-poc
-          extension_table_column: table_name
-          type_id_column: entity_type_id
-          returning: entity_id
-        args:
-          - name: name
-            type: string
-            required: true
-            maps_to: trust_name
-          - name: cbu-id
-            type: uuid
-            required: false
-            lookup:
-              table: cbus
-              entity_type: cbu
-              schema: ob-poc
-              search_key: name
-              primary_key: cbu_id
-          - name: jurisdiction
-            type: string
-            required: true
-            maps_to: jurisdiction
           - name: establishment-date
             type: date
             required: false
@@ -212,60 +88,6 @@ domains:
             type: string
             required: false
             maps_to: trust_purpose
-        returns:
-          type: uuid
-          name: entity_id
-          capture: true
-      create-partnership-limited:
-        description: Create a limited partnership entity
-        behavior: crud
-        invocation_phrases:
-          - "create partnership"
-          - "add limited partnership"
-          - "create LP"
-          - "register partnership"
-          - "new limited partnership"
-          - "set up partnership entity"
-          - "create partnership structure"
-          - "add LP entity"
-          - "establish limited partnership"
-          - "create new partnership"
-        metadata:
-          tier: intent
-          source_of_truth: entity
-          scope: global
-          noun: entity
-          tags: [lifecycle, creation, onboarding]
-          phase_tags: [onboarding]
-        produces:
-          type: entity
-          subtype: partnership
-          resolved: false
-        crud:
-          operation: entity_create
-          base_table: entities
-          schema: ob-poc
-          extension_table_column: table_name
-          type_id_column: entity_type_id
-          returning: entity_id
-        args:
-          - name: name
-            type: string
-            required: true
-            maps_to: partnership_name
-          - name: cbu-id
-            type: uuid
-            required: false
-            lookup:
-              table: cbus
-              entity_type: cbu
-              schema: ob-poc
-              search_key: name
-              primary_key: cbu_id
-          - name: jurisdiction
-            type: string
-            required: false
-            maps_to: jurisdiction
           - name: formation-date
             type: date
             required: false
@@ -275,24 +97,20 @@ domains:
           name: entity_id
           capture: true
 
-      # =========================================================================
-      # ENSURE (UPSERT) VERBS - Idempotent entity creation
-      # =========================================================================
-
-      ensure-limited-company:
-        description: Create or update a limited company entity (idempotent by name)
+      ensure:
+        description: Create or update an entity of the requested entity type
         behavior: crud
         invocation_phrases:
+          - "ensure entity"
           - "ensure company"
-          - "add or update company"
-          - "upsert company"
-          - "ensure counterparty"
-          - "ensure company exists"
-          - "get or create company"
-          - "idempotent company create"
-          - "ensure limited company"
-          - "find or create company"
-          - "ensure corporate entity"
+          - "ensure person"
+          - "ensure trust"
+          - "ensure partnership"
+          - "upsert entity"
+          - "get or create entity"
+          - "find or create entity"
+          - "ensure entity exists"
+          - "add or update entity"
         metadata:
           tier: intent
           source_of_truth: entity
@@ -302,7 +120,6 @@ domains:
           phase_tags: [onboarding]
         produces:
           type: entity
-          subtype: limited_company
           resolved: false
         crud:
           operation: entity_upsert
@@ -312,10 +129,20 @@ domains:
           type_id_column: entity_type_id
           returning: entity_id
         args:
-          - name: name
+          - name: entity-type
             type: string
             required: true
-            maps_to: company_name
+          - name: name
+            type: string
+            required: false
+          - name: first-name
+            type: string
+            required: false
+            maps_to: first_name
+          - name: last-name
+            type: string
+            required: false
+            maps_to: last_name
           - name: cbu-id
             type: uuid
             required: false
@@ -338,61 +165,6 @@ domains:
             required: false
             maps_to: lei
             description: Legal Entity Identifier (LEI) from GLEIF
-        returns:
-          type: uuid
-          name: entity_id
-          capture: true
-
-      ensure-proper-person:
-        description: Create or update a natural person entity (idempotent by name)
-        behavior: crud
-        invocation_phrases:
-          - "ensure person"
-          - "add or update person"
-          - "upsert person"
-          - "ensure person exists"
-          - "get or create person"
-          - "idempotent person create"
-          - "find or create individual"
-          - "ensure individual exists"
-          - "ensure natural person"
-          - "ensure individual"
-        metadata:
-          tier: intent
-          source_of_truth: entity
-          scope: global
-          noun: entity
-          tags: [lifecycle, upsert, onboarding]
-          phase_tags: [onboarding]
-        produces:
-          type: entity
-          subtype: proper_person
-          resolved: false
-        crud:
-          operation: entity_upsert
-          base_table: entities
-          schema: ob-poc
-          extension_table_column: table_name
-          type_id_column: entity_type_id
-          returning: entity_id
-        args:
-          - name: first-name
-            type: string
-            required: true
-            maps_to: first_name
-          - name: last-name
-            type: string
-            required: true
-            maps_to: last_name
-          - name: cbu-id
-            type: uuid
-            required: false
-            lookup:
-              table: cbus
-              entity_type: cbu
-              schema: ob-poc
-              search_key: name
-              primary_key: cbu_id
           - name: date-of-birth
             type: date
             required: false
@@ -401,61 +173,6 @@ domains:
             type: string
             required: false
             maps_to: nationality
-        returns:
-          type: uuid
-          name: entity_id
-          capture: true
-
-      ensure-trust-discretionary:
-        description: Create or update a discretionary trust entity (idempotent by name)
-        behavior: crud
-        invocation_phrases:
-          - "ensure trust"
-          - "add or update trust"
-          - "upsert trust"
-          - "ensure trust exists"
-          - "get or create trust"
-          - "find or create trust"
-          - "ensure discretionary trust"
-          - "idempotent trust create"
-          - "ensure trust entity"
-          - "ensure trust structure"
-        metadata:
-          tier: intent
-          source_of_truth: entity
-          scope: global
-          noun: entity
-          tags: [lifecycle, upsert, onboarding]
-          phase_tags: [onboarding]
-        produces:
-          type: entity
-          subtype: trust
-          resolved: false
-        crud:
-          operation: entity_upsert
-          base_table: entities
-          schema: ob-poc
-          extension_table_column: table_name
-          type_id_column: entity_type_id
-          returning: entity_id
-        args:
-          - name: name
-            type: string
-            required: true
-            maps_to: trust_name
-          - name: cbu-id
-            type: uuid
-            required: false
-            lookup:
-              table: cbus
-              entity_type: cbu
-              schema: ob-poc
-              search_key: name
-              primary_key: cbu_id
-          - name: jurisdiction
-            type: string
-            required: true
-            maps_to: jurisdiction
           - name: establishment-date
             type: date
             required: false
@@ -464,61 +181,6 @@ domains:
             type: string
             required: false
             maps_to: trust_purpose
-        returns:
-          type: uuid
-          name: entity_id
-          capture: true
-
-      ensure-partnership-limited:
-        description: Create or update a limited partnership entity (idempotent by name)
-        behavior: crud
-        invocation_phrases:
-          - "ensure partnership"
-          - "add or update partnership"
-          - "upsert partnership"
-          - "ensure partnership exists"
-          - "get or create partnership"
-          - "find or create LP"
-          - "ensure limited partnership"
-          - "idempotent partnership create"
-          - "ensure LP entity"
-          - "ensure partnership structure"
-        metadata:
-          tier: intent
-          source_of_truth: entity
-          scope: global
-          noun: entity
-          tags: [lifecycle, upsert, onboarding]
-          phase_tags: [onboarding]
-        produces:
-          type: entity
-          subtype: partnership
-          resolved: false
-        crud:
-          operation: entity_upsert
-          base_table: entities
-          schema: ob-poc
-          extension_table_column: table_name
-          type_id_column: entity_type_id
-          returning: entity_id
-        args:
-          - name: name
-            type: string
-            required: true
-            maps_to: partnership_name
-          - name: cbu-id
-            type: uuid
-            required: false
-            lookup:
-              table: cbus
-              entity_type: cbu
-              schema: ob-poc
-              search_key: name
-              primary_key: cbu_id
-          - name: jurisdiction
-            type: string
-            required: false
-            maps_to: jurisdiction
           - name: formation-date
             type: date
             required: false

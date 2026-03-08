@@ -135,7 +135,7 @@ Used when referencing the active CBU from session context.
 {
   "intents": [
     {
-      "verb": "entity.create-limited-company",
+      "verb": "entity.create",
       "params": {"name": "HoldCo Ltd", "jurisdiction": "JE"},
       "refs": {},
       "lookups": null
@@ -184,13 +184,13 @@ Used when referencing the active CBU from session context.
 {
   "intents": [
     {
-      "verb": "entity.create-limited-company",
+      "verb": "entity.create",
       "params": {"name": "HoldCo Ltd", "jurisdiction": "LU"},
       "refs": {},
       "lookups": null
     },
     {
-      "verb": "entity.create-limited-company",
+      "verb": "entity.create",
       "params": {"name": "ManCo S.à r.l.", "jurisdiction": "LU"},
       "refs": {},
       "lookups": null
@@ -362,7 +362,7 @@ Used when referencing the active CBU from session context.
 {
   "intents": [
     {
-      "verb": "entity.create-limited-company",
+      "verb": "entity.create",
       "params": {"name": "Apex ManCo S.à r.l.", "jurisdiction": "LU"},
       "refs": {},
       "lookups": null

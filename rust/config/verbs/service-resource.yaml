@@ -435,3 +435,593 @@ domains:
         returns:
           type: record
           name: validation_result
+
+      # === Lifecycle taxonomy and provisioning (merged from lifecycle) ===
+      read-lifecycle:
+        description: Read a lifecycle by ID or code
+        metadata:
+          tier: reference
+          source_of_truth: workflow
+          scope: cbu
+          noun: lifecycle
+          phase_tags: [monitoring]
+        invocation_phrases:
+          - "read lifecycle"
+          - "get lifecycle definition"
+          - "show lifecycle"
+          - "describe lifecycle"
+        behavior: crud
+        crud:
+          operation: select
+          table: lifecycles
+          schema: ob-poc
+        args:
+          - name: lifecycle-id
+            type: uuid
+            required: false
+            maps_to: lifecycle_id
+          - name: code
+            type: string
+            required: false
+            maps_to: code
+        returns:
+          type: record
+
+      list-lifecycles:
+        description: List lifecycles with optional filters
+        metadata:
+          tier: reference
+          source_of_truth: workflow
+          scope: cbu
+          noun: lifecycle
+          phase_tags: [monitoring]
+        invocation_phrases:
+          - "list lifecycles"
+          - "show all lifecycles"
+          - "which lifecycles exist"
+        behavior: crud
+        crud:
+          operation: select
+          table: lifecycles
+          schema: ob-poc
+        args:
+          - name: category
+            type: string
+            required: false
+            maps_to: category
+          - name: owner
+            type: string
+            required: false
+            maps_to: owner
+          - name: is-active
+            type: boolean
+            required: false
+            maps_to: is_active
+        returns:
+          type: record_set
+
+      list-lifecycles-by-instrument:
+        description: List lifecycles for an instrument class
+        metadata:
+          tier: reference
+          source_of_truth: workflow
+          scope: cbu
+          noun: lifecycle
+          phase_tags: [monitoring]
+        invocation_phrases:
+          - "list lifecycles by instrument"
+          - "which lifecycles apply to equities"
+          - "instrument lifecycle requirements"
+        behavior: crud
+        crud:
+          operation: select_with_join
+          primary_table: lifecycles
+          join_table: instrument_lifecycles
+          join_col: lifecycle_id
+          filter_col: instrument_class_id
+          schema: ob-poc
+        args:
+          - name: instrument-class
+            type: lookup
+            required: true
+            lookup:
+              table: instrument_classes
+              entity_type: instrument_class
+              schema: custody
+              code_column: code
+              id_column: class_id
+          - name: is-mandatory
+            type: boolean
+            required: false
+        returns:
+          type: record_set
+
+      read-lifecycle-resource-type:
+        description: Read a lifecycle resource type
+        metadata:
+          tier: reference
+          source_of_truth: workflow
+          scope: cbu
+          noun: lifecycle
+          phase_tags: [monitoring]
+        invocation_phrases:
+          - "read lifecycle resource type"
+          - "inspect lifecycle resource type"
+        behavior: crud
+        crud:
+          operation: select
+          table: lifecycle_resource_types
+          schema: ob-poc
+        args:
+          - name: resource-type-id
+            type: uuid
+            required: false
+            maps_to: resource_type_id
+          - name: code
+            type: string
+            required: false
+            maps_to: code
+        returns:
+          type: record
+
+      list-lifecycle-resource-types:
+        description: List lifecycle resource types
+        metadata:
+          tier: reference
+          source_of_truth: workflow
+          scope: cbu
+          noun: lifecycle
+          phase_tags: [monitoring]
+        invocation_phrases:
+          - "list lifecycle resource types"
+          - "show lifecycle resource types"
+        behavior: crud
+        crud:
+          operation: select
+          table: lifecycle_resource_types
+          schema: ob-poc
+        args:
+          - name: resource-type
+            type: string
+            required: false
+            maps_to: resource_type
+          - name: owner
+            type: string
+            required: false
+            maps_to: owner
+        returns:
+          type: record_set
+
+      list-resources-for-lifecycle:
+        description: List resource types required by a lifecycle
+        metadata:
+          tier: reference
+          source_of_truth: workflow
+          scope: cbu
+          noun: lifecycle
+          phase_tags: [monitoring]
+        invocation_phrases:
+          - "list resources for lifecycle"
+          - "show lifecycle resources"
+          - "lifecycle resource requirements"
+        behavior: crud
+        crud:
+          operation: select_with_join
+          primary_table: lifecycle_resource_types
+          join_table: lifecycle_resource_capabilities
+          join_col: resource_type_id
+          filter_col: lifecycle_id
+          schema: ob-poc
+        args:
+          - name: lifecycle
+            type: lookup
+            required: true
+            lookup:
+              table: lifecycles
+              entity_type: lifecycle
+              schema: ob-poc
+              code_column: code
+              id_column: lifecycle_id
+          - name: is-required
+            type: boolean
+            required: false
+        returns:
+          type: record_set
+
+      provision-lifecycle:
+        description: Provision a lifecycle resource instance for a CBU
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: cbu
+          noun: lifecycle
+          phase_tags: [monitoring]
+        invocation_phrases:
+          - "provision lifecycle"
+          - "start lifecycle provisioning"
+          - "set up lifecycle"
+        behavior: plugin
+        plugin:
+          handler: LifecycleProvisionOp
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: resource-type
+            type: lookup
+            required: true
+            lookup:
+              table: lifecycle_resource_types
+              entity_type: lifecycle_resource_type
+              schema: ob-poc
+              code_column: code
+              id_column: resource_type_id
+          - name: instance-identifier
+            type: string
+            required: false
+          - name: market
+            type: lookup
+            required: false
+            lookup:
+              table: markets
+              entity_type: market
+              schema: custody
+              code_column: mic
+              id_column: market_id
+          - name: currency
+            type: string
+            required: false
+          - name: counterparty
+            type: uuid
+            required: false
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: provider
+            type: string
+            required: false
+          - name: provider-account
+            type: string
+            required: false
+          - name: provider-bic
+            type: string
+            required: false
+          - name: depends-on
+            type: string_list
+            required: false
+          - name: config
+            type: json
+            required: false
+        produces:
+          type: lifecycle_instance
+          resolved: false
+        returns:
+          type: uuid
+          name: instance_id
+          capture: true
+
+      activate-lifecycle:
+        description: Activate a lifecycle resource instance
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: cbu
+          noun: lifecycle
+          phase_tags: [monitoring]
+        invocation_phrases:
+          - "activate lifecycle"
+          - "start lifecycle"
+          - "enable lifecycle"
+        behavior: crud
+        crud:
+          operation: update
+          table: cbu_lifecycle_instances
+          schema: ob-poc
+          key: instance_id
+          set_values:
+            status: ACTIVE
+            activated_at: now()
+        args:
+          - name: instance-id
+            type: uuid
+            required: true
+            maps_to: instance_id
+        returns:
+          type: affected
+
+      suspend-lifecycle:
+        description: Suspend a lifecycle resource instance
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: cbu
+          noun: lifecycle
+          phase_tags: [monitoring]
+        invocation_phrases:
+          - "suspend lifecycle"
+          - "pause lifecycle"
+          - "freeze lifecycle"
+        behavior: crud
+        crud:
+          operation: update
+          table: cbu_lifecycle_instances
+          schema: ob-poc
+          key: instance_id
+          set_values:
+            status: SUSPENDED
+            suspended_at: now()
+        args:
+          - name: instance-id
+            type: uuid
+            required: true
+            maps_to: instance_id
+          - name: reason
+            type: string
+            required: false
+        returns:
+          type: affected
+
+      decommission-lifecycle:
+        description: Decommission a lifecycle resource instance
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: cbu
+          noun: lifecycle
+          phase_tags: [monitoring]
+        invocation_phrases:
+          - "decommission lifecycle"
+          - "retire lifecycle"
+          - "end lifecycle"
+        behavior: crud
+        crud:
+          operation: update
+          table: cbu_lifecycle_instances
+          schema: ob-poc
+          key: instance_id
+          set_values:
+            status: DECOMMISSIONED
+            decommissioned_at: now()
+        args:
+          - name: instance-id
+            type: uuid
+            required: true
+            maps_to: instance_id
+          - name: reason
+            type: string
+            required: false
+        returns:
+          type: affected
+
+      list-lifecycle-instances:
+        description: List lifecycle resource instances for a CBU
+        metadata:
+          tier: reference
+          source_of_truth: workflow
+          scope: cbu
+          noun: lifecycle
+          phase_tags: [monitoring]
+        invocation_phrases:
+          - "list lifecycle instances"
+          - "show lifecycle instances"
+          - "what resources are provisioned"
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: cbu_lifecycle_instances
+          schema: ob-poc
+          fk_col: cbu_id
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: resource-type
+            type: string
+            required: false
+            maps_to: resource_type_id
+          - name: status
+            type: string
+            required: false
+            maps_to: status
+        returns:
+          type: record_set
+
+      analyze-lifecycle-gaps:
+        description: Analyze lifecycle provisioning gaps for a CBU
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: cbu
+          noun: lifecycle
+          phase_tags: [monitoring]
+        invocation_phrases:
+          - "analyze lifecycle gaps"
+          - "find gaps in lifecycle"
+          - "what is missing for onboarding"
+        behavior: plugin
+        plugin:
+          handler: LifecycleAnalyzeGapsOp
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: scope
+            type: string
+            required: false
+            default: ALL
+        returns:
+          type: record_set
+
+      check-lifecycle-readiness:
+        description: Check if CBU is ready to trade an instrument
+        metadata:
+          tier: diagnostics
+          source_of_truth: workflow
+          scope: cbu
+          noun: lifecycle
+          phase_tags: [monitoring]
+        invocation_phrases:
+          - "check lifecycle readiness"
+          - "is lifecycle ready"
+          - "assess onboarding completeness"
+        behavior: plugin
+        plugin:
+          handler: LifecycleCheckReadinessOp
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: instrument-class
+            type: lookup
+            required: true
+            lookup:
+              table: instrument_classes
+              entity_type: instrument_class
+              schema: custody
+              code_column: code
+              id_column: class_id
+          - name: market
+            type: lookup
+            required: false
+            lookup:
+              table: markets
+              entity_type: market
+              schema: custody
+              code_column: mic
+              id_column: market_id
+          - name: counterparty
+            type: uuid
+            required: false
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+        returns:
+          type: record
+
+      generate-lifecycle-plan:
+        description: Generate DSL provisioning plan for lifecycle gaps
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: cbu
+          noun: lifecycle
+          phase_tags: [monitoring]
+        invocation_phrases:
+          - "generate lifecycle plan"
+          - "create lifecycle plan"
+          - "generate provisioning roadmap"
+        behavior: plugin
+        plugin:
+          handler: LifecycleGeneratePlanOp
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: user-responses
+            type: json
+            required: false
+        returns:
+          type: record
+
+      execute-lifecycle-plan:
+        description: Execute a provisioning plan
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: cbu
+          noun: lifecycle
+          phase_tags: [monitoring]
+        invocation_phrases:
+          - "execute lifecycle plan"
+          - "run lifecycle plan"
+          - "apply provisioning plan"
+        behavior: plugin
+        plugin:
+          handler: LifecycleExecutePlanOp
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: plan
+            type: json
+            required: true
+          - name: dry-run
+            type: boolean
+            required: false
+            default: false
+        returns:
+          type: record
+
+      discover-lifecycles:
+        description: Discover all lifecycles and resources for an instrument
+        metadata:
+          tier: composite
+          source_of_truth: workflow
+          scope: cbu
+          noun: lifecycle
+          phase_tags: [monitoring]
+        invocation_phrases:
+          - "discover lifecycles"
+          - "which lifecycles apply"
+          - "lifecycle discovery"
+        behavior: plugin
+        plugin:
+          handler: LifecycleDiscoverOp
+        args:
+          - name: instrument-class
+            type: lookup
+            required: true
+            lookup:
+              table: instrument_classes
+              entity_type: instrument_class
+              schema: custody
+              code_column: code
+              id_column: class_id
+          - name: include-optional
+            type: boolean
+            required: false
+            default: false
+        returns:
+          type: record

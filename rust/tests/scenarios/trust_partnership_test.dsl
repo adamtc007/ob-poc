@@ -16,7 +16,7 @@
 ;; =============================================================================
 
 ;; Create the trust entity
-(entity.create-trust-discretionary
+(entity.create :entity-type "trust-discretionary"
   :name "Smith Family Trust"
   :jurisdiction "JE"
   :trust-type "DISCRETIONARY"
@@ -24,33 +24,33 @@
   :as @trust)
 
 ;; Create trust parties
-(entity.create-proper-person
+(entity.create :entity-type "proper-person"
   :first-name "Robert"
   :last-name "Smith"
   :date-of-birth "1955-04-12"
   :nationality "GB"
   :as @settlor)
 
-(entity.create-limited-company
+(entity.create :entity-type "limited-company"
   :name "Jersey Trust Company Ltd"
   :jurisdiction "JE"
   :as @trustee-corp)
 
-(entity.create-proper-person
+(entity.create :entity-type "proper-person"
   :first-name "Sarah"
   :last-name "Smith"
   :date-of-birth "1980-09-18"
   :nationality "GB"
   :as @beneficiary1)
 
-(entity.create-proper-person
+(entity.create :entity-type "proper-person"
   :first-name "Thomas"
   :last-name "Smith"
   :date-of-birth "1982-12-05"
   :nationality "GB"
   :as @beneficiary2)
 
-(entity.create-proper-person
+(entity.create :entity-type "proper-person"
   :first-name "Michael"
   :last-name "Johnson"
   :date-of-birth "1960-02-28"
@@ -88,22 +88,22 @@
 (entity-workstream.create :case-id @trust-case :entity-id @protector :discovery-reason "PROTECTOR" :is-ubo true :as @ws-protector)
 
 ;; Run screenings on trust parties
-(case-screening.run :workstream-id @ws-settlor :screening-type "PEP")
-(case-screening.run :workstream-id @ws-settlor :screening-type "SANCTIONS")
-(case-screening.run :workstream-id @ws-ben1 :screening-type "PEP")
-(case-screening.run :workstream-id @ws-ben1 :screening-type "SANCTIONS")
-(case-screening.run :workstream-id @ws-ben2 :screening-type "PEP")
-(case-screening.run :workstream-id @ws-ben2 :screening-type "SANCTIONS")
-(case-screening.run :workstream-id @ws-protector :screening-type "PEP")
-(case-screening.run :workstream-id @ws-protector :screening-type "SANCTIONS")
-(case-screening.run :workstream-id @ws-trustee :screening-type "SANCTIONS")
+(screening.run :workstream-id @ws-settlor :screening-type "PEP")
+(screening.run :workstream-id @ws-settlor :screening-type "SANCTIONS")
+(screening.run :workstream-id @ws-ben1 :screening-type "PEP")
+(screening.run :workstream-id @ws-ben1 :screening-type "SANCTIONS")
+(screening.run :workstream-id @ws-ben2 :screening-type "PEP")
+(screening.run :workstream-id @ws-ben2 :screening-type "SANCTIONS")
+(screening.run :workstream-id @ws-protector :screening-type "PEP")
+(screening.run :workstream-id @ws-protector :screening-type "SANCTIONS")
+(screening.run :workstream-id @ws-trustee :screening-type "SANCTIONS")
 
 ;; =============================================================================
 ;; PART 2: PARTNERSHIP STRUCTURE
 ;; =============================================================================
 
 ;; Create the partnership entity
-(entity.create-partnership-limited
+(entity.create :entity-type "partnership-limited"
   :name "Venture Capital LP"
   :jurisdiction "US"
   :partnership-type "LP"
@@ -111,23 +111,23 @@
   :as @partnership)
 
 ;; Create GP entity
-(entity.create-limited-company
+(entity.create :entity-type "limited-company"
   :name "Venture Capital GP LLC"
   :jurisdiction "US"
   :as @gp)
 
 ;; Create LP investors
-(entity.create-limited-company
+(entity.create :entity-type "limited-company"
   :name "Pension Fund Alpha"
   :jurisdiction "US"
   :as @lp1)
 
-(entity.create-limited-company
+(entity.create :entity-type "limited-company"
   :name "Endowment Fund Beta"
   :jurisdiction "US"
   :as @lp2)
 
-(entity.create-proper-person
+(entity.create :entity-type "proper-person"
   :first-name "Elizabeth"
   :last-name "Warren"
   :date-of-birth "1970-07-14"
@@ -163,12 +163,12 @@
 (entity-workstream.create :case-id @partnership-case :entity-id @lp3-person :discovery-reason "LP_NATURAL_PERSON" :is-ubo true :as @ws-lp3)
 
 ;; Run screenings
-(case-screening.run :workstream-id @ws-partnership :screening-type "SANCTIONS")
-(case-screening.run :workstream-id @ws-gp :screening-type "SANCTIONS")
-(case-screening.run :workstream-id @ws-lp1 :screening-type "SANCTIONS")
-(case-screening.run :workstream-id @ws-lp2 :screening-type "SANCTIONS")
-(case-screening.run :workstream-id @ws-lp3 :screening-type "PEP")
-(case-screening.run :workstream-id @ws-lp3 :screening-type "SANCTIONS")
+(screening.run :workstream-id @ws-partnership :screening-type "SANCTIONS")
+(screening.run :workstream-id @ws-gp :screening-type "SANCTIONS")
+(screening.run :workstream-id @ws-lp1 :screening-type "SANCTIONS")
+(screening.run :workstream-id @ws-lp2 :screening-type "SANCTIONS")
+(screening.run :workstream-id @ws-lp3 :screening-type "PEP")
+(screening.run :workstream-id @ws-lp3 :screening-type "SANCTIONS")
 
 ;; =============================================================================
 ;; PART 3: UBO REGISTRATION FOR TRUST

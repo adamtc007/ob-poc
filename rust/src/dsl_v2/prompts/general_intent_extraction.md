@@ -110,7 +110,7 @@ Reference types: `role`, `jurisdiction`, `currency`, `client_type`, `case_type`,
 ### Create a Person Entity
 ```json
 {
-  "verb": "entity.create-proper-person",
+  "verb": "entity.create",
   "action": "create",
   "domain": "entity",
   "args": {
@@ -230,7 +230,7 @@ When the user mentions an existing entity by name:
 {
   "actions": [
     {
-      "verb": "entity.create-proper-person",
+      "verb": "entity.create",
       "action": "create",
       "domain": "entity",
       "args": {

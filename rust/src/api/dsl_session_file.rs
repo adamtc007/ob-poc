@@ -449,7 +449,7 @@ mod tests {
         let metadata = manager
             .append_dsl(
                 session_id,
-                r#"(entity.create-proper-person :first-name "John" :last-name "Doe" :as @person)"#,
+                r#"(entity.create :entity-type "proper-person" :first-name "John" :last-name "Doe" :as @person)"#,
                 "Add person",
             )
             .await
@@ -461,7 +461,7 @@ mod tests {
         // Read DSL
         let dsl = manager.read_dsl(session_id).await.unwrap();
         assert!(dsl.contains("cbu.ensure"));
-        assert!(dsl.contains("entity.create-proper-person"));
+        assert!(dsl.contains("entity.create"));
     }
 
     #[tokio::test]

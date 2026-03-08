@@ -164,7 +164,7 @@ pub struct ImplicitCreateConfig {
     #[serde(default)]
     pub canonical_verb: Option<String>,
 
-    /// Pattern for canonical verb (e.g., "entity.create-{subtype}")
+    /// Optional legacy pattern for canonical verbs during migration
     #[serde(default)]
     pub canonical_verb_pattern: Option<String>,
 

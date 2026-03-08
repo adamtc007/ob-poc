@@ -40,9 +40,9 @@
   :smpg-group "FIXED_INCOME")
 
 ;; --- Markets ---
-(market.ensure :mic "XETR" :name "Deutsche Boerse Xetra" :country-code "DE" :primary-currency "EUR" :csd-bic "DAABORDC" :timezone "Europe/Berlin")
-(market.ensure :mic "XLON" :name "London Stock Exchange" :country-code "GB" :primary-currency "GBP" :csd-bic "CRESTGB2" :timezone "Europe/London")
-(market.ensure :mic "XNYS" :name "New York Stock Exchange" :country-code "US" :primary-currency "USD" :csd-bic "DTCYUS33" :timezone "America/New_York")
+(refdata.ensure :domain "market" :mic "XETR" :name "Deutsche Boerse Xetra" :country-code "DE" :primary-currency "EUR" :csd-bic "DAABORDC" :timezone "Europe/Berlin")
+(refdata.ensure :domain "market" :mic "XLON" :name "London Stock Exchange" :country-code "GB" :primary-currency "GBP" :csd-bic "CRESTGB2" :timezone "Europe/London")
+(refdata.ensure :domain "market" :mic "XNYS" :name "New York Stock Exchange" :country-code "US" :primary-currency "USD" :csd-bic "DTCYUS33" :timezone "America/New_York")
 
 ;; ==============================================================================
 ;; SECTION 1: CREATE CBU AND DRAFT PROFILE
@@ -67,40 +67,46 @@
 ;; ==============================================================================
 
 ;; Add equity instrument class
-(trading-profile.add-instrument-class
+(trading-profile.add-component
   :profile-id @profile
+  :component-type "instrument-class"
   :class-code "EQUITY"
   :is-held true
   :is-traded true)
 
 ;; Add German equities market under EQUITY
-(trading-profile.add-market
+(trading-profile.add-component
   :profile-id @profile
+  :component-type "market"
   :instrument-class "EQUITY"
   :mic "XETR")
 
 ;; Add UK equities market under EQUITY
-(trading-profile.add-market
+(trading-profile.add-component
   :profile-id @profile
+  :component-type "market"
   :instrument-class "EQUITY"
   :mic "XLON")
 
 ;; Add US equities market under EQUITY
-(trading-profile.add-market
+(trading-profile.add-component
   :profile-id @profile
+  :component-type "market"
   :instrument-class "EQUITY"
   :mic "XNYS")
 
 ;; Add government bonds instrument class
-(trading-profile.add-instrument-class
+(trading-profile.add-component
   :profile-id @profile
+  :component-type "instrument-class"
   :class-code "GOVT_BOND"
   :is-held true
   :is-traded true)
 
 ;; Add German market under GOVT_BOND for bonds
-(trading-profile.add-market
+(trading-profile.add-component
   :profile-id @profile
+  :component-type "market"
   :instrument-class "GOVT_BOND"
   :mic "XETR")
 
@@ -110,8 +116,9 @@
 ;; ==============================================================================
 
 ;; German SSI
-(trading-profile.add-standing-instruction
+(trading-profile.add-component
   :profile-id @profile
+  :component-type "standing-instruction"
   :ssi-type "SECURITIES"
   :ssi-name "DE Equity SSI"
   :safekeeping-account "DE-SAFE-001"
@@ -122,8 +129,9 @@
   :pset-bic "DAABORDC")
 
 ;; UK SSI
-(trading-profile.add-standing-instruction
+(trading-profile.add-component
   :profile-id @profile
+  :component-type "standing-instruction"
   :ssi-type "SECURITIES"
   :ssi-name "UK Equity SSI"
   :safekeeping-account "UK-SAFE-001"
@@ -134,8 +142,9 @@
   :pset-bic "CRESTGB2")
 
 ;; US SSI
-(trading-profile.add-standing-instruction
+(trading-profile.add-component
   :profile-id @profile
+  :component-type "standing-instruction"
   :ssi-type "SECURITIES"
   :ssi-name "US Equity SSI"
   :safekeeping-account "US-SAFE-001"
@@ -151,8 +160,9 @@
 ;; ==============================================================================
 
 ;; German equity booking rule
-(trading-profile.add-booking-rule
+(trading-profile.add-component
   :profile-id @profile
+  :component-type "booking-rule"
   :rule-name "DE Equity DVP"
   :ssi-ref "DE Equity SSI"
   :priority 10
@@ -162,8 +172,9 @@
   :match-settlement-type "DVP")
 
 ;; UK equity booking rules (two currencies)
-(trading-profile.add-booking-rule
+(trading-profile.add-component
   :profile-id @profile
+  :component-type "booking-rule"
   :rule-name "UK Equity GBP DVP"
   :ssi-ref "UK Equity SSI"
   :priority 10
@@ -172,8 +183,9 @@
   :match-currency "GBP"
   :match-settlement-type "DVP")
 
-(trading-profile.add-booking-rule
+(trading-profile.add-component
   :profile-id @profile
+  :component-type "booking-rule"
   :rule-name "UK Equity EUR DVP"
   :ssi-ref "UK Equity SSI"
   :priority 10
@@ -183,8 +195,9 @@
   :match-settlement-type "DVP")
 
 ;; US equity booking rule
-(trading-profile.add-booking-rule
+(trading-profile.add-component
   :profile-id @profile
+  :component-type "booking-rule"
   :rule-name "US Equity DVP"
   :ssi-ref "US Equity SSI"
   :priority 10
@@ -194,8 +207,9 @@
   :match-settlement-type "DVP")
 
 ;; Govt bond booking rule
-(trading-profile.add-booking-rule
+(trading-profile.add-component
   :profile-id @profile
+  :component-type "booking-rule"
   :rule-name "DE Govt Bond DVP"
   :ssi-ref "DE Equity SSI"
   :priority 10
@@ -205,22 +219,25 @@
   :match-settlement-type "DVP")
 
 ;; Fallback rules (lower priority, less specific)
-(trading-profile.add-booking-rule
+(trading-profile.add-component
   :profile-id @profile
+  :component-type "booking-rule"
   :rule-name "EUR Fallback"
   :ssi-ref "DE Equity SSI"
   :priority 100
   :match-currency "EUR")
 
-(trading-profile.add-booking-rule
+(trading-profile.add-component
   :profile-id @profile
+  :component-type "booking-rule"
   :rule-name "GBP Fallback"
   :ssi-ref "UK Equity SSI"
   :priority 100
   :match-currency "GBP")
 
-(trading-profile.add-booking-rule
+(trading-profile.add-component
   :profile-id @profile
+  :component-type "booking-rule"
   :rule-name "USD Fallback"
   :ssi-ref "US Equity SSI"
   :priority 100

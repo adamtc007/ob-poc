@@ -84,7 +84,7 @@ params:
     example: "GB"
 
 body: |
-  (entity.create-proper-person
+  (entity.create :entity-type "proper-person"
     :first-name "$first_name"
     :last-name "$last_name"
     :date-of-birth "$date_of_birth"
@@ -99,10 +99,10 @@ body: |
     :entity-id @person
     :discovery-reason "DIRECTOR"
     :as @workstream)
-  (case-screening.run
+  (screening.run
     :workstream-id @workstream
     :screening-type "PEP")
-  (case-screening.run
+  (screening.run
     :workstream-id @workstream
     :screening-type "SANCTIONS")
 

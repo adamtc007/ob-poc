@@ -43,7 +43,7 @@ async fn test_valid_dataflow_passes() {
     // Valid: cbu.ensure produces @fund, cbu.assign-role consumes @fund
     let source = r#"
         (cbu.ensure :name "Test Fund" :jurisdiction "LU" :as @fund)
-        (entity.create-proper-person :first-name "John" :last-name "Smith" :as @john)
+        (entity.create :entity-type "proper-person" :first-name "John" :last-name "Smith" :as @john)
         (cbu.assign-role :cbu-id @fund :entity-id @john :role "DIRECTOR")
     "#;
 
@@ -81,7 +81,7 @@ async fn test_undefined_binding_detected() {
 
     // Invalid: @fund is not defined before use
     let source = r#"
-        (entity.create-proper-person :first-name "John" :last-name "Smith" :as @john)
+        (entity.create :entity-type "proper-person" :first-name "John" :last-name "Smith" :as @john)
         (cbu.assign-role :cbu-id @fund :entity-id @john :role "DIRECTOR")
     "#;
 
@@ -143,12 +143,12 @@ async fn test_valid_kyc_case_flow() {
 
     let source = r#"
         (cbu.ensure :name "Test Corp" :jurisdiction "GB" :as @cbu)
-        (entity.create-proper-person :first-name "Jane" :last-name "Doe" :as @jane)
+        (entity.create :entity-type "proper-person" :first-name "Jane" :last-name "Doe" :as @jane)
         (cbu.assign-role :cbu-id @cbu :entity-id @jane :role "DIRECTOR")
         (kyc-case.create :cbu-id @cbu :case-type "NEW_CLIENT" :as @case)
         (entity-workstream.create :case-id @case :entity-id @jane :as @ws)
-        (case-screening.run :workstream-id @ws :screening-type "PEP" :as @screening)
-        (case-screening.complete :screening-id @screening :status "CLEAR" :result-summary "No matches")
+        (screening.run :workstream-id @ws :screening-type "PEP" :as @screening)
+        (screening.complete :screening-id @screening :status "CLEAR" :result-summary "No matches")
     "#;
 
     let ast = parse_program(source).expect("Failed to parse");
@@ -185,7 +185,7 @@ async fn test_workstream_requires_case() {
 
     // Invalid: @case not defined
     let source = r#"
-        (entity.create-proper-person :first-name "Jane" :last-name "Doe" :as @jane)
+        (entity.create :entity-type "proper-person" :first-name "Jane" :last-name "Doe" :as @jane)
         (entity-workstream.create :case-id @case :entity-id @jane :as @ws)
     "#;
 
@@ -214,7 +214,7 @@ async fn test_screening_requires_workstream() {
 
     // Invalid: @ws not defined
     let source = r#"
-        (case-screening.run :workstream-id @ws :screening-type "SANCTIONS")
+        (screening.run :workstream-id @ws :screening-type "SANCTIONS")
     "#;
 
     let ast = parse_program(source).expect("Failed to parse");

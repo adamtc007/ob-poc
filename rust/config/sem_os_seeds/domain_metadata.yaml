@@ -87,7 +87,13 @@ domains:
         reads: [client_group]
         writes: [client_group_alias]
       client-group.resolve:
-        reads: [client_group, client_group_alias, client_group_anchor, client_group_alias_embedding]
+        reads:
+          [
+            client_group,
+            client_group_alias,
+            client_group_anchor,
+            client_group_alias_embedding,
+          ]
 
   # ---------------------------------------------------------------------------
   # CBU — Client Business Unit
@@ -308,18 +314,34 @@ domains:
         classification: internal
         pii: false
     verb_data_footprint:
-      entity.create-limited-company:
+      entity.create:
         reads: [entity_types, entities]
-        writes: [entities, entity_limited_companies]
-      entity.create-proper-person:
-        reads: [entity_types, entities]
-        writes: [entities, entity_proper_persons]
-      entity.ensure-limited-company:
-        reads: [entity_types, entities, entity_limited_companies]
-        writes: [entities, entity_limited_companies]
-      entity.ensure-proper-person:
-        reads: [entity_types, entities, entity_proper_persons]
-        writes: [entities, entity_proper_persons]
+        writes:
+          [
+            entities,
+            entity_limited_companies,
+            entity_proper_persons,
+            entity_trusts,
+            entity_partnerships,
+          ]
+      entity.ensure:
+        reads:
+          [
+            entity_types,
+            entities,
+            entity_limited_companies,
+            entity_proper_persons,
+            entity_trusts,
+            entity_partnerships,
+          ]
+        writes:
+          [
+            entities,
+            entity_limited_companies,
+            entity_proper_persons,
+            entity_trusts,
+            entity_partnerships,
+          ]
       entity.read:
         reads: [entities]
       entity.update:
@@ -459,7 +481,14 @@ domains:
         reads: [deal_rate_cards]
         writes: [deal_rate_cards]
       deal.summary:
-        reads: [deals, deal_participants, deal_products, deal_rate_cards, deal_rate_card_lines]
+        reads:
+          [
+            deals,
+            deal_participants,
+            deal_products,
+            deal_rate_cards,
+            deal_rate_card_lines,
+          ]
 
   # ---------------------------------------------------------------------------
   # BILLING — Fee Billing & Revenue
@@ -504,7 +533,12 @@ domains:
         reads: [fee_billing_profiles]
         writes: [fee_billing_periods]
       billing.calculate-period:
-        reads: [fee_billing_periods, fee_billing_account_targets, deal_rate_card_lines]
+        reads:
+          [
+            fee_billing_periods,
+            fee_billing_account_targets,
+            deal_rate_card_lines,
+          ]
         writes: [fee_billing_period_lines]
       billing.approve-period:
         reads: [fee_billing_periods]
@@ -609,28 +643,29 @@ domains:
         writes: [cbu_trading_profiles]
       trading-profile.materialize:
         reads: [cbu_trading_profiles]
-        writes: [custody.cbu_instrument_universe, custody.cbu_ssi, custody.ssi_booking_rules, custody.isda_agreements, custody.csa_agreements]
+        writes:
+          [
+            custody.cbu_instrument_universe,
+            custody.cbu_ssi,
+            custody.ssi_booking_rules,
+            custody.isda_agreements,
+            custody.csa_agreements,
+          ]
       trading-profile.diff:
         reads: [cbu_trading_profiles]
       trading-profile.clone-to:
         reads: [cbu_trading_profiles, cbus]
         writes: [cbu_trading_profiles]
-      trading-profile.add-instrument-class:
+      trading-profile.add-component:
         reads: [cbu_trading_profiles]
         writes: [cbu_trading_profiles]
-      trading-profile.remove-instrument-class:
-        reads: [cbu_trading_profiles]
-        writes: [cbu_trading_profiles]
-      trading-profile.add-market:
-        reads: [cbu_trading_profiles]
-        writes: [cbu_trading_profiles]
-      trading-profile.remove-market:
+      trading-profile.remove-component:
         reads: [cbu_trading_profiles]
         writes: [cbu_trading_profiles]
       trading-profile.set-base-currency:
         reads: [cbu_trading_profiles]
         writes: [cbu_trading_profiles]
-      trading-profile.add-standing-instruction:
+      trading-profile.update-im-scope:
         reads: [cbu_trading_profiles]
         writes: [cbu_trading_profiles]
 
@@ -726,15 +761,12 @@ domains:
         classification: internal
         pii: false
     verb_data_footprint:
-      fund.create-umbrella:
+      fund.create:
         reads: [entity_funds, entities]
         writes: [entities, entity_funds, fund_structure]
-      fund.create-sub-fund:
+      fund.ensure:
         reads: [entity_funds, fund_structure]
-        writes: [entities, entity_funds, fund_structure]
-      fund.create-share-class:
-        reads: [entity_funds]
-        writes: [entity_share_classes]
+        writes: [entities, entity_funds, entity_share_classes, fund_structure]
       fund.list:
         reads: [entity_funds]
       fund.get:
@@ -931,7 +963,15 @@ domains:
         reads: [entities, entity_relationships, kyc.ownership_snapshots]
         writes: [kyc.ownership_snapshots]
       ownership.refresh:
-        reads: [entities, entity_relationships, cbu_entity_roles, cbu_groups, cbu_group_members, control_edges]
+        reads:
+          [
+            entities,
+            entity_relationships,
+            cbu_entity_roles,
+            cbu_groups,
+            cbu_group_members,
+            control_edges,
+          ]
         writes: [cbu_entity_roles, cbu_groups, cbu_group_members, control_edges]
       ubo.discover:
         reads: [entities, entity_relationships, ubo_registry]
@@ -1208,7 +1248,15 @@ domains:
         reads: [legal_entity, booking_location]
         writes: [booking_principal]
       booking-principal.evaluate:
-        reads: [booking_principal, service_availability, ruleset, rule, client_profile, client_classification]
+        reads:
+          [
+            booking_principal,
+            service_availability,
+            ruleset,
+            rule,
+            client_profile,
+            client_classification,
+          ]
         writes: [eligibility_evaluation]
       booking-principal.select:
         reads: [eligibility_evaluation]
@@ -1338,7 +1386,13 @@ domains:
         pii: true
     verb_data_footprint:
       screening.run:
-        reads: [entities, entity_proper_persons, screening_lists, screening_requirements]
+        reads:
+          [
+            entities,
+            entity_proper_persons,
+            screening_lists,
+            screening_requirements,
+          ]
         writes: [kyc.screenings]
       screening.check-pep:
         reads: [entity_proper_persons, person_pep_status]
@@ -1688,7 +1742,8 @@ domains:
         reads: [sem_reg.changesets, sem_reg.changeset_entries]
         writes: [sem_reg.changesets]
       changeset.publish:
-        reads: [sem_reg.changesets, sem_reg.changeset_entries, sem_reg.snapshots]
+        reads:
+          [sem_reg.changesets, sem_reg.changeset_entries, sem_reg.snapshots]
         writes: [sem_reg.snapshots, sem_reg.snapshot_sets, sem_reg.changesets]
 
   # ---------------------------------------------------------------------------

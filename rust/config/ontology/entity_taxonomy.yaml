@@ -14,25 +14,24 @@ version: "1.0"
 # ENTITY DEFINITIONS
 # =============================================================================
 entities:
-
   # ===========================================================================
   # CBU - Client Business Unit (core synthetic entity)
   # ===========================================================================
   cbu:
     description: "Client Business Unit - the core onboarding subject representing a fund mandate, corporate group, or institutional account"
     category: subject
-    
+
     db:
       schema: ob-poc
       table: cbus
       pk: cbu_id
-      
+
     search_keys:
       - column: name
         unique: false
       - columns: [name, jurisdiction]
         unique: true
-        
+
     lifecycle:
       status_column: status
       states:
@@ -57,7 +56,7 @@ entities:
         - from: SUSPENDED
           to: [ACTIVE, TERMINATED]
       initial_state: DISCOVERED
-      
+
     implicit_create:
       allowed: true
       canonical_verb: cbu.create
@@ -69,21 +68,21 @@ entities:
   entity:
     description: "Legal or natural person entity - base type for all party types"
     category: entity
-    
+
     db:
       schema: ob-poc
       table: entities
       pk: entity_id
       type_column: type_id
       type_lookup_table: entity_types
-      
+
     search_keys:
       - column: name
         unique: false
       - column: registration_number
         unique: false
         applies_to: [limited_company, partnership, trust]
-        
+
     subtypes:
       source_table: entity_types
       code_column: type_code
@@ -92,7 +91,7 @@ entities:
         limited_company: entity_limited_companies
         trust: entity_trusts
         partnership: entity_partnerships
-        
+
     lifecycle:
       status_column: status
       states:
@@ -108,11 +107,11 @@ entities:
         - from: INACTIVE
           to: [ACTIVE]
       initial_state: DRAFT
-      
+
     implicit_create:
       allowed: true
-      canonical_verb_pattern: "entity.create-{subtype}"
-      required_args: [name]
+      canonical_verb: entity.create
+      required_args: [entity-type, name]
 
   # ===========================================================================
   # Proper Person (entity subtype)
@@ -121,7 +120,7 @@ entities:
     description: "Natural person / individual"
     category: entity
     parent_type: entity
-    
+
     db:
       schema: ob-poc
       table: entities
@@ -129,16 +128,16 @@ entities:
       extension_table: entity_proper_persons
       extension_fk: entity_id
       type_code: proper_person
-      
+
     search_keys:
       - columns: [first_name, last_name]
         unique: false
       - column: national_id
         unique: true
-        
+
     implicit_create:
       allowed: true
-      canonical_verb: entity.create-proper-person
+      canonical_verb: entity.create
       required_args: [first-name, last-name]
 
   # ===========================================================================
@@ -148,7 +147,7 @@ entities:
     description: "Incorporated company / corporation"
     category: entity
     parent_type: entity
-    
+
     db:
       schema: ob-poc
       table: entities
@@ -156,16 +155,16 @@ entities:
       extension_table: entity_limited_companies
       extension_fk: entity_id
       type_code: limited_company
-      
+
     search_keys:
       - column: name
         unique: false
       - column: registration_number
         unique: true
-        
+
     implicit_create:
       allowed: true
-      canonical_verb: entity.create-limited-company
+      canonical_verb: entity.create
       required_args: [name, jurisdiction]
 
   # ===========================================================================
@@ -175,7 +174,7 @@ entities:
     description: "Trust structure"
     category: entity
     parent_type: entity
-    
+
     db:
       schema: ob-poc
       table: entities
@@ -183,17 +182,17 @@ entities:
       extension_table: entity_trusts
       extension_fk: entity_id
       type_code: trust
-      
+
     search_keys:
       - column: name
         unique: false
       - column: trust_deed_reference
         unique: true
-        
+
     implicit_create:
       allowed: true
-      canonical_verb: entity.create-trust
-      required_args: [name]
+      canonical_verb: entity.create
+      required_args: [entity-type, name]
 
   # ===========================================================================
   # Partnership (entity subtype)
@@ -202,7 +201,7 @@ entities:
     description: "Partnership structure (LP, LLP, GP)"
     category: entity
     parent_type: entity
-    
+
     db:
       schema: ob-poc
       table: entities
@@ -210,17 +209,17 @@ entities:
       extension_table: entity_partnerships
       extension_fk: entity_id
       type_code: partnership
-      
+
     search_keys:
       - column: name
         unique: false
       - column: registration_number
         unique: true
-        
+
     implicit_create:
       allowed: true
-      canonical_verb: entity.create-partnership
-      required_args: [name, partnership-type]
+      canonical_verb: entity.create
+      required_args: [entity-type, name, partnership-type]
 
   # ===========================================================================
   # KYC Case
@@ -228,18 +227,18 @@ entities:
   kyc_case:
     description: "KYC investigation case for a CBU"
     category: kyc
-    
+
     db:
       schema: kyc
       table: cases
       pk: case_id
-      
+
     search_keys:
       - column: case_reference
         unique: true
       - columns: [cbu_id, case_type]
         unique: false
-        
+
     lifecycle:
       status_column: status
       states:
@@ -262,11 +261,11 @@ entities:
         - from: REJECTED
           to: [CLOSED, IN_PROGRESS]
         - from: CLOSED
-          to: []  # Terminal state
+          to: [] # Terminal state
         - from: CANCELLED
-          to: []  # Terminal state
+          to: [] # Terminal state
       initial_state: OPEN
-      
+
     implicit_create:
       allowed: true
       canonical_verb: kyc.create-case
@@ -278,16 +277,16 @@ entities:
   kyc_workstream:
     description: "Entity-level KYC workstream within a case"
     category: kyc
-    
+
     db:
       schema: kyc
       table: entity_workstreams
       pk: workstream_id
-      
+
     search_keys:
       - columns: [case_id, entity_id]
         unique: true
-        
+
     lifecycle:
       status_column: status
       states:
@@ -304,11 +303,11 @@ entities:
         - from: BLOCKED
           to: [IN_PROGRESS, WAIVED]
         - from: COMPLETE
-          to: []  # Terminal
+          to: [] # Terminal
         - from: WAIVED
-          to: []  # Terminal
+          to: [] # Terminal
       initial_state: PENDING
-      
+
     implicit_create:
       allowed: true
       canonical_verb: kyc.create-workstream
@@ -320,18 +319,18 @@ entities:
   document:
     description: "Document in the document catalog"
     category: document
-    
+
     db:
       schema: ob-poc
       table: document_catalog
       pk: doc_id
-      
+
     search_keys:
       - column: doc_reference
         unique: true
       - columns: [entity_id, document_type_id]
         unique: false
-        
+
     lifecycle:
       status_column: status
       states:
@@ -354,11 +353,11 @@ entities:
         - from: VERIFIED
           to: [EXPIRED]
         - from: REJECTED
-          to: [REQUESTED]  # Can re-request
+          to: [REQUESTED] # Can re-request
         - from: EXPIRED
-          to: [REQUESTED]  # Can re-request
+          to: [REQUESTED] # Can re-request
       initial_state: PENDING
-      
+
     implicit_create:
       allowed: true
       canonical_verb: document.create
@@ -370,16 +369,16 @@ entities:
   doc_request:
     description: "Document request within a KYC workstream"
     category: kyc
-    
+
     db:
       schema: kyc
       table: doc_requests
       pk: request_id
-      
+
     search_keys:
       - columns: [workstream_id, document_type_id]
         unique: false
-        
+
     lifecycle:
       status_column: status
       states:
@@ -397,13 +396,13 @@ entities:
         - from: RECEIVED
           to: [ACCEPTED, REJECTED]
         - from: REJECTED
-          to: [REQUESTED]  # Re-request
+          to: [REQUESTED] # Re-request
         - from: ACCEPTED
-          to: []  # Terminal
+          to: [] # Terminal
         - from: WAIVED
-          to: []  # Terminal
+          to: [] # Terminal
       initial_state: PENDING
-      
+
     implicit_create:
       allowed: true
       canonical_verb: kyc.request-document
@@ -415,16 +414,16 @@ entities:
   ubo_record:
     description: "Ultimate Beneficial Owner registry entry"
     category: ubo
-    
+
     db:
       schema: ob-poc
       table: ubo_registry
       pk: ubo_id
-      
+
     search_keys:
       - columns: [subject_entity_id, person_entity_id]
         unique: true
-        
+
     lifecycle:
       status_column: verification_status
       states:
@@ -443,9 +442,9 @@ entities:
         - from: DISPUTED
           to: [EVIDENCED, DECLARED, SUPERSEDED]
         - from: SUPERSEDED
-          to: []  # Terminal
+          to: [] # Terminal
       initial_state: DECLARED
-      
+
     implicit_create:
       allowed: true
       canonical_verb: ubo.declare
@@ -457,16 +456,16 @@ entities:
   ownership_edge:
     description: "Ownership relationship between entities in the UBO graph"
     category: ubo
-    
+
     db:
       schema: ob-poc
       table: ownership_relationships
       pk: relationship_id
-      
+
     search_keys:
       - columns: [parent_entity_id, child_entity_id]
         unique: true
-        
+
     implicit_create:
       allowed: true
       canonical_verb: ubo.add-ownership
@@ -478,16 +477,16 @@ entities:
   screening:
     description: "Screening result (PEP, sanctions, adverse media)"
     category: screening
-    
+
     db:
       schema: kyc
       table: screenings
       pk: screening_id
-      
+
     search_keys:
       - columns: [entity_id, screening_type]
         unique: false
-        
+
     lifecycle:
       status_column: status
       states:
@@ -511,7 +510,7 @@ entities:
         - from: CLEARED
           to: []
       initial_state: PENDING
-      
+
     implicit_create:
       allowed: true
       canonical_verb: screening.run
@@ -523,16 +522,16 @@ entities:
   red_flag:
     description: "Risk red flag raised during KYC"
     category: risk
-    
+
     db:
       schema: kyc
       table: red_flags
       pk: flag_id
-      
+
     search_keys:
       - columns: [case_id, flag_type_id]
         unique: false
-        
+
     lifecycle:
       status_column: status
       states:
@@ -553,9 +552,9 @@ entities:
         - from: WAIVED
           to: []
       initial_state: OPEN
-      
+
     implicit_create:
-      allowed: false  # Red flags are raised by system, not user
+      allowed: false # Red flags are raised by system, not user
       canonical_verb: null
 
   # ===========================================================================
@@ -564,21 +563,21 @@ entities:
   product:
     description: "Product offering (CUSTODY, FUND_ACCOUNTING, etc.)"
     category: product
-    
+
     db:
       schema: ob-poc
       table: products
       pk: product_id
-      
+
     search_keys:
       - column: product_code
         unique: true
       - column: name
         unique: false
-        
+
     # Products are reference data - no lifecycle
     implicit_create:
-      allowed: false  # Reference data, pre-seeded
+      allowed: false # Reference data, pre-seeded
       canonical_verb: null
 
   # ===========================================================================
@@ -587,21 +586,21 @@ entities:
   service:
     description: "Service within a product"
     category: service
-    
+
     db:
       schema: ob-poc
       table: services
       pk: service_id
-      
+
     search_keys:
       - column: service_code
         unique: true
       - columns: [product_id, name]
         unique: true
-        
+
     # Services are reference data - no lifecycle
     implicit_create:
-      allowed: false  # Reference data, pre-seeded
+      allowed: false # Reference data, pre-seeded
       canonical_verb: null
 
   # ===========================================================================
@@ -610,16 +609,16 @@ entities:
   resource_type:
     description: "Type of resource that can be provisioned"
     category: resource
-    
+
     db:
       schema: ob-poc
       table: service_resource_types
       pk: resource_id
-      
+
     search_keys:
       - column: resource_code
         unique: true
-        
+
     # Reference data
     implicit_create:
       allowed: false
@@ -631,18 +630,18 @@ entities:
   cbu_resource_instance:
     description: "Provisioned resource instance for a CBU"
     category: resource
-    
+
     db:
       schema: ob-poc
       table: cbu_resource_instances
       pk: instance_id
-      
+
     search_keys:
       - column: instance_identifier
         unique: true
       - columns: [cbu_id, resource_type_id]
         unique: false
-        
+
     lifecycle:
       status_column: status
       states:
@@ -664,9 +663,9 @@ entities:
         - from: SUSPENDED
           to: [ACTIVE, DECOMMISSIONED]
         - from: DECOMMISSIONED
-          to: []  # Terminal
+          to: [] # Terminal
       initial_state: PENDING
-      
+
     implicit_create:
       allowed: true
       canonical_verb: resource.allocate
@@ -678,16 +677,16 @@ entities:
   service_delivery:
     description: "Service delivery status for a CBU"
     category: delivery
-    
+
     db:
       schema: ob-poc
       table: service_delivery_map
       pk: delivery_id
-      
+
     search_keys:
       - columns: [cbu_id, service_id]
         unique: true
-        
+
     lifecycle:
       status_column: delivery_status
       states:
@@ -711,7 +710,7 @@ entities:
         - from: TERMINATED
           to: []
       initial_state: NOT_STARTED
-      
+
     implicit_create:
       allowed: true
       canonical_verb: delivery.create
@@ -724,7 +723,7 @@ entities:
     description: "Alias for KYC case - used in some verb domains"
     category: kyc
     alias_for: kyc_case
-    
+
     db:
       schema: kyc
       table: cases
@@ -736,18 +735,18 @@ entities:
   decision:
     description: "KYC case decision record"
     category: kyc
-    
+
     db:
       schema: ob-poc
       table: case_evaluation_snapshots
       pk: snapshot_id
-      
+
     search_keys:
       - columns: [case_id, evaluated_at]
         unique: false
-        
+
     implicit_create:
-      allowed: false  # Decisions are recorded, not created directly
+      allowed: false # Decisions are recorded, not created directly
       canonical_verb: null
 
   # ===========================================================================
@@ -756,16 +755,16 @@ entities:
   monitoring_event:
     description: "Ongoing monitoring event for a CBU"
     category: monitoring
-    
+
     db:
       schema: ob-poc
       table: monitoring_events
       pk: event_id
-      
+
     search_keys:
       - columns: [cbu_id, event_type]
         unique: false
-        
+
     lifecycle:
       status_column: status
       states:
@@ -786,12 +785,11 @@ entities:
         - from: RESOLVED
           to: []
       initial_state: DETECTED
-      
+
     implicit_create:
       allowed: true
       canonical_verb: monitoring.record-event
       required_args: [cbu-id, event-type]
-
 
 # =============================================================================
 # FK RELATIONSHIPS
@@ -800,7 +798,6 @@ entities:
 # Pattern: when child verb runs under parent context, inject this FK arg
 # =============================================================================
 relationships:
-
   # ---------------------------------------------------------------------------
   # Same-domain self-references
   # ---------------------------------------------------------------------------
@@ -808,42 +805,42 @@ relationships:
     child: cbu
     fk_arg: cbu-id
     description: "CBU operations reference parent CBU"
-    
+
   - parent: entity
     child: entity
     fk_arg: entity-id
     description: "Entity operations reference parent entity"
-    
+
   - parent: document
     child: document
     fk_arg: document-id
     description: "Document operations reference parent document"
-    
+
   - parent: investigation
     child: investigation
     fk_arg: investigation-id
     description: "Investigation operations reference parent investigation"
-    
+
   - parent: decision
     child: decision
     fk_arg: decision-id
-    
+
   - parent: screening
     child: screening
     fk_arg: screening-id
-    
+
   - parent: product
     child: product
     fk_arg: product-id
-    
+
   - parent: service
     child: service
     fk_arg: service-id
-    
+
   - parent: monitoring
     child: monitoring
     fk_arg: monitoring-id
-    
+
   - parent: risk
     child: risk
     fk_arg: risk-id
@@ -855,47 +852,47 @@ relationships:
     child: document
     fk_arg: cbu-id
     description: "Documents can be linked to CBU"
-    
+
   - parent: cbu
     child: investigation
     fk_arg: cbu-id
     description: "Investigations are opened for CBU"
-    
+
   - parent: cbu
     child: kyc
     fk_arg: cbu-id
     description: "KYC operations on CBU"
-    
+
   - parent: cbu
     child: decision
     fk_arg: cbu-id
     description: "Decisions recorded for CBU"
-    
+
   - parent: cbu
     child: monitoring
     fk_arg: cbu-id
     description: "Monitoring events for CBU"
-    
+
   - parent: cbu
     child: risk
     fk_arg: cbu-id
     description: "Risk flags/ratings for CBU"
-    
+
   - parent: cbu
     child: screening
     fk_arg: cbu-id
     description: "Screenings at CBU level"
-    
+
   - parent: cbu
     child: resource
     fk_arg: cbu-id
     description: "Resource instances for CBU"
-    
+
   - parent: cbu
     child: delivery
     fk_arg: cbu-id
     description: "Service delivery for CBU"
-    
+
   - parent: cbu
     child: ubo
     fk_arg: cbu-id
@@ -908,22 +905,22 @@ relationships:
     child: document
     fk_arg: entity-id
     description: "Documents attached to entity"
-    
+
   - parent: entity
     child: screening
     fk_arg: entity-id
     description: "Screenings run on entity"
-    
+
   - parent: entity
     child: risk
     fk_arg: entity-id
     description: "Risk assessments on entity"
-    
+
   - parent: entity
     child: ubo
     fk_arg: entity-id
     description: "UBO relationships for entity"
-    
+
   - parent: entity
     child: attribute
     fk_arg: entity-id
@@ -936,22 +933,22 @@ relationships:
     child: screening
     fk_arg: investigation-id
     description: "Screenings within investigation"
-    
+
   - parent: investigation
     child: decision
     fk_arg: investigation-id
     description: "Decisions within investigation"
-    
+
   - parent: kyc
     child: screening
     fk_arg: case-id
     description: "Screenings within KYC case"
-    
+
   - parent: kyc
     child: decision
     fk_arg: case-id
     description: "Decisions within KYC case"
-    
+
   - parent: kyc
     child: workstream
     fk_arg: case-id
@@ -964,7 +961,7 @@ relationships:
     child: document
     fk_arg: workstream-id
     description: "Documents requested in workstream"
-    
+
   - parent: workstream
     child: screening
     fk_arg: workstream-id
@@ -977,17 +974,16 @@ relationships:
     child: service
     fk_arg: product-id
     description: "Services belong to product"
-    
+
   - parent: service
     child: resource
     fk_arg: service-id
     description: "Resources belong to service"
-    
+
   - parent: service
     child: product
     fk_arg: service-id
     description: "Reverse link service to product"
-
 
 # =============================================================================
 # REFERENCE DATA TABLES
@@ -995,49 +991,48 @@ relationships:
 # These are lookup tables used for validation but not as DSL entities
 # =============================================================================
 reference_tables:
-
   jurisdiction:
     table: master_jurisdictions
     schema: ob-poc
     pk: jurisdiction_code
     search_key: jurisdiction_code
-    
+
   role:
     table: roles
     schema: ob-poc
     pk: role_id
     search_key: name
-    
+
   document_type:
     table: document_types
     schema: ob-poc
     pk: document_type_id
     search_key: type_code
-    
+
   entity_type:
     table: entity_types
     schema: ob-poc
     pk: type_id
     search_key: type_code
-    
+
   case_type:
     table: case_types
     schema: ob-poc
     pk: code
     search_key: code
-    
+
   flag_type:
     table: red_flag_types
     schema: kyc
     pk: flag_type_id
     search_key: flag_code
-    
+
   screening_type:
     table: screening_types
     schema: kyc
     pk: screening_type_id
     search_key: type_code
-    
+
   currency:
     table: currencies
     schema: ob-poc

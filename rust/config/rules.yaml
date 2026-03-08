@@ -480,7 +480,7 @@ rules:
     description: "Auto-advance workstream when all docs received"
     priority: 200
     trigger:
-      event: doc-request.received
+      event: document.receive-requestd
     condition:
       all:
         - field: workstream.status

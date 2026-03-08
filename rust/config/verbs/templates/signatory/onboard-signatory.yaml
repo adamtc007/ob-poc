@@ -80,7 +80,7 @@ params:
     prompt: "Nationality (ISO 2-letter code)"
 
 body: |
-  (entity.create-proper-person
+  (entity.create :entity-type "proper-person"
     :first-name "$first_name"
     :last-name "$last_name"
     :date-of-birth "$date_of_birth"

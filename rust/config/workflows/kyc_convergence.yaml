@@ -221,7 +221,7 @@ actions:
       description: Link document as proof for edge
 
     - action: request_document
-      verb: doc-request.create
+      verb: document.create-request
       description: Request missing document
 
   OBSERVATION_EXTRACTION:
@@ -263,7 +263,7 @@ actions:
       description: Mark proof for re-verification
 
     - action: request_replacement
-      verb: doc-request.create
+      verb: document.create-request
       description: Request replacement document
 
     - action: update_allegation

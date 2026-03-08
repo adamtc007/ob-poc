@@ -46,7 +46,7 @@ stages:
     relevant_verbs:
       - ubo.add-ownership
       - ubo.update-ownership
-      - ubo.end-ownership
+      - ubo.end-relationship
       - ubo.list-owners
       - ubo.list-owned
       - ubo.trace-chains
@@ -104,10 +104,10 @@ stages:
       - cbu.ensure
       - cbu.create
       - cbu.assign-role
-      - entity.create-limited-company
-      - entity.create-proper-person
-      - entity.create-partnership-limited
-      - entity.create-trust-discretionary
+      - entity.create
+      - entity.create
+      - entity.create
+      - entity.create
 
   - code: PRODUCT_SELECTION
     name: "Product Selection"
@@ -136,11 +136,11 @@ stages:
       - entity-workstream.create
       - entity-workstream.update-status
       - entity-workstream.complete
-      - doc-request.create
-      - doc-request.receive
-      - doc-request.verify
-      - case-screening.run
-      - case-screening.complete
+      - document.create-request
+      - document.receive-request
+      - document.verify-request
+      - screening.run
+      - screening.complete
       - red-flag.raise
       - red-flag.mitigate
       - document.catalog
@@ -166,29 +166,12 @@ stages:
       - trading-profile.create-new-version
       - trading-profile.get-active
       - trading-profile.list-versions
-      # Trading profile universe construction
-      - trading-profile.add-instrument-class
-      - trading-profile.remove-instrument-class
-      - trading-profile.add-market
-      - trading-profile.remove-market
+      # Trading profile component construction
+      - trading-profile.add-component
+      - trading-profile.remove-component
       - trading-profile.set-base-currency
-      - trading-profile.add-allowed-currency
-      # Trading profile SSI construction
-      - trading-profile.add-standing-instruction
-      - trading-profile.remove-standing-instruction
-      # Trading profile booking rules
-      - trading-profile.add-booking-rule
-      - trading-profile.remove-booking-rule
-      # Trading profile ISDA/CSA
-      - trading-profile.add-isda-config
-      - trading-profile.add-isda-product-coverage
-      - trading-profile.add-csa-config
-      - trading-profile.add-csa-eligible-collateral
       - trading-profile.link-csa-ssi
-      # Trading profile IM mandates
-      - trading-profile.add-im-mandate
       - trading-profile.update-im-scope
-      - trading-profile.remove-im-mandate
       # Trading profile sync & validation
       - trading-profile.materialize
       - trading-profile.sync-to-operational

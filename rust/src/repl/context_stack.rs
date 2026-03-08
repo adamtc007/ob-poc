@@ -1825,7 +1825,7 @@ mod tests {
             allowed_verbs: vec![
                 "kyc.create-case".to_string(),
                 "kyc.add-entity".to_string(),
-                "entity.ensure-person".to_string(),
+                "entity.ensure".to_string(),
             ],
             forbidden_verbs: vec!["cbu.delete".to_string()],
             ..default_pack_manifest()

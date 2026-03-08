@@ -9,14 +9,14 @@
     :as @cbu)
 
 ;; Create the LP
-(entity.create-partnership-limited
+(entity.create :entity-type "partnership-limited"
     :cbu-id @cbu
     :name "Growth Fund I LP"
     :jurisdiction "KY"
     :as @fund-lp)
 
 ;; Create GP
-(entity.create-limited-company
+(entity.create :entity-type "limited-company"
     :cbu-id @cbu
     :name "Growth GP Ltd"
     :company-number "KY54321"
@@ -24,14 +24,14 @@
     :as @gp)
 
 ;; Create LPs (Limited Partners)
-(entity.create-limited-company
+(entity.create :entity-type "limited-company"
     :cbu-id @cbu
     :name "Pension Fund A"
     :company-number "US11111"
     :jurisdiction "US"
     :as @lp-pension)
 
-(entity.create-limited-company
+(entity.create :entity-type "limited-company"
     :cbu-id @cbu
     :name "Sovereign Wealth Fund B"
     :company-number "AE22222"

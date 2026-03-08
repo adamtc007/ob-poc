@@ -800,6 +800,43 @@ domains:
           type: affected
           description: Number of service delivery entries removed
 
+      list-subscriptions:
+        description: List products currently subscribed on a CBU.
+        invocation_phrases:
+          - "what products is cbu subscribed to"
+          - "list products for CBU"
+          - "show CBU subscriptions"
+          - "which products are enabled on this CBU"
+        behavior: crud
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: global
+          noun: cbu
+          tags: [read, product, onboarding]
+          phase_tags: [onboarding]
+        crud:
+          operation: select
+          table: v_cbu_subscriptions
+          schema: ob-poc
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: product
+            type: string
+            required: false
+            maps_to: product_code
+        returns:
+          type: record_set
+
       decide:
         description: Record KYC/AML decision for CBU collective state (entities, UBOs, documents)
         invocation_phrases:
