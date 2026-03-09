@@ -58,6 +58,25 @@ The SemOS data-management call path remains on the unified session ingress only:
 4. `rust/src/agent/orchestrator.rs` applies the structure-first rewrite and data-management candidate policy.
 5. The selected `schema.entity.*` verb executes through the standard DSL/custom-op path.
 
+### Chat State Contract (2026-03-09)
+
+The chat path is now explicitly asymmetric:
+
+- If there is doubt on user intent, the system biases toward `read` / `show` / `list`.
+- State-changing intents do not execute immediately. They produce a plain-language pending mutation.
+- A read utterance while a mutation is pending cancels that mutation and says so in chat.
+- A confirmation token such as `yes` only executes when a mutation is still pending.
+- A stale confirmation after cancellation is treated as a safe no-op and returns:
+  - `There is no pending change to confirm. I am still in read-only mode.`
+
+Verified smoke behavior on the live `ob-poc-web` path:
+
+- `allianz` -> `Now working with client: Allianz Global Investors.`
+- `what deals does Allianz have?` -> safe read execution, no `deal.search` vs `deal.list` disambiguation
+- `create a new CBU for Allianz UK Fund` -> plain-language pending mutation for `cbu.create`
+- `show me the cbus instead` -> cancels pending mutation and returns to read-only execution
+- `yes` after that cancellation -> explicit no-op confirmation response
+
 ---
 
 ## 2. Problem Statement
