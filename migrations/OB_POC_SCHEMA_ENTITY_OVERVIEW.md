@@ -1,8 +1,12 @@
 # OB-POC — Schema Entity Overview
 
-> **Last reconciled:** 2026-03-02 — against 103 migrations, 58 DSL verb domains, CLAUDE.md
-> **Scope:** `"ob-poc"` schema (206 tables) + `"kyc"` schema (37 tables + 10 views) + `"sem_reg"` schema (16 tables + 14 views) + `"sem_reg_pub"` schema (4 tables) + `"stewardship"` schema (9 tables) + `"ob_ref"` tollgate definitions. External schemas (`custody`, `agent`, `teams`) referenced but not detailed.
-> **Method:** SQL DDL cross-referenced with DSL verb YAML (`rust/config/verbs/*.yaml`) to validate domain groupings.
+> **Last reconciled:** 2026-03-08 — against 125 migrations, 134 DSL verb domains, 1,123 verbs, 100% domain_metadata coverage  
+> **Architecture:** Two schemas only:
+> - **`"ob-poc"`** — single business entity model (~304 tables). All former `agent`, `teams`, `feedback`, `events`, `sessions`, `ob_kyc`, `ob_ref` tables consolidated here.
+> - **`sem_reg` family** — SemOS metadata dictionary: `sem_reg` (25 tables incl. stewardship, 14 views, 2 functions) + `sem_reg_authoring` (6 tables) + `sem_reg_pub` (4 tables)
+>
+> **SemOS coverage:** `domain_metadata.yaml` provides 100% table coverage across 27+ domains with governance_tier, classification, pii flags, and verb data footprints.  
+> **Method:** SQL DDL cross-referenced with DSL verb YAML (`rust/config/verbs/*.yaml`) and `sem_os_seeds/domain_metadata.yaml`.  
 > **Mermaid ER diagrams** render in GitHub, VS Code, and any CommonMark renderer with mermaid support.
 
 ---
@@ -915,7 +919,7 @@ The task queue provides an async return path for long-running operations (docume
 
 **Verb domains:** `screening` (3 verbs), `kyc-agreement` (4)
 
-The main KYC tables live in the `kyc` schema. These `ob-poc` tables support KYC integration.
+The KYC tables now live in the `"ob-poc"` schema alongside all other business tables. These supporting tables are used across screening and KYC integration.
 
 | Table | Purpose |
 |-------|---------|
@@ -966,10 +970,11 @@ Small but load-bearing — drives interpretation, UI grouping, and rule selectio
 
 ## 14) KYC Schema — Case Management, UBO Registry & Skeleton Build Pipeline
 
-> **Schema:** `kyc` (37 tables + 9 views). Separate from `ob-poc` schema.
+> **Schema:** `"ob-poc"` (all KYC tables consolidated into the single business schema).  
+> **SemOS domain:** `kyc` — 19 tables with governance metadata + verb data footprints.  
 > **Verb domains:** `kyc-case` (10 verbs), `entity-workstream` (8), `red-flag` (6), `doc-request` (8), `case-screening` (5), `skeleton` (3), `import-run` (4), `ubo-registry` (6), `ubo-evidence` (5), `tollgate` (3), `outreach` (4), `outstanding-request` (6), `research-workflow` (8)
 
-The `kyc` schema holds all KYC case management state. A case tracks the due diligence lifecycle for a CBU — from intake through ownership discovery, evidence collection, screening, and final approval. The skeleton build pipeline automates the discovery phase.
+The KYC tables hold all case management state. A case tracks the due diligence lifecycle for a CBU — from intake through ownership discovery, evidence collection, screening, and final approval. The skeleton build pipeline automates the discovery phase.
 
 ### Case & Workstream Core
 
@@ -1108,7 +1113,7 @@ erDiagram
 | `doc_requests` | Per-workstream document requests with status tracking (PENDING → REQUESTED → RECEIVED → VERIFIED) |
 | `outstanding_requests` | Polymorphic request tracker (subject_type + subject_id) with escalation, reminders, fulfillment tracking |
 
-**Tollgate definitions** live in `ob_ref.tollgate_definitions`:
+**Tollgate definitions** live in `"ob-poc".tollgate_definitions` (consolidated from former `ob_ref` schema):
 
 | Tollgate ID | Default Threshold | Description |
 |-------------|------------------|-------------|
@@ -1234,8 +1239,9 @@ The skeleton build pipeline (`skeleton.build` verb) orchestrates the discovery p
 
 The Semantic Registry provides an immutable snapshot-based registry for the Semantic OS. All registry objects (13 types) share a single `sem_reg.snapshots` table with a JSONB `definition` column. Typed Rust structs provide compile-time safety over the JSONB bodies.
 
-The registry is split across **two PostgreSQL schemas**:
-- **`sem_reg`** — Source of truth: immutable snapshots, agent plans, projections, outbox, changesets (16 tables, 14 views, 2 functions)
+The registry is split across **three PostgreSQL schemas** (the only non-`ob-poc` schemas in the platform):
+- **`sem_reg`** — Source of truth: immutable snapshots, agent plans, projections, outbox, changesets, plus stewardship tables (25 tables total, 14 views, 2 functions)
+- **`sem_reg_authoring`** — Governed authoring pipeline: validation reports, governance audit, batch publish, artifact storage, archive (6 tables)
 - **`sem_reg_pub`** — Read-only projections: flattened active snapshots for ob-poc consumption (4 tables)
 
 **Migrations:** 078 (Phase 0), 079 (Phase 1), 081 (Phase 2), 082 (Phase 3), 083 (Phases 4-5), 084 (Phase 7), 085 (Phase 8), 086 (Phase 9), 090 (Evidence instances), 091 (Evidence fixes), 092 (Outbox), 093 (Bootstrap audit), 094 (sem_reg_pub projections), 095 (Changesets), 101 (Changesets status CHECK fix)
@@ -1640,9 +1646,9 @@ sem_reg.snapshots (source of truth)
 
 ---
 
-## 17) Stewardship Agent Schema (`stewardship`)
+## 17) Stewardship Agent (within `sem_reg`)
 
-The `stewardship` schema supports the **Stewardship Agent** — a governance-aware agent that manages registry changesets, provides basis-of-record tracing, resolves conflicts between competing changes, and tracks viewport focus for agent sessions. The stewardship agent operates on top of `sem_reg` changesets, adding evidentiary basis, conflict resolution, and session management.
+The stewardship tables live in `sem_reg` (consolidated from the former standalone `stewardship` schema). The **Stewardship Agent** is a governance-aware agent that manages registry changesets, provides basis-of-record tracing, resolves conflicts between competing changes, and tracks viewport focus for agent sessions. It operates on top of `sem_reg` changesets, adding evidentiary basis, conflict resolution, and session management.
 
 **Migrations:** 097 (Phase 0), 098 (Phase 1)
 
@@ -1778,35 +1784,35 @@ erDiagram
     }
 ```
 
-### Cross-Schema Foreign Keys
+### Internal Foreign Keys (all within `sem_reg`)
 
 | Source Table | Column | Target |
 |-------------|--------|--------|
-| `stewardship.basis_records` | `changeset_id` | `sem_reg.changesets` |
-| `stewardship.basis_records` | `entry_id` | `sem_reg.changeset_entries` |
-| `stewardship.conflict_records` | `changeset_id` | `sem_reg.changesets` |
-| `stewardship.conflict_records` | `competing_changeset_id` | `sem_reg.changesets` |
-| `stewardship.events` | `changeset_id` | `sem_reg.changesets` |
-| `stewardship.focus_states` | `changeset_id` | `sem_reg.changesets` |
+| `sem_reg.basis_records` | `changeset_id` | `sem_reg.changesets` |
+| `sem_reg.basis_records` | `entry_id` | `sem_reg.changeset_entries` |
+| `sem_reg.conflict_records` | `changeset_id` | `sem_reg.changesets` |
+| `sem_reg.conflict_records` | `competing_changeset_id` | `sem_reg.changesets` |
+| `sem_reg.events` | `changeset_id` | `sem_reg.changesets` |
+| `sem_reg.focus_states` | `changeset_id` | `sem_reg.changesets` |
 
 ### Data Flow
 
 ```
 sem_reg.changesets (changeset lifecycle)
     │
-    ├─► stewardship.basis_records (why this change was proposed)
-    │       └─► stewardship.basis_claims (specific assertions with evidence)
+    ├─► sem_reg.basis_records (why this change was proposed)
+    │       └─► sem_reg.basis_claims (specific assertions with evidence)
     │
-    ├─► stewardship.conflict_records (competing changes on same FQN)
+    ├─► sem_reg.conflict_records (competing changes on same FQN)
     │
-    ├─► stewardship.events (audit log of all agent actions)
-    │       └─► stewardship.viewport_manifests (point-in-time focus snapshots)
+    ├─► sem_reg.events (audit log of all agent actions)
+    │       └─► sem_reg.viewport_manifests (point-in-time focus snapshots)
     │
-    └─► stewardship.focus_states (live session focus per agent session)
+    └─► sem_reg.focus_states (live session focus per agent session)
 
-stewardship.templates (reusable changeset patterns)
-stewardship.verb_implementation_bindings (verb → executor binding registry)
-stewardship.idempotency_keys (tool invocation dedup)
+sem_reg.templates (reusable changeset patterns)
+sem_reg.verb_implementation_bindings (verb → executor binding registry)
+sem_reg.idempotency_keys (tool invocation dedup)
 ```
 
 ---
@@ -1984,25 +1990,26 @@ Retention Job (background)
 
 | Metric | Count |
 |--------|-------|
-| Total `ob-poc` tables | 206 |
-| Total `kyc` tables | 37 (+ 10 views) |
-| Total `sem_reg` tables | 16 (+ 14 views, 2 functions) |
+| Total `ob-poc` tables (single business schema) | ~304 |
+| Total `sem_reg` tables (incl. stewardship) | 25 (+ 14 views, 2 functions) |
 | Total `sem_reg_pub` tables | 4 |
 | Total `sem_reg_authoring` tables | 6 |
-| Total `stewardship` tables | 9 |
-| Tables with DSL verb domains | ~120 |
-| Tables in this document | ~220 (essential to data model) |
-| Tables omitted (DSL engine, REPL, semantic search, layout cache) | ~70 |
-| DSL verb domains | 58 |
-| Total verb count | ~1,263 |
-| Migrations | 103 SQL files (001–077 + 072b + 078–079, 081–086, 090–103) |
+| SemOS domain_metadata coverage | 100% (all tables governed) |
+| SemOS domains in domain_metadata | 27+ |
+| DSL verb domains (YAML files) | 134 |
+| Total verb count | 1,123 |
+| Verb template files (compound verbs) | 14 |
+| Tables with verb data footprints in SemOS | ~304 (target: 100%) |
+| Migrations | 125 SQL files |
 | Sections in this document | 18 |
 
-**Omitted infrastructure tables** (no verb domains, not essential to data model):
-- DSL engine: `dsl_verbs`, `dsl_sessions`, `dsl_instances`, `dsl_snapshots`, `dsl_*` (14 tables)
-- Semantic search: `verb_pattern_embeddings`, `verb_centroids`, `semantic_match_cache`, `detected_patterns`, `intent_feedback*`
-- REPL: `repl_sessions_v2`, `repl_invocation_records`
-- BPMN integration: `bpmn_correlations`, `bpmn_job_frames`, `bpmn_parked_tokens`, `bpmn_pending_dispatches`, `expansion_reports`
-- Session/layout: `sessions`, `session_scopes`, `session_scope_history`, `session_bookmarks`, `layout_cache`, `layout_config`
-- Audit: `sheet_execution_audit`, `cbu_board_controller`, `board_control_evidence`, `cbu_control_anchors`
-- Agent telemetry (`agent` schema): `intent_events` (M087 base + M103 CCIR columns: `allowed_verbs_fingerprint`, `pruned_verbs_count`, `toctou_recheck_performed`, `toctou_result`, `toctou_new_fingerprint`), `learning_candidates`, `learning_audit`, `user_learned_phrases`, `phrase_blocklist`, `stopwords`, `teaching_audit`
+**Infrastructure tables** (included in domain_metadata under `dsl`, `session`, `agent`, `view` domains — no longer omitted):
+- DSL engine: `dsl_ob`, `dsl_session_locks`, `dsl_snapshots`, `dsl_verb_categories`, `dsl_verb_sync_log`, `dsl_view_state_changes`, `dsl_workflow_phases`
+- Staged execution: `staged_runbook`, `staged_command`, `staged_command_candidate`, `staged_command_entity`
+- Semantic search: `verb_centroids`, `semantic_match_cache`, `verb_pattern_embeddings`, `detected_patterns`, `intent_feedback_analysis`
+- REPL: `repl_invocation_records`
+- BPMN integration: `bpmn_correlations`, `bpmn_job_frames`, `bpmn_parked_tokens`, `bpmn_pending_dispatches`
+- Session/layout: `sessions`, `layout_cache`, `layout_config`, `view_modes`
+- Agent learning (consolidated from former `agent` schema): `entity_aliases`, `invocation_phrases`, `learning_candidates`, `learning_audit`, `user_learned_phrases`, `phrase_blocklist`, `lexicon_tokens`
+- Teams/access (consolidated from former `teams` schema): `teams`, `memberships`, `team_cbu_access`, `team_service_entitlements`, `access_review_campaigns`, `access_review_items`, `access_attestations`
+- Feedback (consolidated from former `feedback` schema): `failures`, `occurrences`, `audit_log`

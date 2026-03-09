@@ -1,0 +1,219 @@
+OB-POC Data Strategy — Vision & Scope (Reverse-Engineered from What’s Implemented)
+
+Audience: BNY Product (Agile) + Engineering
+Purpose: re-sell the platform’s data approach as a pragmatic, buildable strategy — not a “future architecture slide”.
+Positioning: this is a data-first onboarding operating system: commercial intent → operational fulfilment → compliance clearance, with deterministic execution and auditable evidence.
+
+⸻
+
+1) The vision
+
+BNY onboarding is fundamentally a coordination problem across three realities that rarely line up cleanly:
+	1.	Commercial reality — what was actually negotiated and agreed (products, pricing, legal entities, contracts).
+	2.	Operational reality — what must be provisioned and delivered (services/resources, accounts, connectivity, configurations).
+	3.	Compliance reality — what must be proven (KYC/UBO ownership/control, documents, screenings, approvals).
+
+The vision is to make onboarding behave like a single, navigable system where:
+	•	every onboarding outcome is traceable back to the deal context that justified it,
+	•	every delivered service/resource is traceable to a contracted commercial product,
+	•	every compliance decision is traceable to evidence and a case-scoped ownership/control graph,
+	•	and the entire process is executable through deterministic runbooks with durable pause/resume semantics.
+
+In plain terms: “One map, one execution trail, one evidence trail.”
+
+⸻
+
+2) The product promise
+
+For Product (Agile)
+	•	Single source of truth for “what are we onboarding and why?”
+One Deal Map becomes the anchor for backlog, delivery status, and stakeholder alignment.
+	•	Predictable delivery
+Onboarding requests become trackable work packages with clear blockers and gates.
+	•	Measurable outcomes
+Time-to-contract → time-to-onboard → time-to-live become measurable because the data model enforces the join points.
+
+For Engineering
+	•	Deterministic execution over fuzzy inputs
+Agents/LLMs assist discovery, but execution remains contract-driven and auditable.
+	•	Strong join keys across domains
+No “spreadsheet integration layer” between deal, onboarding, and KYC.
+	•	Durable long-running workflows
+Document requests and human approvals don’t break the model; they’re first-class.
+	•	Governable DATA change (Above the Line - Critical Data Elements)
+Definitions (verbs/taxonomies/policies) evolve via versioned registry and published projections.
+  	•	NON Governable change (Below the line - Operational data needed to drive and monitor processses)
+The ability to self define and publish non CDE (verbs/taxonomies/policies) evolve via versioned registry and published projections.
+
+
+
+⸻
+
+3) The core idea: three taxonomies as load-bearing aggregates
+
+The implemented schema reveals a deliberate strategy: reduce the complexity of enterprise onboarding by making three explicit top-level structures (taxonomies), each with crisp join points.
+
+3.1 Deal Map (Deal Record) — the commercial taxonomy
+
+An artificial but essential “deal record” that bundles the commercial truth:
+	•	negotiated commercial products
+	•	negotiated rate cards (pricing lines, tiers, effective dates, supersession)
+	•	contracting legal entities (client side + BNY side)
+	•	legal contracts and contracted product set
+	•	CBUs subscribing to contracted commercial products
+
+Outcome: the Deal Map becomes the authoritative “commercial context graph” that the platform can execute against.
+
+3.2 Onboarding Request — the fulfilment wrapper
+
+A per-CBU work package linked back to the deal:
+	•	binds deal + contract + CBU + product
+	•	decomposes product into services/resources that must be delivered
+	•	tracks operational status, blockers, and completion
+	•	supports “requires KYC” gating and explicit linkage to KYC case IDs
+
+Outcome: you can treat onboarding like a deterministic delivery programme, not a ticket swarm.
+
+3.3 KYC / UBO — the compliance taxonomy
+
+A case-scoped ownership/control and evidence workflow linked to the deal context:
+	•	case + entity workstreams (in-scope targets)
+	•	UBO determination runs (snapshot outputs, coverage)
+	•	asserted UBO registry + evidence binding
+	•	doc requests, screenings, tollgates/decision gates
+
+Outcome: you can prove why someone was cleared (or blocked), based on evidence and a versioned case snapshot.
+
+⸻
+
+4) The “BNY-grade” design principles already embedded
+
+These are not aspirational — they’re visible in what’s been implemented.
+
+4.1 Evidence-first, not “notes-first”
+
+The platform treats documents as:
+	•	stored artefacts (hashes/keys),
+	•	typed objects (document types),
+	•	extractable sources (structured outputs),
+	•	and evidence that satisfies requirements (links to attributes/requirements).
+
+This is the basis for compliance defensibility and audit readiness.
+
+4.2 Deterministic execution, with durable pause/resume
+
+The platform supports:
+	•	compiled runbooks (replayable, auditable plans),
+	•	durable dispatch/correlation,
+	•	parked tokens awaiting external events (document uploads, approvals),
+	•	and job frames for long-running work.
+
+This directly addresses the real onboarding shape: “start → wait → resume”.
+
+4.3 Governance via a Semantic Registry (SemReg) — with 100% metadata coverage
+
+Definitions evolve safely:
+	•	authoring and versioning of verbs/taxonomies/policies,
+	•	publish events,
+	•	and runtime projections (sem_reg_pub) so runtime behaviour comes from “active published definitions”.
+	•	100% table coverage in domain_metadata.yaml: every business table has governance_tier (governed vs operational/CDE vs non-CDE), classification, and pii flags.
+	•	Stewardship (basis records, conflict resolution, changeset templates) consolidated into sem_reg schema.
+
+This creates change control without freezing delivery. The two-schema architecture (“ob-poc” for business, “sem_reg*” for SemOS) ensures clean separation between governed domain data and the metadata that governs it.
+
+4.4 Agents assist discovery; contracts govern capability
+
+The agent schema stores:
+	•	utterance → intent traces,
+	•	phrase→verb learning,
+	•	aliases,
+	•	reviewable learning candidates,
+	•	and blocklists.
+
+Key strategy: learning tunes discovery/ranking; SemReg defines what is actually allowed to execute.
+
+⸻
+
+5) What this strategy solves (in BNY terms)
+
+5.1 Reduces onboarding ambiguity
+
+Instead of “what did we sell?” being spread across emails, slide decks, and PDFs:
+	•	the Deal Map becomes navigable and machine-executable.
+
+5.2 Prevents commercial/operational mismatch
+
+You can’t onboard a CBU to services unless:
+	•	the commercial product is contracted,
+	•	the CBU is subscribed,
+	•	and provisioning maps back to that product decomposition.
+
+5.3 Makes compliance gating explicit and traceable
+
+KYC isn’t a parallel programme with ad-hoc status:
+	•	it is linked to onboarding requests,
+	•	and can be treated as a deterministic precondition with evidence trails.
+
+5.4 Enables “portfolio onboarding” without chaos
+
+Once the model exists, scaling from “one onboarding” to “many CBUs across many products” becomes a matter of:
+	•	generating onboarding request rows,
+	•	running deterministic runbooks,
+	•	and managing blockers consistently.
+
+⸻
+
+6) Scope: what the data strategy covers
+
+In-scope (already structurally supported)
+	•	Deal Map: deals, participants, legal contracts, contracted products, rate cards/lines, CBU subscriptions
+	•	Onboarding Requests: deal-linked delivery work packages, product→service/resource decomposition, provisioning lifecycle tracking
+	•	KYC/UBO: case scoping, ownership/control modelling, UBO determinations, evidence linkage, doc requests, screenings, tollgates
+	•	Documents/Evidence: document catalog, document types, extraction outputs, attribute/evidence linkage
+	•	Durable Execution: compiled runbooks, dispatch/correlation, parked tokens, durable job frames
+	•	Definition Governance: SemReg + published projections + 100% domain_metadata coverage
+	•	Stewardship: basis-of-record tracing, changeset conflict resolution, verb implementation bindings (in sem_reg)
+	•	Learning & UX Assist: agent traces, aliasing, phrase learning, reviewable candidates, guardrails (in ob-poc)
+	•	Teams & Access Control: team membership, CBU access grants, access review campaigns (in ob-poc)
+
+Explicitly out-of-scope (by design, not omission)
+	•	A “single monolithic golden client master” replacing upstream masters
+(the platform links and scopes data; it doesn’t pretend to be the enterprise MDM.)
+	•	A universal workflow engine replacing everything
+(runbooks + BPMN integration remain bounded; the goal is deterministic orchestration, not a new BPM suite.)
+	•	A full customer portal product
+(only the minimal primitives are required: upload docs + respond to requests via correlation keys.)
+
+⸻
+
+7) How this fits Agile without becoming a “data platform project”
+
+This approach is incrementally shippable because each taxonomy is independently valuable:
+
+Slice 1 — Deal Map as Product backbone
+	•	Create/maintain Deal Map records
+	•	Show “what’s sold” and “who’s contracting”
+	•	Attach rate cards and contract products
+	•	Subscribe CBUs
+
+Value: commercial transparency; fewer downstream surprises.
+
+Slice 2 — Onboarding Requests as Delivery mechanism
+	•	Generate onboarding requests from the Deal Map
+	•	Track provisioning, blockers, target live dates
+
+Value: delivery predictability; clear operational status.
+
+Slice 3 — KYC/UBO case gating
+	•	Create KYC cases linked to onboarding requests
+	•	Drive doc requests/screenings, track evidence completeness
+
+Value: compliance defensibility; less “status theatre”.
+
+Slice 4 — Governed definitions + learning loop
+	•	Move definitions into SemReg publishing
+	•	Use agent learning to improve discovery without changing contracts
+
+Value: safe evolution; faster UX; less manual triage.
+
+⸻

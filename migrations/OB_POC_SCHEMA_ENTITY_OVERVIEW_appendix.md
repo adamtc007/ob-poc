@@ -1,5 +1,5 @@
 # OB-POC — Companion Appendix
-> **Last reconciled:** 2026-03-06  
+> **Last reconciled:** 2026-03-08  
 > **Companion to:** `OB_POC_SCHEMA_ENTITY_OVERVIEW_refocused.md`  
 > **Purpose:** map the *cross-cutting platform subsystems* (Documents/Evidence, Semantic Registry, Agent learning, Runbooks/BPMN, Events/Feedback) back onto the **three main taxonomies**:
 > 1) **Deal Map (Deal Record)**  
@@ -15,14 +15,14 @@ This appendix is written for “system navigation”: when you’re looking at a
 
 ---
 
-## 0) Quick orientation: schemas you actually have
+## 0) Quick orientation: the two schemas
 
-- **`"ob-poc"`** — business objects + execution artifacts (deals, onboarding, KYC, docs, runbooks, BPMN frames)
-- **`sem_reg`** — versioned definition store (snapshots, changesets, outbox)
-- **`sem_reg_pub`** — published “active snapshot set” projections used at runtime
-- **`agent`** — learning / embeddings / corrections (“utterance → intent → verb” tuning data)
-- **`events`** — generic event log
-- **`feedback`** — failure inspector (audit trail + repro material)
+- **`"ob-poc"`** — single business entity model (~304 tables). Contains all business objects, execution artifacts, agent learning, teams/access, feedback, events, and reference data. Former `agent`, `teams`, `feedback`, `events`, `sessions`, `ob_kyc`, `ob_ref` schemas consolidated here.
+- **`sem_reg`** — SemOS metadata dictionary (25 tables incl. stewardship). Versioned definition store: snapshots, changesets, outbox, plus basis records, conflict resolution, focus states, templates, verb implementation bindings.
+- **`sem_reg_authoring`** — governed authoring pipeline (6 tables). Validation reports, governance audit, batch publish, artifact storage/archive.
+- **`sem_reg_pub`** — published “active snapshot set” projections used at runtime (4 tables).
+
+**SemOS domain_metadata** provides 100% coverage: every table has governance_tier, classification, pii flags, and verb data footprint mappings.
 
 ---
 

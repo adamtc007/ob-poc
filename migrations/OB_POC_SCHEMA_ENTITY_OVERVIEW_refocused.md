@@ -1,5 +1,7 @@
 # OB-POC — Schema Entity Overview (Refocused)
-> **Last reconciled:** 2026-03-06  
+> **Architecture:** Two schemas — `"ob-poc"` (~304 tables, single business entity model) + `sem_reg*` (SemOS, 35 tables). All former dead schemas consolidated.  
+> **SemOS coverage:** `domain_metadata.yaml` at 100% — every table governed with tier, classification, pii.  
+> **Last reconciled:** 2026-03-08  
 > **Focus:** 3 main taxonomies that drive the “commercial → onboarding → KYC/UBO” lifecycle:
 > 1) **Deal Map (Deal Record)** — the commercial negotiation artefact  
 > 2) **Onboarding Request** — the operational fulfilment wrapper (CBUs → services/resources)  
