@@ -1,12 +1,12 @@
 # OB-POC — Schema Entity Overview
 
-> **Last reconciled:** 2026-03-08 — against 125 migrations, 134 DSL verb domains, 1,123 verbs, 100% domain_metadata coverage  
+> **Last reconciled:** 2026-03-09 — against 125 migrations, 134 DSL verb domains, 1,123 verbs, 100% domain_metadata coverage  
 > **Architecture:** Two schemas only:
-> - **`"ob-poc"`** — single business entity model (~304 tables). All former `agent`, `teams`, `feedback`, `events`, `sessions`, `ob_kyc`, `ob_ref` tables consolidated here.
+> - **`"ob-poc"`** — single business entity model (306 tables, 89 views, 144 functions). All former `agent`, `teams`, `feedback`, `events`, `sessions`, `ob_kyc`, `ob_ref` tables consolidated here.
 > - **`sem_reg` family** — SemOS metadata dictionary: `sem_reg` (25 tables incl. stewardship, 14 views, 2 functions) + `sem_reg_authoring` (6 tables) + `sem_reg_pub` (4 tables)
 >
 > **SemOS coverage:** `domain_metadata.yaml` provides 100% table coverage across 27+ domains with governance_tier, classification, pii flags, and verb data footprints.  
-> **Method:** SQL DDL cross-referenced with DSL verb YAML (`rust/config/verbs/*.yaml`) and `sem_os_seeds/domain_metadata.yaml`.  
+> **Method:** SQL DDL cross-referenced with DSL verb YAML (`config/verbs/*.yaml`) and `sem_os_seeds/domain_metadata.yaml`.  
 > **Mermaid ER diagrams** render in GitHub, VS Code, and any CommonMark renderer with mermaid support.
 
 ---
@@ -193,6 +193,7 @@ erDiagram
 | `client_group_anchor_role` | Anchor role types |
 | `client_group_entity_roles` | GLEIF roles (SUBSIDIARY, ULTIMATE_PARENT) from research phase |
 | `client_group_entity_tag` | Entity classification tags |
+| `client_group_entity_tag_embedding` | Versioned embeddings per entity tag (semantic search for tags) |
 | `client_group_relationship_sources` | Source provenance for relationships |
 
 ---
@@ -282,11 +283,22 @@ erDiagram
 | Table | Purpose |
 |-------|---------|
 | `fee_billing_profiles` | Billing config per deal+contract+rate_card+CBU+product |
+| `rate_cards` | Standalone rate card definitions (name, currency, effective_date) |
 | `fee_billing_account_targets` | Which CBU resource instances to bill (links to `cbu_resource_instances`) |
 | `fee_billing_periods` | Monthly/quarterly billing cycles with status machine |
 | `fee_billing_period_lines` | Calculated fee amounts per target per period |
 
 **Billing period status:** `PENDING → CALCULATING → CALCULATED → REVIEWED → APPROVED → INVOICED → DISPUTED`
+
+**Supporting deal tables:**
+
+| Table | Purpose |
+|-------|---------|
+| `deal_products` | Product associations per deal |
+| `deal_slas` | SLA commitments per deal |
+| `deal_documents` | Document attachments per deal |
+| `deal_ubo_assessments` | UBO assessment status per deal |
+| `deal_events` | Deal lifecycle event log |
 
 ---
 
@@ -573,11 +585,12 @@ erDiagram
 | Table | Verb Domain | Purpose |
 |-------|------------|---------|
 | `cbu_entity_roles` | `cbu-role-v2` | Entity-to-CBU role assignments |
-| `cbu_entity_roles_history` | — | Audit trail of role changes |
+| `cbu_entity_roles_history` | — | Audit trail of role changes (via trigger on `cbu_entity_roles` — no standalone table in DDL) |
 | `cbu_group_members` | `manco-group` | CBU membership in governance groups |
 | `cbu_groups` | `manco-group` | Governance book groups (ManCo, apex parent) |
 | `cbu_product_subscriptions` | `matrix-overlay` | Product subscriptions per CBU |
 | `cbu_trading_profiles` | `trading-profile` | Trading mandate profiles |
+| `trading_profile_materializations` | `trading-profile` | Materialized trading profile snapshots |
 | `cbu_matrix_product_overlay` | `matrix-overlay` | Per-cell instrument/market/currency config |
 | `cbu_resource_instances` | `service-resource` | Provisioned resource instances |
 | `cbu_service_readiness` | — | Computed service readiness status |
@@ -586,6 +599,46 @@ erDiagram
 | `cbu_subscriptions` | `contract` | Contract+product subscription (onboarding gate) |
 | `cbu_pricing_config` | `pricing-config` | NAV pricing configuration |
 | `cbu_evidence` | `cbu` | Document/attestation evidence links |
+
+**CBU settlement & SSI tables:**
+
+| Table | Verb Domain | Purpose |
+|-------|------------|---------|
+| `cbu_ssi` | `settlement` | Standard settlement instructions per CBU |
+| `cbu_ssi_agent_override` | `settlement` | Agent-level SSI overrides |
+| `cbu_settlement_chains` | `settlement` | Multi-hop settlement chain definitions |
+| `cbu_settlement_location_preferences` | `settlement` | Preferred settlement locations per market/currency |
+
+**CBU tax & regulatory tables:**
+
+| Table | Verb Domain | Purpose |
+|-------|------------|---------|
+| `cbu_tax_status` | `tax` | Tax residency and status per CBU |
+| `cbu_tax_reporting` | `tax` | Tax reporting obligations (FATCA, CRS, etc.) |
+| `cbu_tax_reclaim_config` | `tax` | Withholding tax reclaim configuration |
+| `cbu_cross_border_config` | — | Cross-border operational configuration |
+
+**CBU corporate actions & investment management tables:**
+
+| Table | Verb Domain | Purpose |
+|-------|------------|---------|
+| `cbu_ca_preferences` | `corporate-action` | Corporate action election preferences |
+| `cbu_ca_instruction_windows` | `corporate-action` | Instruction window deadlines per event type |
+| `cbu_ca_ssi_mappings` | `corporate-action` | CA proceeds settlement mappings |
+| `cbu_im_assignments` | `investment-manager` | Investment manager assignments per CBU |
+| `cbu_board_controller` | — | Board-level control assignments |
+| `cbu_control_anchors` | — | Control anchor entity mapping |
+| `cbu_relationship_verification` | — | Relationship verification status tracking |
+
+**CBU operational & audit tables:**
+
+| Table | Purpose |
+|-------|---------|
+| `cbu_cash_sweep_config` | Cash sweep configuration per CBU |
+| `cbu_change_log` | Audit trail of CBU attribute/status changes |
+| `cbu_creation_log` | CBU creation audit trail |
+| `cbu_layout_overrides` | Per-user layout customizations for CBU views |
+| `cbu_unified_attr_requirements` | Unified attribute requirements (computed from product + entity type) |
 
 ---
 
@@ -691,9 +744,9 @@ erDiagram
 | `entity_limited_companies` | Corporates | incorporation_country, share_capital |
 | `entity_trusts` | Trusts | trust_type, governing_law |
 | `entity_partnerships` | Partnerships | partnership_type |
-| `entity_foundations` | Foundations | foundation_purpose |
-| `entity_cooperatives` | Cooperatives | cooperative_type |
-| `entity_government` | Government bodies | government_level |
+| `entity_foundations` | Foundations | foundation_purpose (planned — not yet in DDL) |
+| `entity_cooperatives` | Cooperatives | cooperative_type (planned — not yet in DDL) |
+| `entity_government` | Government bodies | government_level (planned — not yet in DDL) |
 | `entity_manco` | Management companies | manco_type, regulated_by |
 
 **Supporting tables:**
@@ -707,6 +760,10 @@ erDiagram
 | `entity_concept_link` | Semantic concept associations (for entity linking) |
 | `entity_feature` | Feature flags for ML/entity linking |
 | `entity_relationships` | Ownership/control edges (from_entity_id → to_entity_id) |
+| `entity_regulatory_registrations` | Regulatory registrations per entity (licences, authorisations) |
+| `entity_settlement_identity` | Settlement identity records per entity (BIC, account details) |
+| `entity_ssi` | Entity-level standard settlement instructions |
+| `entity_type_dependencies` | Type-level dependency graph between entity types |
 
 ---
 
@@ -756,6 +813,10 @@ erDiagram
 | `ubo_snapshot_comparisons` | Diff between two UBO snapshots (added/removed/changed) |
 | `entity_ubos` | Legacy BODS-style UBO records per entity |
 | `control_edges` | Control relationship edges (board, voting) |
+| `board_control_evidence` | Evidence records for board-level control assertions |
+| `delegation_relationships` | Delegation of authority relationships |
+| `trust_parties` | Trust party roles (settlor, trustee, protector, beneficiary) |
+| `proofs` | Proof records linking evidence to assertions (ownership, identity, control) |
 | `entity_relationships_history` | Temporal history of relationship changes |
 
 ---
@@ -819,11 +880,28 @@ erDiagram
 | `resource_instance_attributes` | Attribute values on provisioned instances |
 | `resource_attribute_requirements` | Required attributes per resource type |
 
+**Lifecycle tables:**
+
+| Table | Purpose |
+|-------|---------|
+| `lifecycles` | Lifecycle definitions (onboarding, periodic review, offboarding) |
+| `lifecycle_resource_types` | Resource types required per lifecycle stage |
+| `lifecycle_resource_capabilities` | Capabilities required per lifecycle resource type |
+
+**Instrument & market reference tables:**
+
+| Table | Purpose |
+|-------|---------|
+| `instrument_classes` | Instrument classification taxonomy (equities, fixed income, derivatives, etc.) |
+| `instrument_lifecycles` | Lifecycle events per instrument class |
+| `markets` | Market definitions (exchanges, OTC venues) |
+
 **SLA tables:**
 
 | Table | Purpose |
 |-------|---------|
 | `sla_templates` | SLA definition templates |
+| `sla_metric_types` | SLA metric type definitions |
 | `sla_measurements` | Measured SLA metrics |
 | `sla_breaches` | Recorded SLA breaches |
 | `cbu_sla_commitments` | SLA commitments per CBU |
@@ -835,8 +913,8 @@ erDiagram
 **Verb domains:** `document` (13 verbs), `requirement` (10), `attribute` (11), `docs-bundle` (3)
 
 Two document models coexist:
-- **Legacy:** `document_catalog` + `document_types` — flat catalog
-- **V2 (049):** `documents` → `document_versions` — three-layer model (requirement → document → version)
+- **Legacy (active):** `document_catalog` + `document_types` — flat catalog
+- **V2 (049 — planned, not yet in DDL):** `documents` → `document_versions` — three-layer model (requirement → document → version). The `document_requirements`, `documents`, and `document_versions` tables are specified but not yet present in the master schema.
 
 ```mermaid
 erDiagram
@@ -892,6 +970,8 @@ erDiagram
 | `attribute_observations` | Observed values with source, confidence, supersession chain |
 | `cbu_attr_values` | Attribute values per CBU (with evidence refs) |
 | `document_attribute_links` | Policy-style proof links (document type → attribute) |
+| `document_attribute_mappings` | Document type to attribute extraction mappings |
+| `requirement_acceptable_docs` | Acceptable document types per requirement |
 
 ---
 
@@ -911,6 +991,11 @@ The task queue provides an async return path for long-running operations (docume
 | `workflow_definitions` | Workflow definitions |
 | `staged_runbook` | Staged REPL runbook container |
 | `staged_command` | Individual staged DSL commands |
+| `staged_command_candidate` | Candidate commands from intent resolution |
+| `staged_command_entity` | Entity references within staged commands |
+| `compiled_runbooks` | Immutable compiled runbook snapshots (append-only) |
+| `compiled_runbook_events` | Events emitted during compiled runbook execution |
+| `workflow_audit_log` | Permanent workflow execution audit trail |
 | `rejection_reason_codes` | Reference data for document QA rejection reasons |
 
 ---
@@ -925,10 +1010,21 @@ The KYC tables now live in the `"ob-poc"` schema alongside all other business ta
 |-------|---------|
 | `screening_lists` | Screening list definitions (sanctions, PEP) |
 | `screening_requirements` | Screening requirements per entity type |
+| `screening_types` | Screening type taxonomy |
 | `person_pep_status` | PEP status records per person entity |
 | `kyc_service_agreements` | KYC service agreements between CBU and provider |
+| `kyc_decisions` | KYC decision records with review date tracking |
+| `kyc_ubo_registry` | Legacy KYC-scoped UBO registry |
+| `kyc_ubo_evidence` | Legacy KYC-scoped UBO evidence |
 | `case_types` | Case type taxonomy (NEW_CLIENT, PERIODIC_REVIEW, etc.) |
+| `case_evaluation_snapshots` | Point-in-time evaluation state snapshots per case |
 | `risk_ratings` | Risk rating definitions |
+| `risk_bands` | Risk band thresholds and scoring rules |
+| `client_allegations` | Client allegation tracking (adverse media, regulatory actions) |
+| `client_portal_sessions` | Client portal session tracking |
+| `verification_challenges` | Identity verification challenge records |
+| `verification_escalations` | Verification escalation tracking |
+| `escalations` | General escalation records |
 
 ---
 
@@ -941,9 +1037,12 @@ The KYC tables now live in the `"ob-poc"` schema alongside all other business ta
 | `bods_entity_statements` | Entity statements per Open Ownership standard |
 | `bods_person_statements` | Person statements in ownership chains |
 | `bods_ownership_statements` | Ownership/control statements linking persons to entities |
-| `gleif_lei_records` | Cached LEI records from GLEIF API |
+| `gleif_lei_records` | Cached LEI records from GLEIF API (planned — not yet in DDL) |
 | `gleif_relationships` | Cached GLEIF relationship records (parent/child) |
 | `gleif_sync_log` | GLEIF sync operation audit log |
+| `graph_import_runs` | GLEIF/BODS graph import run tracking |
+| `bods_entity_types` | BODS entity type reference data |
+| `bods_interest_types` | BODS interest type reference data |
 
 ---
 
@@ -956,15 +1055,23 @@ Small but load-bearing — drives interpretation, UI grouping, and rule selectio
 | `roles` | `cbu-role-v2` | Role taxonomy (depositary, IM, director, etc.) |
 | `role_types` | — | Role type classification |
 | `role_categories` | — | Role category grouping |
-| `role_applicable_entity_types` | — | Which entity types can hold which roles |
+| `role_applicable_entity_types` | — | Which entity types can hold which roles (planned — not yet in DDL) |
 | `currencies` | — | Currency reference data |
 | `master_jurisdictions` | `fund` | Jurisdiction definitions |
 | `products` | `product` | Product catalog (CUSTODY, FUND_ACCOUNTING, etc.) |
 | `services` | `service` | Service catalog (SAFEKEEPING, SETTLEMENT, etc.) |
 | `regulators` | `regulatory` | Regulatory body definitions |
 | `rule_field_dictionary` | `rule-field` | Closed-world field registry for rule validation |
-| `placeholder_kinds` | — | Placeholder entity kinds |
+| `placeholder_kinds` | — | Placeholder entity kinds (planned — not yet in DDL) |
 | `client_types` | — | Client type taxonomy |
+| `edge_types` | — | Graph edge type definitions (with view-mode visibility flags) |
+| `node_types` | — | Graph node type definitions (with view-mode visibility flags) |
+| `security_types` | — | Security type taxonomy |
+| `ca_event_types` | — | Corporate action event type taxonomy |
+| `request_types` | — | Request type definitions |
+| `standards_mappings` | — | Regulatory standards cross-reference mappings |
+| `dictionary` | — | General-purpose dictionary entries |
+| `clients` | — | Legacy client records |
 
 ---
 
@@ -1159,6 +1266,13 @@ erDiagram
 
 **Gap-to-doc mapping:** OWNERSHIP→SHARE_REGISTER, IDENTITY→PASSPORT, CONTROL→BOARD_RESOLUTION, SOW→SOW_DECLARATION.
 
+**Additional outreach/observations tables:**
+
+| Table | Purpose |
+|-------|---------|
+| `outreach_requests` | Legacy outreach request records |
+| `observation_discrepancies` | Discrepancies detected between attribute observations |
+
 ### Research Audit Trail
 
 | Table | Purpose |
@@ -1228,16 +1342,79 @@ The skeleton build pipeline (`skeleton.build` verb) orchestrates the discovery p
 7. import-run.complete    — Finalize run, emit IMPORT_RUN_COMPLETED event
 ```
 
-**Key files:**
-- `rust/src/domain_ops/skeleton_build_ops.rs` — Orchestrator with real computation
-- `rust/src/domain_ops/import_run_ops.rs` — Import run lifecycle
-- `rust/src/domain_ops/kyc_case_ops.rs` — Case create/close (deal-aware gate events)
+**Key modules:**
+- `domain_ops/skeleton_build_ops` — Orchestrator with real computation
+- `domain_ops/import_run_ops` — Import run lifecycle
+- `domain_ops/kyc_case_ops` — Case create/close (deal-aware gate events)
+
+---
+
+## 14a) Settlement & SSI
+
+**Verb domains:** `settlement` (verbs), `ssi` (verbs)
+
+Settlement instructions, chain definitions, and subcustodian network. These tables support the operational settlement lifecycle.
+
+| Table | Purpose |
+|-------|---------|
+| `settlement_locations` | Settlement location definitions |
+| `settlement_types` | Settlement type taxonomy |
+| `settlement_chain_hops` | Individual hops in multi-hop settlement chains |
+| `ssi_types` | SSI type taxonomy |
+| `ssi_booking_rules` | SSI booking rule definitions |
+| `subcustodian_network` | Subcustodian network relationships |
+
+CBU-level SSI and settlement tables are listed in Section 5 under CBU settlement & SSI tables.
+
+---
+
+## 14b) ISDA & CSA Agreements
+
+**Verb domains:** `isda` (verbs)
+
+ISDA Master Agreement and Credit Support Annex tracking for derivative-capable CBUs.
+
+| Table | Purpose |
+|-------|---------|
+| `isda_agreements` | ISDA Master Agreement records per counterparty pair |
+| `isda_product_coverage` | Product coverage under each ISDA agreement |
+| `isda_product_taxonomy` | ISDA product taxonomy definitions |
+| `csa_agreements` | Credit Support Annex agreements linked to ISDA masters |
+
+---
+
+## 14c) Tax
+
+**Verb domains:** `tax` (verbs)
+
+Tax jurisdictions, treaty rates, and per-CBU tax configuration.
+
+| Table | Purpose |
+|-------|---------|
+| `tax_jurisdictions` | Tax jurisdiction definitions |
+| `tax_treaty_rates` | Withholding tax treaty rates between jurisdictions |
+| `threshold_factors` | Threshold factor definitions for ownership/control tests |
+| `threshold_requirements` | Threshold requirement rules |
+
+CBU-level tax tables (`cbu_tax_status`, `cbu_tax_reporting`, `cbu_tax_reclaim_config`) are listed in Section 5.
+
+---
+
+## 14d) Onboarding & Submissions
+
+| Table | Purpose |
+|-------|---------|
+| `onboarding_plans` | Onboarding plan definitions per CBU |
+| `onboarding_requests` | Individual onboarding request tracking |
+| `submissions` | Form/document submission records |
+| `commitments` | Commitment tracking records |
+| `credentials` | Credential records (API keys, certificates) for external integrations |
 
 ---
 
 ## 15) Semantic Registry Schema (`sem_reg`)
 
-The Semantic Registry provides an immutable snapshot-based registry for the Semantic OS. All registry objects (13 types) share a single `sem_reg.snapshots` table with a JSONB `definition` column. Typed Rust structs provide compile-time safety over the JSONB bodies.
+The Semantic Registry provides an immutable snapshot-based registry for the Semantic OS. All registry objects (13 types) share a single `sem_reg.snapshots` table with a JSONB `definition` column. Typed data structures in the application layer provide compile-time safety over the JSONB bodies.
 
 The registry is split across **three PostgreSQL schemas** (the only non-`ob-poc` schemas in the platform):
 - **`sem_reg`** — Source of truth: immutable snapshots, agent plans, projections, outbox, changesets, plus stewardship tables (25 tables total, 14 views, 2 functions)
@@ -1358,7 +1535,7 @@ erDiagram
         TEXT object_fqn
         TEXT object_type
         TEXT change_kind
-        VARCHAR action "add|modify|remove (default add)"
+        VARCHAR action "add, modify, or remove"
         JSONB draft_payload
         UUID base_snapshot_id
         UUID predecessor_id FK "→ snapshots"
@@ -1460,7 +1637,7 @@ erDiagram
 
     derivation_edges {
         UUID edge_id PK
-        UUID_ARRAY input_snapshot_ids
+        uuid_arr input_snapshot_ids
         UUID output_snapshot_id FK
         TEXT verb_fqn
         UUID run_id FK
@@ -1483,7 +1660,7 @@ erDiagram
 
     embedding_records {
         UUID embedding_id PK
-        UUID snapshot_id FK_UK
+        UUID snapshot_id FK "unique"
         TEXT object_type
         TEXT version_hash
         TEXT model_id
@@ -1990,26 +2167,31 @@ Retention Job (background)
 
 | Metric | Count |
 |--------|-------|
-| Total `ob-poc` tables (single business schema) | ~304 |
+| Total `ob-poc` tables (single business schema) | 306 |
+| Total `ob-poc` views | 89 |
+| Total `ob-poc` functions | 144 |
 | Total `sem_reg` tables (incl. stewardship) | 25 (+ 14 views, 2 functions) |
 | Total `sem_reg_pub` tables | 4 |
 | Total `sem_reg_authoring` tables | 6 |
+| Total `public` functions | 6 |
 | SemOS domain_metadata coverage | 100% (all tables governed) |
 | SemOS domains in domain_metadata | 27+ |
 | DSL verb domains (YAML files) | 134 |
 | Total verb count | 1,123 |
 | Verb template files (compound verbs) | 14 |
-| Tables with verb data footprints in SemOS | ~304 (target: 100%) |
+| Tables with verb data footprints in SemOS | 306 (target: 100%) |
 | Migrations | 125 SQL files |
-| Sections in this document | 18 |
+| Sections in this document | 22 |
 
 **Infrastructure tables** (included in domain_metadata under `dsl`, `session`, `agent`, `view` domains — no longer omitted):
-- DSL engine: `dsl_ob`, `dsl_session_locks`, `dsl_snapshots`, `dsl_verb_categories`, `dsl_verb_sync_log`, `dsl_view_state_changes`, `dsl_workflow_phases`
+- DSL engine: `dsl_ob`, `dsl_session_locks`, `dsl_snapshots`, `dsl_verb_categories`, `dsl_verb_sync_log`, `dsl_view_state_changes`, `dsl_workflow_phases`, `dsl_verbs`, `dsl_sessions`, `dsl_session_events`, `dsl_instances`, `dsl_instance_versions`, `dsl_generation_log`, `dsl_idempotency`
 - Staged execution: `staged_runbook`, `staged_command`, `staged_command_candidate`, `staged_command_entity`
-- Semantic search: `verb_centroids`, `semantic_match_cache`, `verb_pattern_embeddings`, `detected_patterns`, `intent_feedback_analysis`
-- REPL: `repl_invocation_records`
+- Compiled runbooks: `compiled_runbooks`, `compiled_runbook_events`, `expansion_reports`, `sheet_execution_audit`
+- Semantic search: `verb_centroids`, `semantic_match_cache`, `verb_pattern_embeddings`, `detected_patterns`, `intent_feedback_analysis`, `intent_events`, `intent_feedback`
+- REPL: `repl_invocation_records`, `repl_sessions_v2`
 - BPMN integration: `bpmn_correlations`, `bpmn_job_frames`, `bpmn_parked_tokens`, `bpmn_pending_dispatches`
-- Session/layout: `sessions`, `layout_cache`, `layout_config`, `view_modes`
+- Session/layout: `sessions`, `session_log`, `layout_cache`, `layout_config`, `view_modes`
 - Agent learning (consolidated from former `agent` schema): `entity_aliases`, `invocation_phrases`, `learning_candidates`, `learning_audit`, `user_learned_phrases`, `phrase_blocklist`, `lexicon_tokens`
 - Teams/access (consolidated from former `teams` schema): `teams`, `memberships`, `team_cbu_access`, `team_service_entitlements`, `access_review_campaigns`, `access_review_items`, `access_attestations`
-- Feedback (consolidated from former `feedback` schema): `failures`, `occurrences`, `audit_log`
+- Feedback (consolidated from former `feedback` schema): `failures`, `occurrences`, `audit_log`, `event_log`, `events`
+- CRUD/operations: `crud_operations`, `schema_consolidation_table_map`, `srdef_discovery_reasons`, `fund_structure`, `fund_investments`
