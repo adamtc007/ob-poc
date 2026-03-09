@@ -57,6 +57,9 @@ pub fn build_stub_context(
         goals: vec![],
         stage_focus: None,
         sage_engine: None,
+        pre_sage_entity_kind: None,
+        pre_sage_entity_name: None,
+        recent_sage_intents: vec![],
     }
 }
 

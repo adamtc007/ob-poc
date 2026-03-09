@@ -238,6 +238,12 @@ pub struct AgentChatResponse {
     /// This will eventually replace verb_disambiguation and intent_tier
     #[serde(skip_serializing_if = "Option::is_none")]
     pub decision: Option<ob_poc_types::DecisionPacket>,
+    /// Typed Sage explanation payload for UI rendering.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sage_explain: Option<ob_poc_types::chat::SageExplainPayload>,
+    /// Typed Coder/REPL proposal payload for UI rendering.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub coder_proposal: Option<ob_poc_types::chat::CoderProposalPayload>,
 }
 
 // Re-export AgentCommand from ob_poc_types as the single source of truth
@@ -458,6 +464,8 @@ impl AgentService {
             verb_disambiguation: None,
             intent_tier: None,
             decision: Some(packet),
+            sage_explain: None,
+            coder_proposal: None,
         }
     }
 
@@ -763,6 +771,100 @@ impl AgentService {
             goals,
             stage_focus: session.context.stage_focus.clone(),
             sage_engine: self.sage_engine.clone(),
+            pre_sage_entity_kind: Self::current_sage_entity_kind(session),
+            pre_sage_entity_name: Self::current_sage_entity_name(session),
+            recent_sage_intents: session.recent_sage_intents.clone(),
+        }
+    }
+
+    fn current_sage_entity_kind(session: &crate::session::UnifiedSession) -> Option<String> {
+        session
+            .context
+            .active_cbu
+            .as_ref()
+            .map(|entity| entity.entity_type.clone())
+            .or_else(|| session.current_structure.as_ref().map(|_| "structure".to_string()))
+            .or_else(|| session.current_case.as_ref().map(|_| "kyc-case".to_string()))
+            .or_else(|| session.current_mandate.as_ref().map(|_| "mandate".to_string()))
+            .or_else(|| session.domain_hint.clone())
+            .or_else(|| (!session.entity_type.is_empty()).then(|| session.entity_type.clone()))
+    }
+
+    fn current_sage_entity_name(session: &crate::session::UnifiedSession) -> Option<String> {
+        session
+            .context
+            .active_cbu
+            .as_ref()
+            .map(|entity| entity.display_name.clone())
+            .or_else(|| session.current_structure.as_ref().map(|item| item.display_name.clone()))
+            .or_else(|| session.current_case.as_ref().map(|item| item.display_name.clone()))
+            .or_else(|| session.current_mandate.as_ref().map(|item| item.display_name.clone()))
+            .or_else(|| session.client.as_ref().map(|item| item.display_name.clone()))
+    }
+
+    fn push_recent_sage_intent(
+        session: &mut crate::session::UnifiedSession,
+        intent: &crate::sage::OutcomeIntent,
+    ) {
+        session.recent_sage_intents.push(crate::sage::RecentIntent {
+            plane: intent.plane.as_str().to_string(),
+            domain_concept: intent.domain_concept.clone(),
+            action: intent.action.as_str().to_string(),
+            confidence: intent.confidence.as_str().to_string(),
+        });
+        if session.recent_sage_intents.len() > 5 {
+            let keep_from = session.recent_sage_intents.len() - 5;
+            session.recent_sage_intents.drain(0..keep_from);
+        }
+    }
+
+    fn to_sage_explain_payload(
+        explain: &crate::sage::SageExplain,
+    ) -> ob_poc_types::chat::SageExplainPayload {
+        ob_poc_types::chat::SageExplainPayload {
+            understanding: explain.understanding.clone(),
+            mode: explain.mode.clone(),
+            scope_summary: explain.scope_summary.clone(),
+            confidence: explain.confidence.clone(),
+            clarifications: explain.clarifications.clone(),
+        }
+    }
+
+    fn to_coder_proposal_payload(
+        pending_mutation: Option<&crate::sage::PendingMutation>,
+        dsl: Option<&str>,
+        final_verb: Option<&str>,
+        can_execute: bool,
+    ) -> Option<ob_poc_types::chat::CoderProposalPayload> {
+        if pending_mutation.is_none() && dsl.is_none() && final_verb.is_none() {
+            return None;
+        }
+        Some(ob_poc_types::chat::CoderProposalPayload {
+            verb_fqn: pending_mutation
+                .map(|pending| pending.coder_result.verb_fqn.clone())
+                .or_else(|| final_verb.map(str::to_string)),
+            dsl: pending_mutation
+                .map(|pending| pending.coder_result.dsl.clone())
+                .or_else(|| dsl.map(str::to_string)),
+            change_summary: pending_mutation
+                .map(|pending| pending.change_summary.clone())
+                .unwrap_or_default(),
+            requires_confirmation: pending_mutation.is_some(),
+            ready_to_execute: can_execute,
+        })
+    }
+
+    fn add_agent_message_with_payloads(
+        session: &mut UnifiedSession,
+        content: String,
+        dsl: Option<String>,
+        sage_explain: Option<ob_poc_types::chat::SageExplainPayload>,
+        coder_proposal: Option<ob_poc_types::chat::CoderProposalPayload>,
+    ) {
+        session.add_agent_message(content, None, dsl);
+        if let Some(last) = session.messages.last_mut() {
+            last.sage_explain = sage_explain;
+            last.coder_proposal = coder_proposal;
         }
     }
 
@@ -841,6 +943,16 @@ impl AgentService {
                 session.set_pending_dsl(pending.coder_result.dsl.clone(), ast, None, false);
                 let mut response = self.execute_runbook(session).await?;
                 response.dsl_source = None;
+                if let Some(last) = session.messages.last_mut() {
+                    last.sage_explain =
+                        Some(Self::to_sage_explain_payload(&pending.intent.explain));
+                    last.coder_proposal = Self::to_coder_proposal_payload(
+                        Some(&pending),
+                        Some(&pending.coder_result.dsl),
+                        Some(&pending.coder_result.verb_fqn),
+                        false,
+                    );
+                }
                 return Ok(response);
             }
             session.pending_mutation = None;
@@ -945,6 +1057,8 @@ impl AgentService {
                         verb_disambiguation: None,
                         intent_tier: None,
                         decision: None,
+                        sage_explain: None,
+                        coder_proposal: None,
                     });
                 }
             }
@@ -1301,16 +1415,23 @@ impl AgentService {
         );
         let orch_outcome =
             crate::agent::orchestrator::handle_utterance(&orch_ctx, &request.message).await;
-        let (result, journey_match, journey_decision, pending_mutation, auto_execute) = match orch_outcome {
+        let (result, journey_match, journey_decision, pending_mutation, auto_execute, sage_intent) = match orch_outcome {
             Ok(o) => (
                 Ok(o.pipeline_result),
                 o.trace.journey_match,
                 o.journey_decision,
                 o.pending_mutation,
                 o.auto_execute,
+                o.sage_intent,
             ),
-            Err(e) => (Err(e), None, None, None, false),
+            Err(e) => (Err(e), None, None, None, false, None),
         };
+        if let Some(intent) = sage_intent.as_ref() {
+            Self::push_recent_sage_intent(session, intent);
+        }
+        let sage_explain_payload = sage_intent
+            .as_ref()
+            .map(|intent| Self::to_sage_explain_payload(&intent.explain));
 
         match result {
             Ok(r) => {
@@ -1340,7 +1461,19 @@ impl AgentService {
                         pending.confirmation_text, bullets
                     );
                     let msg = Self::with_pivot_feedback(&pivot_feedback, msg);
-                    session.add_agent_message(msg.clone(), None, None);
+                    let coder_proposal = Self::to_coder_proposal_payload(
+                        Some(&pending),
+                        Some(&pending.coder_result.dsl),
+                        Some(&pending.coder_result.verb_fqn),
+                        false,
+                    );
+                    Self::add_agent_message_with_payloads(
+                        session,
+                        msg.clone(),
+                        None,
+                        sage_explain_payload.clone(),
+                        coder_proposal.clone(),
+                    );
                     return Ok(AgentChatResponse {
                         message: msg,
                         session_state: SessionState::PendingValidation,
@@ -1355,6 +1488,8 @@ impl AgentService {
                         verb_disambiguation: None,
                         intent_tier: None,
                         decision: None,
+                        sage_explain: sage_explain_payload.clone(),
+                        coder_proposal,
                     });
                 }
 
@@ -1387,7 +1522,13 @@ impl AgentService {
                         group_name, entity_count
                     );
                     let msg = Self::with_pivot_feedback(&pivot_feedback, msg);
-                    session.add_agent_message(msg.clone(), None, None);
+                    Self::add_agent_message_with_payloads(
+                        session,
+                        msg.clone(),
+                        None,
+                        sage_explain_payload.clone(),
+                        None,
+                    );
                     return Ok(AgentChatResponse {
                         message: msg,
 
@@ -1403,6 +1544,8 @@ impl AgentService {
                         verb_disambiguation: None,
                         intent_tier: None,
                         decision: None,
+                        sage_explain: sage_explain_payload.clone(),
+                        coder_proposal: None,
                     });
                 }
 
@@ -1431,6 +1574,17 @@ impl AgentService {
                         response.dsl_source = None;
                         response.message =
                             Self::with_pivot_feedback(&pivot_feedback, response.message);
+                        response.sage_explain = sage_explain_payload.clone();
+                        response.coder_proposal = Self::to_coder_proposal_payload(
+                            None,
+                            Some(&r.dsl),
+                            Some(&r.intent.verb),
+                            false,
+                        );
+                        if let Some(last) = session.messages.last_mut() {
+                            last.sage_explain = response.sage_explain.clone();
+                            last.coder_proposal = response.coder_proposal.clone();
+                        }
                         return Ok(response);
                     }
 
@@ -1450,7 +1604,19 @@ impl AgentService {
                     if is_navigation {
                         // Auto-trigger run for navigation verbs (goes through runbook)
                         tracing::debug!(verb = %verb, dsl = %r.dsl, "Auto-running navigation verb");
-                        return self.execute_runbook(session).await;
+                        let mut response = self.execute_runbook(session).await?;
+                        response.sage_explain = sage_explain_payload.clone();
+                        response.coder_proposal = Self::to_coder_proposal_payload(
+                            None,
+                            Some(&r.dsl),
+                            Some(verb),
+                            false,
+                        );
+                        if let Some(last) = session.messages.last_mut() {
+                            last.sage_explain = response.sage_explain.clone();
+                            last.coder_proposal = response.coder_proposal.clone();
+                        }
+                        return Ok(response);
                     }
 
                     // Data mutation - wait for user to say "run"
@@ -1465,8 +1631,23 @@ impl AgentService {
                         format!("Staged: {}\n\nSay 'run' to execute.", r.dsl)
                     };
                     let msg = Self::with_pivot_feedback(&pivot_feedback, msg);
-                    session.add_agent_message(msg.clone(), None, Some(r.dsl.clone()));
-                    return Ok(self.staged_response(r.dsl, msg));
+                    let coder_proposal = Self::to_coder_proposal_payload(
+                        None,
+                        Some(&r.dsl),
+                        Some(&r.intent.verb),
+                        true,
+                    );
+                    Self::add_agent_message_with_payloads(
+                        session,
+                        msg.clone(),
+                        Some(r.dsl.clone()),
+                        sage_explain_payload.clone(),
+                        coder_proposal.clone(),
+                    );
+                    let mut response = self.staged_response(r.dsl, msg);
+                    response.sage_explain = sage_explain_payload.clone();
+                    response.coder_proposal = coder_proposal;
+                    return Ok(response);
                 }
 
                 // Journey-level disambiguation (e.g., macro_selector needs jurisdiction pick)
@@ -1475,7 +1656,13 @@ impl AgentService {
                 if matches!(r.outcome, PipelineOutcome::NeedsClarification) {
                     if let Some(jd) = journey_decision {
                         let msg = Self::with_pivot_feedback(&pivot_feedback, jd.prompt.clone());
-                        session.add_agent_message(msg.clone(), None, None);
+                        Self::add_agent_message_with_payloads(
+                            session,
+                            msg.clone(),
+                            None,
+                            sage_explain_payload.clone(),
+                            None,
+                        );
                         return Ok(AgentChatResponse {
                             message: msg,
                             session_state: SessionState::New,
@@ -1490,6 +1677,8 @@ impl AgentService {
                             verb_disambiguation: None,
                             intent_tier: None,
                             decision: Some(jd),
+                            sage_explain: sage_explain_payload.clone(),
+                            coder_proposal: None,
                         });
                     }
                 }
@@ -1879,6 +2068,8 @@ impl AgentService {
             verb_disambiguation: None,
             intent_tier: None,
             decision: Some(packet),
+            sage_explain: None,
+            coder_proposal: None,
         })
     }
 
@@ -1990,6 +2181,8 @@ impl AgentService {
             verb_disambiguation: None,
             intent_tier: None,
             decision: Some(packet),
+            sage_explain: None,
+            coder_proposal: None,
         })
     }
 
@@ -2105,6 +2298,8 @@ impl AgentService {
             verb_disambiguation: None,
             intent_tier: None,
             decision: None,
+            sage_explain: None,
+            coder_proposal: None,
         })
     }
 
@@ -2351,6 +2546,8 @@ impl AgentService {
                                     verb_disambiguation: None,
                                     intent_tier: None,
                                     decision: None,
+                                    sage_explain: None,
+                                    coder_proposal: None,
                                 });
                             }
                         }
@@ -2382,6 +2579,8 @@ impl AgentService {
                     verb_disambiguation: None,
                     intent_tier: None,
                     decision: None,
+                    sage_explain: None,
+                    coder_proposal: None,
                 })
             }
             Err(e) => {
@@ -2468,9 +2667,12 @@ impl AgentService {
                     sealed_at: chrono::Utc::now(),
                 };
 
+                let runbook_version = session.messages.len() as u64
+                    + session.run_sheet.entries.len() as u64
+                    + 1;
                 let runbook = CompiledRunbook::new(
                     session_id,
-                    0, // version — not critical for Chat API path
+                    runbook_version,
                     vec![step],
                     envelope,
                 );
@@ -2519,6 +2721,8 @@ impl AgentService {
             verb_disambiguation: None,
             intent_tier: None,
             decision: None,
+            sage_explain: None,
+            coder_proposal: None,
         })
     }
 
@@ -2705,6 +2909,8 @@ impl AgentService {
             verb_disambiguation: None,
             intent_tier: None,
             decision: None,
+            sage_explain: None,
+            coder_proposal: None,
         }
     }
 
@@ -2726,6 +2932,8 @@ impl AgentService {
             verb_disambiguation: None,
             intent_tier: None,
             decision: None,
+            sage_explain: None,
+            coder_proposal: None,
         }
     }
 
@@ -2847,6 +3055,8 @@ impl AgentService {
             verb_disambiguation: Some(disambiguation_request),
             intent_tier: None,
             decision: None,
+            sage_explain: None,
+            coder_proposal: None,
         }
     }
 
@@ -2923,6 +3133,8 @@ impl AgentService {
             verb_disambiguation: None,
             intent_tier: Some(tier_request),
             decision: None,
+            sage_explain: None,
+            coder_proposal: None,
         }
     }
 

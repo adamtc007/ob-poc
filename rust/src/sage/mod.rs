@@ -54,12 +54,13 @@ pub mod verb_resolve;
 // Re-export core types for convenience
 pub use arg_assembly::assemble_args_from_step;
 pub use coder::{CoderEngine, CoderResolution, CoderResult};
-pub use context::SageContext;
+pub use context::{RecentIntent, SageContext};
 pub use deterministic::DeterministicSage;
 pub use disposition::{DelegateIntent, PendingMutation, ServeIntent, UtteranceDisposition};
 pub use llm_sage::LlmSage;
 pub use outcome::{
-    Clarification, EntityRef, OutcomeAction, OutcomeIntent, OutcomeStep, SageConfidence,
+    Clarification, CoderHandoff, EntityRef, OutcomeAction, OutcomeIntent, OutcomeStep,
+    SageConfidence, SageExplain, UtteranceHints,
 };
 pub use plane::ObservationPlane;
 pub use polarity::IntentPolarity;

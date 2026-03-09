@@ -13,7 +13,10 @@ use serde::{Deserialize, Serialize};
 
 use super::context::SageContext;
 use super::deterministic::DeterministicSage;
-use super::outcome::{OutcomeAction, OutcomeIntent, OutcomeStep, SageConfidence};
+use super::outcome::{
+    CoderHandoff, OutcomeAction, OutcomeIntent, OutcomeStep, SageConfidence, SageExplain,
+    UtteranceHints,
+};
 use super::pre_classify::{pre_classify, SagePreClassification};
 use super::{IntentPolarity, SageEngine};
 
@@ -172,7 +175,7 @@ RULES:
             context
                 .last_intents
                 .iter()
-                .map(|(plane, domain)| format!("{plane}:{domain}"))
+                .map(|recent| format!("{}:{}:{}", recent.plane, recent.domain_concept, recent.action))
                 .collect::<Vec<_>>()
                 .join(", ")
         };
@@ -297,7 +300,12 @@ fn extract_json(response: &str) -> &str {
     trimmed
 }
 
-fn parse_sage_response(response: &str, pre: &SagePreClassification) -> Result<OutcomeIntent> {
+fn parse_sage_response(
+    utterance: &str,
+    response: &str,
+    context: &SageContext,
+    pre: &SagePreClassification,
+) -> Result<OutcomeIntent> {
     let payload: LlmOutcomePayload =
         serde_json::from_str(extract_json(response)).context("failed to parse Sage response")?;
 
@@ -320,6 +328,7 @@ fn parse_sage_response(response: &str, pre: &SagePreClassification) -> Result<Ou
         domain.clone()
     };
 
+    let hints = build_llm_hints(utterance, context, pre, &domain, &action, &params);
     Ok(OutcomeIntent {
         summary: if summary.is_empty() {
             format!("Intent from: {}", &response[..response.len().min(60)])
@@ -328,7 +337,7 @@ fn parse_sage_response(response: &str, pre: &SagePreClassification) -> Result<Ou
         },
         plane: pre.plane,
         polarity: pre.polarity,
-        domain_concept: domain,
+        domain_concept: domain.clone(),
         action: action.clone(),
         subject: None,
         steps: vec![OutcomeStep {
@@ -339,7 +348,89 @@ fn parse_sage_response(response: &str, pre: &SagePreClassification) -> Result<Ou
         }],
         confidence,
         pending_clarifications: vec![],
+        explain: build_llm_explain(context, utterance, confidence, pre.polarity, &domain),
+        coder_handoff: build_llm_handoff(utterance, pre.polarity, &domain, &hints),
+        hints,
     })
+}
+
+fn build_llm_hints(
+    utterance: &str,
+    context: &SageContext,
+    pre: &SagePreClassification,
+    domain: &str,
+    action: &OutcomeAction,
+    params: &HashMap<String, String>,
+) -> UtteranceHints {
+    UtteranceHints {
+        raw_preview: utterance.trim()[..utterance.trim().len().min(80)].to_string(),
+        subject_phrase: params
+            .get("name")
+            .cloned()
+            .or_else(|| context.dominant_entity_name.clone()),
+        explicit_domain_terms: (!domain.is_empty())
+            .then_some(vec![domain.to_string()])
+            .unwrap_or_else(|| pre.domain_hints.clone()),
+        explicit_action_terms: vec![action.as_str().to_string()],
+        scope_carry_forward_used: !context.last_intents.is_empty(),
+        inventory_read: matches!(action, OutcomeAction::Read)
+            && utterance.to_ascii_lowercase().contains("have"),
+        structure_read: pre.sage_only,
+        create_name_candidate: params.get("name").cloned(),
+    }
+}
+
+fn build_llm_explain(
+    context: &SageContext,
+    utterance: &str,
+    confidence: SageConfidence,
+    polarity: IntentPolarity,
+    domain: &str,
+) -> SageExplain {
+    SageExplain {
+        understanding: if domain.is_empty() {
+            format!("So you want to {}.", utterance.trim())
+        } else {
+            format!("So you want to work on {} for {}.", domain, utterance.trim())
+        },
+        mode: match polarity {
+            IntentPolarity::Read | IntentPolarity::Ambiguous => "read_only".to_string(),
+            IntentPolarity::Write => "confirmation_required".to_string(),
+        },
+        scope_summary: context.dominant_entity_name.clone(),
+        confidence: confidence.as_str().to_string(),
+        clarifications: vec![],
+    }
+}
+
+fn build_llm_handoff(
+    utterance: &str,
+    polarity: IntentPolarity,
+    domain: &str,
+    hints: &UtteranceHints,
+) -> CoderHandoff {
+    let mut hint_terms = hints.explicit_domain_terms.clone();
+    hint_terms.extend(hints.explicit_action_terms.iter().cloned());
+    CoderHandoff {
+        goal: if matches!(polarity, IntentPolarity::Write) {
+            "prepare deterministic mutation proposal".to_string()
+        } else {
+            "serve current state safely".to_string()
+        },
+        intent_summary: utterance.trim()[..utterance.trim().len().min(80)].to_string(),
+        required_outcome: if domain.is_empty() {
+            "realize intended business outcome".to_string()
+        } else {
+            format!("realize intended {} outcome", domain)
+        },
+        constraints: vec![
+            "respect_sem_os_surface".to_string(),
+            "no_mutation_without_confirmation".to_string(),
+        ],
+        hint_terms,
+        serve_safe: !matches!(polarity, IntentPolarity::Write),
+        requires_confirmation: matches!(polarity, IntentPolarity::Write),
+    }
 }
 
 fn apply_asymmetric_risk(raw: SageConfidence, polarity: IntentPolarity) -> SageConfidence {
@@ -383,7 +474,7 @@ impl SageEngine for LlmSage {
 
         let response = serde_json::to_string(&tool_result.arguments)
             .context("failed to serialize Sage tool response")?;
-        match parse_sage_response(&response, &pre) {
+        match parse_sage_response(utterance, &response, context, &pre) {
             Ok(outcome) => Ok(outcome),
             Err(error) => {
                 tracing::warn!(
@@ -456,7 +547,13 @@ mod tests {
             sage_only: false,
         };
 
-        let result = parse_sage_response(response, &pre).unwrap();
+        let result = parse_sage_response(
+            "create a cbu for Allianz in Luxembourg",
+            response,
+            &empty_ctx(),
+            &pre,
+        )
+        .unwrap();
         assert_eq!(result.domain_concept, "cbu");
         assert_eq!(result.steps[0].params.len(), 2);
         assert!(result.steps[0].params.contains_key("name"));

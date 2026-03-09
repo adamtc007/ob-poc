@@ -288,7 +288,10 @@ mod tests {
     use dsl_core::config::types::{ArgConfig, ArgType, DomainConfig, VerbBehavior};
 
     use super::*;
-    use crate::sage::{IntentPolarity, ObservationPlane, OutcomeAction, SageConfidence};
+    use crate::sage::{
+        CoderHandoff, IntentPolarity, ObservationPlane, OutcomeAction, SageConfidence,
+        SageExplain, UtteranceHints,
+    };
 
     fn sample_config() -> VerbsConfig {
         let mut domains = HashMap::new();
@@ -358,6 +361,9 @@ mod tests {
             }],
             confidence: SageConfidence::Medium,
             pending_clarifications: vec![],
+            hints: UtteranceHints::default(),
+            explain: SageExplain::default(),
+            coder_handoff: CoderHandoff::default(),
         }
     }
 
@@ -380,6 +386,9 @@ mod tests {
             }],
             confidence: SageConfidence::High,
             pending_clarifications: vec![],
+            hints: UtteranceHints::default(),
+            explain: SageExplain::default(),
+            coder_handoff: CoderHandoff::default(),
         };
 
         let result = engine.resolve(&outcome).unwrap();
@@ -408,6 +417,9 @@ mod tests {
             }],
             confidence: SageConfidence::Medium,
             pending_clarifications: vec![],
+            hints: UtteranceHints::default(),
+            explain: SageExplain::default(),
+            coder_handoff: CoderHandoff::default(),
         };
 
         let result = engine.resolve(&outcome).unwrap();

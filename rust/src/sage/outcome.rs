@@ -157,6 +157,75 @@ pub struct Clarification {
 }
 
 // ---------------------------------------------------------------------------
+// UtteranceHints / Explain / Handoff
+// ---------------------------------------------------------------------------
+
+/// Compact hint ledger extracted from the utterance and carry-forward context.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct UtteranceHints {
+    /// Truncated raw utterance preview for traceability.
+    pub raw_preview: String,
+    /// Subject phrase as spoken by the user, before resolution.
+    pub subject_phrase: Option<String>,
+    /// Explicit domain terms found in the utterance.
+    #[serde(default)]
+    pub explicit_domain_terms: Vec<String>,
+    /// Explicit action terms found in the utterance.
+    #[serde(default)]
+    pub explicit_action_terms: Vec<String>,
+    /// Whether prior-turn context was used to fill gaps.
+    #[serde(default)]
+    pub scope_carry_forward_used: bool,
+    /// Whether the utterance looks like a safe inventory/list read.
+    #[serde(default)]
+    pub inventory_read: bool,
+    /// Whether the utterance is a structure/schema read.
+    #[serde(default)]
+    pub structure_read: bool,
+    /// Candidate name extracted for create-style intents.
+    pub create_name_candidate: Option<String>,
+}
+
+/// User-facing explanation of Sage's understanding.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct SageExplain {
+    /// Plain-language replay of what Sage thinks the user wants.
+    pub understanding: String,
+    /// Current Sage mode, e.g. `read_only` or `confirmation_required`.
+    pub mode: String,
+    /// Scope summary used for the interpretation.
+    pub scope_summary: Option<String>,
+    /// Confidence label.
+    pub confidence: String,
+    /// Clarifications still needed from the user.
+    #[serde(default)]
+    pub clarifications: Vec<String>,
+}
+
+/// Structured Sage -> Coder handoff contract.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct CoderHandoff {
+    /// Outcome goal Sage wants the Coder to realize.
+    pub goal: String,
+    /// Compact restatement of the intent.
+    pub intent_summary: String,
+    /// Required business outcome.
+    pub required_outcome: String,
+    /// Hard constraints for the Coder.
+    #[serde(default)]
+    pub constraints: Vec<String>,
+    /// Hint terms lifted from the utterance and context.
+    #[serde(default)]
+    pub hint_terms: Vec<String>,
+    /// Whether the path should stay serve/read-only if possible.
+    #[serde(default)]
+    pub serve_safe: bool,
+    /// Whether explicit confirmation is required before execution.
+    #[serde(default)]
+    pub requires_confirmation: bool,
+}
+
+// ---------------------------------------------------------------------------
 // OutcomeStep
 // ---------------------------------------------------------------------------
 
@@ -215,6 +284,18 @@ pub struct OutcomeIntent {
 
     /// Questions the Sage needs answered (empty = confident)
     pub pending_clarifications: Vec<Clarification>,
+
+    /// Compact utterance hint ledger preserved for Coder and traceability.
+    #[serde(default)]
+    pub hints: UtteranceHints,
+
+    /// User-facing explanation of Sage's current understanding.
+    #[serde(default)]
+    pub explain: SageExplain,
+
+    /// Structured Sage -> Coder handoff contract.
+    #[serde(default)]
+    pub coder_handoff: CoderHandoff,
 }
 
 impl OutcomeIntent {
@@ -231,6 +312,29 @@ impl OutcomeIntent {
             steps: Vec::new(),
             confidence: SageConfidence::Low,
             pending_clarifications: Vec::new(),
+            hints: UtteranceHints {
+                raw_preview: utterance[..utterance.len().min(80)].to_string(),
+                ..UtteranceHints::default()
+            },
+            explain: SageExplain {
+                understanding: format!(
+                    "So you want to {}.",
+                    utterance.trim()[..utterance.trim().len().min(60)].to_string()
+                ),
+                mode: "needs_clarification".to_string(),
+                scope_summary: None,
+                confidence: SageConfidence::Low.as_str().to_string(),
+                clarifications: vec![],
+            },
+            coder_handoff: CoderHandoff {
+                goal: "clarify_intent".to_string(),
+                intent_summary: utterance.trim()[..utterance.trim().len().min(60)].to_string(),
+                required_outcome: "determine intended outcome safely".to_string(),
+                constraints: vec!["no_mutation_without_confirmation".to_string()],
+                hint_terms: vec![],
+                serve_safe: true,
+                requires_confirmation: false,
+            },
         }
     }
 }

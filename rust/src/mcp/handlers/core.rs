@@ -1657,6 +1657,9 @@ impl ToolHandlers {
             goals: vec![],
             stage_focus: None,
             sage_engine: None,
+            pre_sage_entity_kind: None,
+            pre_sage_entity_name: None,
+            recent_sage_intents: vec![],
         };
         let outcome = crate::agent::orchestrator::handle_utterance(&orch_ctx, instruction).await?;
         let result = outcome.pipeline_result;

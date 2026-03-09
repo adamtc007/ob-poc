@@ -80,6 +80,12 @@ pub struct OrchestratorContext {
     pub stage_focus: Option<String>,
     /// Optional Sage engine used for Stage 1.5 shadow classification.
     pub sage_engine: Option<Arc<dyn SageEngine>>,
+    /// Pre-Sage entity kind carried from session state or prior scope.
+    pub pre_sage_entity_kind: Option<String>,
+    /// Pre-Sage dominant entity name carried from session state or prior scope.
+    pub pre_sage_entity_name: Option<String>,
+    /// Minimal recent Sage ledger from prior turns.
+    pub recent_sage_intents: Vec<crate::sage::RecentIntent>,
 }
 
 /// Where the utterance originated.
@@ -111,6 +117,8 @@ pub struct OrchestratorOutcome {
     pub pending_mutation: Option<PendingMutation>,
     /// Whether chat should auto-execute the resulting DSL instead of staging it.
     pub auto_execute: bool,
+    /// Sage intent used for this turn, when available.
+    pub sage_intent: Option<crate::sage::OutcomeIntent>,
 }
 
 struct SageStageOutcome {
@@ -434,6 +442,7 @@ async fn build_sage_serve_outcome(
         journey_decision: None,
         pending_mutation: None,
         auto_execute: can_auto_execute_serve_result(&coder_result.verb_fqn),
+        sage_intent: Some(intent.clone()),
     };
     emit_telemetry(ctx, utterance, &mut outcome).await;
     Ok(outcome)
@@ -532,9 +541,9 @@ async fn run_sage_stage(
         session_id: ctx.session_id,
         stage_focus: ctx.stage_focus.clone(),
         goals: ctx.goals.clone(),
-        entity_kind: None,
-        dominant_entity_name: None,
-        last_intents: vec![],
+        entity_kind: ctx.pre_sage_entity_kind.clone(),
+        dominant_entity_name: ctx.pre_sage_entity_name.clone(),
+        last_intents: ctx.recent_sage_intents.clone(),
     };
     let sage_engine = ctx
         .sage_engine
@@ -863,6 +872,7 @@ pub async fn handle_utterance(
                 journey_decision: None,
                 pending_mutation: None,
                 auto_execute: false,
+                sage_intent: Some(intent.clone()),
             };
             apply_sage_trace_fields(&mut outcome.trace, &intent, "sage_delegate");
 
@@ -1153,6 +1163,7 @@ pub async fn legacy_handle_utterance(
                     journey_decision: None,
                     pending_mutation: None,
                     auto_execute: false,
+                    sage_intent: Some(si.clone()),
                 };
                 emit_telemetry(ctx, utterance, &mut outcome).await;
                 return Ok(outcome);
@@ -1250,6 +1261,7 @@ pub async fn legacy_handle_utterance(
             journey_decision: None,
             pending_mutation: None,
             auto_execute: false,
+            sage_intent: sage_intent.clone(),
         };
         emit_telemetry(ctx, utterance, &mut outcome).await;
         return Ok(outcome);
@@ -1619,6 +1631,7 @@ pub async fn legacy_handle_utterance(
         journey_decision: journey_decision_out,
         pending_mutation: None,
         auto_execute: false,
+        sage_intent: sage_intent.clone(),
     };
     emit_telemetry(ctx, utterance, &mut outcome).await;
     Ok(outcome)
@@ -2372,6 +2385,7 @@ pub async fn handle_utterance_with_forced_verb(
             journey_decision: None,
             pending_mutation: None,
             auto_execute: false,
+            sage_intent: None,
         };
         emit_telemetry(ctx, utterance, &mut outcome).await;
         return Ok(outcome);
@@ -2450,6 +2464,7 @@ pub async fn handle_utterance_with_forced_verb(
         journey_decision: None,
         pending_mutation: None,
         auto_execute: can_auto_execute_serve_result(forced_verb_fqn),
+        sage_intent: None,
     };
     emit_telemetry(ctx, utterance, &mut outcome).await;
     Ok(outcome)
@@ -2894,6 +2909,9 @@ mod tests {
             steps: vec![],
             confidence: SageConfidence::Medium,
             pending_clarifications: vec![],
+            hints: crate::sage::UtteranceHints::default(),
+            explain: crate::sage::SageExplain::default(),
+            coder_handoff: crate::sage::CoderHandoff::default(),
         };
         assert!(matches!(route(&read_intent), UtteranceDisposition::Serve(_)));
 
@@ -2911,6 +2929,9 @@ mod tests {
             steps: vec![],
             confidence: SageConfidence::High,
             pending_clarifications: vec![],
+            hints: crate::sage::UtteranceHints::default(),
+            explain: crate::sage::SageExplain::default(),
+            coder_handoff: crate::sage::CoderHandoff::default(),
         };
         assert!(matches!(
             route(&write_intent),
@@ -2942,6 +2963,9 @@ mod tests {
             steps: vec![],
             confidence: SageConfidence::High,
             pending_clarifications: vec![],
+            hints: crate::sage::UtteranceHints::default(),
+            explain: crate::sage::SageExplain::default(),
+            coder_handoff: crate::sage::CoderHandoff::default(),
         };
         let coder_result = CoderResult {
             verb_fqn: "cbu.create".into(),
@@ -2969,6 +2993,9 @@ mod tests {
             steps: vec![],
             confidence: SageConfidence::Medium,
             pending_clarifications: vec![],
+            hints: crate::sage::UtteranceHints::default(),
+            explain: crate::sage::SageExplain::default(),
+            coder_handoff: crate::sage::CoderHandoff::default(),
         };
 
         let result = read_only_list_fallback(&intent).expect("expected safe list fallback");
@@ -3157,6 +3184,9 @@ mod tests {
             steps: vec![],
             confidence: crate::sage::SageConfidence::High,
             pending_clarifications: vec![],
+            hints: crate::sage::UtteranceHints::default(),
+            explain: crate::sage::SageExplain::default(),
+            coder_handoff: crate::sage::CoderHandoff::default(),
         };
 
         assert!(should_use_generic_task_subject_for_sage(
@@ -3182,6 +3212,9 @@ mod tests {
             steps: vec![],
             confidence: crate::sage::SageConfidence::High,
             pending_clarifications: vec![],
+            hints: crate::sage::UtteranceHints::default(),
+            explain: crate::sage::SageExplain::default(),
+            coder_handoff: crate::sage::CoderHandoff::default(),
         };
 
         assert!(allow_data_management_structure_fast_path(
@@ -3221,6 +3254,9 @@ mod tests {
             steps: vec![],
             confidence: crate::sage::SageConfidence::Medium,
             pending_clarifications: vec![],
+            hints: crate::sage::UtteranceHints::default(),
+            explain: crate::sage::SageExplain::default(),
+            coder_handoff: crate::sage::CoderHandoff::default(),
         };
         let coder_result = CoderResult {
             verb_fqn: "cbu.list".to_string(),

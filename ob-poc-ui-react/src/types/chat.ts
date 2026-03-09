@@ -5,7 +5,7 @@
  */
 
 /** Chat message role */
-export type MessageRole = 'user' | 'assistant' | 'system';
+export type MessageRole = "user" | "assistant" | "system";
 
 /** Chat message */
 export interface ChatMessage {
@@ -15,6 +15,24 @@ export interface ChatMessage {
   timestamp: string;
   decision_packet?: DecisionPacket;
   tool_calls?: ToolCall[];
+  sage_explain?: SageExplain;
+  coder_proposal?: CoderProposal;
+}
+
+export interface SageExplain {
+  understanding: string;
+  mode: string;
+  scope_summary?: string;
+  confidence: string;
+  clarifications?: string[];
+}
+
+export interface CoderProposal {
+  verb_fqn?: string;
+  dsl?: string;
+  change_summary?: string[];
+  requires_confirmation: boolean;
+  ready_to_execute: boolean;
 }
 
 /** Tool call information */
@@ -23,16 +41,16 @@ export interface ToolCall {
   name: string;
   arguments: Record<string, unknown>;
   result?: unknown;
-  status: 'pending' | 'running' | 'success' | 'error';
+  status: "pending" | "running" | "success" | "error";
 }
 
 /** Decision packet kind */
 export type DecisionKind =
-  | 'clarification'
-  | 'proposal'
-  | 'confirmation'
-  | 'result'
-  | 'error';
+  | "clarification"
+  | "proposal"
+  | "confirmation"
+  | "result"
+  | "error";
 
 /** Clarification option */
 export interface ClarificationOption {

@@ -334,8 +334,8 @@ mod tests {
 
     use crate::sage::verb_index::VerbMeta;
     use crate::sage::{
-        Clarification, EntityRef, IntentPolarity, ObservationPlane, OutcomeAction, OutcomeStep,
-        SageConfidence,
+        Clarification, CoderHandoff, EntityRef, IntentPolarity, ObservationPlane, OutcomeAction,
+        OutcomeStep, SageConfidence, SageExplain, UtteranceHints,
     };
 
     fn index_with(entries: Vec<VerbMeta>) -> VerbMetadataIndex {
@@ -396,6 +396,9 @@ mod tests {
             }],
             confidence: SageConfidence::Medium,
             pending_clarifications: Vec::<Clarification>::new(),
+            hints: UtteranceHints::default(),
+            explain: SageExplain::default(),
+            coder_handoff: CoderHandoff::default(),
         }
     }
 
@@ -456,6 +459,9 @@ mod tests {
             steps: vec![],
             confidence: SageConfidence::Medium,
             pending_clarifications: vec![],
+            hints: UtteranceHints::default(),
+            explain: SageExplain::default(),
+            coder_handoff: CoderHandoff::default(),
         };
 
         let candidates = scorer.score(&intent, 5);
@@ -520,6 +526,9 @@ mod tests {
             steps: vec![],
             confidence: SageConfidence::Medium,
             pending_clarifications: vec![],
+            hints: UtteranceHints::default(),
+            explain: SageExplain::default(),
+            coder_handoff: CoderHandoff::default(),
         };
 
         let candidates = scorer.score(&intent, 5);
@@ -538,6 +547,9 @@ mod tests {
             steps: vec![],
             confidence: SageConfidence::Low,
             pending_clarifications: vec![],
+            hints: UtteranceHints::default(),
+            explain: SageExplain::default(),
+            coder_handoff: CoderHandoff::default(),
         };
         let scorer = StructuredVerbScorer::new(index_with(vec![sample_meta(
             "deal.timeline",

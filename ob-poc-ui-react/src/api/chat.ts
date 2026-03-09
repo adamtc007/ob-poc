@@ -18,6 +18,8 @@ import type {
   SendMessageResponse,
   DecisionReply,
   ChatMessage,
+  CoderProposal,
+  SageExplain,
   VerbProfile,
 } from "../types/chat";
 
@@ -31,6 +33,8 @@ interface BackendMessage {
   role: "user" | "assistant" | "agent";
   content: string;
   timestamp?: string;
+  sage_explain?: SageExplain;
+  coder_proposal?: CoderProposal;
 }
 
 interface BackendSession {
@@ -75,6 +79,8 @@ function mapBackendSession(backend: BackendSession): ChatSession {
       role: msg.role === "agent" ? "assistant" : msg.role,
       content: msg.content,
       timestamp: msg.timestamp || backend.created_at,
+      sage_explain: msg.sage_explain,
+      coder_proposal: msg.coder_proposal,
     })),
   };
 }
@@ -230,6 +236,8 @@ export const chatApi = {
         intent_tier?: unknown;
         clarification?: unknown;
         error?: string;
+        sage_explain?: SageExplain;
+        coder_proposal?: CoderProposal;
         available_verbs?: VerbProfile[];
         surface_fingerprint?: string;
         // Backend DecisionPacket for client group/deal/verb clarification
@@ -262,6 +270,8 @@ export const chatApi = {
           intent_tier?: unknown;
           clarification?: unknown;
           error?: string;
+          sage_explain?: SageExplain;
+          coder_proposal?: CoderProposal;
           available_verbs?: VerbProfile[];
           surface_fingerprint?: string;
           // Backend DecisionPacket for client group/deal/verb clarification
@@ -319,6 +329,8 @@ export const chatApi = {
       role: "assistant",
       content: content || "No response from server.",
       timestamp: new Date().toISOString(),
+      sage_explain: response.sage_explain,
+      coder_proposal: response.coder_proposal,
     };
 
     // Check for decision packets
@@ -444,6 +456,8 @@ export const chatApi = {
         message?: string;
         response?: string;
         next_packet?: unknown;
+        sage_explain?: SageExplain;
+        coder_proposal?: CoderProposal;
         available_verbs?: VerbProfile[];
         surface_fingerprint?: string;
       };
@@ -455,6 +469,8 @@ export const chatApi = {
           message?: string;
           response?: string;
           next_packet?: unknown;
+          sage_explain?: SageExplain;
+          coder_proposal?: CoderProposal;
           available_verbs?: VerbProfile[];
           surface_fingerprint?: string;
         };
@@ -487,6 +503,8 @@ export const chatApi = {
         role: "assistant" as const,
         content: response.message || response.response || "Decision recorded.",
         timestamp: new Date().toISOString(),
+        sage_explain: response.sage_explain,
+        coder_proposal: response.coder_proposal,
       },
       available_verbs: verbs.length > 0 ? verbs : undefined,
       surface_fingerprint: response.surface_fingerprint,

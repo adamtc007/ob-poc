@@ -34,6 +34,14 @@ pub struct ChatMessage {
     /// DSL generated from this message (if any) - server sends String, not DslState
     #[serde(default)]
     pub dsl: Option<String>,
+
+    /// Sage explanation payload for this message, when present.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sage_explain: Option<SageExplainPayload>,
+
+    /// Coder proposal payload for this message, when present.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub coder_proposal: Option<CoderProposalPayload>,
 }
 
 /// Chat message role
@@ -324,6 +332,39 @@ pub struct ChatResponse {
     /// Enables UI to detect surface drift and refresh VerbBrowser.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub surface_fingerprint: Option<String>,
+
+    /// Typed Sage explanation for UI rendering.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sage_explain: Option<SageExplainPayload>,
+
+    /// Typed Coder/REPL proposal for UI rendering.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub coder_proposal: Option<CoderProposalPayload>,
+}
+
+/// User-facing Sage explanation payload.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SageExplainPayload {
+    pub understanding: String,
+    pub mode: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scope_summary: Option<String>,
+    pub confidence: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub clarifications: Vec<String>,
+}
+
+/// Typed Coder proposal payload for UI rendering.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CoderProposalPayload {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub verb_fqn: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dsl: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub change_summary: Vec<String>,
+    pub requires_confirmation: bool,
+    pub ready_to_execute: bool,
 }
 
 /// Verb surface response for the REST endpoint.

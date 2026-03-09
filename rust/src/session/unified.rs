@@ -72,6 +72,10 @@ pub struct UnifiedSession {
     #[serde(default)]
     pub pending_mutation: Option<PendingMutation>,
 
+    /// Minimal rolling Sage intent ledger for carry-forward context.
+    #[serde(default)]
+    pub recent_sage_intents: Vec<crate::sage::RecentIntent>,
+
     // === Conversation ===
     pub messages: Vec<ChatMessage>,
 
@@ -830,6 +834,12 @@ pub struct ChatMessage {
     /// DSL generated from this message (if any)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dsl: Option<String>,
+    /// Sage explanation payload for this message.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sage_explain: Option<ob_poc_types::chat::SageExplainPayload>,
+    /// Coder proposal payload for this message.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub coder_proposal: Option<ob_poc_types::chat::CoderProposalPayload>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -1593,6 +1603,7 @@ impl UnifiedSession {
             pending_intent_tier: None,
             pending_decision: None,
             pending_mutation: None,
+            recent_sage_intents: Vec::new(),
             messages: Vec::new(),
             bindings: HashMap::new(),
             // Constraint cascade (starts empty, narrowed as user works)
@@ -2092,6 +2103,8 @@ impl UnifiedSession {
             timestamp: Utc::now(),
             intents: None,
             dsl: None,
+            sage_explain: None,
+            coder_proposal: None,
         });
         self.updated_at = Utc::now();
         id
@@ -2113,6 +2126,8 @@ impl UnifiedSession {
             timestamp: Utc::now(),
             intents: None,
             dsl,
+            sage_explain: None,
+            coder_proposal: None,
         });
         self.updated_at = Utc::now();
         id
@@ -2128,6 +2143,8 @@ impl UnifiedSession {
             timestamp: Utc::now(),
             intents: None,
             dsl: None,
+            sage_explain: None,
+            coder_proposal: None,
         });
         self.updated_at = Utc::now();
         id
@@ -3491,6 +3508,8 @@ impl From<ChatMessage> for crate::api::session::ChatMessage {
             timestamp: msg.timestamp,
             intents: msg.intents,
             dsl: msg.dsl,
+            sage_explain: msg.sage_explain,
+            coder_proposal: msg.coder_proposal,
         }
     }
 }

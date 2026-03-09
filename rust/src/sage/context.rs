@@ -18,7 +18,21 @@
 //! - Entity UUIDs (those come from entity linking at Stage 3)
 //! - ContextEnvelope (that's post-SemReg, also Stage 2)
 
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+
+/// Minimal carry-forward record from recent Sage turns.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct RecentIntent {
+    /// Prior plane label.
+    pub plane: String,
+    /// Prior domain concept.
+    pub domain_concept: String,
+    /// Prior action label.
+    pub action: String,
+    /// Prior confidence label.
+    pub confidence: String,
+}
 
 /// Session context visible to the Sage engine.
 ///
@@ -43,9 +57,8 @@ pub struct SageContext {
     /// Example: "Allianz", "the Lux SICAV". Used for domain hint extraction.
     pub dominant_entity_name: Option<String>,
 
-    /// Recent (plane, domain_concept) pairs from the last N turns (for carry-forward).
-    /// Format: Vec<(plane_str, domain_concept)> e.g., [("structure", "deal"), ("instance", "fund")]
-    pub last_intents: Vec<(String, String)>,
+    /// Recent intent records from the last N turns (for carry-forward).
+    pub last_intents: Vec<RecentIntent>,
 }
 
 impl SageContext {

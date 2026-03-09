@@ -9,7 +9,10 @@ use anyhow::Result;
 use super::context::SageContext;
 use std::collections::HashMap;
 
-use super::outcome::{OutcomeAction, OutcomeIntent, OutcomeStep, SageConfidence};
+use super::outcome::{
+    CoderHandoff, OutcomeAction, OutcomeIntent, OutcomeStep, SageConfidence, SageExplain,
+    UtteranceHints,
+};
 use super::pre_classify::pre_classify;
 use super::SageEngine;
 
@@ -43,6 +46,14 @@ impl SageEngine for DeterministicSage {
             utterance.trim()[..utterance.trim().len().min(60)].to_string()
         };
 
+        let hints = build_hints(
+            utterance,
+            context,
+            pre.sage_only,
+            &domain_concept,
+            &action,
+            subject.as_ref(),
+        );
         Ok(OutcomeIntent {
             summary,
             plane: pre.plane,
@@ -53,7 +64,102 @@ impl SageEngine for DeterministicSage {
             steps,
             confidence,
             pending_clarifications: Vec::new(),
+            explain: build_explain(context, utterance, confidence, pre.polarity, &hints),
+            coder_handoff: build_coder_handoff(utterance, pre.polarity, &hints),
+            hints,
         })
+    }
+}
+
+fn build_hints(
+    utterance: &str,
+    context: &SageContext,
+    sage_only: bool,
+    domain_concept: &str,
+    action: &OutcomeAction,
+    subject: Option<&super::outcome::EntityRef>,
+) -> UtteranceHints {
+    let normalized = utterance.trim().to_ascii_lowercase();
+    let mut explicit_domain_terms = Vec::new();
+    if !domain_concept.is_empty() {
+        explicit_domain_terms.push(domain_concept.to_string());
+    }
+    let explicit_action_terms = vec![action.as_str().to_string()];
+    let inventory_read = matches!(action, OutcomeAction::Read)
+        && (normalized.starts_with("show ")
+            || normalized.starts_with("show me ")
+            || normalized.starts_with("list ")
+            || normalized.starts_with("what ")
+            || normalized.contains(" have"));
+    UtteranceHints {
+        raw_preview: utterance.trim()[..utterance.trim().len().min(80)].to_string(),
+        subject_phrase: subject.map(|value| value.mention.clone()),
+        explicit_domain_terms,
+        explicit_action_terms,
+        scope_carry_forward_used: !context.last_intents.is_empty(),
+        inventory_read,
+        structure_read: sage_only,
+        create_name_candidate: subject
+            .map(|value| value.mention.clone())
+            .or_else(|| extract_name_after_keyword(utterance, "called")),
+    }
+}
+
+fn build_explain(
+    context: &SageContext,
+    utterance: &str,
+    confidence: SageConfidence,
+    polarity: super::IntentPolarity,
+    hints: &UtteranceHints,
+) -> SageExplain {
+    let mode = match polarity {
+        super::IntentPolarity::Read | super::IntentPolarity::Ambiguous => "read_only",
+        super::IntentPolarity::Write => "confirmation_required",
+    };
+    let understanding = if let Some(subject) = hints.subject_phrase.as_deref() {
+        format!("So you want to {} {}.", OutcomeAction::from_first_word(utterance).as_str(), subject)
+    } else {
+        format!("So you want to {}.", utterance.trim())
+    };
+    let scope_summary = context
+        .dominant_entity_name
+        .clone()
+        .or_else(|| context.entity_kind.clone());
+    SageExplain {
+        understanding,
+        mode: mode.to_string(),
+        scope_summary,
+        confidence: confidence.as_str().to_string(),
+        clarifications: vec![],
+    }
+}
+
+fn build_coder_handoff(
+    utterance: &str,
+    polarity: super::IntentPolarity,
+    hints: &UtteranceHints,
+) -> CoderHandoff {
+    let required_outcome = if matches!(polarity, super::IntentPolarity::Write) {
+        "prepare a deterministic mutation proposal".to_string()
+    } else {
+        "serve the current state safely".to_string()
+    };
+    let mut hint_terms = hints.explicit_domain_terms.clone();
+    hint_terms.extend(hints.explicit_action_terms.iter().cloned());
+    if let Some(subject) = hints.subject_phrase.as_ref() {
+        hint_terms.push(subject.clone());
+    }
+    CoderHandoff {
+        goal: required_outcome.clone(),
+        intent_summary: utterance.trim()[..utterance.trim().len().min(80)].to_string(),
+        required_outcome,
+        constraints: vec![
+            "respect_sem_os_surface".to_string(),
+            "no_mutation_without_confirmation".to_string(),
+        ],
+        hint_terms,
+        serve_safe: !matches!(polarity, super::IntentPolarity::Write),
+        requires_confirmation: matches!(polarity, super::IntentPolarity::Write),
     }
 }
 

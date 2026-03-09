@@ -2093,6 +2093,10 @@ fn build_verb_profiles(
     let reg = runtime_registry();
 
     // Helper: build arg profiles for a verb from the RuntimeVerbRegistry
+    let normalize_inline_text = |input: &str| -> String {
+        input.split_whitespace().collect::<Vec<_>>().join(" ")
+    };
+
     let build_args = |fqn: &str| -> Vec<VerbArgProfile> {
         reg.get_by_name(fqn)
             .map(|verb| {
@@ -2125,7 +2129,10 @@ fn build_verb_profiles(
                             arg_type: type_label,
                             required: arg.required,
                             valid_values: arg.valid_values.clone(),
-                            description: arg.description.clone(),
+                            description: arg
+                                .description
+                                .as_deref()
+                                .map(normalize_inline_text),
                         }
                     })
                     .collect()
@@ -2145,7 +2152,7 @@ fn build_verb_profiles(
                 VerbProfile {
                     fqn: v.fqn.clone(),
                     domain,
-                    description: v.description.clone(),
+                    description: normalize_inline_text(&v.description),
                     sexpr,
                     args: build_args(&v.fqn),
                     preconditions_met: v.preconditions_met,
@@ -2172,7 +2179,7 @@ fn build_verb_profiles(
                 VerbProfile {
                     fqn: sv.fqn.clone(),
                     domain: sv.domain.clone(),
-                    description: sv.description.clone(),
+                    description: normalize_inline_text(&sv.description),
                     sexpr,
                     args: build_args(&sv.fqn),
                     preconditions_met: sv.lifecycle_eligible,
@@ -2199,7 +2206,7 @@ fn build_verb_profiles(
             VerbProfile {
                 fqn: v.full_name.clone(),
                 domain: v.domain.clone(),
-                description: v.description.clone(),
+                description: normalize_inline_text(&v.description),
                 sexpr,
                 args: build_args(&v.full_name),
                 preconditions_met: true,
@@ -2706,6 +2713,8 @@ async fn chat_session(
                 decision: None,
                 available_verbs,
                 surface_fingerprint: None,
+                sage_explain: None,
+                coder_proposal: None,
             }));
         }
         #[cfg(not(feature = "database"))]
@@ -2728,6 +2737,8 @@ async fn chat_session(
                 decision: None,
                 available_verbs: None,
                 surface_fingerprint: None,
+                sage_explain: None,
+                coder_proposal: None,
             }));
         }
     }
@@ -2762,6 +2773,8 @@ async fn chat_session(
                 decision: None,
                 available_verbs: None,
                 surface_fingerprint: None,
+                sage_explain: None,
+                coder_proposal: None,
             }));
         }
     };
@@ -2869,6 +2882,8 @@ async fn chat_session(
         decision: response.decision,
         available_verbs,
         surface_fingerprint,
+        sage_explain: response.sage_explain,
+        coder_proposal: response.coder_proposal,
     }))
 }
 

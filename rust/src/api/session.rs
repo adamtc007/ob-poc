@@ -1358,6 +1358,8 @@ impl AgentSession {
             timestamp: Utc::now(),
             intents: None,
             dsl: None,
+            sage_explain: None,
+            coder_proposal: None,
         });
         self.updated_at = Utc::now();
         id
@@ -1378,6 +1380,8 @@ impl AgentSession {
             timestamp: Utc::now(),
             intents: None,
             dsl,
+            sage_explain: None,
+            coder_proposal: None,
         });
         self.updated_at = Utc::now();
         id
@@ -1461,6 +1465,12 @@ pub struct ChatMessage {
     /// DSL generated from this message (if any)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dsl: Option<String>,
+    /// Sage explanation payload for this message.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sage_explain: Option<ob_poc_types::chat::SageExplainPayload>,
+    /// Coder proposal payload for this message.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub coder_proposal: Option<ob_poc_types::chat::CoderProposalPayload>,
 }
 
 /// Role of a message sender
