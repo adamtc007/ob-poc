@@ -143,44 +143,6 @@ pub struct EntityLookup {
 #[cfg(test)]
 mod tests {
     use super::AgentService;
-    use crate::mcp::verb_search::{VerbSearchResult, VerbSearchSource};
-
-    fn candidate(verb: &str, score: f32) -> VerbSearchResult {
-        VerbSearchResult {
-            verb: verb.to_string(),
-            score,
-            source: VerbSearchSource::PatternEmbedding,
-            matched_phrase: String::new(),
-            description: None,
-            journey: None,
-        }
-    }
-
-    #[test]
-    fn safe_inventory_reads_prefer_list_over_search() {
-        let selected = AgentService::choose_safe_inventory_read_verb(
-            "what deals does Allianz have?",
-            &[
-                candidate("deal.search", 0.6249),
-                candidate("deal.list", 0.6070),
-            ],
-        );
-
-        assert_eq!(selected.as_deref(), Some("deal.list"));
-    }
-
-    #[test]
-    fn explicit_search_queries_do_not_force_list() {
-        let selected = AgentService::choose_safe_inventory_read_verb(
-            "find deals named alpha",
-            &[
-                candidate("deal.search", 0.70),
-                candidate("deal.list", 0.55),
-            ],
-        );
-
-        assert!(selected.is_none());
-    }
 
     #[test]
     fn read_only_pivot_detection_catches_show_queries() {
@@ -198,6 +160,27 @@ mod tests {
             "create a new cbu for Allianz"
         ));
         assert!(!AgentService::is_read_only_pivot_request("update the cbu"));
+    }
+
+    #[test]
+    fn reclassify_before_pending_for_fresh_utterances() {
+        assert!(AgentService::should_reclassify_before_pending(
+            "what deals does Allianz have?"
+        ));
+        assert!(AgentService::should_reclassify_before_pending(
+            "create a new cbu"
+        ));
+        assert!(!AgentService::should_reclassify_before_pending("2"));
+        assert!(!AgentService::should_reclassify_before_pending("NEW"));
+        assert!(!AgentService::should_reclassify_before_pending(
+            "data management"
+        ));
+    }
+
+    #[test]
+    fn confirmation_without_pending_mutation_is_safe_noop() {
+        assert!(crate::agent::orchestrator::is_confirmation("yes"));
+        assert!(!AgentService::should_reclassify_before_pending("yes"));
     }
 }
 
@@ -861,6 +844,9 @@ impl AgentService {
                 return Ok(response);
             }
             session.pending_mutation = None;
+            session.pending_decision = None;
+            session.pending_intent_tier = None;
+            session.pending_verb_disambiguation = None;
             if session.has_pending() {
                 session.cancel_pending();
             }
@@ -872,6 +858,17 @@ impl AgentService {
             }
         }
 
+        if crate::agent::orchestrator::is_confirmation(&request.message) {
+            session.pending_decision = None;
+            session.pending_intent_tier = None;
+            session.pending_verb_disambiguation = None;
+            let msg = Self::with_pivot_feedback(
+                &pivot_feedback,
+                "There is no pending change to confirm. I am still in read-only mode.",
+            );
+            return Ok(self.fail(&msg, session));
+        }
+
         // 2. Check for RUN command - execute staged runbook
         if matches!(
             input.as_str(),
@@ -881,6 +878,15 @@ impl AgentService {
         }
 
         // 3. Check for pending verb disambiguation - numeric input selects an option
+        if session.pending_verb_disambiguation.is_some()
+            && Self::should_reclassify_before_pending(&request.message)
+        {
+            session.pending_verb_disambiguation = None;
+            pivot_feedback = Some(
+                "Discarded the pending verb choice and re-routed from your new instruction."
+                    .to_string(),
+            );
+        }
         if let Some(ref pending) = session.pending_verb_disambiguation {
             // Check if input is a number (1, 2, 3, etc.)
             if let Ok(selection) = input.trim().parse::<usize>() {
@@ -948,6 +954,12 @@ impl AgentService {
 
         // 4. Check for pending decision (client group or deal selection)
         if let Some(pending) = session.pending_decision.take() {
+            if Self::should_reclassify_before_pending(&request.message) {
+                pivot_feedback = Some(
+                    "Discarded the pending choice and re-routed from your new instruction."
+                        .to_string(),
+                );
+            } else {
             // Check if input is a number (1, 2, 3, etc.) or special keyword
             let input_upper = input.trim().to_uppercase();
             let input_lower = input.trim().to_lowercase();
@@ -1053,9 +1065,19 @@ impl AgentService {
                 return Ok(Self::reprompt_pending_decision(session, pending, msg));
             }
             // Optional decisions can fall through to the normal intent pipeline.
+            }
         }
 
         // 5. Check for pending intent tier selection
+        if session.pending_intent_tier.is_some()
+            && Self::should_reclassify_before_pending(&request.message)
+        {
+            session.pending_intent_tier = None;
+            pivot_feedback = Some(
+                "Discarded the pending intent choice and re-routed from your new instruction."
+                    .to_string(),
+            );
+        }
         if let Some(ref pending_tier) = session.pending_intent_tier.clone() {
             // Check if input is a number selecting a tier option
             if let Ok(selection) = input.trim().parse::<usize>() {
@@ -1317,6 +1339,7 @@ impl AgentService {
                         "This would change state.\n\nPending change: {}{}\n\nReply 'yes' to confirm or ask a read-only question to cancel.",
                         pending.confirmation_text, bullets
                     );
+                    let msg = Self::with_pivot_feedback(&pivot_feedback, msg);
                     session.add_agent_message(msg.clone(), None, None);
                     return Ok(AgentChatResponse {
                         message: msg,
@@ -1363,6 +1386,7 @@ impl AgentService {
                         "Now working with client: {} ({} entities in scope).",
                         group_name, entity_count
                     );
+                    let msg = Self::with_pivot_feedback(&pivot_feedback, msg);
                     session.add_agent_message(msg.clone(), None, None);
                     return Ok(AgentChatResponse {
                         message: msg,
@@ -1385,6 +1409,7 @@ impl AgentService {
                 // Handle scope candidates - multiple client matches
                 if matches!(r.outcome, PipelineOutcome::ScopeCandidates) {
                     if let Some(err) = r.validation_error {
+                        let err = Self::with_pivot_feedback(&pivot_feedback, err);
                         return Ok(self.fail(&err, session));
                     }
                 }
@@ -1404,6 +1429,8 @@ impl AgentService {
                         );
                         let mut response = self.execute_runbook(session).await?;
                         response.dsl_source = None;
+                        response.message =
+                            Self::with_pivot_feedback(&pivot_feedback, response.message);
                         return Ok(response);
                     }
 
@@ -1437,6 +1464,7 @@ impl AgentService {
                     } else {
                         format!("Staged: {}\n\nSay 'run' to execute.", r.dsl)
                     };
+                    let msg = Self::with_pivot_feedback(&pivot_feedback, msg);
                     session.add_agent_message(msg.clone(), None, Some(r.dsl.clone()));
                     return Ok(self.staged_response(r.dsl, msg));
                 }
@@ -1446,7 +1474,7 @@ impl AgentService {
                 // matched — we just need a parameter to resolve the specific macro.
                 if matches!(r.outcome, PipelineOutcome::NeedsClarification) {
                     if let Some(jd) = journey_decision {
-                        let msg = jd.prompt.clone();
+                        let msg = Self::with_pivot_feedback(&pivot_feedback, jd.prompt.clone());
                         session.add_agent_message(msg.clone(), None, None);
                         return Ok(AgentChatResponse {
                             message: msg,
@@ -1471,21 +1499,6 @@ impl AgentService {
                 if matches!(r.outcome, PipelineOutcome::NeedsClarification)
                     && r.verb_candidates.len() >= 2
                 {
-                    if let Some(selected_verb) = Self::choose_safe_inventory_read_verb(
-                        &request.message,
-                        &r.verb_candidates,
-                    ) {
-                        return self
-                            .handle_safe_read_preference(
-                                session,
-                                &request.message,
-                                &selected_verb,
-                                actor.clone(),
-                                pivot_feedback.clone(),
-                            )
-                            .await;
-                    }
-
                     // Analyze which intent tiers are represented
                     let intent_taxonomy = crate::dsl_v2::intent_tiers::intent_tier_taxonomy();
                     let verbs: Vec<&str> =
@@ -1497,24 +1510,31 @@ impl AgentService {
 
                     // Should we show intent tiers first?
                     if intent_taxonomy.should_use_tiers(&analysis, top_score) {
-                        return Ok(self.build_intent_tier_response(
+                        let mut response = self.build_intent_tier_response(
                             &request.message,
                             &r.verb_candidates,
                             &analysis,
                             session,
-                        ));
+                        );
+                        response.message =
+                            Self::with_pivot_feedback(&pivot_feedback, response.message);
+                        return Ok(response);
                     }
 
                     // Otherwise show direct verb disambiguation
-                    return Ok(self.build_verb_disambiguation_response(
+                    let mut response = self.build_verb_disambiguation_response(
                         &request.message,
                         &r.verb_candidates,
                         session,
-                    ));
+                    );
+                    response.message =
+                        Self::with_pivot_feedback(&pivot_feedback, response.message);
+                    return Ok(response);
                 }
 
                 // Pipeline gave an error message? Return it
                 if let Some(err) = r.validation_error {
+                    let err = Self::with_pivot_feedback(&pivot_feedback, err);
                     return Ok(self.fail(&err, session));
                 }
             }
@@ -1524,7 +1544,11 @@ impl AgentService {
         }
 
         // Fallback
-        Ok(self.fail("I don't understand. Try /commands for help.", session))
+        let msg = Self::with_pivot_feedback(
+            &pivot_feedback,
+            "I don't understand. Try /commands for help.",
+        );
+        Ok(self.fail(&msg, session))
     }
 
     /// Check if a verb is a navigation/session verb that should auto-run
@@ -1538,61 +1562,6 @@ impl AgentService {
             return true;
         }
         false
-    }
-
-    fn choose_safe_inventory_read_verb(
-        original_input: &str,
-        candidates: &[crate::mcp::verb_search::VerbSearchResult],
-    ) -> Option<String> {
-        if !Self::is_safe_inventory_read_request(original_input) {
-            return None;
-        }
-
-        let top_candidates: Vec<&crate::mcp::verb_search::VerbSearchResult> =
-            candidates.iter().take(3).collect();
-        if top_candidates.len() < 2 {
-            return None;
-        }
-
-        let all_safe_read_shapes = top_candidates.iter().all(|candidate| {
-            candidate.verb.ends_with(".list")
-                || candidate.verb.ends_with(".search")
-                || candidate.verb.ends_with(".read")
-                || candidate.verb.ends_with(".get")
-        });
-        if !all_safe_read_shapes {
-            return None;
-        }
-
-        top_candidates
-            .iter()
-            .find(|candidate| candidate.verb.ends_with(".list"))
-            .map(|candidate| candidate.verb.clone())
-    }
-
-    fn is_safe_inventory_read_request(input: &str) -> bool {
-        let normalized = input.trim().to_ascii_lowercase();
-        if normalized.is_empty() {
-            return false;
-        }
-
-        let starts_like_read = normalized.starts_with("what ")
-            || normalized.starts_with("show ")
-            || normalized.starts_with("show me ")
-            || normalized.starts_with("list ");
-        let asks_for_inventory = normalized.contains(" have")
-            || normalized.contains(" has")
-            || normalized.contains(" show")
-            || normalized.contains(" list");
-        let has_search_term = normalized.contains("search ")
-            || normalized.contains("find ")
-            || normalized.contains("named ")
-            || normalized.contains("matching ")
-            || normalized.contains("reference ")
-            || normalized.contains("where ")
-            || normalized.contains("filter ");
-
-        starts_like_read && asks_for_inventory && !has_search_term
     }
 
     fn is_read_only_pivot_request(input: &str) -> bool {
@@ -1616,69 +1585,44 @@ impl AgentService {
             || normalized.starts_with("view ")
     }
 
-    fn is_safe_auto_execute_read_verb(verb: &str) -> bool {
-        verb.ends_with(".list") || verb.ends_with(".read") || verb.ends_with(".get")
+    fn is_write_request(input: &str) -> bool {
+        let normalized = input.trim().to_ascii_lowercase();
+        if normalized.is_empty() {
+            return false;
+        }
+
+        normalized.starts_with("create ")
+            || normalized.starts_with("add ")
+            || normalized.starts_with("update ")
+            || normalized.starts_with("change ")
+            || normalized.starts_with("delete ")
+            || normalized.starts_with("remove ")
+            || normalized.starts_with("assign ")
+            || normalized.starts_with("set ")
+            || normalized.starts_with("run ")
+            || normalized.starts_with("execute ")
+            || normalized.starts_with("publish ")
     }
 
-    async fn handle_safe_read_preference(
-        &self,
-        session: &mut UnifiedSession,
-        original_input: &str,
-        selected_verb: &str,
-        actor: crate::sem_reg::abac::ActorContext,
-        pivot_feedback: Option<String>,
-    ) -> Result<AgentChatResponse, String> {
-        use crate::dsl_v2::parse_program;
-
-        let orch_ctx = self.build_orchestrator_context(
-            session,
-            actor,
-            crate::agent::orchestrator::UtteranceSource::Chat,
-        );
-        let outcome = crate::agent::orchestrator::handle_utterance_with_forced_verb(
-            &orch_ctx,
-            original_input,
-            selected_verb,
-        )
-        .await
-        .map_err(|e| format!("Pipeline error: {e}"))?;
-        let r = outcome.pipeline_result;
-
-        if r.valid && !r.dsl.is_empty() {
-            let ast = parse_program(&r.dsl)
-                .map(|program| program.statements)
-                .unwrap_or_default();
-
-            if outcome.auto_execute || Self::is_safe_auto_execute_read_verb(selected_verb) {
-                session.set_pending_dsl(r.dsl.clone(), ast, None, false);
-                let mut response = self.execute_runbook(session).await?;
-                response.dsl_source = None;
-                let prefix = match pivot_feedback {
-                    Some(note) => format!("{note}\n\nReading current state.\n\n"),
-                    None => "Reading current state.\n\n".to_string(),
-                };
-                response.message = format!("{prefix}{}", response.message);
-                return Ok(response);
-            }
-
-            session.set_pending_dsl(r.dsl.clone(), ast, None, false);
-            let msg = format!(
-                "{}Reading current state via **{}**.\n\nStaged: {}\n\nSay 'run' to execute.",
-                pivot_feedback
-                    .map(|note| format!("{note}\n\n"))
-                    .unwrap_or_default(),
-                selected_verb,
-                r.dsl
-            );
-            session.add_agent_message(msg.clone(), None, Some(r.dsl.clone()));
-            return Ok(self.staged_response(r.dsl, msg));
+    fn should_reclassify_before_pending(input: &str) -> bool {
+        let normalized = input.trim().to_ascii_lowercase();
+        if normalized.is_empty()
+            || normalized == "new"
+            || normalized == "skip"
+            || normalized.parse::<usize>().is_ok()
+        {
+            return false;
         }
 
-        if let Some(err) = r.validation_error {
-            return Ok(self.fail(&err, session));
-        }
+        Self::is_read_only_pivot_request(&normalized) || Self::is_write_request(&normalized)
+    }
 
-        Ok(self.fail("Failed to resolve safe read path", session))
+    fn with_pivot_feedback(pivot_feedback: &Option<String>, message: impl Into<String>) -> String {
+        let message = message.into();
+        match pivot_feedback {
+            Some(note) => format!("{note}\n\n{message}"),
+            None => message,
+        }
     }
 
     /// Build provenance labels from journey metadata (Tier -2 match).

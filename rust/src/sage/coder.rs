@@ -192,11 +192,19 @@ impl CoderEngine {
         let config = self.verb_config(&candidate.fqn)?;
         let structured = structured_intent_from_step(&candidate.fqn, &step, config)?;
 
+        let required_args = config
+            .args
+            .iter()
+            .filter(|arg| arg.required)
+            .map(|arg| arg.name.as_str())
+            .collect::<std::collections::HashSet<_>>();
         let missing_args = structured
             .arguments
             .iter()
             .filter_map(|arg| match &arg.value {
-                IntentArgValue::Missing { arg_name } => Some(arg_name.clone()),
+                IntentArgValue::Missing { arg_name } if required_args.contains(arg_name.as_str()) => {
+                    Some(arg_name.clone())
+                }
                 _ => None,
             })
             .collect::<Vec<_>>();

@@ -123,6 +123,16 @@ struct CoderStageOutcome {
     error: Option<String>,
 }
 
+struct PreparedTurnContext {
+    lookup_result: Option<crate::lookup::LookupResult>,
+    dominant_entity_name: Option<String>,
+    dominant_entity_kind: Option<String>,
+    entity_candidates: Vec<String>,
+    sem_reg_verb_names: Option<Vec<String>>,
+    envelope: ContextEnvelope,
+    surface: SessionVerbSurface,
+}
+
 fn route(intent: &crate::sage::OutcomeIntent) -> UtteranceDisposition {
     match intent.polarity {
         crate::sage::IntentPolarity::Read | crate::sage::IntentPolarity::Ambiguous => {
@@ -205,43 +215,11 @@ fn build_mutation_confirmation(
     }
 }
 
-fn coder_result_from_pipeline_result(outcome: &OrchestratorOutcome) -> Option<CoderResult> {
-    if !outcome.pipeline_result.valid || outcome.pipeline_result.dsl.is_empty() {
-        return None;
-    }
-
-    let verb_fqn = outcome.trace.final_verb.clone()?;
-    let unresolved_refs = outcome
-        .pipeline_result
-        .unresolved_refs
-        .iter()
-        .map(|unresolved| {
-            if unresolved.search_value.is_empty() {
-                unresolved.param_name.clone()
-            } else {
-                format!("{}={}", unresolved.param_name, unresolved.search_value)
-            }
-        })
-        .collect::<Vec<_>>();
-
-    Some(CoderResult {
-        verb_fqn,
-        dsl: outcome.pipeline_result.dsl.clone(),
-        resolution: if matches!(outcome.pipeline_result.outcome, PipelineOutcome::Ready) {
-            crate::sage::coder::CoderResolution::Confident
-        } else {
-            crate::sage::coder::CoderResolution::Proposed
-        },
-        missing_args: outcome.pipeline_result.missing_required.clone(),
-        unresolved_refs,
-    })
-}
-
 fn can_use_sage_structure_fast_path(
     ctx: &OrchestratorContext,
     intent: &crate::sage::OutcomeIntent,
     coder_result: &CoderResult,
-    outcome: &OrchestratorOutcome,
+    prepared: &PreparedTurnContext,
 ) -> bool {
     if !matches!(
         ctx.stage_focus.as_deref(),
@@ -267,39 +245,39 @@ fn can_use_sage_structure_fast_path(
         return true;
     }
 
-    outcome
-        .surface
-        .as_ref()
+    Some(&prepared.surface)
         .map(|surface| surface.allowed_fqns().contains(&coder_result.verb_fqn))
         .unwrap_or(false)
 }
 
-fn can_auto_execute_serve_result(verb_fqn: &str) -> bool {
+pub(crate) fn can_auto_execute_serve_result(verb_fqn: &str) -> bool {
     !can_skip_fast_path_parse_validation(verb_fqn)
 }
 
-fn plural_cbu_list_fallback(
+fn read_only_list_fallback(
     intent: &crate::sage::OutcomeIntent,
-    outcome: &OrchestratorOutcome,
 ) -> Option<CoderResult> {
-    if intent.polarity != crate::sage::IntentPolarity::Read
-        || intent.domain_concept != "cbu"
-        || outcome.pipeline_result.valid
-    {
+    if intent.polarity != crate::sage::IntentPolarity::Read || intent.domain_concept.is_empty() {
         return None;
     }
 
     let summary = intent.summary.to_ascii_lowercase();
-    let validation_error = outcome
-        .pipeline_result
-        .validation_error
-        .as_deref()
-        .unwrap_or_default();
+    let domain = intent.domain_concept.as_str();
+    let plural_domain = if domain.ends_with('y') && domain.len() > 1 {
+        format!("{}ies", &domain[..domain.len() - 1])
+    } else if domain.ends_with('s') {
+        domain.to_string()
+    } else {
+        format!("{domain}s")
+    };
+    let list_verb = format!("{domain}.list");
 
-    if summary.contains("cbus") && validation_error.contains("cbu-id") {
+    if (summary.contains(&plural_domain) || summary.starts_with("show ") || summary.starts_with("list "))
+        && registry().get_by_name(&list_verb).is_some()
+    {
         return Some(CoderResult {
-            verb_fqn: "cbu.list".to_string(),
-            dsl: "(cbu.list)".to_string(),
+            verb_fqn: list_verb.clone(),
+            dsl: format!("({list_verb})"),
             resolution: crate::sage::coder::CoderResolution::Confident,
             missing_args: vec![],
             unresolved_refs: vec![],
@@ -307,6 +285,158 @@ fn plural_cbu_list_fallback(
     }
 
     None
+}
+
+async fn prepare_turn_context(
+    ctx: &OrchestratorContext,
+    utterance: &str,
+    sage_intent: Option<&crate::sage::OutcomeIntent>,
+) -> PreparedTurnContext {
+    let lookup_result = if let Some(ref lookup_svc) = ctx.lookup_service {
+        Some(lookup_svc.analyze(utterance, 5).await)
+    } else {
+        None
+    };
+
+    let dominant_entity_name = lookup_result
+        .as_ref()
+        .and_then(|lr| lr.dominant_entity.as_ref())
+        .map(|e| e.canonical_name.clone());
+
+    let dominant_entity_kind = lookup_result
+        .as_ref()
+        .and_then(|lr| lr.dominant_entity.as_ref())
+        .map(|e| e.entity_kind.clone());
+
+    let semreg_entity_kind = if matches!(
+        ctx.stage_focus.as_deref(),
+        Some("semos-data-management" | "semos-data")
+    ) {
+        None
+    } else {
+        dominant_entity_kind.clone()
+    };
+
+    let entity_candidates: Vec<String> = lookup_result
+        .as_ref()
+        .map(|lr| lr.entities.iter().map(|e| e.mention_text.clone()).collect())
+        .unwrap_or_default();
+
+    let use_generic_task_subject =
+        should_use_generic_task_subject_for_sage(ctx.stage_focus.as_deref(), sage_intent);
+    let envelope =
+        resolve_sem_reg_verbs(ctx, semreg_entity_kind.as_deref(), use_generic_task_subject).await;
+
+    let fail_policy = if ctx.policy_gate.semreg_fail_closed() {
+        VerbSurfaceFailPolicy::FailClosed
+    } else {
+        VerbSurfaceFailPolicy::FailOpen
+    };
+    let surface_ctx = VerbSurfaceContext {
+        agent_mode: ctx.agent_mode,
+        stage_focus: ctx.stage_focus.as_deref(),
+        envelope: &envelope,
+        fail_policy,
+        entity_state: None,
+    };
+    let surface = compute_session_verb_surface(&surface_ctx);
+
+    let sem_reg_verb_names = if envelope.is_unavailable() {
+        None
+    } else {
+        Some(envelope.allowed_verbs.iter().cloned().collect())
+    };
+
+    PreparedTurnContext {
+        lookup_result,
+        dominant_entity_name,
+        dominant_entity_kind,
+        entity_candidates,
+        sem_reg_verb_names,
+        envelope,
+        surface,
+    }
+}
+
+fn can_use_coder_for_serve(
+    ctx: &OrchestratorContext,
+    intent: &crate::sage::OutcomeIntent,
+    coder_result: &CoderResult,
+    prepared: &PreparedTurnContext,
+) -> bool {
+    if !coder_result.missing_args.is_empty() || !coder_result.unresolved_refs.is_empty() {
+        return false;
+    }
+
+    if can_use_sage_structure_fast_path(ctx, intent, coder_result, prepared) {
+        return true;
+    }
+
+    let allowed = prepared.surface.allowed_fqns();
+    if !allowed.is_empty() {
+        return allowed.contains(&coder_result.verb_fqn);
+    }
+
+    if !prepared.envelope.is_unavailable() && !prepared.envelope.is_deny_all() {
+        return prepared.envelope.allowed_verbs.contains(&coder_result.verb_fqn);
+    }
+
+    !ctx.policy_gate.semreg_fail_closed()
+}
+
+#[cfg(feature = "database")]
+async fn build_sage_serve_outcome(
+    ctx: &OrchestratorContext,
+    utterance: &str,
+    intent: &crate::sage::OutcomeIntent,
+    coder_result: &CoderResult,
+    prepared: PreparedTurnContext,
+    selection_source: &str,
+) -> anyhow::Result<OrchestratorOutcome> {
+    let pipeline_result =
+        build_sage_fast_path_result(utterance, ctx.scope.clone(), intent, coder_result)?;
+    let candidates = vec![(coder_result.verb_fqn.clone(), pipeline_result
+        .verb_candidates
+        .first()
+        .map(|candidate| candidate.score)
+        .unwrap_or_default())];
+    let chosen = Some(coder_result.verb_fqn.clone());
+    let mut trace = build_trace(
+        utterance,
+        ctx,
+        &prepared.entity_candidates,
+        &prepared.dominant_entity_name,
+        &prepared.dominant_entity_kind,
+        &prepared.sem_reg_verb_names,
+        &candidates,
+        &candidates,
+        &chosen,
+        &chosen,
+        &pipeline_result,
+        &prepared.envelope,
+        Some(selection_source.to_string()),
+        false,
+        prepared.envelope.is_unavailable(),
+        &[],
+        false,
+        None,
+        None,
+    );
+    trace.surface_fingerprint = Some(prepared.surface.surface_fingerprint.0.clone());
+    apply_sage_trace_fields(&mut trace, intent, selection_source);
+
+    let mut outcome = OrchestratorOutcome {
+        pipeline_result,
+        context_envelope: Some(prepared.envelope),
+        surface: Some(prepared.surface),
+        lookup_result: prepared.lookup_result,
+        trace,
+        journey_decision: None,
+        pending_mutation: None,
+        auto_execute: can_auto_execute_serve_result(&coder_result.verb_fqn),
+    };
+    emit_telemetry(ctx, utterance, &mut outcome).await;
+    Ok(outcome)
 }
 
 /// Structured audit trace for every utterance processed.
@@ -343,6 +473,8 @@ pub struct IntentTrace {
     pub semreg_unavailable: bool,
     /// Source of verb selection: "discovery", "user_choice", "macro"
     pub selection_source: String,
+    /// Why Serve fell back to the legacy pipeline, when it did.
+    pub serve_fallback_reason: Option<String>,
     /// True if macro-expanded DSL was checked against SemReg
     pub macro_semreg_checked: bool,
     /// Verbs in macro expansion that were denied by SemReg (empty if none)
@@ -664,59 +796,74 @@ pub async fn handle_utterance(
 
     match route(&intent) {
         UtteranceDisposition::Serve(_) => {
-            let mut outcome = legacy_handle_utterance(ctx, utterance).await?;
+            let prepared = prepare_turn_context(ctx, utterance, Some(&intent)).await;
             let coder_stage = run_coder_stage(Some(&intent));
             let serve_candidate = coder_stage
                 .result
                 .clone()
-                .or_else(|| plural_cbu_list_fallback(&intent, &outcome));
-            if let Some(coder_result) = serve_candidate.as_ref() {
-                let coder_complete =
-                    coder_result.missing_args.is_empty() && coder_result.unresolved_refs.is_empty();
-                let prefer_sage_result =
-                    can_use_sage_structure_fast_path(ctx, &intent, coder_result, &outcome)
-                        || (coder_complete && !outcome.pipeline_result.valid)
-                        || plural_cbu_list_fallback(&intent, &outcome).is_some();
+                .or_else(|| read_only_list_fallback(&intent));
 
-                if prefer_sage_result {
-                    if let Ok(fast_path_result) = build_sage_fast_path_result(
+            if let Some(coder_result) = serve_candidate.as_ref() {
+                let selection_source = if intent.plane == ObservationPlane::Structure {
+                    "sage_serve_fast_path"
+                } else {
+                    "sage_serve_coder"
+                };
+                if can_use_coder_for_serve(ctx, &intent, coder_result, &prepared) {
+                    return build_sage_serve_outcome(
+                        ctx,
                         utterance,
-                        ctx.scope.clone(),
                         &intent,
                         coder_result,
-                    ) {
-                        outcome.pipeline_result = fast_path_result;
-                        outcome.trace.final_verb = Some(coder_result.verb_fqn.clone());
-                        outcome.trace.chosen_verb_post_semreg =
-                            Some(coder_result.verb_fqn.clone());
-                        outcome.trace.dsl_generated =
-                            Some(outcome.pipeline_result.dsl.clone());
-                        outcome.trace.dsl_hash =
-                            Some(compute_dsl_hash(&outcome.pipeline_result.dsl));
-                        outcome.auto_execute = outcome.pipeline_result.valid
-                            && !outcome.pipeline_result.dsl.is_empty()
-                            && can_auto_execute_serve_result(&coder_result.verb_fqn);
-                        outcome.trace.selection_source = if intent.plane == ObservationPlane::Structure
-                        {
-                            "sage_serve_fast_path".to_string()
-                        } else {
-                            "sage_serve_coder".to_string()
-                        };
-                        outcome.trace.dsl_source = Some(outcome.trace.selection_source.clone());
-                    }
+                        prepared,
+                        selection_source,
+                    )
+                    .await;
                 }
             }
-            outcome.auto_execute =
-                outcome.pipeline_result.valid
-                    && !outcome.pipeline_result.dsl.is_empty()
-                    && (outcome.trace.final_verb.as_deref())
-                        .map(can_auto_execute_serve_result)
-                        .unwrap_or(true);
+
+            let mut outcome = legacy_handle_utterance(ctx, utterance).await?;
+            outcome.trace.serve_fallback_reason = Some(
+                coder_stage
+                    .error
+                    .or_else(|| {
+                        serve_candidate.as_ref().map(|candidate| {
+                            format!(
+                                "coder candidate '{}' was incomplete or blocked by surface policy",
+                                candidate.verb_fqn
+                            )
+                        })
+                    })
+                    .unwrap_or_else(|| "sage serve fell back to legacy pipeline".to_string()),
+            );
             apply_sage_trace_fields(&mut outcome.trace, &intent, "sage_serve");
             Ok(outcome)
         }
         UtteranceDisposition::Delegate(delegate) => {
-            let mut outcome = legacy_handle_utterance(ctx, utterance).await?;
+            let prepared = prepare_turn_context(ctx, utterance, Some(&intent)).await;
+            let trace = default_trace_for_runtime(ctx, utterance, &prepared);
+            let mut outcome = OrchestratorOutcome {
+                pipeline_result: PipelineResult {
+                    intent: StructuredIntent::empty(),
+                    verb_candidates: vec![],
+                    dsl: String::new(),
+                    dsl_hash: None,
+                    valid: false,
+                    validation_error: None,
+                    unresolved_refs: vec![],
+                    missing_required: vec![],
+                    outcome: PipelineOutcome::NeedsUserInput,
+                    scope_resolution: None,
+                    scope_context: ctx.scope.clone(),
+                },
+                context_envelope: Some(prepared.envelope),
+                surface: Some(prepared.surface),
+                lookup_result: prepared.lookup_result,
+                trace,
+                journey_decision: None,
+                pending_mutation: None,
+                auto_execute: false,
+            };
             apply_sage_trace_fields(&mut outcome.trace, &intent, "sage_delegate");
 
             if intent.confidence == SageConfidence::Low || !intent.pending_clarifications.is_empty()
@@ -752,9 +899,7 @@ pub async fn handle_utterance(
                     build_mutation_confirmation(&intent, result, outcome.lookup_result.as_ref())
                 })
             } else {
-                coder_result_from_pipeline_result(&outcome).map(|result| {
-                    build_mutation_confirmation(&intent, &result, outcome.lookup_result.as_ref())
-                })
+                None
             };
 
             if let Some(confirmation) = confirmation {
@@ -1694,6 +1839,7 @@ fn build_trace(
         semreg_policy: envelope.label().to_string(),
         semreg_unavailable,
         selection_source: "discovery".to_string(),
+        serve_fallback_reason: None,
         macro_semreg_checked: false,
         macro_denied_verbs: vec![],
         dominant_entity_kind: dominant_entity_kind.clone(),
@@ -2202,6 +2348,7 @@ pub async fn handle_utterance_with_forced_verb(
             sage_plane: None,
             sage_polarity: None,
             sage_domain_hints: vec![],
+            serve_fallback_reason: None,
         };
 
         let mut outcome = OrchestratorOutcome {
@@ -2282,6 +2429,7 @@ pub async fn handle_utterance_with_forced_verb(
         sage_plane: None,
         sage_polarity: None,
         sage_domain_hints: vec![],
+        serve_fallback_reason: None,
     };
 
     tracing::info!(
@@ -2301,10 +2449,69 @@ pub async fn handle_utterance_with_forced_verb(
         trace,
         journey_decision: None,
         pending_mutation: None,
-        auto_execute: false,
+        auto_execute: can_auto_execute_serve_result(forced_verb_fqn),
     };
     emit_telemetry(ctx, utterance, &mut outcome).await;
     Ok(outcome)
+}
+
+fn default_trace_for_runtime(
+    ctx: &OrchestratorContext,
+    utterance: &str,
+    prepared: &PreparedTurnContext,
+) -> IntentTrace {
+    IntentTrace {
+        utterance: utterance.to_string(),
+        source: ctx.source.clone(),
+        entity_candidates: prepared.entity_candidates.clone(),
+        dominant_entity: prepared.dominant_entity_name.clone(),
+        #[cfg(feature = "database")]
+        sem_reg_verb_filter: prepared.sem_reg_verb_names.clone(),
+        verb_candidates_pre_filter: vec![],
+        verb_candidates_post_filter: vec![],
+        final_verb: None,
+        final_confidence: 0.0,
+        dsl_generated: None,
+        dsl_hash: None,
+        bypass_used: None,
+        dsl_source: Some(format!("{:?}", ctx.source)),
+        sem_reg_mode: if ctx.policy_gate.semreg_fail_closed() {
+            "strict".to_string()
+        } else {
+            "permissive".to_string()
+        },
+        sem_reg_denied_all: prepared.envelope.is_deny_all(),
+        policy_gate_snapshot: ctx.policy_gate.snapshot(),
+        forced_verb: None,
+        blocked_reason: None,
+        chosen_verb_pre_semreg: None,
+        chosen_verb_post_semreg: None,
+        semreg_policy: prepared.envelope.label().to_string(),
+        semreg_unavailable: prepared.envelope.is_unavailable(),
+        selection_source: "sage_delegate".to_string(),
+        serve_fallback_reason: None,
+        macro_semreg_checked: false,
+        macro_denied_verbs: vec![],
+        dominant_entity_kind: prepared.dominant_entity_kind.clone(),
+        entity_kind_filtered: prepared.dominant_entity_kind.is_some(),
+        telemetry_persisted: false,
+        agent_mode: ctx.agent_mode.to_string(),
+        agent_mode_blocked_verbs: vec![],
+        allowed_verbs_fingerprint: if prepared.envelope.is_unavailable() {
+            None
+        } else {
+            Some(prepared.envelope.fingerprint_str().to_string())
+        },
+        pruned_verbs_count: prepared.envelope.pruned_count(),
+        toctou_recheck_performed: false,
+        toctou_result: None,
+        toctou_new_fingerprint: None,
+        surface_fingerprint: Some(prepared.surface.surface_fingerprint.0.clone()),
+        journey_match: None,
+        sage_plane: None,
+        sage_polarity: None,
+        sage_domain_hints: vec![],
+    }
 }
 
 /// Resolve SemReg context and return a `ContextEnvelope`.
@@ -2572,6 +2779,7 @@ mod tests {
             sage_plane: None,
             sage_polarity: None,
             sage_domain_hints: vec![],
+            serve_fallback_reason: None,
         }
     }
 
@@ -2747,6 +2955,36 @@ mod tests {
         assert!(pending.confirmation_text.contains("create Allianz UK Fund"));
         assert!(!pending.confirmation_text.contains("cbu.create"));
         assert_eq!(pending.change_summary[0], "Resolved action: cbu.create");
+    }
+
+    #[test]
+    fn test_read_only_list_fallback_prefers_plural_domain_list() {
+        let intent = crate::sage::OutcomeIntent {
+            summary: "what deals does Allianz have?".into(),
+            plane: ObservationPlane::Instance,
+            polarity: crate::sage::IntentPolarity::Read,
+            domain_concept: "deal".into(),
+            action: crate::sage::OutcomeAction::Read,
+            subject: None,
+            steps: vec![],
+            confidence: SageConfidence::Medium,
+            pending_clarifications: vec![],
+        };
+
+        let result = read_only_list_fallback(&intent).expect("expected safe list fallback");
+        assert_eq!(result.verb_fqn, "deal.list");
+        assert_eq!(result.dsl, "(deal.list)");
+        assert!(matches!(
+            result.resolution,
+            crate::sage::coder::CoderResolution::Confident
+        ));
+    }
+
+    #[test]
+    fn test_forced_read_path_uses_serve_auto_execute_policy() {
+        assert!(can_auto_execute_serve_result("deal.list"));
+        assert!(can_auto_execute_serve_result("cbu.read"));
+        assert!(!can_auto_execute_serve_result("schema.entity.describe"));
     }
 
     #[test]
