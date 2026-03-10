@@ -60,6 +60,13 @@ use axum::{
 };
 use uuid::Uuid;
 
+fn semtaxonomy_enabled_for_routes() -> bool {
+    !matches!(
+        std::env::var("SEMTAXONOMY_ENABLED").ok().as_deref(),
+        Some("0" | "false" | "FALSE" | "no" | "NO")
+    )
+}
+
 // Re-export all request/response types from agent_types
 pub(crate) use crate::api::agent_types::ExecutionOutcome;
 pub use crate::api::agent_types::{
@@ -752,7 +759,7 @@ async fn create_session(
     });
 
     // Build decision packet for client group selection if no client is set
-    let decision = if final_state == SessionState::New {
+    let decision = if final_state == SessionState::New && !semtaxonomy_enabled_for_routes() {
         build_client_group_decision(&state.pool, session_id).await
     } else {
         None
@@ -1707,13 +1714,13 @@ fn generate_commands_help() -> String {
 | "teach: 'spin up a fund' = cbu.create" | `agent.teach` |
 | "learn this phrase" / "remember this" | `agent.teach` |
 | "forget this phrase" / "unteach" | `agent.unteach` |
-| "what have I taught?" | `agent.teaching-status` |
+| "what have I taught?" | `agent.read-teaching-status` |
 
 **DSL Syntax:**
 ```clojure
 (agent.teach :phrase "spin up a fund" :verb "cbu.create")
 (agent.unteach :phrase "spin up a fund" :reason "too_generic")
-(agent.teaching-status :limit 20)
+(agent.read-teaching-status :limit 20)
 ```
 
 **Response:**

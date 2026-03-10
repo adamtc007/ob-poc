@@ -601,7 +601,7 @@ impl CustomOperation for ViewRefineOp {
 // VIEW.CLEAR - Clear refinements
 // =============================================================================
 
-/// view.clear handler - Clear all refinements, return to base view
+/// view.clear-refinements handler - Clear all refinements, return to base view
 #[register_custom_op]
 pub struct ViewClearOp;
 
@@ -612,7 +612,7 @@ impl CustomOperation for ViewClearOp {
     }
 
     fn verb(&self) -> &'static str {
-        "clear"
+        "clear-refinements"
     }
 
     fn rationale(&self) -> &'static str {
@@ -640,7 +640,7 @@ impl CustomOperation for ViewClearOp {
         _verb_call: &VerbCall,
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!("view.clear requires database feature"))
+        Err(anyhow::anyhow!("view.clear-refinements requires database feature"))
     }
 }
 
@@ -648,7 +648,7 @@ impl CustomOperation for ViewClearOp {
 // VIEW.SELECT - Explicitly set selection
 // =============================================================================
 
-/// view.select handler - Explicitly set selection within current view
+/// view.set-selection handler - Explicitly set selection within current view
 #[register_custom_op]
 pub struct ViewSelectOp;
 
@@ -659,7 +659,7 @@ impl CustomOperation for ViewSelectOp {
     }
 
     fn verb(&self) -> &'static str {
-        "select"
+        "set-selection"
     }
 
     fn rationale(&self) -> &'static str {
@@ -712,7 +712,7 @@ impl CustomOperation for ViewSelectOp {
         _verb_call: &VerbCall,
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!("view.select requires database feature"))
+        Err(anyhow::anyhow!("view.set-selection requires database feature"))
     }
 }
 
@@ -720,7 +720,7 @@ impl CustomOperation for ViewSelectOp {
 // VIEW.LAYOUT - Change layout strategy
 // =============================================================================
 
-/// view.layout handler - Change layout strategy for current view
+/// view.set-layout handler - Change layout strategy for current view
 #[register_custom_op]
 pub struct ViewLayoutOp;
 
@@ -731,7 +731,7 @@ impl CustomOperation for ViewLayoutOp {
     }
 
     fn verb(&self) -> &'static str {
-        "layout"
+        "set-layout"
     }
 
     fn rationale(&self) -> &'static str {
@@ -776,7 +776,7 @@ impl CustomOperation for ViewLayoutOp {
         _verb_call: &VerbCall,
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!("view.layout requires database feature"))
+        Err(anyhow::anyhow!("view.set-layout requires database feature"))
     }
 }
 
@@ -784,7 +784,7 @@ impl CustomOperation for ViewLayoutOp {
 // VIEW.STATUS - Get current view state summary
 // =============================================================================
 
-/// view.status handler - Get current view state summary
+/// view.read-status handler - Get current view state summary
 #[register_custom_op]
 pub struct ViewStatusOp;
 
@@ -795,7 +795,7 @@ impl CustomOperation for ViewStatusOp {
     }
 
     fn verb(&self) -> &'static str {
-        "status"
+        "read-status"
     }
 
     fn rationale(&self) -> &'static str {
@@ -831,7 +831,7 @@ impl CustomOperation for ViewStatusOp {
         _verb_call: &VerbCall,
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!("view.status requires database feature"))
+        Err(anyhow::anyhow!("view.read-status requires database feature"))
     }
 }
 
@@ -839,7 +839,7 @@ impl CustomOperation for ViewStatusOp {
 // VIEW.SELECTION-INFO - Get detailed info about current selection
 // =============================================================================
 
-/// view.selection-info handler - Get detailed info about current selection
+/// view.read-selection-info handler - Get detailed info about current selection
 #[register_custom_op]
 pub struct ViewSelectionInfoOp;
 
@@ -850,7 +850,7 @@ impl CustomOperation for ViewSelectionInfoOp {
     }
 
     fn verb(&self) -> &'static str {
-        "selection-info"
+        "read-selection-info"
     }
 
     fn rationale(&self) -> &'static str {
@@ -891,7 +891,7 @@ impl CustomOperation for ViewSelectionInfoOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!(
-            "view.selection-info requires database feature"
+            "view.read-selection-info requires database feature"
         ))
     }
 }
@@ -1003,7 +1003,7 @@ impl CustomOperation for ViewZoomOutOp {
 // VIEW.BACK-TO - Jump back to a specific breadcrumb level
 // =============================================================================
 
-/// view.back-to handler - Pop frames until reaching a target level
+/// view.navigate-back-to handler - Pop frames until reaching a target level
 #[register_custom_op]
 pub struct ViewBackToOp;
 
@@ -1014,7 +1014,7 @@ impl CustomOperation for ViewBackToOp {
     }
 
     fn verb(&self) -> &'static str {
-        "back-to"
+        "navigate-back-to"
     }
 
     fn rationale(&self) -> &'static str {
@@ -1041,7 +1041,7 @@ impl CustomOperation for ViewBackToOp {
         // For now, we return a message indicating the navigation action
 
         Ok(ExecutionResult::Record(json!({
-            "action": "back-to",
+            "action": "navigate-back-to",
             "depth": depth,
             "frame_id": frame_id.map(|id| id.to_string()),
             "message": "Navigate to breadcrumb level. Use session.back_to() to execute."
@@ -1054,7 +1054,7 @@ impl CustomOperation for ViewBackToOp {
         _verb_call: &VerbCall,
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!("view.back-to requires database feature"))
+        Err(anyhow::anyhow!("view.navigate-back-to requires database feature"))
     }
 }
 
@@ -1062,7 +1062,7 @@ impl CustomOperation for ViewBackToOp {
 // VIEW.BREADCRUMBS - Get current navigation breadcrumbs
 // =============================================================================
 
-/// view.breadcrumbs handler - Returns the current navigation path
+/// view.read-breadcrumbs handler - Returns the current navigation path
 #[register_custom_op]
 pub struct ViewBreadcrumbsOp;
 
@@ -1073,7 +1073,7 @@ impl CustomOperation for ViewBreadcrumbsOp {
     }
 
     fn verb(&self) -> &'static str {
-        "breadcrumbs"
+        "read-breadcrumbs"
     }
 
     fn rationale(&self) -> &'static str {
@@ -1091,7 +1091,7 @@ impl CustomOperation for ViewBreadcrumbsOp {
         // For now, we return a placeholder indicating breadcrumbs should be fetched from session
 
         Ok(ExecutionResult::Record(json!({
-            "action": "breadcrumbs",
+            "action": "read-breadcrumbs",
             "message": "Get breadcrumbs from session.breadcrumbs() or session.breadcrumbs_with_ids()"
         })))
     }
@@ -1103,7 +1103,7 @@ impl CustomOperation for ViewBreadcrumbsOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!(
-            "view.breadcrumbs requires database feature"
+            "view.read-breadcrumbs requires database feature"
         ))
     }
 }
@@ -1153,19 +1153,19 @@ mod tests {
         assert_eq!(ViewCbuOp.verb(), "cbu");
         assert_eq!(ViewEntityForestOp.verb(), "entity-forest");
         assert_eq!(ViewRefineOp.verb(), "refine");
-        assert_eq!(ViewClearOp.verb(), "clear");
-        assert_eq!(ViewSelectOp.verb(), "select");
-        assert_eq!(ViewLayoutOp.verb(), "layout");
-        assert_eq!(ViewStatusOp.verb(), "status");
-        assert_eq!(ViewSelectionInfoOp.verb(), "selection-info");
+        assert_eq!(ViewClearOp.verb(), "clear-refinements");
+        assert_eq!(ViewSelectOp.verb(), "set-selection");
+        assert_eq!(ViewLayoutOp.verb(), "set-layout");
+        assert_eq!(ViewStatusOp.verb(), "read-status");
+        assert_eq!(ViewSelectionInfoOp.verb(), "read-selection-info");
     }
 
     #[test]
     fn test_zoom_operation_verbs() {
         assert_eq!(ViewZoomInOp.verb(), "zoom-in");
         assert_eq!(ViewZoomOutOp.verb(), "zoom-out");
-        assert_eq!(ViewBackToOp.verb(), "back-to");
-        assert_eq!(ViewBreadcrumbsOp.verb(), "breadcrumbs");
+        assert_eq!(ViewBackToOp.verb(), "navigate-back-to");
+        assert_eq!(ViewBreadcrumbsOp.verb(), "read-breadcrumbs");
     }
 
     #[test]

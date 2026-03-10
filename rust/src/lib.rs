@@ -163,6 +163,10 @@ pub mod policy;
 #[cfg(feature = "database")]
 pub mod sem_reg;
 
+// SemTaxonomy — replacement discovery/composition contract for utterance handling
+#[cfg(feature = "database")]
+pub mod semtaxonomy;
+
 // Sage — intent understanding layer (plane, polarity, domain — no verb FQNs)
 pub mod sage;
 

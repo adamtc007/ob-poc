@@ -38,6 +38,7 @@ mod control_ops;
 mod coverage_compute_ops;
 mod custody;
 mod deal_ops;
+mod discovery_ops;
 mod dilution_ops;
 mod docs_bundle_ops;
 mod document_ops;
@@ -242,6 +243,11 @@ pub use access_review_ops::{
 pub use bods_ops::{
     BodsDiscoverUbosOp, BodsFindByLeiOp, BodsGetStatementOp, BodsImportOp, BodsListOwnershipOp,
     BodsSyncFromGleifOp,
+};
+pub use discovery_ops::{
+    DiscoveryAvailableActionsOp, DiscoveryCascadeResearchOp, DiscoveryEntityContextOp,
+    DiscoveryEntityRelationshipsOp, DiscoveryInspectDataOp, DiscoverySearchDataOp,
+    DiscoverySearchEntitiesOp, DiscoveryVerbDetailOp,
 };
 
 // View operations (session scope and selection management)
@@ -835,13 +841,13 @@ mod tests {
         assert!(registry.has("agent", "pause"));
         assert!(registry.has("agent", "resume"));
         assert!(registry.has("agent", "stop"));
-        assert!(registry.has("agent", "confirm"));
-        assert!(registry.has("agent", "reject"));
-        assert!(registry.has("agent", "select"));
-        assert!(registry.has("agent", "status"));
-        assert!(registry.has("agent", "history"));
-        assert!(registry.has("agent", "set-threshold"));
-        assert!(registry.has("agent", "set-mode"));
+        assert!(registry.has("agent", "confirm-decision"));
+        assert!(registry.has("agent", "reject-decision"));
+        assert!(registry.has("agent", "select-decision-option"));
+        assert!(registry.has("agent", "read-status"));
+        assert!(registry.has("agent", "read-history"));
+        assert!(registry.has("agent", "set-selection-threshold"));
+        assert!(registry.has("agent", "set-execution-mode"));
         // Research source loader operations
         assert!(registry.has("research.sources", "list"));
         assert!(registry.has("research.sources", "info"));

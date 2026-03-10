@@ -373,6 +373,8 @@ fn build_llm_hints(
             .unwrap_or_else(|| pre.domain_hints.clone()),
         explicit_action_terms: vec![action.as_str().to_string()],
         scope_carry_forward_used: !context.last_intents.is_empty(),
+        stage_focus: context.stage_focus.clone(),
+        entity_kind: context.entity_kind.clone(),
         inventory_read: matches!(action, OutcomeAction::Read)
             && utterance.to_ascii_lowercase().contains("have"),
         structure_read: pre.sage_only,
@@ -544,6 +546,8 @@ mod tests {
             polarity: IntentPolarity::Write,
             polarity_clue: Some("create".to_string()),
             domain_hints: vec!["cbu".to_string()],
+            domain_score: 10,
+            runner_up_domain_score: 2,
             sage_only: false,
         };
 

@@ -484,11 +484,11 @@ domains:
       deal.create:
         reads: [client_group]
         writes: [deals]
-      deal.get:
+      deal.read-record:
         reads: [deals]
       deal.list:
         reads: [deals]
-      deal.update:
+      deal.update-record:
         reads: [deals]
         writes: [deals]
       deal.update-status:
@@ -530,7 +530,7 @@ domains:
       deal.agree-rate-card:
         reads: [deal_rate_cards]
         writes: [deal_rate_cards]
-      deal.summary:
+      deal.read-summary:
         reads:
           [
             deals,
@@ -2189,7 +2189,8 @@ domains:
         reads: [sem_reg.changesets, sem_reg.changeset_entries]
         writes: [sem_reg.changeset_entries]
       changeset.suggest:
-        reads: [sem_reg.changesets, sem_reg.changeset_entries, sem_reg.snapshots]
+        reads:
+          [sem_reg.changesets, sem_reg.changeset_entries, sem_reg.snapshots]
         writes: []
       changeset.apply-template:
         reads: [sem_reg.changesets, sem_reg.templates]
@@ -2198,13 +2199,21 @@ domains:
         reads: [sem_reg.changesets, sem_reg.changeset_entries]
         writes: [sem_reg.basis_records, sem_reg.basis_claims]
       changeset.validate-edit:
-        reads: [sem_reg.changesets, sem_reg.changeset_entries, sem_reg.snapshots]
+        reads:
+          [sem_reg.changesets, sem_reg.changeset_entries, sem_reg.snapshots]
         writes: []
       changeset.cross-reference:
-        reads: [sem_reg.changesets, sem_reg.changeset_entries, sem_reg.snapshots]
+        reads:
+          [sem_reg.changesets, sem_reg.changeset_entries, sem_reg.snapshots]
         writes: []
       changeset.impact-analysis:
-        reads: [sem_reg.changesets, sem_reg.changeset_entries, sem_reg.snapshots, sem_reg.derivation_edges]
+        reads:
+          [
+            sem_reg.changesets,
+            sem_reg.changeset_entries,
+            sem_reg.snapshots,
+            sem_reg.derivation_edges,
+          ]
         writes: []
       changeset.resolve-conflict:
         reads: [sem_reg.conflict_records]
@@ -2216,12 +2225,18 @@ domains:
         reads: [sem_reg.changesets, sem_reg.changeset_entries]
         writes: []
       changeset.diff:
-        reads: [sem_reg.changesets, sem_reg.changeset_entries, sem_reg.snapshots]
+        reads:
+          [sem_reg.changesets, sem_reg.changeset_entries, sem_reg.snapshots]
         writes: []
 
       # === governance domain (9 verbs) ===
       governance.gate-precheck:
-        reads: [sem_reg.changesets, sem_reg.changeset_entries, sem_reg_authoring.validation_reports]
+        reads:
+          [
+            sem_reg.changesets,
+            sem_reg.changeset_entries,
+            sem_reg_authoring.validation_reports,
+          ]
         writes: []
       governance.submit-for-review:
         reads: [sem_reg.changesets]
@@ -2231,19 +2246,54 @@ domains:
         writes: [sem_reg.changesets, sem_reg.changeset_reviews, sem_reg.events]
       governance.validate:
         reads: [sem_reg.changesets, sem_reg.changeset_entries]
-        writes: [sem_reg.changesets, sem_reg_authoring.validation_reports, sem_reg_authoring.governance_audit_log]
+        writes:
+          [
+            sem_reg.changesets,
+            sem_reg_authoring.validation_reports,
+            sem_reg_authoring.governance_audit_log,
+          ]
       governance.dry-run:
-        reads: [sem_reg.changesets, sem_reg.changeset_entries, sem_reg.snapshots]
-        writes: [sem_reg.changesets, sem_reg_authoring.validation_reports, sem_reg_authoring.governance_audit_log]
+        reads:
+          [sem_reg.changesets, sem_reg.changeset_entries, sem_reg.snapshots]
+        writes:
+          [
+            sem_reg.changesets,
+            sem_reg_authoring.validation_reports,
+            sem_reg_authoring.governance_audit_log,
+          ]
       governance.plan-publish:
-        reads: [sem_reg.changesets, sem_reg.changeset_entries, sem_reg.snapshots, sem_reg.snapshot_sets]
+        reads:
+          [
+            sem_reg.changesets,
+            sem_reg.changeset_entries,
+            sem_reg.snapshots,
+            sem_reg.snapshot_sets,
+          ]
         writes: []
       governance.publish:
-        reads: [sem_reg.changesets, sem_reg.changeset_entries, sem_reg.snapshots]
-        writes: [sem_reg.snapshots, sem_reg.snapshot_sets, sem_reg.changesets, sem_reg.outbox_events, sem_reg_authoring.publish_batches, sem_reg_authoring.governance_audit_log]
+        reads:
+          [sem_reg.changesets, sem_reg.changeset_entries, sem_reg.snapshots]
+        writes:
+          [
+            sem_reg.snapshots,
+            sem_reg.snapshot_sets,
+            sem_reg.changesets,
+            sem_reg.outbox_events,
+            sem_reg_authoring.publish_batches,
+            sem_reg_authoring.governance_audit_log,
+          ]
       governance.publish-batch:
-        reads: [sem_reg.changesets, sem_reg.changeset_entries, sem_reg.snapshots]
-        writes: [sem_reg.snapshots, sem_reg.snapshot_sets, sem_reg.changesets, sem_reg.outbox_events, sem_reg_authoring.publish_batches, sem_reg_authoring.governance_audit_log]
+        reads:
+          [sem_reg.changesets, sem_reg.changeset_entries, sem_reg.snapshots]
+        writes:
+          [
+            sem_reg.snapshots,
+            sem_reg.snapshot_sets,
+            sem_reg.changesets,
+            sem_reg.outbox_events,
+            sem_reg_authoring.publish_batches,
+            sem_reg_authoring.governance_audit_log,
+          ]
       governance.rollback:
         reads: [sem_reg.snapshot_sets, sem_reg.snapshots]
         writes: [sem_reg.snapshot_sets, sem_reg_authoring.governance_audit_log]
@@ -2262,7 +2312,8 @@ domains:
         reads: [sem_reg.focus_states, sem_reg.viewport_manifests]
         writes: []
       focus.diff:
-        reads: [sem_reg.focus_states, sem_reg.viewport_manifests, sem_reg.snapshots]
+        reads:
+          [sem_reg.focus_states, sem_reg.viewport_manifests, sem_reg.snapshots]
         writes: []
       focus.capture-manifest:
         reads: [sem_reg.focus_states]
@@ -2314,7 +2365,8 @@ domains:
         reads: [sem_reg.snapshots]
         writes: []
       registry.lineage:
-        reads: [sem_reg.snapshots, sem_reg.derivation_edges, sem_reg.run_records]
+        reads:
+          [sem_reg.snapshots, sem_reg.derivation_edges, sem_reg.run_records]
         writes: []
       registry.regulation-trace:
         reads: [sem_reg.snapshots]
@@ -2424,13 +2476,26 @@ domains:
         writes: []
       maintenance.cleanup:
         reads: [sem_reg.changesets]
-        writes: [sem_reg.changesets, sem_reg_authoring.change_sets_archive, sem_reg_authoring.change_set_artifacts_archive]
+        writes:
+          [
+            sem_reg.changesets,
+            sem_reg_authoring.change_sets_archive,
+            sem_reg_authoring.change_set_artifacts_archive,
+          ]
       maintenance.bootstrap-seeds:
         reads: [sem_reg.bootstrap_audit]
-        writes: [sem_reg.snapshots, sem_reg.snapshot_sets, sem_reg.bootstrap_audit]
+        writes:
+          [sem_reg.snapshots, sem_reg.snapshot_sets, sem_reg.bootstrap_audit]
       maintenance.drain-outbox:
         reads: [sem_reg.outbox_events]
-        writes: [sem_reg.outbox_events, sem_reg_pub.active_verb_contracts, sem_reg_pub.active_entity_types, sem_reg_pub.active_taxonomies, sem_reg_pub.projection_watermark]
+        writes:
+          [
+            sem_reg.outbox_events,
+            sem_reg_pub.active_verb_contracts,
+            sem_reg_pub.active_entity_types,
+            sem_reg_pub.active_taxonomies,
+            sem_reg_pub.projection_watermark,
+          ]
       maintenance.reindex-embeddings:
         reads: [sem_reg.snapshots, sem_reg.embedding_records]
         writes: [sem_reg.embedding_records]

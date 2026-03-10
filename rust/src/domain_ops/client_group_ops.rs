@@ -18,13 +18,13 @@
 //! Entity Membership:
 //! - `client-group.entity-add` - Add entity to group
 //! - `client-group.entity-remove` - Remove entity from group
-//! - `client-group.entity-list` - List entities in group
+//! - `client-group.list-entities` - List entities in group
 //!
 //! Role Management:
 //! - `client-group.assign-role` - Assign role to entity
 //! - `client-group.remove-role` - Remove role assignment
 //! - `client-group.list-roles` - List role assignments
-//! - `client-group.parties` - List all parties with roles
+//! - `client-group.list-parties` - List all parties with roles
 //!
 //! Relationship Management:
 //! - `client-group.add-relationship` - Add ownership/control edge
@@ -40,10 +40,10 @@
 //! Shorthand Tags:
 //! - `client-group.tag-add` - Add shorthand tag to entity
 //! - `client-group.tag-remove` - Remove tag
-//! - `client-group.tag-list` - List tags
+//! - `client-group.list-tags` - List tags
 //!
 //! Semantic Search:
-//! - `client-group.search` - Search entities by shorthand (Candle-assisted)
+//! - `client-group.search-entities` - Search entities by shorthand (Candle-assisted)
 //!
 //! Discovery:
 //! - `client-group.discover-entities` - Find entities that might belong to group
@@ -353,7 +353,7 @@ impl CustomOperation for ClientGroupEntityRemoveOp {
 }
 
 // =============================================================================
-// ENTITY-LIST
+// LIST-ENTITIES
 // =============================================================================
 
 #[register_custom_op]
@@ -366,7 +366,7 @@ impl CustomOperation for ClientGroupEntityListOp {
     }
 
     fn verb(&self) -> &'static str {
-        "entity-list"
+        "list-entities"
     }
 
     fn rationale(&self) -> &'static str {
@@ -591,7 +591,7 @@ impl CustomOperation for ClientGroupTagRemoveOp {
 }
 
 // =============================================================================
-// TAG-LIST
+// LIST-TAGS
 // =============================================================================
 
 #[register_custom_op]
@@ -604,7 +604,7 @@ impl CustomOperation for ClientGroupTagListOp {
     }
 
     fn verb(&self) -> &'static str {
-        "tag-list"
+        "list-tags"
     }
 
     fn rationale(&self) -> &'static str {
@@ -680,7 +680,7 @@ impl CustomOperation for ClientGroupTagListOp {
 }
 
 // =============================================================================
-// SEARCH (Candle-assisted semantic search)
+// SEARCH-ENTITIES (Candle-assisted semantic search)
 // =============================================================================
 
 #[register_custom_op]
@@ -693,7 +693,7 @@ impl CustomOperation for ClientGroupSearchOp {
     }
 
     fn verb(&self) -> &'static str {
-        "search"
+        "search-entities"
     }
 
     fn rationale(&self) -> &'static str {
@@ -1410,7 +1410,7 @@ impl CustomOperation for ClientGroupListRolesOp {
 }
 
 // =============================================================================
-// PARTIES
+// LIST-PARTIES
 // =============================================================================
 
 #[register_custom_op]
@@ -1423,7 +1423,7 @@ impl CustomOperation for ClientGroupPartiesOp {
     }
 
     fn verb(&self) -> &'static str {
-        "parties"
+        "list-parties"
     }
 
     fn rationale(&self) -> &'static str {

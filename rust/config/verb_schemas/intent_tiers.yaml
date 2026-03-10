@@ -273,7 +273,7 @@ verb_tier_mapping:
   view.trace: [analyze, drill_down]
   view.xray: [analyze, drill_down]
   view.surface: [navigate, single_structure] # Surface up is navigation
-  view.back-to: [navigate, single_structure]
+  view.navigate-back-to: [navigate, single_structure]
 
   # Workflow verbs
   kyc-case.approve: [workflow, approve]

@@ -118,14 +118,15 @@ nouns:
       create: [client-group.entity-add, client-group.start-discovery]
       list:
         [
-          client-group.entity-list,
-          client-group.tag-list,
+          client-group.list-entities,
+          client-group.list-tags,
+          client-group.list-parties,
           client-group.list-roles,
           client-group.list-relationships,
           client-group.list-unverified,
           client-group.list-discrepancies,
         ]
-      search: [client-group.search, client-group.discover-entities]
+      search: [client-group.search-entities, client-group.discover-entities]
 
   # =========================================================================
   # KYC / COMPLIANCE
@@ -285,10 +286,10 @@ nouns:
           deal.list-slas,
           deal.list-documents,
           deal.list-onboarding-requests,
-          deal.timeline,
+          deal.read-timeline,
         ]
-      update: [deal.update, deal.update-status]
-      search: [deal.search, deal.get, deal.summary]
+      update: [deal.update-record, deal.update-status]
+      search: [deal.search-records, deal.read-record, deal.read-summary]
 
   contract:
     aliases:
@@ -718,8 +719,8 @@ nouns:
     noun_keys:
       - view_state
     action_verbs:
-      list: [view.status]
-      update: [view.layout]
+      list: [view.read-status]
+      update: [view.set-layout, view.set-selection, view.clear-refinements]
 
   # =========================================================================
   # CAPITAL / SHARE CLASSES

@@ -170,7 +170,7 @@ impl CustomOperation for DealSearchOp {
         "deal"
     }
     fn verb(&self) -> &'static str {
-        "search"
+        "search-records"
     }
     fn rationale(&self) -> &'static str {
         "Full-text search across deal name and reference"
@@ -235,7 +235,7 @@ impl CustomOperation for DealUpdateOp {
         "deal"
     }
     fn verb(&self) -> &'static str {
-        "update"
+        "update-record"
     }
     fn rationale(&self) -> &'static str {
         "Updates deal fields and records change event"
@@ -2227,7 +2227,7 @@ impl CustomOperation for DealSummaryOp {
         "deal"
     }
     fn verb(&self) -> &'static str {
-        "summary"
+        "read-summary"
     }
     fn rationale(&self) -> &'static str {
         "Composite query returning deal with all nested data"

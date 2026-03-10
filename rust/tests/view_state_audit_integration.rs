@@ -441,7 +441,7 @@ mod view_state_audit_tests {
         sqlx::query(
             r#"INSERT INTO "ob-poc".dsl_idempotency
                (idempotency_key, execution_id, statement_index, verb, args_hash, result_type, result_json)
-               VALUES ($1, $2, 0, 'view.clear', '', 'success', '{}')"#,
+               VALUES ($1, $2, 0, 'view.clear-refinements', '', 'success', '{}')"#,
         )
         .bind(&idempotency_key)
         .bind(Uuid::new_v4())
@@ -458,7 +458,7 @@ mod view_state_audit_tests {
             .record_view_state_change(ob_poc::database::RecordViewStateChange {
                 idempotency_key: idempotency_key.clone(),
                 session_id: None,
-                verb_name: "view.clear".to_string(),
+                verb_name: "view.clear-refinements".to_string(),
                 view_state,
                 audit_user_id: None,
             })

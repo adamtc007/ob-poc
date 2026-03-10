@@ -76,6 +76,10 @@ pub struct UnifiedSession {
     #[serde(default)]
     pub recent_sage_intents: Vec<crate::sage::RecentIntent>,
 
+    /// Replacement SemTaxonomy session state for discovery/composition flows.
+    #[serde(default)]
+    pub semtaxonomy_session: Option<crate::semtaxonomy::SageSession>,
+
     // === Conversation ===
     pub messages: Vec<ChatMessage>,
 
@@ -1604,6 +1608,7 @@ impl UnifiedSession {
             pending_decision: None,
             pending_mutation: None,
             recent_sage_intents: Vec::new(),
+            semtaxonomy_session: None,
             messages: Vec::new(),
             bindings: HashMap::new(),
             // Constraint cascade (starts empty, narrowed as user works)
@@ -1676,6 +1681,7 @@ impl UnifiedSession {
         session.sub_session_type = sub_session_type;
         session.inherited_symbols = parent.bindings.clone();
         session.domain_hint = parent.domain_hint.clone();
+        session.semtaxonomy_session = parent.semtaxonomy_session.clone();
         // Inherit cascade context
         session.client = parent.client.clone();
         session.structure_type = parent.structure_type;

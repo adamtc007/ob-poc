@@ -1,0 +1,324 @@
+version: "1.0"
+
+domains:
+  discovery:
+    description: "Entity, action, and data discovery verbs for the SemTaxonomy replacement path"
+    verbs:
+      search-entities:
+        description: "Search entities by free text with optional entity-type narrowing"
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: discovery
+          subject_kinds: []
+          phase_tags: [discovery]
+          side_effects: facts_only
+          harm_class: read_only
+          action_class: search
+        invocation_phrases:
+          - "find entity"
+          - "search entities"
+          - "look up company"
+          - "find BNP"
+        behavior: plugin
+        handler: DiscoverySearchEntitiesOp
+        args:
+          - name: query
+            type: string
+            required: true
+            description: "Free text query"
+          - name: entity-types
+            type: string_list
+            required: false
+            description: "Optional list of entity types to narrow the search"
+          - name: max-results
+            type: integer
+            required: false
+            default: 10
+            description: "Maximum number of results"
+          - name: include-inactive
+            type: boolean
+            required: false
+            default: false
+            description: "Include entities with no active engagements"
+        returns:
+          type: record
+          name: search_result_set
+
+      entity-context:
+        description: "Return activity and context signals for a single entity"
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: discovery
+          subject_kinds: [entity, cbu, fund, person, company]
+          phase_tags: [discovery]
+          side_effects: facts_only
+          harm_class: read_only
+          action_class: read
+        invocation_phrases:
+          - "show entity context"
+          - "what is happening around this entity"
+        behavior: plugin
+        handler: DiscoveryEntityContextOp
+        args:
+          - name: entity-id
+            type: uuid
+            required: true
+            description: "Entity to inspect"
+            lookup:
+              table: entities
+              schema: ob-poc
+              entity_type: entity
+              search_key: name
+              primary_key: entity_id
+          - name: include-completed
+            type: boolean
+            required: false
+            default: false
+            description: "Include completed activities"
+        returns:
+          type: record
+          name: entity_context
+
+      entity-relationships:
+        description: "Return relationship graph summary for an entity"
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: discovery
+          subject_kinds: [entity, cbu, fund, person, company]
+          phase_tags: [discovery]
+          side_effects: facts_only
+          harm_class: read_only
+          action_class: read
+        invocation_phrases:
+          - "show entity relationships"
+          - "trace entity relationships"
+        behavior: plugin
+        handler: DiscoveryEntityRelationshipsOp
+        args:
+          - name: entity-id
+            type: uuid
+            required: true
+            description: "Entity to inspect"
+            lookup:
+              table: entities
+              schema: ob-poc
+              entity_type: entity
+              search_key: name
+              primary_key: entity_id
+          - name: relationship-types
+            type: string_list
+            required: false
+            description: "Optional relationship type filter"
+          - name: max-depth
+            type: integer
+            required: false
+            default: 2
+            description: "Maximum traversal depth"
+        returns:
+          type: record
+          name: relationship_graph
+
+      cascade-research:
+        description: "Run search, context, and relationship discovery as one read-only research pass"
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: discovery
+          subject_kinds: []
+          phase_tags: [discovery]
+          side_effects: facts_only
+          harm_class: read_only
+          action_class: search
+        invocation_phrases:
+          - "research this entity"
+          - "cascade research"
+          - "show me what matters about BNP"
+        behavior: plugin
+        handler: DiscoveryCascadeResearchOp
+        args:
+          - name: query
+            type: string
+            required: true
+            description: "Entity search term"
+          - name: top-n
+            type: integer
+            required: false
+            default: 3
+            description: "Number of top entities to expand"
+          - name: include-relationships
+            type: boolean
+            required: false
+            default: true
+            description: "Include relationship expansion"
+        returns:
+          type: record
+          name: cascade_result
+
+      available-actions:
+        description: "Show the currently available action surface for a domain and entity type"
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: discovery
+          subject_kinds: []
+          phase_tags: [discovery]
+          side_effects: facts_only
+          harm_class: read_only
+          action_class: list
+        invocation_phrases:
+          - "what can I do here"
+          - "show available actions"
+          - "list available verbs"
+        behavior: plugin
+        handler: DiscoveryAvailableActionsOp
+        args:
+          - name: domain
+            type: string
+            required: true
+            description: "Target domain"
+          - name: entity-type
+            type: string
+            required: true
+            description: "Subject entity type"
+          - name: aspect
+            type: string
+            required: false
+            description: "Optional phase tag filter"
+          - name: polarity
+            type: string
+            required: false
+            default: all
+            description: "read, write, or all"
+            valid_values: [read, write, all]
+        returns:
+          type: record
+          name: action_surface
+
+      verb-detail:
+        description: "Return the full contract for a verb"
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: discovery
+          subject_kinds: []
+          phase_tags: [discovery]
+          side_effects: facts_only
+          harm_class: read_only
+          action_class: describe
+        invocation_phrases:
+          - "describe this verb"
+          - "show verb detail"
+        behavior: plugin
+        handler: DiscoveryVerbDetailOp
+        args:
+          - name: verb-id
+            type: string
+            required: true
+            description: "Fully qualified verb id"
+        returns:
+          type: record
+          name: verb_contract
+
+      inspect-data:
+        description: "Inspect entity-scoped data for a domain and optional aspect"
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: discovery
+          subject_kinds: [entity, cbu, fund, person, company]
+          phase_tags: [discovery]
+          side_effects: facts_only
+          harm_class: read_only
+          action_class: read
+        invocation_phrases:
+          - "inspect data"
+          - "show the data behind this"
+        behavior: plugin
+        handler: DiscoveryInspectDataOp
+        args:
+          - name: entity-id
+            type: uuid
+            required: true
+            description: "Entity to inspect"
+            lookup:
+              table: entities
+              schema: ob-poc
+              entity_type: entity
+              search_key: name
+              primary_key: entity_id
+          - name: domain
+            type: string
+            required: true
+            description: "Domain to inspect"
+          - name: aspect
+            type: string
+            required: false
+            description: "Optional phase/aspect"
+          - name: depth
+            type: string
+            required: false
+            default: summary
+            valid_values: [summary, detail]
+            description: "Summary or detail response"
+        returns:
+          type: record
+          name: data_snapshot
+
+      search-data:
+        description: "Search data and schema-adjacent surfaces for a scoped entity"
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: discovery
+          subject_kinds: [entity, cbu, fund, person, company]
+          phase_tags: [discovery]
+          side_effects: facts_only
+          harm_class: read_only
+          action_class: search
+        invocation_phrases:
+          - "search this data"
+          - "find in the data"
+        behavior: plugin
+        handler: DiscoverySearchDataOp
+        args:
+          - name: entity-id
+            type: uuid
+            required: true
+            description: "Entity to inspect"
+            lookup:
+              table: entities
+              schema: ob-poc
+              entity_type: entity
+              search_key: name
+              primary_key: entity_id
+          - name: domain
+            type: string
+            required: true
+            description: "Domain to search"
+          - name: query
+            type: string
+            required: true
+            description: "Search query"
+          - name: aspect
+            type: string
+            required: false
+            description: "Optional phase/aspect"
+          - name: max-results
+            type: integer
+            required: false
+            default: 20
+            description: "Maximum number of results"
+        returns:
+          type: record
+          name: data_search_results

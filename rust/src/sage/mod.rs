@@ -44,6 +44,7 @@ pub mod pre_classify;
 
 // Phase 1.4
 pub mod arg_assembly;
+pub mod clash_matrix;
 pub mod coder;
 pub mod context;
 pub mod deterministic;
@@ -53,6 +54,7 @@ pub mod verb_resolve;
 
 // Re-export core types for convenience
 pub use arg_assembly::assemble_args_from_step;
+pub use clash_matrix::{build_clash_matrix, render_clash_reports, ClashRow};
 pub use coder::{CoderEngine, CoderResolution, CoderResult};
 pub use context::{RecentIntent, SageContext};
 pub use deterministic::DeterministicSage;

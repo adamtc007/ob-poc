@@ -12,14 +12,14 @@ domains:
       Manages the agent loop lifecycle: start, pause, resume, stop.
       Handles checkpoint confirmations for ambiguous decisions.
     invocation_hints:
-    - "start agent"
-    - "run autonomously"
-    - "agent mode"
-    - "research mode"
-    - "pause agent"
-    - "stop agent"
-    - "resume"
-    - "continue research"
+      - "start agent"
+      - "run autonomously"
+      - "agent mode"
+      - "research mode"
+      - "pause agent"
+      - "stop agent"
+      - "resume"
+      - "continue research"
     verbs:
       # ============================================
       # Lifecycle Operations
@@ -34,46 +34,48 @@ domains:
           category: agent_control
           context: interactive_only
           side_effects: state_write
+          harm_class: reversible
+          action_class: execute
           subject_kinds: []
           phase_tags: [navigation]
         behavior: plugin
         handler: AgentStartOp
         invocation_phrases:
-        - "start the agent"
-        - "run research automatically"
-        - "start autonomous mode"
-        - "resolve gaps for"
-        - "enrich"
-        - "research this entity"
+          - "start the agent"
+          - "run research automatically"
+          - "start autonomous mode"
+          - "resolve gaps for"
+          - "enrich"
+          - "research this entity"
         args:
-        - name: task
-          type: string
-          required: true
-          description: |
-            Task type: resolve-gaps, chain-research, enrich-entity,
-            enrich-group, screen-entities
-        - name: entity-id
-          type: uuid
-          required: false
-          maps_to: target_entity_id
-          description: Target entity for the task (if applicable)
-          lookup:
-            table: entities
-            schema: ob-poc
-            entity_type: entity
-            search_key: name
-            primary_key: entity_id
-        - name: max-iterations
-          type: integer
-          required: false
-          default: 50
-          description: Maximum loop iterations before stopping
-        - name: mode
-          type: string
-          required: false
-          default: hybrid
-          description: |
-            Agent mode: agent (fully autonomous), hybrid (checkpoints on ambiguous)
+          - name: task
+            type: string
+            required: true
+            description: |
+              Task type: resolve-gaps, chain-research, enrich-entity,
+              enrich-group, screen-entities
+          - name: entity-id
+            type: uuid
+            required: false
+            maps_to: target_entity_id
+            description: Target entity for the task (if applicable)
+            lookup:
+              table: entities
+              schema: ob-poc
+              entity_type: entity
+              search_key: name
+              primary_key: entity_id
+          - name: max-iterations
+            type: integer
+            required: false
+            default: 50
+            description: Maximum loop iterations before stopping
+          - name: mode
+            type: string
+            required: false
+            default: hybrid
+            description: |
+              Agent mode: agent (fully autonomous), hybrid (checkpoints on ambiguous)
         returns:
           type: uuid
           name: agent_session_id
@@ -89,15 +91,17 @@ domains:
           category: agent_control
           context: interactive_only
           side_effects: state_write
+          harm_class: reversible
+          action_class: execute
           subject_kinds: []
           phase_tags: [navigation]
         behavior: plugin
         handler: AgentPauseOp
         invocation_phrases:
-        - "pause the agent"
-        - "pause research"
-        - "hold on"
-        - "wait"
+          - "pause the agent"
+          - "pause research"
+          - "hold on"
+          - "wait"
         args: []
         returns:
           type: affected
@@ -112,15 +116,17 @@ domains:
           category: agent_control
           context: interactive_only
           side_effects: state_write
+          harm_class: reversible
+          action_class: execute
           subject_kinds: []
           phase_tags: [navigation]
         behavior: plugin
         handler: AgentResumeOp
         invocation_phrases:
-        - "resume the agent"
-        - "continue research"
-        - "keep going"
-        - "go ahead"
+          - "resume the agent"
+          - "continue research"
+          - "keep going"
+          - "go ahead"
         args: []
         returns:
           type: affected
@@ -135,15 +141,17 @@ domains:
           category: agent_control
           context: interactive_only
           side_effects: state_write
+          harm_class: reversible
+          action_class: execute
           subject_kinds: []
           phase_tags: [navigation]
         behavior: plugin
         handler: AgentStopOp
         invocation_phrases:
-        - "stop the agent"
-        - "cancel research"
-        - "abort"
-        - "stop"
+          - "stop the agent"
+          - "cancel research"
+          - "abort"
+          - "stop"
         args: []
         returns:
           type: affected
@@ -151,8 +159,8 @@ domains:
       # ============================================
       # Checkpoint Operations
       # ============================================
-      confirm:
-        description: Confirm a checkpoint decision
+      confirm-decision:
+        description: Confirm the current checkpoint decision
         metadata:
           tier: intent
           source_of_truth: session
@@ -161,31 +169,33 @@ domains:
           category: agent_control
           context: interactive_only
           side_effects: state_write
+          harm_class: reversible
+          action_class: approve
           subject_kinds: []
           phase_tags: [navigation]
         behavior: plugin
         handler: AgentConfirmOp
         invocation_phrases:
-        - "confirm"
-        - "yes, use that one"
-        - "proceed with"
-        - "that's correct"
-        - "accept"
+          - "confirm decision"
+          - "yes, use that one"
+          - "proceed with"
+          - "that's correct"
+          - "accept"
         args:
-        - name: checkpoint-id
-          type: uuid
-          required: false
-          maps_to: checkpoint_id
-          description: Checkpoint to confirm (uses current if not specified)
-        - name: selected-candidate
-          type: integer
-          required: false
-          default: 0
-          description: Index of selected candidate (0-based)
+          - name: checkpoint-id
+            type: uuid
+            required: false
+            maps_to: checkpoint_id
+            description: Checkpoint to confirm (uses current if not specified)
+          - name: selected-candidate
+            type: integer
+            required: false
+            default: 0
+            description: Index of selected candidate (0-based)
         returns:
           type: affected
 
-      reject:
+      reject-decision:
         description: Reject a checkpoint and skip this decision
         metadata:
           tier: intent
@@ -195,29 +205,31 @@ domains:
           category: agent_control
           context: interactive_only
           side_effects: state_write
+          harm_class: reversible
+          action_class: reject
           subject_kinds: []
           phase_tags: [navigation]
         behavior: plugin
         handler: AgentRejectOp
         invocation_phrases:
-        - "reject"
-        - "no, skip this"
-        - "none of these"
-        - "skip"
+          - "reject"
+          - "no, skip this"
+          - "none of these"
+          - "skip"
         args:
-        - name: checkpoint-id
-          type: uuid
-          required: false
-          maps_to: checkpoint_id
-          description: Checkpoint to reject (uses current if not specified)
-        - name: reason
-          type: string
-          required: false
-          description: Reason for rejection
+          - name: checkpoint-id
+            type: uuid
+            required: false
+            maps_to: checkpoint_id
+            description: Checkpoint to reject (uses current if not specified)
+          - name: reason
+            type: string
+            required: false
+            description: Reason for rejection
         returns:
           type: affected
 
-      select:
+      select-decision-option:
         description: Select a specific candidate from checkpoint options
         metadata:
           tier: intent
@@ -227,33 +239,35 @@ domains:
           category: agent_control
           context: interactive_only
           side_effects: state_write
+          harm_class: reversible
+          action_class: review
           subject_kinds: []
           phase_tags: [navigation]
         behavior: plugin
         handler: AgentSelectOp
         invocation_phrases:
-        - "select option"
-        - "use the first one"
-        - "use the second one"
-        - "pick"
+          - "select option"
+          - "use the first one"
+          - "use the second one"
+          - "pick"
         args:
-        - name: checkpoint-id
-          type: uuid
-          required: false
-          maps_to: checkpoint_id
-          description: Checkpoint to respond to (uses current if not specified)
-        - name: candidate-index
-          type: integer
-          required: true
-          description: Index of selected candidate (0-based)
+          - name: checkpoint-id
+            type: uuid
+            required: false
+            maps_to: checkpoint_id
+            description: Checkpoint to respond to (uses current if not specified)
+          - name: candidate-index
+            type: integer
+            required: true
+            description: Index of selected candidate (0-based)
         returns:
           type: affected
 
       # ============================================
       # Status Operations
       # ============================================
-      status:
-        description: Get current agent status
+      read-status:
+        description: Read current agent status
         metadata:
           tier: diagnostics
           source_of_truth: session
@@ -262,22 +276,24 @@ domains:
           category: agent_task
           context: scripted_ok
           side_effects: facts_only
+          harm_class: read_only
+          action_class: read
           subject_kinds: []
           phase_tags: [navigation]
         behavior: plugin
         handler: AgentStatusOp
         invocation_phrases:
-        - "agent status"
-        - "what is the agent doing"
-        - "research status"
-        - "progress"
+          - "agent status"
+          - "what is the agent doing"
+          - "research status"
+          - "progress"
         args: []
         returns:
           type: record
           capture: false
 
-      history:
-        description: Get agent decision and action history for current session
+      read-history:
+        description: Read agent decision and action history for current session
         metadata:
           tier: intent
           source_of_truth: session
@@ -286,21 +302,23 @@ domains:
           category: agent_task
           context: scripted_ok
           side_effects: facts_only
+          harm_class: read_only
+          action_class: read
           subject_kinds: []
           phase_tags: [navigation]
         behavior: plugin
         handler: AgentHistoryOp
         invocation_phrases:
-        - "agent history"
-        - "what did the agent do"
-        - "show decisions"
-        - "show actions"
+          - "agent history"
+          - "what did the agent do"
+          - "show decisions"
+          - "show actions"
         args:
-        - name: limit
-          type: integer
-          required: false
-          default: 50
-          description: Maximum entries to return
+          - name: limit
+            type: integer
+            required: false
+            default: 50
+            description: Maximum entries to return
         returns:
           type: record
           capture: false
@@ -308,7 +326,7 @@ domains:
       # ============================================
       # Configuration Operations
       # ============================================
-      set-threshold:
+      set-selection-threshold:
         description: Set confidence thresholds for auto-selection
         metadata:
           tier: intent
@@ -318,33 +336,35 @@ domains:
           category: agent_control
           context: interactive_only
           side_effects: state_write
+          harm_class: reversible
+          action_class: update
           subject_kinds: []
           phase_tags: [navigation]
         invocation_phrases:
-        - "set confidence threshold"
-        - "adjust auto-proceed threshold"
-        - "change agent threshold"
-        - "configure confidence level"
-        - "set ambiguity floor"
-        - "tune matching sensitivity"
-        - "adjust selection threshold"
-        - "modify confidence settings"
+          - "set confidence threshold"
+          - "adjust auto-proceed threshold"
+          - "change agent threshold"
+          - "configure confidence level"
+          - "set ambiguity floor"
+          - "tune matching sensitivity"
+          - "adjust selection threshold"
+          - "modify confidence settings"
         behavior: plugin
         handler: AgentSetThresholdOp
         args:
-        - name: auto-proceed
-          type: decimal
-          required: false
-          description: Confidence threshold for auto-proceed (default 0.90)
-        - name: ambiguous-floor
-          type: decimal
-          required: false
-          description: Minimum confidence for checkpoint (default 0.70)
+          - name: auto-proceed
+            type: decimal
+            required: false
+            description: Confidence threshold for auto-proceed (default 0.90)
+          - name: ambiguous-floor
+            type: decimal
+            required: false
+            description: Minimum confidence for checkpoint (default 0.70)
         returns:
           type: affected
 
-      set-mode:
-        description: Switch between agent and hybrid modes
+      set-execution-mode:
+        description: Set the agent execution mode
         metadata:
           tier: intent
           source_of_truth: session
@@ -353,31 +373,33 @@ domains:
           category: agent_control
           context: interactive_only
           side_effects: state_write
+          harm_class: reversible
+          action_class: update
           subject_kinds: []
           phase_tags: [navigation]
         invocation_phrases:
-        - "set agent mode"
-        - "switch to agent mode"
-        - "switch to hybrid mode"
-        - "change agent operating mode"
-        - "go fully autonomous"
-        - "enable manual mode"
-        - "toggle agent mode"
-        - "change to hybrid"
+          - "set agent mode"
+          - "switch to agent mode"
+          - "switch to hybrid mode"
+          - "change agent operating mode"
+          - "go fully autonomous"
+          - "enable manual mode"
+          - "toggle agent mode"
+          - "change to hybrid"
         behavior: plugin
         handler: AgentSetModeOp
         args:
-        - name: mode
-          type: string
-          required: true
-          description: |
-            Mode: manual (no agent), agent (fully autonomous),
-            hybrid (checkpoints on ambiguous)
+          - name: mode
+            type: string
+            required: true
+            description: |
+              Mode: manual (no agent), agent (fully autonomous),
+              hybrid (checkpoints on ambiguous)
         returns:
           type: affected
 
       set-authoring-mode:
-        description: Switch between Research and Governed authoring modes
+        description: Set the authoring mode boundary
         metadata:
           tier: intent
           source_of_truth: session
@@ -386,33 +408,35 @@ domains:
           category: agent_control
           context: interactive_only
           side_effects: state_write
+          harm_class: reversible
+          action_class: update
           subject_kinds: []
           phase_tags: [navigation]
         behavior: plugin
         handler: AgentSetAuthoringModeOp
         invocation_phrases:
-        - "switch to research mode"
-        - "enter research mode"
-        - "switch to governed mode"
-        - "enter governed mode"
-        - "set authoring mode"
+          - "switch to research mode"
+          - "enter research mode"
+          - "switch to governed mode"
+          - "enter governed mode"
+          - "set authoring mode"
         args:
-        - name: mode
-          type: string
-          required: true
-          description: |
-            Authoring mode: research (exploration, ChangeSet authoring,
-            full schema introspection) or governed (business operations,
-            publish, limited introspection). Default is governed.
-          valid_values:
-          - research
-          - governed
-        - name: confirm
-          type: boolean
-          required: false
-          description: |
-            Explicit confirmation required for mode switch. Must be true
-            to proceed.
+          - name: mode
+            type: string
+            required: true
+            description: |
+              Authoring mode: research (exploration, ChangeSet authoring,
+              full schema introspection) or governed (business operations,
+              publish, limited introspection). Default is governed.
+            valid_values:
+              - research
+              - governed
+          - name: confirm
+            type: boolean
+            required: false
+            description: |
+              Explicit confirmation required for mode switch. Must be true
+              to proceed.
         returns:
           type: affected
 
@@ -428,30 +452,32 @@ domains:
           noun: phrase_mapping
           category: agent_task
           context: scripted_ok
-          side_effects: facts_only
+          side_effects: state_write
+          harm_class: reversible
+          action_class: create
           subject_kinds: []
           phase_tags: [navigation]
         behavior: plugin
         handler: AgentTeachOp
         invocation_phrases:
-        - "teach the system"
-        - "learn this phrase"
-        - "remember this mapping"
-        - "when I say X do Y"
+          - "teach the system"
+          - "learn this phrase"
+          - "remember this mapping"
+          - "when I say X do Y"
         args:
-        - name: phrase
-          type: string
-          required: true
-          description: The phrase to teach (will be normalized)
-        - name: verb
-          type: string
-          required: true
-          description: The DSL verb it should trigger (e.g., 'cbu.create')
-        - name: source
-          type: string
-          required: false
-          default: dsl_teaching
-          description: Source identifier for audit trail
+          - name: phrase
+            type: string
+            required: true
+            description: The phrase to teach (will be normalized)
+          - name: verb
+            type: string
+            required: true
+            description: The DSL verb it should trigger (e.g., 'cbu.create')
+          - name: source
+            type: string
+            required: false
+            default: dsl_teaching
+            description: Source identifier for audit trail
         returns:
           type: record
           capture: false
@@ -465,36 +491,38 @@ domains:
           noun: phrase_mapping
           category: agent_task
           context: scripted_ok
-          side_effects: facts_only
+          side_effects: state_write
+          harm_class: reversible
+          action_class: remove
           subject_kinds: []
           phase_tags: [navigation]
         behavior: plugin
         handler: AgentUnteachOp
         invocation_phrases:
-        - "unteach"
-        - "forget this phrase"
-        - "remove this mapping"
-        - "unlearn"
+          - "unteach"
+          - "forget this phrase"
+          - "remove this mapping"
+          - "unlearn"
         args:
-        - name: phrase
-          type: string
-          required: true
-          description: The phrase to remove
-        - name: verb
-          type: string
-          required: false
-          description: The verb it was mapped to (optional, removes all if not specified)
-        - name: reason
-          type: string
-          required: false
-          default: dsl_unteach
-          description: Reason for removal (for audit)
+          - name: phrase
+            type: string
+            required: true
+            description: The phrase to remove
+          - name: verb
+            type: string
+            required: false
+            description: The verb it was mapped to (optional, removes all if not specified)
+          - name: reason
+            type: string
+            required: false
+            default: dsl_unteach
+            description: Reason for removal (for audit)
         returns:
           type: record
           capture: false
 
-      teaching-status:
-        description: Show recently taught patterns and their embedding status
+      read-teaching-status:
+        description: Read recently taught patterns and their embedding status
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -503,26 +531,28 @@ domains:
           category: agent_task
           context: scripted_ok
           side_effects: facts_only
+          harm_class: read_only
+          action_class: read
           subject_kinds: []
           phase_tags: [navigation]
         behavior: plugin
         handler: AgentTeachingStatusOp
         invocation_phrases:
-        - "teaching status"
-        - "what have I taught"
-        - "show taught phrases"
-        - "list learned patterns"
+          - "teaching status"
+          - "what have I taught"
+          - "show taught phrases"
+          - "list learned patterns"
         args:
-        - name: limit
-          type: integer
-          required: false
-          default: 20
-          description: Maximum patterns to return
-        - name: include-stats
-          type: boolean
-          required: false
-          default: true
-          description: Include aggregate statistics
+          - name: limit
+            type: integer
+            required: false
+            default: 20
+            description: Maximum patterns to return
+          - name: include-stats
+            type: boolean
+            required: false
+            default: true
+            description: Include aggregate statistics
         returns:
           type: record
           capture: false
@@ -530,8 +560,8 @@ domains:
       # ============================================
       # Mode & Policy Introspection
       # ============================================
-      get-mode:
-        description: Get the current agent operating mode (Research or Governed)
+      read-mode:
+        description: Read the current agent operating mode (Research or Governed)
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -540,24 +570,26 @@ domains:
           category: agent_status
           context: scripted_ok
           side_effects: facts_only
+          harm_class: read_only
+          action_class: read
           subject_kinds: []
           phase_tags: [navigation]
         behavior: plugin
         handler: AgentGetModeOp
         invocation_phrases:
-        - "get agent mode"
-        - "what mode am I in"
-        - "current agent mode"
-        - "show agent mode"
-        - "am I in research mode"
-        - "am I in governed mode"
+          - "read agent mode"
+          - "what mode am I in"
+          - "current agent mode"
+          - "show agent mode"
+          - "am I in research mode"
+          - "am I in governed mode"
         args: []
         returns:
           type: record
           capture: false
 
-      get-policy:
-        description: Get the current PolicyGate configuration and active policy snapshot
+      read-policy:
+        description: Read the current PolicyGate configuration and active policy snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -566,16 +598,18 @@ domains:
           category: agent_status
           context: scripted_ok
           side_effects: facts_only
+          harm_class: read_only
+          action_class: read
           subject_kinds: []
           phase_tags: [navigation]
         behavior: plugin
         handler: AgentGetPolicyOp
         invocation_phrases:
-        - "get policy"
-        - "show policy gate"
-        - "current policy"
-        - "policy configuration"
-        - "what policies are active"
+          - "read policy"
+          - "show policy gate"
+          - "current policy"
+          - "policy configuration"
+          - "what policies are active"
         args: []
         returns:
           type: record
@@ -591,27 +625,29 @@ domains:
           category: agent_status
           context: scripted_ok
           side_effects: facts_only
+          harm_class: read_only
+          action_class: list
           subject_kinds: []
           phase_tags: [navigation]
         behavior: plugin
         handler: AgentListToolsOp
         invocation_phrases:
-        - "list tools"
-        - "what tools are available"
-        - "show available tools"
-        - "list MCP tools"
-        - "tool inventory"
+          - "list tools"
+          - "what tools are available"
+          - "show available tools"
+          - "list MCP tools"
+          - "tool inventory"
         args:
-        - name: category
-          type: string
-          required: false
-          description: "Optional category filter (e.g., registry, taxonomy, planning)"
+          - name: category
+            type: string
+            required: false
+            description: "Optional category filter (e.g., registry, taxonomy, planning)"
         returns:
           type: record_set
           capture: false
 
-      telemetry-summary:
-        description: Query intent event telemetry for hit-rate analysis and pipeline health
+      read-telemetry-summary:
+        description: Read intent event telemetry for hit-rate analysis and pipeline health
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -620,37 +656,39 @@ domains:
           category: agent_status
           context: scripted_ok
           side_effects: facts_only
+          harm_class: read_only
+          action_class: read
           subject_kinds: []
           phase_tags: [navigation]
         behavior: plugin
         handler: AgentTelemetrySummaryOp
         invocation_phrases:
-        - "telemetry summary"
-        - "intent telemetry"
-        - "show pipeline health"
-        - "intent hit rate"
-        - "how is the pipeline performing"
+          - "read telemetry summary"
+          - "intent telemetry"
+          - "show pipeline health"
+          - "intent hit rate"
+          - "how is the pipeline performing"
         args:
-        - name: days-back
-          type: integer
-          required: false
-          default: 7
-          description: Number of days to look back
-        - name: min-count
-          type: integer
-          required: false
-          default: 2
-          description: Minimum event count threshold for inclusion
-        - name: include-ccir
-          type: boolean
-          required: false
-          default: false
-          description: Include CCIR fingerprint and prune statistics
+          - name: days-back
+            type: integer
+            required: false
+            default: 7
+            description: Number of days to look back
+          - name: min-count
+            type: integer
+            required: false
+            default: 2
+            description: Minimum event count threshold for inclusion
+          - name: include-ccir
+            type: boolean
+            required: false
+            default: false
+            description: Include CCIR fingerprint and prune statistics
         returns:
           type: record
           capture: false
 
-      learn:
+      activate-teaching:
         description: Activate taught patterns by generating embeddings for semantic search
         metadata:
           tier: intent
@@ -659,17 +697,19 @@ domains:
           noun: phrase_embedding
           category: agent_task
           context: scripted_ok
-          side_effects: facts_only
+          side_effects: state_write
+          harm_class: reversible
+          action_class: execute
           subject_kinds: []
           phase_tags: [navigation]
         behavior: plugin
         handler: AgentLearnOp
         invocation_phrases:
-        - "learn"
-        - "learn new prompts"
-        - "activate taught patterns"
-        - "embed taught phrases"
-        - "done teaching"
+          - "learn"
+          - "learn new prompts"
+          - "activate taught patterns"
+          - "embed taught phrases"
+          - "done teaching"
         args: []
         returns:
           type: record

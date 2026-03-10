@@ -1117,7 +1117,7 @@ impl ToolHandlers {
 
     /// Get teaching status via DSL execution
     ///
-    /// Routes through: (agent.teaching-status [:limit N] [:include-stats true/false])
+    /// Routes through: (agent.read-teaching-status [:limit N] [:include-stats true/false])
     pub(super) async fn teaching_status(&self, args: Value) -> Result<Value> {
         let limit = args.get("limit").and_then(|v| v.as_i64()).unwrap_or(20);
         let include_stats = args
@@ -1126,7 +1126,7 @@ impl ToolHandlers {
             .unwrap_or(true);
 
         let dsl = format!(
-            r#"(agent.teaching-status :limit {} :include-stats {})"#,
+            r#"(agent.read-teaching-status :limit {} :include-stats {})"#,
             limit, include_stats
         );
 

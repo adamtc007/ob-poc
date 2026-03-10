@@ -365,7 +365,7 @@ impl CustomOperation for AgentConfirmOp {
     }
 
     fn verb(&self) -> &'static str {
-        "confirm"
+        "confirm-decision"
     }
 
     fn rationale(&self) -> &'static str {
@@ -428,7 +428,7 @@ impl CustomOperation for AgentRejectOp {
     }
 
     fn verb(&self) -> &'static str {
-        "reject"
+        "reject-decision"
     }
 
     fn rationale(&self) -> &'static str {
@@ -491,7 +491,7 @@ impl CustomOperation for AgentSelectOp {
     }
 
     fn verb(&self) -> &'static str {
-        "select"
+        "select-decision-option"
     }
 
     fn rationale(&self) -> &'static str {
@@ -559,7 +559,7 @@ impl CustomOperation for AgentStatusOp {
     }
 
     fn verb(&self) -> &'static str {
-        "status"
+        "read-status"
     }
 
     fn rationale(&self) -> &'static str {
@@ -663,7 +663,7 @@ impl CustomOperation for AgentHistoryOp {
     }
 
     fn verb(&self) -> &'static str {
-        "history"
+        "read-history"
     }
 
     fn rationale(&self) -> &'static str {
@@ -776,7 +776,7 @@ impl CustomOperation for AgentSetThresholdOp {
     }
 
     fn verb(&self) -> &'static str {
-        "set-threshold"
+        "set-selection-threshold"
     }
 
     fn rationale(&self) -> &'static str {
@@ -840,7 +840,7 @@ impl CustomOperation for AgentSetModeOp {
     }
 
     fn verb(&self) -> &'static str {
-        "set-mode"
+        "set-execution-mode"
     }
 
     fn rationale(&self) -> &'static str {
@@ -1021,7 +1021,10 @@ impl CustomOperation for AgentTeachOp {
                 "phrase": phrase,
                 "verb": verb,
                 "source": source,
-                "message": format!("Taught: '{}' → {}. Run (agent.learn) to activate.", phrase, verb)
+                "message": format!(
+                    "Taught: '{}' → {}. Run (agent.activate-teaching) to activate.",
+                    phrase, verb
+                )
             })))
         } else {
             Ok(ExecutionResult::Record(json!({
@@ -1124,7 +1127,7 @@ impl CustomOperation for AgentTeachingStatusOp {
     }
 
     fn verb(&self) -> &'static str {
-        "teaching-status"
+        "read-teaching-status"
     }
 
     fn rationale(&self) -> &'static str {
@@ -1235,7 +1238,7 @@ impl CustomOperation for AgentGetModeOp {
     }
 
     fn verb(&self) -> &'static str {
-        "get-mode"
+        "read-mode"
     }
 
     fn rationale(&self) -> &'static str {
@@ -1294,7 +1297,7 @@ impl CustomOperation for AgentGetPolicyOp {
     }
 
     fn verb(&self) -> &'static str {
-        "get-policy"
+        "read-policy"
     }
 
     fn rationale(&self) -> &'static str {
@@ -1423,7 +1426,7 @@ impl CustomOperation for AgentTelemetrySummaryOp {
     }
 
     fn verb(&self) -> &'static str {
-        "telemetry-summary"
+        "read-telemetry-summary"
     }
 
     fn rationale(&self) -> &'static str {
@@ -1591,7 +1594,7 @@ impl CustomOperation for AgentLearnOp {
     }
 
     fn verb(&self) -> &'static str {
-        "learn"
+        "activate-teaching"
     }
 
     fn rationale(&self) -> &'static str {

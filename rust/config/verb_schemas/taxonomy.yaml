@@ -108,22 +108,22 @@ domains:
           - view.entity-forest
           - view.zoom-in
           - view.zoom-out
-          - view.back-to
+          - view.navigate-back-to
       - id: filter
         label: Filter & Refine
         description: Filter visible items
         verbs:
           - view.refine
-          - view.clear
-          - view.select
+          - view.clear-refinements
+          - view.set-selection
       - id: layout
         label: Layout
         description: Change layout strategy
         verbs:
-          - view.layout
-          - view.status
-          - view.selection-info
-          - view.breadcrumbs
+          - view.set-layout
+          - view.read-status
+          - view.read-selection-info
+          - view.read-breadcrumbs
 
   # ===========================================================================
   # UBO / OWNERSHIP
@@ -495,5 +495,5 @@ domains:
         label: Status
         description: System status
         verbs:
-          - agent.status
+          - agent.read-status
           - agent.version

@@ -1,0 +1,29 @@
+[[case]]
+verb_a = "deal.list-active-rate-cards"
+verb_b = "deal.read-record"
+expected_kind = "ActionDifferentiable"
+notes = "deal detail read vs active rate-card read share deal-id but differ by action"
+
+[[case]]
+verb_a = "cbu.add-product"
+verb_b = "cbu.remove-product"
+expected_kind = "ActionDifferentiable"
+notes = "same cbu-id/product signature but opposite mutation action"
+
+[[case]]
+verb_a = "service-resource.activate"
+verb_b = "service-resource.activate-lifecycle"
+expected_kind = "StateDifferentiable"
+notes = "same instance-id signature but instance-state vs lifecycle-state action"
+
+[[case]]
+verb_a = "agent.confirm-decision"
+verb_b = "agent.read-mode"
+expected_kind = "ActionDifferentiable"
+notes = "pending-state confirmation vs safe read mode query"
+
+[[case]]
+verb_a = "cbu.delete"
+verb_b = "cbu.delete-cascade"
+expected_kind = "ContextDifferentiable"
+notes = "same delete family, differentiated by destructive context"

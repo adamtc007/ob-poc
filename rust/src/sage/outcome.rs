@@ -176,6 +176,10 @@ pub struct UtteranceHints {
     /// Whether prior-turn context was used to fill gaps.
     #[serde(default)]
     pub scope_carry_forward_used: bool,
+    /// Workflow focus active when Sage classified the utterance.
+    pub stage_focus: Option<String>,
+    /// Current entity kind carried from session state.
+    pub entity_kind: Option<String>,
     /// Whether the utterance looks like a safe inventory/list read.
     #[serde(default)]
     pub inventory_read: bool,

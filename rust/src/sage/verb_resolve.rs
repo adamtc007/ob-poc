@@ -6,6 +6,8 @@
 
 use std::collections::HashSet;
 
+use dsl_core::config::types::ActionClass;
+
 use super::outcome::OutcomeIntent;
 use super::polarity::IntentPolarity;
 use super::verb_index::{VerbMeta, VerbMetadataIndex};
@@ -17,6 +19,16 @@ pub struct ScoredVerbCandidate {
     pub score: f32,
     pub action_score: f32,
     pub param_overlap_score: f32,
+}
+
+/// Candidate counts after each deterministic filter stage.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct FilterDiagnostics {
+    pub base_candidates: usize,
+    pub domain_candidates: usize,
+    pub phase_candidates: usize,
+    pub subject_kind_candidates: usize,
+    pub final_candidates: usize,
 }
 
 /// Deterministic metadata-based verb scorer.
@@ -67,23 +79,20 @@ impl StructuredVerbScorer {
     /// ```
     pub fn score(&self, intent: &OutcomeIntent, limit: usize) -> Vec<ScoredVerbCandidate> {
         let requested_action = normalized_action_tags(intent);
+        let desired_action_classes = desired_action_classes(intent);
         let requested_params = requested_param_keys(intent);
         let intent_keywords = intent_keywords(intent);
-        let domain_hint = (!intent.domain_concept.trim().is_empty())
-            .then_some(intent.domain_concept.as_str());
-        let metas = {
-            let filtered = self.query_by_side_effects(intent, domain_hint);
-            if filtered.is_empty() && domain_hint.is_some() {
-                self.query_by_side_effects(intent, None)
-            } else {
-                filtered
-            }
-        };
+        let (metas, _) = self.candidates_for_intent(intent);
 
         let mut candidates = metas
             .into_iter()
             .map(|meta| {
-                let action_score = action_score(meta, &requested_action, &intent_keywords);
+                let action_score = action_score(
+                    meta,
+                    &requested_action,
+                    &desired_action_classes,
+                    &intent_keywords,
+                );
                 let param_overlap_score = param_overlap_score(meta, &requested_params);
                 let inventory_bias = inventory_read_bias(meta, intent);
                 let score = 0.6 * action_score + 0.4 * param_overlap_score + inventory_bias;
@@ -121,7 +130,39 @@ impl StructuredVerbScorer {
         &self.index
     }
 
-    fn query_by_side_effects<'a>(
+    /// Diagnose how many candidates survive each pre-score filter stage.
+    ///
+    /// # Examples
+    /// ```ignore
+    /// use ob_poc::sage::verb_index::VerbMetadataIndex;
+    /// use ob_poc::sage::verb_resolve::StructuredVerbScorer;
+    ///
+    /// let scorer = StructuredVerbScorer::new(VerbMetadataIndex::load()?);
+    /// // diagnostics shape depends on the intent provided at runtime
+    /// # Ok::<(), anyhow::Error>(())
+    /// ```
+    pub fn diagnose_filters(&self, intent: &OutcomeIntent) -> FilterDiagnostics {
+        let (_, diagnostics) = self.candidates_for_intent(intent);
+        diagnostics
+    }
+
+    fn candidates_for_intent<'a>(
+        &'a self,
+        intent: &OutcomeIntent,
+    ) -> (Vec<&'a VerbMeta>, FilterDiagnostics) {
+        let domain_hint = (!intent.domain_concept.trim().is_empty())
+            .then_some(intent.domain_concept.as_str());
+        let filtered = self.query_by_harm_class(intent, domain_hint);
+        if filtered.is_empty() && domain_hint.is_some() {
+            let diagnostics = self.diagnose_filter_chain(intent, None);
+            (self.query_by_harm_class(intent, None), diagnostics)
+        } else {
+            let diagnostics = self.diagnose_filter_chain(intent, domain_hint);
+            (filtered, diagnostics)
+        }
+    }
+
+    fn query_by_harm_class<'a>(
         &'a self,
         intent: &OutcomeIntent,
         domain_hint: Option<&str>,
@@ -138,18 +179,157 @@ impl StructuredVerbScorer {
         match intent.polarity {
             IntentPolarity::Read | IntentPolarity::Ambiguous => self
                 .index
-                .facts_only_verbs()
+                .read_only_verbs()
                 .filter(|meta| meta.planes.contains(&intent.plane))
                 .filter(filter_domain)
+                .filter(|meta| candidate_matches_context(meta, intent))
                 .collect(),
             IntentPolarity::Write => self
                 .index
-                .state_write_verbs()
+                .mutating_verbs()
                 .filter(|meta| meta.planes.contains(&intent.plane))
                 .filter(filter_domain)
+                .filter(|meta| candidate_matches_context(meta, intent))
                 .collect(),
         }
     }
+
+    fn diagnose_filter_chain(
+        &self,
+        intent: &OutcomeIntent,
+        domain_hint: Option<&str>,
+    ) -> FilterDiagnostics {
+        let base = self.base_candidates(intent);
+        let domain = base
+            .iter()
+            .copied()
+            .filter(|meta| self.matches_domain_filter(intent, meta, domain_hint))
+            .collect::<Vec<_>>();
+        let phase = domain
+            .iter()
+            .copied()
+            .filter(|meta| phase_tags_match(meta, intent))
+            .collect::<Vec<_>>();
+        let subject_kind = phase
+            .iter()
+            .copied()
+            .filter(|meta| subject_kinds_match(meta, intent))
+            .collect::<Vec<_>>();
+
+        FilterDiagnostics {
+            base_candidates: base.len(),
+            domain_candidates: domain.len(),
+            phase_candidates: phase.len(),
+            subject_kind_candidates: subject_kind.len(),
+            final_candidates: subject_kind.len(),
+        }
+    }
+
+    fn base_candidates<'a>(&'a self, intent: &OutcomeIntent) -> Vec<&'a VerbMeta> {
+        let by_harm: Vec<&VerbMeta> = match intent.polarity {
+            IntentPolarity::Read | IntentPolarity::Ambiguous => self.index.read_only_verbs().collect(),
+            IntentPolarity::Write => self.index.mutating_verbs().collect(),
+        };
+
+        by_harm
+            .into_iter()
+            .filter(|meta| meta.planes.contains(&intent.plane))
+            .collect()
+    }
+
+    fn matches_domain_filter(
+        &self,
+        intent: &OutcomeIntent,
+        meta: &VerbMeta,
+        domain_hint: Option<&str>,
+    ) -> bool {
+        match domain_hint {
+            Some(hint) => self
+                .index
+                .query(intent.plane, intent.polarity, Some(hint))
+                .iter()
+                .any(|candidate| candidate.fqn == meta.fqn),
+            None => true,
+        }
+    }
+}
+
+fn candidate_matches_context(meta: &VerbMeta, intent: &OutcomeIntent) -> bool {
+    phase_tags_match(meta, intent) && subject_kinds_match(meta, intent)
+}
+
+fn phase_tags_match(meta: &VerbMeta, intent: &OutcomeIntent) -> bool {
+    if meta.phase_tags.is_empty() {
+        return true;
+    }
+
+    let active_tags = active_phase_tags(intent);
+    if active_tags.is_empty() {
+        return true;
+    }
+
+    meta.phase_tags.iter().any(|tag| {
+        let tag = tag.to_ascii_lowercase();
+        active_tags.iter().any(|active| active == &tag)
+    })
+}
+
+fn active_phase_tags(intent: &OutcomeIntent) -> HashSet<String> {
+    let mut tags = HashSet::new();
+    if let Some(stage_focus) = intent.hints.stage_focus.as_deref() {
+        let normalized = stage_focus.to_ascii_lowercase();
+        if normalized.contains("kyc") {
+            tags.insert("kyc".to_string());
+        }
+        if normalized.contains("data-management") || normalized.contains("semos-data") {
+            tags.insert("data-management".to_string());
+            tags.insert("data".to_string());
+        }
+        if normalized.contains("stewardship") {
+            tags.insert("stewardship".to_string());
+        }
+        if normalized.contains("onboarding") {
+            tags.insert("onboarding".to_string());
+        }
+        if normalized.contains("trading") {
+            tags.insert("trading".to_string());
+        }
+        if normalized.contains("navigation") {
+            tags.insert("navigation".to_string());
+        }
+    }
+
+    for goal in intent.coder_handoff.constraints.iter().chain(intent.hints.explicit_domain_terms.iter()) {
+        let normalized = goal.to_ascii_lowercase();
+        if matches!(
+            normalized.as_str(),
+            "kyc" | "stewardship" | "data" | "data-management" | "onboarding" | "trading" | "navigation"
+        ) {
+            tags.insert(normalized);
+        }
+    }
+
+    tags
+}
+
+fn subject_kinds_match(meta: &VerbMeta, intent: &OutcomeIntent) -> bool {
+    if meta.subject_kinds.is_empty() {
+        return true;
+    }
+
+    let subject_kind = intent
+        .subject
+        .as_ref()
+        .and_then(|subject| subject.kind_hint.as_deref())
+        .or(intent.hints.entity_kind.as_deref());
+    let Some(subject_kind) = subject_kind.map(|value| value.to_ascii_lowercase()) else {
+        return true;
+    };
+
+    meta.subject_kinds
+        .iter()
+        .map(|kind| kind.to_ascii_lowercase())
+        .any(|kind| kind == subject_kind)
 }
 
 fn normalized_action_tags(intent: &OutcomeIntent) -> HashSet<String> {
@@ -172,6 +352,35 @@ fn normalized_action_tags(intent: &OutcomeIntent) -> HashSet<String> {
         }
     }
     tags
+}
+
+fn desired_action_classes(intent: &OutcomeIntent) -> HashSet<ActionClass> {
+    let mut classes = HashSet::from([match intent.action {
+        super::OutcomeAction::Read => {
+            if summary_suggests_collection(intent) {
+                ActionClass::List
+            } else {
+                ActionClass::Read
+            }
+        }
+        super::OutcomeAction::Create => ActionClass::Create,
+        super::OutcomeAction::Update => ActionClass::Update,
+        super::OutcomeAction::Delete => ActionClass::Delete,
+        super::OutcomeAction::Assign => ActionClass::Assign,
+        super::OutcomeAction::Import => ActionClass::Import,
+        super::OutcomeAction::Search => ActionClass::Search,
+        super::OutcomeAction::Compute => ActionClass::Compute,
+        super::OutcomeAction::Publish => ActionClass::Approve,
+        super::OutcomeAction::Other(_) => ActionClass::Read,
+    }]);
+
+    if matches!(intent.polarity, IntentPolarity::Read | IntentPolarity::Ambiguous)
+        && summary_suggests_collection(intent)
+    {
+        classes.insert(ActionClass::List);
+    }
+
+    classes
 }
 
 fn summary_suggests_collection(intent: &OutcomeIntent) -> bool {
@@ -243,8 +452,13 @@ fn intent_keywords(intent: &OutcomeIntent) -> HashSet<String> {
 fn action_score(
     meta: &VerbMeta,
     requested_action: &HashSet<String>,
+    desired_action_classes: &HashSet<ActionClass>,
     intent_keywords: &HashSet<String>,
 ) -> f32 {
+    if desired_action_classes.contains(&meta.action_class) {
+        return 0.95;
+    }
+
     let verb_name = meta.verb_name.to_ascii_lowercase();
     if requested_action.contains(&verb_name) {
         return 0.8;
@@ -332,6 +546,8 @@ mod tests {
     use super::*;
     use std::collections::HashMap;
 
+    use dsl_core::config::types::{ActionClass, HarmClass};
+
     use crate::sage::verb_index::VerbMeta;
     use crate::sage::{
         Clarification, CoderHandoff, EntityRef, IntentPolarity, ObservationPlane, OutcomeAction,
@@ -368,6 +584,23 @@ mod tests {
                 }
                 .to_string(),
             ),
+            harm_class: match polarity {
+                IntentPolarity::Read | IntentPolarity::Ambiguous => HarmClass::ReadOnly,
+                IntentPolarity::Write => HarmClass::Reversible,
+            },
+            action_class: match polarity {
+                IntentPolarity::Read | IntentPolarity::Ambiguous => {
+                    if verb_name == "list" || verb_name.starts_with("list-") {
+                        ActionClass::List
+                    } else {
+                        ActionClass::Read
+                    }
+                }
+                IntentPolarity::Write => ActionClass::Create,
+            },
+            subject_kinds: vec![],
+            phase_tags: vec![],
+            requires_subject: true,
             planes,
             action_tags: action_tags.iter().map(|s| s.to_string()).collect(),
             param_names: params.iter().map(|s| s.to_string()).collect(),
@@ -470,6 +703,147 @@ mod tests {
     }
 
     #[test]
+    fn scorer_excludes_destructive_candidates_for_ambiguous_reads() {
+        let mut list = sample_meta(
+            "cbu.list",
+            IntentPolarity::Read,
+            vec![ObservationPlane::Instance],
+            &["list", "cbu"],
+            &[],
+            "List CBUs",
+        );
+        list.harm_class = HarmClass::ReadOnly;
+
+        let mut delete = sample_meta(
+            "cbu.delete",
+            IntentPolarity::Write,
+            vec![ObservationPlane::Instance],
+            &["delete", "cbu"],
+            &["cbu-id"],
+            "Delete a CBU",
+        );
+        delete.harm_class = HarmClass::Destructive;
+
+        let scorer = StructuredVerbScorer::new(index_with(vec![list, delete]));
+        let intent = OutcomeIntent {
+            summary: "show me the cbus".to_string(),
+            plane: ObservationPlane::Instance,
+            polarity: IntentPolarity::Ambiguous,
+            domain_concept: "cbu".to_string(),
+            action: OutcomeAction::Read,
+            subject: None,
+            steps: vec![],
+            confidence: SageConfidence::Medium,
+            pending_clarifications: vec![],
+            hints: UtteranceHints::default(),
+            explain: SageExplain::default(),
+            coder_handoff: CoderHandoff::default(),
+        };
+
+        let candidates = scorer.score(&intent, 5);
+        assert_eq!(candidates.len(), 1);
+        assert_eq!(candidates[0].fqn, "cbu.list");
+    }
+
+    #[test]
+    fn scorer_filters_by_phase_tags_when_stage_focus_is_known() {
+        let mut kyc = sample_meta(
+            "deal.list",
+            IntentPolarity::Read,
+            vec![ObservationPlane::Instance],
+            &["list", "deal"],
+            &[],
+            "List deals",
+        );
+        kyc.phase_tags = vec!["kyc".to_string()];
+
+        let mut onboarding = sample_meta(
+            "deal.list-onboarding",
+            IntentPolarity::Read,
+            vec![ObservationPlane::Instance],
+            &["list", "deal"],
+            &[],
+            "List onboarding deals",
+        );
+        onboarding.phase_tags = vec!["onboarding".to_string()];
+
+        let scorer = StructuredVerbScorer::new(index_with(vec![kyc, onboarding]));
+        let mut intent = OutcomeIntent {
+            summary: "show me the deals".to_string(),
+            plane: ObservationPlane::Instance,
+            polarity: IntentPolarity::Read,
+            domain_concept: "deal".to_string(),
+            action: OutcomeAction::Read,
+            subject: None,
+            steps: vec![],
+            confidence: SageConfidence::Medium,
+            pending_clarifications: vec![],
+            hints: UtteranceHints {
+                stage_focus: Some("semos-kyc".to_string()),
+                ..UtteranceHints::default()
+            },
+            explain: SageExplain::default(),
+            coder_handoff: CoderHandoff::default(),
+        };
+
+        let candidates = scorer.score(&intent, 5);
+        assert_eq!(candidates.len(), 1);
+        assert_eq!(candidates[0].fqn, "deal.list");
+
+        intent.hints.stage_focus = Some("onboarding".to_string());
+        let candidates = scorer.score(&intent, 5);
+        assert_eq!(candidates.len(), 1);
+        assert_eq!(candidates[0].fqn, "deal.list-onboarding");
+    }
+
+    #[test]
+    fn scorer_filters_by_subject_kind_when_present() {
+        let mut cbu = sample_meta(
+            "cbu.update",
+            IntentPolarity::Write,
+            vec![ObservationPlane::Instance],
+            &["update", "cbu"],
+            &["cbu-id"],
+            "Update a CBU",
+        );
+        cbu.subject_kinds = vec!["cbu".to_string()];
+
+        let mut fund = sample_meta(
+            "fund.update",
+            IntentPolarity::Write,
+            vec![ObservationPlane::Instance],
+            &["update", "fund"],
+            &["fund-id"],
+            "Update a fund",
+        );
+        fund.subject_kinds = vec!["fund".to_string()];
+
+        let scorer = StructuredVerbScorer::new(index_with(vec![cbu, fund]));
+        let intent = OutcomeIntent {
+            summary: "update this cbu".to_string(),
+            plane: ObservationPlane::Instance,
+            polarity: IntentPolarity::Write,
+            domain_concept: "cbu".to_string(),
+            action: OutcomeAction::Update,
+            subject: Some(EntityRef {
+                mention: "this cbu".to_string(),
+                kind_hint: Some("cbu".to_string()),
+                uuid: None,
+            }),
+            steps: vec![],
+            confidence: SageConfidence::Medium,
+            pending_clarifications: vec![],
+            hints: UtteranceHints::default(),
+            explain: SageExplain::default(),
+            coder_handoff: CoderHandoff::default(),
+        };
+
+        let candidates = scorer.score(&intent, 5);
+        assert_eq!(candidates.len(), 1);
+        assert_eq!(candidates[0].fqn, "cbu.update");
+    }
+
+    #[test]
     fn scorer_prefers_exact_action_and_param_overlap() {
         let scorer = StructuredVerbScorer::new(index_with(vec![
             sample_meta(
@@ -507,7 +881,7 @@ mod tests {
                 "List deals with optional filters",
             ),
             sample_meta(
-                "deal.search",
+                "deal.search-records",
                 IntentPolarity::Read,
                 vec![ObservationPlane::Instance],
                 &["search", "deal"],
@@ -552,7 +926,7 @@ mod tests {
             coder_handoff: CoderHandoff::default(),
         };
         let scorer = StructuredVerbScorer::new(index_with(vec![sample_meta(
-            "deal.timeline",
+            "deal.read-timeline",
             IntentPolarity::Read,
             vec![ObservationPlane::Instance],
             &["deal"],

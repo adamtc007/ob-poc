@@ -8,7 +8,9 @@ use std::collections::HashMap;
 
 use anyhow::Result;
 use dsl_core::config::loader::ConfigLoader;
-use dsl_core::config::types::{CrudOperation, VerbConfig, VerbMetadata, VerbTier, VerbsConfig};
+use dsl_core::config::types::{
+    ActionClass, CrudOperation, HarmClass, VerbConfig, VerbMetadata, VerbTier, VerbsConfig,
+};
 
 use crate::dsl_v2::runtime_registry::RuntimeVerbRegistry;
 
@@ -22,6 +24,11 @@ pub struct VerbMeta {
     pub verb_name: String,
     pub polarity: IntentPolarity,
     pub side_effects: Option<String>,
+    pub harm_class: HarmClass,
+    pub action_class: ActionClass,
+    pub subject_kinds: Vec<String>,
+    pub phase_tags: Vec<String>,
+    pub requires_subject: bool,
     pub planes: Vec<ObservationPlane>,
     pub action_tags: Vec<String>,
     pub param_names: Vec<String>,
@@ -121,6 +128,22 @@ impl VerbMetadataIndex {
             .filter(|meta| meta.side_effects.as_deref() == Some("facts_only"))
     }
 
+    /// Iterate only verbs that are safe to serve directly.
+    ///
+    /// # Examples
+    /// ```ignore
+    /// use dsl_core::config::types::HarmClass;
+    /// use ob_poc::sage::verb_index::VerbMetadataIndex;
+    ///
+    /// let index = VerbMetadataIndex::load()?;
+    /// assert!(index.read_only_verbs().all(|meta| meta.harm_class == HarmClass::ReadOnly));
+    /// # Ok::<(), anyhow::Error>(())
+    /// ```
+    pub fn read_only_verbs(&self) -> impl Iterator<Item = &VerbMeta> {
+        self.iter()
+            .filter(|meta| meta.harm_class == HarmClass::ReadOnly)
+    }
+
     /// Iterate only verbs that mutate state and require confirmation.
     ///
     /// # Examples
@@ -134,6 +157,22 @@ impl VerbMetadataIndex {
     pub fn state_write_verbs(&self) -> impl Iterator<Item = &VerbMeta> {
         self.iter()
             .filter(|meta| meta.side_effects.as_deref() == Some("state_write"))
+    }
+
+    /// Iterate only verbs that are not read-only.
+    ///
+    /// # Examples
+    /// ```ignore
+    /// use dsl_core::config::types::HarmClass;
+    /// use ob_poc::sage::verb_index::VerbMetadataIndex;
+    ///
+    /// let index = VerbMetadataIndex::load()?;
+    /// assert!(index.mutating_verbs().all(|meta| meta.harm_class != HarmClass::ReadOnly));
+    /// # Ok::<(), anyhow::Error>(())
+    /// ```
+    pub fn mutating_verbs(&self) -> impl Iterator<Item = &VerbMeta> {
+        self.iter()
+            .filter(|meta| meta.harm_class != HarmClass::ReadOnly)
     }
 
     /// Query verbs by plane, polarity, and optional domain hint.
@@ -238,6 +277,23 @@ impl VerbMetadataIndex {
                 .metadata
                 .as_ref()
                 .and_then(|metadata| metadata.side_effects.clone()),
+            harm_class: infer_harm_class(verb_name, config.metadata.as_ref()),
+            action_class: infer_action_class(verb_name, config),
+            subject_kinds: config
+                .metadata
+                .as_ref()
+                .map(|metadata| metadata.subject_kinds.clone())
+                .unwrap_or_default(),
+            phase_tags: config
+                .metadata
+                .as_ref()
+                .map(|metadata| metadata.phase_tags.clone())
+                .unwrap_or_default(),
+            requires_subject: config
+                .metadata
+                .as_ref()
+                .map(|metadata| metadata.requires_subject)
+                .unwrap_or(true),
             planes,
             action_tags,
             param_names,
@@ -249,6 +305,107 @@ impl VerbMetadataIndex {
     #[cfg(test)]
     pub(crate) fn from_test_map(by_fqn: HashMap<String, VerbMeta>) -> Self {
         Self { by_fqn }
+    }
+}
+
+fn infer_harm_class(verb_name: &str, metadata: Option<&VerbMetadata>) -> HarmClass {
+    if let Some(explicit) = metadata.and_then(|metadata| metadata.harm_class) {
+        return explicit;
+    }
+
+    let normalized_name = verb_name.to_ascii_lowercase();
+    let side_effects = metadata.and_then(|meta| meta.side_effects.as_deref());
+    let dangerous = metadata.is_some_and(|meta| meta.dangerous);
+
+    if matches!(side_effects, Some("facts_only")) {
+        return HarmClass::ReadOnly;
+    }
+
+    if dangerous
+        || ["purge", "destroy", "wipe", "nuke", "truncate", "hard-delete"]
+            .iter()
+            .any(|needle| normalized_name.contains(needle))
+    {
+        return HarmClass::Destructive;
+    }
+
+    if ["delete", "deactivate", "retire", "archive", "close", "publish"]
+        .iter()
+        .any(|needle| normalized_name.contains(needle))
+    {
+        return HarmClass::Irreversible;
+    }
+
+    if matches!(side_effects, Some("state_write")) {
+        return HarmClass::Reversible;
+    }
+
+    if normalized_name.starts_with("list")
+        || normalized_name.starts_with("show")
+        || normalized_name.starts_with("get")
+        || normalized_name.starts_with("read")
+        || normalized_name.starts_with("search")
+        || normalized_name.starts_with("describe")
+        || normalized_name.starts_with("trace")
+    {
+        HarmClass::ReadOnly
+    } else {
+        HarmClass::Reversible
+    }
+}
+
+fn infer_action_class(verb_name: &str, config: &VerbConfig) -> ActionClass {
+    if let Some(explicit) = config.metadata.as_ref().and_then(|metadata| metadata.action_class) {
+        return explicit;
+    }
+
+    if let Some(crud) = &config.crud {
+        return match crud.operation {
+            CrudOperation::Select
+            | CrudOperation::ListByFk
+            | CrudOperation::ListParties
+            | CrudOperation::SelectWithJoin => {
+                if verb_name.starts_with("list") {
+                    ActionClass::List
+                } else {
+                    ActionClass::Read
+                }
+            }
+            CrudOperation::Insert | CrudOperation::EntityCreate => ActionClass::Create,
+            CrudOperation::Update | CrudOperation::EntityUpsert | CrudOperation::Upsert => {
+                ActionClass::Update
+            }
+            CrudOperation::Delete => ActionClass::Delete,
+            CrudOperation::Link | CrudOperation::RoleLink => ActionClass::Assign,
+            CrudOperation::Unlink | CrudOperation::RoleUnlink => ActionClass::Remove,
+        };
+    }
+
+    let normalized_name = verb_name.to_ascii_lowercase();
+    let primary = normalized_name
+        .split(['-', '.'])
+        .find(|segment| !segment.is_empty())
+        .unwrap_or(normalized_name.as_str());
+    match primary {
+        "list" => ActionClass::List,
+        "show" | "get" | "read" => ActionClass::Read,
+        "search" | "find" | "discover" => ActionClass::Search,
+        "describe" => ActionClass::Describe,
+        "create" | "ensure" | "upsert" => ActionClass::Create,
+        "update" | "edit" | "change" | "set" => ActionClass::Update,
+        "delete" | "destroy" | "purge" => ActionClass::Delete,
+        "assign" | "bind" | "link" | "subscribe" => ActionClass::Assign,
+        "remove" | "unlink" | "unsubscribe" => ActionClass::Remove,
+        "import" | "load" | "ingest" => ActionClass::Import,
+        "compute" | "calculate" | "analyze" | "analyse" => ActionClass::Compute,
+        "review" | "validate" => ActionClass::Review,
+        "approve" | "publish" => ActionClass::Approve,
+        "reject" => ActionClass::Reject,
+        "run" | "execute" => ActionClass::Execute,
+        _ => match config.metadata.as_ref().and_then(|meta| meta.side_effects.as_deref()) {
+            Some("facts_only") => ActionClass::Read,
+            _ => ActionClass::Update,
+        },
     }
 }
 
@@ -652,5 +809,46 @@ mod tests {
         let (index_count, registry_count) = runtime_registry_parity().unwrap();
         assert_eq!(index_count, registry_count);
         assert!(index_count > 1000);
+    }
+
+    #[test]
+    fn infer_harm_class_prefers_explicit_or_facts_only() {
+        let read_meta = VerbMetadata {
+            side_effects: Some("facts_only".to_string()),
+            ..VerbMetadata::default()
+        };
+        assert_eq!(infer_harm_class("list", Some(&read_meta)), HarmClass::ReadOnly);
+
+        let explicit = VerbMetadata {
+            harm_class: Some(HarmClass::Destructive),
+            side_effects: Some("facts_only".to_string()),
+            ..VerbMetadata::default()
+        };
+        assert_eq!(
+            infer_harm_class("list", Some(&explicit)),
+            HarmClass::Destructive
+        );
+    }
+
+    #[test]
+    fn infer_harm_class_marks_delete_like_verbs_as_irreversible_or_worse() {
+        let write_meta = VerbMetadata {
+            side_effects: Some("state_write".to_string()),
+            ..VerbMetadata::default()
+        };
+        assert_eq!(
+            infer_harm_class("delete-relationship", Some(&write_meta)),
+            HarmClass::Irreversible
+        );
+
+        let dangerous_meta = VerbMetadata {
+            dangerous: true,
+            side_effects: Some("state_write".to_string()),
+            ..VerbMetadata::default()
+        };
+        assert_eq!(
+            infer_harm_class("purge", Some(&dangerous_meta)),
+            HarmClass::Destructive
+        );
     }
 }

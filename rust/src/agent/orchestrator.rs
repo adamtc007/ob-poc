@@ -289,6 +289,7 @@ fn read_only_list_fallback(
             resolution: crate::sage::coder::CoderResolution::Confident,
             missing_args: vec![],
             unresolved_refs: vec![],
+            diagnostics: None,
         });
     }
 
@@ -2973,6 +2974,7 @@ mod tests {
             resolution: crate::sage::coder::CoderResolution::Confident,
             missing_args: vec![],
             unresolved_refs: vec![],
+            diagnostics: None,
         };
 
         let pending = build_mutation_confirmation(&intent, &coder_result, None);
@@ -3080,7 +3082,7 @@ mod tests {
     fn test_data_management_candidate_policy_prefers_structure_verbs() {
         let candidates = vec![
             VerbSearchResult {
-                verb: "deal.get".into(),
+                verb: "deal.read-record".into(),
                 score: 0.99,
                 source: crate::mcp::verb_search::VerbSearchSource::PatternEmbedding,
                 matched_phrase: "show me deal record".into(),
@@ -3264,6 +3266,7 @@ mod tests {
             resolution: crate::sage::coder::CoderResolution::Confident,
             missing_args: vec![],
             unresolved_refs: vec![],
+            diagnostics: None,
         };
 
         let result = build_sage_fast_path_result("show me the cbus", None, &outcome, &coder_result)

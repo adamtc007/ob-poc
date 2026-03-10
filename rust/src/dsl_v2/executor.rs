@@ -952,7 +952,7 @@ impl ExecutionContext {
         );
     }
 
-    /// Signal checkpoint response (called by agent.confirm/reject/select)
+    /// Signal checkpoint response (called by agent.confirm-decision/reject-decision/select-decision-option)
     pub fn set_pending_checkpoint_response(
         &mut self,
         checkpoint_id: Option<Uuid>,
@@ -970,7 +970,7 @@ impl ExecutionContext {
         );
     }
 
-    /// Signal threshold change (called by agent.set-threshold)
+    /// Signal threshold change (called by agent.set-selection-threshold)
     pub fn set_pending_threshold_change(
         &mut self,
         auto_proceed: Option<f64>,
@@ -986,7 +986,7 @@ impl ExecutionContext {
         );
     }
 
-    /// Signal mode change (called by agent.set-mode)
+    /// Signal mode change (called by agent.set-execution-mode)
     pub fn set_pending_mode_change(&mut self, mode: String) {
         self.bind_json(
             "_agent_control",

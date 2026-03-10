@@ -97,6 +97,8 @@ fn build_hints(
         explicit_domain_terms,
         explicit_action_terms,
         scope_carry_forward_used: !context.last_intents.is_empty(),
+        stage_focus: context.stage_focus.clone(),
+        entity_kind: context.entity_kind.clone(),
         inventory_read,
         structure_read: sage_only,
         create_name_candidate: subject
@@ -246,11 +248,40 @@ fn extract_name_after_keyword(utterance: &str, keyword: &str) -> Option<String> 
 
 fn select_domain_concept(utterance: &str, domain_hints: &[String]) -> String {
     let normalized = utterance.trim().to_ascii_lowercase();
+    if normalized.contains("teach the system") || normalized.contains("research mode") {
+        return "agent".to_string();
+    }
     if normalized.contains(" cbu")
         || normalized.starts_with("cbu ")
         || normalized.contains("client business unit")
     {
         return "cbu".to_string();
+    }
+    if normalized.contains("beneficial owner")
+        || normalized.contains("ownership structure")
+        || normalized.contains("who controls")
+    {
+        return "ubo".to_string();
+    }
+    if normalized.contains("icav")
+        || normalized.contains("sicav")
+        || normalized.contains("oeic")
+        || normalized.contains("40-act")
+        || normalized.contains("fund structure")
+    {
+        return "struct".to_string();
+    }
+    if normalized.contains("kyc case")
+        || normalized.contains("open a case")
+        || normalized.contains("new case")
+    {
+        return "case".to_string();
+    }
+    if normalized.contains("collect documents")
+        || normalized.contains("request identity documents")
+        || normalized.contains("full kyc")
+    {
+        return "kyc".to_string();
     }
     if normalized.contains(" document") || normalized.starts_with("document ") {
         return "document".to_string();
@@ -288,9 +319,13 @@ fn confidence_for(
     pre: &super::pre_classify::SagePreClassification,
     domain_concept: &str,
 ) -> SageConfidence {
+    let margin = pre.domain_score - pre.runner_up_domain_score;
+
     if pre.sage_only && !domain_concept.is_empty() {
         SageConfidence::High
-    } else if !domain_concept.is_empty() {
+    } else if !domain_concept.is_empty() && pre.domain_score >= 10 && margin >= 4 {
+        SageConfidence::High
+    } else if !domain_concept.is_empty() && pre.domain_score >= 6 && margin >= 2 {
         SageConfidence::Medium
     } else {
         SageConfidence::Low
@@ -471,5 +506,28 @@ mod tests {
         let long = "show me all the funds that are in luxembourg and have been registered since 2020 and have more than 100 sub-funds";
         let result = sage.classify(long, &ctx).await.unwrap();
         assert!(result.summary.len() <= 60);
+    }
+
+    #[tokio::test]
+    async fn test_case_phrase_gets_high_confidence() {
+        let sage = DeterministicSage;
+        let ctx = empty_ctx();
+        let result = sage
+            .classify("open a new case and collect the KYC documents", &ctx)
+            .await
+            .unwrap();
+        assert_eq!(result.domain_concept, "case");
+        assert_eq!(result.confidence, SageConfidence::High);
+    }
+
+    #[tokio::test]
+    async fn test_struct_phrase_beats_fund() {
+        let sage = DeterministicSage;
+        let ctx = empty_ctx();
+        let result = sage
+            .classify("Set up an Irish ICAV fund", &ctx)
+            .await
+            .unwrap();
+        assert_eq!(result.domain_concept, "struct");
     }
 }

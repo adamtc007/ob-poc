@@ -14,7 +14,7 @@ use strum::{AsRefStr, Display, EnumString};
 
 /// Agent operating mode for the Research → Governed boundary.
 ///
-/// Default is `Governed`. Mode switch requires explicit `agent.set-mode` verb
+/// Default is `Governed`. Mode switch requires explicit `agent.set-execution-mode` verb
 /// with confirmation.
 #[derive(
     Debug,
@@ -223,7 +223,7 @@ mod tests {
             "focus.set",
             "audit.create-plan",
             "audit.record-decision",
-            "agent.get-mode",
+            "agent.read-mode",
             "agent.set-authoring-mode",
         ] {
             assert!(

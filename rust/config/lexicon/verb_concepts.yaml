@@ -217,8 +217,8 @@ deal.list:
   target_types: []
   crud_type: read
 
-deal.get:
-  pref_label: "get deal"
+deal.read-record:
+  pref_label: "read deal record"
   alt_labels:
     - "show deal"
     - "deal details"
@@ -231,8 +231,8 @@ deal.get:
   target_types: []
   crud_type: read
 
-deal.search:
-  pref_label: "search deals"
+deal.search-records:
+  pref_label: "search deal records"
   alt_labels:
     - "find deal"
     - "lookup deal"

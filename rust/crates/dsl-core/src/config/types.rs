@@ -269,6 +269,40 @@ pub enum ConfirmPolicyConfig {
 /// - Agent to select appropriate verbs
 /// - Documentation generation
 /// - Verb inventory reports
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum HarmClass {
+    /// Read-only inspection with no persisted state mutation.
+    #[default]
+    ReadOnly,
+    /// State mutation that can be reversed by a compensating operation.
+    Reversible,
+    /// State mutation that is normally one-way in business terms.
+    Irreversible,
+    /// High-risk destructive mutation such as purge/delete semantics.
+    Destructive,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ActionClass {
+    List,
+    Read,
+    Search,
+    Describe,
+    Create,
+    Update,
+    Delete,
+    Assign,
+    Remove,
+    Import,
+    Compute,
+    Review,
+    Approve,
+    Reject,
+    Execute,
+}
+
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct VerbMetadata {
     /// Verb tier classification:
@@ -301,6 +335,14 @@ pub struct VerbMetadata {
     /// persisted/session state (`state_write`).
     #[serde(default)]
     pub side_effects: Option<String>,
+
+    /// Safety tier for Coder routing and confirmation policy.
+    #[serde(default)]
+    pub harm_class: Option<HarmClass>,
+
+    /// Normalized action family for deterministic intent routing.
+    #[serde(default)]
+    pub action_class: Option<ActionClass>,
 
     /// Primary noun this verb operates on (for grouping):
     /// e.g., "trading_matrix", "ssi", "gateway", "booking_rule", "corporate_actions"

@@ -763,18 +763,18 @@ ecir_path = "fallthrough"
 
 [[test]]
 utterance = "what's the status of the deal?"
-expected_verb = "deal.get"
+expected_verb = "deal.read-record"
 expected_plane = "instance"
 expected_polarity = "read"
 expected_domain_concept = "deal"
 category = "natural"
 difficulty = "medium"
-alt_verbs = ["deal.summary"]
+alt_verbs = ["deal.read-summary"]
 ecir_path = "fallthrough"
 
 [[test]]
 utterance = "show me the deal timeline"
-expected_verb = "deal.timeline"
+expected_verb = "deal.read-timeline"
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "deal"
@@ -1038,7 +1038,7 @@ ecir_path = "fallthrough"
 
 [[test]]
 utterance = "go back"
-expected_verb = "view.back-to"
+expected_verb = "view.navigate-back-to"
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "view"
@@ -1153,9 +1153,9 @@ ecir_path = "fallthrough"
 
 [[test]]
 utterance = "who are the parties in this group?"
-expected_verb = "client-group.parties"
+expected_verb = "client-group.list-parties"
 expected_plane = "instance"
-expected_polarity = "write"
+expected_polarity = "read"
 expected_domain_concept = "client-group"
 category = "natural"
 difficulty = "medium"
@@ -1164,7 +1164,7 @@ ecir_path = "fallthrough"
 
 [[test]]
 utterance = "search for entities matching 'Vanguard' in this group"
-expected_verb = "client-group.search"
+expected_verb = "client-group.search-entities"
 expected_plane = "instance"
 expected_polarity = "read"
 expected_domain_concept = "client-group"
@@ -1444,12 +1444,12 @@ expected_polarity = "write"
 expected_domain_concept = "agent"
 category = "natural"
 difficulty = "medium"
-alt_verbs = ["agent.set-mode"]
+alt_verbs = ["agent.set-execution-mode"]
 ecir_path = "fallthrough"
 
 [[test]]
 utterance = "confirm"
-expected_verb = "agent.confirm"
+expected_verb = "agent.confirm-decision"
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "agent"
@@ -1459,13 +1459,13 @@ ecir_path = "fallthrough"
 
 [[test]]
 utterance = "no, go back"
-expected_verb = "agent.reject"
+expected_verb = "agent.reject-decision"
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "agent"
 category = "natural"
 difficulty = "medium"
-alt_verbs = ["view.surface", "view.back-to", "view.zoom-out", "session.undo"]
+alt_verbs = ["view.surface", "view.navigate-back-to", "view.zoom-out", "session.undo"]
 ecir_path = "fallthrough"
 
 # ============================================================================

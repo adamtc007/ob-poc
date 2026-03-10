@@ -65,6 +65,22 @@ impl Accuracy {
     }
 }
 
+#[derive(Debug, Clone, Copy, Default)]
+struct DomainBucket {
+    hits: usize,
+    total: usize,
+}
+
+impl DomainBucket {
+    fn ratio(self) -> f64 {
+        if self.total == 0 {
+            0.0
+        } else {
+            self.hits as f64 / self.total as f64
+        }
+    }
+}
+
 fn fixture_path() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/intent_test_utterances.toml")
 }
@@ -157,6 +173,30 @@ fn write_report(
         domain.total,
         domain.ratio() * 100.0,
     ));
+
+    let mut by_expected_domain = std::collections::BTreeMap::<String, DomainBucket>::new();
+    for row in rows.iter().filter(|row| row.expected_domain_concept.is_some()) {
+        let key = row.expected_domain_concept.clone().unwrap_or_default();
+        let bucket = by_expected_domain.entry(key).or_default();
+        bucket.total += 1;
+        if row.domain_hit {
+            bucket.hits += 1;
+        }
+    }
+
+    markdown.push_str("## Domain Accuracy By Expected Domain\n\n");
+    markdown.push_str("| Domain | Hits | Total | Accuracy |\n");
+    markdown.push_str("| --- | --- | --- | --- |\n");
+    for (domain_name, bucket) in by_expected_domain {
+        markdown.push_str(&format!(
+            "| {} | {} | {} | {:.1}% |\n",
+            domain_name,
+            bucket.hits,
+            bucket.total,
+            bucket.ratio() * 100.0
+        ));
+    }
+    markdown.push('\n');
 
     markdown.push_str("## Mismatches\n\n");
     if mismatches.is_empty() {

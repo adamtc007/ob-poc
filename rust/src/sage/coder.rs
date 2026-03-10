@@ -2,7 +2,7 @@
 
 use anyhow::{anyhow, Result};
 use dsl_core::config::loader::ConfigLoader;
-use dsl_core::config::types::{VerbConfig, VerbsConfig};
+use dsl_core::config::types::{HarmClass, VerbConfig, VerbsConfig};
 use serde::{Deserialize, Serialize};
 
 use crate::mcp::intent_pipeline::IntentArgValue;
@@ -10,7 +10,7 @@ use crate::mcp::intent_pipeline::IntentArgValue;
 use super::arg_assembly::structured_intent_from_step;
 use super::outcome::{OutcomeIntent, OutcomeStep};
 use super::verb_index::VerbMetadataIndex;
-use super::verb_resolve::{ScoredVerbCandidate, StructuredVerbScorer};
+use super::verb_resolve::{FilterDiagnostics, ScoredVerbCandidate, StructuredVerbScorer};
 
 /// Resolution state for the Coder output.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -18,6 +18,50 @@ pub enum CoderResolution {
     Confident,
     Proposed,
     NeedsInput,
+}
+
+/// Explicit failure reason when deterministic Coder resolution cannot proceed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CoderFailureKind {
+    NoCandidateAfterFilters,
+    DomainConflict,
+    PhaseConflict,
+    SubjectKindConflict,
+    ActionConflict,
+    BelowThreshold,
+    PolicyConflict,
+}
+
+/// Diagnostics explaining how Coder resolution succeeded or failed.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CoderDiagnostics {
+    pub failure_kind: Option<CoderFailureKind>,
+    pub filter_diagnostics: CoderFilterDiagnostics,
+    pub top_candidate: Option<String>,
+    pub top_score: Option<f32>,
+    pub threshold: Option<f32>,
+}
+
+/// Serializable copy of scorer filter counts.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct CoderFilterDiagnostics {
+    pub base_candidates: usize,
+    pub domain_candidates: usize,
+    pub phase_candidates: usize,
+    pub subject_kind_candidates: usize,
+    pub final_candidates: usize,
+}
+
+impl From<FilterDiagnostics> for CoderFilterDiagnostics {
+    fn from(value: FilterDiagnostics) -> Self {
+        Self {
+            base_candidates: value.base_candidates,
+            domain_candidates: value.domain_candidates,
+            phase_candidates: value.phase_candidates,
+            subject_kind_candidates: value.subject_kind_candidates,
+            final_candidates: value.final_candidates,
+        }
+    }
 }
 
 /// End-to-end Coder output.
@@ -28,6 +72,7 @@ pub struct CoderResult {
     pub resolution: CoderResolution,
     pub missing_args: Vec<String>,
     pub unresolved_refs: Vec<String>,
+    pub diagnostics: Option<CoderDiagnostics>,
 }
 
 /// Deterministic Coder engine over verb metadata and config.
@@ -104,13 +149,14 @@ impl CoderEngine {
             return Ok(result);
         }
 
+        let filter_diagnostics = self.scorer.diagnose_filters(outcome);
         let candidates = self.scorer.score(outcome, 5);
         let step = primary_step(outcome);
         let threshold = acceptance_threshold(&step);
         let top = candidates
             .first()
             .cloned()
-            .ok_or_else(|| anyhow!("no coder candidates for outcome"))?;
+            .ok_or_else(|| self.failure_error(outcome, None, threshold, filter_diagnostics, None))?;
         let verb_required = self
             .verb_index
             .get(&top.fqn)
@@ -132,20 +178,31 @@ impl CoderEngine {
         );
 
         if top.score < threshold {
-            return Err(anyhow!(
-                "no coder candidate met threshold ({score:.3} < {threshold:.3})",
-                score = top.score
+            return Err(self.failure_error(
+                outcome,
+                Some(&top),
+                threshold,
+                filter_diagnostics,
+                Some(CoderFailureKind::BelowThreshold),
             ));
         }
 
         if !self.is_candidate_allowed(outcome, &top.fqn) {
-            return Err(anyhow!(
-                "coder candidate '{}' violates side_effects policy for {:?} intent",
-                top.fqn,
-                outcome.polarity
+            return Err(self.failure_error(
+                outcome,
+                Some(&top),
+                threshold,
+                filter_diagnostics,
+                Some(CoderFailureKind::PolicyConflict),
             ));
         }
-        self.resolve_candidate(outcome, &top)
+        self.resolve_candidate(outcome, &top, Some(CoderDiagnostics {
+            failure_kind: None,
+            filter_diagnostics: filter_diagnostics.into(),
+            top_candidate: Some(top.fqn.clone()),
+            top_score: Some(top.score),
+            threshold: Some(threshold),
+        }))
     }
 
     /// Access the underlying verb index.
@@ -180,13 +237,14 @@ impl CoderEngine {
             action_score: 1.0,
             param_overlap_score: 1.0,
         };
-        self.resolve_candidate(outcome, &candidate).map(Some)
+        self.resolve_candidate(outcome, &candidate, None).map(Some)
     }
 
     fn resolve_candidate(
         &self,
         outcome: &OutcomeIntent,
         candidate: &ScoredVerbCandidate,
+        diagnostics: Option<CoderDiagnostics>,
     ) -> Result<CoderResult> {
         let step = primary_step(outcome);
         let config = self.verb_config(&candidate.fqn)?;
@@ -233,6 +291,7 @@ impl CoderEngine {
             resolution,
             missing_args,
             unresolved_refs,
+            diagnostics,
         })
     }
 
@@ -253,11 +312,76 @@ impl CoderEngine {
         };
         match outcome.polarity {
             super::IntentPolarity::Read | super::IntentPolarity::Ambiguous => {
-                meta.side_effects.as_deref() == Some("facts_only")
+                meta.harm_class == HarmClass::ReadOnly
             }
-            super::IntentPolarity::Write => meta.side_effects.as_deref() == Some("state_write"),
+            super::IntentPolarity::Write => meta.harm_class != HarmClass::ReadOnly,
         }
     }
+
+    fn failure_error(
+        &self,
+        _outcome: &OutcomeIntent,
+        top: Option<&ScoredVerbCandidate>,
+        threshold: f32,
+        filter_diagnostics: FilterDiagnostics,
+        override_kind: Option<CoderFailureKind>,
+    ) -> anyhow::Error {
+        let failure_kind =
+            override_kind.unwrap_or_else(|| classify_failure_kind(filter_diagnostics, top, threshold));
+        let diagnostics = CoderDiagnostics {
+            failure_kind: Some(failure_kind),
+            filter_diagnostics: filter_diagnostics.into(),
+            top_candidate: top.map(|candidate| candidate.fqn.clone()),
+            top_score: top.map(|candidate| candidate.score),
+            threshold: Some(threshold),
+        };
+        anyhow!(
+            "coder resolution failed: kind={:?}, top_candidate={}, top_score={}, threshold={:.3}, filters=base:{} domain:{} phase:{} subject:{} final:{}",
+            failure_kind,
+            diagnostics.top_candidate.as_deref().unwrap_or("<none>"),
+            diagnostics
+                .top_score
+                .map(|value| format!("{value:.3}"))
+                .unwrap_or_else(|| "<none>".to_string()),
+            threshold,
+            diagnostics.filter_diagnostics.base_candidates,
+            diagnostics.filter_diagnostics.domain_candidates,
+            diagnostics.filter_diagnostics.phase_candidates,
+            diagnostics.filter_diagnostics.subject_kind_candidates,
+            diagnostics.filter_diagnostics.final_candidates,
+        )
+    }
+}
+
+fn classify_failure_kind(
+    filter_diagnostics: FilterDiagnostics,
+    top: Option<&ScoredVerbCandidate>,
+    threshold: f32,
+) -> CoderFailureKind {
+    if filter_diagnostics.base_candidates == 0 || filter_diagnostics.final_candidates == 0 {
+        if filter_diagnostics.domain_candidates == 0 && filter_diagnostics.base_candidates > 0 {
+            return CoderFailureKind::DomainConflict;
+        }
+        if filter_diagnostics.phase_candidates == 0 && filter_diagnostics.domain_candidates > 0 {
+            return CoderFailureKind::PhaseConflict;
+        }
+        if filter_diagnostics.subject_kind_candidates == 0 && filter_diagnostics.phase_candidates > 0
+        {
+            return CoderFailureKind::SubjectKindConflict;
+        }
+        return CoderFailureKind::NoCandidateAfterFilters;
+    }
+
+    if let Some(top) = top {
+        if top.score < threshold {
+            if top.action_score < 0.5 {
+                return CoderFailureKind::ActionConflict;
+            }
+            return CoderFailureKind::BelowThreshold;
+        }
+    }
+
+    CoderFailureKind::NoCandidateAfterFilters
 }
 
 fn primary_step(outcome: &OutcomeIntent) -> OutcomeStep {
@@ -285,7 +409,9 @@ fn acceptance_threshold(step: &OutcomeStep) -> f32 {
 mod tests {
     use std::collections::HashMap;
 
-    use dsl_core::config::types::{ArgConfig, ArgType, DomainConfig, VerbBehavior};
+    use dsl_core::config::types::{
+        ActionClass, ArgConfig, ArgType, DomainConfig, HarmClass, VerbBehavior, VerbMetadata,
+    };
 
     use super::*;
     use crate::sage::{
@@ -367,6 +493,53 @@ mod tests {
         }
     }
 
+    fn sample_read_config_with_metadata(metadata: VerbMetadata) -> VerbsConfig {
+        sample_read_config_named("list", "List deals", metadata)
+    }
+
+    fn sample_read_config_named(
+        verb_name: &str,
+        description: &str,
+        metadata: VerbMetadata,
+    ) -> VerbsConfig {
+        let mut domains = HashMap::new();
+        let mut verbs = HashMap::new();
+        verbs.insert(
+            verb_name.to_string(),
+            VerbConfig {
+                description: description.to_string(),
+                behavior: VerbBehavior::Plugin,
+                crud: None,
+                handler: Some(format!("deal.{verb_name}")),
+                graph_query: None,
+                durable: None,
+                args: vec![],
+                returns: None,
+                produces: None,
+                consumes: vec![],
+                lifecycle: None,
+                metadata: Some(metadata),
+                invocation_phrases: vec![],
+                policy: None,
+                sentences: None,
+                confirm_policy: None,
+            },
+        );
+        domains.insert(
+            "deal".to_string(),
+            DomainConfig {
+                description: "Deal".to_string(),
+                verbs,
+                dynamic_verbs: vec![],
+                invocation_hints: vec![],
+            },
+        );
+        VerbsConfig {
+            version: "1.0".to_string(),
+            domains,
+        }
+    }
+
     #[test]
     fn structure_read_prefers_schema_entity_describe() {
         let engine = CoderEngine::load().unwrap();
@@ -443,5 +616,103 @@ mod tests {
         let result = engine.resolve(&outcome).unwrap();
         assert_eq!(result.resolution, CoderResolution::Proposed);
         assert_eq!(result.missing_args, vec!["name".to_string()]);
+    }
+
+    #[test]
+    fn coder_reports_phase_conflict_when_candidates_are_filtered_by_stage() {
+        let engine = CoderEngine::from_config(sample_read_config_with_metadata(VerbMetadata {
+            side_effects: Some("facts_only".to_string()),
+            harm_class: Some(HarmClass::ReadOnly),
+            action_class: Some(ActionClass::List),
+            phase_tags: vec!["kyc".to_string()],
+            ..VerbMetadata::default()
+        }));
+        let outcome = OutcomeIntent {
+            summary: "show me the deals".to_string(),
+            plane: ObservationPlane::Instance,
+            polarity: IntentPolarity::Read,
+            domain_concept: "deal".to_string(),
+            action: OutcomeAction::Read,
+            subject: None,
+            steps: vec![],
+            confidence: SageConfidence::Medium,
+            pending_clarifications: vec![],
+            hints: UtteranceHints {
+                stage_focus: Some("onboarding".to_string()),
+                ..UtteranceHints::default()
+            },
+            explain: SageExplain::default(),
+            coder_handoff: CoderHandoff::default(),
+        };
+
+        let error = engine.resolve(&outcome).unwrap_err().to_string();
+        assert!(error.contains("kind=PhaseConflict"));
+    }
+
+    #[test]
+    fn coder_reports_subject_kind_conflict_when_candidates_are_filtered_by_kind() {
+        let engine = CoderEngine::from_config(sample_read_config_with_metadata(VerbMetadata {
+            side_effects: Some("facts_only".to_string()),
+            harm_class: Some(HarmClass::ReadOnly),
+            action_class: Some(ActionClass::List),
+            subject_kinds: vec!["fund".to_string()],
+            ..VerbMetadata::default()
+        }));
+        let outcome = OutcomeIntent {
+            summary: "show me the deals".to_string(),
+            plane: ObservationPlane::Instance,
+            polarity: IntentPolarity::Read,
+            domain_concept: "deal".to_string(),
+            action: OutcomeAction::Read,
+            subject: Some(crate::sage::EntityRef {
+                mention: "this cbu".to_string(),
+                kind_hint: Some("cbu".to_string()),
+                uuid: None,
+            }),
+            steps: vec![],
+            confidence: SageConfidence::Medium,
+            pending_clarifications: vec![],
+            hints: UtteranceHints::default(),
+            explain: SageExplain::default(),
+            coder_handoff: CoderHandoff::default(),
+        };
+
+        let error = engine.resolve(&outcome).unwrap_err().to_string();
+        assert!(error.contains("kind=SubjectKindConflict"));
+    }
+
+    #[test]
+    fn coder_reports_action_conflict_when_top_candidate_is_below_threshold() {
+        let engine = CoderEngine::from_config(sample_read_config_named(
+            "status",
+            "Read current status",
+            VerbMetadata {
+            side_effects: Some("facts_only".to_string()),
+            harm_class: Some(HarmClass::ReadOnly),
+            action_class: Some(ActionClass::Read),
+            ..VerbMetadata::default()
+        }));
+        let outcome = OutcomeIntent {
+            summary: "publish the portfolio".to_string(),
+            plane: ObservationPlane::Instance,
+            polarity: IntentPolarity::Read,
+            domain_concept: String::new(),
+            action: OutcomeAction::Publish,
+            subject: None,
+            steps: vec![OutcomeStep {
+                action: OutcomeAction::Publish,
+                target: "portfolio".to_string(),
+                params: HashMap::from([("target-id".to_string(), "123".to_string())]),
+                notes: None,
+            }],
+            confidence: SageConfidence::Low,
+            pending_clarifications: vec![],
+            hints: UtteranceHints::default(),
+            explain: SageExplain::default(),
+            coder_handoff: CoderHandoff::default(),
+        };
+
+        let error = engine.resolve(&outcome).unwrap_err().to_string();
+        assert!(error.contains("kind=ActionConflict") || error.contains("kind=BelowThreshold"));
     }
 }

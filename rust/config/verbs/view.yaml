@@ -22,26 +22,26 @@ domains:
       universe:
         description: "View all CBUs with optional filters"
         invocation_phrases:
-        - "show me everything"
-        - "view all CBUs"
-        - "show the universe"
-        - "display all clients"
-        - "show me all entities"
-        - "view entire portfolio"
-        - "show global view"
-        - "display everything"
-        - "see all CBUs"
-        - "give me the full picture"
-        - "show complete universe"
-        - "view all records"
-        - "show my universe"
-        - "display universe view"
-        - "view universe"
-        - "show universe view"
-        - "display the universe"
-        - "show all cbus in universe"
-        - "universe view"
-        - "see the universe"
+          - "show me everything"
+          - "view all CBUs"
+          - "show the universe"
+          - "display all clients"
+          - "show me all entities"
+          - "view entire portfolio"
+          - "show global view"
+          - "display everything"
+          - "see all CBUs"
+          - "give me the full picture"
+          - "show complete universe"
+          - "view all records"
+          - "show my universe"
+          - "display universe view"
+          - "view universe"
+          - "show universe view"
+          - "display the universe"
+          - "show all cbus in universe"
+          - "universe view"
+          - "see the universe"
         behavior: plugin
         plugin:
           handler: ViewUniverseOp
@@ -55,37 +55,37 @@ domains:
           phase_tags: [navigation]
           side_effects: facts_only
         args:
-        - name: client
-          type: uuid
-          required: false
-          description: "Filter to CBUs for this client entity"
-          lookup:
-            table: entities
-            schema: ob-poc
-            entity_type: entity
-            search_key: name
-            primary_key: entity_id
-            resolution_mode: entity
-        - name: jurisdiction
-          type: string_list
-          required: false
-          description: "Filter by jurisdiction(s)"
-        - name: fund-type
-          type: string_list
-          required: false
-          description: "Filter by fund type(s)"
-        - name: status
-          type: string_list
-          required: false
-          description: "Filter by status (RED, AMBER, GREEN)"
-          valid_values:
-          - RED
-          - AMBER
-          - GREEN
-        - name: needs-attention
-          type: boolean
-          required: false
-          description: "Filter to items needing attention"
+          - name: client
+            type: uuid
+            required: false
+            description: "Filter to CBUs for this client entity"
+            lookup:
+              table: entities
+              schema: ob-poc
+              entity_type: entity
+              search_key: name
+              primary_key: entity_id
+              resolution_mode: entity
+          - name: jurisdiction
+            type: string_list
+            required: false
+            description: "Filter by jurisdiction(s)"
+          - name: fund-type
+            type: string_list
+            required: false
+            description: "Filter by fund type(s)"
+          - name: status
+            type: string_list
+            required: false
+            description: "Filter by status (RED, AMBER, GREEN)"
+            valid_values:
+              - RED
+              - AMBER
+              - GREEN
+          - name: needs-attention
+            type: boolean
+            required: false
+            description: "Filter to items needing attention"
         returns:
           type: view_state
           capture: true
@@ -94,17 +94,17 @@ domains:
       book:
         description: "View all CBUs for a commercial client (book view)"
         invocation_phrases:
-        - "show client book"
-        - "view the book"
-        - "display client CBUs"
-        - "show me client portfolio"
-        - "open the book view"
-        - "view client entities"
-        - "show book for client"
-        - "display commercial book"
-        - "see client CBUs"
-        - "open client view"
-        - "show all CBUs for client"
+          - "show client book"
+          - "view the book"
+          - "display client CBUs"
+          - "show me client portfolio"
+          - "open the book view"
+          - "view client entities"
+          - "show book for client"
+          - "display commercial book"
+          - "see client CBUs"
+          - "open client view"
+          - "show all CBUs for client"
         behavior: plugin
         plugin:
           handler: ViewBookOp
@@ -118,17 +118,17 @@ domains:
           phase_tags: [navigation]
           side_effects: facts_only
         args:
-        - name: client
-          type: uuid
-          required: true
-          description: "Commercial client entity"
-          lookup:
-            table: entities
-            schema: ob-poc
-            entity_type: entity
-            search_key: name
-            primary_key: entity_id
-            resolution_mode: entity
+          - name: client
+            type: uuid
+            required: true
+            description: "Commercial client entity"
+            lookup:
+              table: entities
+              schema: ob-poc
+              entity_type: entity
+              search_key: name
+              primary_key: entity_id
+              resolution_mode: entity
         returns:
           type: view_state
           capture: true
@@ -136,16 +136,16 @@ domains:
       cbu:
         description: "Focus on a single CBU with specified view mode"
         invocation_phrases:
-        - "focus on CBU"
-        - "view this CBU"
-        - "show CBU details"
-        - "open the CBU"
-        - "zoom into CBU"
-        - "display CBU view"
-        - "focus view on CBU"
-        - "show me the CBU"
-        - "select this CBU"
-        - "drill into CBU"
+          - "focus on CBU"
+          - "view this CBU"
+          - "show CBU details"
+          - "open the CBU"
+          - "zoom into CBU"
+          - "display CBU view"
+          - "focus view on CBU"
+          - "show me the CBU"
+          - "select this CBU"
+          - "drill into CBU"
         behavior: plugin
         plugin:
           handler: ViewCbuOp
@@ -159,25 +159,25 @@ domains:
           phase_tags: [navigation]
           side_effects: facts_only
         args:
-        - name: cbu-id
-          type: uuid
-          required: true
-          description: "CBU to focus on"
-          lookup:
-            table: cbus
-            schema: ob-poc
-            entity_type: cbu
-            search_key: name
-            primary_key: cbu_id
-            resolution_mode: entity
-        - name: mode
-          type: string
-          required: false
-          default: "trading"
-          valid_values:
-          - trading     # Trading network view
-          - ubo     # UBO ownership view
-          description: "View mode for CBU focus"
+          - name: cbu-id
+            type: uuid
+            required: true
+            description: "CBU to focus on"
+            lookup:
+              table: cbus
+              schema: ob-poc
+              entity_type: cbu
+              search_key: name
+              primary_key: cbu_id
+              resolution_mode: entity
+          - name: mode
+            type: string
+            required: false
+            default: "trading"
+            valid_values:
+              - trading # Trading network view
+              - ubo # UBO ownership view
+            description: "View mode for CBU focus"
         returns:
           type: view_state
           capture: true
@@ -185,16 +185,16 @@ domains:
       entity-forest:
         description: "View entities by type/ownership filters"
         invocation_phrases:
-        - "show entity tree"
-        - "view entity forest"
-        - "display entity hierarchy"
-        - "show me entities by type"
-        - "view ownership forest"
-        - "show entity structure"
-        - "display entity relationships"
-        - "see the entity tree"
-        - "open entity view"
-        - "show entities filtered by"
+          - "show entity tree"
+          - "view entity forest"
+          - "display entity hierarchy"
+          - "show me entities by type"
+          - "view ownership forest"
+          - "show entity structure"
+          - "display entity relationships"
+          - "see the entity tree"
+          - "open entity view"
+          - "show entities filtered by"
         behavior: plugin
         plugin:
           handler: ViewEntityForestOp
@@ -208,18 +208,18 @@ domains:
           phase_tags: [navigation]
           side_effects: facts_only
         args:
-        - name: entity-type
-          type: string_list
-          required: false
-          description: "Filter by entity types"
-        - name: jurisdiction
-          type: string_list
-          required: false
-          description: "Filter by jurisdictions"
-        - name: role
-          type: string_list
-          required: false
-          description: "Filter by roles"
+          - name: entity-type
+            type: string_list
+            required: false
+            description: "Filter by entity types"
+          - name: jurisdiction
+            type: string_list
+            required: false
+            description: "Filter by jurisdictions"
+          - name: role
+            type: string_list
+            required: false
+            description: "Filter by roles"
         returns:
           type: view_state
           capture: true
@@ -231,17 +231,17 @@ domains:
       refine:
         description: "Refine current view with additional filter"
         invocation_phrases:
-        - "filter the view"
-        - "refine current selection"
-        - "narrow down results"
-        - "add a filter"
-        - "filter by status"
-        - "refine by jurisdiction"
-        - "narrow the view"
-        - "apply filter to view"
-        - "restrict to matching"
-        - "filter down to"
-        - "show only matching"
+          - "filter the view"
+          - "refine current selection"
+          - "narrow down results"
+          - "add a filter"
+          - "filter by status"
+          - "refine by jurisdiction"
+          - "narrow the view"
+          - "apply filter to view"
+          - "restrict to matching"
+          - "filter down to"
+          - "show only matching"
         behavior: plugin
         plugin:
           handler: ViewRefineOp
@@ -255,39 +255,39 @@ domains:
           phase_tags: [navigation]
           side_effects: facts_only
         args:
-        - name: include
-          type: object
-          required: false
-          description: "Filter to include (narrows selection)"
-        - name: exclude
-          type: object
-          required: false
-          description: "Filter to exclude (removes from selection)"
-        - name: add
-          type: uuid_list
-          required: false
-          description: "Specific IDs to add to selection"
-        - name: remove
-          type: uuid_list
-          required: false
-          description: "Specific IDs to remove from selection"
+          - name: include
+            type: object
+            required: false
+            description: "Filter to include (narrows selection)"
+          - name: exclude
+            type: object
+            required: false
+            description: "Filter to exclude (removes from selection)"
+          - name: add
+            type: uuid_list
+            required: false
+            description: "Specific IDs to add to selection"
+          - name: remove
+            type: uuid_list
+            required: false
+            description: "Specific IDs to remove from selection"
         returns:
           type: view_state
           capture: true
 
-      clear:
-        description: "Clear refinements, return to base view"
+      clear-refinements:
+        description: "Clear refinements and return to the base view"
         invocation_phrases:
-        - "clear all filters"
-        - "reset the view"
-        - "remove all refinements"
-        - "clear current filters"
-        - "start fresh"
-        - "reset to base view"
-        - "clear refinements"
-        - "remove filters"
-        - "reset filters"
-        - "go back to unfiltered"
+          - "clear all filters"
+          - "reset the view"
+          - "remove all refinements"
+          - "clear current filters"
+          - "start fresh"
+          - "reset to base view"
+          - "clear refinements"
+          - "remove filters"
+          - "reset filters"
+          - "go back to unfiltered"
         behavior: plugin
         plugin:
           handler: ViewClearOp
@@ -309,19 +309,19 @@ domains:
       # SELECTION
       # =========================================================================
 
-      select:
-        description: "Explicitly set selection within current view"
+      set-selection:
+        description: "Explicitly set selection within the current view"
         invocation_phrases:
-        - "select these items"
-        - "select all visible"
-        - "mark as selected"
-        - "select everything"
-        - "clear selection"
-        - "select none"
-        - "choose these nodes"
-        - "select current items"
-        - "pick these entities"
-        - "highlight selected"
+          - "select these items"
+          - "select all visible"
+          - "mark as selected"
+          - "select everything"
+          - "clear selection"
+          - "select none"
+          - "choose these nodes"
+          - "select current items"
+          - "pick these entities"
+          - "highlight selected"
         behavior: plugin
         plugin:
           handler: ViewSelectOp
@@ -335,18 +335,18 @@ domains:
           phase_tags: [navigation]
           side_effects: state_write
         args:
-        - name: ids
-          type: uuid_list
-          required: false
-          description: "Explicit IDs to select"
-        - name: all
-          type: boolean
-          required: false
-          description: "Select all nodes in current view"
-        - name: none
-          type: boolean
-          required: false
-          description: "Clear selection"
+          - name: ids
+            type: uuid_list
+            required: false
+            description: "Explicit IDs to select"
+          - name: all
+            type: boolean
+            required: false
+            description: "Select all nodes in current view"
+          - name: none
+            type: boolean
+            required: false
+            description: "Clear selection"
         returns:
           type: view_state
           capture: true
@@ -355,20 +355,20 @@ domains:
       # LAYOUT
       # =========================================================================
 
-      layout:
-        description: "Change layout strategy for current view"
+      set-layout:
+        description: "Set the layout strategy for the current view"
         invocation_phrases:
-        - "change layout"
-        - "switch to grid view"
-        - "use tree layout"
-        - "show as network"
-        - "arrange as pyramid"
-        - "change display layout"
-        - "switch visualization"
-        - "use galaxy layout"
-        - "arrange nodes differently"
-        - "show in grid format"
-        - "display as hierarchy"
+          - "change layout"
+          - "switch to grid view"
+          - "use tree layout"
+          - "show as network"
+          - "arrange as pyramid"
+          - "change display layout"
+          - "switch visualization"
+          - "use galaxy layout"
+          - "arrange nodes differently"
+          - "show in grid format"
+          - "display as hierarchy"
         behavior: plugin
         plugin:
           handler: ViewLayoutOp
@@ -382,35 +382,35 @@ domains:
           phase_tags: [navigation]
           side_effects: facts_only
         args:
-        - name: mode
-          type: string
-          required: false
-          valid_values:
-          - auto     # Derive from taxonomy shape
-          - galaxy     # Semantic clustering
-          - grid     # Rows/columns
-          - tree     # Hierarchical
-          - network     # Force directed
-          - pyramid     # Ownership pyramid
-          description: "Layout algorithm to use"
-        - name: primary-axis
-          type: string
-          required: false
-          valid_values:
-          - jurisdiction
-          - fund_type
-          - status
-          - manco
-          - role_category
-          description: "Primary grouping dimension for layout"
-        - name: size-by
-          type: string
-          required: false
-          description: "Attribute to map to node size"
-        - name: color-by
-          type: string
-          required: false
-          description: "Attribute to map to node color"
+          - name: mode
+            type: string
+            required: false
+            valid_values:
+              - auto # Derive from taxonomy shape
+              - galaxy # Semantic clustering
+              - grid # Rows/columns
+              - tree # Hierarchical
+              - network # Force directed
+              - pyramid # Ownership pyramid
+            description: "Layout algorithm to use"
+          - name: primary-axis
+            type: string
+            required: false
+            valid_values:
+              - jurisdiction
+              - fund_type
+              - status
+              - manco
+              - role_category
+            description: "Primary grouping dimension for layout"
+          - name: size-by
+            type: string
+            required: false
+            description: "Attribute to map to node size"
+          - name: color-by
+            type: string
+            required: false
+            description: "Attribute to map to node color"
         returns:
           type: layout_result
           capture: true
@@ -422,17 +422,17 @@ domains:
       zoom-in:
         description: "Zoom into a node, expanding it into its child taxonomy"
         invocation_phrases:
-        - "zoom in"
-        - "zoom into this"
-        - "expand this node"
-        - "go deeper"
-        - "dive into details"
-        - "expand and zoom"
-        - "zoom closer"
-        - "magnify this area"
-        - "zoom in for detail"
-        - "get closer view"
-        - "show more detail"
+          - "zoom in"
+          - "zoom into this"
+          - "expand this node"
+          - "go deeper"
+          - "dive into details"
+          - "expand and zoom"
+          - "zoom closer"
+          - "magnify this area"
+          - "zoom in for detail"
+          - "get closer view"
+          - "show more detail"
         behavior: plugin
         plugin:
           handler: ViewZoomInOp
@@ -446,10 +446,10 @@ domains:
           phase_tags: [navigation]
           side_effects: facts_only
         args:
-        - name: node-id
-          type: uuid
-          required: true
-          description: "Node to zoom into"
+          - name: node-id
+            type: uuid
+            required: true
+            description: "Node to zoom into"
         returns:
           type: view_state
           capture: true
@@ -458,17 +458,17 @@ domains:
       zoom-out:
         description: "Zoom out to the parent taxonomy"
         invocation_phrases:
-        - "zoom out"
-        - "zoom back out"
-        - "see bigger picture"
-        - "widen the view"
-        - "expand view outward"
-        - "zoom to parent"
-        - "pull back view"
-        - "see wider context"
-        - "zoom out one level"
-        - "show less detail"
-        - "go back up"
+          - "zoom out"
+          - "zoom back out"
+          - "see bigger picture"
+          - "widen the view"
+          - "expand view outward"
+          - "zoom to parent"
+          - "pull back view"
+          - "see wider context"
+          - "zoom out one level"
+          - "show less detail"
+          - "go back up"
         behavior: plugin
         plugin:
           handler: ViewZoomOutOp
@@ -487,19 +487,19 @@ domains:
           capture: true
           description: "Pops current frame, returns to parent view"
 
-      back-to:
-        description: "Jump back to a specific breadcrumb level"
+      navigate-back-to:
+        description: "Navigate back to a specific breadcrumb level"
         invocation_phrases:
-        - "go back to"
-        - "jump back to"
-        - "return to level"
-        - "back to breadcrumb"
-        - "go to parent level"
-        - "jump to root"
-        - "return to start"
-        - "back to beginning"
-        - "go back several levels"
-        - "return to previous"
+          - "go back to"
+          - "jump back to"
+          - "return to level"
+          - "back to breadcrumb"
+          - "go to parent level"
+          - "jump to root"
+          - "return to start"
+          - "back to beginning"
+          - "go back several levels"
+          - "return to previous"
         behavior: plugin
         plugin:
           handler: ViewBackToOp
@@ -513,32 +513,32 @@ domains:
           phase_tags: [navigation]
           side_effects: facts_only
         args:
-        - name: depth
-          type: integer
-          required: false
-          description: "Breadcrumb depth (0 = root, 1 = first zoom, etc.)"
-        - name: frame-id
-          type: uuid
-          required: false
-          description: "Specific frame ID to jump to"
+          - name: depth
+            type: integer
+            required: false
+            description: "Breadcrumb depth (0 = root, 1 = first zoom, etc.)"
+          - name: frame-id
+            type: uuid
+            required: false
+            description: "Specific frame ID to jump to"
         returns:
           type: view_state
           capture: true
           description: "Pops frames until reaching target level"
 
-      breadcrumbs:
-        description: "Get current navigation breadcrumbs"
+      read-breadcrumbs:
+        description: "Read the current navigation breadcrumbs"
         invocation_phrases:
-        - "show breadcrumbs"
-        - "where am I"
-        - "show navigation path"
-        - "display current path"
-        - "show my location"
-        - "what level am I at"
-        - "show navigation trail"
-        - "display breadcrumb trail"
-        - "current navigation path"
-        - "view breadcrumbs"
+          - "show breadcrumbs"
+          - "where am I"
+          - "show navigation path"
+          - "display current path"
+          - "show my location"
+          - "what level am I at"
+          - "show navigation trail"
+          - "display breadcrumb trail"
+          - "current navigation path"
+          - "view breadcrumbs"
         behavior: plugin
         plugin:
           handler: ViewBreadcrumbsOp
@@ -547,7 +547,8 @@ domains:
           source_of_truth: session
           scope: global
           noun: view_state
-          tags: [navigation, fractal, breadcrumbs, introspection, data-management]
+          tags:
+            [navigation, fractal, breadcrumbs, introspection, data-management]
           subject_kinds: []
           phase_tags: [navigation]
           side_effects: facts_only
@@ -561,19 +562,19 @@ domains:
       # INTROSPECTION
       # =========================================================================
 
-      status:
-        description: "Get current view state summary"
+      read-status:
+        description: "Read the current view state summary"
         invocation_phrases:
-        - "show current status"
-        - "what's the status"
-        - "view state summary"
-        - "show view status"
-        - "current view state"
-        - "where am I now"
-        - "show session status"
-        - "display current state"
-        - "get view status"
-        - "check view state"
+          - "show current status"
+          - "what's the status"
+          - "view state summary"
+          - "show view status"
+          - "current view state"
+          - "where am I now"
+          - "show session status"
+          - "display current state"
+          - "get view status"
+          - "check view state"
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -590,19 +591,19 @@ domains:
           type: view_state
           capture: true
 
-      selection-info:
-        description: "Get detailed info about current selection"
+      read-selection-info:
+        description: "Read detailed info about the current selection"
         invocation_phrases:
-        - "show selection details"
-        - "what's selected"
-        - "selection summary"
-        - "show selected info"
-        - "details on selection"
-        - "info about selected"
-        - "selected items info"
-        - "describe selection"
-        - "view selection details"
-        - "get selection info"
+          - "show selection details"
+          - "what's selected"
+          - "selection summary"
+          - "show selected info"
+          - "details on selection"
+          - "info about selected"
+          - "selected items info"
+          - "describe selection"
+          - "view selection details"
+          - "get selection info"
         metadata:
           tier: intent
           source_of_truth: operational
