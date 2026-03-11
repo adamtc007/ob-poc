@@ -8,7 +8,7 @@
 //!
 //! Execution, governance, and discovery I/O remain elsewhere.
 
-use crate::semtaxonomy::{extract_entity_candidates, EntityCandidate};
+use crate::semtaxonomy::{extract_entity_candidates, EntityCandidate, VerbSurfaceEntry};
 use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -118,6 +118,63 @@ pub struct SelectedVerb {
     pub resolution_mode: ResolutionMode,
 }
 
+/// Build a generic Step 2 state from an unscoped action surface.
+///
+/// This is used for generic fresh turns that do not identify an existing
+/// entity but still have a valid action surface, such as `create a new CBU`.
+///
+/// # Examples
+///
+/// ```ignore
+/// use ob_poc::semtaxonomy::VerbSurfaceEntry;
+/// use ob_poc::semtaxonomy_v2::build_generic_state;
+///
+/// let state = build_generic_state("entity", &Vec::<VerbSurfaceEntry>::new());
+/// assert!(state.valid_verbs.is_empty());
+/// ```
+pub fn build_generic_state(entity_type: &str, action_surface: &[VerbSurfaceEntry]) -> EntityState {
+    EntityState {
+        entity: EntityScope {
+            entity_id: Uuid::nil(),
+            entity_type: entity_type.to_string(),
+            name: "unscoped".to_string(),
+            confidence: 0.0,
+            source: EntitySource::SessionCarry,
+        },
+        lane_positions: Vec::new(),
+        valid_verbs: action_surface
+            .iter()
+            .map(|entry| ValidVerb {
+                verb_id: entry.verb_id.clone(),
+                description: entry.description.clone(),
+                polarity: entry.polarity.clone(),
+                invocation_phrases: Vec::new(),
+                parameters: entry
+                    .parameters
+                    .iter()
+                    .map(|parameter| ValidVerbParameter {
+                        name: parameter.name.clone(),
+                        required: parameter.required,
+                        description: parameter.description.clone(),
+                    })
+                    .collect(),
+                lane: entry
+                    .phase_tags
+                    .first()
+                    .cloned()
+                    .unwrap_or_else(|| "general".to_string()),
+                phase: entry
+                    .phase_tags
+                    .first()
+                    .cloned()
+                    .unwrap_or_else(|| "general".to_string()),
+                relevance: 0.5,
+            })
+            .collect(),
+        blocked_verbs: Vec::new(),
+    }
+}
+
 fn utterance_tokens(input: &str) -> Vec<String> {
     input
         .split(|ch: char| !ch.is_alphanumeric())
@@ -131,6 +188,12 @@ fn classify_action(input: &str) -> Option<&'static str> {
     if tokens.iter().any(|t| matches!(t.as_str(), "delete" | "remove")) {
         return Some("delete");
     }
+    if tokens
+        .iter()
+        .any(|t| matches!(t.as_str(), "run" | "screen" | "screening" | "check" | "scan"))
+    {
+        return Some("operate");
+    }
     if tokens.iter().any(|t| matches!(t.as_str(), "create" | "add" | "open" | "onboard" | "register")) {
         return Some("create");
     }
@@ -141,6 +204,129 @@ fn classify_action(input: &str) -> Option<&'static str> {
         return Some("read");
     }
     None
+}
+
+fn canonical_action_from_verb(verb_id: &str, polarity: &str) -> &'static str {
+    let lower = verb_id.to_ascii_lowercase();
+    if lower.contains(".delete")
+        || lower.contains(".remove")
+        || lower.contains("delete-")
+        || lower.contains("remove-")
+    {
+        return "delete";
+    }
+    if lower.contains(".update")
+        || lower.contains(".set")
+        || lower.contains(".assign")
+        || lower.contains(".mark")
+        || lower.contains(".link")
+        || lower.contains(".verify")
+        || lower.contains(".reject")
+        || lower.contains(".approve")
+        || lower.contains(".review")
+    {
+        return "update";
+    }
+    if lower.contains(".create")
+        || lower.contains(".open")
+        || lower.contains(".ensure")
+        || lower.contains(".solicit")
+        || lower.contains(".upload")
+        || lower.contains(".collect")
+        || lower.contains(".run")
+        || lower.contains(".sanctions")
+        || lower.contains(".pep")
+        || lower.contains(".adverse-media")
+        || lower.contains(".full")
+        || lower.contains(".import")
+    {
+        return "create";
+    }
+    if polarity.eq_ignore_ascii_case("read") {
+        return "read";
+    }
+    "update"
+}
+
+fn verb_matches_action_class(action: Option<&str>, verb: &ValidVerb) -> bool {
+    match action {
+        Some("read") => verb.polarity.eq_ignore_ascii_case("read"),
+        Some("delete") => canonical_action_from_verb(&verb.verb_id, &verb.polarity) == "delete",
+        Some("create") => matches!(
+            canonical_action_from_verb(&verb.verb_id, &verb.polarity),
+            "create" | "update"
+        ) && !verb.polarity.eq_ignore_ascii_case("read"),
+        Some("update") => matches!(
+            canonical_action_from_verb(&verb.verb_id, &verb.polarity),
+            "update" | "create"
+        ) && !verb.polarity.eq_ignore_ascii_case("read"),
+        Some("operate") => !verb.polarity.eq_ignore_ascii_case("read"),
+        None => verb.polarity.eq_ignore_ascii_case("read"),
+        Some(_) => true,
+    }
+}
+
+fn verb_conflicts_action_class(action: Option<&str>, verb: &ValidVerb) -> bool {
+    match action {
+        Some("create") => canonical_action_from_verb(&verb.verb_id, &verb.polarity) == "delete",
+        Some("delete") => canonical_action_from_verb(&verb.verb_id, &verb.polarity) != "delete",
+        Some("operate") => verb.polarity.eq_ignore_ascii_case("read"),
+        Some("read") => !verb.polarity.eq_ignore_ascii_case("read"),
+        _ => false,
+    }
+}
+
+fn preferred_domains(utterance: &str) -> Vec<&'static str> {
+    let lower = utterance.to_ascii_lowercase();
+    let mut domains = Vec::new();
+    if ["sanction", "pep", "adverse media", "ofac", "aml", "screening", "rba"]
+        .iter()
+        .any(|needle| lower.contains(needle))
+    {
+        domains.push("screening");
+    }
+    if ["kyc", "case", "readiness", "review"].iter().any(|needle| lower.contains(needle)) {
+        domains.push("kyc");
+        domains.push("case");
+    }
+    if [
+        "fund",
+        "umbrella",
+        "sicav",
+        "icav",
+        "oeic",
+        "raif",
+        "subfund",
+        "share class",
+        "master-feeder",
+        "hedge",
+    ]
+    .iter()
+    .any(|needle| lower.contains(needle))
+    {
+        domains.push("fund");
+        domains.push("struct");
+    }
+    if [
+        "document",
+        "documents",
+        "passport",
+        "certificate",
+        "articles",
+        "identity",
+    ]
+    .iter()
+    .any(|needle| lower.contains(needle))
+    {
+        domains.push("document");
+    }
+    if ["company", "person", "trust", "partnership", "legal entity"]
+        .iter()
+        .any(|needle| lower.contains(needle))
+    {
+        domains.push("entity");
+    }
+    domains
 }
 
 fn is_inventory_utterance(input: &str) -> bool {
@@ -158,6 +344,102 @@ fn is_scope_only_utterance(input: &str) -> bool {
     let extracted = extract_entity_candidates(input);
     let token_count = input.split_whitespace().count();
     !extracted.is_empty() && token_count <= extracted[0].split_whitespace().count() + 1
+}
+
+fn is_deictic_scope_utterance(input: &str) -> bool {
+    let lower = input.to_ascii_lowercase();
+    let deictic_markers = [
+        " this ",
+        " that ",
+        " these ",
+        " those ",
+        " they ",
+        " them ",
+        " their ",
+        " it ",
+        " its ",
+    ];
+    let padded = format!(" {lower} ");
+    deictic_markers.iter().any(|marker| padded.contains(marker))
+}
+
+fn generic_entity_reference_tokens() -> &'static [&'static str] {
+    &[
+        "cbu",
+        "cbus",
+        "client",
+        "clients",
+        "deal",
+        "deals",
+        "document",
+        "documents",
+        "doc",
+        "docs",
+        "entity",
+        "entities",
+        "company",
+        "companies",
+        "person",
+        "people",
+        "trust",
+        "fund",
+        "funds",
+        "subfund",
+        "subfunds",
+        "share",
+        "class",
+        "classes",
+        "structure",
+        "ownership",
+        "owner",
+        "owners",
+        "party",
+        "parties",
+        "screening",
+        "sanctions",
+        "pep",
+        "kyc",
+        "case",
+        "cases",
+        "book",
+        "cluster",
+        "service",
+        "services",
+        "role",
+        "roles",
+        "tool",
+        "tools",
+        "register",
+        "assessment",
+        "review",
+        "reviews",
+        "mandate",
+        "mandates",
+    ]
+}
+
+fn candidate_looks_like_proper_name(candidate: &str) -> bool {
+    let generic_tokens = generic_entity_reference_tokens();
+    let words: Vec<&str> = candidate.split_whitespace().collect();
+    if words.is_empty() {
+        return false;
+    }
+
+    let generic_word_count = words
+        .iter()
+        .filter(|word| generic_tokens.contains(&word.to_ascii_lowercase().as_str()))
+        .count();
+    let capitalized_word_count = words
+        .iter()
+        .filter(|word| word.chars().next().is_some_and(|ch| ch.is_uppercase()))
+        .count();
+    let acronym_or_suffix = words.iter().any(|word| {
+        let upper = word.to_ascii_uppercase();
+        matches!(upper.as_str(), "AG" | "SA" | "SE" | "PLC" | "LLC" | "LTD" | "LP")
+    });
+
+    (words.len() >= 2 && capitalized_word_count >= 2 && generic_word_count < words.len())
+        || acronym_or_suffix
 }
 
 /// Decide whether an utterance explicitly introduces a fresh entity reference.
@@ -182,17 +464,17 @@ pub fn introduces_entity_reference(utterance: &str) -> bool {
 
     let utterance_trimmed = utterance.trim();
     let utterance_lower = utterance_trimmed.to_ascii_lowercase();
+    if is_deictic_scope_utterance(utterance) {
+        return false;
+    }
+
     let explicit_markers = [
         " for ",
         " called ",
         " named ",
-        " on ",
         " about ",
         " regarding ",
         " between ",
-        " and ",
-        " owns ",
-        " controls ",
     ];
     if explicit_markers
         .iter()
@@ -201,9 +483,12 @@ pub fn introduces_entity_reference(utterance: &str) -> bool {
         return true;
     }
 
+    if classify_action(utterance).is_some() || is_inventory_utterance(utterance) {
+        return extracted.iter().any(|candidate| candidate_looks_like_proper_name(candidate));
+    }
+
     extracted.iter().any(|candidate| {
-        candidate.split_whitespace().count() > 1
-            || candidate.chars().any(|ch| ch.is_uppercase())
+        candidate_looks_like_proper_name(candidate)
             || candidate.chars().any(|ch| ch.is_numeric())
             || utterance_trimmed == candidate
     })
@@ -355,10 +640,97 @@ fn parse_lane_positions(entity_state: Option<&Value>, transitions: Option<&Value
             });
         }
     }
+    if let Some(frontier_nodes) = transitions
+        .and_then(|value| value.get("frontier_nodes"))
+        .and_then(Value::as_array)
+    {
+        for node in frontier_nodes {
+            let lane_name = node
+                .as_str()
+                .and_then(|raw| raw.split('.').next())
+                .unwrap_or("general")
+                .to_string();
+            if positions.iter().any(|position| position.lane == lane_name) {
+                continue;
+            }
+            positions.push(LanePosition {
+                lane: lane_name,
+                current_phase: "frontier".to_string(),
+                is_active: true,
+                is_terminal: false,
+            });
+        }
+    }
     positions
 }
 
 fn parse_valid_verbs(transitions: Option<&Value>) -> Vec<ValidVerb> {
+    if let Some(valid_verbs) = transitions
+        .and_then(|value| value.get("valid_verbs"))
+        .and_then(Value::as_array)
+    {
+        return valid_verbs
+            .iter()
+            .map(|verb| ValidVerb {
+                verb_id: verb
+                    .get("verb_id")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default()
+                    .to_string(),
+                description: verb
+                    .get("description")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default()
+                    .to_string(),
+                polarity: verb
+                    .get("polarity")
+                    .and_then(Value::as_str)
+                    .unwrap_or("read")
+                    .to_string(),
+                invocation_phrases: verb
+                    .get("invocation_phrases")
+                    .and_then(Value::as_array)
+                    .cloned()
+                    .unwrap_or_default()
+                    .into_iter()
+                    .filter_map(|value| value.as_str().map(str::to_string))
+                    .collect(),
+                parameters: verb
+                    .get("parameters")
+                    .and_then(Value::as_array)
+                    .cloned()
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|parameter| ValidVerbParameter {
+                        name: parameter
+                            .get("name")
+                            .and_then(Value::as_str)
+                            .unwrap_or_default()
+                            .to_string(),
+                        required: parameter
+                            .get("required")
+                            .and_then(Value::as_bool)
+                            .unwrap_or(false),
+                        description: parameter
+                            .get("description")
+                            .and_then(Value::as_str)
+                            .map(str::to_string),
+                    })
+                    .collect(),
+                lane: verb
+                    .get("lane")
+                    .and_then(Value::as_str)
+                    .unwrap_or("general")
+                    .to_string(),
+                phase: verb
+                    .get("to_node")
+                    .and_then(Value::as_str)
+                    .unwrap_or("frontier")
+                    .to_string(),
+                relevance: verb.get("relevance").and_then(Value::as_f64).unwrap_or_default(),
+            })
+            .collect();
+    }
     transitions
         .and_then(|value| value.get("lanes"))
         .and_then(Value::as_array)
@@ -436,6 +808,42 @@ fn parse_valid_verbs(transitions: Option<&Value>) -> Vec<ValidVerb> {
 }
 
 fn parse_blocked_verbs(transitions: Option<&Value>) -> Vec<BlockedVerb> {
+    if let Some(blocked_verbs) = transitions
+        .and_then(|value| value.get("blocked_verbs"))
+        .and_then(Value::as_array)
+    {
+        return blocked_verbs
+            .iter()
+            .map(|verb| BlockedVerb {
+                verb_id: verb
+                    .get("verb_id")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default()
+                    .to_string(),
+                description: verb
+                    .get("description")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default()
+                    .to_string(),
+                unmet_preconditions: verb
+                    .get("unmet_conditions")
+                    .and_then(Value::as_array)
+                    .cloned()
+                    .unwrap_or_default()
+                    .into_iter()
+                    .filter_map(|value| value.as_str().map(str::to_string))
+                    .collect(),
+                unblocking_actions: verb
+                    .get("unblocking_verbs")
+                    .and_then(Value::as_array)
+                    .cloned()
+                    .unwrap_or_default()
+                    .into_iter()
+                    .filter_map(|value| value.as_str().map(str::to_string))
+                    .collect(),
+            })
+            .collect();
+    }
     transitions
         .and_then(|value| value.get("blocked"))
         .and_then(Value::as_array)
@@ -537,6 +945,26 @@ pub fn step1_entity_scope(
     previous_scope: Option<&EntityScope>,
     search_candidates: &[EntityCandidate],
 ) -> EntityScopeOutcome {
+    let action = classify_action(utterance);
+
+    if is_deictic_scope_utterance(utterance) {
+        if let Some(previous_scope) = previous_scope {
+            return EntityScopeOutcome::Resolved(EntityScope {
+                entity_id: previous_scope.entity_id,
+                entity_type: previous_scope.entity_type.clone(),
+                name: previous_scope.name.clone(),
+                confidence: previous_scope.confidence,
+                source: EntitySource::SessionCarry,
+            });
+        }
+
+        return EntityScopeOutcome::Unresolved;
+    }
+
+    if matches!(action, Some("create")) && previous_scope.is_none() {
+        return EntityScopeOutcome::Unresolved;
+    }
+
     if !introduces_entity_reference(utterance) {
         if let Some(previous_scope) = previous_scope {
             return EntityScopeOutcome::Resolved(EntityScope {
@@ -547,6 +975,8 @@ pub fn step1_entity_scope(
                 source: EntitySource::SessionCarry,
             });
         }
+
+        return EntityScopeOutcome::Unresolved;
     }
 
     let candidates = merge_entity_candidates(search_candidates.to_vec());
@@ -678,15 +1108,27 @@ pub fn step3_select_verb(utterance: &str, state: &EntityState) -> Option<Selecte
 
     let action = classify_action(utterance);
     let inventory = is_inventory_utterance(utterance);
+    let domain_prefilter = preferred_domains(utterance);
     let mut candidates = state
         .valid_verbs
         .iter()
         .filter(|verb| !verb.verb_id.starts_with("discovery."))
-        .filter(|verb| match action {
-            Some("read") => verb.polarity.eq_ignore_ascii_case("read"),
-            Some("create") | Some("update") | Some("delete") => !verb.polarity.eq_ignore_ascii_case("read"),
-            None => verb.polarity.eq_ignore_ascii_case("read"),
-            _ => true,
+        .filter(|verb| {
+            if domain_prefilter.is_empty() {
+                return true;
+            }
+            let domain = verb
+                .verb_id
+                .split_once('.')
+                .map(|(domain, _)| domain)
+                .unwrap_or_default();
+            domain_prefilter.iter().any(|preferred| preferred == &domain)
+        })
+        .filter(|verb| {
+            if verb_conflicts_action_class(action, verb) {
+                return false;
+            }
+            verb_matches_action_class(action, verb)
         })
         .map(|verb| {
             let mut score = semantic_similarity_score(utterance, verb);
@@ -702,6 +1144,17 @@ pub fn step3_select_verb(utterance: &str, state: &EntityState) -> Option<Selecte
             }
             if matches!(action, Some("delete")) && (verb.verb_id.contains(".delete") || verb.verb_id.contains(".remove")) {
                 score += 8;
+            }
+            if matches!(action, Some("operate")) {
+                if verb.verb_id.starts_with("screening.") && !verb.verb_id.contains("list") {
+                    score += 10;
+                }
+                if verb.verb_id.starts_with("case.") || verb.verb_id.starts_with("kyc.") {
+                    score += 6;
+                }
+            }
+            if matches!(action, Some("create")) && verb.verb_id.starts_with("fund.") && utterance.to_ascii_lowercase().contains("fund") {
+                score += 6;
             }
             (score, verb)
         })
@@ -739,10 +1192,10 @@ pub fn step3_select_verb(utterance: &str, state: &EntityState) -> Option<Selecte
 #[cfg(test)]
 mod tests {
     use super::{
-        introduces_entity_reference, step1_entity_scope, step2_entity_state, step3_select_verb,
-        EntityScope, EntityScopeOutcome, EntitySource,
+        build_generic_state, introduces_entity_reference, step1_entity_scope, step2_entity_state,
+        step3_select_verb, EntityScope, EntityScopeOutcome, EntitySource,
     };
-    use crate::semtaxonomy::EntityCandidate;
+    use crate::semtaxonomy::{EntityCandidate, VerbParameter, VerbSurfaceEntry};
     use serde_json::json;
     use uuid::Uuid;
 
@@ -788,12 +1241,16 @@ mod tests {
     fn generic_inventory_utterance_does_not_introduce_entity_reference() {
         assert!(!introduces_entity_reference("show me the cbus"));
         assert!(!introduces_entity_reference("what deals do we have?"));
+        assert!(!introduces_entity_reference("spin up a CBU"));
+        assert!(!introduces_entity_reference("what's the status of the deal?"));
     }
 
     #[test]
     fn explicit_named_entity_does_introduce_entity_reference() {
         assert!(introduces_entity_reference("show me the deals for Allianz Global Investors"));
         assert!(introduces_entity_reference("who owns BNP Paribas"));
+        assert!(introduces_entity_reference("make State Street the transfer agent"));
+        assert!(introduces_entity_reference("register John Smith as a person"));
     }
 
     #[test]
@@ -832,6 +1289,130 @@ mod tests {
             }
             other => panic!("expected resolved outcome, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn step1_does_not_search_for_generic_fresh_turn_without_scope() {
+        let outcome = step1_entity_scope("spin up a CBU", None, &[candidate("SeedCap Holdings", 0.63)]);
+        assert_eq!(outcome, EntityScopeOutcome::Unresolved);
+    }
+
+    #[test]
+    fn step1_does_not_force_scope_for_fresh_create_with_named_payload() {
+        let outcome = step1_entity_scope(
+            "register John Smith as a person",
+            None,
+            &[candidate("John Smith Holdings", 0.93)],
+        );
+        assert_eq!(outcome, EntityScopeOutcome::Unresolved);
+    }
+
+    #[test]
+    fn step1_uses_session_carry_for_deictic_scope_turn() {
+        let previous = EntityScope {
+            entity_id: Uuid::new_v4(),
+            entity_type: "cbu".to_string(),
+            name: "SeedCap Growth Fund".to_string(),
+            confidence: 1.0,
+            source: EntitySource::UserConfirmed,
+        };
+        let outcome = step1_entity_scope(
+            "update the jurisdiction to Ireland for this CBU",
+            Some(&previous),
+            &[candidate("Other Candidate", 0.92)],
+        );
+        assert_eq!(
+            outcome,
+            EntityScopeOutcome::Resolved(EntityScope {
+                source: EntitySource::SessionCarry,
+                ..previous
+            })
+        );
+    }
+
+    #[test]
+    fn generic_state_can_select_create_verb_without_entity_scope() {
+        let state = build_generic_state(
+            "entity",
+            &[VerbSurfaceEntry {
+                verb_id: "entity.create".to_string(),
+                domain: "entity".to_string(),
+                name: "create".to_string(),
+                description: "Create a new legal entity".to_string(),
+                polarity: "write".to_string(),
+                phase_tags: vec!["entity".to_string()],
+                subject_kinds: vec!["entity".to_string()],
+                parameters: vec![VerbParameter {
+                    name: "name".to_string(),
+                    required: true,
+                    description: Some("Entity name".to_string()),
+                }],
+            }],
+        );
+        let selected = step3_select_verb("add a new company", &state).expect("selected verb");
+        assert_eq!(selected.verb_id, "entity.create");
+    }
+
+    #[test]
+    fn operate_action_never_selects_read_list_screening_verb() {
+        let state = build_generic_state(
+            "entity",
+            &[
+                VerbSurfaceEntry {
+                    verb_id: "screening.list-by-workstream".to_string(),
+                    domain: "screening".to_string(),
+                    name: "list-by-workstream".to_string(),
+                    description: "List screening results for a workstream".to_string(),
+                    polarity: "read".to_string(),
+                    phase_tags: vec!["kyc".to_string()],
+                    subject_kinds: vec!["entity".to_string()],
+                    parameters: vec![],
+                },
+                VerbSurfaceEntry {
+                    verb_id: "screening.sanctions".to_string(),
+                    domain: "screening".to_string(),
+                    name: "sanctions".to_string(),
+                    description: "Run sanctions list screening".to_string(),
+                    polarity: "write".to_string(),
+                    phase_tags: vec!["kyc".to_string()],
+                    subject_kinds: vec!["entity".to_string()],
+                    parameters: vec![],
+                },
+            ],
+        );
+        let selected = step3_select_verb("run sanctions screening", &state).expect("selected verb");
+        assert_eq!(selected.verb_id, "screening.sanctions");
+    }
+
+    #[test]
+    fn create_action_never_selects_delete_verb() {
+        let state = build_generic_state(
+            "fund",
+            &[
+                VerbSurfaceEntry {
+                    verb_id: "fund.delete-compartment".to_string(),
+                    domain: "fund".to_string(),
+                    name: "delete-compartment".to_string(),
+                    description: "Delete fund compartment".to_string(),
+                    polarity: "write".to_string(),
+                    phase_tags: vec!["fund".to_string()],
+                    subject_kinds: vec!["fund".to_string()],
+                    parameters: vec![],
+                },
+                VerbSurfaceEntry {
+                    verb_id: "fund.create".to_string(),
+                    domain: "fund".to_string(),
+                    name: "create".to_string(),
+                    description: "Create fund structure".to_string(),
+                    polarity: "write".to_string(),
+                    phase_tags: vec!["fund".to_string()],
+                    subject_kinds: vec!["fund".to_string()],
+                    parameters: vec![],
+                },
+            ],
+        );
+        let selected = step3_select_verb("Create an umbrella fund", &state).expect("selected verb");
+        assert_eq!(selected.verb_id, "fund.create");
     }
 
     #[test]

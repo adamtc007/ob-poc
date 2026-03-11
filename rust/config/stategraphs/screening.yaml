@@ -1,0 +1,32 @@
+graph_id: screening
+name: Screening Graph
+version: "1"
+description: Screening workflow graph
+entity_types:
+  - client-group
+  - cbu
+  - entity
+nodes:
+  - node_id: screening.entry
+    name: Screening Entry
+    node_type: entry
+    lane: screening
+  - node_id: screening.active
+    name: Active Screening
+    node_type: milestone
+    lane: screening
+    satisfied_when:
+      - signal: screening_active_count
+        description: Screening records exist
+edges:
+  - edge_id: screening.start
+    from_node: screening.entry
+    to_node: screening.active
+    verb_ids: ["screening.sanctions", "screening.pep", "screening.adverse-media", "screening.run"]
+    edge_type: advance
+  - edge_id: screening.review
+    from_node: screening.active
+    to_node: screening.active
+    verb_ids: ["screening.list-by-workstream", "screening.review-hit", "screening.complete"]
+    edge_type: conditional
+gates: []

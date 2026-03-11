@@ -2,27 +2,32 @@ domains:
   entity:
     description: Entity management operations
     invocation_hints:
-    - entity
-    - company
-    - person
-    - counterparty
-    - director
-    - UBO
+      - entity
+      - company
+      - person
+      - counterparty
+      - director
+      - UBO
     verbs:
       create:
         description: Create an entity of the requested entity type
         behavior: crud
         invocation_phrases:
-        - "create entity"
-        - "create company"
-        - "create person"
-        - "create trust"
-        - "create partnership"
-        - "add entity"
-        - "register entity"
-        - "new entity"
-        - "set up entity"
-        - "create legal entity"
+          - "create entity"
+          - "create company"
+          - "create person"
+          - "create trust"
+          - "create partnership"
+          - "add entity"
+          - "register entity"
+          - "new entity"
+          - "set up entity"
+          - "create legal entity"
+          - "register company"
+          - "register person"
+          - "create a new company"
+          - "set up a new legal entity"
+          - "register a new trust"
         metadata:
           tier: intent
           source_of_truth: entity
@@ -42,57 +47,57 @@ domains:
           type_id_column: entity_type_id
           returning: entity_id
         args:
-        - name: entity-type
-          type: string
-          required: true
-        - name: name
-          type: string
-          required: false
-        - name: first-name
-          type: string
-          required: false
-          maps_to: first_name
-        - name: last-name
-          type: string
-          required: false
-          maps_to: last_name
-        - name: cbu-id
-          type: uuid
-          required: false
-          lookup:
-            table: cbus
-            entity_type: cbu
-            schema: ob-poc
-            search_key: name
-            primary_key: cbu_id
-        - name: company-number
-          type: string
-          required: false
-          maps_to: registration_number
-        - name: jurisdiction
-          type: string
-          required: false
-          maps_to: jurisdiction
-        - name: date-of-birth
-          type: date
-          required: false
-          maps_to: date_of_birth
-        - name: nationality
-          type: string
-          required: false
-          maps_to: nationality
-        - name: establishment-date
-          type: date
-          required: false
-          maps_to: establishment_date
-        - name: trust-purpose
-          type: string
-          required: false
-          maps_to: trust_purpose
-        - name: formation-date
-          type: date
-          required: false
-          maps_to: formation_date
+          - name: entity-type
+            type: string
+            required: true
+          - name: name
+            type: string
+            required: false
+          - name: first-name
+            type: string
+            required: false
+            maps_to: first_name
+          - name: last-name
+            type: string
+            required: false
+            maps_to: last_name
+          - name: cbu-id
+            type: uuid
+            required: false
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: company-number
+            type: string
+            required: false
+            maps_to: registration_number
+          - name: jurisdiction
+            type: string
+            required: false
+            maps_to: jurisdiction
+          - name: date-of-birth
+            type: date
+            required: false
+            maps_to: date_of_birth
+          - name: nationality
+            type: string
+            required: false
+            maps_to: nationality
+          - name: establishment-date
+            type: date
+            required: false
+            maps_to: establishment_date
+          - name: trust-purpose
+            type: string
+            required: false
+            maps_to: trust_purpose
+          - name: formation-date
+            type: date
+            required: false
+            maps_to: formation_date
         returns:
           type: uuid
           name: entity_id
@@ -102,16 +107,16 @@ domains:
         description: Create or update an entity of the requested entity type
         behavior: crud
         invocation_phrases:
-        - "ensure entity"
-        - "ensure company"
-        - "ensure person"
-        - "ensure trust"
-        - "ensure partnership"
-        - "upsert entity"
-        - "get or create entity"
-        - "find or create entity"
-        - "ensure entity exists"
-        - "add or update entity"
+          - "ensure entity"
+          - "ensure company"
+          - "ensure person"
+          - "ensure trust"
+          - "ensure partnership"
+          - "upsert entity"
+          - "get or create entity"
+          - "find or create entity"
+          - "ensure entity exists"
+          - "add or update entity"
         metadata:
           tier: intent
           source_of_truth: entity
@@ -131,62 +136,62 @@ domains:
           type_id_column: entity_type_id
           returning: entity_id
         args:
-        - name: entity-type
-          type: string
-          required: true
-        - name: name
-          type: string
-          required: false
-        - name: first-name
-          type: string
-          required: false
-          maps_to: first_name
-        - name: last-name
-          type: string
-          required: false
-          maps_to: last_name
-        - name: cbu-id
-          type: uuid
-          required: false
-          lookup:
-            table: cbus
-            entity_type: cbu
-            schema: ob-poc
-            search_key: name
-            primary_key: cbu_id
-        - name: company-number
-          type: string
-          required: false
-          maps_to: registration_number
-        - name: jurisdiction
-          type: string
-          required: false
-          maps_to: jurisdiction
-        - name: lei
-          type: string
-          required: false
-          maps_to: lei
-          description: Legal Entity Identifier (LEI) from GLEIF
-        - name: date-of-birth
-          type: date
-          required: false
-          maps_to: date_of_birth
-        - name: nationality
-          type: string
-          required: false
-          maps_to: nationality
-        - name: establishment-date
-          type: date
-          required: false
-          maps_to: establishment_date
-        - name: trust-purpose
-          type: string
-          required: false
-          maps_to: trust_purpose
-        - name: formation-date
-          type: date
-          required: false
-          maps_to: formation_date
+          - name: entity-type
+            type: string
+            required: true
+          - name: name
+            type: string
+            required: false
+          - name: first-name
+            type: string
+            required: false
+            maps_to: first_name
+          - name: last-name
+            type: string
+            required: false
+            maps_to: last_name
+          - name: cbu-id
+            type: uuid
+            required: false
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: company-number
+            type: string
+            required: false
+            maps_to: registration_number
+          - name: jurisdiction
+            type: string
+            required: false
+            maps_to: jurisdiction
+          - name: lei
+            type: string
+            required: false
+            maps_to: lei
+            description: Legal Entity Identifier (LEI) from GLEIF
+          - name: date-of-birth
+            type: date
+            required: false
+            maps_to: date_of_birth
+          - name: nationality
+            type: string
+            required: false
+            maps_to: nationality
+          - name: establishment-date
+            type: date
+            required: false
+            maps_to: establishment_date
+          - name: trust-purpose
+            type: string
+            required: false
+            maps_to: trust_purpose
+          - name: formation-date
+            type: date
+            required: false
+            maps_to: formation_date
         returns:
           type: uuid
           name: entity_id
@@ -195,16 +200,16 @@ domains:
       read:
         description: Read an entity by ID
         invocation_phrases:
-        - "read entity"
-        - "get entity"
-        - "show entity"
-        - "view entity"
-        - "fetch entity details"
-        - "look up entity"
-        - "find entity by id"
-        - "describe entity"
-        - "entity details"
-        - "retrieve entity"
+          - "read entity"
+          - "get entity"
+          - "show entity"
+          - "view entity"
+          - "fetch entity details"
+          - "look up entity"
+          - "find entity by id"
+          - "describe entity"
+          - "entity details"
+          - "retrieve entity"
         behavior: crud
         metadata:
           tier: diagnostics
@@ -218,31 +223,36 @@ domains:
           table: entities
           schema: ob-poc
         args:
-        - name: entity-id
-          type: uuid
-          required: true
-          maps_to: entity_id
-          lookup:
-            table: entities
-            entity_type: entity
-            schema: ob-poc
-            search_key: name
-            primary_key: entity_id
+          - name: entity-id
+            type: uuid
+            required: true
+            maps_to: entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
         returns:
           type: record
       update:
         description: Update an entity's base fields
         invocation_phrases:
-        - "update entity"
-        - "modify entity details"
-        - "change entity information"
-        - "edit entity"
-        - "update company details"
-        - "modify entity"
-        - "change entity name"
-        - "update entity attributes"
-        - "amend entity"
-        - "update party details"
+          - "update entity"
+          - "modify entity details"
+          - "change entity information"
+          - "edit entity"
+          - "update company details"
+          - "modify entity"
+          - "change entity name"
+          - "update entity attributes"
+          - "amend entity"
+          - "update party details"
+          - "change company details"
+          - "change person details"
+          - "amend this entity record"
+          - "update this company record"
+          - "edit the legal entity details"
         behavior: crud
         metadata:
           tier: intent
@@ -258,43 +268,43 @@ domains:
           schema: ob-poc
           key: entity_id
         args:
-        - name: entity-id
-          type: uuid
-          required: true
-          maps_to: entity_id
-          lookup:
-            table: entities
-            entity_type: entity
-            schema: ob-poc
-            search_key: name
-            primary_key: entity_id
-        - name: name
-          type: string
-          required: false
-          maps_to: name
-        - name: status
-          type: string
-          required: false
-          maps_to: status
-        - name: jurisdiction
-          type: string
-          required: false
-          maps_to: jurisdiction
+          - name: entity-id
+            type: uuid
+            required: true
+            maps_to: entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: name
+            type: string
+            required: false
+            maps_to: name
+          - name: status
+            type: string
+            required: false
+            maps_to: status
+          - name: jurisdiction
+            type: string
+            required: false
+            maps_to: jurisdiction
         returns:
           type: affected
       delete:
         description: Delete an entity (cascades to type extension)
         invocation_phrases:
-        - "delete entity"
-        - "remove entity"
-        - "drop entity"
-        - "delete person"
-        - "delete company"
-        - "remove party"
-        - "delete entity record"
-        - "destroy entity"
-        - "erase entity"
-        - "remove entity from system"
+          - "delete entity"
+          - "remove entity"
+          - "drop entity"
+          - "delete person"
+          - "delete company"
+          - "remove party"
+          - "delete entity record"
+          - "destroy entity"
+          - "erase entity"
+          - "remove entity from system"
         behavior: crud
         metadata:
           tier: intent
@@ -310,31 +320,34 @@ domains:
           schema: ob-poc
           key: entity_id
         args:
-        - name: entity-id
-          type: uuid
-          required: true
-          maps_to: entity_id
-          lookup:
-            table: entities
-            entity_type: entity
-            schema: ob-poc
-            search_key: name
-            primary_key: entity_id
+          - name: entity-id
+            type: uuid
+            required: true
+            maps_to: entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
         returns:
           type: affected
       list:
         description: List entities with optional filters
         invocation_phrases:
-        - "list entities"
-        - "show all entities"
-        - "view entity list"
-        - "list companies"
-        - "show entities by type"
-        - "list all entities"
-        - "display entities"
-        - "get entity list"
-        - "enumerate entities"
-        - "browse entities"
+          - "list entities"
+          - "show all entities"
+          - "view entity list"
+          - "list companies"
+          - "show entities by type"
+          - "list all entities"
+          - "display entities"
+          - "get entity list"
+          - "enumerate entities"
+          - "browse entities"
+          - "show me all companies"
+          - "what entities do we have"
+          - "list the registered entities"
         behavior: crud
         metadata:
           tier: diagnostics
@@ -348,41 +361,41 @@ domains:
           table: entities
           schema: ob-poc
         args:
-        - name: entity-type
-          type: string
-          required: false
-        - name: jurisdiction
-          type: string
-          required: false
-          maps_to: jurisdiction
-        - name: status
-          type: string
-          required: false
-          maps_to: status
-        - name: limit
-          type: integer
-          required: false
-          default: 100
-        - name: offset
-          type: integer
-          required: false
-          default: 0
+          - name: entity-type
+            type: string
+            required: false
+          - name: jurisdiction
+            type: string
+            required: false
+            maps_to: jurisdiction
+          - name: status
+            type: string
+            required: false
+            maps_to: status
+          - name: limit
+            type: integer
+            required: false
+            default: 100
+          - name: offset
+            type: integer
+            required: false
+            default: 0
         returns:
           type: record_set
 
       query:
         description: Query entities for batch template iteration (returns entity refs, not records)
         invocation_phrases:
-        - "query entities"
-        - "search entities"
-        - "find entities"
-        - "entity search"
-        - "filter entities"
-        - "query entity by name"
-        - "entity query"
-        - "search for entities"
-        - "find matching entities"
-        - "entity lookup"
+          - "query entities"
+          - "search entities"
+          - "find entities"
+          - "entity search"
+          - "filter entities"
+          - "query entity by name"
+          - "entity query"
+          - "search for entities"
+          - "find matching entities"
+          - "entity lookup"
         behavior: plugin
         metadata:
           tier: diagnostics
@@ -394,23 +407,23 @@ domains:
         plugin:
           handler: entity_query
         args:
-        - name: type
-          type: string
-          required: false
-          description: Entity type filter (fund, proper_person, limited_company, etc.)
-        - name: name-like
-          type: string
-          required: false
-          description: Name pattern for ILIKE search (supports % wildcards)
-        - name: jurisdiction
-          type: string
-          required: false
-          description: Jurisdiction code filter
-        - name: limit
-          type: integer
-          required: false
-          default: 1000
-          description: Maximum number of results
+          - name: type
+            type: string
+            required: false
+            description: Entity type filter (fund, proper_person, limited_company, etc.)
+          - name: name-like
+            type: string
+            required: false
+            description: Name pattern for ILIKE search (supports % wildcards)
+          - name: jurisdiction
+            type: string
+            required: false
+            description: Jurisdiction code filter
+          - name: limit
+            type: integer
+            required: false
+            default: 1000
+            description: Maximum number of results
         returns:
           type: entity_query_result
           description: List of (entity_id, name) tuples for batch iteration
@@ -423,16 +436,16 @@ domains:
       ghost:
         description: Create a ghost person entity (name only, minimal attributes)
         invocation_phrases:
-        - "create ghost entity"
-        - "add ghost person"
-        - "create ghost"
-        - "ghost entity"
-        - "create provisional person"
-        - "add unverified person"
-        - "create name-only entity"
-        - "ghost a person"
-        - "create preliminary entity"
-        - "add ghost record"
+          - "create ghost entity"
+          - "add ghost person"
+          - "create ghost"
+          - "ghost entity"
+          - "create provisional person"
+          - "add unverified person"
+          - "create name-only entity"
+          - "ghost a person"
+          - "create preliminary entity"
+          - "add ghost record"
         behavior: plugin
         metadata:
           tier: intent
@@ -449,22 +462,22 @@ domains:
           subtype: proper_person
           resolved: false
         args:
-        - name: name
-          type: string
-          required: true
-          description: Full name as discovered (e.g., "John Smith" from document)
-        - name: source
-          type: string
-          required: false
-          description: Discovery source (document, ownership_chain, allegation, gleif)
-        - name: source-reference
-          type: string
-          required: false
-          description: Reference to source (document_id, relationship_id, etc.)
-        - name: notes
-          type: string
-          required: false
-          description: Context notes about the ghost entity
+          - name: name
+            type: string
+            required: true
+            description: Full name as discovered (e.g., "John Smith" from document)
+          - name: source
+            type: string
+            required: false
+            description: Discovery source (document, ownership_chain, allegation, gleif)
+          - name: source-reference
+            type: string
+            required: false
+            description: Reference to source (document_id, relationship_id, etc.)
+          - name: notes
+            type: string
+            required: false
+            description: Context notes about the ghost entity
         returns:
           type: uuid
           name: entity_id
@@ -473,16 +486,16 @@ domains:
       identify:
         description: Add identifying attributes to a ghost entity (transitions to IDENTIFIED state)
         invocation_phrases:
-        - "identify ghost entity"
-        - "add identity to ghost"
-        - "identify person"
-        - "set ghost identity"
-        - "add identifying details"
-        - "identify entity"
-        - "resolve ghost identity"
-        - "add ID to ghost"
-        - "enrich ghost entity"
-        - "provide ghost identification"
+          - "identify ghost entity"
+          - "add identity to ghost"
+          - "identify person"
+          - "set ghost identity"
+          - "add identifying details"
+          - "identify entity"
+          - "resolve ghost identity"
+          - "add ID to ghost"
+          - "enrich ghost entity"
+          - "provide ghost identification"
         behavior: plugin
         metadata:
           tier: intent
@@ -495,40 +508,41 @@ domains:
         plugin:
           handler: entity_identify
         args:
-        - name: entity-id
-          type: uuid
-          required: true
-          lookup:
-            table: entity_proper_persons
-            entity_type: proper_person
-            schema: ob-poc
-              # Composite search: name + nationality (usually captured first) + DOB (year approx or exact)
-            search_key: "(search_name (nationality :selectivity 0.7) (date_of_birth :selectivity 0.95 :match-mode year-or-exact))"
-            primary_key: entity_id
-        - name: first-name
-          type: string
-          required: false
-          description: First name (if splitting from full name)
-        - name: last-name
-          type: string
-          required: false
-          description: Last name (if splitting from full name)
-        - name: date-of-birth
-          type: date
-          required: false
-          description: Date of birth
-        - name: nationality
-          type: string
-          required: false
-          description: Nationality/citizenship
-        - name: id-document-type
-          type: string
-          required: false
-          description: ID document type (PASSPORT, NATIONAL_ID, etc.)
-        - name: id-document-number
-          type: string
-          required: false
-          description: ID document number
+          - name: entity-id
+            type: uuid
+            required: true
+            lookup:
+              table: entity_proper_persons
+              entity_type: proper_person
+              schema:
+                ob-poc
+                # Composite search: name + nationality (usually captured first) + DOB (year approx or exact)
+              search_key: "(search_name (nationality :selectivity 0.7) (date_of_birth :selectivity 0.95 :match-mode year-or-exact))"
+              primary_key: entity_id
+          - name: first-name
+            type: string
+            required: false
+            description: First name (if splitting from full name)
+          - name: last-name
+            type: string
+            required: false
+            description: Last name (if splitting from full name)
+          - name: date-of-birth
+            type: date
+            required: false
+            description: Date of birth
+          - name: nationality
+            type: string
+            required: false
+            description: Nationality/citizenship
+          - name: id-document-type
+            type: string
+            required: false
+            description: ID document type (PASSPORT, NATIONAL_ID, etc.)
+          - name: id-document-number
+            type: string
+            required: false
+            description: ID document number
         returns:
           type: uuid
           name: entity_id
@@ -536,16 +550,16 @@ domains:
       verify:
         description: Mark an identified entity as verified (transitions to VERIFIED state)
         invocation_phrases:
-        - "verify entity"
-        - "confirm entity identity"
-        - "mark entity verified"
-        - "verify person"
-        - "approve entity identification"
-        - "verify ghost entity"
-        - "confirm ghost identity"
-        - "entity verification"
-        - "complete entity verification"
-        - "mark as verified"
+          - "verify entity"
+          - "confirm entity identity"
+          - "mark entity verified"
+          - "verify person"
+          - "approve entity identification"
+          - "verify ghost entity"
+          - "confirm ghost identity"
+          - "entity verification"
+          - "complete entity verification"
+          - "mark as verified"
         behavior: crud
         metadata:
           tier: intent
@@ -560,36 +574,37 @@ domains:
           table: entity_proper_persons
           schema: ob-poc
         args:
-        - name: entity-id
-          type: uuid
-          required: true
-          lookup:
-            table: entity_proper_persons
-            entity_type: proper_person
-            schema: ob-poc
-              # Composite search: name + nationality + DOB discriminators
-            search_key: "(search_name (nationality :selectivity 0.7) (date_of_birth :selectivity 0.95 :match-mode year-or-exact))"
-            primary_key: entity_id
-        - name: verification-notes
-          type: string
-          required: false
-          description: Notes about how verification was completed
+          - name: entity-id
+            type: uuid
+            required: true
+            lookup:
+              table: entity_proper_persons
+              entity_type: proper_person
+              schema:
+                ob-poc
+                # Composite search: name + nationality + DOB discriminators
+              search_key: "(search_name (nationality :selectivity 0.7) (date_of_birth :selectivity 0.95 :match-mode year-or-exact))"
+              primary_key: entity_id
+          - name: verification-notes
+            type: string
+            required: false
+            description: Notes about how verification was completed
         returns:
           type: affected
 
       list-ghosts:
         description: List ghost entities requiring identification
         invocation_phrases:
-        - "list ghost entities"
-        - "show ghosts"
-        - "list unverified entities"
-        - "show ghost persons"
-        - "list pending ghosts"
-        - "display ghost entities"
-        - "get ghost list"
-        - "view unidentified entities"
-        - "show provisional entities"
-        - "list entities needing identification"
+          - "list ghost entities"
+          - "show ghosts"
+          - "list unverified entities"
+          - "show ghost persons"
+          - "list pending ghosts"
+          - "display ghost entities"
+          - "get ghost list"
+          - "view unidentified entities"
+          - "show provisional entities"
+          - "list entities needing identification"
         behavior: crud
         metadata:
           tier: diagnostics
@@ -604,14 +619,14 @@ domains:
           schema: ob-poc
           where_clause: "person_state = 'GHOST'"
         args:
-        - name: limit
-          type: integer
-          required: false
-          default: 100
-        - name: offset
-          type: integer
-          required: false
-          default: 0
+          - name: limit
+            type: integer
+            required: false
+            default: 100
+          - name: offset
+            type: integer
+            required: false
+            default: 0
         returns:
           type: record_set
 
@@ -623,16 +638,16 @@ domains:
         description: Return existing entity or create placeholder for later resolution
         behavior: plugin
         invocation_phrases:
-        - "ensure entity or create placeholder"
-        - "get or placeholder"
-        - "entity placeholder"
-        - "deferred entity"
-        - "create placeholder entity"
-        - "placeholder for entity"
-        - "ensure or placeholder"
-        - "find or create placeholder"
-        - "get entity or create placeholder"
-        - "deferred entity resolution"
+          - "ensure entity or create placeholder"
+          - "get or placeholder"
+          - "entity placeholder"
+          - "deferred entity"
+          - "create placeholder entity"
+          - "placeholder for entity"
+          - "ensure or placeholder"
+          - "find or create placeholder"
+          - "get entity or create placeholder"
+          - "deferred entity resolution"
         metadata:
           tier: intent
           source_of_truth: entity
@@ -644,72 +659,72 @@ domains:
         plugin:
           handler: entity_ensure_or_placeholder
         args:
-        - name: ref
-          type: uuid
-          required: false
-          description: Optional entity reference to check
-          lookup:
-            table: entities
-            entity_type: entity
-            schema: ob-poc
-            search_key: name
-            primary_key: entity_id
-        - name: kind
-          type: string
-          required: true
-          description: Kind of placeholder (depositary, auditor, custodian, etc.)
-          valid_values:
-          - depositary
-          - auditor
-          - custodian
-          - administrator
-          - transfer-agent
-          - prime-broker
-          - legal-counsel
-          - tax-advisor
-          - compliance-officer
-          - director
-          - secretary
-          - authorized-signatory
-        - name: cbu-id
-          type: uuid
-          required: true
-          description: CBU this placeholder is being created for
-          lookup:
-            table: cbus
-            entity_type: cbu
-            schema: ob-poc
-            search_key: name
-            primary_key: cbu_id
-        - name: name-hint
-          type: string
-          required: false
-          description: Optional name hint for the placeholder
+          - name: ref
+            type: uuid
+            required: false
+            description: Optional entity reference to check
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: kind
+            type: string
+            required: true
+            description: Kind of placeholder (depositary, auditor, custodian, etc.)
+            valid_values:
+              - depositary
+              - auditor
+              - custodian
+              - administrator
+              - transfer-agent
+              - prime-broker
+              - legal-counsel
+              - tax-advisor
+              - compliance-officer
+              - director
+              - secretary
+              - authorized-signatory
+          - name: cbu-id
+            type: uuid
+            required: true
+            description: CBU this placeholder is being created for
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: name-hint
+            type: string
+            required: false
+            description: Optional name hint for the placeholder
         returns:
           type: record
           fields:
-          - name: entity_id
-            type: uuid
-            description: The entity ID (existing or placeholder)
-          - name: is_placeholder
-            type: boolean
-            description: True if a placeholder was created
+            - name: entity_id
+              type: uuid
+              description: The entity ID (existing or placeholder)
+            - name: is_placeholder
+              type: boolean
+              description: True if a placeholder was created
           capture: true
 
       resolve-placeholder:
         description: Resolve a placeholder entity to a real entity
         behavior: plugin
         invocation_phrases:
-        - "resolve placeholder"
-        - "link placeholder to entity"
-        - "replace placeholder"
-        - "resolve placeholder entity"
-        - "convert placeholder to real entity"
-        - "swap placeholder"
-        - "placeholder resolution"
-        - "assign entity to placeholder"
-        - "fill placeholder"
-        - "resolve deferred entity"
+          - "resolve placeholder"
+          - "link placeholder to entity"
+          - "replace placeholder"
+          - "resolve placeholder entity"
+          - "convert placeholder to real entity"
+          - "swap placeholder"
+          - "placeholder resolution"
+          - "assign entity to placeholder"
+          - "fill placeholder"
+          - "resolve deferred entity"
         metadata:
           tier: intent
           source_of_truth: entity
@@ -721,57 +736,60 @@ domains:
         plugin:
           handler: entity_resolve_placeholder
         args:
-        - name: placeholder-id
-          type: uuid
-          required: true
-          description: The placeholder entity ID
-          lookup:
-            table: entities
-            entity_type: entity
-            schema: ob-poc
-            search_key: name
-            primary_key: entity_id
-        - name: resolved-entity-id
-          type: uuid
-          required: true
-          description: The real entity to resolve to
-          lookup:
-            table: entities
-            entity_type: entity
-            schema: ob-poc
-            search_key: name
-            primary_key: entity_id
-        - name: resolved-by
-          type: string
-          required: false
-          description: Who is performing the resolution
-          default: system
+          - name: placeholder-id
+            type: uuid
+            required: true
+            description: The placeholder entity ID
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: resolved-entity-id
+            type: uuid
+            required: true
+            description: The real entity to resolve to
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: resolved-by
+            type: string
+            required: false
+            description: Who is performing the resolution
+            default: system
         returns:
           type: record
           fields:
-          - name: placeholder_entity_id
-            type: uuid
-          - name: resolved_to_entity_id
-            type: uuid
-          - name: status
-            type: string
-          - name: roles_transferred
-            type: integer
+            - name: placeholder_entity_id
+              type: uuid
+            - name: resolved_to_entity_id
+              type: uuid
+            - name: status
+              type: string
+            - name: roles_transferred
+              type: integer
 
       list-placeholders:
         description: List pending placeholder entities for a CBU
         behavior: plugin
         invocation_phrases:
-        - "list placeholders"
-        - "show pending placeholders"
-        - "view unresolved entities"
-        - "list placeholder entities"
-        - "show unresolved placeholders"
-        - "display placeholders"
-        - "get placeholder list"
-        - "view deferred entities"
-        - "list pending entity placeholders"
-        - "show placeholders for CBU"
+          - "list placeholders"
+          - "show pending placeholders"
+          - "view unresolved entities"
+          - "list placeholder entities"
+          - "show unresolved placeholders"
+          - "display placeholders"
+          - "get placeholder list"
+          - "view deferred entities"
+          - "list pending entity placeholders"
+          - "show placeholders for CBU"
+          - "show unresolved onboarding entities"
+          - "list the temporary placeholder entities"
+          - "what placeholders are still open"
         metadata:
           tier: diagnostics
           source_of_truth: entity
@@ -782,32 +800,32 @@ domains:
         plugin:
           handler: entity_list_placeholders
         args:
-        - name: cbu-id
-          type: uuid
-          required: false
-          description: Filter by CBU (if not provided, lists all pending)
-          lookup:
-            table: cbus
-            entity_type: cbu
-            schema: ob-poc
-            search_key: name
-            primary_key: cbu_id
+          - name: cbu-id
+            type: uuid
+            required: false
+            description: Filter by CBU (if not provided, lists all pending)
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
         returns:
           type: record_set
 
       placeholder-summary:
         description: Get placeholder summary statistics for a CBU
         invocation_phrases:
-        - "placeholder summary"
-        - "placeholder statistics"
-        - "show placeholder stats"
-        - "placeholder status"
-        - "how many placeholders"
-        - "placeholder overview"
-        - "get placeholder summary"
-        - "placeholder count"
-        - "view placeholder statistics"
-        - "placeholder report"
+          - "placeholder summary"
+          - "placeholder statistics"
+          - "show placeholder stats"
+          - "placeholder status"
+          - "how many placeholders"
+          - "placeholder overview"
+          - "get placeholder summary"
+          - "placeholder count"
+          - "view placeholder statistics"
+          - "placeholder report"
         behavior: plugin
         metadata:
           tier: diagnostics
@@ -819,22 +837,22 @@ domains:
         plugin:
           handler: entity_placeholder_summary
         args:
-        - name: cbu-id
-          type: uuid
-          required: true
-          description: CBU to get summary for
-          lookup:
-            table: cbus
-            entity_type: cbu
-            schema: ob-poc
-            search_key: name
-            primary_key: cbu_id
+          - name: cbu-id
+            type: uuid
+            required: true
+            description: CBU to get summary for
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
         returns:
           type: record
           fields:
-          - name: cbu_id
-            type: uuid
-          - name: pending_count
-            type: integer
-          - name: by_kind
-            type: array
+            - name: cbu_id
+              type: uuid
+            - name: pending_count
+              type: integer
+            - name: by_kind
+              type: array

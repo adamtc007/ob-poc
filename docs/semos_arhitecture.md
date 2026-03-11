@@ -48,12 +48,23 @@ The key integration invariant is now:
 
 Current live harness state for the new path:
 
-- exact top-verb accuracy: `7/176` (`3.98%`)
-- grounded responses: `51/176` (`28.98%`)
-- stateful responses: `51/176` (`28.98%`)
-- business proposals: `35/176`
+- exact top-verb accuracy: `14/176` (`7.95%`)
+- grounded responses: `125/176` (`71.02%`)
+- stateful responses: `125/176` (`71.02%`)
+- business proposals: `84/176`
 
-These numbers show that the simplified pipeline boundary is in place, but business composition quality remains below the legacy baseline and still requires further grounded-state coverage and transition selection improvements.
+These numbers show that the simplified pipeline boundary is in place and that the biggest remaining issue is no longer call-stack complexity. The current bottleneck is metadata quality across the StateGraph triangle:
+
+- live entity/state signals
+- canonical verb contracts and invocation phrases
+- graph/corpus alignment
+
+The safe Phase 1 cleanup in-repo is complete:
+- `entity-context` signal enrichment
+- canonical invocation phrase enrichment
+- repo-derived reconciliation pack
+
+The unsafe reconciliation work is intentionally parked pending the authoritative external correction table for unresolved verb families such as `struct.*`, `screening.full`, and any external graph-edge correction map.
 
 ### Current Runtime State (2026-03-08)
 

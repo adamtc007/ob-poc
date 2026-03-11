@@ -105,6 +105,8 @@ domains:
           - "show me deal record by id"
           - "deal details"
           - "view deal by id"
+          - "read this deal"
+          - "show the current deal record"
         args:
           - name: deal-id
             type: uuid
@@ -241,6 +243,11 @@ domains:
           - "move deal to"
           - "advance deal"
           - "progress deal"
+          - "change the deal stage"
+          - "move this deal forward"
+          - "mark this deal as negotiated"
+          - "move this deal into onboarding"
+          - "advance the commercial status"
         args:
           - name: deal-id
             type: uuid
@@ -726,6 +733,9 @@ domains:
           - "add fee line"
           - "add pricing line"
           - "add fee to rate card"
+          - "add a pricing row"
+          - "insert a fee row on the rate card"
+          - "add a charge line to this rate card"
         args:
           - name: rate-card-id
             type: uuid
@@ -891,6 +901,9 @@ domains:
           - "propose rate card"
           - "submit rate card"
           - "send rate card to client"
+          - "send this rate card for review"
+          - "issue the commercial proposal"
+          - "propose these fees to the client"
         args:
           - name: rate-card-id
             type: uuid
@@ -916,6 +929,9 @@ domains:
           - "counter rate card"
           - "client counter offer"
           - "counter proposal"
+          - "submit a counter offer on the rate card"
+          - "counter the current fee proposal"
+          - "send back a revised rate card"
         args:
           - name: rate-card-id
             type: uuid

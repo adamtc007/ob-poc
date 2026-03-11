@@ -1,0 +1,33 @@
+graph_id: document
+name: Document Graph
+version: "1"
+description: Document collection and verification graph
+entity_types:
+  - client-group
+  - cbu
+  - entity
+  - deal
+nodes:
+  - node_id: document.entry
+    name: Document Entry
+    node_type: entry
+    lane: document
+  - node_id: document.pending
+    name: Pending Documents
+    node_type: milestone
+    lane: document
+    satisfied_when:
+      - signal: has_pending_documentation
+        description: Missing or pending documentation exists
+edges:
+  - edge_id: document.read
+    from_node: document.entry
+    to_node: document.pending
+    verb_ids: ["document.for-entity", "document.missing-for-entity"]
+    edge_type: conditional
+  - edge_id: document.progress
+    from_node: document.pending
+    to_node: document.pending
+    verb_ids: ["document.solicit", "document.upload-version", "document.verify", "document.reject"]
+    edge_type: advance
+gates: []

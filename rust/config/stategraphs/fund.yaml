@@ -1,0 +1,36 @@
+graph_id: fund
+name: Fund Graph
+version: "1"
+description: Fund structure graph
+entity_types:
+  - fund
+  - cbu
+nodes:
+  - node_id: fund.entry
+    name: Fund Entry
+    node_type: entry
+    lane: fund
+  - node_id: fund.live
+    name: Fund Populated
+    node_type: milestone
+    lane: fund
+    satisfied_when:
+      - signal: linked_entity_count
+        description: Linked fund entities exist
+edges:
+  - edge_id: fund.create
+    from_node: fund.entry
+    to_node: fund.live
+    verb_ids: ["fund.create", "fund.ensure", "fund.upsert-compartment"]
+    edge_type: advance
+  - edge_id: fund.read
+    from_node: fund.live
+    to_node: fund.live
+    verb_ids: ["fund.list-subfunds", "fund.list-share-classes", "fund.list-investors"]
+    edge_type: conditional
+  - edge_id: fund.allocate
+    from_node: fund.live
+    to_node: fund.live
+    verb_ids: ["fund.add-investment"]
+    edge_type: advance
+gates: []

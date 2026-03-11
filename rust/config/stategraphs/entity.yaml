@@ -1,0 +1,38 @@
+graph_id: entity
+name: Entity Graph
+version: "1"
+description: Base entity lifecycle graph
+entity_types:
+  - entity
+  - client-group
+  - person
+  - company
+nodes:
+  - node_id: entity.entry
+    name: Entity Entry
+    node_type: entry
+    lane: entity
+  - node_id: entity.live
+    name: Entity Exists
+    node_type: milestone
+    lane: entity
+    satisfied_when:
+      - signal: linked_entity_count
+        description: Entity is linked into live operations
+edges:
+  - edge_id: entity.create
+    from_node: entity.entry
+    to_node: entity.live
+    verb_ids: ["entity.create", "entity.ensure"]
+    edge_type: advance
+  - edge_id: entity.read
+    from_node: entity.live
+    to_node: entity.live
+    verb_ids: ["entity.read", "entity.list", "entity.list-placeholders"]
+    edge_type: conditional
+  - edge_id: entity.update
+    from_node: entity.live
+    to_node: entity.live
+    verb_ids: ["entity.update"]
+    edge_type: advance
+gates: []

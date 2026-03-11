@@ -265,6 +265,39 @@ domains:
           type: record
           name: valid_transition_set
 
+      graph-walk:
+        description: "Walk applicable StateGraphs for an entity and return valid and blocked transitions"
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: discovery
+          subject_kinds:
+            [entity, cbu, fund, person, company, client-group, deal, case]
+          phase_tags: [discovery]
+          side_effects: facts_only
+          harm_class: read_only
+          action_class: read
+        invocation_phrases:
+          - "walk the state graph"
+          - "show graph transitions"
+          - "what transitions are available"
+        behavior: plugin
+        handler: DiscoveryGraphWalkOp
+        args:
+          - name: entity-id
+            type: uuid
+            required: true
+            description: "Entity to walk graphs for"
+          - name: include-blocked
+            type: boolean
+            required: false
+            default: true
+            description: "Include blocked transitions with unmet conditions"
+        returns:
+          type: record
+          name: graph_walk_result
+
       inspect-data:
         description: "Inspect entity-scoped data for a domain and optional aspect"
         metadata:

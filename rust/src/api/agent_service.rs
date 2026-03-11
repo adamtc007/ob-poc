@@ -122,8 +122,10 @@ use crate::semtaxonomy::{
     extract_entity_candidates, hydrate_sage_session, DomainStateSummary, EntityCandidate,
     EntityRef as SemtaxEntityRef, IntentHint, SageSession as SemtaxSession, VerbSurfaceEntry,
 };
-use crate::semtaxonomy_v2::{step1_entity_scope, EntityScope, EntityScopeOutcome, EntitySource};
-use crate::semtaxonomy_v2::{step2_entity_state, step3_select_verb};
+use crate::semtaxonomy_v2::{
+    build_generic_state, introduces_entity_reference, step1_entity_scope, step2_entity_state,
+    step3_select_verb, EntityScope, EntityScopeOutcome, EntitySource,
+};
 #[cfg(not(feature = "runbook-gate-vnext"))]
 use crate::session::SessionScope;
 use crate::session::{SessionEvent, SessionState, UnifiedSession, UnresolvedRefInfo};
@@ -1162,6 +1164,7 @@ impl AgentService {
                     confidence: 1.0,
                     source: EntitySource::SessionCarry,
                 });
+                let fresh_entity_reference = introduces_entity_reference(&request.message);
                 let scope_outcome = step1_entity_scope(
                     &request.message,
                     previous_scope.as_ref(),
@@ -1223,7 +1226,7 @@ impl AgentService {
                             sage_explain,
                         )));
                     }
-                    EntityScopeOutcome::Unresolved if !extracted_names.is_empty() => {
+                    EntityScopeOutcome::Unresolved if fresh_entity_reference => {
                         hydrate_sage_session(
                             &mut state,
                             Some(search.clone()),
@@ -1381,83 +1384,73 @@ impl AgentService {
             let transitions = self
                 .run_discovery_op(
                     "discovery",
-                    "valid-transitions",
+                    "graph-walk",
                     vec![
                         ("entity-id", serde_json::json!(active_entity.entity_id)),
                         ("include-blocked", serde_json::json!(true)),
-                        ("lanes", serde_json::json!(inferred_domains.clone())),
                     ],
                 )
                 .await
                 .unwrap_or_else(|_| serde_json::json!({}));
             state
                 .research_cache
-                .insert("valid-transitions".to_string(), transitions.clone());
+                .insert("graph-walk".to_string(), transitions.clone());
 
-            transitions["lanes"]
+            transitions["valid_verbs"]
                 .as_array()
                 .cloned()
                 .unwrap_or_default()
                 .into_iter()
-                .flat_map(|lane| {
-                    let phase = lane["lane"].as_str().unwrap_or("general").to_string();
-                    let subject_kind = entity_type_for_actions.clone();
-                    lane["valid"]
+                .map(|verb| {
+                    let verb_id = verb["verb_id"].as_str().unwrap_or_default().to_string();
+                    let domain = verb_id
+                        .split_once('.')
+                        .map(|(domain, _)| domain.to_string())
+                        .unwrap_or_else(|| "unknown".to_string());
+                    let invocation_phrases = verb["invocation_phrases"]
                         .as_array()
                         .cloned()
                         .unwrap_or_default()
                         .into_iter()
-                        .map(move |verb| {
-                            let verb_id = verb["verb_id"].as_str().unwrap_or_default().to_string();
-                            let domain = verb_id
-                                .split_once('.')
-                                .map(|(domain, _)| domain.to_string())
-                                .unwrap_or_else(|| "unknown".to_string());
-                            let invocation_phrases = verb["invocation_phrases"]
-                                .as_array()
-                                .cloned()
-                                .unwrap_or_default()
-                                .into_iter()
-                                .filter_map(|value| value.as_str().map(str::to_string))
-                                .collect::<Vec<_>>();
-                            let description = if invocation_phrases.is_empty() {
-                                verb["description"].as_str().unwrap_or_default().to_string()
-                            } else {
-                                format!(
-                                    "{} {}",
-                                    verb["description"].as_str().unwrap_or_default(),
-                                    invocation_phrases.join(" ")
-                                )
-                            };
-                            VerbSurfaceEntry {
-                                verb_id: verb_id.clone(),
-                                domain,
-                                name: verb_id
-                                    .split_once('.')
-                                    .map(|(_, name)| name.to_string())
-                                    .unwrap_or_else(|| verb_id.clone()),
-                                description,
-                                polarity: verb["polarity"].as_str().unwrap_or("read").to_string(),
-                                phase_tags: vec![phase.clone()],
-                                subject_kinds: vec![subject_kind.clone()],
-                                parameters: verb["parameters"]
-                                    .as_array()
-                                    .cloned()
+                        .filter_map(|value| value.as_str().map(str::to_string))
+                        .collect::<Vec<_>>();
+                    let description = if invocation_phrases.is_empty() {
+                        verb["description"].as_str().unwrap_or_default().to_string()
+                    } else {
+                        format!(
+                            "{} {}",
+                            verb["description"].as_str().unwrap_or_default(),
+                            invocation_phrases.join(" ")
+                        )
+                    };
+                    VerbSurfaceEntry {
+                        verb_id: verb_id.clone(),
+                        domain,
+                        name: verb_id
+                            .split_once('.')
+                            .map(|(_, name)| name.to_string())
+                            .unwrap_or_else(|| verb_id.clone()),
+                        description,
+                        polarity: verb["polarity"].as_str().unwrap_or("read").to_string(),
+                        phase_tags: vec![verb["lane"].as_str().unwrap_or("general").to_string()],
+                        subject_kinds: vec![entity_type_for_actions.clone()],
+                        parameters: verb["parameters"]
+                            .as_array()
+                            .cloned()
+                            .unwrap_or_default()
+                            .into_iter()
+                            .map(|parameter| crate::semtaxonomy::VerbParameter {
+                                name: parameter["name"]
+                                    .as_str()
                                     .unwrap_or_default()
-                                    .into_iter()
-                                    .map(|parameter| crate::semtaxonomy::VerbParameter {
-                                        name: parameter["name"]
-                                            .as_str()
-                                            .unwrap_or_default()
-                                            .to_string(),
-                                        required: parameter["required"].as_bool().unwrap_or(false),
-                                        description: parameter["description"]
-                                            .as_str()
-                                            .map(str::to_string),
-                                    })
-                                    .collect(),
-                            }
-                        })
+                                    .to_string(),
+                                required: parameter["required"].as_bool().unwrap_or(false),
+                                description: parameter["description"]
+                                    .as_str()
+                                    .map(str::to_string),
+                            })
+                            .collect(),
+                    }
                 })
                 .collect::<Vec<_>>()
         } else {
@@ -1540,7 +1533,11 @@ impl AgentService {
         action_surface.sort_by(|left, right| left.verb_id.cmp(&right.verb_id));
         action_surface.dedup_by(|left, right| left.verb_id == right.verb_id);
         let action_surface = (!action_surface.is_empty()).then_some(action_surface);
-        let valid_transitions = state.research_cache.get("valid-transitions").cloned();
+        let valid_transitions = state
+            .research_cache
+            .get("graph-walk")
+            .cloned()
+            .or_else(|| state.research_cache.get("valid-transitions").cloned());
 
         if let Some(entries) = action_surface.as_ref() {
             for entry in entries.iter().take(12) {
@@ -1580,7 +1577,7 @@ impl AgentService {
 
         let history_depth = session.messages.len();
         let visible_action_count = action_surface.as_ref().map(|verbs| verbs.len()).unwrap_or(0);
-        let selected_verb = active_entity.as_ref().map(|entity| {
+        let selected_verb = if let Some(entity) = active_entity.as_ref() {
             let scope = EntityScope {
                 entity_id: entity.entity_id,
                 entity_type: entity.entity_type.clone(),
@@ -1594,7 +1591,15 @@ impl AgentService {
                 valid_transitions.as_ref(),
             );
             step3_select_verb(&request.message, &state_model)
-        }).flatten();
+        } else {
+            action_surface
+                .as_ref()
+                .map(|surface| {
+                    let state_model = build_generic_state(&entity_type_for_actions, surface);
+                    step3_select_verb(&request.message, &state_model)
+                })
+                .flatten()
+        };
         let dsl = selected_verb
             .as_ref()
             .and_then(Self::render_selected_verb_dsl);

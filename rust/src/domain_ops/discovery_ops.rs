@@ -9,13 +9,14 @@ use dsl_core::config::loader::ConfigLoader;
 use dsl_core::config::types::{ArgConfig, DomainConfig, VerbConfig, VerbMetadata};
 use ob_poc_macros::register_custom_op;
 use serde_json::{json, Value};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use uuid::Uuid;
 
 use super::sem_reg_helpers::{build_actor_from_ctx, get_bool_arg, get_string_arg};
 use super::{CustomOperation, ExecutionContext, ExecutionResult, VerbCall};
 use crate::dsl_v2::gateway_resolver::gateway_addr;
 use crate::sem_reg::agent::mcp_tools::{dispatch_tool, SemRegToolContext, SemRegToolResult};
+use crate::stategraph::{load_state_graphs, validate_graphs, walk_graph};
 
 #[cfg(feature = "database")]
 use {
@@ -774,6 +775,391 @@ fn activity_record(
 }
 
 #[cfg(feature = "database")]
+async fn screening_counts_for_client_group(pool: &PgPool, group_id: Uuid) -> (i64, i64, i64, i64) {
+    let row = sqlx::query(
+        r#"
+        SELECT
+            COUNT(*) FILTER (
+                WHERE s.status IN ('PENDING', 'RUNNING', 'HIT_PENDING_REVIEW', 'HIT_CONFIRMED')
+            ) AS active_total,
+            COUNT(*) FILTER (
+                WHERE s.screening_type = 'SANCTIONS'
+                  AND s.status IN ('PENDING', 'RUNNING', 'HIT_PENDING_REVIEW', 'HIT_CONFIRMED')
+            ) AS sanctions_count,
+            COUNT(*) FILTER (
+                WHERE s.screening_type = 'PEP'
+                  AND s.status IN ('PENDING', 'RUNNING', 'HIT_PENDING_REVIEW', 'HIT_CONFIRMED')
+            ) AS pep_count,
+            COUNT(*) FILTER (
+                WHERE s.screening_type = 'ADVERSE_MEDIA'
+                  AND s.status IN ('PENDING', 'RUNNING', 'HIT_PENDING_REVIEW', 'HIT_CONFIRMED')
+            ) AS adverse_media_count
+        FROM "ob-poc".screenings s
+        JOIN "ob-poc".entity_workstreams ew ON ew.workstream_id = s.workstream_id
+        JOIN "ob-poc".cases c ON c.case_id = ew.case_id
+        WHERE c.client_group_id = $1
+        "#,
+    )
+    .bind(group_id)
+    .fetch_one(pool)
+    .await;
+
+    match row {
+        Ok(row) => (
+            row.get::<Option<i64>, _>("active_total").unwrap_or(0),
+            row.get::<Option<i64>, _>("sanctions_count").unwrap_or(0),
+            row.get::<Option<i64>, _>("pep_count").unwrap_or(0),
+            row.get::<Option<i64>, _>("adverse_media_count").unwrap_or(0),
+        ),
+        Err(_) => (0, 0, 0, 0),
+    }
+}
+
+#[cfg(feature = "database")]
+async fn screening_counts_for_cbu(pool: &PgPool, cbu_id: Uuid) -> (i64, i64, i64, i64) {
+    let row = sqlx::query(
+        r#"
+        SELECT
+            COUNT(*) FILTER (
+                WHERE s.status IN ('PENDING', 'RUNNING', 'HIT_PENDING_REVIEW', 'HIT_CONFIRMED')
+            ) AS active_total,
+            COUNT(*) FILTER (
+                WHERE s.screening_type = 'SANCTIONS'
+                  AND s.status IN ('PENDING', 'RUNNING', 'HIT_PENDING_REVIEW', 'HIT_CONFIRMED')
+            ) AS sanctions_count,
+            COUNT(*) FILTER (
+                WHERE s.screening_type = 'PEP'
+                  AND s.status IN ('PENDING', 'RUNNING', 'HIT_PENDING_REVIEW', 'HIT_CONFIRMED')
+            ) AS pep_count,
+            COUNT(*) FILTER (
+                WHERE s.screening_type = 'ADVERSE_MEDIA'
+                  AND s.status IN ('PENDING', 'RUNNING', 'HIT_PENDING_REVIEW', 'HIT_CONFIRMED')
+            ) AS adverse_media_count
+        FROM "ob-poc".screenings s
+        JOIN "ob-poc".entity_workstreams ew ON ew.workstream_id = s.workstream_id
+        JOIN "ob-poc".cases c ON c.case_id = ew.case_id
+        WHERE c.cbu_id = $1
+        "#,
+    )
+    .bind(cbu_id)
+    .fetch_one(pool)
+    .await;
+
+    match row {
+        Ok(row) => (
+            row.get::<Option<i64>, _>("active_total").unwrap_or(0),
+            row.get::<Option<i64>, _>("sanctions_count").unwrap_or(0),
+            row.get::<Option<i64>, _>("pep_count").unwrap_or(0),
+            row.get::<Option<i64>, _>("adverse_media_count").unwrap_or(0),
+        ),
+        Err(_) => (0, 0, 0, 0),
+    }
+}
+
+#[cfg(feature = "database")]
+async fn case_status_counts_for_client_group(pool: &PgPool, group_id: Uuid) -> (i64, i64, i64) {
+    let row = sqlx::query(
+        r#"
+        SELECT
+            COUNT(*) FILTER (WHERE status NOT IN ('APPROVED', 'REJECTED', 'WITHDRAWN', 'DO_NOT_ONBOARD')) AS active_count,
+            COUNT(*) FILTER (WHERE status = 'BLOCKED') AS blocked_count,
+            COUNT(*) FILTER (WHERE status = 'REVIEW') AS review_count
+        FROM "ob-poc".cases
+        WHERE client_group_id = $1
+        "#,
+    )
+    .bind(group_id)
+    .fetch_one(pool)
+    .await;
+
+    match row {
+        Ok(row) => (
+            row.get::<Option<i64>, _>("active_count").unwrap_or(0),
+            row.get::<Option<i64>, _>("blocked_count").unwrap_or(0),
+            row.get::<Option<i64>, _>("review_count").unwrap_or(0),
+        ),
+        Err(_) => (0, 0, 0),
+    }
+}
+
+#[cfg(feature = "database")]
+async fn case_status_counts_for_cbu(pool: &PgPool, cbu_id: Uuid) -> (i64, i64, i64) {
+    let row = sqlx::query(
+        r#"
+        SELECT
+            COUNT(*) FILTER (WHERE status NOT IN ('APPROVED', 'REJECTED', 'WITHDRAWN', 'DO_NOT_ONBOARD')) AS active_count,
+            COUNT(*) FILTER (WHERE status = 'BLOCKED') AS blocked_count,
+            COUNT(*) FILTER (WHERE status = 'REVIEW') AS review_count
+        FROM "ob-poc".cases
+        WHERE cbu_id = $1
+        "#,
+    )
+    .bind(cbu_id)
+    .fetch_one(pool)
+    .await;
+
+    match row {
+        Ok(row) => (
+            row.get::<Option<i64>, _>("active_count").unwrap_or(0),
+            row.get::<Option<i64>, _>("blocked_count").unwrap_or(0),
+            row.get::<Option<i64>, _>("review_count").unwrap_or(0),
+        ),
+        Err(_) => (0, 0, 0),
+    }
+}
+
+#[cfg(feature = "database")]
+async fn case_status_counts_for_deal(pool: &PgPool, deal_id: Uuid) -> (i64, i64, i64) {
+    let row = sqlx::query(
+        r#"
+        SELECT
+            COUNT(*) FILTER (WHERE status NOT IN ('APPROVED', 'REJECTED', 'WITHDRAWN', 'DO_NOT_ONBOARD')) AS active_count,
+            COUNT(*) FILTER (WHERE status = 'BLOCKED') AS blocked_count,
+            COUNT(*) FILTER (WHERE status = 'REVIEW') AS review_count
+        FROM "ob-poc".cases
+        WHERE deal_id = $1
+        "#,
+    )
+    .bind(deal_id)
+    .fetch_one(pool)
+    .await;
+
+    match row {
+        Ok(row) => (
+            row.get::<Option<i64>, _>("active_count").unwrap_or(0),
+            row.get::<Option<i64>, _>("blocked_count").unwrap_or(0),
+            row.get::<Option<i64>, _>("review_count").unwrap_or(0),
+        ),
+        Err(_) => (0, 0, 0),
+    }
+}
+
+#[cfg(feature = "database")]
+async fn document_status_counts_for_client_group(
+    pool: &PgPool,
+    group_id: Uuid,
+) -> (i64, i64, i64, i64) {
+    let row = sqlx::query(
+        r#"
+        SELECT
+            COUNT(*) FILTER (WHERE dc.status NOT IN ('archived', 'verified', 'approved')) AS pending_count,
+            COUNT(*) FILTER (WHERE dc.status IN ('verified', 'approved')) AS verified_count,
+            COUNT(*) FILTER (WHERE dc.status = 'rejected') AS rejected_count,
+            COUNT(*) AS catalogued_count
+        FROM "ob-poc".document_catalog dc
+        JOIN "ob-poc".client_group_entity cge ON cge.cbu_id = dc.cbu_id
+        WHERE cge.group_id = $1
+        "#,
+    )
+    .bind(group_id)
+    .fetch_one(pool)
+    .await;
+
+    match row {
+        Ok(row) => (
+            row.get::<Option<i64>, _>("pending_count").unwrap_or(0),
+            row.get::<Option<i64>, _>("verified_count").unwrap_or(0),
+            row.get::<Option<i64>, _>("rejected_count").unwrap_or(0),
+            row.get::<Option<i64>, _>("catalogued_count").unwrap_or(0),
+        ),
+        Err(_) => (0, 0, 0, 0),
+    }
+}
+
+#[cfg(feature = "database")]
+async fn document_status_counts_for_cbu(pool: &PgPool, cbu_id: Uuid) -> (i64, i64, i64, i64) {
+    let row = sqlx::query(
+        r#"
+        SELECT
+            COUNT(*) FILTER (WHERE status NOT IN ('archived', 'verified', 'approved')) AS pending_count,
+            COUNT(*) FILTER (WHERE status IN ('verified', 'approved')) AS verified_count,
+            COUNT(*) FILTER (WHERE status = 'rejected') AS rejected_count,
+            COUNT(*) AS catalogued_count
+        FROM "ob-poc".document_catalog
+        WHERE cbu_id = $1
+        "#,
+    )
+    .bind(cbu_id)
+    .fetch_one(pool)
+    .await;
+
+    match row {
+        Ok(row) => (
+            row.get::<Option<i64>, _>("pending_count").unwrap_or(0),
+            row.get::<Option<i64>, _>("verified_count").unwrap_or(0),
+            row.get::<Option<i64>, _>("rejected_count").unwrap_or(0),
+            row.get::<Option<i64>, _>("catalogued_count").unwrap_or(0),
+        ),
+        Err(_) => (0, 0, 0, 0),
+    }
+}
+
+#[cfg(feature = "database")]
+async fn document_status_counts_for_deal(pool: &PgPool, deal_id: Uuid) -> (i64, i64, i64, i64) {
+    let row = sqlx::query(
+        r#"
+        SELECT
+            COUNT(*) FILTER (WHERE document_status NOT IN ('SIGNED', 'EXECUTED', 'ARCHIVED')) AS pending_count,
+            COUNT(*) FILTER (WHERE document_status IN ('SIGNED', 'EXECUTED')) AS complete_count,
+            COUNT(*) FILTER (WHERE document_status = 'REJECTED') AS rejected_count,
+            COUNT(*) AS total_count
+        FROM "ob-poc".deal_documents
+        WHERE deal_id = $1
+        "#,
+    )
+    .bind(deal_id)
+    .fetch_one(pool)
+    .await;
+
+    match row {
+        Ok(row) => (
+            row.get::<Option<i64>, _>("pending_count").unwrap_or(0),
+            row.get::<Option<i64>, _>("complete_count").unwrap_or(0),
+            row.get::<Option<i64>, _>("rejected_count").unwrap_or(0),
+            row.get::<Option<i64>, _>("total_count").unwrap_or(0),
+        ),
+        Err(_) => (0, 0, 0, 0),
+    }
+}
+
+#[cfg(feature = "database")]
+async fn fund_counts_for_entities(pool: &PgPool, entity_ids: &[Uuid]) -> (i64, i64, i64) {
+    if entity_ids.is_empty() {
+        return (0, 0, 0);
+    }
+
+    let row = sqlx::query(
+        r#"
+        SELECT
+            COUNT(*) AS fund_entity_count,
+            COUNT(*) FILTER (WHERE parent_fund_id IS NOT NULL) AS nested_fund_count,
+            COUNT(*) FILTER (WHERE master_fund_id IS NOT NULL) AS feeder_or_master_link_count
+        FROM "ob-poc".entity_funds
+        WHERE entity_id = ANY($1)
+        "#,
+    )
+    .bind(entity_ids)
+    .fetch_one(pool)
+    .await;
+
+    match row {
+        Ok(row) => (
+            row.get::<Option<i64>, _>("fund_entity_count").unwrap_or(0),
+            row.get::<Option<i64>, _>("nested_fund_count").unwrap_or(0),
+            row.get::<Option<i64>, _>("feeder_or_master_link_count")
+                .unwrap_or(0),
+        ),
+        Err(_) => (0, 0, 0),
+    }
+}
+
+#[cfg(feature = "database")]
+async fn fund_signals_for_entity(pool: &PgPool, entity_id: Uuid) -> (bool, bool, bool) {
+    let row = sqlx::query(
+        r#"
+        SELECT
+            EXISTS(
+                SELECT 1
+                FROM "ob-poc".entity_funds
+                WHERE entity_id = $1
+            ) AS is_fund_entity,
+            EXISTS(
+                SELECT 1
+                FROM "ob-poc".entity_funds
+                WHERE entity_id = $1
+                  AND parent_fund_id IS NOT NULL
+            ) AS is_nested_fund,
+            EXISTS(
+                SELECT 1
+                FROM "ob-poc".entity_funds
+                WHERE entity_id = $1
+                  AND master_fund_id IS NOT NULL
+            ) AS has_master_feeder_link
+        "#,
+    )
+    .bind(entity_id)
+    .fetch_one(pool)
+    .await;
+
+    match row {
+        Ok(row) => (
+            row.get::<Option<bool>, _>("is_fund_entity").unwrap_or(false),
+            row.get::<Option<bool>, _>("is_nested_fund").unwrap_or(false),
+            row.get::<Option<bool>, _>("has_master_feeder_link")
+                .unwrap_or(false),
+        ),
+        Err(_) => (false, false, false),
+    }
+}
+
+#[cfg(feature = "database")]
+async fn deal_onboarding_request_counts(pool: &PgPool, deal_id: Uuid) -> (i64, i64, i64) {
+    let row = sqlx::query(
+        r#"
+        SELECT
+            COUNT(*) FILTER (WHERE request_status NOT IN ('COMPLETED', 'CANCELLED')) AS active_count,
+            COUNT(*) FILTER (WHERE request_status = 'COMPLETED') AS completed_count,
+            COUNT(*) AS total_count
+        FROM "ob-poc".deal_onboarding_requests
+        WHERE deal_id = $1
+        "#,
+    )
+    .bind(deal_id)
+    .fetch_one(pool)
+    .await;
+
+    match row {
+        Ok(row) => (
+            row.get::<Option<i64>, _>("active_count").unwrap_or(0),
+            row.get::<Option<i64>, _>("completed_count").unwrap_or(0),
+            row.get::<Option<i64>, _>("total_count").unwrap_or(0),
+        ),
+        Err(_) => (0, 0, 0),
+    }
+}
+
+#[cfg(feature = "database")]
+async fn screening_counts_for_deal(pool: &PgPool, deal_id: Uuid) -> (i64, i64, i64, i64) {
+    let row = sqlx::query(
+        r#"
+        SELECT
+            COUNT(*) FILTER (
+                WHERE s.status IN ('PENDING', 'RUNNING', 'HIT_PENDING_REVIEW', 'HIT_CONFIRMED')
+            ) AS active_total,
+            COUNT(*) FILTER (
+                WHERE s.screening_type = 'SANCTIONS'
+                  AND s.status IN ('PENDING', 'RUNNING', 'HIT_PENDING_REVIEW', 'HIT_CONFIRMED')
+            ) AS sanctions_count,
+            COUNT(*) FILTER (
+                WHERE s.screening_type = 'PEP'
+                  AND s.status IN ('PENDING', 'RUNNING', 'HIT_PENDING_REVIEW', 'HIT_CONFIRMED')
+            ) AS pep_count,
+            COUNT(*) FILTER (
+                WHERE s.screening_type = 'ADVERSE_MEDIA'
+                  AND s.status IN ('PENDING', 'RUNNING', 'HIT_PENDING_REVIEW', 'HIT_CONFIRMED')
+            ) AS adverse_media_count
+        FROM "ob-poc".screenings s
+        JOIN "ob-poc".entity_workstreams ew ON ew.workstream_id = s.workstream_id
+        JOIN "ob-poc".cases c ON c.case_id = ew.case_id
+        WHERE c.deal_id = $1
+        "#,
+    )
+    .bind(deal_id)
+    .fetch_one(pool)
+    .await;
+
+    match row {
+        Ok(row) => (
+            row.get::<Option<i64>, _>("active_total").unwrap_or(0),
+            row.get::<Option<i64>, _>("sanctions_count").unwrap_or(0),
+            row.get::<Option<i64>, _>("pep_count").unwrap_or(0),
+            row.get::<Option<i64>, _>("adverse_media_count").unwrap_or(0),
+        ),
+        Err(_) => (0, 0, 0, 0),
+    }
+}
+
+#[cfg(feature = "database")]
 async fn build_entity_context_record(
     pool: &PgPool,
     entity_id: Uuid,
@@ -834,45 +1220,20 @@ async fn build_entity_context_record(
             .await
             .unwrap_or(0)
         };
-        let active_kyc_count: i64 = sqlx::query_scalar(
-            r#"
-            SELECT COUNT(*)
-            FROM "ob-poc".cases
-            WHERE client_group_id = $1
-              AND status NOT IN ('APPROVED', 'REJECTED', 'WITHDRAWN', 'DO_NOT_ONBOARD')
-            "#,
-        )
-        .bind(entity_id)
-        .fetch_one(pool)
-        .await
-        .unwrap_or(0);
-        let pending_docs_count: i64 = sqlx::query_scalar(
-            r#"
-            SELECT COUNT(*)
-            FROM "ob-poc".deal_documents dd
-            JOIN "ob-poc".deals d ON d.deal_id = dd.deal_id
-            WHERE d.primary_client_group_id = $1
-              AND dd.document_status NOT IN ('SIGNED', 'EXECUTED', 'ARCHIVED')
-            "#,
-        )
-        .bind(entity_id)
-        .fetch_one(pool)
-        .await
-        .unwrap_or(0);
-        let screening_review_count: i64 = sqlx::query_scalar(
-            r#"
-            SELECT COUNT(*)
-            FROM "ob-poc".screenings s
-            JOIN "ob-poc".entity_workstreams ew ON ew.workstream_id = s.workstream_id
-            JOIN "ob-poc".cases c ON c.case_id = ew.case_id
-            WHERE c.client_group_id = $1
-              AND s.status IN ('PENDING', 'RUNNING', 'HIT_PENDING_REVIEW', 'HIT_CONFIRMED')
-            "#,
-        )
-        .bind(entity_id)
-        .fetch_one(pool)
-        .await
-        .unwrap_or(0);
+        let (active_kyc_count, blocked_kyc_count, review_kyc_count) =
+            case_status_counts_for_client_group(pool, entity_id).await;
+        let (
+            pending_docs_count,
+            verified_docs_count,
+            rejected_docs_count,
+            catalogued_docs_count,
+        ) = document_status_counts_for_client_group(pool, entity_id).await;
+        let (
+            screening_review_count,
+            sanctions_screening_count,
+            pep_screening_count,
+            adverse_media_screening_count,
+        ) = screening_counts_for_client_group(pool, entity_id).await;
         let entity_ubo_count: i64 = if linked_entity_ids.is_empty() {
             0
         } else {
@@ -903,6 +1264,8 @@ async fn build_entity_context_record(
         .unwrap_or(0);
         let has_incomplete_ubo = active_registry_ubo_count > 0
             || (!linked_entity_ids.is_empty() && entity_ubo_count == 0);
+        let (fund_entity_count, nested_fund_count, feeder_or_master_link_count) =
+            fund_counts_for_entities(pool, &linked_entity_ids).await;
 
         let mut activities = Vec::new();
         if include_completed || active_deal_count > 0 {
@@ -988,11 +1351,29 @@ async fn build_entity_context_record(
             "signals": {
                 "anchor": "client-group",
                 "onboarding_present": onboarding_active_count > 0,
+                "linked_cbu_count": linked_cbu_ids.len(),
+                "linked_entity_count": linked_entity_ids.len(),
                 "has_active_onboarding": onboarding_active_count > 0,
                 "has_active_deal": active_deal_count > 0,
                 "has_active_kyc": active_kyc_count > 0,
+                "active_kyc_case_count": active_kyc_count,
+                "blocked_kyc_case_count": blocked_kyc_count,
+                "review_kyc_case_count": review_kyc_count,
                 "has_incomplete_ubo": has_incomplete_ubo,
+                "ubo_registry_pending_count": active_registry_ubo_count,
+                "ubo_record_count": entity_ubo_count,
                 "has_pending_documentation": pending_docs_count > 0,
+                "pending_document_count": pending_docs_count,
+                "verified_document_count": verified_docs_count,
+                "rejected_document_count": rejected_docs_count,
+                "catalogued_document_count": catalogued_docs_count,
+                "fund_entity_count": fund_entity_count,
+                "nested_fund_count": nested_fund_count,
+                "feeder_or_master_link_count": feeder_or_master_link_count,
+                "screening_active_count": screening_review_count,
+                "screening_sanctions_count": sanctions_screening_count,
+                "screening_pep_count": pep_screening_count,
+                "screening_adverse_media_count": adverse_media_screening_count,
                 "days_since_last_activity": Value::Null,
                 "stale": active_deal_count == 0
                     && onboarding_active_count == 0
@@ -1027,44 +1408,20 @@ async fn build_entity_context_record(
         .fetch_one(pool)
         .await
         .unwrap_or(0);
-        let active_kyc_count: i64 = sqlx::query_scalar(
-            r#"
-            SELECT COUNT(*)
-            FROM "ob-poc".cases
-            WHERE cbu_id = $1
-              AND status NOT IN ('APPROVED', 'REJECTED', 'WITHDRAWN', 'DO_NOT_ONBOARD')
-            "#,
-        )
-        .bind(entity_id)
-        .fetch_one(pool)
-        .await
-        .unwrap_or(0);
-        let pending_docs_count: i64 = sqlx::query_scalar(
-            r#"
-            SELECT COUNT(*)
-            FROM "ob-poc".document_catalog
-            WHERE cbu_id = $1
-              AND status <> 'archived'
-            "#,
-        )
-        .bind(entity_id)
-        .fetch_one(pool)
-        .await
-        .unwrap_or(0);
-        let screening_review_count: i64 = sqlx::query_scalar(
-            r#"
-            SELECT COUNT(*)
-            FROM "ob-poc".screenings s
-            JOIN "ob-poc".entity_workstreams ew ON ew.workstream_id = s.workstream_id
-            JOIN "ob-poc".cases c ON c.case_id = ew.case_id
-            WHERE c.cbu_id = $1
-              AND s.status IN ('PENDING', 'RUNNING', 'HIT_PENDING_REVIEW', 'HIT_CONFIRMED')
-            "#,
-        )
-        .bind(entity_id)
-        .fetch_one(pool)
-        .await
-        .unwrap_or(0);
+        let (active_kyc_count, blocked_kyc_count, review_kyc_count) =
+            case_status_counts_for_cbu(pool, entity_id).await;
+        let (
+            pending_docs_count,
+            verified_docs_count,
+            rejected_docs_count,
+            catalogued_docs_count,
+        ) = document_status_counts_for_cbu(pool, entity_id).await;
+        let (
+            screening_review_count,
+            sanctions_screening_count,
+            pep_screening_count,
+            adverse_media_screening_count,
+        ) = screening_counts_for_cbu(pool, entity_id).await;
         let entity_ubo_count: i64 = if linked_entity_ids.is_empty() {
             0
         } else {
@@ -1095,6 +1452,8 @@ async fn build_entity_context_record(
         .unwrap_or(0);
         let has_incomplete_ubo = active_registry_ubo_count > 0
             || (!linked_entity_ids.is_empty() && entity_ubo_count == 0);
+        let (fund_entity_count, nested_fund_count, feeder_or_master_link_count) =
+            fund_counts_for_entities(pool, &linked_entity_ids).await;
 
         let mut activities = Vec::new();
         if include_completed || onboarding_active_count > 0 {
@@ -1162,11 +1521,28 @@ async fn build_entity_context_record(
             "signals": {
                 "anchor": "cbu",
                 "onboarding_present": onboarding_active_count > 0,
+                "linked_entity_count": linked_entity_ids.len(),
                 "has_active_onboarding": onboarding_active_count > 0,
                 "has_active_deal": false,
                 "has_active_kyc": active_kyc_count > 0,
+                "active_kyc_case_count": active_kyc_count,
+                "blocked_kyc_case_count": blocked_kyc_count,
+                "review_kyc_case_count": review_kyc_count,
                 "has_incomplete_ubo": has_incomplete_ubo,
+                "ubo_registry_pending_count": active_registry_ubo_count,
+                "ubo_record_count": entity_ubo_count,
                 "has_pending_documentation": pending_docs_count > 0,
+                "pending_document_count": pending_docs_count,
+                "verified_document_count": verified_docs_count,
+                "rejected_document_count": rejected_docs_count,
+                "catalogued_document_count": catalogued_docs_count,
+                "fund_entity_count": fund_entity_count,
+                "nested_fund_count": nested_fund_count,
+                "feeder_or_master_link_count": feeder_or_master_link_count,
+                "screening_active_count": screening_review_count,
+                "screening_sanctions_count": sanctions_screening_count,
+                "screening_pep_count": pep_screening_count,
+                "screening_adverse_media_count": adverse_media_screening_count,
                 "days_since_last_activity": Value::Null,
                 "stale": onboarding_active_count == 0 && active_kyc_count == 0 && screening_review_count == 0,
             }
@@ -1185,30 +1561,22 @@ async fn build_entity_context_record(
         .fetch_optional(pool)
         .await
         .unwrap_or(None);
-        let linked_case_count: i64 = sqlx::query_scalar(
-            r#"
-            SELECT COUNT(*)
-            FROM "ob-poc".cases
-            WHERE deal_id = $1
-              AND status NOT IN ('APPROVED', 'REJECTED', 'WITHDRAWN', 'DO_NOT_ONBOARD')
-            "#,
-        )
-        .bind(entity_id)
-        .fetch_one(pool)
-        .await
-        .unwrap_or(0);
-        let pending_docs_count: i64 = sqlx::query_scalar(
-            r#"
-            SELECT COUNT(*)
-            FROM "ob-poc".deal_documents
-            WHERE deal_id = $1
-              AND document_status NOT IN ('SIGNED', 'EXECUTED', 'ARCHIVED')
-            "#,
-        )
-        .bind(entity_id)
-        .fetch_one(pool)
-        .await
-        .unwrap_or(0);
+        let (active_kyc_count, blocked_kyc_count, review_kyc_count) =
+            case_status_counts_for_deal(pool, entity_id).await;
+        let (
+            pending_docs_count,
+            complete_docs_count,
+            rejected_docs_count,
+            total_docs_count,
+        ) = document_status_counts_for_deal(pool, entity_id).await;
+        let (active_onboarding_request_count, completed_onboarding_request_count, total_onboarding_request_count) =
+            deal_onboarding_request_counts(pool, entity_id).await;
+        let (
+            screening_review_count,
+            sanctions_screening_count,
+            pep_screening_count,
+            adverse_media_screening_count,
+        ) = screening_counts_for_deal(pool, entity_id).await;
 
         return Ok(json!({
             "entity_id": entity_id,
@@ -1230,12 +1598,27 @@ async fn build_entity_context_record(
             ],
             "signals": {
                 "anchor": "deal",
+                "deal_phase": deal_status.as_deref().unwrap_or("active"),
                 "onboarding_present": deal_status.as_deref() == Some("ONBOARDING"),
                 "has_active_onboarding": deal_status.as_deref() == Some("ONBOARDING"),
                 "has_active_deal": true,
-                "has_active_kyc": linked_case_count > 0,
+                "has_active_kyc": active_kyc_count > 0,
+                "active_kyc_case_count": active_kyc_count,
+                "blocked_kyc_case_count": blocked_kyc_count,
+                "review_kyc_case_count": review_kyc_count,
                 "has_incomplete_ubo": false,
                 "has_pending_documentation": pending_docs_count > 0,
+                "pending_document_count": pending_docs_count,
+                "complete_document_count": complete_docs_count,
+                "rejected_document_count": rejected_docs_count,
+                "catalogued_document_count": total_docs_count,
+                "active_onboarding_request_count": active_onboarding_request_count,
+                "completed_onboarding_request_count": completed_onboarding_request_count,
+                "total_onboarding_request_count": total_onboarding_request_count,
+                "screening_active_count": screening_review_count,
+                "screening_sanctions_count": sanctions_screening_count,
+                "screening_pep_count": pep_screening_count,
+                "screening_adverse_media_count": adverse_media_screening_count,
                 "days_since_last_activity": Value::Null,
                 "stale": false,
             }
@@ -1290,8 +1673,10 @@ async fn build_entity_context_record(
     .unwrap_or(0);
     let has_incomplete_ubo = active_registry_ubo_count > 0
         || (relationship_count > 0 && entity_ubo_count == 0);
+    let (is_fund_entity, is_nested_fund, has_master_feeder_link) =
+        fund_signals_for_entity(pool, entity_id).await;
 
-    let activities = if include_completed {
+    let mut activities = if include_completed {
         vec![json!({
             "domain": "discovery",
             "activity_type": "relationship_review",
@@ -1306,6 +1691,20 @@ async fn build_entity_context_record(
     } else {
         Vec::new()
     };
+    if include_completed || is_fund_entity {
+        activities.push(activity_record(
+            "fund",
+            "fund",
+            if is_nested_fund { "nested" } else { "standalone" },
+            if is_fund_entity {
+                "in_progress"
+            } else {
+                "not_started"
+            },
+            None,
+            Vec::new(),
+        ));
+    }
 
     Ok(json!({
         "entity_id": entity_id,
@@ -1319,7 +1718,13 @@ async fn build_entity_context_record(
             "has_active_deal": false,
             "has_active_kyc": false,
             "has_incomplete_ubo": has_incomplete_ubo,
+            "ubo_registry_pending_count": active_registry_ubo_count,
+            "ubo_record_count": entity_ubo_count,
             "has_pending_documentation": false,
+            "linked_entity_count": relationship_count,
+            "is_fund_entity": is_fund_entity,
+            "is_nested_fund": is_nested_fund,
+            "has_master_feeder_link": has_master_feeder_link,
             "days_since_last_activity": Value::Null,
             "stale": latest_relationship_activity.is_none(),
         }
@@ -1916,6 +2321,106 @@ impl CustomOperation for DiscoveryValidTransitionsOp {
 }
 
 #[register_custom_op]
+pub struct DiscoveryGraphWalkOp;
+
+#[async_trait]
+impl CustomOperation for DiscoveryGraphWalkOp {
+    fn domain(&self) -> &'static str {
+        "discovery"
+    }
+
+    fn verb(&self) -> &'static str {
+        "graph-walk"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Walks applicable authored StateGraphs for a grounded entity and returns frontier and blocked actions"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let entity_id = get_uuid_arg(ctx, verb_call, "entity-id")
+            .ok_or_else(|| anyhow!("discovery.graph-walk requires :entity-id"))?;
+        let include_blocked = get_bool_arg(verb_call, "include-blocked").unwrap_or(true);
+        let context = build_entity_context_record(pool, entity_id, true).await?;
+        let entity_type = context["entity_type"].as_str().unwrap_or("entity");
+
+        let graphs = load_state_graphs()?;
+        validate_graphs(&graphs)?;
+        let applicable = graphs
+            .into_iter()
+            .filter(|graph| {
+                graph.entity_types.is_empty()
+                    || graph
+                        .entity_types
+                        .iter()
+                        .any(|candidate| candidate.eq_ignore_ascii_case(entity_type))
+            })
+            .collect::<Vec<_>>();
+
+        let mut valid = BTreeMap::<String, Value>::new();
+        let mut blocked = BTreeMap::<String, Value>::new();
+        let mut satisfied_nodes = BTreeSet::new();
+        let mut frontier_nodes = BTreeSet::new();
+        let mut gate_status = Vec::new();
+        let mut graph_ids = Vec::new();
+
+        for graph in applicable {
+            let result = walk_graph(&graph, &context)?;
+            graph_ids.push(result.graph_id.clone());
+            satisfied_nodes.extend(result.satisfied_nodes);
+            frontier_nodes.extend(result.frontier_nodes);
+            gate_status.extend(
+                result
+                    .gate_status
+                    .into_iter()
+                    .map(|status| serde_json::to_value(status).unwrap_or(Value::Null)),
+            );
+            for verb in result.valid_verbs {
+                valid.entry(verb.verb_id.clone())
+                    .or_insert_with(|| serde_json::to_value(verb).unwrap_or(Value::Null));
+            }
+            if include_blocked {
+                for verb in result.blocked_verbs {
+                    blocked
+                        .entry(verb.verb_id.clone())
+                        .or_insert_with(|| serde_json::to_value(verb).unwrap_or(Value::Null));
+                }
+            }
+        }
+
+        let valid_verbs = valid.into_values().collect::<Vec<_>>();
+        let blocked_verbs = blocked.into_values().collect::<Vec<_>>();
+
+        Ok(ExecutionResult::Record(json!({
+            "entity_id": entity_id,
+            "entity_type": entity_type,
+            "entity_name": context["name"].as_str().unwrap_or("unknown"),
+            "graph_ids": graph_ids,
+            "satisfied_nodes": satisfied_nodes.into_iter().collect::<Vec<_>>(),
+            "frontier_nodes": frontier_nodes.into_iter().collect::<Vec<_>>(),
+            "valid_verbs": valid_verbs,
+            "blocked_verbs": blocked_verbs,
+            "gate_status": gate_status,
+            "summary": {
+                "total_valid": valid_verbs.len(),
+                "total_blocked": blocked_verbs.len(),
+            }
+        })))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(&self, _verb_call: &VerbCall, _ctx: &mut ExecutionContext) -> Result<ExecutionResult> {
+        Err(anyhow!("discovery.graph-walk requires database"))
+    }
+}
+
+#[register_custom_op]
 pub struct DiscoveryInspectDataOp;
 
 #[async_trait]
@@ -2090,6 +2595,7 @@ mod tests {
         assert!(domain.verbs.contains_key("available-actions"));
         assert!(domain.verbs.contains_key("verb-detail"));
         assert!(domain.verbs.contains_key("valid-transitions"));
+        assert!(domain.verbs.contains_key("graph-walk"));
     }
 
     #[test]
@@ -2102,6 +2608,7 @@ mod tests {
         assert!(registry.has("discovery", "available-actions"));
         assert!(registry.has("discovery", "verb-detail"));
         assert!(registry.has("discovery", "valid-transitions"));
+        assert!(registry.has("discovery", "graph-walk"));
         assert!(registry.has("discovery", "inspect-data"));
         assert!(registry.has("discovery", "search-data"));
     }

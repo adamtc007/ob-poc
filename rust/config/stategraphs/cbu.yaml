@@ -1,0 +1,57 @@
+graph_id: cbu
+name: CBU Onboarding Graph
+version: "1"
+description: CBU onboarding lifecycle graph
+entity_types:
+  - client-group
+  - cbu
+nodes:
+  - node_id: cbu.entry
+    name: CBU Entry
+    node_type: entry
+    lane: cbu
+  - node_id: cbu.active
+    name: Active Onboarding
+    node_type: milestone
+    lane: cbu
+    satisfied_when:
+      - signal: has_active_onboarding
+        description: Active onboarding exists
+  - node_id: cbu.documents
+    name: Documents Outstanding
+    node_type: gate
+    lane: document
+    satisfied_when:
+      - signal: pending_document_count
+        description: Pending document count is non-zero
+  - node_id: cbu.ubo
+    name: UBO Review Needed
+    node_type: gate
+    lane: ubo
+    satisfied_when:
+      - signal: has_incomplete_ubo
+        description: UBO data is incomplete
+edges:
+  - edge_id: cbu.create
+    from_node: cbu.entry
+    to_node: cbu.active
+    verb_ids: ["cbu.create", "cbu.create-from-client-group"]
+    edge_type: advance
+  - edge_id: cbu.list
+    from_node: cbu.active
+    to_node: cbu.active
+    verb_ids: ["cbu.list", "cbu.read"]
+    edge_type: conditional
+  - edge_id: cbu.docs
+    from_node: cbu.active
+    to_node: cbu.documents
+    verb_ids: ["document.missing-for-entity", "document.for-entity"]
+    edge_type: conditional
+  - edge_id: cbu.ubo
+    from_node: cbu.active
+    to_node: cbu.ubo
+    verb_ids: ["ubo.list-ubos", "ubo.list-owners"]
+    edge_type: conditional
+gates:
+  - gate_node: cbu.active
+    required_nodes: ["cbu.entry"]

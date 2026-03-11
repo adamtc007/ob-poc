@@ -1,0 +1,32 @@
+graph_id: ubo
+name: UBO Graph
+version: "1"
+description: Ownership and control lifecycle graph
+entity_types:
+  - client-group
+  - cbu
+  - entity
+nodes:
+  - node_id: ubo.entry
+    name: UBO Entry
+    node_type: entry
+    lane: ubo
+  - node_id: ubo.incomplete
+    name: UBO Incomplete
+    node_type: milestone
+    lane: ubo
+    satisfied_when:
+      - signal: has_incomplete_ubo
+        description: UBO completeness is outstanding
+edges:
+  - edge_id: ubo.read
+    from_node: ubo.entry
+    to_node: ubo.incomplete
+    verb_ids: ["ubo.list-owners", "ubo.list-ubos"]
+    edge_type: conditional
+  - edge_id: ubo.advance
+    from_node: ubo.incomplete
+    to_node: ubo.incomplete
+    verb_ids: ["ubo.add-ownership", "ubo.update-ownership", "ubo.add-control", "ubo.add-trust-role"]
+    edge_type: advance
+gates: []

@@ -58,6 +58,10 @@ pub mod agentic;
 #[cfg(feature = "database")]
 pub mod graph;
 
+// StateGraph pipeline substrate
+#[cfg(feature = "database")]
+pub mod stategraph;
+
 // Navigation module - Nom-based parser for graph navigation commands
 #[cfg(feature = "database")]
 pub mod navigation;
