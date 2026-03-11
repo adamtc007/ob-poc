@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-> **Last reviewed:** 2026-03-08
+> **Last reviewed:** 2026-03-11
 > **Frontend:** React/TypeScript (`ob-poc-ui-react/`) - Chat UI with scope panel, Inspector, Semantic OS Tab
 > **Backend:** Rust/Axum (`rust/crates/ob-poc-web/`) - Serves React + REST API
 > **Crates:** 22 active Rust crates (16 ob-poc + 6 sem_os_*; esper_* deprecated; ob-poc-graph + viewport removed)
@@ -73,6 +73,8 @@
 > **Coder Rewrite (Phase 2):** ✅ Complete — verb metadata index, structured verb resolution, OutcomeStep arg assembly, Sage+Coder shadow comparison, utterance comparative harness, `SAGE_FAST_PATH=1` read+structure fast path for data-management schema introspection
 > **Sage/Coder GATE 5:** ⚠️ Comparative harness run complete — existing pipeline `58/134` (`43.28%`), deterministic Sage+Coder `6/134` (`4.48%`), LLM-backed Sage+Coder `7/134` (`5.22%`); outcome points to vocabulary/routing work before further LLM spend
 > **Sage-Primary Chat Narration:** ✅ Implemented — scoped inventory reads now default to safe read/list execution, write intents surface plain-language pending mutations, read pivots cancel pending mutations with an explicit chat notice, confirmation executes only when a mutation is still pending, and a stale `yes` now returns `There is no pending change to confirm. I am still in read-only mode.`
+> **SemTaxonomy Rip-and-Replace (Three-Step Pipeline):** ✅ Cut over — the normal SemTaxonomy-enabled chat path now runs only `EntityScope -> EntityState -> SelectedVerb` via `rust/src/semtaxonomy_v2/mod.rs`; the old SemTaxonomy composition path has been removed from normal proposal selection, and Step 1 entity scope is now a hard gate that returns clarification instead of allowing ambiguity to cascade.
+> **Three-Step Harness State (2026-03-11):** ⚠️ Grounding/state metrics improved but exact verb accuracy remains low — live 176-utterance harness currently reports `7/176` (`3.98%`) exact hits, `51/176` (`28.98%`) grounded/stateful responses, and `35/176` business proposals; seeded capability harness remains materially stronger and is the primary proof that the simplified path can compose when real state exists.
 > **Phase 0 Vocabulary Rationalization (Batches 1-3):** ✅ Complete — domain merges/deletions (`case-screening`, `doc-request`, `product-subscription`, `fund-vehicle`, `fund-compartment`, `lifecycle`), type-parameterized family merges (`entity.*`, `ubo.*`, `sla.*`, `trading-profile.*`, `fund.*`), unified `refdata.*` runtime + tests
 > **Schema Consolidation (Migrations 115-121):** ✅ Complete — runtime schemas collapsed to `"ob-poc"` for business data and `sem_reg*` for Semantic OS; retired schemas (`stewardship`, `agent`, `teams`, `feedback`, `events`, `sessions`, `ob_ref`, `ob_kyc`) removed from the live database
 > **Domain Metadata Coverage:** ✅ Complete — `rust/config/sem_os_seeds/domain_metadata.yaml` now covers `306/306` live `"ob-poc"` tables, with SemOS footprint remediation applied for `sem-reg` and `stewardship`

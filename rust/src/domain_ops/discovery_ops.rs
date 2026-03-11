@@ -126,6 +126,140 @@ fn governance_status(config: &VerbConfig) -> &'static str {
     }
 }
 
+fn lane_for_verb(domain_name: &str, config: &VerbConfig) -> String {
+    config
+        .metadata
+        .as_ref()
+        .and_then(|m| m.phase_tags.first().cloned())
+        .unwrap_or_else(|| domain_name.to_string())
+}
+
+fn signal_flag(entity_state: &Value, key: &str) -> bool {
+    entity_state["signals"][key].as_bool().unwrap_or(false)
+}
+
+fn active_lanes(entity_state: &Value) -> Vec<String> {
+    let mut lanes = Vec::new();
+    if signal_flag(entity_state, "has_active_onboarding") {
+        lanes.push("onboarding".to_string());
+        lanes.push("cbu".to_string());
+    }
+    if signal_flag(entity_state, "has_active_deal") {
+        lanes.push("deal".to_string());
+    }
+    if signal_flag(entity_state, "has_active_kyc") {
+        lanes.push("kyc".to_string());
+        lanes.push("case".to_string());
+    }
+    if signal_flag(entity_state, "has_pending_documentation") {
+        lanes.push("document".to_string());
+    }
+    if signal_flag(entity_state, "has_incomplete_ubo") {
+        lanes.push("ubo".to_string());
+        lanes.push("ownership".to_string());
+    }
+    lanes.sort();
+    lanes.dedup();
+    lanes
+}
+
+fn current_phase_for_lane(entity_state: &Value, lane: &str) -> String {
+    entity_state["activities"]
+        .as_array()
+        .and_then(|activities| {
+            activities.iter().find_map(|activity| {
+                let domain = activity["domain"].as_str().unwrap_or_default();
+                let activity_type = activity["activity_type"].as_str().unwrap_or_default();
+                if domain.eq_ignore_ascii_case(lane) || activity_type.contains(lane) {
+                    activity["phase"].as_str().map(str::to_string)
+                } else {
+                    None
+                }
+            })
+        })
+        .unwrap_or_else(|| "current".to_string())
+}
+
+fn matches_lane_filter(config: &VerbConfig, domain_name: &str, lanes: &[String]) -> bool {
+    if lanes.is_empty() {
+        return true;
+    }
+    let lane = lane_for_verb(domain_name, config);
+    lanes.iter().any(|candidate| {
+        candidate.eq_ignore_ascii_case(domain_name)
+            || candidate.eq_ignore_ascii_case(&lane)
+            || config
+                .metadata
+                .as_ref()
+                .map(|m| m.phase_tags.iter().any(|tag| tag.eq_ignore_ascii_case(candidate)))
+                .unwrap_or(false)
+    })
+}
+
+fn evaluate_preconditions(config: &VerbConfig, entity_state: &Value) -> Vec<String> {
+    let Some(lifecycle) = config.lifecycle.as_ref() else {
+        return Vec::new();
+    };
+
+    let mut unmet = Vec::new();
+    for check in &lifecycle.precondition_checks {
+        let ok = match check.as_str() {
+            "check_cbu_evidence_completeness" => !signal_flag(entity_state, "has_pending_documentation"),
+            "check_required_parties_present" => !entity_state["signals"]["stale"].as_bool().unwrap_or(false),
+            "check_ubo_completeness" => !signal_flag(entity_state, "has_incomplete_ubo"),
+            "check_kyc_case_approved" => !signal_flag(entity_state, "has_active_kyc"),
+            "check_service_delivery_ready" => !signal_flag(entity_state, "has_active_onboarding"),
+            "check_resources_provisioned" => !signal_flag(entity_state, "has_active_onboarding"),
+            other => {
+                // Unknown checks remain advisory, not blocking, until wired.
+                tracing::debug!(precondition_check = %other, "valid-transitions skipping unknown precondition check");
+                true
+            }
+        };
+        if !ok {
+            unmet.push(check.clone());
+        }
+    }
+    unmet
+}
+
+fn derive_unblocking_actions(unmet: &[String]) -> Vec<String> {
+    let mut actions = Vec::new();
+    for precondition in unmet {
+        match precondition.as_str() {
+            "check_cbu_evidence_completeness" => actions.push("document.missing-for-entity".to_string()),
+            "check_required_parties_present" => actions.push("cbu.parties".to_string()),
+            "check_ubo_completeness" => actions.push("ubo.list-ubos".to_string()),
+            "check_kyc_case_approved" => actions.push("case.list".to_string()),
+            "check_service_delivery_ready" => actions.push("service-resource.check-lifecycle-readiness".to_string()),
+            "check_resources_provisioned" => actions.push("service-resource.list-lifecycle-instances".to_string()),
+            _ => {}
+        }
+    }
+    actions.sort();
+    actions.dedup();
+    actions
+}
+
+fn compute_relevance(domain_name: &str, config: &VerbConfig, entity_state: &Value) -> f32 {
+    let lane = lane_for_verb(domain_name, config);
+    let active_lanes = active_lanes(entity_state);
+    let mut relevance = 0.2f32;
+    if active_lanes
+        .iter()
+        .any(|active| active.eq_ignore_ascii_case(domain_name) || active.eq_ignore_ascii_case(&lane))
+    {
+        relevance += 0.5;
+    }
+    if infer_polarity(config.metadata.as_ref()) == "write" {
+        relevance += 0.1;
+    }
+    if !config.invocation_phrases.is_empty() {
+        relevance += 0.1;
+    }
+    relevance.min(1.0)
+}
+
 fn find_verb_config<'a>(
     verbs: &'a dsl_core::config::types::VerbsConfig,
     verb_id: &'a str,
@@ -163,6 +297,110 @@ async fn search_entities_via_db(
     entity_types: &[String],
     limit: i32,
 ) -> Result<Vec<Value>> {
+    async fn lifecycle_stats_for(
+        pool: &PgPool,
+        entity_id: Uuid,
+        entity_type: &str,
+        linked_cbu_ids: &[Uuid],
+    ) -> (bool, usize, bool) {
+        let linked_entity_count = match entity_type {
+            "client-group" => sqlx::query_scalar(
+                r#"
+                SELECT COUNT(*)
+                FROM "ob-poc".client_group_entity
+                WHERE group_id = $1
+                "#,
+            )
+            .bind(entity_id)
+            .fetch_one(pool)
+            .await
+            .unwrap_or(0_i64) as usize,
+            "cbu" => sqlx::query_scalar(
+                r#"
+                SELECT COUNT(*)
+                FROM "ob-poc".client_group_entity
+                WHERE cbu_id = $1
+                "#,
+            )
+            .bind(entity_id)
+            .fetch_one(pool)
+            .await
+            .unwrap_or(0_i64) as usize,
+            _ => 0,
+        };
+
+        let has_active_workflow = match entity_type {
+            "client-group" => {
+                let deal_count: i64 = sqlx::query_scalar(
+                    r#"
+                    SELECT COUNT(*) FROM "ob-poc".deals
+                    WHERE primary_client_group_id = $1
+                      AND deal_status NOT IN ('OFFBOARDED', 'CANCELLED')
+                    "#,
+                )
+                .bind(entity_id)
+                .fetch_one(pool)
+                .await
+                .unwrap_or(0);
+                let onboarding_count: i64 = if linked_cbu_ids.is_empty() {
+                    0
+                } else {
+                    sqlx::query_scalar(
+                        r#"
+                        SELECT COUNT(*) FROM "ob-poc".onboarding_requests
+                        WHERE cbu_id = ANY($1) AND request_state <> 'complete'
+                        "#,
+                    )
+                    .bind(linked_cbu_ids)
+                    .fetch_one(pool)
+                    .await
+                    .unwrap_or(0)
+                };
+                deal_count > 0 || onboarding_count > 0
+            }
+            "cbu" => {
+                let onboarding_count: i64 = sqlx::query_scalar(
+                    r#"
+                    SELECT COUNT(*) FROM "ob-poc".onboarding_requests
+                    WHERE cbu_id = $1 AND request_state <> 'complete'
+                    "#,
+                )
+                .bind(entity_id)
+                .fetch_one(pool)
+                .await
+                .unwrap_or(0);
+                let case_count: i64 = sqlx::query_scalar(
+                    r#"
+                    SELECT COUNT(*) FROM "ob-poc".cases
+                    WHERE cbu_id = $1
+                      AND status NOT IN ('APPROVED', 'REJECTED', 'WITHDRAWN', 'DO_NOT_ONBOARD')
+                    "#,
+                )
+                .bind(entity_id)
+                .fetch_one(pool)
+                .await
+                .unwrap_or(0);
+                onboarding_count > 0 || case_count > 0
+            }
+            "deal" => {
+                let status: Option<String> = sqlx::query_scalar(
+                    r#"
+                    SELECT deal_status FROM "ob-poc".deals WHERE deal_id = $1
+                    "#,
+                )
+                .bind(entity_id)
+                .fetch_optional(pool)
+                .await
+                .unwrap_or(None);
+                status.is_some_and(|value| value != "OFFBOARDED" && value != "CANCELLED")
+            }
+            _ => !linked_cbu_ids.is_empty(),
+        };
+
+        let lifecycle_populated = has_active_workflow || linked_entity_count > 0 || !linked_cbu_ids.is_empty();
+        (lifecycle_populated, linked_entity_count, has_active_workflow)
+    }
+
     async fn linked_cbu_ids_for(pool: &PgPool, entity_id: Uuid, entity_type: &str) -> Vec<Uuid> {
         match entity_type {
             "client-group" => {
@@ -339,6 +577,8 @@ async fn search_entities_via_db(
         let linked_cbu_ids = linked_cbu_ids_for(pool, entity_id, entity_type.as_str()).await;
         let is_onboarding_member =
             !linked_cbu_ids.is_empty() || entity_type.eq_ignore_ascii_case("cbu");
+        let (lifecycle_populated, linked_entity_count, has_active_workflow) =
+            lifecycle_stats_for(pool, entity_id, entity_type.as_str(), &linked_cbu_ids).await;
         results.push(json!({
             "entity_id": entity_id,
             "entity_type": entity_type,
@@ -350,6 +590,9 @@ async fn search_entities_via_db(
             "linked_cbu_ids": linked_cbu_ids,
             "is_onboarding_member": is_onboarding_member,
             "candidate_for_cbu": !is_onboarding_member,
+            "lifecycle_populated": lifecycle_populated,
+            "linked_entity_count": linked_entity_count,
+            "has_active_workflow": has_active_workflow,
             "summary": {
                 "jurisdiction": Value::Null,
                 "status": "active",
@@ -409,6 +652,9 @@ async fn search_entities_internal(
                 "linked_cbu_ids": [],
                 "is_onboarding_member": false,
                 "candidate_for_cbu": true,
+                "lifecycle_populated": false,
+                "linked_entity_count": 0,
+                "has_active_workflow": false,
                 "summary": {
                     "jurisdiction": extract_jurisdiction(&hit.display),
                     "status": "active",
@@ -536,6 +782,18 @@ async fn build_entity_context_record(
     let (name, entity_type) = load_entity_record(pool, entity_id).await?;
 
     if entity_type.eq_ignore_ascii_case("client-group") {
+        let linked_entity_ids: Vec<Uuid> = sqlx::query_scalar(
+            r#"
+            SELECT entity_id
+            FROM "ob-poc".client_group_entity
+            WHERE group_id = $1
+              AND entity_id IS NOT NULL
+            "#,
+        )
+        .bind(entity_id)
+        .fetch_all(pool)
+        .await
+        .unwrap_or_default();
         let active_deal_count: i64 = sqlx::query_scalar(
             r#"
             SELECT COUNT(*)
@@ -615,6 +873,36 @@ async fn build_entity_context_record(
         .fetch_one(pool)
         .await
         .unwrap_or(0);
+        let entity_ubo_count: i64 = if linked_entity_ids.is_empty() {
+            0
+        } else {
+            sqlx::query_scalar(
+                r#"
+                SELECT COUNT(*)
+                FROM "ob-poc".entity_ubos
+                WHERE entity_id = ANY($1)
+                "#,
+            )
+            .bind(&linked_entity_ids)
+            .fetch_one(pool)
+            .await
+            .unwrap_or(0)
+        };
+        let active_registry_ubo_count: i64 = sqlx::query_scalar(
+            r#"
+            SELECT COUNT(*)
+            FROM "ob-poc".kyc_ubo_registry ur
+            JOIN "ob-poc".cases c ON c.case_id = ur.case_id
+            WHERE c.client_group_id = $1
+              AND ur.status NOT IN ('APPROVED', 'WAIVED')
+            "#,
+        )
+        .bind(entity_id)
+        .fetch_one(pool)
+        .await
+        .unwrap_or(0);
+        let has_incomplete_ubo = active_registry_ubo_count > 0
+            || (!linked_entity_ids.is_empty() && entity_ubo_count == 0);
 
         let mut activities = Vec::new();
         if include_completed || active_deal_count > 0 {
@@ -703,7 +991,7 @@ async fn build_entity_context_record(
                 "has_active_onboarding": onboarding_active_count > 0,
                 "has_active_deal": active_deal_count > 0,
                 "has_active_kyc": active_kyc_count > 0,
-                "has_incomplete_ubo": false,
+                "has_incomplete_ubo": has_incomplete_ubo,
                 "has_pending_documentation": pending_docs_count > 0,
                 "days_since_last_activity": Value::Null,
                 "stale": active_deal_count == 0
@@ -715,6 +1003,18 @@ async fn build_entity_context_record(
     }
 
     if entity_type.eq_ignore_ascii_case("cbu") {
+        let linked_entity_ids: Vec<Uuid> = sqlx::query_scalar(
+            r#"
+            SELECT entity_id
+            FROM "ob-poc".client_group_entity
+            WHERE cbu_id = $1
+              AND entity_id IS NOT NULL
+            "#,
+        )
+        .bind(entity_id)
+        .fetch_all(pool)
+        .await
+        .unwrap_or_default();
         let onboarding_active_count: i64 = sqlx::query_scalar(
             r#"
             SELECT COUNT(*)
@@ -765,6 +1065,36 @@ async fn build_entity_context_record(
         .fetch_one(pool)
         .await
         .unwrap_or(0);
+        let entity_ubo_count: i64 = if linked_entity_ids.is_empty() {
+            0
+        } else {
+            sqlx::query_scalar(
+                r#"
+                SELECT COUNT(*)
+                FROM "ob-poc".entity_ubos
+                WHERE entity_id = ANY($1)
+                "#,
+            )
+            .bind(&linked_entity_ids)
+            .fetch_one(pool)
+            .await
+            .unwrap_or(0)
+        };
+        let active_registry_ubo_count: i64 = sqlx::query_scalar(
+            r#"
+            SELECT COUNT(*)
+            FROM "ob-poc".kyc_ubo_registry ur
+            JOIN "ob-poc".cases c ON c.case_id = ur.case_id
+            WHERE c.cbu_id = $1
+              AND ur.status NOT IN ('APPROVED', 'WAIVED')
+            "#,
+        )
+        .bind(entity_id)
+        .fetch_one(pool)
+        .await
+        .unwrap_or(0);
+        let has_incomplete_ubo = active_registry_ubo_count > 0
+            || (!linked_entity_ids.is_empty() && entity_ubo_count == 0);
 
         let mut activities = Vec::new();
         if include_completed || onboarding_active_count > 0 {
@@ -835,7 +1165,7 @@ async fn build_entity_context_record(
                 "has_active_onboarding": onboarding_active_count > 0,
                 "has_active_deal": false,
                 "has_active_kyc": active_kyc_count > 0,
-                "has_incomplete_ubo": false,
+                "has_incomplete_ubo": has_incomplete_ubo,
                 "has_pending_documentation": pending_docs_count > 0,
                 "days_since_last_activity": Value::Null,
                 "stale": onboarding_active_count == 0 && active_kyc_count == 0 && screening_review_count == 0,
@@ -935,6 +1265,31 @@ async fn build_entity_context_record(
     .fetch_optional(pool)
     .await
     .unwrap_or(None);
+    let entity_ubo_count: i64 = sqlx::query_scalar(
+        r#"
+        SELECT COUNT(*)
+        FROM "ob-poc".entity_ubos
+        WHERE entity_id = $1
+        "#,
+    )
+    .bind(entity_id)
+    .fetch_one(pool)
+    .await
+    .unwrap_or(0);
+    let active_registry_ubo_count: i64 = sqlx::query_scalar(
+        r#"
+        SELECT COUNT(*)
+        FROM "ob-poc".kyc_ubo_registry
+        WHERE subject_entity_id = $1
+          AND status NOT IN ('APPROVED', 'WAIVED')
+        "#,
+    )
+    .bind(entity_id)
+    .fetch_one(pool)
+    .await
+    .unwrap_or(0);
+    let has_incomplete_ubo = active_registry_ubo_count > 0
+        || (relationship_count > 0 && entity_ubo_count == 0);
 
     let activities = if include_completed {
         vec![json!({
@@ -963,7 +1318,7 @@ async fn build_entity_context_record(
             "has_active_onboarding": false,
             "has_active_deal": false,
             "has_active_kyc": false,
-            "has_incomplete_ubo": relationship_count > 0,
+            "has_incomplete_ubo": has_incomplete_ubo,
             "has_pending_documentation": false,
             "days_since_last_activity": Value::Null,
             "stale": latest_relationship_activity.is_none(),
@@ -1247,6 +1602,12 @@ impl CustomOperation for DiscoveryCascadeResearchOp {
                 "aliases": hit["aliases"].clone(),
                 "match_score": hit["match_score"].clone(),
                 "match_field": hit["match_field"].clone(),
+                "linked_cbu_ids": hit["linked_cbu_ids"].clone(),
+                "is_onboarding_member": hit["is_onboarding_member"].clone(),
+                "candidate_for_cbu": hit["candidate_for_cbu"].clone(),
+                "lifecycle_populated": hit["lifecycle_populated"].clone(),
+                "linked_entity_count": hit["linked_entity_count"].clone(),
+                "has_active_workflow": hit["has_active_workflow"].clone(),
                 "context": context,
                 "relationships": relationships,
                 "signals": context.as_ref().map(|c| c["signals"].clone()).unwrap_or(Value::Null),
@@ -1431,6 +1792,130 @@ impl CustomOperation for DiscoveryVerbDetailOp {
 }
 
 #[register_custom_op]
+pub struct DiscoveryValidTransitionsOp;
+
+#[async_trait]
+impl CustomOperation for DiscoveryValidTransitionsOp {
+    fn domain(&self) -> &'static str {
+        "discovery"
+    }
+
+    fn verb(&self) -> &'static str {
+        "valid-transitions"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Computes the currently valid and blocked transitions for a grounded entity using existing verb contracts, lifecycle metadata, and entity-context signals"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let entity_id = get_uuid_arg(_ctx, verb_call, "entity-id")
+            .ok_or_else(|| anyhow!("discovery.valid-transitions requires :entity-id"))?;
+        let include_blocked = get_bool_arg(verb_call, "include-blocked").unwrap_or(true);
+        let lanes = get_list_arg(verb_call, "lanes");
+        let context = build_entity_context_record(pool, entity_id, true).await?;
+        let entity_type = context["entity_type"].as_str().unwrap_or("entity").to_string();
+        let entity_name = context["name"].as_str().unwrap_or("unknown").to_string();
+        let verbs = ConfigLoader::from_env().load_verbs()?;
+
+        let mut grouped_valid: BTreeMap<String, Vec<Value>> = BTreeMap::new();
+        let mut blocked = Vec::new();
+
+        for (domain_name, domain) in &verbs.domains {
+            if domain_name == "discovery" {
+                continue;
+            }
+
+            for (verb_name, config) in &domain.verbs {
+                if !matches_subject_kind(config.metadata.as_ref(), &entity_type) {
+                    continue;
+                }
+                if !matches_lane_filter(config, domain_name, &lanes) {
+                    continue;
+                }
+
+                let unmet = evaluate_preconditions(config, &context);
+                let lane = lane_for_verb(domain_name, config);
+                let verb_id = format!("{}.{}", domain_name, verb_name);
+                if unmet.is_empty() {
+                    grouped_valid.entry(lane.clone()).or_default().push(json!({
+                        "verb_id": verb_id,
+                        "description": config.description,
+                        "polarity": infer_polarity(config.metadata.as_ref()),
+                        "invocation_phrases": config.invocation_phrases,
+                        "enables": Value::Array(vec![]),
+                        "parameters": config.args.iter().map(param_summary).collect::<Vec<_>>(),
+                        "phase_tags": config.metadata.as_ref().map(|m| m.phase_tags.clone()).unwrap_or_default(),
+                        "relevance": compute_relevance(domain_name, config, &context),
+                    }));
+                } else if include_blocked {
+                    blocked.push(json!({
+                        "verb_id": verb_id,
+                        "description": config.description,
+                        "unmet_preconditions": unmet,
+                        "unblocking_actions": derive_unblocking_actions(&evaluate_preconditions(config, &context)),
+                    }));
+                }
+            }
+        }
+
+        let mut lanes_json = grouped_valid
+            .into_iter()
+            .map(|(lane, mut valid)| {
+                valid.sort_by(|left, right| {
+                    right["relevance"]
+                        .as_f64()
+                        .partial_cmp(&left["relevance"].as_f64())
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                });
+                json!({
+                    "lane": lane.clone(),
+                    "current_phase": current_phase_for_lane(&context, &lane),
+                    "valid": valid,
+                })
+            })
+            .collect::<Vec<_>>();
+        lanes_json.sort_by(|left, right| left["lane"].as_str().cmp(&right["lane"].as_str()));
+        blocked.sort_by(|left, right| left["verb_id"].as_str().cmp(&right["verb_id"].as_str()));
+
+        let suggested_next = lanes_json
+            .iter()
+            .flat_map(|lane| lane["valid"].as_array().into_iter().flatten())
+            .max_by(|left, right| {
+                left["relevance"]
+                    .as_f64()
+                    .partial_cmp(&right["relevance"].as_f64())
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
+            .and_then(|best| best["verb_id"].as_str().map(str::to_string));
+
+        Ok(ExecutionResult::Record(json!({
+            "entity_id": entity_id,
+            "entity_type": entity_type,
+            "entity_name": entity_name,
+            "lanes": lanes_json,
+            "blocked": blocked,
+            "summary": {
+                "total_valid": lanes_json.iter().map(|lane| lane["valid"].as_array().map(|items| items.len()).unwrap_or(0)).sum::<usize>(),
+                "total_blocked": blocked.len(),
+                "suggested_next": suggested_next,
+            }
+        })))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(&self, _verb_call: &VerbCall, _ctx: &mut ExecutionContext) -> Result<ExecutionResult> {
+        Err(anyhow!("discovery.valid-transitions requires database"))
+    }
+}
+
+#[register_custom_op]
 pub struct DiscoveryInspectDataOp;
 
 #[async_trait]
@@ -1604,6 +2089,7 @@ mod tests {
         assert!(domain.verbs.contains_key("search-entities"));
         assert!(domain.verbs.contains_key("available-actions"));
         assert!(domain.verbs.contains_key("verb-detail"));
+        assert!(domain.verbs.contains_key("valid-transitions"));
     }
 
     #[test]
@@ -1615,6 +2101,7 @@ mod tests {
         assert!(registry.has("discovery", "cascade-research"));
         assert!(registry.has("discovery", "available-actions"));
         assert!(registry.has("discovery", "verb-detail"));
+        assert!(registry.has("discovery", "valid-transitions"));
         assert!(registry.has("discovery", "inspect-data"));
         assert!(registry.has("discovery", "search-data"));
     }

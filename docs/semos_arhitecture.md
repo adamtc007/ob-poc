@@ -27,6 +27,34 @@ Semantic OS enforces governance through **three complementary layers**:
 
 The system is deployed as a **standalone service** (6 Rust crates) with port-trait isolation, REST+JWT API, outbox-driven projections, and optional in-process mode for the ob-poc monolith.
 
+### Current Agent Integration State (2026-03-11)
+
+The downstream `ob-poc` utterance-understanding path has been collapsed to a strict three-step pipeline:
+
+1. `EntityScope`
+2. `EntityState`
+3. `SelectedVerb`
+
+This is implemented in [`rust/src/semtaxonomy_v2/mod.rs`](/Users/adamtc007/Developer/ob-poc/rust/src/semtaxonomy_v2/mod.rs). Semantic OS remains the constraint and metadata layer, while `ob-poc` composes business proposals from:
+
+- live grounded entity candidates and business state
+- SemOS/registry-derived valid transitions and verb contracts
+
+The key integration invariant is now:
+
+- Step 1 is a hard gate.
+- If entity scope is ambiguous, the pipeline stops and returns clarification.
+- Ambiguity is not allowed to cascade into state derivation or verb selection.
+
+Current live harness state for the new path:
+
+- exact top-verb accuracy: `7/176` (`3.98%`)
+- grounded responses: `51/176` (`28.98%`)
+- stateful responses: `51/176` (`28.98%`)
+- business proposals: `35/176`
+
+These numbers show that the simplified pipeline boundary is in place, but business composition quality remains below the legacy baseline and still requires further grounded-state coverage and transition selection improvements.
+
 ### Current Runtime State (2026-03-08)
 
 - Business runtime data is consolidated into `"ob-poc"`.

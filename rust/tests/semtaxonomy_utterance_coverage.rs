@@ -33,6 +33,25 @@ struct TestCase {
     difficulty: String,
     #[serde(default)]
     alt_verbs: Vec<String>,
+    #[serde(default)]
+    bootstrap: Vec<String>,
+}
+
+#[derive(Debug, Serialize, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum ContractClass {
+    FreshEntity,
+    FreshGeneric,
+    ScopedDeictic,
+}
+
+impl ContractClass {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::FreshEntity => "fresh_entity",
+            Self::FreshGeneric => "fresh_generic",
+            Self::ScopedDeictic => "scoped_deictic",
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -46,12 +65,18 @@ struct RowResult {
     requires_confirmation: bool,
     ready_to_execute: bool,
     has_sage_explain: bool,
+    step1_resolved: bool,
+    step1_ambiguous: bool,
+    step1_unresolved: bool,
+    step2_stateful: bool,
+    step3_proposed: bool,
     grounded: bool,
     business_verb: bool,
     stateful_response: bool,
     pass: bool,
     category: String,
     difficulty: String,
+    contract_class: String,
 }
 
 #[derive(Debug, Serialize, Default, Clone)]
@@ -69,6 +94,11 @@ struct Summary {
     accuracy: f64,
     grounded: usize,
     grounded_accuracy: f64,
+    step1_resolved: usize,
+    step1_ambiguous: usize,
+    step1_unresolved: usize,
+    step2_stateful: usize,
+    step3_proposed: usize,
     business_proposals: usize,
     stateful_responses: usize,
 }
@@ -78,6 +108,7 @@ struct CoverageReport {
     summary: Summary,
     by_category: BTreeMap<String, BucketStats>,
     by_difficulty: BTreeMap<String, BucketStats>,
+    by_contract: BTreeMap<String, BucketStats>,
     by_domain_prefix: BTreeMap<String, BucketStats>,
     mismatches: Vec<RowResult>,
     rows: Vec<RowResult>,
@@ -150,6 +181,73 @@ fn finalize_bucket(map: HashMap<String, (usize, usize)>) -> BTreeMap<String, Buc
         .collect()
 }
 
+fn contract_class_for_utterance(utterance: &str) -> ContractClass {
+    let lower = utterance.to_ascii_lowercase();
+    if [
+        " this ",
+        " that ",
+        " these ",
+        " those ",
+        " current ",
+        " it ",
+        " its ",
+        " their ",
+        " them ",
+        " this?",
+        " this cbu",
+        " this entity",
+        " this deal",
+        " this case",
+    ]
+    .iter()
+    .any(|needle| lower.contains(needle))
+    {
+        return ContractClass::ScopedDeictic;
+    }
+    if [
+        " for ",
+        " between ",
+        " named ",
+        " called ",
+        " on ",
+        " regarding ",
+        " about ",
+        " who owns ",
+        " who controls ",
+    ]
+    .iter()
+    .any(|needle| lower.contains(needle))
+    {
+        return ContractClass::FreshEntity;
+    }
+    if utterance.chars().any(|ch| ch.is_uppercase()) && utterance.split_whitespace().count() <= 6 {
+        return ContractClass::FreshEntity;
+    }
+    ContractClass::FreshGeneric
+}
+
+fn bootstrap_turns(case: &TestCase, contract_class: ContractClass) -> Vec<String> {
+    if !case.bootstrap.is_empty() {
+        return case.bootstrap.clone();
+    }
+
+    if contract_class != ContractClass::ScopedDeictic {
+        return Vec::new();
+    }
+
+    let domain = case.expected_verb.split('.').next().unwrap_or_default();
+    match domain {
+        "deal" => vec![
+            "Allianz Global Investors".to_string(),
+            "show me the deals for Allianz Global Investors".to_string(),
+        ],
+        "cbu" | "document" | "screening" | "ubo" | "entity" | "kyc" | "case" => {
+            vec!["Allianz Global Investors".to_string()]
+        }
+        _ => vec!["Allianz Global Investors".to_string()],
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -184,9 +282,11 @@ mod tests {
         let mut rows = Vec::with_capacity(tests.len());
         let mut by_category: HashMap<String, (usize, usize)> = HashMap::new();
         let mut by_difficulty: HashMap<String, (usize, usize)> = HashMap::new();
+        let mut by_contract: HashMap<String, (usize, usize)> = HashMap::new();
         let mut by_domain_prefix: HashMap<String, (usize, usize)> = HashMap::new();
 
         for (idx, case) in tests.iter().enumerate() {
+            let contract_class = contract_class_for_utterance(&case.utterance);
             let session_resp = client
                 .post(format!("{base_url}/api/session"))
                 .header("content-type", "application/json")
@@ -201,6 +301,21 @@ mod tests {
                 .get("session_id")
                 .and_then(serde_json::Value::as_str)
                 .ok_or_else(|| anyhow::anyhow!("Missing session_id in session response"))?;
+
+            for bootstrap in bootstrap_turns(case, contract_class) {
+                client
+                    .post(format!("{base_url}/api/session/{session_id}/input"))
+                    .header("content-type", "application/json")
+                    .header("x-obpoc-actor-id", &actor_id)
+                    .header("x-obpoc-roles", &roles)
+                    .json(&json!({
+                        "kind": "utterance",
+                        "message": bootstrap,
+                    }))
+                    .send()
+                    .await?
+                    .error_for_status()?;
+            }
 
             let input_resp = client
                 .post(format!("{base_url}/api/session/{session_id}/input"))
@@ -241,11 +356,28 @@ mod tests {
                 .and_then(serde_json::Value::as_bool)
                 .unwrap_or(false);
             let has_sage_explain = response.get("sage_explain").is_some();
+            let sage_mode = response
+                .get("sage_explain")
+                .and_then(|value| value.get("mode"))
+                .and_then(serde_json::Value::as_str);
+            let clarification_count = response
+                .get("sage_explain")
+                .and_then(|value| value.get("clarifications"))
+                .and_then(serde_json::Value::as_array)
+                .map(|items| items.len())
+                .unwrap_or(0);
             let grounded = response
                 .get("sage_explain")
                 .and_then(|value| value.get("scope_summary"))
                 .and_then(serde_json::Value::as_str)
                 .is_some();
+            let step1_ambiguous =
+                sage_mode == Some("scope_clarification") && clarification_count > 1;
+            let step1_unresolved =
+                sage_mode == Some("scope_clarification") && clarification_count == 0 && !grounded;
+            let step1_resolved = grounded && !step1_ambiguous && !step1_unresolved;
+            let step2_stateful = grounded && has_sage_explain && !step1_ambiguous && !step1_unresolved;
+            let step3_proposed = predicted_verb.is_some();
             let business_verb = predicted_verb
                 .as_ref()
                 .map(|verb| !verb.starts_with("discovery."))
@@ -258,6 +390,7 @@ mod tests {
 
             update_bucket(&mut by_category, &case.category, pass);
             update_bucket(&mut by_difficulty, &case.difficulty, pass);
+            update_bucket(&mut by_contract, contract_class.as_str(), pass);
             update_bucket(
                 &mut by_domain_prefix,
                 case.expected_verb.split('.').next().unwrap_or("unknown"),
@@ -274,12 +407,18 @@ mod tests {
                 requires_confirmation,
                 ready_to_execute,
                 has_sage_explain,
+                step1_resolved,
+                step1_ambiguous,
+                step1_unresolved,
+                step2_stateful,
+                step3_proposed,
                 grounded,
                 business_verb,
                 stateful_response,
                 pass,
                 category: case.category.clone(),
                 difficulty: case.difficulty.clone(),
+                contract_class: contract_class.as_str().to_string(),
             });
         }
 
@@ -296,6 +435,11 @@ mod tests {
         } else {
             grounded as f64 / total as f64
         };
+        let step1_resolved = rows.iter().filter(|row| row.step1_resolved).count();
+        let step1_ambiguous = rows.iter().filter(|row| row.step1_ambiguous).count();
+        let step1_unresolved = rows.iter().filter(|row| row.step1_unresolved).count();
+        let step2_stateful = rows.iter().filter(|row| row.step2_stateful).count();
+        let step3_proposed = rows.iter().filter(|row| row.step3_proposed).count();
         let business_proposals = rows.iter().filter(|row| row.business_verb).count();
         let stateful_responses = rows.iter().filter(|row| row.stateful_response).count();
         let mut mismatches: Vec<RowResult> = rows.iter().filter(|row| !row.pass).cloned().collect();
@@ -309,11 +453,17 @@ mod tests {
                 accuracy,
                 grounded,
                 grounded_accuracy,
+                step1_resolved,
+                step1_ambiguous,
+                step1_unresolved,
+                step2_stateful,
+                step3_proposed,
                 business_proposals,
                 stateful_responses,
             },
             by_category: finalize_bucket(by_category),
             by_difficulty: finalize_bucket(by_difficulty),
+            by_contract: finalize_bucket(by_contract),
             by_domain_prefix: finalize_bucket(by_domain_prefix),
             mismatches,
             rows,
@@ -330,6 +480,11 @@ mod tests {
         md.push_str(&format!("- Failed: {}\n", report.summary.failed));
         md.push_str(&format!("- Accuracy: {:.2}%\n\n", report.summary.accuracy * 100.0));
         md.push_str(&format!("- Grounded responses: {} ({:.2}%)\n", report.summary.grounded, report.summary.grounded_accuracy * 100.0));
+        md.push_str(&format!("- Step 1 resolved: {}\n", report.summary.step1_resolved));
+        md.push_str(&format!("- Step 1 ambiguous: {}\n", report.summary.step1_ambiguous));
+        md.push_str(&format!("- Step 1 unresolved: {}\n", report.summary.step1_unresolved));
+        md.push_str(&format!("- Step 2 stateful: {}\n", report.summary.step2_stateful));
+        md.push_str(&format!("- Step 3 proposed: {}\n", report.summary.step3_proposed));
         md.push_str(&format!("- Business proposals: {}\n", report.summary.business_proposals));
         md.push_str(&format!("- Stateful responses: {}\n\n", report.summary.stateful_responses));
         md.push_str("## Accuracy by category\n");
@@ -344,6 +499,16 @@ mod tests {
         md.push('\n');
         md.push_str("## Accuracy by difficulty\n");
         for (key, value) in &report.by_difficulty {
+            md.push_str(&format!(
+                "- {key}: {}/{} ({:.2}%)\n",
+                value.passed,
+                value.total,
+                value.accuracy * 100.0
+            ));
+        }
+        md.push('\n');
+        md.push_str("## Accuracy by contract\n");
+        for (key, value) in &report.by_contract {
             md.push_str(&format!(
                 "- {key}: {}/{} ({:.2}%)\n",
                 value.passed,
@@ -374,6 +539,11 @@ mod tests {
         println!("  Failed: {}", report.summary.failed);
         println!("  Accuracy: {:.2}%", report.summary.accuracy * 100.0);
         println!("  Grounded: {} ({:.2}%)", report.summary.grounded, report.summary.grounded_accuracy * 100.0);
+        println!("  Step 1 resolved: {}", report.summary.step1_resolved);
+        println!("  Step 1 ambiguous: {}", report.summary.step1_ambiguous);
+        println!("  Step 1 unresolved: {}", report.summary.step1_unresolved);
+        println!("  Step 2 stateful: {}", report.summary.step2_stateful);
+        println!("  Step 3 proposed: {}", report.summary.step3_proposed);
         println!("  Business proposals: {}", report.summary.business_proposals);
         println!("  Stateful responses: {}", report.summary.stateful_responses);
         println!();

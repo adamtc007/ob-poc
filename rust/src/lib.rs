@@ -167,6 +167,10 @@ pub mod sem_reg;
 #[cfg(feature = "database")]
 pub mod semtaxonomy;
 
+// SemTaxonomy v2 — three-step rip-and-replace pipeline
+#[cfg(feature = "database")]
+pub mod semtaxonomy_v2;
+
 // Sage — intent understanding layer (plane, polarity, domain — no verb FQNs)
 pub mod sage;
 

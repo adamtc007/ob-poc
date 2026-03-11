@@ -228,6 +228,43 @@ domains:
           type: record
           name: verb_contract
 
+      valid-transitions:
+        description: "Return verbs whose preconditions are currently satisfiable for the grounded entity state"
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: discovery
+          subject_kinds:
+            [entity, cbu, fund, person, company, client-group, deal, case]
+          phase_tags: [discovery]
+          side_effects: facts_only
+          harm_class: read_only
+          action_class: read
+        invocation_phrases:
+          - "what can I do next"
+          - "show valid transitions"
+          - "what is blocking this"
+        behavior: plugin
+        handler: DiscoveryValidTransitionsOp
+        args:
+          - name: entity-id
+            type: uuid
+            required: true
+            description: "Entity to compute transitions for"
+          - name: include-blocked
+            type: boolean
+            required: false
+            default: true
+            description: "Include blocked transitions and unmet preconditions"
+          - name: lanes
+            type: string_list
+            required: false
+            description: "Optional lane or phase filters"
+        returns:
+          type: record
+          name: valid_transition_set
+
       inspect-data:
         description: "Inspect entity-scoped data for a domain and optional aspect"
         metadata:
