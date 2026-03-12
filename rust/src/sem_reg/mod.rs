@@ -50,9 +50,12 @@ pub mod abac;
 pub mod document_type_def;
 pub mod enforce;
 pub mod evidence;
+pub mod evidence_strategy_def;
 pub mod ids;
 pub mod observation_def;
 pub mod policy_rule;
+pub mod proof_obligation_def;
+pub mod requirement_profile_def;
 
 // Phase 4: Security label inheritance
 pub mod security;
@@ -109,8 +112,11 @@ pub use abac::{evaluate_abac, AccessDecision, AccessPurpose, ActorContext};
 pub use derivation_spec::DerivationSpecBody;
 pub use document_type_def::DocumentTypeDefBody;
 pub use evidence::EvidenceRequirementBody;
+pub use evidence_strategy_def::{EvidenceStrategyComponent, EvidenceStrategyDefBody};
 pub use observation_def::ObservationDefBody;
 pub use policy_rule::PolicyRuleBody;
+pub use proof_obligation_def::{ProofObligationDefBody, ProofStrength};
+pub use requirement_profile_def::RequirementProfileDefBody;
 pub use security::{compute_inherited_label, validate_verb_security_compatibility};
 
 // Re-export Phase 5-6 types

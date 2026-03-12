@@ -310,6 +310,9 @@ impl SnapshotStore for PgSnapshotStore {
             ObjectType::PolicyRule,
             ObjectType::EvidenceRequirement,
             ObjectType::DocumentTypeDef,
+            ObjectType::RequirementProfileDef,
+            ObjectType::ProofObligationDef,
+            ObjectType::EvidenceStrategyDef,
             ObjectType::ObservationDef,
             ObjectType::DerivationSpec,
         ];
@@ -1304,6 +1307,63 @@ impl ProjectionWriter for PgProjectionWriter {
                     sqlx::query(
                         r#"
                         INSERT INTO sem_reg_pub.active_taxonomies
+                            (snapshot_set_id, snapshot_id, fqn, payload, published_at)
+                        VALUES ($1, $2, $3, $4, $5)
+                        ON CONFLICT (snapshot_set_id, fqn)
+                        DO UPDATE SET snapshot_id = $2, payload = $4, published_at = $5
+                        "#,
+                    )
+                    .bind(set_id)
+                    .bind(snapshot_id)
+                    .bind(fqn)
+                    .bind(definition)
+                    .bind(now)
+                    .execute(&mut *tx)
+                    .await
+                    .map_err(|e| anyhow!(e))?;
+                }
+                "requirement_profile_def" => {
+                    sqlx::query(
+                        r#"
+                        INSERT INTO sem_reg_pub.active_requirement_profiles
+                            (snapshot_set_id, snapshot_id, fqn, payload, published_at)
+                        VALUES ($1, $2, $3, $4, $5)
+                        ON CONFLICT (snapshot_set_id, fqn)
+                        DO UPDATE SET snapshot_id = $2, payload = $4, published_at = $5
+                        "#,
+                    )
+                    .bind(set_id)
+                    .bind(snapshot_id)
+                    .bind(fqn)
+                    .bind(definition)
+                    .bind(now)
+                    .execute(&mut *tx)
+                    .await
+                    .map_err(|e| anyhow!(e))?;
+                }
+                "proof_obligation_def" => {
+                    sqlx::query(
+                        r#"
+                        INSERT INTO sem_reg_pub.active_proof_obligations
+                            (snapshot_set_id, snapshot_id, fqn, payload, published_at)
+                        VALUES ($1, $2, $3, $4, $5)
+                        ON CONFLICT (snapshot_set_id, fqn)
+                        DO UPDATE SET snapshot_id = $2, payload = $4, published_at = $5
+                        "#,
+                    )
+                    .bind(set_id)
+                    .bind(snapshot_id)
+                    .bind(fqn)
+                    .bind(definition)
+                    .bind(now)
+                    .execute(&mut *tx)
+                    .await
+                    .map_err(|e| anyhow!(e))?;
+                }
+                "evidence_strategy_def" => {
+                    sqlx::query(
+                        r#"
+                        INSERT INTO sem_reg_pub.active_evidence_strategies
                             (snapshot_set_id, snapshot_id, fqn, payload, published_at)
                         VALUES ($1, $2, $3, $4, $5)
                         ON CONFLICT (snapshot_set_id, fqn)

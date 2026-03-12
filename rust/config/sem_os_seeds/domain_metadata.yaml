@@ -2139,8 +2139,28 @@ domains:
         governance_tier: operational
         classification: internal
         pii: false
+      sem_reg_pub.active_requirement_profiles:
+        description: "Flattened active requirement profile projections for runtime document-policy consumption"
+        governance_tier: operational
+        classification: internal
+        pii: false
+      sem_reg_pub.active_proof_obligations:
+        description: "Flattened active proof obligation projections for runtime document-policy consumption"
+        governance_tier: operational
+        classification: internal
+        pii: false
+      sem_reg_pub.active_evidence_strategies:
+        description: "Flattened active evidence strategy projections for runtime document-policy consumption"
+        governance_tier: operational
+        classification: internal
+        pii: false
       sem_reg_pub.projection_watermark:
         description: "Outbox dispatcher progress tracker — last processed sequence per projection"
+        governance_tier: operational
+        classification: internal
+        pii: false
+      policy_version_bindings:
+        description: "Immutable runtime bindings to the published SemOS snapshot set and policy object snapshots used during document computations"
         governance_tier: operational
         classification: internal
         pii: false

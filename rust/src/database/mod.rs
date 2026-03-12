@@ -16,11 +16,13 @@ pub mod cbu_entity_roles_service;
 pub mod cbu_service;
 pub mod context_discovery_service;
 pub mod crud_service;
+pub mod document_policy_service;
 pub mod document_service;
 pub mod dsl_repository;
 pub mod entity_service;
 pub mod execution_audit;
 pub mod expansion_audit;
+pub mod governed_document_requirements_service;
 pub mod semantic_state_service;
 // Fuzzy search is now handled by EntityGateway gRPC service.
 // See rust/crates/entity-gateway/ for the central lookup service.
@@ -29,6 +31,7 @@ pub mod deal_repository;
 pub mod generation_log_repository;
 pub mod graph_repository;
 pub mod locks;
+pub mod policy_version_binding_service;
 pub mod product_service;
 pub mod resource_instance_service;
 pub mod service_resource_service;
@@ -56,6 +59,10 @@ pub use bods_types::{
 pub use cbu_entity_roles_service::{CbuEntityRoleExpanded, CbuEntityRolesService, RoleRow};
 pub use cbu_service::{CbuRow, CbuService, NewCbuFields};
 pub use crud_service::{AssetType, CrudOperation, CrudService, OperationType};
+pub use document_policy_service::{
+    ActiveDocumentPolicyBundle, DocumentPolicyService, PublishedEvidenceStrategy,
+    PublishedProofObligation, PublishedRequirementProfile,
+};
 pub use document_service::{
     DocumentCatalogEntry, DocumentService, DocumentType, NewDocumentFields,
 };
@@ -99,11 +106,20 @@ pub use locks::{
     LockAcquisitionResult, LockError,
 };
 
+pub use policy_version_binding_service::{
+    NewPolicyVersionBinding, PolicyVersionBindingRow, PolicyVersionBindingService,
+};
+
 pub use execution_audit::{
     ExecutionAuditRepository, ExecutionByVerbHash, ExecutionVerbAudit, VerbConfigAtExecution,
 };
 
 pub use expansion_audit::{ExpansionAuditRepository, ExpansionReportRow};
+pub use governed_document_requirements_service::{
+    EntityPolicyContext, GovernedComponentStatus, GovernedDocumentGap,
+    GovernedDocumentRequirements, GovernedDocumentRequirementsService, GovernedObligationCategory,
+    GovernedObligationStatus, GovernedRequirementMatrix, GovernedStrategyStatus,
+};
 
 pub use context_discovery_service::{
     CbuContextRow, ContextDiscoveryService, DiscoveredContext, LinkedContextRow,

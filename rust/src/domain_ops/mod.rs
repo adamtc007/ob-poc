@@ -38,8 +38,8 @@ mod control_ops;
 mod coverage_compute_ops;
 mod custody;
 mod deal_ops;
-mod discovery_ops;
 mod dilution_ops;
+mod discovery_ops;
 mod docs_bundle_ops;
 mod document_ops;
 mod economic_exposure_ops;
@@ -65,8 +65,8 @@ mod ownership_ops;
 mod pack_ops;
 mod partnership_ops;
 mod refdata_loader;
-mod regulatory_ops;
 mod refdata_ops;
+mod regulatory_ops;
 mod request_ops;
 mod requirement_ops;
 mod research_normalize_ops;
@@ -141,12 +141,12 @@ pub use refdata_loader::{
     get_refdata_operations, LoadAllRefdataOp, LoadInstrumentClassesOp, LoadMarketsOp,
     LoadSlaTemplatesOp, LoadSubcustodiansOp,
 };
+pub use refdata_ops::{RefdataDeactivateOp, RefdataEnsureOp, RefdataListOp, RefdataReadOp};
 pub use request_ops::{
     DocumentRequestOp, DocumentUploadOp, DocumentWaiveOp, RequestCancelOp, RequestCreateOp,
     RequestEscalateOp, RequestExtendOp, RequestFulfillOp, RequestOverdueOp, RequestRemindOp,
     RequestWaiveOp,
 };
-pub use refdata_ops::{RefdataDeactivateOp, RefdataEnsureOp, RefdataListOp, RefdataReadOp};
 
 pub use semantic_ops::{
     SemanticListStagesOp, SemanticMissingEntitiesOp, SemanticNextActionsOp,
@@ -164,19 +164,18 @@ pub use temporal_ops::{
 pub use trading_matrix::{FindImForTradeOp, FindPricingForInstrumentOp, ListOpenSlaBreachesOp};
 pub use trading_profile::{
     TradingProfileActivateOp, TradingProfileAddAllowedCurrencyOp, TradingProfileAddBookingRuleOp,
-    TradingProfileAddComponentOp, TradingProfileAddCsaCollateralOp,
-    TradingProfileAddCsaConfigOp, TradingProfileAddImMandateOp,
-    TradingProfileAddInstrumentClassOp, TradingProfileAddIsdaConfigOp,
-    TradingProfileAddIsdaCoverageOp, TradingProfileAddMarketOp, TradingProfileAddSsiOp,
-    TradingProfileApproveOp, TradingProfileArchiveOp, TradingProfileCloneToOp,
-    TradingProfileCreateDraftOp, TradingProfileCreateNewVersionOp, TradingProfileDiffOp,
-    TradingProfileGetActiveOp, TradingProfileImportOp, TradingProfileLinkCsaSsiOp,
-    TradingProfileMaterializeOp, TradingProfileRejectOp, TradingProfileRemoveBookingRuleOp,
-    TradingProfileRemoveComponentOp, TradingProfileRemoveCsaConfigOp,
-    TradingProfileRemoveImMandateOp, TradingProfileRemoveInstrumentClassOp,
-    TradingProfileRemoveIsdaConfigOp, TradingProfileRemoveMarketOp,
-    TradingProfileRemoveSsiOp, TradingProfileSetBaseCurrencyOp, TradingProfileSubmitOp,
-    TradingProfileUpdateImScopeOp, TradingProfileValidateCoverageOp,
+    TradingProfileAddComponentOp, TradingProfileAddCsaCollateralOp, TradingProfileAddCsaConfigOp,
+    TradingProfileAddImMandateOp, TradingProfileAddInstrumentClassOp,
+    TradingProfileAddIsdaConfigOp, TradingProfileAddIsdaCoverageOp, TradingProfileAddMarketOp,
+    TradingProfileAddSsiOp, TradingProfileApproveOp, TradingProfileArchiveOp,
+    TradingProfileCloneToOp, TradingProfileCreateDraftOp, TradingProfileCreateNewVersionOp,
+    TradingProfileDiffOp, TradingProfileGetActiveOp, TradingProfileImportOp,
+    TradingProfileLinkCsaSsiOp, TradingProfileMaterializeOp, TradingProfileRejectOp,
+    TradingProfileRemoveBookingRuleOp, TradingProfileRemoveComponentOp,
+    TradingProfileRemoveCsaConfigOp, TradingProfileRemoveImMandateOp,
+    TradingProfileRemoveInstrumentClassOp, TradingProfileRemoveIsdaConfigOp,
+    TradingProfileRemoveMarketOp, TradingProfileRemoveSsiOp, TradingProfileSetBaseCurrencyOp,
+    TradingProfileSubmitOp, TradingProfileUpdateImScopeOp, TradingProfileValidateCoverageOp,
     TradingProfileValidateGoLiveReadyOp,
 };
 pub use trading_profile_ca_ops::{

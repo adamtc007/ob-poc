@@ -153,6 +153,9 @@ mod tests {
             ObjectType::PolicyRule,
             ObjectType::EvidenceRequirement,
             ObjectType::DocumentTypeDef,
+            ObjectType::RequirementProfileDef,
+            ObjectType::ProofObligationDef,
+            ObjectType::EvidenceStrategyDef,
             ObjectType::ObservationDef,
             ObjectType::DerivationSpec,
         ] {

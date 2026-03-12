@@ -14,11 +14,14 @@ use super::{
     document_type_def::DocumentTypeDefBody,
     entity_type_def::EntityTypeDefBody,
     evidence::EvidenceRequirementBody,
+    evidence_strategy_def::EvidenceStrategyDefBody,
     gates::{evaluate_publish_gates, ExtendedPublishGateResult, GateFailure, GateMode},
     membership::MembershipRuleBody,
     observation_def::ObservationDefBody,
     policy_rule::PolicyRuleBody,
+    proof_obligation_def::ProofObligationDefBody,
     relationship_type_def::RelationshipTypeDefBody,
+    requirement_profile_def::RequirementProfileDefBody,
     store::SnapshotStore,
     taxonomy_def::{TaxonomyDefBody, TaxonomyNodeBody},
     types::{ObjectType, PgSnapshotRow, SnapshotMeta, SnapshotRow},
@@ -200,6 +203,39 @@ impl RegistryService {
         DocumentTypeDefBody,
         ObjectType::DocumentTypeDef,
         "a document type definition"
+    );
+
+    // ── Requirement Profile Definitions ───────────────────────
+
+    typed_registry_methods!(
+        publish_requirement_profile_def,
+        resolve_requirement_profile_def,
+        resolve_requirement_profile_def_by_fqn,
+        RequirementProfileDefBody,
+        ObjectType::RequirementProfileDef,
+        "a requirement profile definition"
+    );
+
+    // ── Proof Obligation Definitions ─────────────────────────
+
+    typed_registry_methods!(
+        publish_proof_obligation_def,
+        resolve_proof_obligation_def,
+        resolve_proof_obligation_def_by_fqn,
+        ProofObligationDefBody,
+        ObjectType::ProofObligationDef,
+        "a proof obligation definition"
+    );
+
+    // ── Evidence Strategy Definitions ────────────────────────
+
+    typed_registry_methods!(
+        publish_evidence_strategy_def,
+        resolve_evidence_strategy_def,
+        resolve_evidence_strategy_def_by_fqn,
+        EvidenceStrategyDefBody,
+        ObjectType::EvidenceStrategyDef,
+        "an evidence strategy definition"
     );
 
     // ── Observation Definitions ───────────────────────────────

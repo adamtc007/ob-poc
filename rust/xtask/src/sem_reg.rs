@@ -1650,11 +1650,14 @@ fn parse_object_type(s: &str) -> Result<ObjectType> {
         "policy_rule" | "policy" => Ok(ObjectType::PolicyRule),
         "evidence_requirement" | "evidence" => Ok(ObjectType::EvidenceRequirement),
         "document_type_def" | "doc-type" => Ok(ObjectType::DocumentTypeDef),
+        "requirement_profile_def" | "requirement-profile" => Ok(ObjectType::RequirementProfileDef),
+        "proof_obligation_def" | "proof-obligation" => Ok(ObjectType::ProofObligationDef),
+        "evidence_strategy_def" | "evidence-strategy" => Ok(ObjectType::EvidenceStrategyDef),
         "observation_def" | "observation" => Ok(ObjectType::ObservationDef),
         "derivation_spec" | "derivation" => Ok(ObjectType::DerivationSpec),
         _ => anyhow::bail!(
             "Unknown object type: '{}'. Valid types: attr, entity-type, verb, taxonomy, \
-             membership, view, policy, evidence, doc-type, observation, derivation",
+             membership, view, policy, evidence, doc-type, requirement-profile, proof-obligation, evidence-strategy, observation, derivation",
             s
         ),
     }

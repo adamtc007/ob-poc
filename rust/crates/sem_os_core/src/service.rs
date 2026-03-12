@@ -397,6 +397,25 @@ impl CoreService for CoreServiceImpl {
                     .iter()
                     .map(|s| (ObjectType::DerivationSpec, s.fqn.as_str(), &s.payload)),
             )
+            .chain(bundle.requirement_profiles.iter().map(|s| {
+                (
+                    ObjectType::RequirementProfileDef,
+                    s.fqn.as_str(),
+                    &s.payload,
+                )
+            }))
+            .chain(
+                bundle
+                    .proof_obligations
+                    .iter()
+                    .map(|s| (ObjectType::ProofObligationDef, s.fqn.as_str(), &s.payload)),
+            )
+            .chain(
+                bundle
+                    .evidence_strategies
+                    .iter()
+                    .map(|s| (ObjectType::EvidenceStrategyDef, s.fqn.as_str(), &s.payload)),
+            )
             .collect();
 
         for (object_type, fqn, payload) in &all_seeds {

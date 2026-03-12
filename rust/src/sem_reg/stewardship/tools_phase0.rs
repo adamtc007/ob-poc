@@ -317,6 +317,9 @@ fn parse_object_type(s: &str) -> Option<ObjectType> {
         "policy_rule" => Some(ObjectType::PolicyRule),
         "evidence_requirement" => Some(ObjectType::EvidenceRequirement),
         "document_type_def" => Some(ObjectType::DocumentTypeDef),
+        "requirement_profile_def" => Some(ObjectType::RequirementProfileDef),
+        "proof_obligation_def" => Some(ObjectType::ProofObligationDef),
+        "evidence_strategy_def" => Some(ObjectType::EvidenceStrategyDef),
         "observation_def" => Some(ObjectType::ObservationDef),
         "derivation_spec" => Some(ObjectType::DerivationSpec),
         _ => None,
@@ -1410,6 +1413,9 @@ async fn handle_describe_object(
             ObjectType::TaxonomyDef,
             ObjectType::ViewDef,
             ObjectType::PolicyRule,
+            ObjectType::RequirementProfileDef,
+            ObjectType::ProofObligationDef,
+            ObjectType::EvidenceStrategyDef,
         ];
         let mut found = Ok(None);
         for ot in &types {

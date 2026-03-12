@@ -16,6 +16,9 @@ use serde_json::json;
 use uuid::Uuid;
 
 #[cfg(feature = "database")]
+use crate::database::GovernedDocumentRequirementsService;
+
+#[cfg(feature = "database")]
 use sqlx::PgPool;
 
 use super::helpers::get_required_uuid;
@@ -337,11 +340,12 @@ impl CustomOperation for TollgateOverrideOp {
             .and_then(|a| a.value.as_string());
 
         // Verify evaluation exists and is a failure
-        let eval: Option<(String,)> =
-            sqlx::query_as(r#"SELECT overall_result FROM "ob-poc".tollgate_evaluations WHERE id = $1"#)
-                .bind(evaluation_id)
-                .fetch_optional(pool)
-                .await?;
+        let eval: Option<(String,)> = sqlx::query_as(
+            r#"SELECT overall_result FROM "ob-poc".tollgate_evaluations WHERE id = $1"#,
+        )
+        .bind(evaluation_id)
+        .fetch_optional(pool)
+        .await?;
 
         let (result,) = eval.ok_or_else(|| anyhow!("Evaluation not found"))?;
 
@@ -568,29 +572,7 @@ async fn compute_metrics(pool: &PgPool, cbu_id: Uuid, case_id: Uuid) -> Result<T
     let ubo_coverage_pct = ubo_stats.0;
 
     // Document completeness
-    let doc_stats: (i64, i64) = sqlx::query_as(
-        r#"
-        SELECT
-            COUNT(*) as total,
-            COUNT(*) FILTER (WHERE status IN ('VERIFIED', 'WAIVED')) as complete
-        FROM "ob-poc".doc_requests dr
-        JOIN "ob-poc".entity_workstreams ew ON dr.workstream_id = ew.workstream_id
-        WHERE ew.case_id = $1
-        "#,
-    )
-    .bind(case_id)
-    .fetch_one(pool)
-    .await
-    .unwrap_or((0, 0));
-
-    let doc_completeness_pct = if doc_stats.0 > 0 {
-        Some(
-            rust_decimal::Decimal::from(doc_stats.1 * 100)
-                / rust_decimal::Decimal::from(doc_stats.0),
-        )
-    } else {
-        Some(rust_decimal::Decimal::from(100)) // No docs required = 100%
-    };
+    let doc_completeness_pct = compute_doc_completeness_pct(pool, cbu_id, case_id).await?;
 
     // Screening clear percentage
     let screening_stats: (i64, i64) = sqlx::query_as(
@@ -663,4 +645,72 @@ async fn compute_metrics(pool: &PgPool, cbu_id: Uuid, case_id: Uuid) -> Result<T
         allegation_unresolved_count: allegation_count.0,
         days_since_last_refresh: last_activity.map(|l| l.0),
     })
+}
+
+#[cfg(feature = "database")]
+async fn compute_doc_completeness_pct(
+    pool: &PgPool,
+    cbu_id: Uuid,
+    case_id: Uuid,
+) -> Result<Option<rust_decimal::Decimal>> {
+    let governed_service = GovernedDocumentRequirementsService::new(pool.clone());
+
+    let entity_ids: Vec<Uuid> = sqlx::query_scalar(
+        r#"
+        SELECT DISTINCT entity_id
+        FROM "ob-poc".cbu_entity_roles
+        WHERE cbu_id = $1
+        ORDER BY entity_id
+        "#,
+    )
+    .bind(cbu_id)
+    .fetch_all(pool)
+    .await
+    .unwrap_or_default();
+
+    let mut mandatory_total = 0usize;
+    let mut mandatory_satisfied = 0usize;
+    let mut matched_any_governed_profile = false;
+
+    for entity_id in entity_ids {
+        if let Some(matrix) = governed_service
+            .compute_matrix_for_entity(entity_id)
+            .await?
+        {
+            matched_any_governed_profile = true;
+            mandatory_total += matrix.mandatory_obligations;
+            mandatory_satisfied += matrix.mandatory_satisfied_obligations;
+        }
+    }
+
+    if matched_any_governed_profile {
+        let pct = if mandatory_total == 0 {
+            rust_decimal::Decimal::from(100)
+        } else {
+            rust_decimal::Decimal::from((mandatory_satisfied * 100) as i64)
+                / rust_decimal::Decimal::from(mandatory_total as i64)
+        };
+        return Ok(Some(pct));
+    }
+
+    let doc_stats: (i64, i64) = sqlx::query_as(
+        r#"
+        SELECT
+            COUNT(*) as total,
+            COUNT(*) FILTER (WHERE status IN ('VERIFIED', 'WAIVED')) as complete
+        FROM "ob-poc".doc_requests dr
+        JOIN "ob-poc".entity_workstreams ew ON dr.workstream_id = ew.workstream_id
+        WHERE ew.case_id = $1
+        "#,
+    )
+    .bind(case_id)
+    .fetch_one(pool)
+    .await
+    .unwrap_or((0, 0));
+
+    Ok(Some(if doc_stats.0 > 0 {
+        rust_decimal::Decimal::from(doc_stats.1 * 100) / rust_decimal::Decimal::from(doc_stats.0)
+    } else {
+        rust_decimal::Decimal::from(100)
+    }))
 }

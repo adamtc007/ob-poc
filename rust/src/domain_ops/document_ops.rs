@@ -24,6 +24,9 @@ use crate::dsl_v2::ast::VerbCall;
 use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
 
 #[cfg(feature = "database")]
+use crate::database::{GovernedDocumentRequirementsService, GovernedRequirementMatrix};
+
+#[cfg(feature = "database")]
 use sqlx::PgPool;
 
 #[cfg(feature = "database")]
@@ -950,6 +953,34 @@ impl CustomOperation for DocumentMissingForEntityOp {
             .find(|a| a.key == "workflow-instance-id")
             .and_then(|a| a.value.as_uuid());
 
+        let governed_service = GovernedDocumentRequirementsService::new(pool.clone());
+        if let Some(governed) = governed_service.compute_for_entity(entity_id).await? {
+            let results: Vec<serde_json::Value> = governed
+                .gaps
+                .into_iter()
+                .map(|gap| {
+                    serde_json::json!({
+                        "requirement_id": serde_json::Value::Null,
+                        "doc_type": gap.document_type_fqn,
+                        "status": gap.status,
+                        "required_state": gap.required_state,
+                        "attempt_count": 0,
+                        "last_rejection_code": gap.last_rejection_code,
+                        "requirement_profile_fqn": governed.requirement_profile_fqn,
+                        "obligation_fqn": gap.obligation_fqn,
+                        "obligation_category": gap.obligation_category,
+                        "strategy_fqn": gap.strategy_fqn,
+                        "strategy_priority": gap.strategy_priority,
+                        "matched_document_id": gap.matched_document_id,
+                        "matched_version_id": gap.matched_version_id,
+                        "snapshot_set_id": governed.snapshot_set_id
+                    })
+                })
+                .collect();
+
+            return Ok(ExecutionResult::RecordSet(results));
+        }
+
         let rows = sqlx::query(
             r#"
             SELECT
@@ -986,5 +1017,60 @@ impl CustomOperation for DocumentMissingForEntityOp {
             .collect();
 
         Ok(ExecutionResult::RecordSet(results))
+    }
+}
+
+/// Compute governed document requirements for an entity.
+///
+/// Rationale: Resolves the published SemOS requirement profile and computes
+/// obligation coverage against the current document runtime.
+#[register_custom_op]
+#[cfg(feature = "database")]
+pub struct DocumentComputeRequirementsOp;
+
+#[cfg(feature = "database")]
+#[async_trait]
+impl CustomOperation for DocumentComputeRequirementsOp {
+    fn domain(&self) -> &'static str {
+        "document"
+    }
+    fn verb(&self) -> &'static str {
+        "compute-requirements"
+    }
+    fn rationale(&self) -> &'static str {
+        "Computes governed document requirement matrix from published SemOS policy snapshots"
+    }
+
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let entity_id: Uuid = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "entity-id")
+            .and_then(|a| {
+                if let Some(name) = a.value.as_symbol() {
+                    ctx.resolve(name)
+                } else {
+                    a.value.as_uuid()
+                }
+            })
+            .ok_or_else(|| anyhow::anyhow!("Missing entity-id argument"))?;
+
+        let governed_service = GovernedDocumentRequirementsService::new(pool.clone());
+        let matrix: GovernedRequirementMatrix = governed_service
+            .compute_matrix_for_entity(entity_id)
+            .await?
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "No active governed requirement profile matched entity {}",
+                    entity_id
+                )
+            })?;
+
+        Ok(ExecutionResult::Record(serde_json::to_value(matrix)?))
     }
 }

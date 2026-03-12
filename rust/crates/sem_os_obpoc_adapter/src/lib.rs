@@ -126,6 +126,9 @@ pub fn build_seed_bundle_with_metadata(
         &policies,
         &views,
         &derivation_specs,
+        &[],
+        &[],
+        &[],
     )
     .expect("SeedBundle canonical JSON serialization should never fail");
 
@@ -138,6 +141,9 @@ pub fn build_seed_bundle_with_metadata(
         policies,
         views,
         derivation_specs,
+        requirement_profiles: vec![],
+        proof_obligations: vec![],
+        evidence_strategies: vec![],
     }
 }
 

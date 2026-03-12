@@ -20,6 +20,12 @@ pub struct SeedBundle {
     pub views: Vec<ViewSeed>,
     #[serde(default)]
     pub derivation_specs: Vec<DerivationSpecSeed>,
+    #[serde(default)]
+    pub requirement_profiles: Vec<RequirementProfileSeed>,
+    #[serde(default)]
+    pub proof_obligations: Vec<ProofObligationSeed>,
+    #[serde(default)]
+    pub evidence_strategies: Vec<EvidenceStrategySeed>,
 }
 
 impl SeedBundle {
@@ -37,6 +43,9 @@ impl SeedBundle {
         policies: &[PolicySeed],
         views: &[ViewSeed],
         derivation_specs: &[DerivationSpecSeed],
+        requirement_profiles: &[RequirementProfileSeed],
+        proof_obligations: &[ProofObligationSeed],
+        evidence_strategies: &[EvidenceStrategySeed],
     ) -> std::result::Result<String, serde_json::Error> {
         #[derive(Serialize)]
         struct Canonical<'a> {
@@ -47,6 +56,9 @@ impl SeedBundle {
             policies: Vec<&'a PolicySeed>,
             views: Vec<&'a ViewSeed>,
             derivation_specs: Vec<&'a DerivationSpecSeed>,
+            requirement_profiles: Vec<&'a RequirementProfileSeed>,
+            proof_obligations: Vec<&'a ProofObligationSeed>,
+            evidence_strategies: Vec<&'a EvidenceStrategySeed>,
         }
 
         let mut vc: Vec<&VerbContractSeed> = verb_contracts.iter().collect();
@@ -61,8 +73,8 @@ impl SeedBundle {
         let mut tx: Vec<&TaxonomySeed> = taxonomies.iter().collect();
         tx.sort_by_key(|s| &s.fqn);
 
-        let mut po: Vec<&PolicySeed> = policies.iter().collect();
-        po.sort_by_key(|s| &s.fqn);
+        let mut ps: Vec<&PolicySeed> = policies.iter().collect();
+        ps.sort_by_key(|s| &s.fqn);
 
         let mut vi: Vec<&ViewSeed> = views.iter().collect();
         vi.sort_by_key(|s| &s.fqn);
@@ -70,14 +82,26 @@ impl SeedBundle {
         let mut ds: Vec<&DerivationSpecSeed> = derivation_specs.iter().collect();
         ds.sort_by_key(|s| &s.fqn);
 
+        let mut rp: Vec<&RequirementProfileSeed> = requirement_profiles.iter().collect();
+        rp.sort_by_key(|s| &s.fqn);
+
+        let mut pob: Vec<&ProofObligationSeed> = proof_obligations.iter().collect();
+        pob.sort_by_key(|s| &s.fqn);
+
+        let mut es: Vec<&EvidenceStrategySeed> = evidence_strategies.iter().collect();
+        es.sort_by_key(|s| &s.fqn);
+
         let canonical = Canonical {
             verb_contracts: vc,
             attributes: at,
             entity_types: et,
             taxonomies: tx,
-            policies: po,
+            policies: ps,
             views: vi,
             derivation_specs: ds,
+            requirement_profiles: rp,
+            proof_obligations: pob,
+            evidence_strategies: es,
         };
         let json = serde_json::to_string(&canonical)?;
         let hash = Sha256::digest(json.as_bytes());
@@ -129,6 +153,24 @@ pub struct DerivationSpecSeed {
     pub payload: serde_json::Value,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RequirementProfileSeed {
+    pub fqn: String,
+    pub payload: serde_json::Value,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProofObligationSeed {
+    pub fqn: String,
+    pub payload: serde_json::Value,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EvidenceStrategySeed {
+    pub fqn: String,
+    pub payload: serde_json::Value,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -149,7 +191,7 @@ mod tests {
     }
 
     fn empty_hash(verbs: &[VerbContractSeed], attrs: &[AttributeSeed]) -> String {
-        SeedBundle::compute_hash(verbs, attrs, &[], &[], &[], &[], &[]).unwrap()
+        SeedBundle::compute_hash(verbs, attrs, &[], &[], &[], &[], &[], &[], &[], &[]).unwrap()
     }
 
     #[test]
@@ -214,6 +256,18 @@ mod tests {
                 fqn: "d.spec".into(),
                 payload: json!({}),
             }],
+            requirement_profiles: vec![RequirementProfileSeed {
+                fqn: "doc.requirement_profile.test".into(),
+                payload: json!({}),
+            }],
+            proof_obligations: vec![ProofObligationSeed {
+                fqn: "doc.proof_obligation.test".into(),
+                payload: json!({}),
+            }],
+            evidence_strategies: vec![EvidenceStrategySeed {
+                fqn: "doc.evidence_strategy.test".into(),
+                payload: json!({}),
+            }],
         };
         let json_str = serde_json::to_string(&bundle).unwrap();
         let restored: SeedBundle = serde_json::from_str(&json_str).unwrap();
@@ -225,6 +279,9 @@ mod tests {
         assert_eq!(restored.policies.len(), 1);
         assert_eq!(restored.views.len(), 1);
         assert_eq!(restored.derivation_specs.len(), 1);
+        assert_eq!(restored.requirement_profiles.len(), 1);
+        assert_eq!(restored.proof_obligations.len(), 1);
+        assert_eq!(restored.evidence_strategies.len(), 1);
     }
 
     #[test]
@@ -265,6 +322,21 @@ mod tests {
                 payload: json!(7),
             })
             .unwrap(),
+            serde_json::to_value(RequirementProfileSeed {
+                fqn: "rp.s".into(),
+                payload: json!(8),
+            })
+            .unwrap(),
+            serde_json::to_value(ProofObligationSeed {
+                fqn: "po.s".into(),
+                payload: json!(9),
+            })
+            .unwrap(),
+            serde_json::to_value(EvidenceStrategySeed {
+                fqn: "es.s".into(),
+                payload: json!(10),
+            })
+            .unwrap(),
         ];
         // Deserialize each back to its concrete type
         let _: VerbContractSeed = serde_json::from_value(seeds[0].clone()).unwrap();
@@ -274,5 +346,8 @@ mod tests {
         let _: PolicySeed = serde_json::from_value(seeds[4].clone()).unwrap();
         let _: ViewSeed = serde_json::from_value(seeds[5].clone()).unwrap();
         let _: DerivationSpecSeed = serde_json::from_value(seeds[6].clone()).unwrap();
+        let _: RequirementProfileSeed = serde_json::from_value(seeds[7].clone()).unwrap();
+        let _: ProofObligationSeed = serde_json::from_value(seeds[8].clone()).unwrap();
+        let _: EvidenceStrategySeed = serde_json::from_value(seeds[9].clone()).unwrap();
     }
 }

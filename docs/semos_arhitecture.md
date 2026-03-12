@@ -1,8 +1,8 @@
 # Semantic OS — Vision & Scope v3.0
 
 > **Version:** 3.0
-> **Date:** 2026-02-27
-> **Status:** Living document — consolidation of 9 prior specs, updated for the 2026-03-08 runtime schema consolidation
+> **Date:** 2026-03-12
+> **Status:** Living document — consolidation of 9 prior specs, updated for the 2026-03-08 runtime schema consolidation and the 2026-03-12 document-governance bootstrap
 > **Audience:** Engineering, governance, architecture review
 
 ---
@@ -13,7 +13,7 @@ Semantic OS is an **immutable, governance-aware knowledge registry** that serves
 
 It answers three questions at any point in time:
 
-1. **What exists?** — 13 object types stored as immutable snapshots
+1. **What exists?** — 16 object types stored as immutable snapshots
 2. **Who can access it?** — ABAC with security labels, classification, PII tracking
 3. **What should the agent do next?** — Context resolution pipeline returning ranked, tier-aware, snapshot-pinned candidates
 
@@ -72,6 +72,23 @@ The unsafe reconciliation work is intentionally parked pending the authoritative
 - Semantic OS runtime data is consolidated into `sem_reg`, `sem_reg_authoring`, and `sem_reg_pub`.
 - The legacy runtime schemas `stewardship`, `agent`, `teams`, `feedback`, `events`, `sessions`, `ob_ref`, and `ob_kyc` have been retired.
 - `rust/config/sem_os_seeds/domain_metadata.yaml` now covers `306/306` live `"ob-poc"` tables and includes remediated SemOS footprint metadata for `sem-reg` and stewardship-backed verbs.
+
+### Document Governance Bootstrap (2026-03-12)
+
+Semantic OS now governs the first document-policy control-plane objects needed for document polymorphism:
+
+- `RequirementProfileDef`
+- `ProofObligationDef`
+- `EvidenceStrategyDef`
+
+These objects now follow the same immutable snapshot and publication path as the rest of SemOS:
+
+- authoring and publish still land in `sem_reg.snapshots`
+- active published copies project into `sem_reg_pub.active_requirement_profiles`
+- active published copies project into `sem_reg_pub.active_proof_obligations`
+- active published copies project into `sem_reg_pub.active_evidence_strategies`
+
+The `ob-poc` runtime no longer has to read mutable authoring state directly to answer document-requirement questions. It now consumes the published SemOS snapshot set for KYC/entity document flows, computes governed requirement matrices through `document.compute-requirements`, and can persist immutable audit bindings through `"ob-poc".policy_version_bindings`.
 
 ### Data Management Contract (2026-03-06)
 

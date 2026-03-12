@@ -988,3 +988,34 @@ domains:
             required_state: string
             attempt_count: integer
             last_rejection_code: string
+
+      compute-requirements:
+        description: Compute governed document requirement matrix for an entity
+        behavior: plugin
+        invocation_phrases:
+          - compute document requirements
+          - show governed document requirements
+          - show document requirement matrix
+          - what evidence is required for this entity
+          - compute missing document matrix
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: requirement_matrix
+          tags: [read, query, workflow]
+          phase_tags: [kyc]
+          side_effects: facts_only
+        args:
+          - name: entity-id
+            type: uuid
+            required: true
+            description: Entity to compute governed requirements for
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+        returns:
+          type: record

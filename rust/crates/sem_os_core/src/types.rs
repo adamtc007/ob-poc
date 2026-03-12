@@ -79,6 +79,9 @@ pub enum ObjectType {
     PolicyRule,
     EvidenceRequirement,
     DocumentTypeDef,
+    RequirementProfileDef,
+    ProofObligationDef,
+    EvidenceStrategyDef,
     ObservationDef,
     DerivationSpec,
 }

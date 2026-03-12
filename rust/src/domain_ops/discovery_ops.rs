@@ -26,6 +26,9 @@ use {
     sqlx::{PgPool, Row},
 };
 
+#[cfg(feature = "database")]
+use crate::database::{GovernedDocumentRequirementsService, GovernedRequirementMatrix};
+
 fn get_int_arg_or_default(verb_call: &VerbCall, name: &str, default: i64) -> i64 {
     verb_call
         .arguments
@@ -51,13 +54,17 @@ fn get_list_arg(verb_call: &VerbCall, name: &str) -> Vec<String> {
 }
 
 fn get_uuid_arg(ctx: &ExecutionContext, verb_call: &VerbCall, name: &str) -> Option<Uuid> {
-    verb_call.arguments.iter().find(|a| a.key == name).and_then(|arg| {
-        if let Some(symbol) = arg.value.as_symbol() {
-            ctx.resolve(symbol)
-        } else {
-            arg.value.as_uuid()
-        }
-    })
+    verb_call
+        .arguments
+        .iter()
+        .find(|a| a.key == name)
+        .and_then(|arg| {
+            if let Some(symbol) = arg.value.as_symbol() {
+                ctx.resolve(symbol)
+            } else {
+                arg.value.as_uuid()
+            }
+        })
 }
 
 fn normalize_entity_type(entity_type: &str) -> String {
@@ -121,7 +128,11 @@ fn matches_aspect(metadata: Option<&VerbMetadata>, aspect: Option<&str>) -> bool
 }
 
 fn governance_status(config: &VerbConfig) -> &'static str {
-    match config.metadata.as_ref().and_then(|m| m.replaced_by.as_ref()) {
+    match config
+        .metadata
+        .as_ref()
+        .and_then(|m| m.replaced_by.as_ref())
+    {
         Some(_) => "pending",
         None => "active",
     }
@@ -192,7 +203,11 @@ fn matches_lane_filter(config: &VerbConfig, domain_name: &str, lanes: &[String])
             || config
                 .metadata
                 .as_ref()
-                .map(|m| m.phase_tags.iter().any(|tag| tag.eq_ignore_ascii_case(candidate)))
+                .map(|m| {
+                    m.phase_tags
+                        .iter()
+                        .any(|tag| tag.eq_ignore_ascii_case(candidate))
+                })
                 .unwrap_or(false)
     })
 }
@@ -205,8 +220,12 @@ fn evaluate_preconditions(config: &VerbConfig, entity_state: &Value) -> Vec<Stri
     let mut unmet = Vec::new();
     for check in &lifecycle.precondition_checks {
         let ok = match check.as_str() {
-            "check_cbu_evidence_completeness" => !signal_flag(entity_state, "has_pending_documentation"),
-            "check_required_parties_present" => !entity_state["signals"]["stale"].as_bool().unwrap_or(false),
+            "check_cbu_evidence_completeness" => {
+                !signal_flag(entity_state, "has_pending_documentation")
+            }
+            "check_required_parties_present" => {
+                !entity_state["signals"]["stale"].as_bool().unwrap_or(false)
+            }
             "check_ubo_completeness" => !signal_flag(entity_state, "has_incomplete_ubo"),
             "check_kyc_case_approved" => !signal_flag(entity_state, "has_active_kyc"),
             "check_service_delivery_ready" => !signal_flag(entity_state, "has_active_onboarding"),
@@ -228,12 +247,18 @@ fn derive_unblocking_actions(unmet: &[String]) -> Vec<String> {
     let mut actions = Vec::new();
     for precondition in unmet {
         match precondition.as_str() {
-            "check_cbu_evidence_completeness" => actions.push("document.missing-for-entity".to_string()),
+            "check_cbu_evidence_completeness" => {
+                actions.push("document.missing-for-entity".to_string())
+            }
             "check_required_parties_present" => actions.push("cbu.parties".to_string()),
             "check_ubo_completeness" => actions.push("ubo.list-ubos".to_string()),
             "check_kyc_case_approved" => actions.push("case.list".to_string()),
-            "check_service_delivery_ready" => actions.push("service-resource.check-lifecycle-readiness".to_string()),
-            "check_resources_provisioned" => actions.push("service-resource.list-lifecycle-instances".to_string()),
+            "check_service_delivery_ready" => {
+                actions.push("service-resource.check-lifecycle-readiness".to_string())
+            }
+            "check_resources_provisioned" => {
+                actions.push("service-resource.list-lifecycle-instances".to_string())
+            }
             _ => {}
         }
     }
@@ -246,10 +271,9 @@ fn compute_relevance(domain_name: &str, config: &VerbConfig, entity_state: &Valu
     let lane = lane_for_verb(domain_name, config);
     let active_lanes = active_lanes(entity_state);
     let mut relevance = 0.2f32;
-    if active_lanes
-        .iter()
-        .any(|active| active.eq_ignore_ascii_case(domain_name) || active.eq_ignore_ascii_case(&lane))
-    {
+    if active_lanes.iter().any(|active| {
+        active.eq_ignore_ascii_case(domain_name) || active.eq_ignore_ascii_case(&lane)
+    }) {
         relevance += 0.5;
     }
     if infer_polarity(config.metadata.as_ref()) == "write" {
@@ -286,8 +310,112 @@ fn tool_error(result: SemRegToolResult) -> Result<Value> {
     } else {
         Err(anyhow!(
             "{}",
-            result.error.unwrap_or_else(|| "Unknown SemReg tool error".to_string())
+            result
+                .error
+                .unwrap_or_else(|| "Unknown SemReg tool error".to_string())
         ))
+    }
+}
+
+#[cfg(feature = "database")]
+#[derive(Debug, Clone, Default)]
+struct GovernedDocumentSignalSummary {
+    matched_profile_count: usize,
+    pending_component_count: usize,
+    rejected_component_count: usize,
+    expired_component_count: usize,
+    mandatory_obligations: usize,
+    mandatory_satisfied_obligations: usize,
+    total_obligations: usize,
+    satisfied_obligations: usize,
+    partially_satisfied_obligations: usize,
+    unsatisfied_obligations: usize,
+}
+
+#[cfg(feature = "database")]
+impl GovernedDocumentSignalSummary {
+    fn mandatory_coverage(&self) -> f64 {
+        if self.mandatory_obligations == 0 {
+            1.0
+        } else {
+            self.mandatory_satisfied_obligations as f64 / self.mandatory_obligations as f64
+        }
+    }
+
+    fn overall_coverage(&self) -> f64 {
+        if self.total_obligations == 0 {
+            1.0
+        } else {
+            self.satisfied_obligations as f64 / self.total_obligations as f64
+        }
+    }
+
+    fn has_matches(&self) -> bool {
+        self.matched_profile_count > 0
+    }
+}
+
+#[cfg(feature = "database")]
+fn pending_components_for_matrix(matrix: &GovernedRequirementMatrix) -> (usize, usize, usize) {
+    let mut pending = 0usize;
+    let mut rejected = 0usize;
+    let mut expired = 0usize;
+
+    for category in &matrix.categories {
+        for obligation in &category.obligations {
+            let Some(strategy) = obligation.active_strategy.as_ref() else {
+                continue;
+            };
+            for component in &strategy.components {
+                if component.status != "satisfied" {
+                    pending += 1;
+                    match component.status.as_str() {
+                        "rejected" => rejected += 1,
+                        "expired" => expired += 1,
+                        _ => {}
+                    }
+                }
+            }
+        }
+    }
+
+    (pending, rejected, expired)
+}
+
+#[cfg(feature = "database")]
+async fn governed_document_signal_summary_for_entities(
+    pool: &PgPool,
+    entity_ids: &[Uuid],
+) -> Result<Option<GovernedDocumentSignalSummary>> {
+    if entity_ids.is_empty() {
+        return Ok(None);
+    }
+
+    let service = GovernedDocumentRequirementsService::new(pool.clone());
+    let mut summary = GovernedDocumentSignalSummary::default();
+
+    for entity_id in entity_ids {
+        let Some(matrix) = service.compute_matrix_for_entity(*entity_id).await? else {
+            continue;
+        };
+
+        let (pending, rejected, expired) = pending_components_for_matrix(&matrix);
+        summary.matched_profile_count += 1;
+        summary.pending_component_count += pending;
+        summary.rejected_component_count += rejected;
+        summary.expired_component_count += expired;
+        summary.mandatory_obligations += matrix.mandatory_obligations;
+        summary.mandatory_satisfied_obligations += matrix.mandatory_satisfied_obligations;
+        summary.total_obligations += matrix.total_obligations;
+        summary.satisfied_obligations += matrix.satisfied_obligations;
+        summary.partially_satisfied_obligations += matrix.partially_satisfied;
+        summary.unsatisfied_obligations += matrix.unsatisfied_obligations;
+    }
+
+    if summary.has_matches() {
+        Ok(Some(summary))
+    } else {
+        Ok(None)
     }
 }
 
@@ -398,41 +526,42 @@ async fn search_entities_via_db(
             _ => !linked_cbu_ids.is_empty(),
         };
 
-        let lifecycle_populated = has_active_workflow || linked_entity_count > 0 || !linked_cbu_ids.is_empty();
-        (lifecycle_populated, linked_entity_count, has_active_workflow)
+        let lifecycle_populated =
+            has_active_workflow || linked_entity_count > 0 || !linked_cbu_ids.is_empty();
+        (
+            lifecycle_populated,
+            linked_entity_count,
+            has_active_workflow,
+        )
     }
 
     async fn linked_cbu_ids_for(pool: &PgPool, entity_id: Uuid, entity_type: &str) -> Vec<Uuid> {
         match entity_type {
-            "client-group" => {
-                sqlx::query_scalar(
-                    r#"
+            "client-group" => sqlx::query_scalar(
+                r#"
                     SELECT DISTINCT cbu_id
                     FROM "ob-poc".client_group_entity
                     WHERE group_id = $1
                       AND cbu_id IS NOT NULL
                     "#,
-                )
-                .bind(entity_id)
-                .fetch_all(pool)
-                .await
-                .unwrap_or_default()
-            }
+            )
+            .bind(entity_id)
+            .fetch_all(pool)
+            .await
+            .unwrap_or_default(),
             "cbu" => vec![entity_id],
-            _ => {
-                sqlx::query_scalar(
-                    r#"
+            _ => sqlx::query_scalar(
+                r#"
                     SELECT DISTINCT cbu_id
                     FROM "ob-poc".client_group_entity
                     WHERE entity_id = $1
                       AND cbu_id IS NOT NULL
                     "#,
-                )
-                .bind(entity_id)
-                .fetch_all(pool)
-                .await
-                .unwrap_or_default()
-            }
+            )
+            .bind(entity_id)
+            .fetch_all(pool)
+            .await
+            .unwrap_or_default(),
         }
     }
 
@@ -442,7 +571,8 @@ async fn search_entities_via_db(
         .collect::<Vec<_>>();
     let wants_client_groups =
         normalized_types.is_empty() || normalized_types.iter().any(|kind| kind == "client-group");
-    let wants_cbus = normalized_types.is_empty() || normalized_types.iter().any(|kind| kind == "cbu");
+    let wants_cbus =
+        normalized_types.is_empty() || normalized_types.iter().any(|kind| kind == "cbu");
     let wants_deals =
         normalized_types.is_empty() || normalized_types.iter().any(|kind| kind == "deal");
     let wants_documents =
@@ -641,7 +771,12 @@ async fn search_entities_internal(
             Ok(response) => response,
             Err(_) => return search_entities_via_db(pool, query, entity_types, limit).await,
         };
-        for hit in response.into_inner().matches.into_iter().take(limit as usize) {
+        for hit in response
+            .into_inner()
+            .matches
+            .into_iter()
+            .take(limit as usize)
+        {
             hits.push(json!({
                 "entity_id": hit.token,
                 "entity_type": entity_type,
@@ -690,7 +825,10 @@ async fn load_entity_record(pool: &PgPool, entity_id: Uuid) -> Result<(String, S
     .fetch_optional(pool)
     .await?
     {
-        return Ok((row.get::<String, _>("canonical_name"), "client-group".to_string()));
+        return Ok((
+            row.get::<String, _>("canonical_name"),
+            "client-group".to_string(),
+        ));
     }
 
     if let Some(row) = sqlx::query(
@@ -749,7 +887,10 @@ async fn load_entity_record(pool: &PgPool, entity_id: Uuid) -> Result<(String, S
     .fetch_one(pool)
     .await?;
 
-    Ok((row.get::<String, _>("name"), row.get::<String, _>("entity_type")))
+    Ok((
+        row.get::<String, _>("name"),
+        row.get::<String, _>("entity_type"),
+    ))
 }
 
 #[cfg(feature = "database")]
@@ -809,7 +950,8 @@ async fn screening_counts_for_client_group(pool: &PgPool, group_id: Uuid) -> (i6
             row.get::<Option<i64>, _>("active_total").unwrap_or(0),
             row.get::<Option<i64>, _>("sanctions_count").unwrap_or(0),
             row.get::<Option<i64>, _>("pep_count").unwrap_or(0),
-            row.get::<Option<i64>, _>("adverse_media_count").unwrap_or(0),
+            row.get::<Option<i64>, _>("adverse_media_count")
+                .unwrap_or(0),
         ),
         Err(_) => (0, 0, 0, 0),
     }
@@ -850,7 +992,8 @@ async fn screening_counts_for_cbu(pool: &PgPool, cbu_id: Uuid) -> (i64, i64, i64
             row.get::<Option<i64>, _>("active_total").unwrap_or(0),
             row.get::<Option<i64>, _>("sanctions_count").unwrap_or(0),
             row.get::<Option<i64>, _>("pep_count").unwrap_or(0),
-            row.get::<Option<i64>, _>("adverse_media_count").unwrap_or(0),
+            row.get::<Option<i64>, _>("adverse_media_count")
+                .unwrap_or(0),
         ),
         Err(_) => (0, 0, 0, 0),
     }
@@ -1083,8 +1226,10 @@ async fn fund_signals_for_entity(pool: &PgPool, entity_id: Uuid) -> (bool, bool,
 
     match row {
         Ok(row) => (
-            row.get::<Option<bool>, _>("is_fund_entity").unwrap_or(false),
-            row.get::<Option<bool>, _>("is_nested_fund").unwrap_or(false),
+            row.get::<Option<bool>, _>("is_fund_entity")
+                .unwrap_or(false),
+            row.get::<Option<bool>, _>("is_nested_fund")
+                .unwrap_or(false),
             row.get::<Option<bool>, _>("has_master_feeder_link")
                 .unwrap_or(false),
         ),
@@ -1153,7 +1298,8 @@ async fn screening_counts_for_deal(pool: &PgPool, deal_id: Uuid) -> (i64, i64, i
             row.get::<Option<i64>, _>("active_total").unwrap_or(0),
             row.get::<Option<i64>, _>("sanctions_count").unwrap_or(0),
             row.get::<Option<i64>, _>("pep_count").unwrap_or(0),
-            row.get::<Option<i64>, _>("adverse_media_count").unwrap_or(0),
+            row.get::<Option<i64>, _>("adverse_media_count")
+                .unwrap_or(0),
         ),
         Err(_) => (0, 0, 0, 0),
     }
@@ -1222,12 +1368,18 @@ async fn build_entity_context_record(
         };
         let (active_kyc_count, blocked_kyc_count, review_kyc_count) =
             case_status_counts_for_client_group(pool, entity_id).await;
-        let (
-            pending_docs_count,
-            verified_docs_count,
-            rejected_docs_count,
-            catalogued_docs_count,
-        ) = document_status_counts_for_client_group(pool, entity_id).await;
+        let (pending_docs_count, verified_docs_count, rejected_docs_count, catalogued_docs_count) =
+            document_status_counts_for_client_group(pool, entity_id).await;
+        let governed_doc_summary =
+            governed_document_signal_summary_for_entities(pool, &linked_entity_ids).await?;
+        let effective_pending_docs_count = governed_doc_summary
+            .as_ref()
+            .map(|summary| summary.pending_component_count as i64)
+            .unwrap_or(pending_docs_count);
+        let effective_rejected_docs_count = governed_doc_summary
+            .as_ref()
+            .map(|summary| summary.rejected_component_count as i64)
+            .unwrap_or(rejected_docs_count);
         let (
             screening_review_count,
             sanctions_screening_count,
@@ -1324,18 +1476,18 @@ async fn build_entity_context_record(
                 Vec::new(),
             ));
         }
-        if include_completed || pending_docs_count > 0 {
+        if include_completed || effective_pending_docs_count > 0 {
             activities.push(activity_record(
                 "document",
                 "documentation",
                 "collection",
-                if pending_docs_count > 0 {
+                if effective_pending_docs_count > 0 {
                     "blocked"
                 } else {
                     "not_started"
                 },
                 None,
-                if pending_docs_count > 0 {
+                if effective_pending_docs_count > 0 {
                     vec!["pending documentation".to_string()]
                 } else {
                     Vec::new()
@@ -1343,43 +1495,55 @@ async fn build_entity_context_record(
             ));
         }
 
+        let signals = json!({
+            "anchor": "client-group",
+            "onboarding_present": onboarding_active_count > 0,
+            "linked_cbu_count": linked_cbu_ids.len(),
+            "linked_entity_count": linked_entity_ids.len(),
+            "has_active_onboarding": onboarding_active_count > 0,
+            "has_active_deal": active_deal_count > 0,
+            "has_active_kyc": active_kyc_count > 0,
+            "active_kyc_case_count": active_kyc_count,
+            "blocked_kyc_case_count": blocked_kyc_count,
+            "review_kyc_case_count": review_kyc_count,
+            "has_incomplete_ubo": has_incomplete_ubo,
+            "ubo_registry_pending_count": active_registry_ubo_count,
+            "ubo_record_count": entity_ubo_count,
+            "has_governed_document_profile": governed_doc_summary.is_some(),
+            "governed_document_profile_count": governed_doc_summary.as_ref().map(|summary| summary.matched_profile_count).unwrap_or(0),
+            "has_pending_documentation": effective_pending_docs_count > 0,
+            "pending_document_count": effective_pending_docs_count,
+            "legacy_pending_document_count": pending_docs_count,
+            "verified_document_count": verified_docs_count,
+            "rejected_document_count": effective_rejected_docs_count,
+            "legacy_rejected_document_count": rejected_docs_count,
+            "catalogued_document_count": catalogued_docs_count,
+            "doc_mandatory_coverage_pct": governed_doc_summary.as_ref().map(|summary| (summary.mandatory_coverage() * 100.0).round() as i64),
+            "doc_overall_coverage_pct": governed_doc_summary.as_ref().map(|summary| (summary.overall_coverage() * 100.0).round() as i64),
+            "doc_requirements_satisfied": governed_doc_summary.as_ref().map(|summary| summary.pending_component_count == 0 && summary.partially_satisfied_obligations == 0 && summary.unsatisfied_obligations == 0),
+            "doc_in_progress_obligation_count": governed_doc_summary.as_ref().map(|summary| summary.partially_satisfied_obligations).unwrap_or(0),
+            "doc_unsatisfied_obligation_count": governed_doc_summary.as_ref().map(|summary| summary.unsatisfied_obligations).unwrap_or(0),
+            "doc_expired_component_count": governed_doc_summary.as_ref().map(|summary| summary.expired_component_count).unwrap_or(0),
+            "fund_entity_count": fund_entity_count,
+            "nested_fund_count": nested_fund_count,
+            "feeder_or_master_link_count": feeder_or_master_link_count,
+            "screening_active_count": screening_review_count,
+            "screening_sanctions_count": sanctions_screening_count,
+            "screening_pep_count": pep_screening_count,
+            "screening_adverse_media_count": adverse_media_screening_count,
+            "days_since_last_activity": Value::Null,
+            "stale": active_deal_count == 0
+                && onboarding_active_count == 0
+                && active_kyc_count == 0
+                && screening_review_count == 0,
+        });
+
         return Ok(json!({
             "entity_id": entity_id,
             "entity_type": entity_type,
             "name": name,
             "activities": activities,
-            "signals": {
-                "anchor": "client-group",
-                "onboarding_present": onboarding_active_count > 0,
-                "linked_cbu_count": linked_cbu_ids.len(),
-                "linked_entity_count": linked_entity_ids.len(),
-                "has_active_onboarding": onboarding_active_count > 0,
-                "has_active_deal": active_deal_count > 0,
-                "has_active_kyc": active_kyc_count > 0,
-                "active_kyc_case_count": active_kyc_count,
-                "blocked_kyc_case_count": blocked_kyc_count,
-                "review_kyc_case_count": review_kyc_count,
-                "has_incomplete_ubo": has_incomplete_ubo,
-                "ubo_registry_pending_count": active_registry_ubo_count,
-                "ubo_record_count": entity_ubo_count,
-                "has_pending_documentation": pending_docs_count > 0,
-                "pending_document_count": pending_docs_count,
-                "verified_document_count": verified_docs_count,
-                "rejected_document_count": rejected_docs_count,
-                "catalogued_document_count": catalogued_docs_count,
-                "fund_entity_count": fund_entity_count,
-                "nested_fund_count": nested_fund_count,
-                "feeder_or_master_link_count": feeder_or_master_link_count,
-                "screening_active_count": screening_review_count,
-                "screening_sanctions_count": sanctions_screening_count,
-                "screening_pep_count": pep_screening_count,
-                "screening_adverse_media_count": adverse_media_screening_count,
-                "days_since_last_activity": Value::Null,
-                "stale": active_deal_count == 0
-                    && onboarding_active_count == 0
-                    && active_kyc_count == 0
-                    && screening_review_count == 0,
-            }
+            "signals": signals
         }));
     }
 
@@ -1410,12 +1574,18 @@ async fn build_entity_context_record(
         .unwrap_or(0);
         let (active_kyc_count, blocked_kyc_count, review_kyc_count) =
             case_status_counts_for_cbu(pool, entity_id).await;
-        let (
-            pending_docs_count,
-            verified_docs_count,
-            rejected_docs_count,
-            catalogued_docs_count,
-        ) = document_status_counts_for_cbu(pool, entity_id).await;
+        let (pending_docs_count, verified_docs_count, rejected_docs_count, catalogued_docs_count) =
+            document_status_counts_for_cbu(pool, entity_id).await;
+        let governed_doc_summary =
+            governed_document_signal_summary_for_entities(pool, &linked_entity_ids).await?;
+        let effective_pending_docs_count = governed_doc_summary
+            .as_ref()
+            .map(|summary| summary.pending_component_count as i64)
+            .unwrap_or(pending_docs_count);
+        let effective_rejected_docs_count = governed_doc_summary
+            .as_ref()
+            .map(|summary| summary.rejected_component_count as i64)
+            .unwrap_or(rejected_docs_count);
         let (
             screening_review_count,
             sanctions_screening_count,
@@ -1498,12 +1668,12 @@ async fn build_entity_context_record(
                 Vec::new(),
             ));
         }
-        if include_completed || pending_docs_count > 0 {
+        if include_completed || effective_pending_docs_count > 0 {
             activities.push(activity_record(
                 "document",
                 "documentation",
                 "collection",
-                if pending_docs_count > 0 {
+                if effective_pending_docs_count > 0 {
                     "in_progress"
                 } else {
                     "not_started"
@@ -1513,39 +1683,51 @@ async fn build_entity_context_record(
             ));
         }
 
+        let signals = json!({
+            "anchor": "cbu",
+            "onboarding_present": onboarding_active_count > 0,
+            "linked_entity_count": linked_entity_ids.len(),
+            "has_active_onboarding": onboarding_active_count > 0,
+            "has_active_deal": false,
+            "has_active_kyc": active_kyc_count > 0,
+            "active_kyc_case_count": active_kyc_count,
+            "blocked_kyc_case_count": blocked_kyc_count,
+            "review_kyc_case_count": review_kyc_count,
+            "has_incomplete_ubo": has_incomplete_ubo,
+            "ubo_registry_pending_count": active_registry_ubo_count,
+            "ubo_record_count": entity_ubo_count,
+            "has_governed_document_profile": governed_doc_summary.is_some(),
+            "governed_document_profile_count": governed_doc_summary.as_ref().map(|summary| summary.matched_profile_count).unwrap_or(0),
+            "has_pending_documentation": effective_pending_docs_count > 0,
+            "pending_document_count": effective_pending_docs_count,
+            "legacy_pending_document_count": pending_docs_count,
+            "verified_document_count": verified_docs_count,
+            "rejected_document_count": effective_rejected_docs_count,
+            "legacy_rejected_document_count": rejected_docs_count,
+            "catalogued_document_count": catalogued_docs_count,
+            "doc_mandatory_coverage_pct": governed_doc_summary.as_ref().map(|summary| (summary.mandatory_coverage() * 100.0).round() as i64),
+            "doc_overall_coverage_pct": governed_doc_summary.as_ref().map(|summary| (summary.overall_coverage() * 100.0).round() as i64),
+            "doc_requirements_satisfied": governed_doc_summary.as_ref().map(|summary| summary.pending_component_count == 0 && summary.partially_satisfied_obligations == 0 && summary.unsatisfied_obligations == 0),
+            "doc_in_progress_obligation_count": governed_doc_summary.as_ref().map(|summary| summary.partially_satisfied_obligations).unwrap_or(0),
+            "doc_unsatisfied_obligation_count": governed_doc_summary.as_ref().map(|summary| summary.unsatisfied_obligations).unwrap_or(0),
+            "doc_expired_component_count": governed_doc_summary.as_ref().map(|summary| summary.expired_component_count).unwrap_or(0),
+            "fund_entity_count": fund_entity_count,
+            "nested_fund_count": nested_fund_count,
+            "feeder_or_master_link_count": feeder_or_master_link_count,
+            "screening_active_count": screening_review_count,
+            "screening_sanctions_count": sanctions_screening_count,
+            "screening_pep_count": pep_screening_count,
+            "screening_adverse_media_count": adverse_media_screening_count,
+            "days_since_last_activity": Value::Null,
+            "stale": onboarding_active_count == 0 && active_kyc_count == 0 && screening_review_count == 0,
+        });
+
         return Ok(json!({
             "entity_id": entity_id,
             "entity_type": entity_type,
             "name": name,
             "activities": activities,
-            "signals": {
-                "anchor": "cbu",
-                "onboarding_present": onboarding_active_count > 0,
-                "linked_entity_count": linked_entity_ids.len(),
-                "has_active_onboarding": onboarding_active_count > 0,
-                "has_active_deal": false,
-                "has_active_kyc": active_kyc_count > 0,
-                "active_kyc_case_count": active_kyc_count,
-                "blocked_kyc_case_count": blocked_kyc_count,
-                "review_kyc_case_count": review_kyc_count,
-                "has_incomplete_ubo": has_incomplete_ubo,
-                "ubo_registry_pending_count": active_registry_ubo_count,
-                "ubo_record_count": entity_ubo_count,
-                "has_pending_documentation": pending_docs_count > 0,
-                "pending_document_count": pending_docs_count,
-                "verified_document_count": verified_docs_count,
-                "rejected_document_count": rejected_docs_count,
-                "catalogued_document_count": catalogued_docs_count,
-                "fund_entity_count": fund_entity_count,
-                "nested_fund_count": nested_fund_count,
-                "feeder_or_master_link_count": feeder_or_master_link_count,
-                "screening_active_count": screening_review_count,
-                "screening_sanctions_count": sanctions_screening_count,
-                "screening_pep_count": pep_screening_count,
-                "screening_adverse_media_count": adverse_media_screening_count,
-                "days_since_last_activity": Value::Null,
-                "stale": onboarding_active_count == 0 && active_kyc_count == 0 && screening_review_count == 0,
-            }
+            "signals": signals
         }));
     }
 
@@ -1563,14 +1745,13 @@ async fn build_entity_context_record(
         .unwrap_or(None);
         let (active_kyc_count, blocked_kyc_count, review_kyc_count) =
             case_status_counts_for_deal(pool, entity_id).await;
+        let (pending_docs_count, complete_docs_count, rejected_docs_count, total_docs_count) =
+            document_status_counts_for_deal(pool, entity_id).await;
         let (
-            pending_docs_count,
-            complete_docs_count,
-            rejected_docs_count,
-            total_docs_count,
-        ) = document_status_counts_for_deal(pool, entity_id).await;
-        let (active_onboarding_request_count, completed_onboarding_request_count, total_onboarding_request_count) =
-            deal_onboarding_request_counts(pool, entity_id).await;
+            active_onboarding_request_count,
+            completed_onboarding_request_count,
+            total_onboarding_request_count,
+        ) = deal_onboarding_request_counts(pool, entity_id).await;
         let (
             screening_review_count,
             sanctions_screening_count,
@@ -1671,10 +1852,16 @@ async fn build_entity_context_record(
     .fetch_one(pool)
     .await
     .unwrap_or(0);
-    let has_incomplete_ubo = active_registry_ubo_count > 0
-        || (relationship_count > 0 && entity_ubo_count == 0);
+    let has_incomplete_ubo =
+        active_registry_ubo_count > 0 || (relationship_count > 0 && entity_ubo_count == 0);
     let (is_fund_entity, is_nested_fund, has_master_feeder_link) =
         fund_signals_for_entity(pool, entity_id).await;
+    let governed_doc_summary =
+        governed_document_signal_summary_for_entities(pool, &[entity_id]).await?;
+    let effective_pending_docs_count = governed_doc_summary
+        .as_ref()
+        .map(|summary| summary.pending_component_count as i64)
+        .unwrap_or(0);
 
     let mut activities = if include_completed {
         vec![json!({
@@ -1695,7 +1882,11 @@ async fn build_entity_context_record(
         activities.push(activity_record(
             "fund",
             "fund",
-            if is_nested_fund { "nested" } else { "standalone" },
+            if is_nested_fund {
+                "nested"
+            } else {
+                "standalone"
+            },
             if is_fund_entity {
                 "in_progress"
             } else {
@@ -1705,29 +1896,59 @@ async fn build_entity_context_record(
             Vec::new(),
         ));
     }
+    if include_completed || effective_pending_docs_count > 0 {
+        activities.push(activity_record(
+            "document",
+            "documentation",
+            "collection",
+            if effective_pending_docs_count > 0 {
+                "in_progress"
+            } else {
+                "not_started"
+            },
+            None,
+            if effective_pending_docs_count > 0 {
+                vec!["pending documentation".to_string()]
+            } else {
+                Vec::new()
+            },
+        ));
+    }
+
+    let signals = json!({
+        "anchor": "entity",
+        "onboarding_present": false,
+        "has_active_onboarding": false,
+        "has_active_deal": false,
+        "has_active_kyc": false,
+        "has_incomplete_ubo": has_incomplete_ubo,
+        "ubo_registry_pending_count": active_registry_ubo_count,
+        "ubo_record_count": entity_ubo_count,
+        "has_governed_document_profile": governed_doc_summary.is_some(),
+        "governed_document_profile_count": governed_doc_summary.as_ref().map(|summary| summary.matched_profile_count).unwrap_or(0),
+        "has_pending_documentation": effective_pending_docs_count > 0,
+        "pending_document_count": effective_pending_docs_count,
+        "doc_mandatory_coverage_pct": governed_doc_summary.as_ref().map(|summary| (summary.mandatory_coverage() * 100.0).round() as i64),
+        "doc_overall_coverage_pct": governed_doc_summary.as_ref().map(|summary| (summary.overall_coverage() * 100.0).round() as i64),
+        "doc_requirements_satisfied": governed_doc_summary.as_ref().map(|summary| summary.pending_component_count == 0 && summary.partially_satisfied_obligations == 0 && summary.unsatisfied_obligations == 0),
+        "doc_in_progress_obligation_count": governed_doc_summary.as_ref().map(|summary| summary.partially_satisfied_obligations).unwrap_or(0),
+        "doc_unsatisfied_obligation_count": governed_doc_summary.as_ref().map(|summary| summary.unsatisfied_obligations).unwrap_or(0),
+        "doc_rejected_component_count": governed_doc_summary.as_ref().map(|summary| summary.rejected_component_count).unwrap_or(0),
+        "doc_expired_component_count": governed_doc_summary.as_ref().map(|summary| summary.expired_component_count).unwrap_or(0),
+        "linked_entity_count": relationship_count,
+        "is_fund_entity": is_fund_entity,
+        "is_nested_fund": is_nested_fund,
+        "has_master_feeder_link": has_master_feeder_link,
+        "days_since_last_activity": Value::Null,
+        "stale": latest_relationship_activity.is_none(),
+    });
 
     Ok(json!({
         "entity_id": entity_id,
         "entity_type": entity_type,
         "name": name,
         "activities": activities,
-        "signals": {
-            "anchor": "entity",
-            "onboarding_present": false,
-            "has_active_onboarding": false,
-            "has_active_deal": false,
-            "has_active_kyc": false,
-            "has_incomplete_ubo": has_incomplete_ubo,
-            "ubo_registry_pending_count": active_registry_ubo_count,
-            "ubo_record_count": entity_ubo_count,
-            "has_pending_documentation": false,
-            "linked_entity_count": relationship_count,
-            "is_fund_entity": is_fund_entity,
-            "is_nested_fund": is_nested_fund,
-            "has_master_feeder_link": has_master_feeder_link,
-            "days_since_last_activity": Value::Null,
-            "stale": latest_relationship_activity.is_none(),
-        }
+        "signals": signals
     }))
 }
 
@@ -1869,7 +2090,11 @@ impl CustomOperation for DiscoverySearchEntitiesOp {
     }
 
     #[cfg(not(feature = "database"))]
-    async fn execute(&self, _verb_call: &VerbCall, _ctx: &mut ExecutionContext) -> Result<ExecutionResult> {
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
         Err(anyhow!("discovery.search-entities requires database"))
     }
 }
@@ -1907,7 +2132,11 @@ impl CustomOperation for DiscoveryEntityContextOp {
     }
 
     #[cfg(not(feature = "database"))]
-    async fn execute(&self, _verb_call: &VerbCall, _ctx: &mut ExecutionContext) -> Result<ExecutionResult> {
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
         Err(anyhow!("discovery.entity-context requires database"))
     }
 }
@@ -1947,7 +2176,11 @@ impl CustomOperation for DiscoveryEntityRelationshipsOp {
     }
 
     #[cfg(not(feature = "database"))]
-    async fn execute(&self, _verb_call: &VerbCall, _ctx: &mut ExecutionContext) -> Result<ExecutionResult> {
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
         Err(anyhow!("discovery.entity-relationships requires database"))
     }
 }
@@ -1979,7 +2212,8 @@ impl CustomOperation for DiscoveryCascadeResearchOp {
         let query = get_string_arg(verb_call, "query")
             .ok_or_else(|| anyhow!("discovery.cascade-research requires :query"))?;
         let top_n = get_int_arg_or_default(verb_call, "top-n", 3) as i32;
-        let include_relationships = get_bool_arg(verb_call, "include-relationships").unwrap_or(true);
+        let include_relationships =
+            get_bool_arg(verb_call, "include-relationships").unwrap_or(true);
         let results = search_entities_internal(pool, &query, &[], top_n).await?;
         let mut entities = Vec::new();
 
@@ -2032,7 +2266,11 @@ impl CustomOperation for DiscoveryCascadeResearchOp {
     }
 
     #[cfg(not(feature = "database"))]
-    async fn execute(&self, _verb_call: &VerbCall, _ctx: &mut ExecutionContext) -> Result<ExecutionResult> {
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
         Err(anyhow!("discovery.cascade-research requires database"))
     }
 }
@@ -2123,7 +2361,11 @@ impl CustomOperation for DiscoveryAvailableActionsOp {
     }
 
     #[cfg(not(feature = "database"))]
-    async fn execute(&self, _verb_call: &VerbCall, _ctx: &mut ExecutionContext) -> Result<ExecutionResult> {
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
         Err(anyhow!("discovery.available-actions requires database"))
     }
 }
@@ -2157,9 +2399,14 @@ impl CustomOperation for DiscoveryVerbDetailOp {
         let verbs = ConfigLoader::from_env().load_verbs()?;
         let (domain_name, config) = find_verb_config(&verbs, &verb_id)
             .ok_or_else(|| anyhow!("Unknown verb id: {}", verb_id))?;
-        let sem_reg_surface = sem_reg_tool(pool, ctx, "sem_reg_verb_surface", json!({
-            "verb_fqn": verb_id,
-        }))
+        let sem_reg_surface = sem_reg_tool(
+            pool,
+            ctx,
+            "sem_reg_verb_surface",
+            json!({
+                "verb_fqn": verb_id,
+            }),
+        )
         .await
         .unwrap_or(Value::Null);
 
@@ -2191,7 +2438,11 @@ impl CustomOperation for DiscoveryVerbDetailOp {
     }
 
     #[cfg(not(feature = "database"))]
-    async fn execute(&self, _verb_call: &VerbCall, _ctx: &mut ExecutionContext) -> Result<ExecutionResult> {
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
         Err(anyhow!("discovery.verb-detail requires database"))
     }
 }
@@ -2225,7 +2476,10 @@ impl CustomOperation for DiscoveryValidTransitionsOp {
         let include_blocked = get_bool_arg(verb_call, "include-blocked").unwrap_or(true);
         let lanes = get_list_arg(verb_call, "lanes");
         let context = build_entity_context_record(pool, entity_id, true).await?;
-        let entity_type = context["entity_type"].as_str().unwrap_or("entity").to_string();
+        let entity_type = context["entity_type"]
+            .as_str()
+            .unwrap_or("entity")
+            .to_string();
         let entity_name = context["name"].as_str().unwrap_or("unknown").to_string();
         let verbs = ConfigLoader::from_env().load_verbs()?;
 
@@ -2315,7 +2569,11 @@ impl CustomOperation for DiscoveryValidTransitionsOp {
     }
 
     #[cfg(not(feature = "database"))]
-    async fn execute(&self, _verb_call: &VerbCall, _ctx: &mut ExecutionContext) -> Result<ExecutionResult> {
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
         Err(anyhow!("discovery.valid-transitions requires database"))
     }
 }
@@ -2382,7 +2640,8 @@ impl CustomOperation for DiscoveryGraphWalkOp {
                     .map(|status| serde_json::to_value(status).unwrap_or(Value::Null)),
             );
             for verb in result.valid_verbs {
-                valid.entry(verb.verb_id.clone())
+                valid
+                    .entry(verb.verb_id.clone())
                     .or_insert_with(|| serde_json::to_value(verb).unwrap_or(Value::Null));
             }
             if include_blocked {
@@ -2415,7 +2674,11 @@ impl CustomOperation for DiscoveryGraphWalkOp {
     }
 
     #[cfg(not(feature = "database"))]
-    async fn execute(&self, _verb_call: &VerbCall, _ctx: &mut ExecutionContext) -> Result<ExecutionResult> {
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
         Err(anyhow!("discovery.graph-walk requires database"))
     }
 }
@@ -2451,7 +2714,10 @@ impl CustomOperation for DiscoveryInspectDataOp {
         let aspect = get_string_arg(verb_call, "aspect");
         let depth = get_string_arg(verb_call, "depth").unwrap_or_else(|| "summary".to_string());
         let context = build_entity_context_record(pool, entity_id, false).await?;
-        let entity_type = context["entity_type"].as_str().unwrap_or("entity").to_string();
+        let entity_type = context["entity_type"]
+            .as_str()
+            .unwrap_or("entity")
+            .to_string();
 
         let verbs = ConfigLoader::from_env().load_verbs()?;
         let action_count = verbs
@@ -2489,7 +2755,11 @@ impl CustomOperation for DiscoveryInspectDataOp {
     }
 
     #[cfg(not(feature = "database"))]
-    async fn execute(&self, _verb_call: &VerbCall, _ctx: &mut ExecutionContext) -> Result<ExecutionResult> {
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
         Err(anyhow!("discovery.inspect-data requires database"))
     }
 }
@@ -2527,10 +2797,15 @@ impl CustomOperation for DiscoverySearchDataOp {
         let aspect = get_string_arg(verb_call, "aspect");
         let max_results = get_int_arg_or_default(verb_call, "max-results", 20) as usize;
 
-        let result = sem_reg_tool(pool, ctx, "sem_reg_search", json!({
-            "query": query,
-            "limit": max_results,
-        }))
+        let result = sem_reg_tool(
+            pool,
+            ctx,
+            "sem_reg_search",
+            json!({
+                "query": query,
+                "limit": max_results,
+            }),
+        )
         .await?;
         let filtered_results: Vec<Value> = result
             .get("results")
@@ -2572,7 +2847,11 @@ impl CustomOperation for DiscoverySearchDataOp {
     }
 
     #[cfg(not(feature = "database"))]
-    async fn execute(&self, _verb_call: &VerbCall, _ctx: &mut ExecutionContext) -> Result<ExecutionResult> {
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
         Err(anyhow!("discovery.search-data requires database"))
     }
 }
