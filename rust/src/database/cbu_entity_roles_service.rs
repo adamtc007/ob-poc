@@ -224,8 +224,17 @@ impl CbuEntityRolesService {
         Ok(result.rows_affected())
     }
 
-    /// Detach an entity from a CBU for a specific role
-    pub async fn detach_entity_from_cbu_role(
+    /// Detach an entity from a CBU for a specific role.
+    ///
+    /// # Examples
+    /// ```ignore
+    /// # async fn demo(svc: &ob_poc::database::CbuEntityRolesService, cbu_id: uuid::Uuid, entity_id: uuid::Uuid) -> anyhow::Result<()> {
+    /// let removed = svc.detach_entity_from_role(cbu_id, entity_id, "DIRECTOR").await?;
+    /// assert!(removed || !removed);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn detach_entity_from_role(
         &self,
         cbu_id: Uuid,
         entity_id: Uuid,

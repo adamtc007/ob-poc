@@ -43,7 +43,7 @@
   :jurisdiction "DE"
   :as @party)
 
-(cbu-role.assign
+(cbu.assign-role
   :cbu-id @structure
   :entity-id @party
   :role "GENERAL_PARTNER"

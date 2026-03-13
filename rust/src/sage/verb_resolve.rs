@@ -150,8 +150,8 @@ impl StructuredVerbScorer {
         &'a self,
         intent: &OutcomeIntent,
     ) -> (Vec<&'a VerbMeta>, FilterDiagnostics) {
-        let domain_hint = (!intent.domain_concept.trim().is_empty())
-            .then_some(intent.domain_concept.as_str());
+        let domain_hint =
+            (!intent.domain_concept.trim().is_empty()).then_some(intent.domain_concept.as_str());
         let filtered = self.query_by_harm_class(intent, domain_hint);
         if filtered.is_empty() && domain_hint.is_some() {
             let diagnostics = self.diagnose_filter_chain(intent, None);
@@ -227,7 +227,9 @@ impl StructuredVerbScorer {
 
     fn base_candidates<'a>(&'a self, intent: &OutcomeIntent) -> Vec<&'a VerbMeta> {
         let by_harm: Vec<&VerbMeta> = match intent.polarity {
-            IntentPolarity::Read | IntentPolarity::Ambiguous => self.index.read_only_verbs().collect(),
+            IntentPolarity::Read | IntentPolarity::Ambiguous => {
+                self.index.read_only_verbs().collect()
+            }
             IntentPolarity::Write => self.index.mutating_verbs().collect(),
         };
 
@@ -299,11 +301,22 @@ fn active_phase_tags(intent: &OutcomeIntent) -> HashSet<String> {
         }
     }
 
-    for goal in intent.coder_handoff.constraints.iter().chain(intent.hints.explicit_domain_terms.iter()) {
+    for goal in intent
+        .coder_handoff
+        .constraints
+        .iter()
+        .chain(intent.hints.explicit_domain_terms.iter())
+    {
         let normalized = goal.to_ascii_lowercase();
         if matches!(
             normalized.as_str(),
-            "kyc" | "stewardship" | "data" | "data-management" | "onboarding" | "trading" | "navigation"
+            "kyc"
+                | "stewardship"
+                | "data"
+                | "data-management"
+                | "onboarding"
+                | "trading"
+                | "navigation"
         ) {
             tags.insert(normalized);
         }
@@ -374,8 +387,10 @@ fn desired_action_classes(intent: &OutcomeIntent) -> HashSet<ActionClass> {
         super::OutcomeAction::Other(_) => ActionClass::Read,
     }]);
 
-    if matches!(intent.polarity, IntentPolarity::Read | IntentPolarity::Ambiguous)
-        && summary_suggests_collection(intent)
+    if matches!(
+        intent.polarity,
+        IntentPolarity::Read | IntentPolarity::Ambiguous
+    ) && summary_suggests_collection(intent)
     {
         classes.insert(ActionClass::List);
     }
@@ -611,10 +626,10 @@ mod tests {
 
     fn sample_intent() -> OutcomeIntent {
         OutcomeIntent {
-            summary: "Create a CBU for this client".to_string(),
+            summary: "Create a deal for this client".to_string(),
             plane: ObservationPlane::Instance,
             polarity: IntentPolarity::Write,
-            domain_concept: "cbu".to_string(),
+            domain_concept: "deal".to_string(),
             action: OutcomeAction::Create,
             subject: Some(EntityRef {
                 mention: "this client".to_string(),
@@ -623,7 +638,7 @@ mod tests {
             }),
             steps: vec![OutcomeStep {
                 action: OutcomeAction::Create,
-                target: "cbu".to_string(),
+                target: "deal".to_string(),
                 params: HashMap::from([(String::from("client-id"), String::from("123"))]),
                 notes: None,
             }],
@@ -639,12 +654,12 @@ mod tests {
     fn scorer_filters_by_plane_and_polarity() {
         let scorer = StructuredVerbScorer::new(index_with(vec![
             sample_meta(
-                "cbu.create",
+                "deal.create",
                 IntentPolarity::Write,
                 vec![ObservationPlane::Instance],
-                &["create", "cbu"],
+                &["create", "deal"],
                 &["client-id"],
-                "Create a CBU",
+                "Create a deal",
             ),
             sample_meta(
                 "registry.list-entities",
@@ -658,35 +673,35 @@ mod tests {
 
         let candidates = scorer.score(&sample_intent(), 5);
         assert_eq!(candidates.len(), 1);
-        assert_eq!(candidates[0].fqn, "cbu.create");
+        assert_eq!(candidates[0].fqn, "deal.create");
     }
 
     #[test]
     fn scorer_never_offers_write_verbs_for_read_intents() {
         let scorer = StructuredVerbScorer::new(index_with(vec![
             sample_meta(
-                "cbu.list",
+                "deal.list",
                 IntentPolarity::Read,
                 vec![ObservationPlane::Instance],
-                &["list", "cbu"],
+                &["list", "deal"],
                 &[],
-                "List CBUs",
+                "List deals",
             ),
             sample_meta(
-                "cbu.create",
+                "deal.create",
                 IntentPolarity::Write,
                 vec![ObservationPlane::Instance],
-                &["create", "cbu"],
+                &["create", "deal"],
                 &["client-id"],
-                "Create a CBU",
+                "Create a deal",
             ),
         ]));
 
         let intent = OutcomeIntent {
-            summary: "show me the cbus".to_string(),
+            summary: "show me the deals".to_string(),
             plane: ObservationPlane::Instance,
             polarity: IntentPolarity::Read,
-            domain_concept: "cbu".to_string(),
+            domain_concept: "deal".to_string(),
             action: OutcomeAction::Read,
             subject: None,
             steps: vec![],
@@ -699,37 +714,37 @@ mod tests {
 
         let candidates = scorer.score(&intent, 5);
         assert_eq!(candidates.len(), 1);
-        assert_eq!(candidates[0].fqn, "cbu.list");
+        assert_eq!(candidates[0].fqn, "deal.list");
     }
 
     #[test]
     fn scorer_excludes_destructive_candidates_for_ambiguous_reads() {
         let mut list = sample_meta(
-            "cbu.list",
+            "deal.list",
             IntentPolarity::Read,
             vec![ObservationPlane::Instance],
-            &["list", "cbu"],
+            &["list", "deal"],
             &[],
-            "List CBUs",
+            "List deals",
         );
         list.harm_class = HarmClass::ReadOnly;
 
         let mut delete = sample_meta(
-            "cbu.delete",
+            "deal.delete",
             IntentPolarity::Write,
             vec![ObservationPlane::Instance],
-            &["delete", "cbu"],
-            &["cbu-id"],
-            "Delete a CBU",
+            &["delete", "deal"],
+            &["deal-id"],
+            "Delete a deal",
         );
         delete.harm_class = HarmClass::Destructive;
 
         let scorer = StructuredVerbScorer::new(index_with(vec![list, delete]));
         let intent = OutcomeIntent {
-            summary: "show me the cbus".to_string(),
+            summary: "show me the deals".to_string(),
             plane: ObservationPlane::Instance,
             polarity: IntentPolarity::Ambiguous,
-            domain_concept: "cbu".to_string(),
+            domain_concept: "deal".to_string(),
             action: OutcomeAction::Read,
             subject: None,
             steps: vec![],
@@ -742,7 +757,7 @@ mod tests {
 
         let candidates = scorer.score(&intent, 5);
         assert_eq!(candidates.len(), 1);
-        assert_eq!(candidates[0].fqn, "cbu.list");
+        assert_eq!(candidates[0].fqn, "deal.list");
     }
 
     #[test]
@@ -797,75 +812,28 @@ mod tests {
     }
 
     #[test]
-    fn scorer_filters_by_subject_kind_when_present() {
-        let mut cbu = sample_meta(
-            "cbu.update",
-            IntentPolarity::Write,
-            vec![ObservationPlane::Instance],
-            &["update", "cbu"],
-            &["cbu-id"],
-            "Update a CBU",
-        );
-        cbu.subject_kinds = vec!["cbu".to_string()];
-
-        let mut fund = sample_meta(
-            "fund.update",
-            IntentPolarity::Write,
-            vec![ObservationPlane::Instance],
-            &["update", "fund"],
-            &["fund-id"],
-            "Update a fund",
-        );
-        fund.subject_kinds = vec!["fund".to_string()];
-
-        let scorer = StructuredVerbScorer::new(index_with(vec![cbu, fund]));
-        let intent = OutcomeIntent {
-            summary: "update this cbu".to_string(),
-            plane: ObservationPlane::Instance,
-            polarity: IntentPolarity::Write,
-            domain_concept: "cbu".to_string(),
-            action: OutcomeAction::Update,
-            subject: Some(EntityRef {
-                mention: "this cbu".to_string(),
-                kind_hint: Some("cbu".to_string()),
-                uuid: None,
-            }),
-            steps: vec![],
-            confidence: SageConfidence::Medium,
-            pending_clarifications: vec![],
-            hints: UtteranceHints::default(),
-            explain: SageExplain::default(),
-            coder_handoff: CoderHandoff::default(),
-        };
-
-        let candidates = scorer.score(&intent, 5);
-        assert_eq!(candidates.len(), 1);
-        assert_eq!(candidates[0].fqn, "cbu.update");
-    }
-
-    #[test]
     fn scorer_prefers_exact_action_and_param_overlap() {
         let scorer = StructuredVerbScorer::new(index_with(vec![
             sample_meta(
-                "cbu.create",
+                "deal.create",
                 IntentPolarity::Write,
                 vec![ObservationPlane::Instance],
-                &["create", "cbu"],
+                &["create", "deal"],
                 &["client-id"],
-                "Create a CBU",
+                "Create a deal",
             ),
             sample_meta(
-                "cbu.assign-role",
+                "deal.assign-owner",
                 IntentPolarity::Write,
                 vec![ObservationPlane::Instance],
-                &["assign", "cbu"],
+                &["assign", "deal"],
                 &["role-id"],
-                "Assign role to a CBU",
+                "Assign owner to a deal",
             ),
         ]));
 
         let candidates = scorer.score(&sample_intent(), 5);
-        assert_eq!(candidates[0].fqn, "cbu.create");
+        assert_eq!(candidates[0].fqn, "deal.create");
         assert!(candidates[0].score > candidates[1].score);
     }
 

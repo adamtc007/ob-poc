@@ -959,13 +959,6 @@ fn print_sweep_results(results: &[SweepResult]) {
 fn taught_phrase_scenarios() -> Vec<TestScenario> {
     vec![
         TestScenario::matched_with_score(
-            "spin up a fund (taught)",
-            "spin up a fund",
-            "cbu.create",
-            0.90,
-        )
-        .with_category("taught"),
-        TestScenario::matched_with_score(
             "load the allianz book (taught)",
             "load the allianz book",
             "session.load-cluster",
@@ -1073,26 +1066,12 @@ fn session_scenarios() -> Vec<TestScenario> {
 #[cfg(feature = "database")]
 fn cbu_scenarios() -> Vec<TestScenario> {
     vec![
-        TestScenario::matched("create cbu", "create a new cbu", "cbu.create").with_category("cbu"),
-        TestScenario::matched(
-            "create fund",
-            "create a fund called Alpha Growth",
-            "cbu.create",
-        )
-        .with_category("cbu"),
-        TestScenario::matched(
-            "onboard client",
-            "onboard new client Acme Corp",
-            "cbu.create",
-        )
-        .with_category("cbu"),
         TestScenario::matched(
             "assign role",
             "assign custody role to BNY",
             "cbu.assign-role",
         )
         .with_category("cbu"),
-        TestScenario::matched("list cbus", "list all cbus", "cbu.list").with_category("cbu"),
     ]
 }
 
@@ -1105,12 +1084,8 @@ fn entity_scenarios() -> Vec<TestScenario> {
             "entity.create",
         )
         .with_category("entity"),
-        TestScenario::matched(
-            "create person",
-            "add a natural person",
-            "entity.create",
-        )
-        .with_category("entity"),
+        TestScenario::matched("create person", "add a natural person", "entity.create")
+            .with_category("entity"),
         TestScenario::matched("search entity", "find entity BlackRock", "entity.query")
             .with_category("entity"),
         TestScenario::matched("entity details", "show entity details", "entity.read")
@@ -1165,11 +1140,6 @@ fn hard_negative_scenarios() -> Vec<TestScenario> {
         // MUST MATCH CORRECTLY - clear semantic difference
         // =====================================================================
 
-        // create vs update - distinct actions
-        TestScenario::matched("create not update", "create a new cbu", "cbu.create")
-            .hard_negative(),
-        TestScenario::matched("update not create", "update cbu details", "cbu.update")
-            .hard_negative(),
         // load vs unload - opposite actions
         TestScenario::matched("load cbu", "load cbu into session", "session.load-system")
             .hard_negative(),
@@ -1584,10 +1554,10 @@ fn test_ambiguity_detection() {
     // Clear winner
     let clear_winner = vec![
         VerbSearchResult {
-            verb: "cbu.create".to_string(),
+            verb: "deal.create".to_string(),
             score: 0.95,
             source: VerbSearchSource::PatternEmbedding,
-            matched_phrase: "create cbu".to_string(),
+            matched_phrase: "create deal".to_string(),
             description: None,
             journey: None,
         },
@@ -1602,17 +1572,17 @@ fn test_ambiguity_detection() {
     ];
 
     match check_ambiguity_with_margin(&clear_winner, threshold, AMBIGUITY_MARGIN) {
-        VerbSearchOutcome::Matched(r) => assert_eq!(r.verb, "cbu.create"),
+        VerbSearchOutcome::Matched(r) => assert_eq!(r.verb, "deal.create"),
         other => panic!("Expected Matched, got {:?}", other),
     }
 
     // Ambiguous - top two scores are within AMBIGUITY_MARGIN of each other
     let ambiguous = vec![
         VerbSearchResult {
-            verb: "cbu.create".to_string(),
+            verb: "deal.create".to_string(),
             score: 0.92,
             source: VerbSearchSource::PatternEmbedding,
-            matched_phrase: "create cbu".to_string(),
+            matched_phrase: "create deal".to_string(),
             description: None,
             journey: None,
         },
@@ -1633,10 +1603,10 @@ fn test_ambiguity_detection() {
 
     // No match (below threshold)
     let below = vec![VerbSearchResult {
-        verb: "cbu.create".to_string(),
+        verb: "deal.create".to_string(),
         score: 0.80,
         source: VerbSearchSource::PatternEmbedding,
-        matched_phrase: "create cbu".to_string(),
+        matched_phrase: "create deal".to_string(),
         description: None,
         journey: None,
     }];
@@ -1651,18 +1621,18 @@ fn test_ambiguity_detection() {
 fn test_normalize_candidates() {
     let candidates = vec![
         VerbSearchResult {
-            verb: "cbu.create".to_string(),
+            verb: "deal.create".to_string(),
             score: 0.80,
             source: VerbSearchSource::GlobalLearned,
-            matched_phrase: "make a cbu".to_string(),
+            matched_phrase: "make a deal".to_string(),
             description: None,
             journey: None,
         },
         VerbSearchResult {
-            verb: "cbu.create".to_string(),
+            verb: "deal.create".to_string(),
             score: 0.95,
             source: VerbSearchSource::PatternEmbedding,
-            matched_phrase: "create cbu".to_string(),
+            matched_phrase: "create deal".to_string(),
             description: None,
             journey: None,
         },
@@ -1679,7 +1649,7 @@ fn test_normalize_candidates() {
     let normalized = normalize_candidates(candidates, 10);
 
     assert_eq!(normalized.len(), 2);
-    assert_eq!(normalized[0].verb, "cbu.create");
+    assert_eq!(normalized[0].verb, "deal.create");
     assert!((normalized[0].score - 0.95).abs() < 0.001);
 }
 

@@ -181,11 +181,13 @@ domains:
     categories:
       - id: lifecycle
         label: Lifecycle
-        description: Create, update, archive CBUs
+        description: Create, validate, and retire CBUs
         verbs:
           - cbu.create
-          - cbu.update
-          - cbu.archive
+          - cbu.submit-for-validation
+          - cbu.decide
+          - cbu.request-proof-update
+          - cbu.reopen-validation
           - cbu.delete
       - id: roles
         label: Roles & Membership
@@ -193,14 +195,14 @@ domains:
         verbs:
           - cbu.assign-role
           - cbu.remove-role
-          - cbu.list-roles
+          - cbu.parties
       - id: query
         label: Query
         description: Search and list CBUs
         verbs:
-          - cbu.get
+          - cbu.read
           - cbu.list
-          - cbu.search
+          - cbu.show
 
   # ===========================================================================
   # ENTITY MANAGEMENT

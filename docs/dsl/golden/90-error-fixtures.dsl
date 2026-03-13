@@ -73,7 +73,7 @@ cbu.create :name "No open paren")
 
 ;; ERROR: Undefined symbol reference
 ;; Expected: Diagnostic "undefined symbol @nonexistent"
-(cbu-role.assign :cbu-id @nonexistent :entity-id @also_missing :role "TEST")
+(cbu.assign-role :cbu-id @nonexistent :entity-id @also_missing :role "TEST")
 
 ;; ERROR: Invalid entity reference syntax
 ;; Expected: Diagnostic for malformed entity ref
@@ -106,7 +106,7 @@ cbu.create :name "No open paren")
 (cbu.create :name "Valid After Errors" :as @recovered)
 
 ;; This should parse correctly
-(cbu.get :id @recovered)
+(cbu.read :cbu-id @recovered)
 
 ;; ============================================================================
 ;; Section 7: Edge Cases

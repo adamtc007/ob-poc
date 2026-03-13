@@ -1570,7 +1570,7 @@ fn generate_commands_help() -> String {
 |-----|-----|
 | "create a fund called Lux Alpha" | `(cbu.create :name "Lux Alpha" :type FUND)` |
 | "add custody product" | `(cbu.add-product :product "Custody")` |
-| "who are the directors?" | `(cbu.list-roles :role DIRECTOR)` |
+| "who are the directors?" | `(cbu.parties :cbu-id @cbu)` |
 | "create person John Smith" | `(entity.create :name "John Smith" :type PERSON)` |
 | "find BlackRock" | `(entity.search :query "BlackRock")` |
 
@@ -2100,9 +2100,8 @@ fn build_verb_profiles(
     let reg = runtime_registry();
 
     // Helper: build arg profiles for a verb from the RuntimeVerbRegistry
-    let normalize_inline_text = |input: &str| -> String {
-        input.split_whitespace().collect::<Vec<_>>().join(" ")
-    };
+    let normalize_inline_text =
+        |input: &str| -> String { input.split_whitespace().collect::<Vec<_>>().join(" ") };
 
     let build_args = |fqn: &str| -> Vec<VerbArgProfile> {
         reg.get_by_name(fqn)
@@ -2136,10 +2135,7 @@ fn build_verb_profiles(
                             arg_type: type_label,
                             required: arg.required,
                             valid_values: arg.valid_values.clone(),
-                            description: arg
-                                .description
-                                .as_deref()
-                                .map(normalize_inline_text),
+                            description: arg.description.as_deref().map(normalize_inline_text),
                         }
                     })
                     .collect()
@@ -4591,7 +4587,9 @@ mod tests {
     #[test]
     fn test_execute_route_rejects_normal_session_flow_requests() {
         assert!(!is_raw_execute_request(&None));
-        assert!(!is_raw_execute_request(&Some(ExecuteDslRequest { dsl: None })));
+        assert!(!is_raw_execute_request(&Some(ExecuteDslRequest {
+            dsl: None
+        })));
         assert!(!is_raw_execute_request(&Some(ExecuteDslRequest {
             dsl: Some("   ".to_string()),
         })));

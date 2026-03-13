@@ -187,27 +187,27 @@ pub fn get_intent_patterns() -> HashMap<&'static str, Vec<&'static str>> {
         "list controllers", "who controls", "controlling parties"
     ]);
     
-    // === ROLE ASSIGNMENT (V2) ===
-    m.insert("cbu.role:assign", vec![
+    // === ROLE ASSIGNMENT ===
+    m.insert("cbu.assign-role", vec![
         "assign role", "add role to cbu", "entity role"
     ]);
-    m.insert("cbu.role:assign-ownership", vec![
+    m.insert("cbu.assign-ownership", vec![
         "assign ownership role", "shareholder role", "owner role"
     ]);
-    m.insert("cbu.role:assign-control", vec![
+    m.insert("cbu.assign-control", vec![
         "assign control role", "director role", "officer role"
     ]);
-    m.insert("cbu.role:assign-trust-role", vec![
+    m.insert("cbu.assign-trust-role", vec![
         "assign trust role", "trustee", "settlor", "beneficiary", "protector"
     ]);
-    m.insert("cbu.role:assign-fund-role", vec![
+    m.insert("cbu.assign-fund-role", vec![
         "assign fund role", "management company", "manco", "investment manager"
     ]);
-    m.insert("cbu.role:assign-service-provider", vec![
+    m.insert("cbu.assign-service-provider", vec![
         "assign service provider", "depositary", "custodian", "auditor",
         "administrator", "transfer agent"
     ]);
-    m.insert("cbu.role:assign-signatory", vec![
+    m.insert("cbu.assign-signatory", vec![
         "assign signatory", "authorized signatory", "authorized trader",
         "power of attorney"
     ]);
@@ -279,10 +279,9 @@ pub fn get_workflow_phases() -> HashMap<&'static str, Vec<&'static str>> {
     
     // Structure building phase
     m.insert("structure_building", vec![
-        "cbu.assign-role", "cbu.role:assign",
-        "cbu.role:assign-ownership", "cbu.role:assign-control",
-        "cbu.role:assign-trust-role", "cbu.role:assign-fund-role",
-        "cbu.role:assign-service-provider", "cbu.role:assign-signatory",
+        "cbu.assign-role", "cbu.assign-ownership", "cbu.assign-control",
+        "cbu.assign-trust-role", "cbu.assign-fund-role",
+        "cbu.assign-service-provider", "cbu.assign-signatory",
         "ubo.add-ownership", "control.add",
         "fund.link-feeder",
     ]);
@@ -326,7 +325,7 @@ pub fn get_graph_contexts() -> HashMap<&'static str, Vec<&'static str>> {
     
     // When cursor is on an entity node
     m.insert("cursor_on_entity", vec![
-        "entity.update", "cbu.role:assign",
+        "entity.update", "cbu.assign-role",
         "ubo.add-ownership", "ubo.list-owners", "ubo.list-owned",
         "control.add", "graph.ancestors", "graph.descendants",
     ]);
@@ -335,7 +334,7 @@ pub fn get_graph_contexts() -> HashMap<&'static str, Vec<&'static str>> {
     m.insert("cursor_on_fund", vec![
         "fund.list-subfunds", "fund.list-share-classes",
         "fund.create-subfund", "fund.create-share-class",
-        "cbu.role:assign-fund-role",
+        "cbu.assign-fund-role",
     ]);
     
     // When viewing UBO layer
@@ -347,14 +346,14 @@ pub fn get_graph_contexts() -> HashMap<&'static str, Vec<&'static str>> {
     
     // When viewing trading layer
     m.insert("layer_trading", vec![
-        "cbu.role:assign-signatory", "cbu.role:assign-service-provider",
+        "cbu.assign-signatory", "cbu.assign-service-provider",
         "fund.list-share-classes",
     ]);
     
     // When viewing control layer
     m.insert("layer_control", vec![
         "control.add", "control.list-controllers",
-        "cbu.role:assign-control",
+        "cbu.assign-control",
     ]);
     
     m
@@ -382,18 +381,18 @@ pub fn get_typical_next() -> HashMap<&'static str, Vec<&'static str>> {
         "ubo.add-ownership",
     ]);
     m.insert("entity.create-proper-person", vec![
-        "cbu.role:assign-control",
+        "cbu.assign-control",
         "ubo.register-ubo",
     ]);
     
     // After creating umbrella
     m.insert("fund.create-umbrella", vec![
         "fund.create-subfund",
-        "cbu.role:assign-fund-role",
+        "cbu.assign-fund-role",
     ]);
     m.insert("fund.ensure-umbrella", vec![
         "fund.ensure-subfund",
-        "cbu.role:assign-fund-role",
+        "cbu.assign-fund-role",
     ]);
     
     // After creating subfund

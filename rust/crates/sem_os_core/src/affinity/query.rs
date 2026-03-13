@@ -364,9 +364,9 @@ mod tests {
                 affinity_kind: AffinityKind::ProducesAttribute,
                 provenance: AffinityProvenance::AttributeSource,
             },
-            // cbu.get → ConsumesAttribute cbu.client_label (read-before-write: no producer)
+            // cbu.read → ConsumesAttribute cbu.client_label (read-before-write: no producer)
             AffinityEdge {
-                verb_fqn: "cbu.get".into(),
+                verb_fqn: "cbu.read".into(),
                 data_ref: DataRef::Attribute {
                     fqn: "cbu.client_label".into(),
                 },

@@ -50,6 +50,7 @@ use crate::mcp::scope_resolution::{ScopeContext, ScopeResolutionOutcome, ScopeRe
 use crate::mcp::verb_search::{
     check_ambiguity, HybridVerbSearcher, VerbSearchOutcome, VerbSearchResult,
 };
+use crate::semtaxonomy_v2::{parse_structured_intent_plan, StructuredIntentPlan};
 
 #[cfg(feature = "database")]
 use sqlx::PgPool;
@@ -496,6 +497,13 @@ impl IntentPipeline {
         domain_filter: Option<&str>,
         scope_ctx: ScopeContext,
     ) -> Result<PipelineResult> {
+        if let Err(error) = self.extract_nlci_plan(instruction).await {
+            tracing::warn!(
+                error = %error,
+                "NLCI structured-intent extraction failed during shadow execution"
+            );
+        }
+
         // Step 1: Find verb candidates via semantic search
         // Domain filter narrows results to relevant verbs (e.g., "session" domain for "set session...")
         // When allowed_verbs is set (Phase 3 CCIR), search is pre-constrained to SemReg-approved verbs.
@@ -624,7 +632,7 @@ impl IntentPipeline {
                 candidates: suggestion_candidates,
             } => {
                 // Low confidence but has suggestions - offer menu for learning
-                // This is the CRITICAL path for queries like "show me the cbus"
+                // This is the CRITICAL path for queries like "show me the deals"
                 // that fall between fallback_threshold and semantic_threshold.
                 // By showing a menu, we capture user selection as training data.
                 let verb_list: Vec<String> = suggestion_candidates
@@ -780,6 +788,13 @@ impl IntentPipeline {
                 None
             },
         })
+    }
+
+    async fn extract_nlci_plan(&self, instruction: &str) -> Result<StructuredIntentPlan> {
+        let llm = self.get_llm()?;
+        let system_prompt = include_str!("../dsl_v2/prompts/general_intent_extraction.md");
+        let response = llm.chat_json(system_prompt, instruction).await?;
+        parse_structured_intent_plan(extract_json_from_response(&response))
     }
 
     /// Extract arguments from instruction using LLM (structured output only)
@@ -1298,7 +1313,7 @@ mod tests {
     #[test]
     fn test_assemble_dsl_string() {
         let intent = StructuredIntent {
-            verb: "cbu.create".to_string(),
+            verb: "deal.create".to_string(),
             arguments: vec![
                 IntentArgument {
                     name: "name".to_string(),
@@ -1329,7 +1344,7 @@ mod tests {
 
         // assemble_dsl_string returns only the DSL string (Fix C)
         let dsl = pipeline.assemble_dsl_string(&intent).unwrap();
-        assert!(dsl.contains("cbu.create"));
+        assert!(dsl.contains("deal.create"));
         assert!(dsl.contains(":name \"Apex Fund\""));
         assert!(dsl.contains(":jurisdiction \"LU\""));
         assert!(dsl.contains(":client \"Allianz\""));

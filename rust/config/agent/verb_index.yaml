@@ -651,7 +651,14 @@ categories:
       - cbu.create
       - cbu.ensure
       - cbu.read
-      - cbu.update
+      - cbu.rename
+      - cbu.set-jurisdiction
+      - cbu.set-client-type
+      - cbu.set-commercial-client
+      - cbu.set-category
+      - cbu.submit-for-validation
+      - cbu.request-proof-update
+      - cbu.reopen-validation
       - cbu.delete
       - cbu.assign-role
       - cbu.remove-role

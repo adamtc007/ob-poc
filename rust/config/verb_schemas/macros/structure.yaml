@@ -1,7 +1,7 @@
 # Structure Domain Macros
 #
 # Operator vocabulary for fund/mandate structure operations.
-# These macros wrap DSL primitives (cbu.*, cbu-role.*) with business terminology.
+# These macros wrap canonical CBU DSL primitives (cbu.*) with business terminology.
 #
 # INVARIANTS:
 # - UI labels NEVER contain: cbu, entity_ref, trading-profile, kyc-case
@@ -143,7 +143,7 @@ structure.assign-role:
       key: structure.exists
 
   expands-to:
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "${arg.structure}"
         role: "${arg.role.internal}"
@@ -280,7 +280,7 @@ structure.roles:
       key: structure.exists
 
   expands-to:
-    - verb: cbu-role.list
+    - verb: cbu.parties
       args:
         cbu_id: "${arg.structure}"
 

@@ -38,10 +38,14 @@ use crate::mcp::verb_search::{
 };
 use crate::policy::{gate::PolicySnapshot, PolicyGate};
 use crate::sage::{
-    CoderResult, ObservationPlane, OutcomeStep, PendingMutation, SageConfidence, SageEngine,
-    UtteranceDisposition,
+    coder::CoderResolution, CoderResult, ObservationPlane, OutcomeStep, PendingMutation,
+    SageConfidence, SageEngine, UtteranceDisposition,
 };
 use crate::sem_reg::abac::ActorContext;
+use crate::semtaxonomy_v2::{
+    compiler_input_from_outcome_intent, supports_cbu_compiler_slice, CompilerSelection,
+    IntentCompiler,
+};
 
 use sem_os_client::SemOsClient;
 use sem_os_core::authoring::agent_mode::AgentMode;
@@ -86,6 +90,8 @@ pub struct OrchestratorContext {
     pub pre_sage_entity_name: Option<String>,
     /// Minimal recent Sage ledger from prior turns.
     pub recent_sage_intents: Vec<crate::sage::RecentIntent>,
+    /// Optional NLCI compiler hook for the deterministic replacement pipeline.
+    pub nlci_compiler: Option<Arc<dyn IntentCompiler>>,
 }
 
 /// Where the utterance originated.
@@ -198,7 +204,12 @@ fn build_mutation_confirmation(
     let subject_name = lookup
         .and_then(|lr| lr.dominant_entity.as_ref())
         .map(|entity| entity.canonical_name.as_str())
-        .or_else(|| intent.subject.as_ref().map(|subject| subject.mention.as_str()))
+        .or_else(|| {
+            intent
+                .subject
+                .as_ref()
+                .map(|subject| subject.mention.as_str())
+        })
         .unwrap_or("this");
 
     let mut change_summary = vec![format!("Resolved action: {}", coder_result.verb_fqn)];
@@ -238,7 +249,10 @@ fn can_use_sage_structure_fast_path(
 
     if intent.plane != ObservationPlane::Structure
         || intent.polarity != crate::sage::IntentPolarity::Read
-        || !matches!(intent.confidence, SageConfidence::High | SageConfidence::Medium)
+        || !matches!(
+            intent.confidence,
+            SageConfidence::High | SageConfidence::Medium
+        )
         || !intent.pending_clarifications.is_empty()
         || !coder_result.missing_args.is_empty()
     {
@@ -262,9 +276,7 @@ pub(crate) fn can_auto_execute_serve_result(verb_fqn: &str) -> bool {
     !can_skip_fast_path_parse_validation(verb_fqn)
 }
 
-fn read_only_list_fallback(
-    intent: &crate::sage::OutcomeIntent,
-) -> Option<CoderResult> {
+fn read_only_list_fallback(intent: &crate::sage::OutcomeIntent) -> Option<CoderResult> {
     if intent.polarity != crate::sage::IntentPolarity::Read || intent.domain_concept.is_empty() {
         return None;
     }
@@ -280,7 +292,9 @@ fn read_only_list_fallback(
     };
     let list_verb = format!("{domain}.list");
 
-    if (summary.contains(&plural_domain) || summary.starts_with("show ") || summary.starts_with("list "))
+    if (summary.contains(&plural_domain)
+        || summary.starts_with("show ")
+        || summary.starts_with("list "))
         && registry().get_by_name(&list_verb).is_some()
     {
         return Some(CoderResult {
@@ -387,7 +401,10 @@ fn can_use_coder_for_serve(
     }
 
     if !prepared.envelope.is_unavailable() && !prepared.envelope.is_deny_all() {
-        return prepared.envelope.allowed_verbs.contains(&coder_result.verb_fqn);
+        return prepared
+            .envelope
+            .allowed_verbs
+            .contains(&coder_result.verb_fqn);
     }
 
     !ctx.policy_gate.semreg_fail_closed()
@@ -404,11 +421,14 @@ async fn build_sage_serve_outcome(
 ) -> anyhow::Result<OrchestratorOutcome> {
     let pipeline_result =
         build_sage_fast_path_result(utterance, ctx.scope.clone(), intent, coder_result)?;
-    let candidates = vec![(coder_result.verb_fqn.clone(), pipeline_result
-        .verb_candidates
-        .first()
-        .map(|candidate| candidate.score)
-        .unwrap_or_default())];
+    let candidates = vec![(
+        coder_result.verb_fqn.clone(),
+        pipeline_result
+            .verb_candidates
+            .first()
+            .map(|candidate| candidate.score)
+            .unwrap_or_default(),
+    )];
     let chosen = Some(coder_result.verb_fqn.clone());
     let mut trace = build_trace(
         utterance,
@@ -570,7 +590,10 @@ async fn run_sage_stage(
     SageStageOutcome { intent }
 }
 
-fn run_coder_stage(intent: Option<&crate::sage::OutcomeIntent>) -> CoderStageOutcome {
+fn run_coder_stage(
+    ctx: &OrchestratorContext,
+    intent: Option<&crate::sage::OutcomeIntent>,
+) -> CoderStageOutcome {
     let Some(intent) = intent else {
         return CoderStageOutcome {
             result: None,
@@ -580,6 +603,45 @@ fn run_coder_stage(intent: Option<&crate::sage::OutcomeIntent>) -> CoderStageOut
     };
 
     let started_at = std::time::Instant::now();
+    if let Some(compiler) = &ctx.nlci_compiler {
+        let compiler_input = compiler_input_from_outcome_intent(
+            intent,
+            ctx.session_id,
+            ctx.dominant_entity_id,
+            ctx.pre_sage_entity_kind.as_deref(),
+            ctx.pre_sage_entity_name.as_deref(),
+        );
+        if supports_cbu_compiler_slice(&compiler_input) {
+            return match compiler.compile(compiler_input) {
+                Ok(output) => match output.selection {
+                    Some(selection) => CoderStageOutcome {
+                        result: Some(coder_result_from_compiler_selection(selection)),
+                        elapsed_ms: Some(started_at.elapsed().as_millis()),
+                        error: None,
+                    },
+                    None => CoderStageOutcome {
+                        result: None,
+                        elapsed_ms: Some(started_at.elapsed().as_millis()),
+                        error: Some(
+                            output
+                                .failure
+                                .map(|failure| failure.user_message)
+                                .unwrap_or_else(|| {
+                                    "NLCI compiler returned no selection for supported CBU intent"
+                                        .to_string()
+                                }),
+                        ),
+                    },
+                },
+                Err(error) => CoderStageOutcome {
+                    result: None,
+                    elapsed_ms: Some(started_at.elapsed().as_millis()),
+                    error: Some(error.to_string()),
+                },
+            };
+        }
+    }
+
     match crate::sage::CoderEngine::load().and_then(|engine| engine.resolve(intent)) {
         Ok(coder_result) => CoderStageOutcome {
             result: Some(coder_result),
@@ -592,6 +654,31 @@ fn run_coder_stage(intent: Option<&crate::sage::OutcomeIntent>) -> CoderStageOut
             error: Some(error.to_string()),
         },
     }
+}
+
+fn coder_result_from_compiler_selection(selection: CompilerSelection) -> CoderResult {
+    let dsl = render_selection_dsl(&selection);
+    CoderResult {
+        verb_fqn: selection.verb_id,
+        dsl,
+        resolution: CoderResolution::Confident,
+        missing_args: vec![],
+        unresolved_refs: vec![],
+        diagnostics: None,
+    }
+}
+
+fn render_selection_dsl(selection: &CompilerSelection) -> String {
+    let args = selection
+        .arguments
+        .iter()
+        .map(|(name, value)| format!(" :{} {}", name, render_dsl_string(value)))
+        .collect::<String>();
+    format!("({}{})", selection.verb_id, args)
+}
+
+fn render_dsl_string(value: &str) -> String {
+    format!("\"{}\"", value.replace('\\', "\\\\").replace('"', "\\\""))
 }
 
 /// Returns true for pipeline outcomes that are "early exits" -- scope resolution,
@@ -783,7 +870,11 @@ fn can_skip_fast_path_parse_validation(verb_fqn: &str) -> bool {
 /// 5. For matched-path outcomes: re-generate DSL via forced-verb if SemReg
 ///    changes the winning verb (ensures SemReg is binding, not cosmetic)
 /// 6. Build IntentTrace with full provenance
-fn apply_sage_trace_fields(trace: &mut IntentTrace, intent: &crate::sage::OutcomeIntent, source: &str) {
+fn apply_sage_trace_fields(
+    trace: &mut IntentTrace,
+    intent: &crate::sage::OutcomeIntent,
+    source: &str,
+) {
     trace.selection_source = source.to_string();
     trace.sage_plane = Some(format!("{:?}", intent.plane));
     trace.sage_polarity = Some(format!("{:?}", intent.polarity));
@@ -804,10 +895,28 @@ pub async fn handle_utterance(
         return legacy_handle_utterance(ctx, utterance).await;
     };
 
+    if let Some(compiler) = &ctx.nlci_compiler {
+        let compiler_input = compiler_input_from_outcome_intent(
+            &intent,
+            ctx.session_id,
+            ctx.dominant_entity_id,
+            ctx.pre_sage_entity_kind.as_deref(),
+            ctx.pre_sage_entity_name.as_deref(),
+        );
+        if !supports_cbu_compiler_slice(&compiler_input) {
+            if let Err(error) = compiler.compile(compiler_input) {
+                tracing::warn!(
+                    error = %error,
+                    "NLCI compiler hook failed during shadow compilation"
+                );
+            }
+        }
+    }
+
     match route(&intent) {
         UtteranceDisposition::Serve(_) => {
             let prepared = prepare_turn_context(ctx, utterance, Some(&intent)).await;
-            let coder_stage = run_coder_stage(Some(&intent));
+            let coder_stage = run_coder_stage(ctx, Some(&intent));
             let serve_candidate = coder_stage
                 .result
                 .clone()
@@ -899,7 +1008,7 @@ pub async fn handle_utterance(
                 return Ok(outcome);
             }
 
-            let coder_stage = run_coder_stage(Some(&delegate.outcome));
+            let coder_stage = run_coder_stage(ctx, Some(&delegate.outcome));
             let coder_result = coder_stage.result.as_ref();
             let coder_complete = coder_result
                 .map(|result| result.missing_args.is_empty() && result.unresolved_refs.is_empty())
@@ -990,7 +1099,7 @@ pub async fn legacy_handle_utterance(
 
     let sage_stage = run_sage_stage(ctx, utterance, sage_enabled).await;
     let sage_intent = sage_stage.intent;
-    let coder_stage = run_coder_stage(sage_intent.as_ref());
+    let coder_stage = run_coder_stage(ctx, sage_intent.as_ref());
     let sage_coder_result = coder_stage.result;
     let sage_coder_elapsed_ms = coder_stage.elapsed_ms;
     let sage_coder_error = coder_stage.error;
@@ -1708,12 +1817,15 @@ fn build_sage_fast_path_result(
                     entity_type: Some(loc.entity_type),
                     search_column: loc.search_column,
                     ref_id: loc.ref_id,
-            })
+                })
                 .collect::<Vec<_>>();
             (refs, None)
         }
         Err(_) if skip_parse_validation => (vec![], None),
-        Err(error) => (vec![], Some(format!("Parse error after assembly: {:?}", error))),
+        Err(error) => (
+            vec![],
+            Some(format!("Parse error after assembly: {:?}", error)),
+        ),
     };
 
     let (valid, validation_error) = match parse_error {
@@ -2750,6 +2862,8 @@ pub async fn resolve_allowed_verbs(
 mod tests {
     use super::*;
     use crate::dsl_v2::parse_program;
+    use crate::mcp::verb_search::HybridVerbSearcher;
+    use uuid::Uuid;
 
     /// Helper to build a default IntentTrace for tests.
     fn default_trace() -> IntentTrace {
@@ -2825,17 +2939,17 @@ mod tests {
     #[test]
     fn test_intent_trace_forced_verb_field() {
         let mut trace = default_trace();
-        trace.utterance = "create a fund".into();
-        trace.verb_candidates_post_filter = vec![("cbu.create".into(), 1.0)];
-        trace.final_verb = Some("cbu.create".into());
+        trace.utterance = "create a deal".into();
+        trace.verb_candidates_post_filter = vec![("deal.create".into(), 1.0)];
+        trace.final_verb = Some("deal.create".into());
         trace.final_confidence = 1.0;
-        trace.dsl_generated = Some("(cbu.create)".into());
+        trace.dsl_generated = Some("(deal.create)".into());
         trace.dsl_source = Some("chat".into());
-        trace.forced_verb = Some("cbu.create".into());
+        trace.forced_verb = Some("deal.create".into());
 
         let json = serde_json::to_string(&trace).unwrap();
         assert!(json.contains("forced_verb"));
-        assert!(json.contains("cbu.create"));
+        assert!(json.contains("deal.create"));
     }
 
     #[test]
@@ -2914,17 +3028,20 @@ mod tests {
             explain: crate::sage::SageExplain::default(),
             coder_handoff: crate::sage::CoderHandoff::default(),
         };
-        assert!(matches!(route(&read_intent), UtteranceDisposition::Serve(_)));
+        assert!(matches!(
+            route(&read_intent),
+            UtteranceDisposition::Serve(_)
+        ));
 
         let write_intent = crate::sage::OutcomeIntent {
-            summary: "create a new cbu".into(),
+            summary: "create a new deal".into(),
             plane: ObservationPlane::Instance,
             polarity: crate::sage::IntentPolarity::Write,
-            domain_concept: "cbu".into(),
+            domain_concept: "deal".into(),
             action: crate::sage::OutcomeAction::Create,
             subject: Some(crate::sage::EntityRef {
-                mention: "Allianz UK Fund".into(),
-                kind_hint: Some("cbu".into()),
+                mention: "Allianz UK Deal".into(),
+                kind_hint: Some("deal".into()),
                 uuid: None,
             }),
             steps: vec![],
@@ -2951,14 +3068,14 @@ mod tests {
     #[test]
     fn test_build_mutation_confirmation_hides_dsl() {
         let intent = crate::sage::OutcomeIntent {
-            summary: "create a new cbu".into(),
+            summary: "create a new deal".into(),
             plane: ObservationPlane::Instance,
             polarity: crate::sage::IntentPolarity::Write,
-            domain_concept: "cbu".into(),
+            domain_concept: "deal".into(),
             action: crate::sage::OutcomeAction::Create,
             subject: Some(crate::sage::EntityRef {
-                mention: "Allianz UK Fund".into(),
-                kind_hint: Some("cbu".into()),
+                mention: "Allianz UK Deal".into(),
+                kind_hint: Some("deal".into()),
                 uuid: None,
             }),
             steps: vec![],
@@ -2969,8 +3086,8 @@ mod tests {
             coder_handoff: crate::sage::CoderHandoff::default(),
         };
         let coder_result = CoderResult {
-            verb_fqn: "cbu.create".into(),
-            dsl: "(cbu.create :name \"Allianz UK Fund\")".into(),
+            verb_fqn: "deal.create".into(),
+            dsl: "(deal.create :name \"Allianz UK Deal\")".into(),
             resolution: crate::sage::coder::CoderResolution::Confident,
             missing_args: vec![],
             unresolved_refs: vec![],
@@ -2978,9 +3095,9 @@ mod tests {
         };
 
         let pending = build_mutation_confirmation(&intent, &coder_result, None);
-        assert!(pending.confirmation_text.contains("create Allianz UK Fund"));
-        assert!(!pending.confirmation_text.contains("cbu.create"));
-        assert_eq!(pending.change_summary[0], "Resolved action: cbu.create");
+        assert!(pending.confirmation_text.contains("create Allianz UK Deal"));
+        assert!(!pending.confirmation_text.contains("deal.create"));
+        assert_eq!(pending.change_summary[0], "Resolved action: deal.create");
     }
 
     #[test]
@@ -3108,6 +3225,396 @@ mod tests {
 
         assert_eq!(filtered.len(), 1);
         assert_eq!(filtered[0].verb, "schema.entity.describe");
+    }
+
+    fn make_test_context() -> OrchestratorContext {
+        OrchestratorContext {
+            actor: crate::sem_reg::abac::ActorContext {
+                actor_id: "test.user".to_string(),
+                roles: vec!["operator".to_string()],
+                department: None,
+                clearance: None,
+                jurisdictions: vec![],
+            },
+            session_id: Some(Uuid::new_v4()),
+            case_id: None,
+            dominant_entity_id: Some(
+                Uuid::parse_str("123e4567-e89b-12d3-a456-426614174000").expect("valid uuid"),
+            ),
+            scope: None,
+            pool: sqlx::PgPool::connect_lazy("postgres://localhost/test").expect("lazy pool"),
+            verb_searcher: std::sync::Arc::new(HybridVerbSearcher::minimal()),
+            lookup_service: None,
+            policy_gate: std::sync::Arc::new(crate::policy::PolicyGate::strict()),
+            source: UtteranceSource::Chat,
+            sem_os_client: None,
+            agent_mode: sem_os_core::authoring::agent_mode::AgentMode::default(),
+            goals: vec![],
+            stage_focus: None,
+            sage_engine: None,
+            pre_sage_entity_kind: Some("cbu".to_string()),
+            pre_sage_entity_name: Some("Current CBU".to_string()),
+            recent_sage_intents: vec![],
+            nlci_compiler: Some(crate::semtaxonomy_v2::build_minimal_cbu_compiler()),
+        }
+    }
+
+    fn make_unscoped_test_context() -> OrchestratorContext {
+        OrchestratorContext {
+            dominant_entity_id: None,
+            pre_sage_entity_kind: None,
+            pre_sage_entity_name: None,
+            ..make_test_context()
+        }
+    }
+
+    fn make_cbu_intent(
+        action: crate::sage::OutcomeAction,
+        params: Vec<(&str, &str)>,
+    ) -> crate::sage::OutcomeIntent {
+        crate::sage::OutcomeIntent {
+            summary: "test".to_string(),
+            plane: ObservationPlane::Instance,
+            polarity: if matches!(action, crate::sage::OutcomeAction::Read) {
+                crate::sage::IntentPolarity::Read
+            } else {
+                crate::sage::IntentPolarity::Write
+            },
+            domain_concept: "cbu".to_string(),
+            action: action.clone(),
+            subject: None,
+            steps: vec![crate::sage::OutcomeStep {
+                action,
+                target: "cbu".to_string(),
+                params: params
+                    .into_iter()
+                    .map(|(name, value)| (name.to_string(), value.to_string()))
+                    .collect(),
+                notes: None,
+            }],
+            confidence: SageConfidence::High,
+            pending_clarifications: vec![],
+            hints: crate::sage::UtteranceHints::default(),
+            explain: crate::sage::SageExplain::default(),
+            coder_handoff: crate::sage::CoderHandoff::default(),
+        }
+    }
+
+    fn make_cbu_intent_with_summary_and_notes(
+        action: crate::sage::OutcomeAction,
+        summary: &str,
+        notes: Option<&str>,
+    ) -> crate::sage::OutcomeIntent {
+        crate::sage::OutcomeIntent {
+            summary: summary.to_string(),
+            plane: ObservationPlane::Instance,
+            polarity: if matches!(action, crate::sage::OutcomeAction::Read) {
+                crate::sage::IntentPolarity::Read
+            } else {
+                crate::sage::IntentPolarity::Write
+            },
+            domain_concept: "cbu".to_string(),
+            action: action.clone(),
+            subject: None,
+            steps: vec![crate::sage::OutcomeStep {
+                action,
+                target: "cbu".to_string(),
+                params: std::collections::HashMap::new(),
+                notes: notes.map(str::to_string),
+            }],
+            confidence: SageConfidence::High,
+            pending_clarifications: vec![],
+            hints: crate::sage::UtteranceHints::default(),
+            explain: crate::sage::SageExplain::default(),
+            coder_handoff: crate::sage::CoderHandoff::default(),
+        }
+    }
+
+    #[test]
+    fn test_run_coder_stage_uses_compiler_for_cbu_read() {
+        let ctx = make_test_context();
+        let intent = make_cbu_intent(crate::sage::OutcomeAction::Read, vec![]);
+
+        let stage = run_coder_stage(&ctx, Some(&intent));
+        let result = stage.result.expect("compiler-backed result should exist");
+
+        assert_eq!(result.verb_fqn, "cbu.read");
+        assert_eq!(
+            result.dsl,
+            "(cbu.read :cbu-id \"123e4567-e89b-12d3-a456-426614174000\")"
+        );
+    }
+
+    #[test]
+    fn test_run_coder_stage_uses_compiler_for_cbu_list() {
+        let ctx = make_unscoped_test_context();
+        let intent = make_cbu_intent_with_summary_and_notes(
+            crate::sage::OutcomeAction::Read,
+            "Show me the CBUs",
+            Some("show all cbus"),
+        );
+
+        let stage = run_coder_stage(&ctx, Some(&intent));
+        let result = stage.result.expect("compiler-backed result should exist");
+
+        assert_eq!(result.verb_fqn, "cbu.list");
+        assert_eq!(result.dsl, "(cbu.list)");
+    }
+
+    #[test]
+    fn test_run_coder_stage_uses_compiler_for_cbu_list_with_filter() {
+        let ctx = make_unscoped_test_context();
+        let intent = make_cbu_intent(
+            crate::sage::OutcomeAction::Read,
+            vec![("jurisdiction", "LU"), ("client-type", "FUND")],
+        );
+
+        let stage = run_coder_stage(&ctx, Some(&intent));
+        let result = stage.result.expect("compiler-backed result should exist");
+
+        assert_eq!(result.verb_fqn, "cbu.list");
+        assert_eq!(
+            result.dsl,
+            "(cbu.list :jurisdiction \"LU\" :client-type \"FUND\")"
+        );
+    }
+
+    #[test]
+    fn test_run_coder_stage_uses_compiler_for_cbu_create() {
+        let ctx = make_test_context();
+        let intent = make_cbu_intent(
+            crate::sage::OutcomeAction::Create,
+            vec![
+                ("name", "Apex Growth Fund"),
+                ("jurisdiction", "LU"),
+                ("client-type", "FUND"),
+            ],
+        );
+
+        let stage = run_coder_stage(&ctx, Some(&intent));
+        let result = stage.result.expect("compiler-backed result should exist");
+
+        assert_eq!(result.verb_fqn, "cbu.create");
+        assert_eq!(
+            result.dsl,
+            "(cbu.create :name \"Apex Growth Fund\" :jurisdiction \"LU\" :client-type \"FUND\")"
+        );
+    }
+
+    #[test]
+    fn test_run_coder_stage_uses_compiler_for_cbu_create_with_commercial_client() {
+        let ctx = make_test_context();
+        let intent = make_cbu_intent(
+            crate::sage::OutcomeAction::Create,
+            vec![
+                ("name", "Apex Growth Fund"),
+                (
+                    "commercial-client-entity-id",
+                    "123e4567-e89b-12d3-a456-426614174111",
+                ),
+            ],
+        );
+
+        let stage = run_coder_stage(&ctx, Some(&intent));
+        let result = stage.result.expect("compiler-backed result should exist");
+
+        assert_eq!(result.verb_fqn, "cbu.create");
+        assert_eq!(
+            result.dsl,
+            "(cbu.create :name \"Apex Growth Fund\" :commercial-client-entity-id \"123e4567-e89b-12d3-a456-426614174111\")"
+        );
+    }
+
+    #[test]
+    fn test_run_coder_stage_uses_compiler_for_cbu_create_with_fund_entity() {
+        let ctx = make_test_context();
+        let intent = make_cbu_intent(
+            crate::sage::OutcomeAction::Create,
+            vec![
+                ("name", "Apex Growth Fund"),
+                ("fund-entity-id", "123e4567-e89b-12d3-a456-426614174222"),
+            ],
+        );
+
+        let stage = run_coder_stage(&ctx, Some(&intent));
+        let result = stage.result.expect("compiler-backed result should exist");
+
+        assert_eq!(result.verb_fqn, "cbu.create");
+        assert_eq!(
+            result.dsl,
+            "(cbu.create :name \"Apex Growth Fund\" :fund-entity-id \"123e4567-e89b-12d3-a456-426614174222\")"
+        );
+    }
+
+    #[test]
+    fn test_run_coder_stage_uses_compiler_for_cbu_create_with_manco_entity() {
+        let ctx = make_test_context();
+        let intent = make_cbu_intent(
+            crate::sage::OutcomeAction::Create,
+            vec![
+                ("name", "Apex Growth Fund"),
+                ("manco-entity-id", "123e4567-e89b-12d3-a456-426614174333"),
+            ],
+        );
+
+        let stage = run_coder_stage(&ctx, Some(&intent));
+        let result = stage.result.expect("compiler-backed result should exist");
+
+        assert_eq!(result.verb_fqn, "cbu.create");
+        assert_eq!(
+            result.dsl,
+            "(cbu.create :name \"Apex Growth Fund\" :manco-entity-id \"123e4567-e89b-12d3-a456-426614174333\")"
+        );
+    }
+
+    #[test]
+    fn test_run_coder_stage_uses_compiler_for_cbu_rename() {
+        let ctx = make_test_context();
+        let intent = make_cbu_intent(
+            crate::sage::OutcomeAction::Update,
+            vec![("name", "Apex Growth Fund")],
+        );
+
+        let stage = run_coder_stage(&ctx, Some(&intent));
+        let result = stage.result.expect("compiler-backed result should exist");
+
+        assert_eq!(result.verb_fqn, "cbu.rename");
+        assert_eq!(
+            result.dsl,
+            "(cbu.rename :cbu-id \"123e4567-e89b-12d3-a456-426614174000\" :name \"Apex Growth Fund\")"
+        );
+    }
+
+    #[test]
+    fn test_run_coder_stage_uses_compiler_for_cbu_set_jurisdiction() {
+        let ctx = make_test_context();
+        let intent = make_cbu_intent(
+            crate::sage::OutcomeAction::Update,
+            vec![("jurisdiction", "LU")],
+        );
+
+        let stage = run_coder_stage(&ctx, Some(&intent));
+        let result = stage.result.expect("compiler-backed result should exist");
+
+        assert_eq!(result.verb_fqn, "cbu.set-jurisdiction");
+        assert_eq!(
+            result.dsl,
+            "(cbu.set-jurisdiction :cbu-id \"123e4567-e89b-12d3-a456-426614174000\" :jurisdiction \"LU\")"
+        );
+    }
+
+    #[test]
+    fn test_run_coder_stage_uses_compiler_for_cbu_set_client_type() {
+        let ctx = make_test_context();
+        let intent = make_cbu_intent(
+            crate::sage::OutcomeAction::Update,
+            vec![("client-type", "FUND")],
+        );
+
+        let stage = run_coder_stage(&ctx, Some(&intent));
+        let result = stage.result.expect("compiler-backed result should exist");
+
+        assert_eq!(result.verb_fqn, "cbu.set-client-type");
+        assert_eq!(
+            result.dsl,
+            "(cbu.set-client-type :cbu-id \"123e4567-e89b-12d3-a456-426614174000\" :client-type \"FUND\")"
+        );
+    }
+
+    #[test]
+    fn test_run_coder_stage_uses_compiler_for_cbu_set_commercial_client() {
+        let ctx = make_test_context();
+        let intent = make_cbu_intent(
+            crate::sage::OutcomeAction::Update,
+            vec![(
+                "commercial-client-entity-id",
+                "123e4567-e89b-12d3-a456-426614174111",
+            )],
+        );
+
+        let stage = run_coder_stage(&ctx, Some(&intent));
+        let result = stage.result.expect("compiler-backed result should exist");
+
+        assert_eq!(result.verb_fqn, "cbu.set-commercial-client");
+        assert_eq!(
+            result.dsl,
+            "(cbu.set-commercial-client :cbu-id \"123e4567-e89b-12d3-a456-426614174000\" :commercial-client-entity-id \"123e4567-e89b-12d3-a456-426614174111\")"
+        );
+    }
+
+    #[test]
+    fn test_run_coder_stage_uses_compiler_for_cbu_set_category() {
+        let ctx = make_test_context();
+        let intent = make_cbu_intent(
+            crate::sage::OutcomeAction::Update,
+            vec![("category", "FUND_MANDATE")],
+        );
+
+        let stage = run_coder_stage(&ctx, Some(&intent));
+        let result = stage.result.expect("compiler-backed result should exist");
+
+        assert_eq!(result.verb_fqn, "cbu.set-category");
+        assert_eq!(
+            result.dsl,
+            "(cbu.set-category :cbu-id \"123e4567-e89b-12d3-a456-426614174000\" :category \"FUND_MANDATE\")"
+        );
+    }
+
+    #[test]
+    fn test_run_coder_stage_uses_compiler_for_cbu_submit_for_validation() {
+        let ctx = make_test_context();
+        let intent = make_cbu_intent_with_summary_and_notes(
+            crate::sage::OutcomeAction::Update,
+            "Submit the current CBU for validation",
+            Some("move lifecycle into validation review"),
+        );
+
+        let stage = run_coder_stage(&ctx, Some(&intent));
+        let result = stage.result.expect("compiler-backed result should exist");
+
+        assert_eq!(result.verb_fqn, "cbu.submit-for-validation");
+        assert_eq!(
+            result.dsl,
+            "(cbu.submit-for-validation :cbu-id \"123e4567-e89b-12d3-a456-426614174000\")"
+        );
+    }
+
+    #[test]
+    fn test_run_coder_stage_uses_compiler_for_cbu_request_proof_update() {
+        let ctx = make_test_context();
+        let intent = make_cbu_intent_with_summary_and_notes(
+            crate::sage::OutcomeAction::Update,
+            "Request proof update for the current CBU",
+            Some("move to update pending proof"),
+        );
+
+        let stage = run_coder_stage(&ctx, Some(&intent));
+        let result = stage.result.expect("compiler-backed result should exist");
+
+        assert_eq!(result.verb_fqn, "cbu.request-proof-update");
+        assert_eq!(
+            result.dsl,
+            "(cbu.request-proof-update :cbu-id \"123e4567-e89b-12d3-a456-426614174000\")"
+        );
+    }
+
+    #[test]
+    fn test_run_coder_stage_uses_compiler_for_cbu_reopen_validation() {
+        let ctx = make_test_context();
+        let intent = make_cbu_intent_with_summary_and_notes(
+            crate::sage::OutcomeAction::Update,
+            "Reopen validation for the current CBU",
+            Some("move failed cbu back to validation"),
+        );
+
+        let stage = run_coder_stage(&ctx, Some(&intent));
+        let result = stage.result.expect("compiler-backed result should exist");
+
+        assert_eq!(result.verb_fqn, "cbu.reopen-validation");
+        assert_eq!(
+            result.dsl,
+            "(cbu.reopen-validation :cbu-id \"123e4567-e89b-12d3-a456-426614174000\")"
+        );
     }
 
     #[test]
@@ -3364,7 +3871,7 @@ mod tests {
     #[test]
     fn test_ast_verb_extraction_single_verb() {
         use dsl_core::ast::Statement;
-        let dsl = "(cbu.create :name \"Test\")";
+        let dsl = "(deal.create :name \"Test\")";
         let program = parse_program(dsl).expect("valid DSL");
         let verbs: Vec<String> = program
             .statements
@@ -3378,7 +3885,7 @@ mod tests {
             })
             .collect();
         assert_eq!(verbs.len(), 1);
-        assert_eq!(verbs[0], "cbu.create");
+        assert_eq!(verbs[0], "deal.create");
     }
 
     #[test]

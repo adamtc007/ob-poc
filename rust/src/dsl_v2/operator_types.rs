@@ -63,7 +63,7 @@ pub enum OperatorType {
     DocumentRef,
 
     /// Reference to a role assignment
-    /// Internal: cbu-role
+    /// Internal: role
     RoleRef,
 }
 
@@ -82,7 +82,7 @@ impl OperatorType {
             Self::CaseRef => &["kyc-case"],
             Self::MandateRef => &["trading-profile"],
             Self::DocumentRef => &["document"],
-            Self::RoleRef => &["cbu-role"],
+            Self::RoleRef => &["role"],
         }
     }
 

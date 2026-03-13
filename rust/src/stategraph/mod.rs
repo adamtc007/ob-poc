@@ -189,7 +189,11 @@ pub fn validate_graphs(graphs: &[StateGraph]) -> Result<()> {
         let mut node_ids = BTreeSet::new();
         for node in &graph.nodes {
             if !node_ids.insert(node.node_id.clone()) {
-                return Err(anyhow!("duplicate node '{}' in graph '{}'", node.node_id, graph.graph_id));
+                return Err(anyhow!(
+                    "duplicate node '{}' in graph '{}'",
+                    node.node_id,
+                    graph.graph_id
+                ));
             }
         }
         for edge in &graph.edges {
@@ -201,10 +205,19 @@ pub fn validate_graphs(graphs: &[StateGraph]) -> Result<()> {
                 ));
             }
             for verb_id in &edge.verb_ids {
-                let (domain, verb) = verb_id
-                    .split_once('.')
-                    .ok_or_else(|| anyhow!("invalid verb id '{}' in graph '{}'", verb_id, graph.graph_id))?;
-                if !verbs.domains.get(domain).and_then(|cfg| cfg.verbs.get(verb)).is_some() {
+                let (domain, verb) = verb_id.split_once('.').ok_or_else(|| {
+                    anyhow!(
+                        "invalid verb id '{}' in graph '{}'",
+                        verb_id,
+                        graph.graph_id
+                    )
+                })?;
+                if !verbs
+                    .domains
+                    .get(domain)
+                    .and_then(|cfg| cfg.verbs.get(verb))
+                    .is_some()
+                {
                     return Err(anyhow!(
                         "graph '{}' references missing verb '{}'",
                         graph.graph_id,
@@ -248,7 +261,9 @@ pub fn validate_graphs(graphs: &[StateGraph]) -> Result<()> {
 /// ```
 pub fn evaluate_signal(signal: &str, entity_context: &Value) -> bool {
     let signal_value = &entity_context["signals"][signal];
-    signal_value.as_bool().unwrap_or_else(|| signal_value.as_i64().unwrap_or(0) > 0)
+    signal_value
+        .as_bool()
+        .unwrap_or_else(|| signal_value.as_i64().unwrap_or(0) > 0)
 }
 
 /// Walk a validated graph for a grounded entity context.
@@ -332,7 +347,13 @@ pub fn walk_graph(graph: &StateGraph, entity_context: &Value) -> Result<GraphWal
                         .metadata
                         .as_ref()
                         .and_then(|metadata| metadata.side_effects.as_deref())
-                        .map(|side_effects| if side_effects == "facts_only" { "read" } else { "write" })
+                        .map(|side_effects| {
+                            if side_effects == "facts_only" {
+                                "read"
+                            } else {
+                                "write"
+                            }
+                        })
                         .unwrap_or("write")
                         .to_string(),
                     invocation_phrases: verb.invocation_phrases.clone(),
@@ -409,8 +430,14 @@ pub fn walk_graph(graph: &StateGraph, entity_context: &Value) -> Result<GraphWal
         .collect::<Vec<_>>();
 
     Ok(GraphWalkResult {
-        entity_id: entity_context["entity_id"].to_string().trim_matches('"').to_string(),
-        entity_name: entity_context["name"].as_str().unwrap_or("unknown").to_string(),
+        entity_id: entity_context["entity_id"]
+            .to_string()
+            .trim_matches('"')
+            .to_string(),
+        entity_name: entity_context["name"]
+            .as_str()
+            .unwrap_or("unknown")
+            .to_string(),
         graph_id: graph.graph_id.clone(),
         satisfied_nodes: satisfied_nodes.into_iter().collect(),
         frontier_nodes: frontier_nodes.into_iter().collect(),

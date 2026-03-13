@@ -95,12 +95,8 @@ pub fn discover_dsl(
         }
     }
 
-    let governance_context = build_governance_context(
-        graph,
-        &suggested_sequence,
-        subject_id,
-        policy_check,
-    );
+    let governance_context =
+        build_governance_context(graph, &suggested_sequence, subject_id, policy_check);
 
     DiscoveryResponse {
         intent_matches,
@@ -271,8 +267,7 @@ pub fn synthesize_chain(
             )
         })
         .filter(|(verb, shared_refs, produces_lookup_hits, _)| {
-            verb != primary_verb
-                && (*produces_lookup_hits > 0 || !shared_refs.is_empty())
+            verb != primary_verb && (*produces_lookup_hits > 0 || !shared_refs.is_empty())
         })
         .collect::<Vec<_>>();
 
@@ -284,9 +279,8 @@ pub fn synthesize_chain(
 
     let mut chain = Vec::new();
     let prereq_limit = max_chain_length.saturating_sub(1);
-    for (verb, shared_refs, produces_lookup_hits, footprint) in prerequisites
-        .into_iter()
-        .take(prereq_limit)
+    for (verb, shared_refs, produces_lookup_hits, footprint) in
+        prerequisites.into_iter().take(prereq_limit)
     {
         let args = verb_contracts
             .iter()
@@ -375,10 +369,7 @@ pub fn generate_disambiguation(
 
     if verb.requires_subject && subject_id.is_none() {
         prompts.push(DisambiguationPrompt {
-            question: format!(
-                "What subject entity should '{}' run against?",
-                verb.fqn
-            ),
+            question: format!("What subject entity should '{}' run against?", verb.fqn),
             lookup: Some("entities".to_owned()),
             options: Vec::new(),
         });
@@ -477,7 +468,13 @@ fn normalize(text: &str) -> String {
     let lower = text.to_lowercase();
     lower
         .chars()
-        .map(|ch| if ch.is_alphanumeric() || ch.is_whitespace() { ch } else { ' ' })
+        .map(|ch| {
+            if ch.is_alphanumeric() || ch.is_whitespace() {
+                ch
+            } else {
+                ' '
+            }
+        })
         .collect::<String>()
         .split_whitespace()
         .collect::<Vec<_>>()

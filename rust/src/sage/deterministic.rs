@@ -35,7 +35,13 @@ impl SageEngine for DeterministicSage {
 
         let domain_concept = select_domain_concept(utterance, &pre.domain_hints);
         let subject = extract_subject(utterance, &action, &domain_concept);
-        let steps = build_steps(utterance, pre.sage_only, &action, &domain_concept, subject.as_ref());
+        let steps = build_steps(
+            utterance,
+            pre.sage_only,
+            &action,
+            &domain_concept,
+            subject.as_ref(),
+        );
         let confidence = confidence_for(&pre, &domain_concept);
         let summary = if pre.sage_only && !domain_concept.is_empty() {
             format!(
@@ -119,7 +125,11 @@ fn build_explain(
         super::IntentPolarity::Write => "confirmation_required",
     };
     let understanding = if let Some(subject) = hints.subject_phrase.as_deref() {
-        format!("So you want to {} {}.", OutcomeAction::from_first_word(utterance).as_str(), subject)
+        format!(
+            "So you want to {} {}.",
+            OutcomeAction::from_first_word(utterance).as_str(),
+            subject
+        )
     } else {
         format!("So you want to {}.", utterance.trim())
     };
@@ -200,7 +210,10 @@ fn populate_instance_params(
     subject: Option<&super::outcome::EntityRef>,
 ) {
     if matches!(action, OutcomeAction::Create) {
-        if let Some(subject) = subject.map(|subject| subject.mention.trim()).filter(|s| !s.is_empty()) {
+        if let Some(subject) = subject
+            .map(|subject| subject.mention.trim())
+            .filter(|s| !s.is_empty())
+        {
             params.insert("name".to_string(), subject.to_string());
         } else if let Some(name) = extract_name_after_keyword(utterance, "called") {
             params.insert("name".to_string(), name);
@@ -238,7 +251,9 @@ fn extract_name_after_keyword(utterance: &str, keyword: &str) -> Option<String> 
     let lower = normalized.to_ascii_lowercase();
     let needle = format!(" {keyword} ");
     let start = lower.find(&needle).map(|idx| idx + needle.len())?;
-    let candidate = normalized[start..].trim().trim_matches(|c| c == '"' || c == '\'');
+    let candidate = normalized[start..]
+        .trim()
+        .trim_matches(|c| c == '"' || c == '\'');
     if candidate.is_empty() {
         None
     } else {
@@ -446,18 +461,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_deterministic_sage_coder_resolves_plural_cbus_to_list() {
-        let sage = DeterministicSage;
-        let ctx = empty_ctx();
-        let outcome = sage.classify("show me the cbus", &ctx).await.unwrap();
-        let coder = CoderEngine::load().unwrap();
-        let result = coder.resolve(&outcome).unwrap();
-
-        assert_eq!(outcome.domain_concept, "cbu");
-        assert_eq!(result.verb_fqn, "cbu.list");
-    }
-
-    #[tokio::test]
     async fn test_deterministic_sage_preserves_inventory_summary_for_deal_list() {
         let sage = DeterministicSage;
         let ctx = empty_ctx();
@@ -484,7 +487,10 @@ mod tests {
         let result = coder.resolve(&outcome).unwrap();
 
         assert_eq!(
-            outcome.subject.as_ref().map(|subject| subject.mention.as_str()),
+            outcome
+                .subject
+                .as_ref()
+                .map(|subject| subject.mention.as_str()),
             Some("Allianz UK Fund")
         );
         assert_eq!(

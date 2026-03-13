@@ -67,7 +67,6 @@ static DISPLAY_NOUN_MAP: LazyLock<HashMap<&'static str, &'static str>> = LazyLoc
     m.insert("legal-person", "Company");
 
     // Role types
-    m.insert("cbu-role", "Role");
     m.insert("role", "Role");
     m.insert("general-partner", "General Partner");
     m.insert("limited-partner", "Limited Partner");
@@ -149,8 +148,7 @@ pub const FORBIDDEN_UI_TOKENS: &[&str] = &[
     "trading_profile",
     "kyc-case",
     "kyc_case",
-    "cbu-role",
-    "cbu_role",
+    "role_ref",
     "entity_id",
     "entity-id",
 ];
@@ -200,7 +198,7 @@ mod tests {
         assert_eq!(display_noun("kyc-case"), "Case");
         assert_eq!(display_noun("person"), "Person");
         assert_eq!(display_noun("company"), "Company");
-        assert_eq!(display_noun("cbu-role"), "Role");
+        assert_eq!(display_noun("role"), "Role");
     }
 
     #[test]

@@ -303,13 +303,14 @@ async fn get_cap_table(
     let share_classes = get_share_classes_internal(&pool, issuer_id).await?;
 
     // Get holder positions using fn_holder_control_position
-    let holder_rows = sqlx::query(r#"SELECT * FROM "ob-poc".fn_holder_control_position($1, $2, $3)"#)
-        .bind(issuer_id)
-        .bind(as_of)
-        .bind(basis)
-        .fetch_all(&pool)
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let holder_rows =
+        sqlx::query(r#"SELECT * FROM "ob-poc".fn_holder_control_position($1, $2, $3)"#)
+            .bind(issuer_id)
+            .bind(as_of)
+            .bind(basis)
+            .fetch_all(&pool)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     let mut holders = Vec::new();
     let mut total_votes = 0.0;
@@ -748,13 +749,14 @@ async fn get_ownership_graph(
     }
 
     // Get holder positions and add as nodes with edges
-    let holder_rows = sqlx::query(r#"SELECT * FROM "ob-poc".fn_holder_control_position($1, $2, $3)"#)
-        .bind(issuer_id)
-        .bind(as_of)
-        .bind(basis)
-        .fetch_all(&pool)
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let holder_rows =
+        sqlx::query(r#"SELECT * FROM "ob-poc".fn_holder_control_position($1, $2, $3)"#)
+            .bind(issuer_id)
+            .bind(as_of)
+            .bind(basis)
+            .fetch_all(&pool)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     for row in &holder_rows {
         let holder_id: Uuid = row.try_get("holder_entity_id").unwrap_or(Uuid::nil());

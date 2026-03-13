@@ -154,8 +154,8 @@ mod tests {
                 domain: None,
             },
             VerbCandidate {
-                verb_fqn: "cbu.create".to_string(),
-                description: "Create CBU".to_string(),
+                verb_fqn: "deal.create".to_string(),
+                description: "Create deal".to_string(),
                 score: 0.65,
                 example: None,
                 domain: None,
@@ -199,8 +199,8 @@ mod tests {
     #[test]
     fn test_derive_outcome_below_threshold() {
         let candidates = vec![VerbCandidate {
-            verb_fqn: "cbu.create".to_string(),
-            description: "Create CBU".to_string(),
+            verb_fqn: "deal.create".to_string(),
+            description: "Create deal".to_string(),
             score: 0.40,
             example: None,
             domain: None,
@@ -214,15 +214,15 @@ mod tests {
     #[test]
     fn test_derive_outcome_single_above_threshold() {
         let candidates = vec![VerbCandidate {
-            verb_fqn: "cbu.create".to_string(),
-            description: "Create CBU".to_string(),
+            verb_fqn: "deal.create".to_string(),
+            description: "Create deal".to_string(),
             score: 0.88,
             example: None,
             domain: None,
         }];
         match derive_outcome(&candidates) {
             MatchOutcome::Matched { verb, confidence } => {
-                assert_eq!(verb, "cbu.create");
+                assert_eq!(verb, "deal.create");
                 assert!(confidence > 0.85);
             }
             other => panic!("Expected Matched, got {:?}", other),

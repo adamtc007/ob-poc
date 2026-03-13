@@ -6,7 +6,7 @@ Merge invocation phrases from `_invocation_phrases_draft.yaml` and `_invocation_
 ## Context
 The semantic intent matching system needs 8-15 invocation phrases per verb for BGE embedding model to work effectively. Two draft files contain the phrases to be merged:
 - `_invocation_phrases_draft.yaml` - phrases for view, ownership, fund, ubo domains
-- `_invocation_phrases_extension.yaml` - phrases for trading-profile, entity, control, gleif, cbu, graph, bods, session, cbu-role-v2, client-group domains
+- `_invocation_phrases_extension.yaml` - phrases for trading-profile, entity, control, gleif, cbu, graph, bods, session, cbu-specialist-roles, client-group domains
 
 ## Rules
 
@@ -37,7 +37,7 @@ The semantic intent matching system needs 8-15 invocation phrases per verb for B
    - `graph` → `graph.yaml`
    - `bods` → `bods.yaml`
    - `session` → `session.yaml`
-   - `cbu-role-v2` → `cbu-role-v2.yaml`
+   - `cbu-specialist-roles` → `cbu-specialist-roles.yaml`
    - `client-group` → `client-group.yaml`
 
 5. **Validation**: After each file update, validate YAML syntax with `python3 -c "import yaml; yaml.safe_load(open('filename.yaml'))"`
@@ -109,7 +109,7 @@ After completion:
 ├── graph.yaml                          # TARGET
 ├── bods.yaml                           # TARGET
 ├── session.yaml                        # TARGET
-├── cbu-role-v2.yaml                    # TARGET
+├── cbu-specialist-roles.yaml           # TARGET
 └── client-group.yaml                   # TARGET
 ```
 

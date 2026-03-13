@@ -111,17 +111,17 @@ requirements:
 actions:
   DRAFT:
     - action: update_cbu
-      verb: cbu.update
-      description: Update CBU details
+      verb: cbu.rename
+      description: Update CBU display name
 
   DATA_CAPTURE:
     - action: update_cbu
-      verb: cbu.update
-      description: Update CBU details
+      verb: cbu.set-jurisdiction
+      description: Update CBU jurisdiction
 
     - action: set_domicile
-      verb: cbu.set-domicile
-      description: Set CBU domicile
+      verb: cbu.set-jurisdiction
+      description: Set CBU jurisdiction
 
     - action: add_contact
       verb: cbu.assign-role

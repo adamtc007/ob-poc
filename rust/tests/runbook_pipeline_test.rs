@@ -636,7 +636,7 @@ async fn locking_no_deadlock() {
     step2.write_set = vec![id_b, id_a];
 
     // Runbook 2: steps reference entities in order [B, C, A]
-    let mut step3 = make_step("cbu.update");
+    let mut step3 = make_step("cbu.rename");
     step3.write_set = vec![id_b, id_c];
     let mut step4 = make_step("entity.update");
     step4.write_set = vec![id_a];

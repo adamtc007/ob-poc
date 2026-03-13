@@ -110,7 +110,7 @@ trading-profile:
     - "investment"
     - "strategy"
 
-cbu-role:
+role:
   label: "CBU Entity Roles"
   parent: cbu
   inference_keywords:

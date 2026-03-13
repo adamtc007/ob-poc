@@ -118,7 +118,7 @@ mod tests {
 
     fn make_doc_with_symbols() -> DocumentState {
         let text =
-            "(cbu.create :name \"Test\" :as @my-cbu)\n(cbu.update :cbu-id @my-cbu)".to_string();
+            "(cbu.create :name \"Test\" :as @my-cbu)\n(cbu.rename :cbu-id @my-cbu :name \"Updated Test\")".to_string();
         let mut doc = DocumentState::new(text);
 
         // Add symbol definition

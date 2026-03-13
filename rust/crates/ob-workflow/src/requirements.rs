@@ -756,7 +756,7 @@ impl RequirementEvaluator {
                             description.to_string()
                         },
                     )
-                    .with_resolution("cbu.update")
+                    .with_resolution("cbu.ensure")
                     .with_detail("field", serde_json::json!(field)),
                 );
             }

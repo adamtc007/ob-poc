@@ -81,7 +81,7 @@
 
 ;; intent: Assign management company role
 ;; macro: structure.assign-role
-(cbu-role.assign
+(cbu.assign-role
   :cbu-id @fund
   :entity-id @manco
   :role "MANAGEMENT_COMPANY"
@@ -89,7 +89,7 @@
 
 ;; intent: Assign depositary role
 ;; macro: structure.assign-role
-(cbu-role.assign
+(cbu.assign-role
   :cbu-id @fund
   :entity-id @depositary
   :role "DEPOSITARY"
@@ -97,7 +97,7 @@
 
 ;; intent: Assign administrator role
 ;; macro: structure.assign-role
-(cbu-role.assign
+(cbu.assign-role
   :cbu-id @fund
   :entity-id @admin
   :role "ADMINISTRATOR"
@@ -105,7 +105,7 @@
 
 ;; intent: Assign auditor role
 ;; macro: structure.assign-role
-(cbu-role.assign
+(cbu.assign-role
   :cbu-id @fund
   :entity-id @auditor
   :role "AUDITOR"
@@ -113,13 +113,13 @@
 
 ;; intent: Assign board directors
 ;; macro: structure.assign-role
-(cbu-role.assign
+(cbu.assign-role
   :cbu-id @fund
   :entity-id @director1
   :role "DIRECTOR"
   :effective-date "2024-01-01")
 
-(cbu-role.assign
+(cbu.assign-role
   :cbu-id @fund
   :entity-id @director2
   :role "DIRECTOR"
@@ -130,4 +130,4 @@
 ;; ----------------------------------------------------------------------------
 
 ;; intent: List all roles for the fund
-(cbu-role.list :cbu-id @fund)
+(cbu.parties :cbu-id @fund)

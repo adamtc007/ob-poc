@@ -143,8 +143,8 @@ requirements:
 actions:
   INTAKE:
     - action: update_cbu
-      verb: cbu.update
-      description: Update CBU details
+      verb: cbu.rename
+      description: Update CBU display name
 
   ENTITY_COLLECTION:
     - action: add_person

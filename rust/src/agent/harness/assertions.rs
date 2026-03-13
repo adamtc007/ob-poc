@@ -6,6 +6,7 @@
 use super::StepExpectation;
 use crate::agent::orchestrator::{IntentTrace, OrchestratorOutcome};
 use crate::mcp::intent_pipeline::PipelineOutcome;
+use crate::semtaxonomy_v2::{parse_structured_intent_plan, CompilerInputEnvelope};
 use crate::session::unified::UnifiedSession;
 use serde::Serialize;
 
@@ -279,9 +280,51 @@ fn check_global_invariants(
     }
 }
 
+/// Validate a canonical NLCI structured-intent fixture.
+pub fn check_nlci_plan_fixture(raw: &str) -> Vec<AssertionFailure> {
+    match parse_structured_intent_plan(raw) {
+        Ok(_) => Vec::new(),
+        Err(error) => vec![AssertionFailure {
+            field: "nlci_plan_fixture".into(),
+            expected: "valid canonical structured intent".into(),
+            actual: error.to_string(),
+        }],
+    }
+}
+
+/// Validate a canonical NLCI compiler-envelope fixture.
+pub fn check_nlci_compiler_input_fixture(raw: &str) -> Vec<AssertionFailure> {
+    match serde_json::from_str::<CompilerInputEnvelope>(raw) {
+        Ok(envelope) => match envelope.validate_invariants() {
+            Ok(()) => Vec::new(),
+            Err(error) => vec![AssertionFailure {
+                field: "nlci_compiler_input_fixture".into(),
+                expected: "valid canonical compiler input envelope".into(),
+                actual: error.to_string(),
+            }],
+        },
+        Err(error) => vec![AssertionFailure {
+            field: "nlci_compiler_input_fixture".into(),
+            expected: "deserializable canonical compiler input envelope".into(),
+            actual: error.to_string(),
+        }],
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::PathBuf;
+
+    fn fixture_path(name: &str) -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures/nlci")
+            .join(name)
+    }
+
+    fn load_fixture(name: &str) -> String {
+        std::fs::read_to_string(fixture_path(name)).expect("fixture should load")
+    }
 
     #[test]
     fn test_empty_expectation_always_passes() {
@@ -316,5 +359,37 @@ mod tests {
             outcome_label(&PipelineOutcome::NoAllowedVerbs),
             "NoAllowedVerbs"
         );
+    }
+
+    #[test]
+    fn test_valid_nlci_plan_fixtures_pass() {
+        for fixture in [
+            "valid_single_step_cbu_read.json",
+            "valid_sequential_cbu_create_submit.json",
+        ] {
+            let failures = check_nlci_plan_fixture(&load_fixture(fixture));
+            assert!(
+                failures.is_empty(),
+                "fixture {} should pass, got {:?}",
+                fixture,
+                failures
+            );
+        }
+    }
+
+    #[test]
+    fn test_invalid_nlci_plan_fixture_fails_invariant_check() {
+        let failures = check_nlci_plan_fixture(&load_fixture("invalid_dsl_shaped_action.json"));
+        assert_eq!(failures.len(), 1);
+        assert!(failures[0].actual.contains("structured actions, not DSL text"));
+    }
+
+    #[test]
+    fn test_invalid_nlci_compiler_input_fixture_fails_invariant_check() {
+        let failures = check_nlci_compiler_input_fixture(&load_fixture(
+            "invalid_step_count_mismatch_semantic_ir.json",
+        ));
+        assert_eq!(failures.len(), 1);
+        assert!(failures[0].actual.contains("step count must match semantic IR step count"));
     }
 }

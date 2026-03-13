@@ -1,0 +1,14 @@
+{
+  "steps": [
+    {
+      "action": "(cbu.read)",
+      "entity": "cbu",
+      "target": null,
+      "qualifiers": [],
+      "parameters": [],
+      "confidence": "high"
+    }
+  ],
+  "composition": "single_step",
+  "data_flow": []
+}

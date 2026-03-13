@@ -34,10 +34,10 @@
 //! | E-SAGE-5 | `cargo check -p ob-poc` passes after every sub-phase |
 //! | E-SAGE-6 | data_management_rewrite() unchanged until Sage accuracy exceeds it |
 
+pub mod disposition;
 pub mod outcome;
 pub mod plane;
 pub mod polarity;
-pub mod disposition;
 
 // Phase 1.2+
 pub mod pre_classify;

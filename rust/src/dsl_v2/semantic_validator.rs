@@ -1129,7 +1129,7 @@ fn is_verb_allowed_for_intent(verb: &str, intent: &crate::dsl_v2::validation::In
         Intent::LinkDocumentToEntity => verb == "document.link-entity",
         Intent::GetCbuStatus | Intent::ListDocuments | Intent::ListEntities => {
             // Query intents - read-only verbs
-            verb == "cbu.get-status" || verb == "document.list" || verb == "entity.list"
+            verb == "cbu.read" || verb == "document.list" || verb == "entity.list"
         }
         Intent::RunScreening | Intent::RunKycCheck => {
             verb.starts_with("screening.") || verb.starts_with("kyc.")

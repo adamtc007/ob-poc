@@ -617,11 +617,13 @@ mod kyc_full_lifecycle {
                     .unwrap();
                 }
                 // Set approved_at
-                sqlx::query(r#"UPDATE "ob-poc".ubo_registry SET approved_at = NOW() WHERE ubo_id = $1"#)
-                    .bind(ubo_id)
-                    .execute(&db.pool)
-                    .await
-                    .unwrap();
+                sqlx::query(
+                    r#"UPDATE "ob-poc".ubo_registry SET approved_at = NOW() WHERE ubo_id = $1"#,
+                )
+                .bind(ubo_id)
+                .execute(&db.pool)
+                .await
+                .unwrap();
             }
 
             assert_eq!(db.get_ubo_status(ubo_a).await, "APPROVED");
@@ -757,12 +759,13 @@ mod kyc_full_lifecycle {
             assert_eq!(db.get_ubo_status(ubo).await, "IDENTIFIED");
 
             // Verify identified_at is set
-            let identified: (Option<chrono::DateTime<chrono::Utc>>,) =
-                sqlx::query_as(r#"SELECT identified_at FROM "ob-poc".ubo_registry WHERE ubo_id = $1"#)
-                    .bind(ubo)
-                    .fetch_one(&db.pool)
-                    .await
-                    .unwrap();
+            let identified: (Option<chrono::DateTime<chrono::Utc>>,) = sqlx::query_as(
+                r#"SELECT identified_at FROM "ob-poc".ubo_registry WHERE ubo_id = $1"#,
+            )
+            .bind(ubo)
+            .fetch_one(&db.pool)
+            .await
+            .unwrap();
             assert!(
                 identified.0.is_some(),
                 "identified_at must be set after promote"
@@ -1161,11 +1164,13 @@ mod kyc_full_lifecycle {
             );
 
             let reopen_data: (Option<chrono::DateTime<chrono::Utc>>, Option<String>) =
-                sqlx::query_as(r#"SELECT closed_at, case_type FROM "ob-poc".cases WHERE case_id = $1"#)
-                    .bind(case_id)
-                    .fetch_one(&db.pool)
-                    .await
-                    .unwrap();
+                sqlx::query_as(
+                    r#"SELECT closed_at, case_type FROM "ob-poc".cases WHERE case_id = $1"#,
+                )
+                .bind(case_id)
+                .fetch_one(&db.pool)
+                .await
+                .unwrap();
 
             assert!(
                 reopen_data.0.is_none(),
@@ -1250,12 +1255,13 @@ mod kyc_full_lifecycle {
             );
 
             // No workstreams for case B
-            let ws_count_b: (i64,) =
-                sqlx::query_as(r#"SELECT COUNT(*) FROM "ob-poc".entity_workstreams WHERE case_id = $1"#)
-                    .bind(case_b)
-                    .fetch_one(&db.pool)
-                    .await
-                    .unwrap();
+            let ws_count_b: (i64,) = sqlx::query_as(
+                r#"SELECT COUNT(*) FROM "ob-poc".entity_workstreams WHERE case_id = $1"#,
+            )
+            .bind(case_b)
+            .fetch_one(&db.pool)
+            .await
+            .unwrap();
             assert_eq!(ws_count_b.0, 0, "Case B should have no entity workstreams");
 
             // No UBO registry entries for case B

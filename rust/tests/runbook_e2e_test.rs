@@ -900,7 +900,7 @@ async fn test_write_set_locks_acquired() {
     let entity_id_2 = Uuid::new_v4();
 
     // Build steps with write_set containing entity IDs
-    let step1 = make_step_with_write_set("cbu.update", vec![entity_id_1]);
+    let step1 = make_step_with_write_set("cbu.rename", vec![entity_id_1]);
     let step2 = make_step_with_write_set("entity.update", vec![entity_id_2, entity_id_1]);
 
     // Compute combined write_set
@@ -945,7 +945,7 @@ async fn test_write_set_locks_acquired() {
     // Both steps executed
     assert_eq!(
         recorder.executed_verbs(),
-        vec!["cbu.update", "entity.update"]
+        vec!["cbu.rename", "entity.update"]
     );
 
     // INV-10: Verify lock event logging is present in source code
@@ -989,7 +989,7 @@ async fn test_concurrent_lock_contention() {
     let entity_b = Uuid::parse_str("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb").unwrap();
 
     // Runbook 1: updates contested entity + entity B
-    let rb1_step1 = make_step_with_write_set("cbu.update", vec![contested_entity]);
+    let rb1_step1 = make_step_with_write_set("cbu.rename", vec![contested_entity]);
     let rb1_step2 = make_step_with_write_set("entity.update", vec![entity_b]);
 
     // Runbook 2: also updates contested entity

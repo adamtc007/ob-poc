@@ -121,9 +121,12 @@ async fn query_existing_entities(
     }
 
     // KYC cases
-    let cases = sqlx::query_scalar!(r#"SELECT case_id FROM "ob-poc".cases WHERE cbu_id = $1"#, cbu_id)
-        .fetch_all(pool)
-        .await?;
+    let cases = sqlx::query_scalar!(
+        r#"SELECT case_id FROM "ob-poc".cases WHERE cbu_id = $1"#,
+        cbu_id
+    )
+    .fetch_all(pool)
+    .await?;
     if !cases.is_empty() {
         let case_ids = cases.clone();
         existing.insert("kyc_case".to_string(), cases);

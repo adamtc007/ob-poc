@@ -49,7 +49,7 @@
 ;; macro: primitive
 ;; constraints: @demo-fund must exist
 ;; NOTE: Nested calls ARE supported - entity created inline
-(cbu-role.assign
+(cbu.assign-role
   :cbu-id @demo-fund
   :entity-id (entity.create :name "Demo Director" :type "NATURAL" :as @director)
   :role "DIRECTOR"
@@ -57,7 +57,7 @@
 
 ;; Alternative: separate calls (always works)
 (entity.create :name "Demo Director" :type "NATURAL" :as @director)
-(cbu-role.assign
+(cbu.assign-role
   :cbu-id @demo-fund
   :entity-id @director
   :role "DIRECTOR"

@@ -640,7 +640,9 @@ impl CustomOperation for ViewClearOp {
         _verb_call: &VerbCall,
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!("view.clear-refinements requires database feature"))
+        Err(anyhow::anyhow!(
+            "view.clear-refinements requires database feature"
+        ))
     }
 }
 
@@ -712,7 +714,9 @@ impl CustomOperation for ViewSelectOp {
         _verb_call: &VerbCall,
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!("view.set-selection requires database feature"))
+        Err(anyhow::anyhow!(
+            "view.set-selection requires database feature"
+        ))
     }
 }
 
@@ -831,7 +835,9 @@ impl CustomOperation for ViewStatusOp {
         _verb_call: &VerbCall,
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!("view.read-status requires database feature"))
+        Err(anyhow::anyhow!(
+            "view.read-status requires database feature"
+        ))
     }
 }
 
@@ -1054,7 +1060,9 @@ impl CustomOperation for ViewBackToOp {
         _verb_call: &VerbCall,
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!("view.navigate-back-to requires database feature"))
+        Err(anyhow::anyhow!(
+            "view.navigate-back-to requires database feature"
+        ))
     }
 }
 

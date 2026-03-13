@@ -211,7 +211,7 @@ const DEFAULT_FALLBACK_THRESHOLD: f32 = 0.55;
 /// - Suggest: top < threshold BUT top >= fallback_threshold (has suggestions)
 /// - NoMatch: top < fallback_threshold (nothing useful)
 ///
-/// The Suggest path is CRITICAL for learning: vague queries like "show me the cbus"
+/// The Suggest path is CRITICAL for learning: vague queries like "show me the deals"
 /// get a menu instead of "no match", allowing user selection to create training data.
 pub fn check_ambiguity_with_fallback(
     candidates: &[VerbSearchResult],
@@ -1536,26 +1536,26 @@ mod tests {
         // Simulate tier-by-tier appending: same verb appears twice with different scores
         let candidates = vec![
             VerbSearchResult {
-                verb: "cbu.create".to_string(),
+                verb: "deal.create".to_string(),
                 score: 0.82, // lower score, added first (tier 3)
                 source: VerbSearchSource::GlobalLearned,
-                matched_phrase: "make a cbu".to_string(),
+                matched_phrase: "make a deal".to_string(),
                 description: None,
                 journey: None,
             },
             VerbSearchResult {
-                verb: "cbu.ensure".to_string(),
+                verb: "deal.ensure".to_string(),
                 score: 0.80,
                 source: VerbSearchSource::PatternEmbedding,
-                matched_phrase: "ensure cbu".to_string(),
+                matched_phrase: "ensure deal".to_string(),
                 description: None,
                 journey: None,
             },
             VerbSearchResult {
-                verb: "cbu.create".to_string(),
+                verb: "deal.create".to_string(),
                 score: 0.91, // higher score, added later (tier 6)
                 source: VerbSearchSource::PatternEmbedding,
-                matched_phrase: "create cbu".to_string(),
+                matched_phrase: "create deal".to_string(),
                 description: None,
                 journey: None,
             },
@@ -1566,16 +1566,16 @@ mod tests {
         // Should have 2 unique verbs
         assert_eq!(normalized.len(), 2);
 
-        // First should be cbu.create with the HIGHER score (0.91)
-        assert_eq!(normalized[0].verb, "cbu.create");
+        // First should be deal.create with the HIGHER score (0.91)
+        assert_eq!(normalized[0].verb, "deal.create");
         assert!((normalized[0].score - 0.91).abs() < 0.001);
         assert!(matches!(
             normalized[0].source,
             VerbSearchSource::PatternEmbedding
         ));
 
-        // Second should be cbu.ensure
-        assert_eq!(normalized[1].verb, "cbu.ensure");
+        // Second should be deal.ensure
+        assert_eq!(normalized[1].verb, "deal.ensure");
     }
 
     #[test]
@@ -1585,18 +1585,18 @@ mod tests {
         // Two candidates within margin, both above threshold
         let candidates = vec![
             VerbSearchResult {
-                verb: "cbu.create".to_string(),
+                verb: "deal.create".to_string(),
                 score: 0.85,
                 source: VerbSearchSource::PatternEmbedding,
-                matched_phrase: "create cbu".to_string(),
+                matched_phrase: "create deal".to_string(),
                 description: None,
                 journey: None,
             },
             VerbSearchResult {
-                verb: "cbu.ensure".to_string(),
+                verb: "deal.ensure".to_string(),
                 score: 0.83, // margin = 0.02 < AMBIGUITY_MARGIN (0.05)
                 source: VerbSearchSource::PatternEmbedding,
-                matched_phrase: "ensure cbu".to_string(),
+                matched_phrase: "ensure deal".to_string(),
                 description: None,
                 journey: None,
             },
@@ -1610,8 +1610,8 @@ mod tests {
                 runner_up,
                 margin,
             } => {
-                assert_eq!(top.verb, "cbu.create");
-                assert_eq!(runner_up.verb, "cbu.ensure");
+                assert_eq!(top.verb, "deal.create");
+                assert_eq!(runner_up.verb, "deal.ensure");
                 assert!(
                     margin < AMBIGUITY_MARGIN,
                     "margin {} should be < {}",
@@ -1630,18 +1630,18 @@ mod tests {
         // Clear winner - margin > AMBIGUITY_MARGIN
         let candidates = vec![
             VerbSearchResult {
-                verb: "cbu.create".to_string(),
+                verb: "deal.create".to_string(),
                 score: 0.92,
                 source: VerbSearchSource::PatternEmbedding,
-                matched_phrase: "create cbu".to_string(),
+                matched_phrase: "create deal".to_string(),
                 description: None,
                 journey: None,
             },
             VerbSearchResult {
-                verb: "cbu.ensure".to_string(),
+                verb: "deal.ensure".to_string(),
                 score: 0.82, // margin = 0.10 > AMBIGUITY_MARGIN (0.05)
                 source: VerbSearchSource::PatternEmbedding,
-                matched_phrase: "ensure cbu".to_string(),
+                matched_phrase: "ensure deal".to_string(),
                 description: None,
                 journey: None,
             },
@@ -1651,7 +1651,7 @@ mod tests {
 
         match outcome {
             VerbSearchOutcome::Matched(result) => {
-                assert_eq!(result.verb, "cbu.create");
+                assert_eq!(result.verb, "deal.create");
             }
             other => panic!("Expected Matched, got {:?}", other),
         }
@@ -1664,10 +1664,10 @@ mod tests {
         // Candidate below semantic threshold but above fallback threshold (0.55)
         // should trigger Suggest path, not NoMatch
         let candidates = vec![VerbSearchResult {
-            verb: "cbu.create".to_string(),
+            verb: "deal.create".to_string(),
             score: 0.75, // below semantic threshold, above fallback
             source: VerbSearchSource::PatternEmbedding,
-            matched_phrase: "create cbu".to_string(),
+            matched_phrase: "create deal".to_string(),
             description: None,
             journey: None,
         }];
@@ -1684,10 +1684,10 @@ mod tests {
 
         // Candidate below BOTH thresholds should be NoMatch
         let candidates = vec![VerbSearchResult {
-            verb: "cbu.create".to_string(),
+            verb: "deal.create".to_string(),
             score: 0.50, // below fallback threshold (0.55)
             source: VerbSearchSource::PatternEmbedding,
-            matched_phrase: "create cbu".to_string(),
+            matched_phrase: "create deal".to_string(),
             description: None,
             journey: None,
         }];
@@ -1712,10 +1712,10 @@ mod tests {
         let threshold = 0.80;
 
         let candidates = vec![VerbSearchResult {
-            verb: "cbu.create".to_string(),
+            verb: "deal.create".to_string(),
             score: 0.90,
             source: VerbSearchSource::PatternEmbedding,
-            matched_phrase: "create cbu".to_string(),
+            matched_phrase: "create deal".to_string(),
             description: None,
             journey: None,
         }];
@@ -1724,7 +1724,7 @@ mod tests {
 
         match outcome {
             VerbSearchOutcome::Matched(result) => {
-                assert_eq!(result.verb, "cbu.create");
+                assert_eq!(result.verb, "deal.create");
             }
             other => panic!("Expected Matched, got {:?}", other),
         }

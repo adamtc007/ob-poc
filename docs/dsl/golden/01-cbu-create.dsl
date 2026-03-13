@@ -27,16 +27,14 @@
 ;; intent: Set the fund's base currency
 (cbu.set-currency :cbu-id @fund :currency "EUR")
 
-;; intent: Set the fund's domicile details
-(cbu.set-domicile
+;; intent: Set the fund's jurisdiction
+(cbu.set-jurisdiction
   :cbu-id @fund
-  :country "LU"
-  :regulator "CSSF"
-  :registration-number "O-123456")
+  :jurisdiction "LU")
 
 ;; ----------------------------------------------------------------------------
 ;; Step 3: Verify Creation
 ;; ----------------------------------------------------------------------------
 
 ;; intent: Confirm the CBU was created successfully
-(cbu.get :id @fund)
+(cbu.read :cbu-id @fund)

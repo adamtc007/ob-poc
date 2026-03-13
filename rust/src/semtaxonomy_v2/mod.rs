@@ -8,11 +8,39 @@
 //!
 //! Execution, governance, and discovery I/O remain elsewhere.
 
+pub mod binding;
+pub mod bridge;
+pub mod cbu_compiler;
+pub mod compiler;
+pub mod extraction;
+pub mod failure;
+pub mod intent_schema;
+pub mod phases;
+pub mod semantic_ir;
+
 use crate::semtaxonomy::{extract_entity_candidates, EntityCandidate, VerbSurfaceEntry};
-use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::collections::BTreeMap;
 use uuid::Uuid;
+
+pub use binding::{BindingMode, CompilerCandidate, CompilerInputEnvelope, CompilerSelection};
+pub use bridge::compiler_input_from_outcome_intent;
+pub use cbu_compiler::{build_minimal_cbu_compiler, supports_cbu_compiler_slice};
+pub use compiler::{
+    CandidateSelector, CompilerOutput, CompilerPipeline, CompositionBinder, Discriminator,
+    IntentCompiler, OperationResolver, SurfaceObjectResolver,
+};
+pub use extraction::parse_structured_intent_plan;
+pub use failure::{
+    AmbiguityReason, BindingFailure, CompilerFailure, CompilerFailureKind,
+    DiscriminationFailure, ResolutionFailure,
+};
+pub use intent_schema::{
+    IntentIdentifier, IntentParameter, IntentQualifier, IntentStep, IntentTarget,
+    StructuredIntentPlan,
+};
+pub use semantic_ir::{SemanticIr, SemanticStep, SemanticTarget};
 
 /// Source of the active entity scope.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -185,22 +213,40 @@ fn utterance_tokens(input: &str) -> Vec<String> {
 
 fn classify_action(input: &str) -> Option<&'static str> {
     let tokens = utterance_tokens(input);
-    if tokens.iter().any(|t| matches!(t.as_str(), "delete" | "remove")) {
+    if tokens
+        .iter()
+        .any(|t| matches!(t.as_str(), "delete" | "remove"))
+    {
         return Some("delete");
+    }
+    if tokens.iter().any(|t| {
+        matches!(
+            t.as_str(),
+            "run" | "screen" | "screening" | "check" | "scan"
+        )
+    }) {
+        return Some("operate");
+    }
+    if tokens.iter().any(|t| {
+        matches!(
+            t.as_str(),
+            "create" | "add" | "open" | "onboard" | "register"
+        )
+    }) {
+        return Some("create");
     }
     if tokens
         .iter()
-        .any(|t| matches!(t.as_str(), "run" | "screen" | "screening" | "check" | "scan"))
+        .any(|t| matches!(t.as_str(), "update" | "change" | "edit" | "set"))
     {
-        return Some("operate");
-    }
-    if tokens.iter().any(|t| matches!(t.as_str(), "create" | "add" | "open" | "onboard" | "register")) {
-        return Some("create");
-    }
-    if tokens.iter().any(|t| matches!(t.as_str(), "update" | "change" | "edit" | "set")) {
         return Some("update");
     }
-    if tokens.iter().any(|t| matches!(t.as_str(), "show" | "list" | "read" | "view" | "what" | "who")) {
+    if tokens.iter().any(|t| {
+        matches!(
+            t.as_str(),
+            "show" | "list" | "read" | "view" | "what" | "who"
+        )
+    }) {
         return Some("read");
     }
     None
@@ -252,14 +298,18 @@ fn verb_matches_action_class(action: Option<&str>, verb: &ValidVerb) -> bool {
     match action {
         Some("read") => verb.polarity.eq_ignore_ascii_case("read"),
         Some("delete") => canonical_action_from_verb(&verb.verb_id, &verb.polarity) == "delete",
-        Some("create") => matches!(
-            canonical_action_from_verb(&verb.verb_id, &verb.polarity),
-            "create" | "update"
-        ) && !verb.polarity.eq_ignore_ascii_case("read"),
-        Some("update") => matches!(
-            canonical_action_from_verb(&verb.verb_id, &verb.polarity),
-            "update" | "create"
-        ) && !verb.polarity.eq_ignore_ascii_case("read"),
+        Some("create") => {
+            matches!(
+                canonical_action_from_verb(&verb.verb_id, &verb.polarity),
+                "create" | "update"
+            ) && !verb.polarity.eq_ignore_ascii_case("read")
+        }
+        Some("update") => {
+            matches!(
+                canonical_action_from_verb(&verb.verb_id, &verb.polarity),
+                "update" | "create"
+            ) && !verb.polarity.eq_ignore_ascii_case("read")
+        }
         Some("operate") => !verb.polarity.eq_ignore_ascii_case("read"),
         None => verb.polarity.eq_ignore_ascii_case("read"),
         Some(_) => true,
@@ -279,13 +329,24 @@ fn verb_conflicts_action_class(action: Option<&str>, verb: &ValidVerb) -> bool {
 fn preferred_domains(utterance: &str) -> Vec<&'static str> {
     let lower = utterance.to_ascii_lowercase();
     let mut domains = Vec::new();
-    if ["sanction", "pep", "adverse media", "ofac", "aml", "screening", "rba"]
-        .iter()
-        .any(|needle| lower.contains(needle))
+    if [
+        "sanction",
+        "pep",
+        "adverse media",
+        "ofac",
+        "aml",
+        "screening",
+        "rba",
+    ]
+    .iter()
+    .any(|needle| lower.contains(needle))
     {
         domains.push("screening");
     }
-    if ["kyc", "case", "readiness", "review"].iter().any(|needle| lower.contains(needle)) {
+    if ["kyc", "case", "readiness", "review"]
+        .iter()
+        .any(|needle| lower.contains(needle))
+    {
         domains.push("kyc");
         domains.push("case");
     }
@@ -349,15 +410,7 @@ fn is_scope_only_utterance(input: &str) -> bool {
 fn is_deictic_scope_utterance(input: &str) -> bool {
     let lower = input.to_ascii_lowercase();
     let deictic_markers = [
-        " this ",
-        " that ",
-        " these ",
-        " those ",
-        " they ",
-        " them ",
-        " their ",
-        " it ",
-        " its ",
+        " this ", " that ", " these ", " those ", " they ", " them ", " their ", " it ", " its ",
     ];
     let padded = format!(" {lower} ");
     deictic_markers.iter().any(|marker| padded.contains(marker))
@@ -435,7 +488,10 @@ fn candidate_looks_like_proper_name(candidate: &str) -> bool {
         .count();
     let acronym_or_suffix = words.iter().any(|word| {
         let upper = word.to_ascii_uppercase();
-        matches!(upper.as_str(), "AG" | "SA" | "SE" | "PLC" | "LLC" | "LTD" | "LP")
+        matches!(
+            upper.as_str(),
+            "AG" | "SA" | "SE" | "PLC" | "LLC" | "LTD" | "LP"
+        )
     });
 
     (words.len() >= 2 && capitalized_word_count >= 2 && generic_word_count < words.len())
@@ -484,7 +540,9 @@ pub fn introduces_entity_reference(utterance: &str) -> bool {
     }
 
     if classify_action(utterance).is_some() || is_inventory_utterance(utterance) {
-        return extracted.iter().any(|candidate| candidate_looks_like_proper_name(candidate));
+        return extracted
+            .iter()
+            .any(|candidate| candidate_looks_like_proper_name(candidate));
     }
 
     extracted.iter().any(|candidate| {
@@ -530,27 +588,47 @@ fn semantic_similarity_score(utterance: &str, verb: &ValidVerb) -> i64 {
     score
 }
 
-fn synthesize_args(utterance: &str, entity: &EntityScope, verb: &ValidVerb) -> BTreeMap<String, Value> {
+fn synthesize_args(
+    utterance: &str,
+    entity: &EntityScope,
+    verb: &ValidVerb,
+) -> BTreeMap<String, Value> {
     let lower = utterance.to_ascii_lowercase();
     let mut args = BTreeMap::new();
     for parameter in &verb.parameters {
         match parameter.name.as_str() {
             "entity-id" => {
-                args.insert(parameter.name.clone(), Value::String(entity.entity_id.to_string()));
+                args.insert(
+                    parameter.name.clone(),
+                    Value::String(entity.entity_id.to_string()),
+                );
             }
             "group-id" if entity.entity_type.eq_ignore_ascii_case("client-group") => {
-                args.insert(parameter.name.clone(), Value::String(entity.entity_id.to_string()));
+                args.insert(
+                    parameter.name.clone(),
+                    Value::String(entity.entity_id.to_string()),
+                );
             }
             "cbu-id" if entity.entity_type.eq_ignore_ascii_case("cbu") => {
-                args.insert(parameter.name.clone(), Value::String(entity.entity_id.to_string()));
+                args.insert(
+                    parameter.name.clone(),
+                    Value::String(entity.entity_id.to_string()),
+                );
             }
             "deal-id" if entity.entity_type.eq_ignore_ascii_case("deal") => {
-                args.insert(parameter.name.clone(), Value::String(entity.entity_id.to_string()));
+                args.insert(
+                    parameter.name.clone(),
+                    Value::String(entity.entity_id.to_string()),
+                );
             }
             "name" => {
                 let extracted = extract_entity_candidates(utterance);
                 if let Some(name) = extracted.first() {
-                    if !name.eq_ignore_ascii_case(&entity.name) || lower.contains("called") || lower.contains("named") || lower.contains("for ") {
+                    if !name.eq_ignore_ascii_case(&entity.name)
+                        || lower.contains("called")
+                        || lower.contains("named")
+                        || lower.contains("for ")
+                    {
                         args.insert(parameter.name.clone(), Value::String(name.clone()));
                     }
                 }
@@ -586,7 +664,10 @@ fn build_partial_explanation(utterance: &str, verb: &ValidVerb, missing: &[Missi
     )
 }
 
-fn parse_lane_positions(entity_state: Option<&Value>, transitions: Option<&Value>) -> Vec<LanePosition> {
+fn parse_lane_positions(
+    entity_state: Option<&Value>,
+    transitions: Option<&Value>,
+) -> Vec<LanePosition> {
     let active_lanes = entity_state
         .and_then(|state| state.get("activities"))
         .and_then(Value::as_array)
@@ -614,7 +695,10 @@ fn parse_lane_positions(entity_state: Option<&Value>, transitions: Option<&Value
         .collect::<Vec<_>>();
 
     let mut positions = active_lanes;
-    if let Some(lanes) = transitions.and_then(|value| value.get("lanes")).and_then(Value::as_array) {
+    if let Some(lanes) = transitions
+        .and_then(|value| value.get("lanes"))
+        .and_then(Value::as_array)
+    {
         for lane in lanes {
             let lane_name = lane
                 .get("lane")
@@ -727,7 +811,10 @@ fn parse_valid_verbs(transitions: Option<&Value>) -> Vec<ValidVerb> {
                     .and_then(Value::as_str)
                     .unwrap_or("frontier")
                     .to_string(),
-                relevance: verb.get("relevance").and_then(Value::as_f64).unwrap_or_default(),
+                relevance: verb
+                    .get("relevance")
+                    .and_then(Value::as_f64)
+                    .unwrap_or_default(),
             })
             .collect();
     }
@@ -801,7 +888,10 @@ fn parse_valid_verbs(transitions: Option<&Value>) -> Vec<ValidVerb> {
                         .collect(),
                     lane: lane_name.clone(),
                     phase: phase.clone(),
-                    relevance: verb.get("relevance").and_then(Value::as_f64).unwrap_or_default(),
+                    relevance: verb
+                        .get("relevance")
+                        .and_then(Value::as_f64)
+                        .unwrap_or_default(),
                 })
         })
         .collect()
@@ -906,7 +996,11 @@ fn structurally_better(left: &EntityCandidate, right: &EntityCandidate) -> bool 
     )
 }
 
-fn candidate_to_scope(candidate: &EntityCandidate, source: EntitySource, confidence: f64) -> EntityScope {
+fn candidate_to_scope(
+    candidate: &EntityCandidate,
+    source: EntitySource,
+    confidence: f64,
+) -> EntityScope {
     EntityScope {
         entity_id: candidate.entity_id,
         entity_type: candidate.entity_type.clone(),
@@ -997,8 +1091,8 @@ pub fn step1_entity_scope(
     let top = &candidates[0];
     let runner_up = &candidates[1];
     let top_is_named = request_explicitly_names_candidate(&utterance_lower, top);
-    let dominant = top.match_score >= runner_up.match_score + 0.12
-        || structurally_better(top, runner_up);
+    let dominant =
+        top.match_score >= runner_up.match_score + 0.12 || structurally_better(top, runner_up);
 
     if dominant || top_is_named {
         let confidence = if top_is_named {
@@ -1122,7 +1216,9 @@ pub fn step3_select_verb(utterance: &str, state: &EntityState) -> Option<Selecte
                 .split_once('.')
                 .map(|(domain, _)| domain)
                 .unwrap_or_default();
-            domain_prefilter.iter().any(|preferred| preferred == &domain)
+            domain_prefilter
+                .iter()
+                .any(|preferred| preferred == &domain)
         })
         .filter(|verb| {
             if verb_conflicts_action_class(action, verb) {
@@ -1142,7 +1238,9 @@ pub fn step3_select_verb(utterance: &str, state: &EntityState) -> Option<Selecte
             if matches!(action, Some("update")) && verb.verb_id.contains(".update") {
                 score += 8;
             }
-            if matches!(action, Some("delete")) && (verb.verb_id.contains(".delete") || verb.verb_id.contains(".remove")) {
+            if matches!(action, Some("delete"))
+                && (verb.verb_id.contains(".delete") || verb.verb_id.contains(".remove"))
+            {
                 score += 8;
             }
             if matches!(action, Some("operate")) {
@@ -1153,7 +1251,10 @@ pub fn step3_select_verb(utterance: &str, state: &EntityState) -> Option<Selecte
                     score += 6;
                 }
             }
-            if matches!(action, Some("create")) && verb.verb_id.starts_with("fund.") && utterance.to_ascii_lowercase().contains("fund") {
+            if matches!(action, Some("create"))
+                && verb.verb_id.starts_with("fund.")
+                && utterance.to_ascii_lowercase().contains("fund")
+            {
                 score += 6;
             }
             (score, verb)
@@ -1242,15 +1343,23 @@ mod tests {
         assert!(!introduces_entity_reference("show me the cbus"));
         assert!(!introduces_entity_reference("what deals do we have?"));
         assert!(!introduces_entity_reference("spin up a CBU"));
-        assert!(!introduces_entity_reference("what's the status of the deal?"));
+        assert!(!introduces_entity_reference(
+            "what's the status of the deal?"
+        ));
     }
 
     #[test]
     fn explicit_named_entity_does_introduce_entity_reference() {
-        assert!(introduces_entity_reference("show me the deals for Allianz Global Investors"));
+        assert!(introduces_entity_reference(
+            "show me the deals for Allianz Global Investors"
+        ));
         assert!(introduces_entity_reference("who owns BNP Paribas"));
-        assert!(introduces_entity_reference("make State Street the transfer agent"));
-        assert!(introduces_entity_reference("register John Smith as a person"));
+        assert!(introduces_entity_reference(
+            "make State Street the transfer agent"
+        ));
+        assert!(introduces_entity_reference(
+            "register John Smith as a person"
+        ));
     }
 
     #[test]
@@ -1268,7 +1377,10 @@ mod tests {
 
     #[test]
     fn step1_returns_ambiguity_for_close_candidates() {
-        let candidates = vec![candidate("Allianz Global Investors", 0.71), candidate("Allianz SE", 0.69)];
+        let candidates = vec![
+            candidate("Allianz Global Investors", 0.71),
+            candidate("Allianz SE", 0.69),
+        ];
         let outcome = step1_entity_scope("allianz", None, &candidates);
         match outcome {
             EntityScopeOutcome::Ambiguous(scopes) => assert_eq!(scopes.len(), 2),
@@ -1293,7 +1405,11 @@ mod tests {
 
     #[test]
     fn step1_does_not_search_for_generic_fresh_turn_without_scope() {
-        let outcome = step1_entity_scope("spin up a CBU", None, &[candidate("SeedCap Holdings", 0.63)]);
+        let outcome = step1_entity_scope(
+            "spin up a CBU",
+            None,
+            &[candidate("SeedCap Holdings", 0.63)],
+        );
         assert_eq!(outcome, EntityScopeOutcome::Unresolved);
     }
 

@@ -109,7 +109,7 @@ mod tests {
             governance_tier: Some("governed".into()),
             security_classification: Some("internal".into()),
             pii: Some(false),
-            read_by_verbs: vec!["cbu.list".into(), "cbu.get".into()],
+            read_by_verbs: vec!["cbu.list".into(), "cbu.read".into()],
             written_by_verbs: vec!["cbu.create".into()],
         };
         let json = serde_json::to_value(&val).unwrap();

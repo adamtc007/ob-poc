@@ -440,8 +440,8 @@ mod tests {
         let steps = vec![
             make_step("cbu.create", "(cbu.create :name \"Acme\" :as @cbu)"),
             make_step(
-                "cbu-role.assign",
-                "(cbu-role.assign :cbu-id @cbu :role depositary)",
+                "cbu.assign-role",
+                "(cbu.assign-role :cbu-id @cbu :role depositary)",
             ),
         ];
         let result = assemble_plan(steps).unwrap();
@@ -458,8 +458,8 @@ mod tests {
         // Consumer listed before producer — assembler should reorder.
         let steps = vec![
             make_step(
-                "cbu-role.assign",
-                "(cbu-role.assign :cbu-id @cbu :role depositary)",
+                "cbu.assign-role",
+                "(cbu.assign-role :cbu-id @cbu :role depositary)",
             ),
             make_step("cbu.create", "(cbu.create :name \"Acme\" :as @cbu)"),
         ];
@@ -467,7 +467,7 @@ mod tests {
         assert!(result.reordered);
         // After sort, cbu.create should come first.
         assert_eq!(result.steps[0].verb, "cbu.create");
-        assert_eq!(result.steps[1].verb, "cbu-role.assign");
+        assert_eq!(result.steps[1].verb, "cbu.assign-role");
         // The assign step should depend on the create step.
         assert_eq!(result.steps[1].depends_on.len(), 1);
         assert_eq!(result.steps[1].depends_on[0], result.steps[0].step_id);
@@ -501,8 +501,8 @@ mod tests {
         let steps = vec![
             make_step("cbu.create", "(cbu.create :name \"Acme\")"),
             make_step(
-                "cbu-role.assign",
-                "(cbu-role.assign :cbu-id @unknown_ref :role depositary)",
+                "cbu.assign-role",
+                "(cbu.assign-role :cbu-id @unknown_ref :role depositary)",
             ),
         ];
         let result = assemble_plan(steps).unwrap();
@@ -524,8 +524,8 @@ mod tests {
     #[test]
     fn test_extract_binding_consumes() {
         let step = make_step(
-            "cbu-role.assign",
-            "(cbu-role.assign :cbu-id @my-cbu :entity-id @person)",
+            "cbu.assign-role",
+            "(cbu.assign-role :cbu-id @my-cbu :entity-id @person)",
         );
         let bindings = extract_bindings(&step);
         assert!(bindings.produces.is_empty());

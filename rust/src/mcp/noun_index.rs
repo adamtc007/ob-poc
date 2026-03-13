@@ -250,7 +250,7 @@ fn derive_subject_kinds(domain: &str, config: &dsl_core::config::types::VerbConf
 /// Map a verb domain name to its primary subject kind (lowest-priority heuristic).
 fn domain_to_subject_kind(domain: &str) -> String {
     match domain {
-        "cbu" | "cbu-role" => "cbu".into(),
+        "cbu" | "role" => "cbu".into(),
         "entity" | "entity-role" => "entity".into(),
         "kyc" | "kyc-case" | "screening" => "kyc-case".into(),
         "deal" => "deal".into(),
@@ -678,7 +678,7 @@ nouns:
                 "cbu",
                 "assign-role",
                 "Assign role to CBU",
-                Some("cbu_role"),
+                Some("role"),
                 vec!["cbu"],
             ),
             (
@@ -893,9 +893,7 @@ nouns:
 
         assert_eq!(resolution.resolution_path, ResolutionPath::ExplicitMapping);
         assert_eq!(resolution.candidates.len(), 2);
-        assert!(resolution
-            .candidates
-            .contains(&"fund.create".to_string()));
+        assert!(resolution.candidates.contains(&"fund.create".to_string()));
         assert!(resolution
             .candidates
             .contains(&"capital.share-class.create".to_string()));

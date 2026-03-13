@@ -309,8 +309,6 @@ fn extract_domain_hints(
         ("nominee", "ubo", 9),
         ("deceased", "ubo", 8),
         ("client business unit", "cbu", 12),
-        ("show me the cbus", "cbu", 11),
-        ("show me all the cbus", "cbu", 11),
         ("transfer agent", "cbu", 9),
         ("custody services", "cbu", 9),
         ("fund accounting", "cbu", 8),
@@ -726,7 +724,10 @@ mod tests {
     fn test_case_beats_document_for_open_case_flow() {
         let ctx = empty_ctx();
         let result = pre_classify("Open a case and collect the KYC documents", &ctx);
-        assert_eq!(result.domain_hints.first().map(String::as_str), Some("case"));
+        assert_eq!(
+            result.domain_hints.first().map(String::as_str),
+            Some("case")
+        );
     }
 
     #[test]
@@ -740,14 +741,20 @@ mod tests {
     fn test_struct_beats_fund_for_icav_setup() {
         let ctx = empty_ctx();
         let result = pre_classify("Set up an Irish ICAV fund", &ctx);
-        assert_eq!(result.domain_hints.first().map(String::as_str), Some("struct"));
+        assert_eq!(
+            result.domain_hints.first().map(String::as_str),
+            Some("struct")
+        );
     }
 
     #[test]
     fn test_entity_kept_for_show_all_entities() {
         let ctx = empty_ctx();
         let result = pre_classify("show me all entities", &ctx);
-        assert_eq!(result.domain_hints.first().map(String::as_str), Some("entity"));
+        assert_eq!(
+            result.domain_hints.first().map(String::as_str),
+            Some("entity")
+        );
     }
 
     #[test]

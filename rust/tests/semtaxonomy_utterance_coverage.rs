@@ -332,7 +332,11 @@ mod tests {
             let input_json: serde_json::Value = input_resp.json().await?;
             let response = input_json
                 .get("response")
-                .or_else(|| input_json.get("chat").and_then(|value| value.get("response")))
+                .or_else(|| {
+                    input_json
+                        .get("chat")
+                        .and_then(|value| value.get("response"))
+                })
                 .ok_or_else(|| anyhow::anyhow!("Missing chat response payload"))?;
 
             let predicted_verb = response
@@ -376,7 +380,8 @@ mod tests {
             let step1_unresolved =
                 sage_mode == Some("scope_clarification") && clarification_count == 0 && !grounded;
             let step1_resolved = grounded && !step1_ambiguous && !step1_unresolved;
-            let step2_stateful = grounded && has_sage_explain && !step1_ambiguous && !step1_unresolved;
+            let step2_stateful =
+                grounded && has_sage_explain && !step1_ambiguous && !step1_unresolved;
             let step3_proposed = predicted_verb.is_some();
             let business_verb = predicted_verb
                 .as_ref()
@@ -385,7 +390,9 @@ mod tests {
             let stateful_response = grounded && has_sage_explain;
             let pass = predicted_verb
                 .as_ref()
-                .map(|verb| verb == &case.expected_verb || case.alt_verbs.iter().any(|alt| alt == verb))
+                .map(|verb| {
+                    verb == &case.expected_verb || case.alt_verbs.iter().any(|alt| alt == verb)
+                })
                 .unwrap_or(false);
 
             update_bucket(&mut by_category, &case.category, pass);
@@ -478,15 +485,43 @@ mod tests {
         md.push_str(&format!("- Total utterances: {}\n", report.summary.total));
         md.push_str(&format!("- Passed: {}\n", report.summary.passed));
         md.push_str(&format!("- Failed: {}\n", report.summary.failed));
-        md.push_str(&format!("- Accuracy: {:.2}%\n\n", report.summary.accuracy * 100.0));
-        md.push_str(&format!("- Grounded responses: {} ({:.2}%)\n", report.summary.grounded, report.summary.grounded_accuracy * 100.0));
-        md.push_str(&format!("- Step 1 resolved: {}\n", report.summary.step1_resolved));
-        md.push_str(&format!("- Step 1 ambiguous: {}\n", report.summary.step1_ambiguous));
-        md.push_str(&format!("- Step 1 unresolved: {}\n", report.summary.step1_unresolved));
-        md.push_str(&format!("- Step 2 stateful: {}\n", report.summary.step2_stateful));
-        md.push_str(&format!("- Step 3 proposed: {}\n", report.summary.step3_proposed));
-        md.push_str(&format!("- Business proposals: {}\n", report.summary.business_proposals));
-        md.push_str(&format!("- Stateful responses: {}\n\n", report.summary.stateful_responses));
+        md.push_str(&format!(
+            "- Accuracy: {:.2}%\n\n",
+            report.summary.accuracy * 100.0
+        ));
+        md.push_str(&format!(
+            "- Grounded responses: {} ({:.2}%)\n",
+            report.summary.grounded,
+            report.summary.grounded_accuracy * 100.0
+        ));
+        md.push_str(&format!(
+            "- Step 1 resolved: {}\n",
+            report.summary.step1_resolved
+        ));
+        md.push_str(&format!(
+            "- Step 1 ambiguous: {}\n",
+            report.summary.step1_ambiguous
+        ));
+        md.push_str(&format!(
+            "- Step 1 unresolved: {}\n",
+            report.summary.step1_unresolved
+        ));
+        md.push_str(&format!(
+            "- Step 2 stateful: {}\n",
+            report.summary.step2_stateful
+        ));
+        md.push_str(&format!(
+            "- Step 3 proposed: {}\n",
+            report.summary.step3_proposed
+        ));
+        md.push_str(&format!(
+            "- Business proposals: {}\n",
+            report.summary.business_proposals
+        ));
+        md.push_str(&format!(
+            "- Stateful responses: {}\n\n",
+            report.summary.stateful_responses
+        ));
         md.push_str("## Accuracy by category\n");
         for (key, value) in &report.by_category {
             md.push_str(&format!(
@@ -531,21 +566,34 @@ mod tests {
 
         println!();
         println!("=======================================================================");
-        println!("  SEMTAXONOMY COVERAGE -- {} utterances", report.summary.total);
+        println!(
+            "  SEMTAXONOMY COVERAGE -- {} utterances",
+            report.summary.total
+        );
         println!("  base_url={base_url}");
         println!("  output={}", out_dir.display());
         println!("=======================================================================");
         println!("  Passed: {}", report.summary.passed);
         println!("  Failed: {}", report.summary.failed);
         println!("  Accuracy: {:.2}%", report.summary.accuracy * 100.0);
-        println!("  Grounded: {} ({:.2}%)", report.summary.grounded, report.summary.grounded_accuracy * 100.0);
+        println!(
+            "  Grounded: {} ({:.2}%)",
+            report.summary.grounded,
+            report.summary.grounded_accuracy * 100.0
+        );
         println!("  Step 1 resolved: {}", report.summary.step1_resolved);
         println!("  Step 1 ambiguous: {}", report.summary.step1_ambiguous);
         println!("  Step 1 unresolved: {}", report.summary.step1_unresolved);
         println!("  Step 2 stateful: {}", report.summary.step2_stateful);
         println!("  Step 3 proposed: {}", report.summary.step3_proposed);
-        println!("  Business proposals: {}", report.summary.business_proposals);
-        println!("  Stateful responses: {}", report.summary.stateful_responses);
+        println!(
+            "  Business proposals: {}",
+            report.summary.business_proposals
+        );
+        println!(
+            "  Stateful responses: {}",
+            report.summary.stateful_responses
+        );
         println!();
 
         if let Some(min_accuracy) = min_accuracy {

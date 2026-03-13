@@ -708,7 +708,7 @@ Full schema for rendering the verb form UI:
     }
   },
   "prereqs_met": true,
-  "preview_dsl": "(cbu-role.assign :cbu-id \"${structure}\" :role \"${role.internal}\" :entity-id \"${party}\")"
+  "preview_dsl": "(cbu.assign-role :cbu-id \"${structure}\" :role \"${role.internal}\" :entity-id \"${party}\")"
 }
 ```
 
@@ -845,7 +845,7 @@ nouns:
   trading_profile_id: "mandate"
   kyc-case: "Case"
   kyc_case_id: "case"
-  cbu-role: "Role"
+  role: "Role"
 
 # Error message translations
 errors:

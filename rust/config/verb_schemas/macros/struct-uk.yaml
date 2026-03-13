@@ -117,7 +117,7 @@ struct.uk.authorised.oeic:
         placeholder_name: "ACD TBD"
       as: "@acd"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@cbu"
         role: authorised-corporate-director
@@ -131,7 +131,7 @@ struct.uk.authorised.oeic:
         placeholder_name: "Depositary TBD"
       as: "@depositary"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@cbu"
         role: depositary
@@ -146,7 +146,7 @@ struct.uk.authorised.oeic:
         skip_if_empty: true
       as: "@im"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@cbu"
         role: investment-manager
@@ -162,7 +162,7 @@ struct.uk.authorised.oeic:
         skip_if_empty: true
       as: "@admin"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@cbu"
         role: administrator
@@ -178,7 +178,7 @@ struct.uk.authorised.oeic:
         skip_if_empty: true
       as: "@auditor"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@cbu"
         role: auditor
@@ -301,7 +301,7 @@ struct.uk.authorised.aut:
         placeholder_name: "Manager TBD"
       as: "@manager"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@cbu"
         role: authorised-fund-manager
@@ -315,7 +315,7 @@ struct.uk.authorised.aut:
         placeholder_name: "Trustee TBD"
       as: "@trustee"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@cbu"
         role: trustee
@@ -330,7 +330,7 @@ struct.uk.authorised.aut:
         skip_if_empty: true
       as: "@im"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@cbu"
         role: investment-manager
@@ -346,7 +346,7 @@ struct.uk.authorised.aut:
         skip_if_empty: true
       as: "@admin"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@cbu"
         role: administrator
@@ -362,7 +362,7 @@ struct.uk.authorised.aut:
         skip_if_empty: true
       as: "@auditor"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@cbu"
         role: auditor
@@ -484,7 +484,7 @@ struct.uk.authorised.acs:
         placeholder_name: "ACS Operator TBD"
       as: "@operator"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@cbu"
         role: acs-operator
@@ -498,7 +498,7 @@ struct.uk.authorised.acs:
         placeholder_name: "Depositary TBD"
       as: "@depositary"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@cbu"
         role: depositary
@@ -513,7 +513,7 @@ struct.uk.authorised.acs:
         skip_if_empty: true
       as: "@im"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@cbu"
         role: investment-manager
@@ -529,7 +529,7 @@ struct.uk.authorised.acs:
         skip_if_empty: true
       as: "@admin"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@cbu"
         role: administrator
@@ -545,7 +545,7 @@ struct.uk.authorised.acs:
         skip_if_empty: true
       as: "@auditor"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@cbu"
         role: auditor
@@ -659,12 +659,6 @@ struct.uk.authorised.ltaf:
         cbu_id: "@cbu"
         bundle_id: docs.bundle.ltaf-baseline
 
-    # Update CBU with LTAF-specific attributes
-    - verb: cbu.update
-      args:
-        cbu_id: "@cbu"
-        kind: ltaf
-        liquidity_type: illiquid
         redemption_notice_days: 90
 
     # Assign valuation agent (important for LTAFs)
@@ -676,7 +670,7 @@ struct.uk.authorised.ltaf:
         skip_if_empty: true
       as: "@valuer"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@cbu"
         role: valuation-agent
@@ -789,7 +783,7 @@ struct.uk.manager.llp:
         placeholder_name: "Designated Member 1 TBD"
       as: "@dm1"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@cbu"
         role: designated-member
@@ -803,7 +797,7 @@ struct.uk.manager.llp:
         placeholder_name: "Designated Member 2 TBD"
       as: "@dm2"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@cbu"
         role: designated-member
@@ -818,7 +812,7 @@ struct.uk.manager.llp:
         skip_if_empty: true
       as: "@co"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@cbu"
         role: compliance-officer
@@ -834,7 +828,7 @@ struct.uk.manager.llp:
         skip_if_empty: true
       as: "@mlro"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@cbu"
         role: mlro
@@ -850,7 +844,7 @@ struct.uk.manager.llp:
         skip_if_empty: true
       as: "@auditor"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@cbu"
         role: auditor
@@ -965,7 +959,7 @@ struct.uk.private-equity.lp:
         placeholder_name: "GP TBD"
       as: "@gp"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@cbu"
         role: general-partner
@@ -980,7 +974,7 @@ struct.uk.private-equity.lp:
         skip_if_empty: true
       as: "@aifm"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@cbu"
         role: aifm
@@ -996,7 +990,7 @@ struct.uk.private-equity.lp:
         skip_if_empty: true
       as: "@depositary"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@cbu"
         role: depositary
@@ -1012,7 +1006,7 @@ struct.uk.private-equity.lp:
         skip_if_empty: true
       as: "@admin"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@cbu"
         role: administrator
@@ -1028,7 +1022,7 @@ struct.uk.private-equity.lp:
         skip_if_empty: true
       as: "@auditor"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@cbu"
         role: auditor
@@ -1044,7 +1038,7 @@ struct.uk.private-equity.lp:
         skip_if_empty: true
       as: "@legal"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@cbu"
         role: legal-counsel

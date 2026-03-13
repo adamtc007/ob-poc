@@ -1449,35 +1449,56 @@ impl CustomOperation for TradingProfileAddComponentOp {
             .get_value("component-type")
             .and_then(|value| value.as_string())
             .ok_or_else(|| anyhow::anyhow!("Missing component-type argument"))?;
-        let forwarded = forward_component_verb_call(verb_call, resolve_add_component_verb(component_type)?);
+        let forwarded =
+            forward_component_verb_call(verb_call, resolve_add_component_verb(component_type)?);
 
         match component_type {
-            "instrument-class" => TradingProfileAddInstrumentClassOp
-                .execute(&forwarded, ctx, pool)
-                .await,
-            "market" => TradingProfileAddMarketOp.execute(&forwarded, ctx, pool).await,
-            "allowed-currency" => TradingProfileAddAllowedCurrencyOp
-                .execute(&forwarded, ctx, pool)
-                .await,
+            "instrument-class" => {
+                TradingProfileAddInstrumentClassOp
+                    .execute(&forwarded, ctx, pool)
+                    .await
+            }
+            "market" => {
+                TradingProfileAddMarketOp
+                    .execute(&forwarded, ctx, pool)
+                    .await
+            }
+            "allowed-currency" => {
+                TradingProfileAddAllowedCurrencyOp
+                    .execute(&forwarded, ctx, pool)
+                    .await
+            }
             "standing-instruction" => TradingProfileAddSsiOp.execute(&forwarded, ctx, pool).await,
-            "booking-rule" => TradingProfileAddBookingRuleOp
-                .execute(&forwarded, ctx, pool)
-                .await,
-            "isda-config" => TradingProfileAddIsdaConfigOp
-                .execute(&forwarded, ctx, pool)
-                .await,
-            "isda-coverage" => TradingProfileAddIsdaCoverageOp
-                .execute(&forwarded, ctx, pool)
-                .await,
-            "csa-config" => TradingProfileAddCsaConfigOp
-                .execute(&forwarded, ctx, pool)
-                .await,
-            "csa-collateral" => TradingProfileAddCsaCollateralOp
-                .execute(&forwarded, ctx, pool)
-                .await,
-            "im-mandate" => TradingProfileAddImMandateOp
-                .execute(&forwarded, ctx, pool)
-                .await,
+            "booking-rule" => {
+                TradingProfileAddBookingRuleOp
+                    .execute(&forwarded, ctx, pool)
+                    .await
+            }
+            "isda-config" => {
+                TradingProfileAddIsdaConfigOp
+                    .execute(&forwarded, ctx, pool)
+                    .await
+            }
+            "isda-coverage" => {
+                TradingProfileAddIsdaCoverageOp
+                    .execute(&forwarded, ctx, pool)
+                    .await
+            }
+            "csa-config" => {
+                TradingProfileAddCsaConfigOp
+                    .execute(&forwarded, ctx, pool)
+                    .await
+            }
+            "csa-collateral" => {
+                TradingProfileAddCsaCollateralOp
+                    .execute(&forwarded, ctx, pool)
+                    .await
+            }
+            "im-mandate" => {
+                TradingProfileAddImMandateOp
+                    .execute(&forwarded, ctx, pool)
+                    .await
+            }
             other => Err(anyhow::anyhow!(
                 "Unsupported trading-profile add-component type: {}",
                 other
@@ -1495,18 +1516,39 @@ impl CustomOperation for TradingProfileAddComponentOp {
             .get_value("component-type")
             .and_then(|value| value.as_string())
             .ok_or_else(|| anyhow::anyhow!("Missing component-type argument"))?;
-        let forwarded = forward_component_verb_call(verb_call, resolve_add_component_verb(component_type)?);
+        let forwarded =
+            forward_component_verb_call(verb_call, resolve_add_component_verb(component_type)?);
 
         match component_type {
-            "instrument-class" => TradingProfileAddInstrumentClassOp.execute(&forwarded, ctx).await,
+            "instrument-class" => {
+                TradingProfileAddInstrumentClassOp
+                    .execute(&forwarded, ctx)
+                    .await
+            }
             "market" => TradingProfileAddMarketOp.execute(&forwarded, ctx).await,
-            "allowed-currency" => TradingProfileAddAllowedCurrencyOp.execute(&forwarded, ctx).await,
+            "allowed-currency" => {
+                TradingProfileAddAllowedCurrencyOp
+                    .execute(&forwarded, ctx)
+                    .await
+            }
             "standing-instruction" => TradingProfileAddSsiOp.execute(&forwarded, ctx).await,
-            "booking-rule" => TradingProfileAddBookingRuleOp.execute(&forwarded, ctx).await,
+            "booking-rule" => {
+                TradingProfileAddBookingRuleOp
+                    .execute(&forwarded, ctx)
+                    .await
+            }
             "isda-config" => TradingProfileAddIsdaConfigOp.execute(&forwarded, ctx).await,
-            "isda-coverage" => TradingProfileAddIsdaCoverageOp.execute(&forwarded, ctx).await,
+            "isda-coverage" => {
+                TradingProfileAddIsdaCoverageOp
+                    .execute(&forwarded, ctx)
+                    .await
+            }
             "csa-config" => TradingProfileAddCsaConfigOp.execute(&forwarded, ctx).await,
-            "csa-collateral" => TradingProfileAddCsaCollateralOp.execute(&forwarded, ctx).await,
+            "csa-collateral" => {
+                TradingProfileAddCsaCollateralOp
+                    .execute(&forwarded, ctx)
+                    .await
+            }
             "im-mandate" => TradingProfileAddImMandateOp.execute(&forwarded, ctx).await,
             other => Err(anyhow::anyhow!(
                 "Unsupported trading-profile add-component type: {}",
@@ -1548,23 +1590,41 @@ impl CustomOperation for TradingProfileRemoveComponentOp {
             forward_component_verb_call(verb_call, resolve_remove_component_verb(component_type)?);
 
         match component_type {
-            "instrument-class" => TradingProfileRemoveInstrumentClassOp
-                .execute(&forwarded, ctx, pool)
-                .await,
-            "market" => TradingProfileRemoveMarketOp.execute(&forwarded, ctx, pool).await,
-            "standing-instruction" => TradingProfileRemoveSsiOp.execute(&forwarded, ctx, pool).await,
-            "booking-rule" => TradingProfileRemoveBookingRuleOp
-                .execute(&forwarded, ctx, pool)
-                .await,
-            "isda-config" => TradingProfileRemoveIsdaConfigOp
-                .execute(&forwarded, ctx, pool)
-                .await,
-            "csa-config" => TradingProfileRemoveCsaConfigOp
-                .execute(&forwarded, ctx, pool)
-                .await,
-            "im-mandate" => TradingProfileRemoveImMandateOp
-                .execute(&forwarded, ctx, pool)
-                .await,
+            "instrument-class" => {
+                TradingProfileRemoveInstrumentClassOp
+                    .execute(&forwarded, ctx, pool)
+                    .await
+            }
+            "market" => {
+                TradingProfileRemoveMarketOp
+                    .execute(&forwarded, ctx, pool)
+                    .await
+            }
+            "standing-instruction" => {
+                TradingProfileRemoveSsiOp
+                    .execute(&forwarded, ctx, pool)
+                    .await
+            }
+            "booking-rule" => {
+                TradingProfileRemoveBookingRuleOp
+                    .execute(&forwarded, ctx, pool)
+                    .await
+            }
+            "isda-config" => {
+                TradingProfileRemoveIsdaConfigOp
+                    .execute(&forwarded, ctx, pool)
+                    .await
+            }
+            "csa-config" => {
+                TradingProfileRemoveCsaConfigOp
+                    .execute(&forwarded, ctx, pool)
+                    .await
+            }
+            "im-mandate" => {
+                TradingProfileRemoveImMandateOp
+                    .execute(&forwarded, ctx, pool)
+                    .await
+            }
             other => Err(anyhow::anyhow!(
                 "Unsupported trading-profile remove-component type: {}",
                 other
@@ -1586,15 +1646,33 @@ impl CustomOperation for TradingProfileRemoveComponentOp {
             forward_component_verb_call(verb_call, resolve_remove_component_verb(component_type)?);
 
         match component_type {
-            "instrument-class" => TradingProfileRemoveInstrumentClassOp
-                .execute(&forwarded, ctx)
-                .await,
+            "instrument-class" => {
+                TradingProfileRemoveInstrumentClassOp
+                    .execute(&forwarded, ctx)
+                    .await
+            }
             "market" => TradingProfileRemoveMarketOp.execute(&forwarded, ctx).await,
             "standing-instruction" => TradingProfileRemoveSsiOp.execute(&forwarded, ctx).await,
-            "booking-rule" => TradingProfileRemoveBookingRuleOp.execute(&forwarded, ctx).await,
-            "isda-config" => TradingProfileRemoveIsdaConfigOp.execute(&forwarded, ctx).await,
-            "csa-config" => TradingProfileRemoveCsaConfigOp.execute(&forwarded, ctx).await,
-            "im-mandate" => TradingProfileRemoveImMandateOp.execute(&forwarded, ctx).await,
+            "booking-rule" => {
+                TradingProfileRemoveBookingRuleOp
+                    .execute(&forwarded, ctx)
+                    .await
+            }
+            "isda-config" => {
+                TradingProfileRemoveIsdaConfigOp
+                    .execute(&forwarded, ctx)
+                    .await
+            }
+            "csa-config" => {
+                TradingProfileRemoveCsaConfigOp
+                    .execute(&forwarded, ctx)
+                    .await
+            }
+            "im-mandate" => {
+                TradingProfileRemoveImMandateOp
+                    .execute(&forwarded, ctx)
+                    .await
+            }
             other => Err(anyhow::anyhow!(
                 "Unsupported trading-profile remove-component type: {}",
                 other
@@ -1835,27 +1913,28 @@ impl CustomOperation for TradingProfileAddMarketOp {
             .map(|s| s.to_string());
 
         // Look up market metadata from reference data if not provided
-        let (resolved_name, resolved_country) =
-            if let (Some(name), Some(code)) = (market_name.clone(), country_code.clone()) {
-                (name, code)
-            } else {
-                let row =
-                    sqlx::query(r#"SELECT name, country_code FROM "ob-poc".markets WHERE mic = $1"#)
-                        .bind(&mic)
-                        .fetch_optional(pool)
-                        .await?;
+        let (resolved_name, resolved_country) = if let (Some(name), Some(code)) =
+            (market_name.clone(), country_code.clone())
+        {
+            (name, code)
+        } else {
+            let row =
+                sqlx::query(r#"SELECT name, country_code FROM "ob-poc".markets WHERE mic = $1"#)
+                    .bind(&mic)
+                    .fetch_optional(pool)
+                    .await?;
 
-                match row {
-                    Some(r) => (
-                        market_name.unwrap_or_else(|| r.get::<String, _>("name")),
-                        country_code.unwrap_or_else(|| r.get::<String, _>("country_code")),
-                    ),
-                    None => (
-                        market_name.unwrap_or_else(|| mic.clone()),
-                        country_code.unwrap_or_else(|| "XX".to_string()),
-                    ),
-                }
-            };
+            match row {
+                Some(r) => (
+                    market_name.unwrap_or_else(|| r.get::<String, _>("name")),
+                    country_code.unwrap_or_else(|| r.get::<String, _>("country_code")),
+                ),
+                None => (
+                    market_name.unwrap_or_else(|| mic.clone()),
+                    country_code.unwrap_or_else(|| "XX".to_string()),
+                ),
+            }
+        };
 
         // Apply operation to AST and save
         let doc = ast_db::apply_and_save(

@@ -57,7 +57,7 @@ LOW CONFIDENCE (corroborate required)
 ## DSL Source Attribution Pattern
 
 ```clojure
-(cbu.role:assign-ownership
+(cbu.assign-ownership
     :owner-entity-id @parent
     :owned-entity-id @child
     :percentage 100.0

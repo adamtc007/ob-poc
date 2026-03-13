@@ -323,7 +323,7 @@ impl BlockerType {
         match self {
             // Core / Entity Structure
             BlockerType::MissingRole { .. } => Some("cbu.assign-role"),
-            BlockerType::FieldMissing { .. } => Some("cbu.update"),
+            BlockerType::FieldMissing { .. } => Some("cbu.ensure"),
             BlockerType::MissingProduct { .. } => Some("cbu.add-product"),
             BlockerType::MissingRelationship { .. } => Some("ubo.add-ownership"),
 

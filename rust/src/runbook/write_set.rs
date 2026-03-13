@@ -225,8 +225,8 @@ mod tests {
         fn test_index() -> VerbConfigIndex {
             let mut index = VerbConfigIndex::empty();
             index.insert_test_entry(VerbIndexEntry {
-                fqn: "cbu.update".to_string(),
-                description: "Update a CBU".to_string(),
+                fqn: "cbu.rename".to_string(),
+                description: "Rename a CBU".to_string(),
                 invocation_phrases: vec![],
                 sentence_templates: vec![],
                 sentences: None,
@@ -291,7 +291,7 @@ mod tests {
             args.insert("cbu-id".to_string(), cbu_id.to_string());
             args.insert("name".to_string(), "New Name".to_string());
 
-            let result = derive_write_set_from_contract("cbu.update", &args, &index);
+            let result = derive_write_set_from_contract("cbu.rename", &args, &index);
             assert!(
                 result.contains(&cbu_id),
                 "CRUD key arg should be in write_set"
@@ -324,7 +324,7 @@ mod tests {
             // An arg not in the contract but contains a UUID — heuristic picks it up
             args.insert("extra-ref".to_string(), extra_id.to_string());
 
-            let result = derive_write_set("cbu.update", &args, Some(&index));
+            let result = derive_write_set("cbu.rename", &args, Some(&index));
             assert!(result.contains(&cbu_id), "Contract-derived");
             assert!(result.contains(&extra_id), "Heuristic-derived");
             assert_eq!(result.len(), 2, "Union without duplicates");

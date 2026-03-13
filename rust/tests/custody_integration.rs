@@ -53,10 +53,13 @@ async fn get_instrument_class_id(pool: &PgPool, code: &str) -> Option<Uuid> {
 
 /// Test helper to get market ID
 async fn get_market_id(pool: &PgPool, mic: &str) -> Option<Uuid> {
-    sqlx::query_scalar!("SELECT market_id FROM \"ob-poc\".markets WHERE mic = $1", mic)
-        .fetch_optional(pool)
-        .await
-        .expect("Failed to query market")
+    sqlx::query_scalar!(
+        "SELECT market_id FROM \"ob-poc\".markets WHERE mic = $1",
+        mic
+    )
+    .fetch_optional(pool)
+    .await
+    .expect("Failed to query market")
 }
 
 /// Cleanup test data

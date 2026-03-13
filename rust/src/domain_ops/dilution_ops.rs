@@ -88,12 +88,13 @@ impl CustomOperation for DilutionGrantOptionsOp {
         let plan_name = extract_string_opt(verb_call, "plan-name");
 
         // Get issuer from share class
-        let issuer_entity_id: Uuid =
-            sqlx::query_scalar(r#"SELECT issuer_entity_id FROM "ob-poc".share_classes WHERE id = $1"#)
-                .bind(share_class_id)
-                .fetch_optional(pool)
-                .await?
-                .ok_or_else(|| anyhow!("Share class {} not found", share_class_id))?;
+        let issuer_entity_id: Uuid = sqlx::query_scalar(
+            r#"SELECT issuer_entity_id FROM "ob-poc".share_classes WHERE id = $1"#,
+        )
+        .bind(share_class_id)
+        .fetch_optional(pool)
+        .await?
+        .ok_or_else(|| anyhow!("Share class {} not found", share_class_id))?;
 
         let instrument_id: Uuid = sqlx::query_scalar(
             r#"
@@ -197,12 +198,13 @@ impl CustomOperation for DilutionIssueWarrantOp {
         let warrant_series = extract_string_opt(verb_call, "warrant-series");
 
         // Get issuer from share class
-        let issuer_entity_id: Uuid =
-            sqlx::query_scalar(r#"SELECT issuer_entity_id FROM "ob-poc".share_classes WHERE id = $1"#)
-                .bind(share_class_id)
-                .fetch_optional(pool)
-                .await?
-                .ok_or_else(|| anyhow!("Share class {} not found", share_class_id))?;
+        let issuer_entity_id: Uuid = sqlx::query_scalar(
+            r#"SELECT issuer_entity_id FROM "ob-poc".share_classes WHERE id = $1"#,
+        )
+        .bind(share_class_id)
+        .fetch_optional(pool)
+        .await?
+        .ok_or_else(|| anyhow!("Share class {} not found", share_class_id))?;
 
         let instrument_id: Uuid = sqlx::query_scalar(
             r#"

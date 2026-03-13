@@ -1842,5 +1842,5 @@ impl CustomOperation for CbuCreateFromClientGroupOp {
     }
 }
 
-// Note: map_to_cbu_role, fetch_cbu_role_ids, assign_cbu_role removed
+// Note: legacy role-mapping helpers were removed.
 // Role assignment is now handled by cbu.create plugin via :fund-entity-id arg

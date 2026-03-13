@@ -118,7 +118,7 @@
   notes: "Product addition in book setup"
 
 - utterance: "assign general partner role"
-  expected_verb: cbu-role.assign
+  expected_verb: cbu.assign-role
   pack: book-setup
   outcome: matched
   notes: "Role assignment in book setup context"

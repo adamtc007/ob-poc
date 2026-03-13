@@ -124,7 +124,7 @@ struct.hedge.cross-border:
         placeholder_name: "AIFM TBD"
       as: "@aifm"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@master"
         role: aifm
@@ -138,7 +138,7 @@ struct.hedge.cross-border:
         placeholder_name: "Depositary TBD"
       as: "@depositary"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@master"
         role: depositary
@@ -152,7 +152,7 @@ struct.hedge.cross-border:
         placeholder_name: "Prime Broker TBD"
       as: "@pb"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@master"
         role: prime-broker
@@ -167,7 +167,7 @@ struct.hedge.cross-border:
         skip_if_empty: true
       as: "@im"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@master"
         role: investment-manager
@@ -183,7 +183,7 @@ struct.hedge.cross-border:
         skip_if_empty: true
       as: "@admin"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@master"
         role: administrator
@@ -199,7 +199,7 @@ struct.hedge.cross-border:
         skip_if_empty: true
       as: "@auditor"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@master"
         role: auditor
@@ -215,7 +215,7 @@ struct.hedge.cross-border:
         skip_if_empty: true
       as: "@secondary-pb"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@master"
         role: prime-broker
@@ -243,7 +243,7 @@ struct.hedge.cross-border:
         exemption: 3c7
       as: "@us-feeder"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@us-feeder"
         role: general-partner
@@ -260,13 +260,13 @@ struct.hedge.cross-border:
         aif_type: qiaif
       as: "@ie-feeder"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@ie-feeder"
         role: aifm
         entity_id: "@aifm"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@ie-feeder"
         role: depositary
@@ -410,13 +410,6 @@ struct.pe.cross-border:
         - "@cbu"
         - "@trading-profile"
 
-    # Rename the imported @cbu to @main for clarity
-    - verb: cbu.update
-      args:
-        cbu_id: "@cbu"
-        is_main_fund: true
-        structure_role: main
-
     # Create US Parallel (Delaware LP for US tax-exempt investors)
     - verb: cbu.create
       args:
@@ -442,7 +435,7 @@ struct.pe.cross-border:
         placeholder_name: "GP TBD"
       as: "@gp-us"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@us-parallel"
         role: general-partner
@@ -457,7 +450,7 @@ struct.pe.cross-border:
         skip_if_empty: true
       as: "@auditor-us"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@us-parallel"
         role: auditor

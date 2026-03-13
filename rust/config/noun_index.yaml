@@ -31,13 +31,19 @@ nouns:
     entity_type_fqn: cbu
     noun_keys:
       - cbu
-      - cbu_role
     action_verbs:
-      create: [cbu.create, cbu.ensure, cbu.create-from-client-group]
-      list: [cbu.list, cbu.show, cbu.list-evidence]
-      delete: [cbu.delete, cbu.delete-cascade]
-      update: [cbu.update]
-      assign: [cbu.assign-role, cbu.assign-entity-role]
+      create: [cbu.create]
+      list: [cbu.list]
+      delete: [cbu.delete]
+      update:
+        [
+          cbu.rename,
+          cbu.set-jurisdiction,
+          cbu.set-client-type,
+          cbu.set-commercial-client,
+          cbu.set-category,
+        ]
+      assign: [cbu.assign-role]
 
   entity:
     aliases:
@@ -636,22 +642,13 @@ nouns:
       - entity role
       - cbu role
       - position
-    entity_type_fqn: cbu.role
+    entity_type_fqn: role
     noun_keys:
-      - cbu_role
+      - role
     action_verbs:
-      assign:
-        [
-          cbu.assign-role,
-          cbu-role.assign,
-          cbu-role.assign-ownership,
-          cbu-role.assign-control,
-          cbu-role.assign-fund-role,
-          cbu-role.assign-service-provider,
-          cbu-role.assign-signatory,
-        ]
-      list: [cbu-role.list, cbu-role.validate]
-      delete: [cbu-role.remove]
+      assign: [cbu.assign-role]
+      list: [cbu.parties]
+      delete: [cbu.remove-role]
 
   # =========================================================================
   # STEWARDSHIP / REGISTRY

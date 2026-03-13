@@ -87,33 +87,78 @@ SELECT * FROM agent.teach_phrases_batch('[
     {"phrase": "list pending CBUs", "verb": "cbu.list"}
 ]'::jsonb, 'claude_accelerated_learning');
 
--- CBU.UPDATE - Modifying CBU details
+-- CBU.RENAME - Renaming CBU/fund
 SELECT * FROM agent.teach_phrases_batch('[
-    {"phrase": "change fund name", "verb": "cbu.update"},
-    {"phrase": "rename fund", "verb": "cbu.update"},
-    {"phrase": "rename the CBU", "verb": "cbu.update"},
-    {"phrase": "update fund details", "verb": "cbu.update"},
-    {"phrase": "modify fund", "verb": "cbu.update"},
-    {"phrase": "change structure details", "verb": "cbu.update"},
-    {"phrase": "edit structure", "verb": "cbu.update"},
-    {"phrase": "update structure", "verb": "cbu.update"},
-    {"phrase": "change client type", "verb": "cbu.update"},
-    {"phrase": "update client type", "verb": "cbu.update"},
-    {"phrase": "modify CBU status", "verb": "cbu.update"},
-    {"phrase": "change CBU status", "verb": "cbu.update"},
-    {"phrase": "update CBU jurisdiction", "verb": "cbu.update"},
-    {"phrase": "change jurisdiction for", "verb": "cbu.update"},
-    {"phrase": "update the fund name to", "verb": "cbu.update"},
-    {"phrase": "rename structure to", "verb": "cbu.update"},
-    {"phrase": "modify fund name", "verb": "cbu.update"},
-    {"phrase": "edit fund details", "verb": "cbu.update"},
-    {"phrase": "change fund status", "verb": "cbu.update"},
-    {"phrase": "mark fund as active", "verb": "cbu.update"},
-    {"phrase": "mark CBU inactive", "verb": "cbu.update"},
-    {"phrase": "deactivate fund", "verb": "cbu.update"},
-    {"phrase": "activate fund", "verb": "cbu.update"},
-    {"phrase": "correct fund name", "verb": "cbu.update"},
-    {"phrase": "fix CBU details", "verb": "cbu.update"}
+    {"phrase": "change fund name", "verb": "cbu.rename"},
+    {"phrase": "rename fund", "verb": "cbu.rename"},
+    {"phrase": "rename the CBU", "verb": "cbu.rename"},
+    {"phrase": "update the fund name to", "verb": "cbu.rename"},
+    {"phrase": "rename structure to", "verb": "cbu.rename"},
+    {"phrase": "modify fund name", "verb": "cbu.rename"},
+    {"phrase": "correct fund name", "verb": "cbu.rename"},
+    {"phrase": "change CBU name", "verb": "cbu.rename"}
+]'::jsonb, 'claude_accelerated_learning');
+
+-- CBU.SET-JURISDICTION - Jurisdiction changes
+SELECT * FROM agent.teach_phrases_batch('[
+    {"phrase": "update CBU jurisdiction", "verb": "cbu.set-jurisdiction"},
+    {"phrase": "change jurisdiction for", "verb": "cbu.set-jurisdiction"},
+    {"phrase": "change fund jurisdiction", "verb": "cbu.set-jurisdiction"},
+    {"phrase": "set fund jurisdiction", "verb": "cbu.set-jurisdiction"},
+    {"phrase": "move fund jurisdiction to", "verb": "cbu.set-jurisdiction"}
+]'::jsonb, 'claude_accelerated_learning');
+
+-- CBU.SET-CLIENT-TYPE - Client type changes
+SELECT * FROM agent.teach_phrases_batch('[
+    {"phrase": "change client type", "verb": "cbu.set-client-type"},
+    {"phrase": "update client type", "verb": "cbu.set-client-type"},
+    {"phrase": "set fund client type", "verb": "cbu.set-client-type"},
+    {"phrase": "change fund type", "verb": "cbu.set-client-type"}
+]'::jsonb, 'claude_accelerated_learning');
+
+-- CBU.SET-COMMERCIAL-CLIENT - Parent/commercial client linkage
+SELECT * FROM agent.teach_phrases_batch('[
+    {"phrase": "set commercial client", "verb": "cbu.set-commercial-client"},
+    {"phrase": "change commercial client", "verb": "cbu.set-commercial-client"},
+    {"phrase": "set parent client for CBU", "verb": "cbu.set-commercial-client"},
+    {"phrase": "link commercial client", "verb": "cbu.set-commercial-client"}
+]'::jsonb, 'claude_accelerated_learning');
+
+-- CBU.SUBMIT-FOR-VALIDATION - Enter validation review
+SELECT * FROM agent.teach_phrases_batch('[
+    {"phrase": "submit CBU for validation", "verb": "cbu.submit-for-validation"},
+    {"phrase": "submit fund for validation", "verb": "cbu.submit-for-validation"},
+    {"phrase": "start validation", "verb": "cbu.submit-for-validation"},
+    {"phrase": "send CBU to review", "verb": "cbu.submit-for-validation"},
+    {"phrase": "begin validation review", "verb": "cbu.submit-for-validation"}
+]'::jsonb, 'claude_accelerated_learning');
+
+-- CBU.DECIDE - Validation decision
+SELECT * FROM agent.teach_phrases_batch('[
+    {"phrase": "approve CBU", "verb": "cbu.decide"},
+    {"phrase": "reject CBU", "verb": "cbu.decide"},
+    {"phrase": "approve fund", "verb": "cbu.decide"},
+    {"phrase": "reject fund", "verb": "cbu.decide"},
+    {"phrase": "record KYC decision", "verb": "cbu.decide"},
+    {"phrase": "make CBU decision", "verb": "cbu.decide"},
+    {"phrase": "refer this CBU", "verb": "cbu.decide"},
+    {"phrase": "refer fund for review", "verb": "cbu.decide"}
+]'::jsonb, 'claude_accelerated_learning');
+
+-- CBU.REQUEST-PROOF-UPDATE - Revalidation proof required
+SELECT * FROM agent.teach_phrases_batch('[
+    {"phrase": "request proof update", "verb": "cbu.request-proof-update"},
+    {"phrase": "request additional proof", "verb": "cbu.request-proof-update"},
+    {"phrase": "mark as update pending proof", "verb": "cbu.request-proof-update"},
+    {"phrase": "require revalidation proof", "verb": "cbu.request-proof-update"}
+]'::jsonb, 'claude_accelerated_learning');
+
+-- CBU.REOPEN-VALIDATION - Retry after failure
+SELECT * FROM agent.teach_phrases_batch('[
+    {"phrase": "reopen validation", "verb": "cbu.reopen-validation"},
+    {"phrase": "retry validation", "verb": "cbu.reopen-validation"},
+    {"phrase": "resubmit after failure", "verb": "cbu.reopen-validation"},
+    {"phrase": "restart validation review", "verb": "cbu.reopen-validation"}
 ]'::jsonb, 'claude_accelerated_learning');
 
 -- CBU.READ - Getting single CBU details
@@ -410,64 +455,6 @@ SELECT * FROM agent.teach_phrases_batch('[
     {"phrase": "mass onboard funds", "verb": "cbu.create-from-client-group"}
 ]'::jsonb, 'claude_accelerated_learning');
 
--- CBU.ROLE.ASSIGN - Generic role assignment
-SELECT * FROM agent.teach_phrases_batch('[
-    {"phrase": "give role to entity", "verb": "cbu.role.assign"},
-    {"phrase": "grant role to entity", "verb": "cbu.role.assign"},
-    {"phrase": "assign role to person", "verb": "cbu.role.assign"},
-    {"phrase": "give role to person", "verb": "cbu.role.assign"},
-    {"phrase": "add entity with role", "verb": "cbu.role.assign"},
-    {"phrase": "add person with role", "verb": "cbu.role.assign"},
-    {"phrase": "set entity role", "verb": "cbu.role.assign"},
-    {"phrase": "set person role", "verb": "cbu.role.assign"},
-    {"phrase": "link with role", "verb": "cbu.role.assign"},
-    {"phrase": "connect with role", "verb": "cbu.role.assign"}
-]'::jsonb, 'claude_accelerated_learning');
-
--- CBU.ROLE.REMOVE - Generic role removal
-SELECT * FROM agent.teach_phrases_batch('[
-    {"phrase": "take role from entity", "verb": "cbu.role.remove"},
-    {"phrase": "revoke role from entity", "verb": "cbu.role.remove"},
-    {"phrase": "remove role from person", "verb": "cbu.role.remove"},
-    {"phrase": "take role from person", "verb": "cbu.role.remove"},
-    {"phrase": "delete entity role", "verb": "cbu.role.remove"},
-    {"phrase": "delete person role", "verb": "cbu.role.remove"},
-    {"phrase": "clear entity role", "verb": "cbu.role.remove"},
-    {"phrase": "clear person role", "verb": "cbu.role.remove"},
-    {"phrase": "unlink with role", "verb": "cbu.role.remove"},
-    {"phrase": "disconnect role", "verb": "cbu.role.remove"}
-]'::jsonb, 'claude_accelerated_learning');
-
--- CBU.ROLE.LIST - List roles
-SELECT * FROM agent.teach_phrases_batch('[
-    {"phrase": "show all roles", "verb": "cbu.role.list"},
-    {"phrase": "list all roles", "verb": "cbu.role.list"},
-    {"phrase": "what roles exist", "verb": "cbu.role.list"},
-    {"phrase": "available roles", "verb": "cbu.role.list"},
-    {"phrase": "role list", "verb": "cbu.role.list"},
-    {"phrase": "show role types", "verb": "cbu.role.list"},
-    {"phrase": "list role types", "verb": "cbu.role.list"},
-    {"phrase": "get role inventory", "verb": "cbu.role.list"},
-    {"phrase": "enumerate roles", "verb": "cbu.role.list"},
-    {"phrase": "role options", "verb": "cbu.role.list"}
-]'::jsonb, 'claude_accelerated_learning');
-
--- CBU.ROLE.VALIDATE - Role validation
-SELECT * FROM agent.teach_phrases_batch('[
-    {"phrase": "check if roles are complete", "verb": "cbu.role.validate"},
-    {"phrase": "validate fund roles", "verb": "cbu.role.validate"},
-    {"phrase": "validate CBU roles", "verb": "cbu.role.validate"},
-    {"phrase": "are required roles filled", "verb": "cbu.role.validate"},
-    {"phrase": "check role completeness", "verb": "cbu.role.validate"},
-    {"phrase": "role validation check", "verb": "cbu.role.validate"},
-    {"phrase": "verify roles are assigned", "verb": "cbu.role.validate"},
-    {"phrase": "check mandatory roles", "verb": "cbu.role.validate"},
-    {"phrase": "missing roles check", "verb": "cbu.role.validate"},
-    {"phrase": "role requirements check", "verb": "cbu.role.validate"},
-    {"phrase": "are all roles assigned", "verb": "cbu.role.validate"},
-    {"phrase": "role gap analysis", "verb": "cbu.role.validate"},
-    {"phrase": "check role coverage", "verb": "cbu.role.validate"}
-]'::jsonb, 'claude_accelerated_learning');
 
 -- =============================================================================
 -- Summary: Check what was taught

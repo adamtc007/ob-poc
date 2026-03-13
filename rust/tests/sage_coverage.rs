@@ -175,7 +175,10 @@ fn write_report(
     ));
 
     let mut by_expected_domain = std::collections::BTreeMap::<String, DomainBucket>::new();
-    for row in rows.iter().filter(|row| row.expected_domain_concept.is_some()) {
+    for row in rows
+        .iter()
+        .filter(|row| row.expected_domain_concept.is_some())
+    {
         let key = row.expected_domain_concept.clone().unwrap_or_default();
         let bucket = by_expected_domain.entry(key).or_default();
         bucket.total += 1;

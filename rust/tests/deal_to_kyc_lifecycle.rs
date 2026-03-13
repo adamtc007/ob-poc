@@ -424,12 +424,13 @@ mod deal_to_kyc_lifecycle {
             db.close_case(case_id, "APPROVED").await;
 
             // Verify case is APPROVED with closed_at
-            let closed_case: (String, Option<chrono::DateTime<chrono::Utc>>) =
-                sqlx::query_as(r#"SELECT status, closed_at FROM "ob-poc".cases WHERE case_id = $1"#)
-                    .bind(case_id)
-                    .fetch_one(&db.pool)
-                    .await
-                    .unwrap();
+            let closed_case: (String, Option<chrono::DateTime<chrono::Utc>>) = sqlx::query_as(
+                r#"SELECT status, closed_at FROM "ob-poc".cases WHERE case_id = $1"#,
+            )
+            .bind(case_id)
+            .fetch_one(&db.pool)
+            .await
+            .unwrap();
             assert_eq!(closed_case.0, "APPROVED");
             assert!(closed_case.1.is_some(), "closed_at must be set");
 

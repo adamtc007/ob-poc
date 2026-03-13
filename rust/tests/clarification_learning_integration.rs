@@ -94,7 +94,7 @@ fn get_test_scenarios() -> Vec<ClarificationScenario> {
         ClarificationScenario {
             description: "Vague entity request",
             user_input: "add john smith",
-            expected_verbs: &["entity.create", "cbu-role.assign"],
+            expected_verbs: &["entity.create", "cbu.assign-role"],
             user_selection: "entity.create",
             category: "creation",
         },

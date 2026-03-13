@@ -689,7 +689,7 @@ expands-to:
     import-symbols:
       - "@cbu"
       - "@trading-profile"
-  - verb: cbu-role.assign
+  - verb: cbu.assign-role
     args:
       cbu-id: "@cbu"
       role: cross-border-coordinator
@@ -713,7 +713,7 @@ unlocks: []
         // Second step should be verb call
         match &schema.expands_to[1] {
             MacroExpansionStep::VerbCall(v) => {
-                assert_eq!(v.verb, "cbu-role.assign");
+                assert_eq!(v.verb, "cbu.assign-role");
             }
             _ => panic!("Expected VerbCall"),
         }

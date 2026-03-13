@@ -64,11 +64,12 @@ impl CustomOperation for OwnershipComputeOp {
         let _basis = extract_string_opt(verb_call, "basis").unwrap_or_else(|| "VOTES".to_string());
 
         // Call the derivation function
-        let count: i32 = sqlx::query_scalar(r#"SELECT "ob-poc".fn_derive_ownership_snapshots($1, $2)"#)
-            .bind(issuer_entity_id)
-            .bind(as_of)
-            .fetch_one(pool)
-            .await?;
+        let count: i32 =
+            sqlx::query_scalar(r#"SELECT "ob-poc".fn_derive_ownership_snapshots($1, $2)"#)
+                .bind(issuer_entity_id)
+                .bind(as_of)
+                .fetch_one(pool)
+                .await?;
 
         tracing::info!(
             "ownership.compute: derived {} snapshots for issuer {} as-of {}",

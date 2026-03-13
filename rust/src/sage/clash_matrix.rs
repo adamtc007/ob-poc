@@ -64,8 +64,10 @@ pub fn build_clash_matrix(index: &VerbMetadataIndex) -> Vec<ClashRow> {
             let mut required_param_signature = left.required_params.clone();
             required_param_signature.sort();
 
-            let mut action_overlap =
-                intersect_strings(left.action_tags.iter().cloned(), right.action_tags.iter().cloned());
+            let mut action_overlap = intersect_strings(
+                left.action_tags.iter().cloned(),
+                right.action_tags.iter().cloned(),
+            );
             action_overlap.retain(|tag| !tag.is_empty());
             action_overlap.sort();
 
@@ -231,7 +233,9 @@ fn intersect_strings(
     right: impl IntoIterator<Item = String>,
 ) -> Vec<String> {
     let right = right.into_iter().collect::<std::collections::BTreeSet<_>>();
-    left.into_iter().filter(|value| right.contains(value)).collect()
+    left.into_iter()
+        .filter(|value| right.contains(value))
+        .collect()
 }
 
 fn csv_escape(value: &str) -> String {
@@ -245,8 +249,8 @@ fn csv_escape(value: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use dsl_core::config::types::ActionClass;
     use crate::sage::{IntentPolarity, ObservationPlane, VerbMeta};
+    use dsl_core::config::types::ActionClass;
 
     fn sample_meta(fqn: &str, action_tags: &[&str], required_params: &[&str]) -> VerbMeta {
         let (domain, verb_name) = fqn.split_once('.').unwrap();
@@ -263,8 +267,14 @@ mod tests {
             requires_subject: true,
             planes: vec![ObservationPlane::Instance],
             action_tags: action_tags.iter().map(|value| value.to_string()).collect(),
-            param_names: required_params.iter().map(|value| value.to_string()).collect(),
-            required_params: required_params.iter().map(|value| value.to_string()).collect(),
+            param_names: required_params
+                .iter()
+                .map(|value| value.to_string())
+                .collect(),
+            required_params: required_params
+                .iter()
+                .map(|value| value.to_string())
+                .collect(),
             description: "sample".to_string(),
         }
     }

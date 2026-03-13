@@ -1,6 +1,6 @@
-//! CBU Role Assignment Operations (Role Taxonomy V2)
+//! CBU specialist role assignment operations (Role Taxonomy V2)
 //!
-//! Custom handlers for the cbu.role domain verbs defined in cbu-role-v2.yaml.
+//! Custom handlers for specialist `cbu.*` role verbs defined in `cbu-specialist-roles.yaml`.
 //! These operations manage entity role assignments within CBUs with validation.
 //!
 //! ## Why Custom Operations?
@@ -39,162 +39,7 @@ async fn get_role_id(pool: &PgPool, role_name: &str) -> Result<uuid::Uuid> {
 }
 
 // =============================================================================
-// cbu.role:assign - Core role assignment
-// =============================================================================
-
-/// Assign a role to an entity within a CBU context
-///
-/// This is the base role assignment operation. For ownership, control, and trust
-/// roles, use the specialized variants that also create relationship edges.
-#[register_custom_op]
-pub struct CbuRoleAssignOp;
-
-#[async_trait]
-impl CustomOperation for CbuRoleAssignOp {
-    fn domain(&self) -> &'static str {
-        "cbu.role"
-    }
-
-    fn verb(&self) -> &'static str {
-        "assign"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Role assignment requires entity type validation and conflict detection"
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        use chrono::NaiveDate;
-        use sqlx::types::BigDecimal;
-        use uuid::Uuid;
-
-        // Extract required arguments
-        let cbu_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "cbu-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing cbu-id argument"))?;
-
-        let entity_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "entity-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing entity-id argument"))?;
-
-        let role: String = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "role")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_uppercase())
-            .ok_or_else(|| anyhow::anyhow!("Missing role argument"))?;
-
-        // Optional arguments
-        let target_entity_id: Option<Uuid> = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "target-entity-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            });
-
-        let percentage: Option<BigDecimal> = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "percentage")
-            .and_then(|a| a.value.as_decimal())
-            .map(|d| d.to_string().parse::<BigDecimal>().unwrap_or_default());
-
-        let effective_from: Option<NaiveDate> = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "effective-from")
-            .and_then(|a| a.value.as_string())
-            .and_then(|s| NaiveDate::parse_from_str(s, "%Y-%m-%d").ok());
-
-        let effective_to: Option<NaiveDate> = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "effective-to")
-            .and_then(|a| a.value.as_string())
-            .and_then(|s| NaiveDate::parse_from_str(s, "%Y-%m-%d").ok());
-
-        // Get role_id
-        let role_id = get_role_id(pool, &role).await?;
-
-        // Upsert role assignment (idempotent via ON CONFLICT)
-        let row = sqlx::query_scalar!(
-            r#"INSERT INTO "ob-poc".cbu_entity_roles
-               (cbu_id, entity_id, role_id, target_entity_id, ownership_percentage,
-                effective_from, effective_to, created_at, updated_at)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
-               ON CONFLICT (cbu_id, entity_id, role_id) DO UPDATE SET
-                   target_entity_id = EXCLUDED.target_entity_id,
-                   ownership_percentage = EXCLUDED.ownership_percentage,
-                   effective_from = EXCLUDED.effective_from,
-                   effective_to = EXCLUDED.effective_to,
-                   updated_at = NOW()
-               RETURNING cbu_entity_role_id"#,
-            cbu_id,
-            entity_id,
-            role_id,
-            target_entity_id,
-            percentage,
-            effective_from,
-            effective_to
-        )
-        .fetch_one(pool)
-        .await?;
-
-        // Capture result for :as binding
-        if let Some(binding) = &verb_call.binding {
-            ctx.bind(binding, row);
-        }
-
-        Ok(ExecutionResult::Record(serde_json::json!({
-            "cbu_entity_role_id": row,
-            "role": role,
-            "entity_id": entity_id,
-            "message": format!("Assigned role {} to entity {}", role, entity_id)
-        })))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Affected(0))
-    }
-}
-
-// =============================================================================
-// cbu.role:assign-ownership - Ownership role + relationship edge
+// cbu.assign-ownership - Ownership role + relationship edge
 // =============================================================================
 
 /// Assign an ownership role and create the corresponding entity_relationships edge
@@ -208,7 +53,7 @@ pub struct CbuRoleAssignOwnershipOp;
 #[async_trait]
 impl CustomOperation for CbuRoleAssignOwnershipOp {
     fn domain(&self) -> &'static str {
-        "cbu.role"
+        "cbu"
     }
 
     fn verb(&self) -> &'static str {
@@ -333,7 +178,7 @@ impl CustomOperation for CbuRoleAssignOwnershipOp {
             r#"INSERT INTO "ob-poc".entity_relationships
                (from_entity_id, to_entity_id, relationship_type, percentage,
                 ownership_type, effective_from, source, confidence, created_at, updated_at)
-               VALUES ($1, $2, 'ownership', $3, $4, $5, 'cbu_role.assign', 'HIGH', NOW(), NOW())
+               VALUES ($1, $2, 'ownership', $3, $4, $5, 'cbu.assign-ownership', 'HIGH', NOW(), NOW())
                ON CONFLICT (from_entity_id, to_entity_id, relationship_type, effective_from)
                    WHERE effective_from IS NOT NULL
                DO UPDATE SET
@@ -378,7 +223,7 @@ impl CustomOperation for CbuRoleAssignOwnershipOp {
 }
 
 // =============================================================================
-// cbu.role:assign-control - Control role + relationship edge
+// cbu.assign-control - Control role + relationship edge
 // =============================================================================
 
 /// Assign a control role and create the corresponding entity_relationships edge
@@ -388,7 +233,7 @@ pub struct CbuRoleAssignControlOp;
 #[async_trait]
 impl CustomOperation for CbuRoleAssignControlOp {
     fn domain(&self) -> &'static str {
-        "cbu.role"
+        "cbu"
     }
 
     fn verb(&self) -> &'static str {
@@ -498,7 +343,7 @@ impl CustomOperation for CbuRoleAssignControlOp {
             r#"INSERT INTO "ob-poc".entity_relationships
                (from_entity_id, to_entity_id, relationship_type, control_type,
                 effective_from, source, confidence, created_at, updated_at)
-               VALUES ($1, $2, 'control', $3, $4, 'cbu_role.assign', 'HIGH', NOW(), NOW())
+               VALUES ($1, $2, 'control', $3, $4, 'cbu.assign-control', 'HIGH', NOW(), NOW())
                ON CONFLICT (from_entity_id, to_entity_id, relationship_type, effective_from)
                    WHERE effective_from IS NOT NULL
                DO UPDATE SET
@@ -541,7 +386,7 @@ impl CustomOperation for CbuRoleAssignControlOp {
 }
 
 // =============================================================================
-// cbu.role:assign-trust-role - Trust-specific roles
+// cbu.assign-trust-role - Trust-specific roles
 // =============================================================================
 
 /// Assign a trust role (settlor, trustee, beneficiary, protector, etc.)
@@ -551,7 +396,7 @@ pub struct CbuRoleAssignTrustOp;
 #[async_trait]
 impl CustomOperation for CbuRoleAssignTrustOp {
     fn domain(&self) -> &'static str {
-        "cbu.role"
+        "cbu"
     }
 
     fn verb(&self) -> &'static str {
@@ -683,7 +528,7 @@ impl CustomOperation for CbuRoleAssignTrustOp {
                (from_entity_id, to_entity_id, relationship_type, percentage,
                 trust_interest_type, trust_class_description, source, confidence,
                 created_at, updated_at)
-               VALUES ($1, $2, $3, $4, $5, $6, 'cbu_role.assign', 'HIGH', NOW(), NOW())
+               VALUES ($1, $2, $3, $4, $5, $6, 'cbu.assign-trust-role', 'HIGH', NOW(), NOW())
                ON CONFLICT (from_entity_id, to_entity_id, relationship_type)
                    WHERE effective_from IS NULL AND effective_to IS NULL
                DO UPDATE SET
@@ -730,7 +575,7 @@ impl CustomOperation for CbuRoleAssignTrustOp {
 }
 
 // =============================================================================
-// cbu.role:assign-fund-role - Fund structure/management roles
+// cbu.assign-fund-role - Fund structure/management roles
 // =============================================================================
 
 /// Assign a fund-related role (ManCo, IM, fund investor, etc.)
@@ -740,7 +585,7 @@ pub struct CbuRoleAssignFundOp;
 #[async_trait]
 impl CustomOperation for CbuRoleAssignFundOp {
     fn domain(&self) -> &'static str {
-        "cbu.role"
+        "cbu"
     }
 
     fn verb(&self) -> &'static str {
@@ -868,7 +713,7 @@ impl CustomOperation for CbuRoleAssignFundOp {
                    (from_entity_id, to_entity_id, relationship_type, percentage,
                     is_regulated, regulatory_jurisdiction, source, confidence,
                     created_at, updated_at)
-                   VALUES ($1, $2, $3, $4, $5, $6, 'cbu_role.assign', 'HIGH', NOW(), NOW())
+                   VALUES ($1, $2, $3, $4, $5, $6, 'cbu.assign-fund-role', 'HIGH', NOW(), NOW())
                    ON CONFLICT (from_entity_id, to_entity_id, relationship_type)
                        WHERE effective_from IS NULL AND effective_to IS NULL
                    DO UPDATE SET
@@ -916,7 +761,7 @@ impl CustomOperation for CbuRoleAssignFundOp {
 }
 
 // =============================================================================
-// cbu.role:assign-service-provider - Service provider roles
+// cbu.assign-service-provider - Service provider roles
 // =============================================================================
 
 /// Assign a service provider role (admin, custodian, auditor, etc.)
@@ -926,7 +771,7 @@ pub struct CbuRoleAssignServiceOp;
 #[async_trait]
 impl CustomOperation for CbuRoleAssignServiceOp {
     fn domain(&self) -> &'static str {
-        "cbu.role"
+        "cbu"
     }
 
     fn verb(&self) -> &'static str {
@@ -1046,7 +891,7 @@ impl CustomOperation for CbuRoleAssignServiceOp {
 }
 
 // =============================================================================
-// cbu.role:assign-signatory - Trading/execution roles
+// cbu.assign-signatory - Trading/execution roles
 // =============================================================================
 
 /// Assign a signatory role with authority limits
@@ -1056,7 +901,7 @@ pub struct CbuRoleAssignSignatoryOp;
 #[async_trait]
 impl CustomOperation for CbuRoleAssignSignatoryOp {
     fn domain(&self) -> &'static str {
-        "cbu.role"
+        "cbu"
     }
 
     fn verb(&self) -> &'static str {
@@ -1193,7 +1038,7 @@ impl CustomOperation for CbuRoleAssignSignatoryOp {
 }
 
 // =============================================================================
-// cbu.role:validate - Validate all CBU role requirements
+// cbu.validate-roles - Validate all CBU role requirements
 // =============================================================================
 
 /// Validate that all required roles are assigned and relationships are complete
@@ -1203,11 +1048,11 @@ pub struct CbuRoleValidateAllOp;
 #[async_trait]
 impl CustomOperation for CbuRoleValidateAllOp {
     fn domain(&self) -> &'static str {
-        "cbu.role"
+        "cbu"
     }
 
     fn verb(&self) -> &'static str {
-        "validate"
+        "validate-roles"
     }
 
     fn rationale(&self) -> &'static str {

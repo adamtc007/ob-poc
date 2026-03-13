@@ -32,108 +32,6 @@
 # ============================================================================
 
 [[test]]
-utterance = "create a new CBU for Allianz Global Investors in Luxembourg"
-expected_verb = "cbu.create"
-expected_plane = "instance"
-expected_polarity = "write"
-expected_domain_concept = "cbu"
-category = "direct"
-difficulty = "easy"
-domain_hint = "cbu"
-expected_noun = "cbu"
-expected_action = "create"
-ecir_path = "narrow"
-
-[[test]]
-utterance = "I need to onboard a new client"
-expected_verb = "cbu.create"
-expected_plane = "instance"
-expected_polarity = "write"
-expected_domain_concept = "cbu"
-category = "natural"
-difficulty = "medium"
-notes = "Classic natural language - 'onboard' maps to cbu.create"
-ecir_path = "fallthrough"
-
-[[test]]
-utterance = "set up a fund structure for BlackRock"
-expected_verb = "cbu.create"
-expected_plane = "instance"
-expected_polarity = "write"
-expected_domain_concept = "cbu"
-category = "natural"
-difficulty = "medium"
-ecir_path = "fallthrough"
-
-[[test]]
-utterance = "spin up a CBU"
-expected_verb = "cbu.create"
-expected_plane = "instance"
-expected_polarity = "write"
-expected_domain_concept = "cbu"
-category = "natural"
-difficulty = "medium"
-notes = "Informal language"
-expected_noun = "cbu"
-expected_action = "create"
-ecir_path = "narrow"
-
-[[test]]
-utterance = "show me all the CBUs"
-expected_verb = "cbu.list"
-expected_plane = "instance"
-expected_polarity = "read"
-expected_domain_concept = "cbu"
-category = "direct"
-difficulty = "easy"
-expected_noun = "cbu"
-expected_action = "list"
-ecir_path = "narrow"
-
-[[test]]
-utterance = "what clients do we have in Germany?"
-expected_verb = "cbu.list"
-expected_plane = "instance"
-expected_polarity = "read"
-expected_domain_concept = "cbu"
-category = "indirect"
-difficulty = "hard"
-notes = "Needs to infer 'clients in Germany' = cbu.list with jurisdiction filter"
-ecir_path = "fallthrough"
-
-[[test]]
-utterance = "how many onboarding cases are open right now?"
-expected_verb = "cbu.list"
-expected_plane = "instance"
-expected_polarity = "read"
-expected_domain_concept = "cbu"
-category = "indirect"
-difficulty = "hard"
-ecir_path = "fallthrough"
-
-[[test]]
-utterance = "update the jurisdiction to Ireland for this CBU"
-expected_verb = "cbu.update"
-expected_plane = "instance"
-expected_polarity = "write"
-expected_domain_concept = "cbu"
-category = "direct"
-difficulty = "easy"
-expected_noun = "cbu"
-expected_action = "update"
-ecir_path = "deterministic"
-
-[[test]]
-utterance = "change the fund name"
-expected_verb = "cbu.update"
-expected_plane = "instance"
-expected_polarity = "write"
-expected_domain_concept = "cbu"
-category = "natural"
-difficulty = "medium"
-ecir_path = "fallthrough"
-
-[[test]]
 utterance = "assign Goldman Sachs as custodian for this CBU"
 expected_verb = "cbu.assign-role"
 expected_plane = "instance"
@@ -141,20 +39,20 @@ expected_polarity = "write"
 expected_domain_concept = "cbu"
 category = "natural"
 difficulty = "medium"
-notes = "Collision risk: cbu.assign-role vs cbu.role.assign"
+notes = "Role assignment should resolve to the canonical cbu.assign-role verb"
 expected_noun = "cbu"
 expected_action = "assign"
 ecir_path = "narrow"
 
 [[test]]
 utterance = "make State Street the transfer agent"
-expected_verb = "cbu.role.assign"
+expected_verb = "cbu.assign-role"
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "cbu"
 category = "natural"
 difficulty = "hard"
-notes = "Role assignment - should prefer cbu.role.assign (v2)"
+notes = "Role assignment should prefer cbu.assign-role"
 ecir_path = "fallthrough"
 
 [[test]]
@@ -175,17 +73,6 @@ expected_polarity = "write"
 expected_domain_concept = "cbu"
 category = "natural"
 difficulty = "medium"
-ecir_path = "fallthrough"
-
-[[test]]
-utterance = "what products does this CBU have?"
-expected_verb = "cbu.read"
-expected_plane = "instance"
-expected_polarity = "read"
-expected_domain_concept = "cbu"
-category = "indirect"
-difficulty = "hard"
-alt_verbs = ["cbu.show"]
 ecir_path = "fallthrough"
 
 [[test]]
@@ -1180,7 +1067,7 @@ ecir_path = "fallthrough"
 
 [[test]]
 utterance = "list the roles"
-expected_verb = "cbu.role.list"
+expected_verb = "cbu.parties"
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "cbu"
@@ -1222,7 +1109,7 @@ expected_polarity = "write"
 expected_domain_concept = "screening"
 category = "adversarial"
 difficulty = "expert"
-alt_verbs = ["screening.pep", "ownership.reconcile", "cbu.role.validate"]
+alt_verbs = ["screening.pep", "ownership.reconcile", "cbu.parties"]
 notes = "Extremely vague -- 'check' is overloaded"
 ecir_path = "fallthrough"
 
@@ -1248,18 +1135,6 @@ category = "adversarial"
 difficulty = "expert"
 alt_verbs = ["gleif.enrich", "control.import-psc-register", "bods.sync-from-gleif", "research.sources.fetch", "bods.import"]
 notes = "'import data' could be any external data source"
-ecir_path = "fallthrough"
-
-[[test]]
-utterance = "create a new one"
-expected_verb = "cbu.create"
-expected_plane = "instance"
-expected_polarity = "write"
-expected_domain_concept = "cbu"
-category = "adversarial"
-difficulty = "expert"
-alt_verbs = ["entity.create", "fund.create", "deal.create"]
-notes = "Completely ambiguous without context"
 ecir_path = "fallthrough"
 
 # ============================================================================
@@ -1355,17 +1230,6 @@ expected_domain_concept = "screening"
 category = "natural"
 difficulty = "expert"
 notes = "OFAC = US sanctions body -- maps to sanctions screening"
-ecir_path = "fallthrough"
-
-[[test]]
-utterance = "onboard the sub-custodian"
-expected_verb = "cbu.create"
-expected_plane = "instance"
-expected_polarity = "write"
-expected_domain_concept = "cbu"
-category = "natural"
-difficulty = "expert"
-notes = "Sub-custodian is an entity type in custody banking"
 ecir_path = "fallthrough"
 
 [[test]]
@@ -1963,18 +1827,6 @@ expected_noun = "fund"
 expected_action = "create"
 ecir_path = "deterministic"
 
-[[test]]
-utterance = "List all CBUs in Luxembourg"
-expected_verb = "cbu.list"
-expected_plane = "instance"
-expected_polarity = "read"
-expected_domain_concept = "cbu"
-category = "tier2_blocker"
-difficulty = "easy"
-expected_tier = "ecir"
-notes = "Single-verb with jurisdiction context — not a compound intent"
-expected_noun = "cbu"
-expected_action = "list"
 ecir_path = "deterministic"
 
 [[test]]
@@ -1993,10 +1845,10 @@ ecir_path = "deterministic"
 
 [[test]]
 utterance = "Add a role to this entity"
-expected_verb = "cbu-role.assign"
+expected_verb = "cbu.assign-role"
 expected_plane = "instance"
 expected_polarity = "write"
-expected_domain_concept = "cbu-role"
+expected_domain_concept = "role"
 category = "tier2_blocker"
 difficulty = "medium"
 expected_tier = "ecir"

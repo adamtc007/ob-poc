@@ -30,13 +30,13 @@
 (holding.set :shares 1000 :price 45.50 :nav 1234567.89)
 
 ;; intent: Boolean values
-(cbu.update :id @fund :active true :archived false)
+(entity.update :id @person :is-pep true :is-sanctioned false)
 
 ;; intent: Null literal (nil, not null)
 (entity.update :id @person :middle-name nil)
 
 ;; intent: Symbol references (bindings from previous calls)
-(cbu-role.assign :cbu-id @fund :entity-id @person :role "DIRECTOR")
+(cbu.assign-role :cbu-id @fund :entity-id @person :role "DIRECTOR")
 
 ;; intent: Entity references (strings resolved post-parse via EntityGateway)
 ;; NOTE: <Allianz> is a UI convention, not valid DSL - use string literals

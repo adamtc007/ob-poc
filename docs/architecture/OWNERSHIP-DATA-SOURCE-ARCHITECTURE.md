@@ -471,7 +471,7 @@ python gleif_extract_allianz.py --lei OJ2TIQSVQND4IZYYK658 --output ../data/deri
     :source "GLEIF"
     :source-date "2025-07-01")
 
-(cbu.role:assign-ownership
+(cbu.assign-ownership
     :owner-entity-id @allianz_se
     :owned-entity-id @allianz_gi
     :percentage 100.0

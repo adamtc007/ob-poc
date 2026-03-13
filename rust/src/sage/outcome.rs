@@ -66,10 +66,10 @@ impl OutcomeAction {
             .to_lowercase();
 
         match first.as_str() {
-            "show" | "list" | "get" | "fetch" | "describe" | "view" | "what" | "who"
-            | "find" | "display" | "inspect" | "tell" | "read" | "look" | "lookup"
-            | "query" | "count" | "check" | "trace" | "summarize" | "summary" | "explain"
-            | "explore" | "report" | "which" | "where" | "how" => OutcomeAction::Read,
+            "show" | "list" | "get" | "fetch" | "describe" | "view" | "what" | "who" | "find"
+            | "display" | "inspect" | "tell" | "read" | "look" | "lookup" | "query" | "count"
+            | "check" | "trace" | "summarize" | "summary" | "explain" | "explore" | "report"
+            | "which" | "where" | "how" => OutcomeAction::Read,
 
             "create" | "add" | "make" | "new" | "register" | "build" | "generate" => {
                 OutcomeAction::Create
@@ -349,11 +349,26 @@ mod tests {
 
     #[test]
     fn test_outcome_action_from_first_word() {
-        assert_eq!(OutcomeAction::from_first_word("show me the deals"), OutcomeAction::Read);
-        assert_eq!(OutcomeAction::from_first_word("create a new fund"), OutcomeAction::Create);
-        assert_eq!(OutcomeAction::from_first_word("import the gleif tree"), OutcomeAction::Import);
-        assert_eq!(OutcomeAction::from_first_word("assign a role to the entity"), OutcomeAction::Assign);
-        assert_eq!(OutcomeAction::from_first_word("xyzzy unknown verb"), OutcomeAction::Other("xyzzy".to_string()));
+        assert_eq!(
+            OutcomeAction::from_first_word("show me the deals"),
+            OutcomeAction::Read
+        );
+        assert_eq!(
+            OutcomeAction::from_first_word("create a new fund"),
+            OutcomeAction::Create
+        );
+        assert_eq!(
+            OutcomeAction::from_first_word("import the gleif tree"),
+            OutcomeAction::Import
+        );
+        assert_eq!(
+            OutcomeAction::from_first_word("assign a role to the entity"),
+            OutcomeAction::Assign
+        );
+        assert_eq!(
+            OutcomeAction::from_first_word("xyzzy unknown verb"),
+            OutcomeAction::Other("xyzzy".to_string())
+        );
     }
 
     #[test]

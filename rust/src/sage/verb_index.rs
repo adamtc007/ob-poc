@@ -322,16 +322,30 @@ fn infer_harm_class(verb_name: &str, metadata: Option<&VerbMetadata>) -> HarmCla
     }
 
     if dangerous
-        || ["purge", "destroy", "wipe", "nuke", "truncate", "hard-delete"]
-            .iter()
-            .any(|needle| normalized_name.contains(needle))
+        || [
+            "purge",
+            "destroy",
+            "wipe",
+            "nuke",
+            "truncate",
+            "hard-delete",
+        ]
+        .iter()
+        .any(|needle| normalized_name.contains(needle))
     {
         return HarmClass::Destructive;
     }
 
-    if ["delete", "deactivate", "retire", "archive", "close", "publish"]
-        .iter()
-        .any(|needle| normalized_name.contains(needle))
+    if [
+        "delete",
+        "deactivate",
+        "retire",
+        "archive",
+        "close",
+        "publish",
+    ]
+    .iter()
+    .any(|needle| normalized_name.contains(needle))
     {
         return HarmClass::Irreversible;
     }
@@ -355,7 +369,11 @@ fn infer_harm_class(verb_name: &str, metadata: Option<&VerbMetadata>) -> HarmCla
 }
 
 fn infer_action_class(verb_name: &str, config: &VerbConfig) -> ActionClass {
-    if let Some(explicit) = config.metadata.as_ref().and_then(|metadata| metadata.action_class) {
+    if let Some(explicit) = config
+        .metadata
+        .as_ref()
+        .and_then(|metadata| metadata.action_class)
+    {
         return explicit;
     }
 
@@ -402,7 +420,11 @@ fn infer_action_class(verb_name: &str, config: &VerbConfig) -> ActionClass {
         "approve" | "publish" => ActionClass::Approve,
         "reject" => ActionClass::Reject,
         "run" | "execute" => ActionClass::Execute,
-        _ => match config.metadata.as_ref().and_then(|meta| meta.side_effects.as_deref()) {
+        _ => match config
+            .metadata
+            .as_ref()
+            .and_then(|meta| meta.side_effects.as_deref())
+        {
             Some("facts_only") => ActionClass::Read,
             _ => ActionClass::Update,
         },
@@ -761,14 +783,15 @@ mod tests {
     #[test]
     fn query_matches_domain_prefix_and_tags() {
         let mut config = sample_config();
-        let screening_domain = config.domains.entry("case-screening".to_string()).or_insert(
-            DomainConfig {
+        let screening_domain = config
+            .domains
+            .entry("case-screening".to_string())
+            .or_insert(DomainConfig {
                 description: "Screening verbs".to_string(),
                 verbs: HashMap::new(),
                 dynamic_verbs: vec![],
                 invocation_hints: vec![],
-            },
-        );
+            });
         screening_domain.verbs.insert(
             "list".to_string(),
             VerbConfig {
@@ -817,7 +840,10 @@ mod tests {
             side_effects: Some("facts_only".to_string()),
             ..VerbMetadata::default()
         };
-        assert_eq!(infer_harm_class("list", Some(&read_meta)), HarmClass::ReadOnly);
+        assert_eq!(
+            infer_harm_class("list", Some(&read_meta)),
+            HarmClass::ReadOnly
+        );
 
         let explicit = VerbMetadata {
             harm_class: Some(HarmClass::Destructive),

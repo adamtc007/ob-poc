@@ -76,12 +76,7 @@ const WRITE_DOMAINS: &[&str] = &[
     "kyc-case",
 ];
 
-const READ_ACTIONS: &[&str] = &[
-    "investigate",
-    "report",
-    "trace",
-    "assess-readonly",
-];
+const READ_ACTIONS: &[&str] = &["investigate", "report", "trace", "assess-readonly"];
 
 const WRITE_ACTIONS: &[&str] = &[
     "create",
@@ -164,10 +159,7 @@ RULES:
         let actions = action_list_for(pre.polarity).join(", ");
         let param_hints = render_param_hints(domain_list_for(pre.polarity));
         let workflow = context.stage_focus.as_deref().unwrap_or("general");
-        let current_entity = context
-            .dominant_entity_name
-            .as_deref()
-            .unwrap_or("none");
+        let current_entity = context.dominant_entity_name.as_deref().unwrap_or("none");
         let entity_type = context.entity_kind.as_deref().unwrap_or("unknown");
         let recent_actions = if context.last_intents.is_empty() {
             "none".to_string()
@@ -175,7 +167,12 @@ RULES:
             context
                 .last_intents
                 .iter()
-                .map(|recent| format!("{}:{}:{}", recent.plane, recent.domain_concept, recent.action))
+                .map(|recent| {
+                    format!(
+                        "{}:{}:{}",
+                        recent.plane, recent.domain_concept, recent.action
+                    )
+                })
                 .collect::<Vec<_>>()
                 .join(", ")
         };
@@ -201,7 +198,9 @@ Respond with JSON fields:\n{{\n  \"summary\": \"one sentence business outcome\",
     fn tool_definition() -> ToolDefinition {
         ToolDefinition {
             name: "classify_sage_outcome".to_string(),
-            description: "Classify business outcome, domain, action family, extracted params, and confidence".to_string(),
+            description:
+                "Classify business outcome, domain, action family, extracted params, and confidence"
+                    .to_string(),
             parameters: serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -393,7 +392,11 @@ fn build_llm_explain(
         understanding: if domain.is_empty() {
             format!("So you want to {}.", utterance.trim())
         } else {
-            format!("So you want to work on {} for {}.", domain, utterance.trim())
+            format!(
+                "So you want to work on {} for {}.",
+                domain,
+                utterance.trim()
+            )
         },
         mode: match polarity {
             IntentPolarity::Read | IntentPolarity::Ambiguous => "read_only".to_string(),
@@ -603,7 +606,10 @@ mod tests {
         assert_eq!(outcome.domain_concept, "kyc-case");
         assert_eq!(outcome.confidence, SageConfidence::High);
         assert_eq!(
-            outcome.steps[0].params.get("entity-name").map(String::as_str),
+            outcome.steps[0]
+                .params
+                .get("entity-name")
+                .map(String::as_str),
             Some("Allianz")
         );
     }

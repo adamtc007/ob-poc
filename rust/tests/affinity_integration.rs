@@ -209,7 +209,7 @@ mod integration {
             println!("  {} (shares {} data assets)", fqn, shared.len());
         }
 
-        // Must return some adjacent verbs — at least cbu.list, cbu.get, etc.
+        // Must return some adjacent verbs — at least cbu.list, cbu.read, etc.
         assert!(
             !adj.is_empty(),
             "adjacent_verbs(cbu.create) returned empty — \

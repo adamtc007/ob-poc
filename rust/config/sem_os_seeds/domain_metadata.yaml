@@ -197,7 +197,16 @@ domains:
         writes: [cbus, cbu_entity_roles]
       cbu.read:
         reads: [cbus]
-      cbu.update:
+      cbu.rename:
+        reads: [cbus]
+        writes: [cbus]
+      cbu.set-jurisdiction:
+        reads: [cbus, master_jurisdictions]
+        writes: [cbus]
+      cbu.set-client-type:
+        reads: [cbus]
+        writes: [cbus]
+      cbu.set-commercial-client:
         reads: [cbus]
         writes: [cbus]
       cbu.delete:
@@ -227,7 +236,16 @@ domains:
       cbu.remove-product:
         reads: [service_delivery_map]
         writes: [service_delivery_map]
+      cbu.submit-for-validation:
+        reads: [cbus]
+        writes: [cbus]
       cbu.decide:
+        reads: [cbus, cases, case_evaluation_snapshots]
+        writes: [cbus, cases, case_evaluation_snapshots]
+      cbu.request-proof-update:
+        reads: [cbus]
+        writes: [cbus]
+      cbu.reopen-validation:
         reads: [cbus]
         writes: [cbus]
       cbu.attach-evidence:

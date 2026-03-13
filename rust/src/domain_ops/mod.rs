@@ -198,7 +198,7 @@ pub use attribute_ops::{
 };
 pub use cbu_ops::{CbuAddProductOp, CbuDecideOp, CbuDeleteCascadeOp, CbuShowOp};
 pub use cbu_role_ops::{
-    CbuRoleAssignControlOp, CbuRoleAssignFundOp, CbuRoleAssignOp, CbuRoleAssignOwnershipOp,
+    CbuRoleAssignControlOp, CbuRoleAssignFundOp, CbuRoleAssignOwnershipOp,
     CbuRoleAssignServiceOp, CbuRoleAssignSignatoryOp, CbuRoleAssignTrustOp, CbuRoleValidateAllOp,
 };
 pub use document_ops::{DocumentCatalogOp, DocumentExtractOp};
@@ -644,14 +644,13 @@ mod tests {
         assert!(registry.has("cbu", "show"));
         assert!(registry.has("cbu", "delete-cascade"));
         // CBU Role operations (Role Taxonomy V2)
-        assert!(registry.has("cbu.role", "assign"));
-        assert!(registry.has("cbu.role", "assign-ownership"));
-        assert!(registry.has("cbu.role", "assign-control"));
-        assert!(registry.has("cbu.role", "assign-trust-role"));
-        assert!(registry.has("cbu.role", "assign-fund-role"));
-        assert!(registry.has("cbu.role", "assign-service-provider"));
-        assert!(registry.has("cbu.role", "assign-signatory"));
-        assert!(registry.has("cbu.role", "validate"));
+        assert!(registry.has("cbu", "assign-ownership"));
+        assert!(registry.has("cbu", "assign-control"));
+        assert!(registry.has("cbu", "assign-trust-role"));
+        assert!(registry.has("cbu", "assign-fund-role"));
+        assert!(registry.has("cbu", "assign-service-provider"));
+        assert!(registry.has("cbu", "assign-signatory"));
+        assert!(registry.has("cbu", "validate-roles"));
         // Trading Matrix operations
         assert!(registry.has("investment-manager", "find-for-trade"));
         assert!(registry.has("pricing-config", "find-for-instrument"));

@@ -11,320 +11,133 @@
 #![allow(unused_imports)]
 use crate::{ExpectedOutcome, TestScenario};
 
-/// Extended CBU create scenarios - common ways users ask to create funds/structures
-pub fn cbu_create_scenarios() -> Vec<TestScenario> {
-    vec![
-        // Core phrases
-        TestScenario::matched("create cbu direct", "create cbu", "cbu.create")
-            .with_category("cbu_create"),
-        TestScenario::matched("create a cbu", "create a cbu", "cbu.create")
-            .with_category("cbu_create"),
-        TestScenario::matched("new cbu", "new cbu", "cbu.create").with_category("cbu_create"),
-        TestScenario::matched("add cbu", "add cbu", "cbu.create").with_category("cbu_create"),
-        // Fund terminology
-        TestScenario::matched("create fund", "create a fund", "cbu.create")
-            .with_category("cbu_create"),
-        TestScenario::matched("new fund", "new fund", "cbu.create").with_category("cbu_create"),
-        TestScenario::matched("set up fund", "set up a fund", "cbu.create")
-            .with_category("cbu_create"),
-        TestScenario::matched("spin up fund", "spin up a fund", "cbu.create")
-            .with_category("cbu_create"),
-        TestScenario::matched("establish fund", "establish a fund", "cbu.create")
-            .with_category("cbu_create"),
-        // Structure terminology
-        TestScenario::matched("create structure", "create a structure", "cbu.create")
-            .with_category("cbu_create"),
-        TestScenario::matched("new structure", "new structure", "cbu.create")
-            .with_category("cbu_create"),
-        TestScenario::matched("set up structure", "set up a structure", "cbu.create")
-            .with_category("cbu_create"),
-        TestScenario::matched("add structure", "add a new structure", "cbu.create")
-            .with_category("cbu_create"),
-        // Trading unit terminology
-        TestScenario::matched("create trading unit", "create a trading unit", "cbu.create")
-            .with_category("cbu_create"),
-        TestScenario::matched("new trading unit", "new trading unit", "cbu.create")
-            .with_category("cbu_create"),
-        // Client/account terminology
-        TestScenario::matched("onboard client", "onboard a new client", "cbu.create")
-            .with_category("cbu_create"),
-        TestScenario::matched("register client", "register a client", "cbu.create")
-            .with_category("cbu_create"),
-        TestScenario::matched("create account", "create an account", "cbu.create")
-            .with_category("cbu_create"),
-        TestScenario::matched("open account", "open an account", "cbu.create")
-            .with_category("cbu_create"),
-        // Fund type variations
-        TestScenario::matched("create sicav", "create a sicav", "cbu.create")
-            .with_category("cbu_create"),
-        TestScenario::matched("set up sicav", "set up a sicav", "cbu.create")
-            .with_category("cbu_create"),
-        TestScenario::matched("create ucits", "create a ucits fund", "cbu.create")
-            .with_category("cbu_create"),
-        TestScenario::matched("set up ucits", "set up ucits", "cbu.create")
-            .with_category("cbu_create"),
-        TestScenario::matched("create pe fund", "create a pe fund", "cbu.create")
-            .with_category("cbu_create"),
-        TestScenario::matched(
-            "create private equity",
-            "create a private equity fund",
-            "cbu.create",
-        )
-        .with_category("cbu_create"),
-        TestScenario::matched("create hedge fund", "create a hedge fund", "cbu.create")
-            .with_category("cbu_create"),
-        TestScenario::matched("set up hedge fund", "set up hedge fund", "cbu.create")
-            .with_category("cbu_create"),
-        TestScenario::matched(
-            "create segregated mandate",
-            "create a segregated mandate",
-            "cbu.create",
-        )
-        .with_category("cbu_create"),
-        TestScenario::matched("create subfund", "create a subfund", "cbu.create")
-            .with_category("cbu_create"),
-        TestScenario::matched("add subfund", "add a subfund", "cbu.create")
-            .with_category("cbu_create"),
-        TestScenario::matched("create compartment", "create a compartment", "cbu.create")
-            .with_category("cbu_create"),
-        // With entity names
-        TestScenario::matched(
-            "create fund named",
-            "create a fund called Alpha Growth",
-            "cbu.create",
-        )
-        .with_category("cbu_create"),
-        TestScenario::matched(
-            "spin up named",
-            "spin up a fund for Acme Corp",
-            "cbu.create",
-        )
-        .with_category("cbu_create"),
-        TestScenario::matched(
-            "onboard specific",
-            "onboard Blackrock Alpha Fund",
-            "cbu.create",
-        )
-        .with_category("cbu_create"),
-    ]
-}
-
-/// CBU list scenarios - viewing/querying CBU inventory
-pub fn cbu_list_scenarios() -> Vec<TestScenario> {
-    vec![
-        TestScenario::matched("list cbus", "list cbus", "cbu.list").with_category("cbu_list"),
-        TestScenario::matched("list all cbus", "list all cbus", "cbu.list")
-            .with_category("cbu_list"),
-        TestScenario::matched("show cbus", "show all cbus", "cbu.list").with_category("cbu_list"),
-        TestScenario::matched("show me cbus", "show me all cbus", "cbu.list")
-            .with_category("cbu_list"),
-        // Fund terminology
-        TestScenario::matched("list funds", "list all funds", "cbu.list").with_category("cbu_list"),
-        TestScenario::matched("show funds", "show all funds", "cbu.list").with_category("cbu_list"),
-        TestScenario::matched("show me funds", "show me all funds", "cbu.list")
-            .with_category("cbu_list"),
-        TestScenario::matched("what funds exist", "what funds exist", "cbu.list")
-            .with_category("cbu_list"),
-        TestScenario::matched("what funds do we have", "what funds do we have", "cbu.list")
-            .with_category("cbu_list"),
-        // Structure terminology
-        TestScenario::matched("list structures", "list structures", "cbu.list")
-            .with_category("cbu_list"),
-        TestScenario::matched("show structures", "show all structures", "cbu.list")
-            .with_category("cbu_list"),
-        TestScenario::matched("what structures exist", "what structures exist", "cbu.list")
-            .with_category("cbu_list"),
-        // Client/account terminology
-        TestScenario::matched("list clients", "list all clients", "cbu.list")
-            .with_category("cbu_list"),
-        TestScenario::matched("show clients", "show clients", "cbu.list").with_category("cbu_list"),
-        TestScenario::matched("list accounts", "list accounts", "cbu.list")
-            .with_category("cbu_list"),
-        // With filters
-        TestScenario::matched("list lux funds", "list luxembourg funds", "cbu.list")
-            .with_category("cbu_list"),
-        TestScenario::matched("show irish funds", "show irish funds", "cbu.list")
-            .with_category("cbu_list"),
-        TestScenario::matched("funds by jurisdiction", "funds by jurisdiction", "cbu.list")
-            .with_category("cbu_list"),
-        TestScenario::matched("active cbus", "show active cbus", "cbu.list")
-            .with_category("cbu_list"),
-        // Questions
-        TestScenario::matched("how many cbus", "how many cbus", "cbu.list")
-            .with_category("cbu_list"),
-        TestScenario::matched("how many funds", "how many funds do we have", "cbu.list")
-            .with_category("cbu_list"),
-    ]
-}
-
-/// CBU update scenarios - modifying existing CBUs
-pub fn cbu_update_scenarios() -> Vec<TestScenario> {
-    vec![
-        TestScenario::matched("update cbu", "update cbu", "cbu.update").with_category("cbu_update"),
-        TestScenario::matched("update the cbu", "update the cbu", "cbu.update")
-            .with_category("cbu_update"),
-        TestScenario::matched("modify cbu", "modify cbu", "cbu.update").with_category("cbu_update"),
-        TestScenario::matched("edit cbu", "edit cbu", "cbu.update").with_category("cbu_update"),
-        // Fund terminology
-        TestScenario::matched("update fund", "update fund details", "cbu.update")
-            .with_category("cbu_update"),
-        TestScenario::matched("modify fund", "modify the fund", "cbu.update")
-            .with_category("cbu_update"),
-        TestScenario::matched("edit fund", "edit fund details", "cbu.update")
-            .with_category("cbu_update"),
-        // Specific updates
-        TestScenario::matched("rename cbu", "rename cbu", "cbu.update").with_category("cbu_update"),
-        TestScenario::matched("rename fund", "rename the fund", "cbu.update")
-            .with_category("cbu_update"),
-        TestScenario::matched("change fund name", "change fund name", "cbu.update")
-            .with_category("cbu_update"),
-        TestScenario::matched("change cbu status", "change cbu status", "cbu.update")
-            .with_category("cbu_update"),
-        TestScenario::matched("update status", "update cbu status", "cbu.update")
-            .with_category("cbu_update"),
-        TestScenario::matched(
-            "change jurisdiction",
-            "change cbu jurisdiction",
-            "cbu.update",
-        )
-        .with_category("cbu_update"),
-        // Actions
-        TestScenario::matched("activate cbu", "activate the cbu", "cbu.update")
-            .with_category("cbu_update"),
-        TestScenario::matched("activate fund", "activate fund", "cbu.update")
-            .with_category("cbu_update"),
-        TestScenario::matched("deactivate cbu", "deactivate cbu", "cbu.update")
-            .with_category("cbu_update"),
-    ]
-}
-
 /// CBU role assignment scenarios - adding parties to CBUs
 pub fn cbu_assign_role_scenarios() -> Vec<TestScenario> {
     vec![
         // Generic role
         TestScenario::matched("assign role", "assign role to cbu", "cbu.assign-role")
-            .with_category("cbu_role"),
+            .with_category("role_assign"),
         TestScenario::matched("add role", "add role to entity", "cbu.assign-role")
-            .with_category("cbu_role"),
+            .with_category("role_assign"),
         // Director
         TestScenario::matched("add director", "add director to fund", "cbu.assign-role")
-            .with_category("cbu_role"),
+            .with_category("role_assign"),
         TestScenario::matched("assign director", "assign director", "cbu.assign-role")
-            .with_category("cbu_role"),
+            .with_category("role_assign"),
         TestScenario::matched("appoint director", "appoint director", "cbu.assign-role")
-            .with_category("cbu_role"),
+            .with_category("role_assign"),
         TestScenario::matched(
             "make director",
             "make john smith a director",
             "cbu.assign-role",
         )
-        .with_category("cbu_role"),
+        .with_category("role_assign"),
         // UBO
         TestScenario::matched("add ubo", "add ubo to fund", "cbu.assign-role")
-            .with_category("cbu_role"),
+            .with_category("role_assign"),
         TestScenario::matched("assign ubo", "assign ubo", "cbu.assign-role")
-            .with_category("cbu_role"),
+            .with_category("role_assign"),
         TestScenario::matched(
             "add beneficial owner",
             "add beneficial owner",
             "cbu.assign-role",
         )
-        .with_category("cbu_role"),
+        .with_category("role_assign"),
         // Signatory
         TestScenario::matched("add signatory", "add signatory to fund", "cbu.assign-role")
-            .with_category("cbu_role"),
+            .with_category("role_assign"),
         TestScenario::matched("assign signatory", "assign signatory", "cbu.assign-role")
-            .with_category("cbu_role"),
+            .with_category("role_assign"),
         TestScenario::matched(
             "add authorized signatory",
             "add authorized signatory",
             "cbu.assign-role",
         )
-        .with_category("cbu_role"),
+        .with_category("role_assign"),
         // Shareholder
         TestScenario::matched(
             "add shareholder",
             "add shareholder to fund",
             "cbu.assign-role",
         )
-        .with_category("cbu_role"),
+        .with_category("role_assign"),
         TestScenario::matched(
             "assign shareholder",
             "assign shareholder",
             "cbu.assign-role",
         )
-        .with_category("cbu_role"),
+        .with_category("role_assign"),
         // Service providers
         TestScenario::matched("add manco", "add manco to fund", "cbu.assign-role")
-            .with_category("cbu_role"),
+            .with_category("role_assign"),
         TestScenario::matched(
             "assign management company",
             "assign management company",
             "cbu.assign-role",
         )
-        .with_category("cbu_role"),
+        .with_category("role_assign"),
         TestScenario::matched(
             "add investment manager",
             "add investment manager",
             "cbu.assign-role",
         )
-        .with_category("cbu_role"),
+        .with_category("role_assign"),
         TestScenario::matched("assign im", "assign im to fund", "cbu.assign-role")
-            .with_category("cbu_role"),
+            .with_category("role_assign"),
         TestScenario::matched("add depositary", "add depositary", "cbu.assign-role")
-            .with_category("cbu_role"),
+            .with_category("role_assign"),
         TestScenario::matched(
             "assign depositary",
             "assign depositary to fund",
             "cbu.assign-role",
         )
-        .with_category("cbu_role"),
+        .with_category("role_assign"),
         TestScenario::matched("add custodian", "add custodian to fund", "cbu.assign-role")
-            .with_category("cbu_role"),
+            .with_category("role_assign"),
         TestScenario::matched("assign custodian", "assign custodian", "cbu.assign-role")
-            .with_category("cbu_role"),
+            .with_category("role_assign"),
         TestScenario::matched("add auditor", "add auditor to fund", "cbu.assign-role")
-            .with_category("cbu_role"),
+            .with_category("role_assign"),
         TestScenario::matched("add administrator", "add administrator", "cbu.assign-role")
-            .with_category("cbu_role"),
+            .with_category("role_assign"),
         TestScenario::matched(
             "add transfer agent",
             "add transfer agent",
             "cbu.assign-role",
         )
-        .with_category("cbu_role"),
+        .with_category("role_assign"),
         TestScenario::matched("add prime broker", "add prime broker", "cbu.assign-role")
-            .with_category("cbu_role"),
+            .with_category("role_assign"),
         // GP/LP
         TestScenario::matched("add gp", "add gp to fund", "cbu.assign-role")
-            .with_category("cbu_role"),
+            .with_category("role_assign"),
         TestScenario::matched(
             "assign general partner",
             "assign general partner",
             "cbu.assign-role",
         )
-        .with_category("cbu_role"),
+        .with_category("role_assign"),
         TestScenario::matched("add lp", "add lp to fund", "cbu.assign-role")
-            .with_category("cbu_role"),
+            .with_category("role_assign"),
         TestScenario::matched(
             "assign limited partner",
             "assign limited partner",
             "cbu.assign-role",
         )
-        .with_category("cbu_role"),
+        .with_category("role_assign"),
         // Generic party/entity
         TestScenario::matched("add party", "add party to fund", "cbu.assign-role")
-            .with_category("cbu_role"),
+            .with_category("role_assign"),
         TestScenario::matched(
             "add participant",
             "add participant to cbu",
             "cbu.assign-role",
         )
-        .with_category("cbu_role"),
+        .with_category("role_assign"),
         TestScenario::matched("link entity", "link entity to fund", "cbu.assign-role")
-            .with_category("cbu_role"),
+            .with_category("role_assign"),
         TestScenario::matched("connect entity", "connect entity to cbu", "cbu.assign-role")
-            .with_category("cbu_role"),
+            .with_category("role_assign"),
     ]
 }
 
@@ -332,41 +145,41 @@ pub fn cbu_assign_role_scenarios() -> Vec<TestScenario> {
 pub fn cbu_remove_role_scenarios() -> Vec<TestScenario> {
     vec![
         TestScenario::matched("remove role", "remove role from cbu", "cbu.remove-role")
-            .with_category("cbu_role_remove"),
+            .with_category("role_remove"),
         TestScenario::matched("unassign role", "unassign role", "cbu.remove-role")
-            .with_category("cbu_role_remove"),
+            .with_category("role_remove"),
         TestScenario::matched(
             "remove director",
             "remove director from fund",
             "cbu.remove-role",
         )
-        .with_category("cbu_role_remove"),
+        .with_category("role_remove"),
         TestScenario::matched("remove ubo", "remove ubo from fund", "cbu.remove-role")
-            .with_category("cbu_role_remove"),
+            .with_category("role_remove"),
         TestScenario::matched(
             "remove signatory",
             "remove signatory from fund",
             "cbu.remove-role",
         )
-        .with_category("cbu_role_remove"),
+        .with_category("role_remove"),
         TestScenario::matched(
             "unlink entity",
             "unlink entity from fund",
             "cbu.remove-role",
         )
-        .with_category("cbu_role_remove"),
+        .with_category("role_remove"),
         TestScenario::matched(
             "remove participant",
             "remove participant from cbu",
             "cbu.remove-role",
         )
-        .with_category("cbu_role_remove"),
+        .with_category("role_remove"),
         TestScenario::matched(
             "delete role assignment",
             "delete role assignment",
             "cbu.remove-role",
         )
-        .with_category("cbu_role_remove"),
+        .with_category("role_remove"),
     ]
 }
 
@@ -552,9 +365,6 @@ pub fn cbu_bulk_create_scenarios() -> Vec<TestScenario> {
 /// All CBU scenarios combined
 pub fn all_cbu_scenarios() -> Vec<TestScenario> {
     let mut all = Vec::new();
-    all.extend(cbu_create_scenarios());
-    all.extend(cbu_list_scenarios());
-    all.extend(cbu_update_scenarios());
     all.extend(cbu_assign_role_scenarios());
     all.extend(cbu_remove_role_scenarios());
     all.extend(cbu_parties_scenarios());

@@ -42,7 +42,7 @@ Use section headers to organize related operations:
   :as @profile)
 
 ;; Also correct - aligned with first arg
-(cbu-role.assign :cbu-id @fund
+(cbu.assign-role :cbu-id @fund
                  :entity-id @person
                  :role "DIRECTOR")
 ```
@@ -83,7 +83,7 @@ Use section headers to organize related operations:
 ;; Good
 (cbu.create :name "Fund" :as @fund)
 (entity.create :name "Manager" :as @manager_entity)
-(cbu-role.assign ... :as @director_role)
+(cbu.assign-role ... :as @director_role)
 
 ;; Avoid - unclear purpose
 (cbu.create :name "Fund" :as @x)
@@ -148,7 +148,7 @@ For multi-line explanations, use consecutive comment lines:
 
 ```clojure
 ;; Correct order
-(cbu-role.assign
+(cbu.assign-role
   :cbu-id @fund              ;; 1. Identifier
   :entity-id @person         ;; 1. Identifier
   :role "DIRECTOR"           ;; 3. Type
@@ -202,11 +202,11 @@ Always capture results with `:as` when you'll reference them later:
 ```clojure
 ;; Good - captured for later use
 (cbu.create :name "Fund" :as @fund)
-(cbu-role.assign :cbu-id @fund ...)
+(cbu.assign-role :cbu-id @fund ...)
 
 ;; Bad - can't reference the created CBU
 (cbu.create :name "Fund")
-(cbu-role.assign :cbu-id ??? ...)  ;; No way to reference
+(cbu.assign-role :cbu-id ??? ...)  ;; No way to reference
 ```
 
 ### Check Dependencies
@@ -217,10 +217,10 @@ Ensure bindings are defined before use:
 ;; Correct order
 (entity.create :name "Manager" :as @manager)
 (cbu.create :name "Fund" :as @fund)
-(cbu-role.assign :cbu-id @fund :entity-id @manager :role "MANCO")
+(cbu.assign-role :cbu-id @fund :entity-id @manager :role "MANCO")
 
 ;; Wrong - @fund used before defined
-(cbu-role.assign :cbu-id @fund :entity-id @manager :role "MANCO")
+(cbu.assign-role :cbu-id @fund :entity-id @manager :role "MANCO")
 (cbu.create :name "Fund" :as @fund)  ;; Too late!
 ```
 

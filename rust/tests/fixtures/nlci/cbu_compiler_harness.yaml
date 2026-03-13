@@ -1,0 +1,110 @@
+name: "NLCI CBU Compiler Slice"
+suite_id: "nlci_cbu_compiler"
+description: "Harness scenarios for the first compiler-backed CBU read/update slice"
+mode_expectations:
+  strict_semreg: true
+  strict_single_pipeline: true
+  allow_raw_execute: false
+session_seed:
+  dominant_entity: "Current CBU"
+  actor:
+    actor_id: "operator.user"
+    roles: ["operator"]
+scenarios:
+  - name: "CBU List"
+    tags: ["nlci", "cbu", "read"]
+    steps:
+      - user: "show me the cbus"
+        expect:
+          chosen_verb: "cbu.list"
+          selection_source_in: ["sage_serve_coder", "sage_serve_fast_path"]
+          dsl_non_empty: true
+
+  - name: "CBU List With Filter"
+    tags: ["nlci", "cbu", "read"]
+    steps:
+      - user: "show me the luxembourg fund cbus"
+        expect:
+          outcome: "NeedsUserInput"
+          dsl_non_empty: false
+
+  - name: "CBU Create"
+    tags: ["nlci", "cbu", "write"]
+    steps:
+      - user: "create a cbu called Apex Growth Fund in LU"
+        expect:
+          outcome: "NeedsUserInput"
+          dsl_non_empty: false
+
+  - name: "CBU Create With Commercial Client"
+    tags: ["nlci", "cbu", "write"]
+    steps:
+      - user: "create a cbu called Apex Growth Fund for commercial client entity 123e4567-e89b-12d3-a456-426614174111"
+        expect:
+          outcome: "NeedsUserInput"
+          dsl_non_empty: false
+
+  - name: "CBU Create With Fund Entity"
+    tags: ["nlci", "cbu", "write"]
+    steps:
+      - user: "create a cbu called Apex Growth Fund for fund entity 123e4567-e89b-12d3-a456-426614174222"
+        expect:
+          outcome: "NeedsUserInput"
+          dsl_non_empty: false
+
+  - name: "CBU Create With Manco Entity"
+    tags: ["nlci", "cbu", "write"]
+    steps:
+      - user: "create a cbu called Apex Growth Fund for manco entity 123e4567-e89b-12d3-a456-426614174333"
+        expect:
+          outcome: "NeedsUserInput"
+          dsl_non_empty: false
+
+  - name: "CBU Read Current"
+    tags: ["nlci", "cbu", "read"]
+    steps:
+      - user: "show me the current cbu"
+        expect:
+          chosen_verb: "cbu.read"
+          selection_source_in: ["sage_serve_coder", "sage_serve_fast_path"]
+          dsl_non_empty: true
+
+  - name: "CBU Rename Current"
+    tags: ["nlci", "cbu", "write"]
+    steps:
+      - user: "rename the current cbu to Apex Growth Fund"
+        expect:
+          outcome: "NeedsUserInput"
+          dsl_non_empty: false
+
+  - name: "CBU Set Jurisdiction Current"
+    tags: ["nlci", "cbu", "write"]
+    steps:
+      - user: "change the current cbu jurisdiction to LU"
+        expect:
+          outcome: "NeedsUserInput"
+          dsl_non_empty: false
+
+  - name: "CBU Set Client Type Current"
+    tags: ["nlci", "cbu", "write"]
+    steps:
+      - user: "change the current cbu client type to FUND"
+        expect:
+          outcome: "NeedsUserInput"
+          dsl_non_empty: false
+
+  - name: "CBU Set Commercial Client Current"
+    tags: ["nlci", "cbu", "write"]
+    steps:
+      - user: "set the current cbu commercial client to entity 123e4567-e89b-12d3-a456-426614174111"
+        expect:
+          outcome: "NeedsUserInput"
+          dsl_non_empty: false
+
+  - name: "CBU Set Category Current"
+    tags: ["nlci", "cbu", "write"]
+    steps:
+      - user: "mark the current cbu as FUND_MANDATE"
+        expect:
+          outcome: "NeedsUserInput"
+          dsl_non_empty: false

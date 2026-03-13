@@ -931,12 +931,13 @@ impl CustomOperation for CapitalIssueInitialOp {
         let board_resolution_ref = extract_string_opt(verb_call, "board-resolution-ref");
 
         // Get issuer from share class
-        let issuer_entity_id: Uuid =
-            sqlx::query_scalar(r#"SELECT issuer_entity_id FROM "ob-poc".share_classes WHERE id = $1"#)
-                .bind(share_class_id)
-                .fetch_optional(pool)
-                .await?
-                .ok_or_else(|| anyhow!("Share class {} not found", share_class_id))?;
+        let issuer_entity_id: Uuid = sqlx::query_scalar(
+            r#"SELECT issuer_entity_id FROM "ob-poc".share_classes WHERE id = $1"#,
+        )
+        .bind(share_class_id)
+        .fetch_optional(pool)
+        .await?
+        .ok_or_else(|| anyhow!("Share class {} not found", share_class_id))?;
 
         // Check no prior issuance exists
         let prior_exists: bool = sqlx::query_scalar(
@@ -1237,12 +1238,13 @@ impl CustomOperation for CapitalSplitOp {
         }
 
         // Get issuer and validate share class exists
-        let issuer_entity_id: Uuid =
-            sqlx::query_scalar(r#"SELECT issuer_entity_id FROM "ob-poc".share_classes WHERE id = $1"#)
-                .bind(share_class_id)
-                .fetch_optional(pool)
-                .await?
-                .ok_or_else(|| anyhow!("Share class {} not found", share_class_id))?;
+        let issuer_entity_id: Uuid = sqlx::query_scalar(
+            r#"SELECT issuer_entity_id FROM "ob-poc".share_classes WHERE id = $1"#,
+        )
+        .bind(share_class_id)
+        .fetch_optional(pool)
+        .await?
+        .ok_or_else(|| anyhow!("Share class {} not found", share_class_id))?;
 
         // Start SERIALIZABLE transaction
         let mut tx = pool.begin().await?;
@@ -1434,12 +1436,13 @@ impl CustomOperation for CapitalBuybackOp {
             .and_then(|s| NaiveDate::parse_from_str(s, "%Y-%m-%d").ok())
             .unwrap_or_else(|| chrono::Utc::now().date_naive());
 
-        let issuer_entity_id: Uuid =
-            sqlx::query_scalar(r#"SELECT issuer_entity_id FROM "ob-poc".share_classes WHERE id = $1"#)
-                .bind(share_class_id)
-                .fetch_optional(pool)
-                .await?
-                .ok_or_else(|| anyhow!("Share class {} not found", share_class_id))?;
+        let issuer_entity_id: Uuid = sqlx::query_scalar(
+            r#"SELECT issuer_entity_id FROM "ob-poc".share_classes WHERE id = $1"#,
+        )
+        .bind(share_class_id)
+        .fetch_optional(pool)
+        .await?
+        .ok_or_else(|| anyhow!("Share class {} not found", share_class_id))?;
 
         let total_amount = units * price_per_unit;
 
@@ -1538,12 +1541,13 @@ impl CustomOperation for CapitalCancelOp {
             .unwrap_or_else(|| chrono::Utc::now().date_naive());
         let reason = extract_string_opt(verb_call, "reason");
 
-        let issuer_entity_id: Uuid =
-            sqlx::query_scalar(r#"SELECT issuer_entity_id FROM "ob-poc".share_classes WHERE id = $1"#)
-                .bind(share_class_id)
-                .fetch_optional(pool)
-                .await?
-                .ok_or_else(|| anyhow!("Share class {} not found", share_class_id))?;
+        let issuer_entity_id: Uuid = sqlx::query_scalar(
+            r#"SELECT issuer_entity_id FROM "ob-poc".share_classes WHERE id = $1"#,
+        )
+        .bind(share_class_id)
+        .fetch_optional(pool)
+        .await?
+        .ok_or_else(|| anyhow!("Share class {} not found", share_class_id))?;
 
         let mut tx = pool.begin().await?;
 

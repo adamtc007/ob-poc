@@ -60,6 +60,7 @@ pub fn build_stub_context(
         pre_sage_entity_kind: None,
         pre_sage_entity_name: None,
         recent_sage_intents: vec![],
+        nlci_compiler: Some(crate::semtaxonomy_v2::build_minimal_cbu_compiler()),
     }
 }
 

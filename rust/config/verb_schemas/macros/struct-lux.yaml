@@ -102,7 +102,7 @@ struct.lux.ucits.sicav:
         placeholder_name: "ManCo TBD"
       as: "@manco"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@cbu"
         role: management-company
@@ -116,7 +116,7 @@ struct.lux.ucits.sicav:
         placeholder_name: "Depositary TBD"
       as: "@depositary"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@cbu"
         role: depositary
@@ -131,7 +131,7 @@ struct.lux.ucits.sicav:
         skip_if_empty: true
       as: "@im"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@cbu"
         role: investment-manager
@@ -147,7 +147,7 @@ struct.lux.ucits.sicav:
         skip_if_empty: true
       as: "@admin"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@cbu"
         role: administrator
@@ -163,7 +163,7 @@ struct.lux.ucits.sicav:
         skip_if_empty: true
       as: "@auditor"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@cbu"
         role: auditor
@@ -298,7 +298,7 @@ struct.lux.aif.raif:
         placeholder_name: "AIFM TBD"
       as: "@aifm"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@cbu"
         role: aifm
@@ -312,7 +312,7 @@ struct.lux.aif.raif:
         placeholder_name: "Depositary TBD"
       as: "@depositary"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@cbu"
         role: depositary
@@ -327,7 +327,7 @@ struct.lux.aif.raif:
         skip_if_empty: true
       as: "@im"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@cbu"
         role: investment-manager
@@ -343,7 +343,7 @@ struct.lux.aif.raif:
         skip_if_empty: true
       as: "@admin"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@cbu"
         role: administrator
@@ -359,7 +359,7 @@ struct.lux.aif.raif:
         skip_if_empty: true
       as: "@auditor"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@cbu"
         role: auditor
@@ -375,7 +375,7 @@ struct.lux.aif.raif:
         skip_if_empty: true
       as: "@pb"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@cbu"
         role: prime-broker
@@ -501,7 +501,7 @@ struct.lux.pe.scsp:
         placeholder_name: "GP TBD"
       as: "@gp"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@cbu"
         role: general-partner
@@ -516,7 +516,7 @@ struct.lux.pe.scsp:
         skip_if_empty: true
       as: "@aifm"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@cbu"
         role: aifm
@@ -532,7 +532,7 @@ struct.lux.pe.scsp:
         skip_if_empty: true
       as: "@depositary"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@cbu"
         role: depositary
@@ -548,7 +548,7 @@ struct.lux.pe.scsp:
         skip_if_empty: true
       as: "@admin"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@cbu"
         role: administrator
@@ -564,7 +564,7 @@ struct.lux.pe.scsp:
         skip_if_empty: true
       as: "@auditor"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@cbu"
         role: auditor
@@ -580,7 +580,7 @@ struct.lux.pe.scsp:
         skip_if_empty: true
       as: "@legal"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@cbu"
         role: legal-counsel

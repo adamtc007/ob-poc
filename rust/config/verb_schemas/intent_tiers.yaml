@@ -122,7 +122,7 @@ tier_2:
       - id: relationship
         label: "Relationship / Role assignment"
         description: "Assign a role, add ownership, create a link"
-        verbs: [cbu-role.assign, ownership.add-ubo, party.assign-role]
+        verbs: [cbu.assign-role, ownership.add-ubo, party.assign-role]
 
       - id: case
         label: "KYC Case / Workflow"
@@ -140,8 +140,16 @@ tier_2:
     options:
       - id: structure_properties
         label: "Structure properties"
-        description: "Update CBU attributes, status, or configuration"
-        verbs: [cbu.update, structure.update, cbu.set-status]
+        description: "Update CBU attributes or classification"
+        verbs:
+          [
+            cbu.rename,
+            cbu.set-jurisdiction,
+            cbu.set-client-type,
+            cbu.set-commercial-client,
+            cbu.set-category,
+            structure.update,
+          ]
 
       - id: entity_properties
         label: "Entity properties"
@@ -151,7 +159,7 @@ tier_2:
       - id: roles
         label: "Roles / Relationships"
         description: "Assign, change, or remove role assignments"
-        verbs: [cbu-role.assign, cbu-role.remove, party.assign-role]
+        verbs: [cbu.assign-role, cbu.remove-role, party.assign-role]
 
       - id: trading_config
         label: "Trading configuration"
@@ -236,7 +244,7 @@ verb_tier_mapping:
   entity.ensure: [create, entity]
   party.add: [create, entity]
   party.add-company: [create, entity]
-  cbu-role.assign: [create, relationship]
+  cbu.assign-role: [create, relationship]
   ownership.add-ubo: [create, relationship]
   party.assign-role: [create, relationship]
   kyc-case.create: [create, case]
@@ -246,13 +254,16 @@ verb_tier_mapping:
   mandate.create: [create, trading]
 
   # Modify verbs
-  cbu.update: [modify, structure_properties]
+  cbu.rename: [modify, structure_properties]
+  cbu.set-jurisdiction: [modify, structure_properties]
+  cbu.set-client-type: [modify, structure_properties]
+  cbu.set-commercial-client: [modify, structure_properties]
   structure.update: [modify, structure_properties]
-  cbu.set-status: [modify, structure_properties]
+  cbu.set-category: [modify, structure_properties]
   entity.update: [modify, entity_properties]
   party.set-address: [modify, entity_properties]
   party.assign-identifier: [modify, entity_properties]
-  cbu-role.remove: [modify, roles]
+  cbu.remove-role: [modify, roles]
   trading-profile.update: [modify, trading_config]
   trading-profile.add-instrument: [modify, trading_config]
   trading-profile.clone-to: [modify, trading_config]

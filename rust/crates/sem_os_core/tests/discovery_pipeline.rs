@@ -1,8 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use sem_os_core::affinity::{
-    discover_dsl, AffinityEdge, AffinityGraph, AffinityKind, AffinityProvenance, DataRef,
-    TableRef,
+    discover_dsl, AffinityEdge, AffinityGraph, AffinityKind, AffinityProvenance, DataRef, TableRef,
 };
 use sem_os_core::verb_contract::{VerbArgDef, VerbArgLookup, VerbContractBody, VerbCrudMapping};
 

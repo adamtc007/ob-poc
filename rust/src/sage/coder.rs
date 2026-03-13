@@ -153,10 +153,9 @@ impl CoderEngine {
         let candidates = self.scorer.score(outcome, 5);
         let step = primary_step(outcome);
         let threshold = acceptance_threshold(&step);
-        let top = candidates
-            .first()
-            .cloned()
-            .ok_or_else(|| self.failure_error(outcome, None, threshold, filter_diagnostics, None))?;
+        let top = candidates.first().cloned().ok_or_else(|| {
+            self.failure_error(outcome, None, threshold, filter_diagnostics, None)
+        })?;
         let verb_required = self
             .verb_index
             .get(&top.fqn)
@@ -196,13 +195,17 @@ impl CoderEngine {
                 Some(CoderFailureKind::PolicyConflict),
             ));
         }
-        self.resolve_candidate(outcome, &top, Some(CoderDiagnostics {
-            failure_kind: None,
-            filter_diagnostics: filter_diagnostics.into(),
-            top_candidate: Some(top.fqn.clone()),
-            top_score: Some(top.score),
-            threshold: Some(threshold),
-        }))
+        self.resolve_candidate(
+            outcome,
+            &top,
+            Some(CoderDiagnostics {
+                failure_kind: None,
+                filter_diagnostics: filter_diagnostics.into(),
+                top_candidate: Some(top.fqn.clone()),
+                top_score: Some(top.score),
+                threshold: Some(threshold),
+            }),
+        )
     }
 
     /// Access the underlying verb index.
@@ -260,7 +263,9 @@ impl CoderEngine {
             .arguments
             .iter()
             .filter_map(|arg| match &arg.value {
-                IntentArgValue::Missing { arg_name } if required_args.contains(arg_name.as_str()) => {
+                IntentArgValue::Missing { arg_name }
+                    if required_args.contains(arg_name.as_str()) =>
+                {
                     Some(arg_name.clone())
                 }
                 _ => None,
@@ -326,8 +331,8 @@ impl CoderEngine {
         filter_diagnostics: FilterDiagnostics,
         override_kind: Option<CoderFailureKind>,
     ) -> anyhow::Error {
-        let failure_kind =
-            override_kind.unwrap_or_else(|| classify_failure_kind(filter_diagnostics, top, threshold));
+        let failure_kind = override_kind
+            .unwrap_or_else(|| classify_failure_kind(filter_diagnostics, top, threshold));
         let diagnostics = CoderDiagnostics {
             failure_kind: Some(failure_kind),
             filter_diagnostics: filter_diagnostics.into(),
@@ -365,7 +370,8 @@ fn classify_failure_kind(
         if filter_diagnostics.phase_candidates == 0 && filter_diagnostics.domain_candidates > 0 {
             return CoderFailureKind::PhaseConflict;
         }
-        if filter_diagnostics.subject_kind_candidates == 0 && filter_diagnostics.phase_candidates > 0
+        if filter_diagnostics.subject_kind_candidates == 0
+            && filter_diagnostics.phase_candidates > 0
         {
             return CoderFailureKind::SubjectKindConflict;
         }
@@ -402,7 +408,11 @@ fn primary_step(outcome: &OutcomeIntent) -> OutcomeStep {
 }
 
 fn acceptance_threshold(step: &OutcomeStep) -> f32 {
-    if step.params.is_empty() { 0.25 } else { 0.5 }
+    if step.params.is_empty() {
+        0.25
+    } else {
+        0.5
+    }
 }
 
 #[cfg(test)]
@@ -415,8 +425,8 @@ mod tests {
 
     use super::*;
     use crate::sage::{
-        CoderHandoff, IntentPolarity, ObservationPlane, OutcomeAction, SageConfidence,
-        SageExplain, UtteranceHints,
+        CoderHandoff, IntentPolarity, ObservationPlane, OutcomeAction, SageConfidence, SageExplain,
+        UtteranceHints,
     };
 
     fn sample_config() -> VerbsConfig {
@@ -425,10 +435,10 @@ mod tests {
         verbs.insert(
             "create".to_string(),
             VerbConfig {
-                description: "Create a CBU".to_string(),
+                description: "Create a deal".to_string(),
                 behavior: VerbBehavior::Plugin,
                 crud: None,
-                handler: Some("cbu.create".to_string()),
+                handler: Some("deal.create".to_string()),
                 graph_query: None,
                 durable: None,
                 args: vec![ArgConfig {
@@ -457,9 +467,9 @@ mod tests {
             },
         );
         domains.insert(
-            "cbu".to_string(),
+            "deal".to_string(),
             DomainConfig {
-                description: "CBU".to_string(),
+                description: "Deal".to_string(),
                 verbs,
                 dynamic_verbs: vec![],
                 invocation_hints: vec![],
@@ -473,16 +483,16 @@ mod tests {
 
     fn sample_outcome() -> OutcomeIntent {
         OutcomeIntent {
-            summary: "Create a CBU".to_string(),
+            summary: "Create a deal".to_string(),
             plane: ObservationPlane::Instance,
             polarity: IntentPolarity::Write,
-            domain_concept: "cbu".to_string(),
+            domain_concept: "deal".to_string(),
             action: OutcomeAction::Create,
             subject: None,
             steps: vec![OutcomeStep {
                 action: OutcomeAction::Create,
-                target: "cbu".to_string(),
-                params: HashMap::from([(String::from("name"), String::from("Apex Fund"))]),
+                target: "deal".to_string(),
+                params: HashMap::from([(String::from("name"), String::from("Apex Deal"))]),
                 notes: None,
             }],
             confidence: SageConfidence::Medium,
@@ -573,39 +583,12 @@ mod tests {
     }
 
     #[test]
-    fn read_plural_cbus_prefers_cbu_list() {
-        let engine = CoderEngine::load().unwrap();
-        let outcome = OutcomeIntent {
-            summary: "show me the cbus".to_string(),
-            plane: ObservationPlane::Instance,
-            polarity: IntentPolarity::Read,
-            domain_concept: "cbu".to_string(),
-            action: OutcomeAction::Read,
-            subject: None,
-            steps: vec![OutcomeStep {
-                action: OutcomeAction::Read,
-                target: "cbu".to_string(),
-                params: HashMap::new(),
-                notes: None,
-            }],
-            confidence: SageConfidence::Medium,
-            pending_clarifications: vec![],
-            hints: UtteranceHints::default(),
-            explain: SageExplain::default(),
-            coder_handoff: CoderHandoff::default(),
-        };
-
-        let result = engine.resolve(&outcome).unwrap();
-        assert_eq!(result.verb_fqn, "cbu.list");
-    }
-
-    #[test]
     fn coder_resolves_confident_result() {
         let engine = CoderEngine::from_config(sample_config());
         let result = engine.resolve(&sample_outcome()).unwrap();
-        assert_eq!(result.verb_fqn, "cbu.create");
+        assert_eq!(result.verb_fqn, "deal.create");
         assert_eq!(result.resolution, CoderResolution::Confident);
-        assert_eq!(result.dsl, "(cbu.create :name \"Apex Fund\")");
+        assert_eq!(result.dsl, "(deal.create :name \"Apex Deal\")");
     }
 
     #[test]
@@ -687,11 +670,12 @@ mod tests {
             "status",
             "Read current status",
             VerbMetadata {
-            side_effects: Some("facts_only".to_string()),
-            harm_class: Some(HarmClass::ReadOnly),
-            action_class: Some(ActionClass::Read),
-            ..VerbMetadata::default()
-        }));
+                side_effects: Some("facts_only".to_string()),
+                harm_class: Some(HarmClass::ReadOnly),
+                action_class: Some(ActionClass::Read),
+                ..VerbMetadata::default()
+            },
+        ));
         let outcome = OutcomeIntent {
             summary: "publish the portfolio".to_string(),
             plane: ObservationPlane::Instance,

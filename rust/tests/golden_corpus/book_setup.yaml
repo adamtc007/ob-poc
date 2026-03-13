@@ -33,7 +33,7 @@
   category: book-setup
   input: "assign the general partner role"
   pack_id: book-setup
-  expected_verb: cbu-role.assign
+  expected_verb: cbu.assign-role
   match_mode: exact
   tags: [role-assign]
 
@@ -81,6 +81,6 @@
   category: book-setup
   input: "assign investment manager to the fund"
   pack_id: book-setup
-  expected_verb: cbu-role.assign
+  expected_verb: cbu.assign-role
   match_mode: exact
   tags: [role-assign, role-shorthand]

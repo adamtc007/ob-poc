@@ -230,7 +230,10 @@ mod tests {
             total: rows.len(),
             passed: rows.iter().filter(|row| row.pass).count(),
             business_verbs: rows.iter().filter(|row| row.business_verb).count(),
-            grounded: rows.iter().filter(|row| row.scope_summary.is_some()).count(),
+            grounded: rows
+                .iter()
+                .filter(|row| row.scope_summary.is_some())
+                .count(),
             stateful_responses: rows.iter().filter(|row| row.stateful_response).count(),
             rows,
         };

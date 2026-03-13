@@ -1,0 +1,46 @@
+{
+  "structured_intent": {
+    "steps": [
+      {
+        "action": "read",
+        "entity": "cbu",
+        "target": null,
+        "qualifiers": [],
+        "parameters": [],
+        "confidence": "high"
+      }
+    ],
+    "composition": "single_step",
+    "data_flow": []
+  },
+  "semantic_ir": {
+    "steps": [
+      {
+        "action": "read",
+        "entity": "cbu",
+        "binding_mode": "Unbound",
+        "target": null,
+        "parameters": [],
+        "qualifiers": []
+      },
+      {
+        "action": "submit",
+        "entity": "cbu",
+        "binding_mode": "SessionReference",
+        "target": {
+          "subject_kind": "cbu",
+          "identifier": null,
+          "identifier_type": null,
+          "reference": "previous_step",
+          "filter": null
+        },
+        "parameters": [],
+        "qualifiers": []
+      }
+    ],
+    "composition": "sequential"
+  },
+  "session_id": null,
+  "session_entity_kind": null,
+  "session_entity_name": null
+}

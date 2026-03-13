@@ -384,9 +384,11 @@ impl CustomOperation for LoadInstrumentClassesOp {
         // Handle REPLACE mode
         if mode == "REPLACE" {
             // Must delete in reverse order due to FK constraints
-            sqlx::query("DELETE FROM \"ob-poc\".instrument_classes WHERE parent_class_id IS NOT NULL")
-                .execute(pool)
-                .await?;
+            sqlx::query(
+                "DELETE FROM \"ob-poc\".instrument_classes WHERE parent_class_id IS NOT NULL",
+            )
+            .execute(pool)
+            .await?;
             sqlx::query("DELETE FROM \"ob-poc\".instrument_classes WHERE parent_class_id IS NULL")
                 .execute(pool)
                 .await?;

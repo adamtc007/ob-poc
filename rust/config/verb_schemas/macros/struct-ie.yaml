@@ -104,7 +104,7 @@ struct.ie.ucits.icav:
         placeholder_name: "ManCo TBD"
       as: "@manco"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@cbu"
         role: management-company
@@ -118,7 +118,7 @@ struct.ie.ucits.icav:
         placeholder_name: "Depositary TBD"
       as: "@depositary"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@cbu"
         role: depositary
@@ -133,7 +133,7 @@ struct.ie.ucits.icav:
         skip_if_empty: true
       as: "@im"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@cbu"
         role: investment-manager
@@ -149,7 +149,7 @@ struct.ie.ucits.icav:
         skip_if_empty: true
       as: "@admin"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@cbu"
         role: administrator
@@ -165,7 +165,7 @@ struct.ie.ucits.icav:
         skip_if_empty: true
       as: "@auditor"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@cbu"
         role: auditor
@@ -181,7 +181,7 @@ struct.ie.ucits.icav:
         skip_if_empty: true
       as: "@secretary"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@cbu"
         role: company-secretary
@@ -316,7 +316,7 @@ struct.ie.aif.icav:
         placeholder_name: "AIFM TBD"
       as: "@aifm"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@cbu"
         role: aifm
@@ -330,7 +330,7 @@ struct.ie.aif.icav:
         placeholder_name: "Depositary TBD"
       as: "@depositary"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@cbu"
         role: depositary
@@ -345,7 +345,7 @@ struct.ie.aif.icav:
         skip_if_empty: true
       as: "@im"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@cbu"
         role: investment-manager
@@ -361,7 +361,7 @@ struct.ie.aif.icav:
         skip_if_empty: true
       as: "@admin"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@cbu"
         role: administrator
@@ -377,7 +377,7 @@ struct.ie.aif.icav:
         skip_if_empty: true
       as: "@auditor"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@cbu"
         role: auditor
@@ -393,7 +393,7 @@ struct.ie.aif.icav:
         skip_if_empty: true
       as: "@pb"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@cbu"
         role: prime-broker
@@ -528,7 +528,7 @@ struct.ie.hedge.icav:
         skip_if_empty: true
       as: "@secondary-pb"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@cbu"
         role: prime-broker
@@ -544,7 +544,7 @@ struct.ie.hedge.icav:
         skip_if_empty: true
       as: "@exec-broker"
 
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu_id: "@cbu"
         role: executing-broker

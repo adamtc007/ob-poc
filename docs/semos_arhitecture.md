@@ -1,8 +1,8 @@
 # Semantic OS — Vision & Scope v3.0
 
 > **Version:** 3.0
-> **Date:** 2026-03-12
-> **Status:** Living document — consolidation of 9 prior specs, updated for the 2026-03-08 runtime schema consolidation and the 2026-03-12 document-governance bootstrap
+> **Date:** 2026-03-13
+> **Status:** Living document — consolidation of 9 prior specs, updated for the 2026-03-08 runtime schema consolidation, the 2026-03-12 document-governance bootstrap, and the 2026-03-13 NLCI/CBU surface reconciliation
 > **Audience:** Engineering, governance, architecture review
 
 ---
@@ -27,7 +27,7 @@ Semantic OS enforces governance through **three complementary layers**:
 
 The system is deployed as a **standalone service** (6 Rust crates) with port-trait isolation, REST+JWT API, outbox-driven projections, and optional in-process mode for the ob-poc monolith.
 
-### Current Agent Integration State (2026-03-11)
+### Current Agent Integration State (2026-03-13)
 
 The downstream `ob-poc` utterance-understanding path has been collapsed to a strict three-step pipeline:
 
@@ -65,6 +65,42 @@ The safe Phase 1 cleanup in-repo is complete:
 - repo-derived reconciliation pack
 
 The unsafe reconciliation work is intentionally parked pending the authoritative external correction table for unresolved verb families such as `struct.*`, `screening.full`, and any external graph-edge correction map.
+
+### Current CBU/NLCI Surface State (2026-03-13)
+
+The downstream `ob-poc` CBU surface is now materially cleaner than the March 11 cutover point:
+
+- the narrow compiler-backed CBU path is live for:
+  - `cbu.create`
+  - `cbu.read`
+  - `cbu.list`
+  - `cbu.rename`
+  - `cbu.set-jurisdiction`
+  - `cbu.set-client-type`
+  - `cbu.set-commercial-client`
+  - `cbu.set-category`
+  - `cbu.submit-for-validation`
+  - `cbu.request-proof-update`
+  - `cbu.reopen-validation`
+- the old duplicate phrase/discovery/test surfaces for those intents were removed instead of being left in place as compatibility debt
+- the CBU role surface was reconciled onto one public namespace:
+  - `cbu.assign-role`
+  - `cbu.remove-role`
+  - `cbu.parties`
+  - specialist role verbs remain under `cbu.*` as:
+    - `cbu.assign-ownership`
+    - `cbu.assign-control`
+    - `cbu.assign-trust-role`
+    - `cbu.assign-fund-role`
+    - `cbu.assign-service-provider`
+    - `cbu.assign-signatory`
+    - `cbu.validate-roles`
+
+The practical SemOS implication is:
+
+- the active resolver/discovery layer is now closer to a single canonical contract
+- utterance routing quality is less constrained by duplicate DSL names
+- the remaining metadata bottleneck is quality and coverage, not multiple competing public verb families for CBU
 
 ### Current Runtime State (2026-03-08)
 

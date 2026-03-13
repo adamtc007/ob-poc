@@ -65,6 +65,114 @@ cbu.read:
   target_types: [cbu]
   crud_type: read
 
+cbu.rename:
+  pref_label: "rename cbu"
+  alt_labels:
+    - "rename fund"
+    - "rename structure"
+    - "change cbu name"
+    - "change fund name"
+  invocation_phrases:
+    - "rename the cbu"
+    - "rename the fund"
+    - "change the fund name"
+  domain: cbu
+  target_types: [cbu]
+  crud_type: update
+
+cbu.set-jurisdiction:
+  pref_label: "set cbu jurisdiction"
+  alt_labels:
+    - "change jurisdiction"
+    - "update cbu jurisdiction"
+    - "change fund jurisdiction"
+  invocation_phrases:
+    - "set the cbu jurisdiction"
+    - "change the fund jurisdiction"
+  domain: cbu
+  target_types: [cbu]
+  crud_type: update
+
+cbu.set-client-type:
+  pref_label: "set cbu client type"
+  alt_labels:
+    - "change client type"
+    - "update client type"
+    - "change fund type"
+  invocation_phrases:
+    - "set the client type"
+    - "change the cbu client type"
+  domain: cbu
+  target_types: [cbu]
+  crud_type: update
+
+cbu.set-commercial-client:
+  pref_label: "set commercial client"
+  alt_labels:
+    - "change commercial client"
+    - "link commercial client"
+    - "set parent client"
+  invocation_phrases:
+    - "set the commercial client"
+    - "change the commercial client for this cbu"
+  domain: cbu
+  target_types: [cbu, entity]
+  crud_type: update
+
+cbu.submit-for-validation:
+  pref_label: "submit cbu for validation"
+  alt_labels:
+    - "start validation"
+    - "send to review"
+    - "submit fund for validation"
+  invocation_phrases:
+    - "submit this cbu for validation"
+    - "start validation for this fund"
+  domain: cbu
+  target_types: [cbu]
+  crud_type: update
+
+cbu.decide:
+  pref_label: "decide cbu validation"
+  alt_labels:
+    - "approve cbu"
+    - "reject cbu"
+    - "refer cbu"
+    - "make validation decision"
+  invocation_phrases:
+    - "approve this cbu"
+    - "reject this fund"
+    - "refer this cbu for review"
+  domain: cbu
+  target_types: [cbu]
+  crud_type: update
+
+cbu.request-proof-update:
+  pref_label: "request proof update"
+  alt_labels:
+    - "require updated proof"
+    - "mark for revalidation proof"
+    - "request additional proof"
+  invocation_phrases:
+    - "request proof update for this cbu"
+    - "mark this cbu as update pending proof"
+  domain: cbu
+  target_types: [cbu]
+  crud_type: update
+
+cbu.reopen-validation:
+  pref_label: "reopen validation"
+  alt_labels:
+    - "retry validation"
+    - "restart validation"
+    - "resubmit after failure"
+  invocation_phrases:
+    - "reopen validation for this cbu"
+    - "retry validation for this fund"
+  domain: cbu
+  target_types: [cbu]
+  crud_type: update
+
 cbu.delete:
   pref_label: "delete cbu"
   alt_labels:
@@ -383,32 +491,44 @@ trading-profile.list-versions:
   crud_type: read
 
 # CBU Role Domain
-cbu.role.assign:
-  pref_label: "assign role"
+cbu.assign-role:
+  pref_label: "assign cbu role"
   alt_labels:
-    - "add role"
-    - "assign entity role"
-    - "give role"
-    - "set role"
+    - "add party to cbu"
+    - "assign role in cbu"
+    - "appoint depositary"
+    - "assign management company"
   invocation_phrases:
-    - "assign a role to entity"
-    - "add entity as depositary"
+    - "assign a role to this cbu"
+    - "add a party to the fund"
     - "make them the custodian"
-  domain: cbu-role
+  domain: role
   target_types: [cbu, entity]
   crud_type: create
 
-cbu.role.list:
-  pref_label: "list roles"
+cbu.remove-role:
+  pref_label: "remove cbu role"
   alt_labels:
-    - "show roles"
-    - "get roles"
-    - "who has roles"
+    - "unassign role"
+    - "remove party from cbu"
+    - "revoke role"
   invocation_phrases:
-    - "list all roles"
-    - "show who has roles"
-    - "what roles exist"
-  domain: cbu-role
+    - "remove the role from this cbu"
+    - "unassign the party from the fund"
+  domain: role
+  target_types: [cbu, entity]
+  crud_type: delete
+
+cbu.parties:
+  pref_label: "list cbu parties"
+  alt_labels:
+    - "show cbu parties"
+    - "who is on this cbu"
+    - "list stakeholders"
+  invocation_phrases:
+    - "show the parties on this cbu"
+    - "who is on this fund"
+  domain: role
   target_types: [cbu]
   crud_type: read
 

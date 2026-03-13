@@ -1,0 +1,18 @@
+{
+  "steps": [
+    {
+      "action": "read",
+      "entity": "cbu",
+      "target": {
+        "identifier": null,
+        "reference": "current",
+        "filter": null
+      },
+      "qualifiers": [],
+      "parameters": [],
+      "confidence": "high"
+    }
+  ],
+  "composition": "single_step",
+  "data_flow": []
+}

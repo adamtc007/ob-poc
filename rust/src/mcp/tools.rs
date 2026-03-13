@@ -306,7 +306,7 @@ Feedback types:
 Examples:
 - User says "no, I meant ISDA not CSA" → verb_correction
 - User says "wrong John Smith" → entity_correction
-- User says "when I say 'onboard' I mean cbu.create" → phrase_mapping
+- User says "when I say 'launch deal' I mean deal.create" → phrase_mapping
 
 The system will:
 1. Record the correction immediately
@@ -2240,8 +2240,8 @@ Used for:
 Format (YAML):
 ```yaml
 phrases:
-  - phrase: "spin up a fund"
-    verb: cbu.create
+  - phrase: "launch a deal"
+    verb: deal.create
   - phrase: "add a sig"
     verb: entity.assign-role
 ```
@@ -2645,7 +2645,7 @@ This is the fastest way to improve verb matching: directly tell the system
 what phrases should trigger which verbs.
 
 Example:
-  teach_phrase("spin up a fund", "cbu.create")
+  teach_phrase("launch a deal", "deal.create")
   teach_phrase("who owns this company", "ubo.discover")
 
 After teaching, patterns are added to dsl_verbs.intent_patterns but need
@@ -2666,7 +2666,7 @@ The pattern is stored permanently and survives server restarts."#.into(),
                     },
                     "verb": {
                         "type": "string",
-                        "description": "The DSL verb it should trigger (e.g., 'cbu.create')"
+                        "description": "The DSL verb it should trigger (e.g., 'deal.create')"
                     }
                 },
                 "required": ["phrase", "verb"]

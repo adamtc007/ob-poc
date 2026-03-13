@@ -12,8 +12,10 @@
 #[cfg(feature = "database")]
 mod integration {
     use anyhow::Result;
-    use ob_poc::dsl_v2::{Argument, AstNode, DslExecutor, ExecutionContext, Literal, Span, VerbCall};
     use ob_poc::dsl_v2::ExecutionResult;
+    use ob_poc::dsl_v2::{
+        Argument, AstNode, DslExecutor, ExecutionContext, Literal, Span, VerbCall,
+    };
     use sqlx::PgPool;
 
     fn s(value: &str) -> AstNode {
@@ -81,7 +83,10 @@ mod integration {
         assert!(record.get("suggested_sequence").is_some());
         assert!(record.get("disambiguation_needed").is_some());
         assert!(record.get("governance_context").is_some());
-        assert!(record.get("status").is_none(), "stub payload still returned");
+        assert!(
+            record.get("status").is_none(),
+            "stub payload still returned"
+        );
 
         Ok(())
     }
@@ -100,13 +105,19 @@ mod integration {
             other => anyhow::bail!("expected Record result, got: {other:?}"),
         };
 
-        assert_eq!(record.get("format").and_then(|v| v.as_str()), Some("mermaid"));
+        assert_eq!(
+            record.get("format").and_then(|v| v.as_str()),
+            Some("mermaid")
+        );
         let diagram = record
             .get("diagram")
             .and_then(|v| v.as_str())
             .unwrap_or_default();
         assert!(diagram.starts_with("graph TD"));
-        assert!(record.get("status").is_none(), "stub payload still returned");
+        assert!(
+            record.get("status").is_none(),
+            "stub payload still returned"
+        );
 
         Ok(())
     }

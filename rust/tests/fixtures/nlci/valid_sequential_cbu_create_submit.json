@@ -1,0 +1,33 @@
+{
+  "steps": [
+    {
+      "action": "create",
+      "entity": "cbu",
+      "target": null,
+      "qualifiers": [
+        { "name": "jurisdiction", "value": "LU" }
+      ],
+      "parameters": [
+        { "name": "name", "value": "Pacific Growth" },
+        { "name": "client_type", "value": "fund" }
+      ],
+      "confidence": "high"
+    },
+    {
+      "action": "submit",
+      "entity": "cbu",
+      "target": {
+        "identifier": null,
+        "reference": "previous_step",
+        "filter": null
+      },
+      "qualifiers": [],
+      "parameters": [],
+      "confidence": "medium"
+    }
+  ],
+  "composition": "sequential",
+  "data_flow": [
+    "step_1 output feeds step_2 target"
+  ]
+}

@@ -432,10 +432,8 @@ async fn ensure_refdata(
     pool: &PgPool,
 ) -> Result<ExecutionResult> {
     let mut present_fields = Vec::new();
-    let mut qb = QueryBuilder::<Postgres>::new(format!(
-        "INSERT INTO \"{}\".{} (",
-        spec.schema, spec.table
-    ));
+    let mut qb =
+        QueryBuilder::<Postgres>::new(format!("INSERT INTO \"{}\".{} (", spec.schema, spec.table));
     {
         let mut cols = qb.separated(", ");
         for field in spec.fields {
@@ -541,10 +539,13 @@ async fn read_refdata(
         "SELECT row_to_json(t) FROM (SELECT * FROM \"{}\".{} WHERE {} = $1) t",
         spec.schema, spec.table, spec.key_column
     );
-    let record: Option<JsonValue> = sqlx::query_scalar(&sql).bind(key).fetch_optional(pool).await?;
-    Ok(ExecutionResult::Record(
-        record.ok_or_else(|| anyhow!("No {} record found", spec.domain))?,
-    ))
+    let record: Option<JsonValue> = sqlx::query_scalar(&sql)
+        .bind(key)
+        .fetch_optional(pool)
+        .await?;
+    Ok(ExecutionResult::Record(record.ok_or_else(|| {
+        anyhow!("No {} record found", spec.domain)
+    })?))
 }
 
 #[cfg(feature = "database")]
@@ -861,9 +862,13 @@ mod tests {
             ],
         );
 
-        let ensure_result = ensure_refdata(&ensure_call, resolve_domain_spec(&ensure_call).unwrap(), &pool)
-            .await
-            .expect("currency ensure should succeed");
+        let ensure_result = ensure_refdata(
+            &ensure_call,
+            resolve_domain_spec(&ensure_call).unwrap(),
+            &pool,
+        )
+        .await
+        .expect("currency ensure should succeed");
         assert!(matches!(ensure_result, ExecutionResult::Uuid(_)));
 
         let read_call = make_verb_call(
@@ -897,7 +902,9 @@ mod tests {
             ExecutionResult::RecordSet(rows) => rows,
             other => panic!("unexpected list result: {:?}", other),
         };
-        assert!(rows.iter().any(|row| record_field(row, "iso_code") == "ZZT"));
+        assert!(rows
+            .iter()
+            .any(|row| record_field(row, "iso_code") == "ZZT"));
 
         let deactivate_call = make_verb_call(
             "deactivate",
@@ -954,10 +961,13 @@ mod tests {
                 ("regulatory-framework", string_node("PHASE0")),
             ],
         );
-        let ensure_result =
-            ensure_refdata(&ensure_call, resolve_domain_spec(&ensure_call).unwrap(), &pool)
-                .await
-                .expect("jurisdiction ensure should succeed");
+        let ensure_result = ensure_refdata(
+            &ensure_call,
+            resolve_domain_spec(&ensure_call).unwrap(),
+            &pool,
+        )
+        .await
+        .expect("jurisdiction ensure should succeed");
         let record = match ensure_result {
             ExecutionResult::Record(record) => record,
             other => panic!("unexpected jurisdiction ensure result: {:?}", other),
@@ -971,10 +981,9 @@ mod tests {
                 ("code", string_node(code)),
             ],
         );
-        let read_result =
-            read_refdata(&read_call, resolve_domain_spec(&read_call).unwrap(), &pool)
-                .await
-                .expect("jurisdiction read should succeed");
+        let read_result = read_refdata(&read_call, resolve_domain_spec(&read_call).unwrap(), &pool)
+            .await
+            .expect("jurisdiction read should succeed");
         let record = match read_result {
             ExecutionResult::Record(record) => record,
             other => panic!("unexpected jurisdiction read result: {:?}", other),
@@ -989,10 +998,9 @@ mod tests {
                 ("region", string_node("TEST")),
             ],
         );
-        let list_result =
-            list_refdata(&list_call, resolve_domain_spec(&list_call).unwrap(), &pool)
-                .await
-                .expect("jurisdiction list should succeed");
+        let list_result = list_refdata(&list_call, resolve_domain_spec(&list_call).unwrap(), &pool)
+            .await
+            .expect("jurisdiction list should succeed");
         let rows = match list_result {
             ExecutionResult::RecordSet(rows) => rows,
             other => panic!("unexpected jurisdiction list result: {:?}", other),
@@ -1017,7 +1025,8 @@ mod tests {
         .expect("jurisdiction deactivate should succeed");
         assert!(matches!(deactivate_result, ExecutionResult::Void));
 
-        let read_after = read_refdata(&read_call, resolve_domain_spec(&read_call).unwrap(), &pool).await;
+        let read_after =
+            read_refdata(&read_call, resolve_domain_spec(&read_call).unwrap(), &pool).await;
         assert!(read_after.is_err());
     }
 }

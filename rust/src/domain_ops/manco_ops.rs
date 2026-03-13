@@ -110,11 +110,12 @@ impl CustomOperation for MancoBridgeGleifFundManagersOp {
     ) -> Result<ExecutionResult> {
         let as_of = extract_date_opt(verb_call, "as-of");
 
-        let row: (i32, i32) =
-            sqlx::query_as("SELECT * FROM \"ob-poc\".fn_bridge_gleif_fund_manager_to_board_rights($1)")
-                .bind(as_of)
-                .fetch_one(pool)
-                .await?;
+        let row: (i32, i32) = sqlx::query_as(
+            "SELECT * FROM \"ob-poc\".fn_bridge_gleif_fund_manager_to_board_rights($1)",
+        )
+        .bind(as_of)
+        .fetch_one(pool)
+        .await?;
 
         let result = BridgeGleifResult {
             rights_created: row.0,
@@ -879,11 +880,12 @@ impl CustomOperation for OwnershipRefreshOp {
         };
 
         // 2. Bridge GLEIF fund managers → board rights
-        let gleif_row: (i32, i32) =
-            sqlx::query_as("SELECT * FROM \"ob-poc\".fn_bridge_gleif_fund_manager_to_board_rights($1)")
-                .bind(as_of)
-                .fetch_one(pool)
-                .await?;
+        let gleif_row: (i32, i32) = sqlx::query_as(
+            "SELECT * FROM \"ob-poc\".fn_bridge_gleif_fund_manager_to_board_rights($1)",
+        )
+        .bind(as_of)
+        .fetch_one(pool)
+        .await?;
         let gleif_bridge = BridgeGleifResult {
             rights_created: gleif_row.0,
             rights_updated: gleif_row.1,
@@ -902,10 +904,11 @@ impl CustomOperation for OwnershipRefreshOp {
         };
 
         // 4. Compute control links
-        let links_count: i32 = sqlx::query_scalar("SELECT \"ob-poc\".fn_compute_control_links(NULL, $1)")
-            .bind(as_of)
-            .fetch_one(pool)
-            .await?;
+        let links_count: i32 =
+            sqlx::query_scalar("SELECT \"ob-poc\".fn_compute_control_links(NULL, $1)")
+                .bind(as_of)
+                .fetch_one(pool)
+                .await?;
         let control_links = ComputeControlLinksResult {
             links_created: links_count,
         };

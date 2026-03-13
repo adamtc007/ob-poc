@@ -1147,7 +1147,7 @@ structure.assign-role:
     optional: {}
   prereqs: []
   expands-to:
-    - verb: cbu-role.assign
+    - verb: cbu.assign-role
       args:
         cbu-id: "${arg.structure}"
         role: "${arg.role.internal}"
