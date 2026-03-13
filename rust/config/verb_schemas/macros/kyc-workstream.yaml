@@ -1,0 +1,193 @@
+# KYC Workstream Macros — per-entity work units within a case
+#
+# INVARIANT:
+# - UI labels say "Workstream", never "entity-workstream"
+
+kyc-workstream.add:
+  kind: macro
+
+  ui:
+    label: "Add Workstream"
+    description: "Create a new KYC workstream for a party in the case"
+    target-label: "Workstream"
+
+  routing:
+    mode-tags: [kyc]
+    operator-domain: kyc-workstream
+
+  target:
+    operates-on: case-ref
+    produces: workstream-ref
+
+  args:
+    style: keyworded
+    required:
+      case:
+        type: case-ref
+        ui-label: "Case"
+        autofill-from: session.current_case
+      party:
+        type: party-ref
+        ui-label: "Party"
+        picker: party_picker
+        internal:
+          kinds: [person, company, trust, foundation]
+    optional:
+      workstream_type:
+        type: enum
+        ui-label: "Workstream Type"
+        values:
+          - key: identity
+            label: "Identity"
+            internal: identity
+          - key: ownership
+            label: "Ownership"
+            internal: ownership
+          - key: screening
+            label: "Screening"
+            internal: screening
+          - key: full
+            label: "Full"
+            internal: full
+        default-key: full
+
+  prereqs:
+    - type: state_exists
+      key: case.exists
+
+  expands-to:
+    - verb: entity-workstream.create
+      args:
+        case-id: "${arg.case}"
+        entity-id: "${arg.party}"
+        discovery-reason: "${arg.workstream_type.internal}"
+
+  sets-state:
+    - key: workstream.exists
+      value: true
+
+  unlocks:
+    - evidence.require
+    - doc-request.create
+    - screening-ops.run
+    - kyc-workstream.update-status
+
+kyc-workstream.update-status:
+  kind: macro
+
+  ui:
+    label: "Update Workstream Status"
+    description: "Advance or block a KYC workstream"
+    target-label: "Workstream"
+
+  routing:
+    mode-tags: [kyc]
+    operator-domain: kyc-workstream
+
+  target:
+    operates-on: workstream-ref
+    produces: null
+
+  args:
+    style: keyworded
+    required:
+      workstream:
+        type: workstream-ref
+        ui-label: "Workstream"
+        autofill-from: session.current_workstream
+      status:
+        type: enum
+        ui-label: "Status"
+        values:
+          - key: in_progress
+            label: "In Progress"
+            internal: COLLECT
+          - key: pending_docs
+            label: "Pending Documents"
+            internal: COLLECT
+          - key: pending_screening
+            label: "Pending Screening"
+            internal: SCREEN
+          - key: verified
+            label: "Verified"
+            internal: COMPLETE
+          - key: blocked
+            label: "Blocked"
+            internal: BLOCKED
+    optional:
+      notes:
+        type: str
+        ui-label: "Notes"
+
+  prereqs:
+    - type: state_exists
+      key: workstream.exists
+
+  expands-to:
+    - verb: entity-workstream.update-status
+      args:
+        workstream-id: "${arg.workstream}"
+        status: "${arg.status.internal}"
+
+  sets-state: []
+
+  unlocks:
+    - tollgate.evaluate
+
+kyc-workstream.close:
+  kind: macro
+
+  ui:
+    label: "Close Workstream"
+    description: "Complete a KYC workstream"
+    target-label: "Workstream"
+
+  routing:
+    mode-tags: [kyc]
+    operator-domain: kyc-workstream
+
+  target:
+    operates-on: workstream-ref
+    produces: null
+
+  args:
+    style: keyworded
+    required:
+      workstream:
+        type: workstream-ref
+        ui-label: "Workstream"
+        autofill-from: session.current_workstream
+    optional:
+      risk_rating:
+        type: enum
+        ui-label: "Risk Rating"
+        values:
+          - key: low
+            label: "Low"
+            internal: LOW
+          - key: medium
+            label: "Medium"
+            internal: MEDIUM
+          - key: high
+            label: "High"
+            internal: HIGH
+          - key: very_high
+            label: "Very High"
+            internal: VERY_HIGH
+
+  prereqs:
+    - type: state_exists
+      key: workstream.exists
+
+  expands-to:
+    - verb: entity-workstream.complete
+      args:
+        workstream-id: "${arg.workstream}"
+        risk-rating: "${arg.risk_rating.internal}"
+
+  sets-state:
+    - key: workstream.closed
+      value: true
+
+  unlocks:
+    - tollgate.evaluate

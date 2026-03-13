@@ -1,0 +1,467 @@
+# UBO Macros — Beneficial Ownership Discovery, Allegation, and Verification
+#
+# INVARIANT: UBO epistemic lifecycle: ALLEGATION → IDENTIFIED → PROVABLE → PROVED → REVIEWED → APPROVED
+# UI labels use "Beneficial Owner" / "Ownership", never "ubo_registry" or "ubo_assertion_log"
+
+ubo.discover:
+  kind: macro
+
+  ui:
+    label: "Discover Beneficial Owners"
+    description: "Compute ownership chains for the current structure"
+    target-label: "Ownership"
+
+  routing:
+    mode-tags: [kyc]
+    operator-domain: ubo
+
+  target:
+    operates-on: structure-ref
+    produces: null
+
+  args:
+    style: keyworded
+    required:
+      case:
+        type: case-ref
+        ui-label: "Case"
+        autofill-from: session.current_case
+      structure:
+        type: structure-ref
+        ui-label: "Structure"
+        autofill-from: session.current_structure
+    optional:
+      threshold:
+        type: str
+        ui-label: "UBO Threshold %"
+        description: "Default 25%"
+      max_depth:
+        type: str
+        ui-label: "Max Chain Depth"
+        description: "Default 10"
+
+  prereqs:
+    - type: state_exists
+      key: case.exists
+    - type: state_exists
+      key: structure.exists
+
+  expands-to:
+    - verb: ownership.compute
+      args:
+        issuer-entity-id: "${arg.structure}"
+        threshold: "${arg.threshold}"
+        max-depth: "${arg.max_depth}"
+
+  sets-state:
+    - key: ubo.chain-built
+      value: true
+
+  unlocks:
+    - ubo.allege
+    - ubo.trace-chains
+
+ubo.allege:
+  kind: macro
+
+  ui:
+    label: "Record Beneficial Owner"
+    description: "Create an initial beneficial ownership allegation"
+    target-label: "Beneficial Owner"
+
+  routing:
+    mode-tags: [kyc]
+    operator-domain: ubo
+
+  target:
+    operates-on: case-ref
+    produces: null
+
+  args:
+    style: keyworded
+    required:
+      case:
+        type: case-ref
+        ui-label: "Case"
+        autofill-from: session.current_case
+      subject:
+        type: party-ref
+        ui-label: "Beneficial Owner"
+        picker: party_picker
+        internal:
+          kinds: [person, company, trust, foundation]
+      owned_entity:
+        type: party-ref
+        ui-label: "Owned Entity"
+        picker: party_picker
+        internal:
+          kinds: [person, company, trust, foundation]
+      percentage:
+        type: str
+        ui-label: "Ownership %"
+    optional:
+      ownership_type:
+        type: enum
+        ui-label: "Ownership Type"
+        values:
+          - key: direct
+            label: "Direct"
+            internal: DIRECT
+          - key: indirect
+            label: "Indirect"
+            internal: INDIRECT
+          - key: beneficial
+            label: "Beneficial"
+            internal: BENEFICIAL
+          - key: control
+            label: "Control"
+            internal: CONTROL
+        default-key: direct
+      source:
+        type: enum
+        ui-label: "Source"
+        values:
+          - key: gleif
+            label: "GLEIF"
+            internal: GLEIF
+          - key: bods
+            label: "BODS"
+            internal: BODS
+          - key: register
+            label: "Register"
+            internal: REGISTER
+          - key: annual_report
+            label: "Annual Report"
+            internal: ANNUAL_REPORT
+          - key: self_declaration
+            label: "Self Declaration"
+            internal: SELF_DECLARATION
+          - key: other
+            label: "Other"
+            internal: OTHER
+        default-key: other
+      notes:
+        type: str
+        ui-label: "Notes"
+
+  prereqs:
+    - type: state_exists
+      key: case.exists
+
+  expands-to:
+    - verb: ubo.registry.create
+      args:
+        case-id: "${arg.case}"
+        owner-entity-id: "${arg.subject}"
+        owned-entity-id: "${arg.owned_entity}"
+        percentage: "${arg.percentage}"
+        ownership-type: "${arg.ownership_type.internal}"
+        source: "${arg.source.internal}"
+        status: "ALLEGED"
+        notes: "${arg.notes}"
+
+  sets-state:
+    - key: ubo.allegation-exists
+      value: true
+
+  unlocks:
+    - ubo.verify
+    - evidence.require
+    - doc-request.create
+
+ubo.verify:
+  kind: macro
+
+  ui:
+    label: "Verify Beneficial Owner"
+    description: "Promote an allegation to identified status"
+    target-label: "Beneficial Owner"
+
+  routing:
+    mode-tags: [kyc]
+    operator-domain: ubo
+
+  target:
+    operates-on: case-ref
+    produces: null
+
+  args:
+    style: keyworded
+    required:
+      case:
+        type: case-ref
+        ui-label: "Case"
+        autofill-from: session.current_case
+      assertion:
+        type: str
+        ui-label: "Ownership Assertion"
+    optional:
+      notes:
+        type: str
+        ui-label: "Notes"
+
+  prereqs:
+    - type: state_exists
+      key: ubo.allegation-exists
+
+  expands-to:
+    - verb: ubo.registry.promote
+      args:
+        registry-id: "${arg.assertion}"
+        notes: "${arg.notes}"
+
+  sets-state: []
+
+  unlocks:
+    - ubo.promote
+
+ubo.promote:
+  kind: macro
+
+  ui:
+    label: "Promote Beneficial Owner"
+    description: "Advance an ownership allegation through provable states"
+    target-label: "Beneficial Owner"
+
+  routing:
+    mode-tags: [kyc]
+    operator-domain: ubo
+
+  target:
+    operates-on: case-ref
+    produces: null
+
+  args:
+    style: keyworded
+    required:
+      case:
+        type: case-ref
+        ui-label: "Case"
+        autofill-from: session.current_case
+      assertion:
+        type: str
+        ui-label: "Ownership Assertion"
+      target_status:
+        type: enum
+        ui-label: "Promote To"
+        values:
+          - key: provable
+            label: "Provable"
+            internal: PROVABLE
+          - key: proved
+            label: "Proved"
+            internal: PROVED
+    optional:
+      notes:
+        type: str
+        ui-label: "Notes"
+
+  prereqs:
+    - type: state_exists
+      key: ubo.allegation-exists
+
+  expands-to:
+    - verb: ubo.registry.advance
+      args:
+        registry-id: "${arg.assertion}"
+        new-status: "${arg.target_status.internal}"
+        notes: "${arg.notes}"
+
+  sets-state:
+    - key: ubo.determination-run
+      value: true
+
+  unlocks:
+    - ubo.approve
+    - ubo.reject
+
+ubo.approve:
+  kind: macro
+
+  ui:
+    label: "Approve Beneficial Owner"
+    description: "Approve a beneficial ownership determination"
+    target-label: "Beneficial Owner"
+
+  routing:
+    mode-tags: [kyc]
+    operator-domain: ubo
+
+  target:
+    operates-on: case-ref
+    produces: null
+
+  args:
+    style: keyworded
+    required:
+      case:
+        type: case-ref
+        ui-label: "Case"
+        autofill-from: session.current_case
+      assertion:
+        type: str
+        ui-label: "Ownership Assertion"
+    optional:
+      notes:
+        type: str
+        ui-label: "Notes"
+
+  prereqs:
+    - type: state_exists
+      key: ubo.determination-run
+
+  expands-to:
+    - verb: ubo.registry.advance
+      args:
+        registry-id: "${arg.assertion}"
+        new-status: "APPROVED"
+        notes: "${arg.notes}"
+
+  sets-state:
+    - key: ubo.approved
+      value: true
+
+  unlocks: []
+
+ubo.reject:
+  kind: macro
+
+  ui:
+    label: "Reject Beneficial Owner"
+    description: "Reject a beneficial ownership allegation"
+    target-label: "Beneficial Owner"
+
+  routing:
+    mode-tags: [kyc]
+    operator-domain: ubo
+
+  target:
+    operates-on: case-ref
+    produces: null
+
+  args:
+    style: keyworded
+    required:
+      case:
+        type: case-ref
+        ui-label: "Case"
+        autofill-from: session.current_case
+      assertion:
+        type: str
+        ui-label: "Ownership Assertion"
+      reason:
+        type: enum
+        ui-label: "Reason"
+        values:
+          - key: insufficient_evidence
+            label: "Insufficient Evidence"
+            internal: INSUFFICIENT_EVIDENCE
+          - key: contradicted
+            label: "Contradicted"
+            internal: CONTRADICTED
+          - key: threshold_not_met
+            label: "Threshold Not Met"
+            internal: THRESHOLD_NOT_MET
+          - key: sanctions_hit
+            label: "Sanctions Hit"
+            internal: SANCTIONS_HIT
+          - key: other
+            label: "Other"
+            internal: OTHER
+    optional:
+      notes:
+        type: str
+        ui-label: "Notes"
+
+  prereqs:
+    - type: state_exists
+      key: ubo.allegation-exists
+
+  expands-to:
+    - verb: ubo.registry.reject
+      args:
+        registry-id: "${arg.assertion}"
+        reason: "${arg.reason.internal}"
+
+  sets-state: []
+
+  unlocks: []
+
+ubo.expire:
+  kind: macro
+
+  ui:
+    label: "Expire Beneficial Owner"
+    description: "Expire a beneficial ownership allegation"
+    target-label: "Beneficial Owner"
+
+  routing:
+    mode-tags: [kyc]
+    operator-domain: ubo
+
+  target:
+    operates-on: case-ref
+    produces: null
+
+  args:
+    style: keyworded
+    required:
+      assertion:
+        type: str
+        ui-label: "Ownership Assertion"
+    optional:
+      reason:
+        type: str
+        ui-label: "Reason"
+
+  prereqs:
+    - type: state_exists
+      key: ubo.allegation-exists
+
+  expands-to:
+    - verb: ubo.registry.expire
+      args:
+        registry-id: "${arg.assertion}"
+        reason: "${arg.reason}"
+
+  sets-state: []
+
+  unlocks: []
+
+ubo.trace-chains:
+  kind: macro
+
+  ui:
+    label: "Trace Ownership Chains"
+    description: "Show computed ownership chain snapshots for a structure"
+    target-label: "Ownership"
+
+  routing:
+    mode-tags: [kyc]
+    operator-domain: ubo
+
+  target:
+    operates-on: structure-ref
+    produces: null
+
+  args:
+    style: keyworded
+    required:
+      structure:
+        type: structure-ref
+        ui-label: "Structure"
+        autofill-from: session.current_structure
+    optional: {}
+
+  prereqs:
+    - type: state_exists
+      key: ubo.chain-built
+
+  expands-to:
+    - verb: ownership.snapshot.list
+      args:
+        issuer-entity-id: "${arg.structure}"
+
+  sets-state: []
+
+  unlocks: []

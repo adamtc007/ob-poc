@@ -1,0 +1,143 @@
+# Tollgate Macros — KYC approval gate evaluation
+#
+# INVARIANT: UI labels say "Approval Gate", never "tollgate_evaluations"
+
+tollgate.evaluate:
+  kind: macro
+
+  ui:
+    label: "Evaluate Approval Gate"
+    description: "Run tollgate evaluation for the current case"
+    target-label: "Approval Gate"
+
+  routing:
+    mode-tags: [kyc]
+    operator-domain: tollgate
+
+  target:
+    operates-on: case-ref
+    produces: null
+
+  args:
+    style: keyworded
+    required:
+      case:
+        type: case-ref
+        ui-label: "Case"
+        autofill-from: session.current_case
+      evaluation_type:
+        type: enum
+        ui-label: "Evaluation Type"
+        values:
+          - key: discovery_complete
+            label: "Discovery Complete"
+            internal: DISCOVERY_COMPLETE
+          - key: evidence_complete
+            label: "Evidence Complete"
+            internal: EVIDENCE_COMPLETE
+          - key: verification_complete
+            label: "Verification Complete"
+            internal: VERIFICATION_COMPLETE
+          - key: decision_ready
+            label: "Decision Ready"
+            internal: DECISION_READY
+          - key: periodic_review
+            label: "Periodic Review"
+            internal: PERIODIC_REVIEW
+    optional:
+      evaluated_by:
+        type: str
+        ui-label: "Evaluated By"
+
+  prereqs:
+    - type: state_exists
+      key: case.exists
+
+  expands-to:
+    - verb: tollgate.evaluate
+      args:
+        case-id: "${arg.case}"
+        evaluation-type: "${arg.evaluation_type.internal}"
+        evaluated-by: "${arg.evaluated_by}"
+
+  sets-state:
+    - key: tollgate.evaluated
+      value: true
+
+  unlocks:
+    - case.submit
+    - tollgate.override
+
+tollgate.override:
+  kind: macro
+
+  ui:
+    label: "Override Approval Gate"
+    description: "Record a management override for a tollgate decision"
+    target-label: "Approval Gate"
+
+  routing:
+    mode-tags: [kyc]
+    operator-domain: tollgate
+
+  target:
+    operates-on: case-ref
+    produces: null
+
+  args:
+    style: keyworded
+    required:
+      case:
+        type: case-ref
+        ui-label: "Case"
+        autofill-from: session.current_case
+      evaluation_id:
+        type: str
+        ui-label: "Evaluation"
+      justification:
+        type: str
+        ui-label: "Override Justification"
+      approved_by:
+        type: str
+        ui-label: "Approved By"
+    optional:
+      approval_authority:
+        type: enum
+        ui-label: "Approval Authority"
+        values:
+          - key: senior_analyst
+            label: "Senior Analyst"
+            internal: SENIOR_ANALYST
+          - key: compliance_officer
+            label: "Compliance Officer"
+            internal: COMPLIANCE_OFFICER
+          - key: mlro
+            label: "MLRO"
+            internal: MLRO
+          - key: executive
+            label: "Executive"
+            internal: EXECUTIVE
+        default-key: compliance_officer
+      conditions:
+        type: str
+        ui-label: "Conditions"
+
+  prereqs:
+    - type: state_exists
+      key: tollgate.evaluated
+
+  expands-to:
+    - verb: tollgate.override
+      args:
+        evaluation-id: "${arg.evaluation_id}"
+        override-reason: "${arg.justification}"
+        approved-by: "${arg.approved_by}"
+        approval-authority: "${arg.approval_authority.internal}"
+        conditions: "${arg.conditions}"
+
+  sets-state:
+    - key: tollgate.passed
+      value: true
+
+  unlocks:
+    - case.submit

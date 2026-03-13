@@ -1,0 +1,271 @@
+# Evidence Macros — Document/attestation evidence lifecycle for KYC verification
+#
+# INVARIANT: UI labels say "Evidence", never "kyc_ubo_evidence"
+
+evidence.require:
+  kind: macro
+
+  ui:
+    label: "Require Evidence"
+    description: "Create an evidence requirement for an ownership allegation"
+    target-label: "Evidence"
+
+  routing:
+    mode-tags: [kyc]
+    operator-domain: evidence
+
+  target:
+    operates-on: workstream-ref
+    produces: null
+
+  args:
+    style: keyworded
+    required:
+      assertion:
+        type: str
+        ui-label: "Ownership Assertion"
+      evidence_type:
+        type: enum
+        ui-label: "Evidence Type"
+        values:
+          - key: ownership_certificate
+            label: "Ownership Certificate"
+            internal: OWNERSHIP_CERTIFICATE
+          - key: share_register
+            label: "Share Register"
+            internal: SHARE_REGISTER
+          - key: board_resolution
+            label: "Board Resolution"
+            internal: BOARD_RESOLUTION
+          - key: trust_deed
+            label: "Trust Deed"
+            internal: TRUST_DEED
+          - key: partnership_agreement
+            label: "Partnership Agreement"
+            internal: PARTNERSHIP_AGREEMENT
+          - key: articles_of_association
+            label: "Articles of Association"
+            internal: ARTICLES_OF_ASSOCIATION
+          - key: identity_document
+            label: "Identity Document"
+            internal: IDENTITY_DOCUMENT
+          - key: proof_of_address
+            label: "Proof of Address"
+            internal: PROOF_OF_ADDRESS
+          - key: source_of_wealth
+            label: "Source of Wealth"
+            internal: SOURCE_OF_WEALTH
+          - key: source_of_funds
+            label: "Source of Funds"
+            internal: SOURCE_OF_FUNDS
+          - key: regulatory_filing
+            label: "Regulatory Filing"
+            internal: REGULATORY_FILING
+          - key: annual_return
+            label: "Annual Return"
+            internal: ANNUAL_RETURN
+          - key: other
+            label: "Other"
+            internal: OTHER
+    optional:
+      description:
+        type: str
+        ui-label: "Description"
+      doc_type:
+        type: str
+        ui-label: "Document Type"
+
+  prereqs:
+    - type: state_exists
+      key: ubo.allegation-exists
+
+  expands-to:
+    - verb: evidence.create-requirement
+      args:
+        registry-id: "${arg.assertion}"
+        evidence-type: "${arg.evidence_type.internal}"
+        description: "${arg.description}"
+        doc-type: "${arg.doc_type}"
+
+  sets-state:
+    - key: evidence.exists
+      value: true
+
+  unlocks:
+    - evidence.link
+    - doc-request.create
+
+evidence.link:
+  kind: macro
+
+  ui:
+    label: "Link Evidence"
+    description: "Attach a document to an evidence requirement"
+    target-label: "Evidence"
+
+  routing:
+    mode-tags: [kyc]
+    operator-domain: evidence
+
+  target:
+    operates-on: workstream-ref
+    produces: null
+
+  args:
+    style: keyworded
+    required:
+      evidence_id:
+        type: str
+        ui-label: "Evidence Requirement"
+      document_ref:
+        type: str
+        ui-label: "Document Reference"
+    optional: {}
+
+  prereqs:
+    - type: state_exists
+      key: evidence.exists
+
+  expands-to:
+    - verb: evidence.attach-document
+      args:
+        evidence-id: "${arg.evidence_id}"
+        document-id: "${arg.document_ref}"
+
+  sets-state: []
+
+  unlocks:
+    - evidence.verify
+    - evidence.reject
+
+evidence.verify:
+  kind: macro
+
+  ui:
+    label: "Verify Evidence"
+    description: "Approve an evidence item"
+    target-label: "Evidence"
+
+  routing:
+    mode-tags: [kyc]
+    operator-domain: evidence
+
+  target:
+    operates-on: workstream-ref
+    produces: null
+
+  args:
+    style: keyworded
+    required:
+      evidence_id:
+        type: str
+        ui-label: "Evidence Item"
+      verified_by:
+        type: str
+        ui-label: "Verified By"
+    optional:
+      notes:
+        type: str
+        ui-label: "Notes"
+
+  prereqs:
+    - type: state_exists
+      key: evidence.exists
+
+  expands-to:
+    - verb: evidence.mark-verified
+      args:
+        evidence-id: "${arg.evidence_id}"
+        verified-by: "${arg.verified_by}"
+        notes: "${arg.notes}"
+
+  sets-state: []
+
+  unlocks: []
+
+evidence.reject:
+  kind: macro
+
+  ui:
+    label: "Reject Evidence"
+    description: "Reject an evidence item"
+    target-label: "Evidence"
+
+  routing:
+    mode-tags: [kyc]
+    operator-domain: evidence
+
+  target:
+    operates-on: workstream-ref
+    produces: null
+
+  args:
+    style: keyworded
+    required:
+      evidence_id:
+        type: str
+        ui-label: "Evidence Item"
+      reason:
+        type: str
+        ui-label: "Reason"
+    optional: {}
+
+  prereqs:
+    - type: state_exists
+      key: evidence.exists
+
+  expands-to:
+    - verb: evidence.mark-rejected
+      args:
+        evidence-id: "${arg.evidence_id}"
+        reason: "${arg.reason}"
+
+  sets-state: []
+
+  unlocks:
+    - evidence.require
+
+evidence.waive:
+  kind: macro
+
+  ui:
+    label: "Waive Evidence"
+    description: "Waive an evidence requirement"
+    target-label: "Evidence"
+
+  routing:
+    mode-tags: [kyc]
+    operator-domain: evidence
+
+  target:
+    operates-on: workstream-ref
+    produces: null
+
+  args:
+    style: keyworded
+    required:
+      evidence_id:
+        type: str
+        ui-label: "Evidence Item"
+      justification:
+        type: str
+        ui-label: "Waiver Justification"
+      approved_by:
+        type: str
+        ui-label: "Approved By"
+    optional: {}
+
+  prereqs:
+    - type: state_exists
+      key: evidence.exists
+
+  expands-to:
+    - verb: evidence.mark-waived
+      args:
+        evidence-id: "${arg.evidence_id}"
+        reason: "${arg.justification}"
+        authority: "${arg.approved_by}"
+
+  sets-state: []
+
+  unlocks: []

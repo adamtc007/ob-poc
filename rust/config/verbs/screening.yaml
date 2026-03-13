@@ -315,6 +315,45 @@ domains:
         returns:
           type: affected
 
+      bulk-refresh:
+        description: Refresh screening coverage for all workstreams in a case.
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: screening
+          tags: [kyc]
+          phase_tags: [kyc]
+          side_effects: state_write
+        invocation_phrases:
+          - "bulk refresh screenings"
+          - "rerun case screenings"
+          - "refresh screening coverage for case"
+          - "refresh sanctions pep and media checks"
+        behavior: plugin
+        plugin:
+          handler: ScreeningBulkRefreshOp
+        args:
+          - name: case-id
+            type: uuid
+            required: true
+            lookup:
+              table: cases
+              entity_type: kyc_case
+              schema: kyc
+              search_key: case_id
+              primary_key: case_id
+          - name: screening-type
+            type: string
+            required: false
+            valid_values:
+              - SANCTIONS
+              - PEP
+              - ADVERSE_MEDIA
+              - CONSOLIDATED
+        returns:
+          type: affected
+
       list-by-workstream:
         description: List screenings for a workstream.
         metadata:

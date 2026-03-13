@@ -379,6 +379,76 @@ case.reject:
 
   unlocks: []
 
+case.request-info:
+  kind: macro
+
+  ui:
+    label: "Request More Information"
+    description: "Request additional information before case decision"
+    target-label: "Case"
+
+  routing:
+    mode-tags: [kyc]
+    operator-domain: case
+
+  target:
+    operates-on: case-ref
+    produces: null
+
+  args:
+    style: keyworded
+    required:
+      case:
+        type: case-ref
+        ui-label: "Case"
+        autofill-from: session.current_case
+      request_type:
+        type: enum
+        ui-label: "Request Type"
+        values:
+          - key: additional_docs
+            label: "Additional Documents"
+            internal: additional-documents
+          - key: clarification
+            label: "Clarification"
+            internal: clarification
+          - key: updated_info
+            label: "Updated Information"
+            internal: updated-information
+          - key: missing_evidence
+            label: "Missing Evidence"
+            internal: missing-evidence
+    optional:
+      notes:
+        type: str
+        ui-label: "Request Details"
+      due_date:
+        type: date
+        ui-label: "Due Date"
+
+  prereqs:
+    - type: state_exists
+      key: case.submitted
+
+  expands-to:
+    - verb: kyc-case.update-status
+      args:
+        case_id: "${arg.case}"
+        status: "INFO_REQUESTED"
+        request_type: "${arg.request_type.internal}"
+        notes: "${arg.notes}"
+        due_date: "${arg.due_date}"
+
+  sets-state:
+    - key: case.info-requested
+      value: true
+
+  unlocks:
+    - case.add-party
+    - case.solicit-document
+    - evidence.require
+    - doc-request.create
+
 case.list:
   kind: macro
 

@@ -1090,7 +1090,13 @@ domains:
         writes: [cases]
       entity-workstream.create:
         reads: [cases, entities]
-        writes: [entity_workstreams]
+        writes: [entity_workstreams, case_events]
+      entity-workstream.update-status:
+        reads: [entity_workstreams]
+        writes: [entity_workstreams, case_events]
+      entity-workstream.complete:
+        reads: [entity_workstreams]
+        writes: [entity_workstreams, case_events]
       kyc-case.update-status:
         reads: [cases]
         writes: [cases]
@@ -1113,6 +1119,89 @@ domains:
       kyc-case.reopen:
         reads: [cases]
         writes: [cases]
+      ubo.registry.create:
+        reads: [cases, entities]
+        writes: [kyc_ubo_registry, ubo_assertion_log, case_events]
+      ubo.registry.promote:
+        reads: [kyc_ubo_registry]
+        writes: [kyc_ubo_registry, ubo_assertion_log, case_events]
+      ubo.registry.advance:
+        reads: [kyc_ubo_registry, kyc_ubo_evidence]
+        writes: [kyc_ubo_registry, ubo_assertion_log, case_events]
+      ubo.registry.reject:
+        reads: [kyc_ubo_registry]
+        writes: [kyc_ubo_registry, ubo_assertion_log, case_events]
+      ubo.registry.expire:
+        reads: [kyc_ubo_registry]
+        writes: [kyc_ubo_registry, ubo_assertion_log]
+      evidence.create-requirement:
+        reads: [kyc_ubo_registry]
+        writes: [kyc_ubo_evidence, case_events]
+      evidence.attach-document:
+        reads: [kyc_ubo_evidence, document_catalog]
+        writes: [kyc_ubo_evidence, case_events]
+      evidence.mark-verified:
+        reads: [kyc_ubo_evidence]
+        writes: [kyc_ubo_evidence, case_events]
+      evidence.mark-rejected:
+        reads: [kyc_ubo_evidence]
+        writes: [kyc_ubo_evidence, case_events]
+      evidence.mark-waived:
+        reads: [kyc_ubo_evidence]
+        writes: [kyc_ubo_evidence, case_events]
+      document.create-request:
+        reads: [entity_workstreams]
+        writes: [doc_requests, case_events]
+      document.mark-requested:
+        reads: [doc_requests]
+        writes: [doc_requests, outreach_requests, case_events]
+      document.receive-request:
+        reads: [doc_requests, document_catalog]
+        writes: [doc_requests, case_events]
+      document.verify-request:
+        reads: [doc_requests]
+        writes: [doc_requests, case_events]
+      document.reject-request:
+        reads: [doc_requests]
+        writes: [doc_requests, case_events]
+      red-flag.raise:
+        reads: [cases, entity_workstreams]
+        writes: [red_flags, case_events]
+      red-flag.close:
+        reads: [red_flags]
+        writes: [red_flags, case_events]
+      red-flag.set-blocking:
+        reads: [red_flags]
+        writes: [red_flags, case_events]
+      screening.review-hit:
+        reads: [screenings]
+        writes: [screenings, case_events]
+      screening.bulk-refresh:
+        reads:
+          [
+            cases,
+            entity_workstreams,
+            entities,
+            screening_lists,
+            screening_requirements,
+          ]
+        writes: [screenings, case_events]
+      tollgate.evaluate:
+        reads:
+          [
+            cases,
+            entity_workstreams,
+            kyc_ubo_registry,
+            kyc_ubo_evidence,
+            screenings,
+            red_flags,
+            doc_requests,
+            case_evaluation_snapshots,
+          ]
+        writes: [tollgate_evaluations, case_evaluation_snapshots, case_events]
+      tollgate.override:
+        reads: [tollgate_evaluations]
+        writes: [tollgate_evaluations, case_events]
 
   # ---------------------------------------------------------------------------
   # UBO & OWNERSHIP — Beneficial Ownership & Control
@@ -1219,6 +1308,8 @@ domains:
       ownership.compute:
         reads: [entities, entity_relationships, kyc.ownership_snapshots]
         writes: [kyc.ownership_snapshots]
+      ownership.snapshot.list:
+        reads: [kyc.ownership_snapshots]
       ownership.refresh:
         reads:
           [
@@ -1759,14 +1850,8 @@ domains:
         pii: false
     verb_data_footprint:
       screening.run:
-        reads:
-          [
-            entities,
-            entity_proper_persons,
-            screening_lists,
-            screening_requirements,
-          ]
-        writes: [kyc.screenings]
+        reads: [entity_workstreams, screening_lists, screening_requirements]
+        writes: [screenings, case_events]
       screening.adverse-media:
         reads: [entities, screening_results]
         writes: [screening_results, screening_hits]

@@ -1,0 +1,217 @@
+# Red Flag Macros — Risk indicator lifecycle
+#
+# INVARIANT: UI labels say "Risk Flag", never "red_flags"
+
+red-flag.raise:
+  kind: macro
+
+  ui:
+    label: "Raise Risk Flag"
+    description: "Create a new KYC risk flag"
+    target-label: "Risk Flag"
+
+  routing:
+    mode-tags: [kyc]
+    operator-domain: red-flag
+
+  target:
+    operates-on: case-ref
+    produces: null
+
+  args:
+    style: keyworded
+    required:
+      case:
+        type: case-ref
+        ui-label: "Case"
+        autofill-from: session.current_case
+      flag_type:
+        type: enum
+        ui-label: "Risk Type"
+        values:
+          - key: sanctions_hit
+            label: "Sanctions Hit"
+            internal: SANCTIONS_MATCH
+          - key: pep_match
+            label: "PEP Match"
+            internal: PEP_IDENTIFIED
+          - key: adverse_media
+            label: "Adverse Media"
+            internal: ADVERSE_MEDIA
+          - key: ownership_opacity
+            label: "Ownership Opacity"
+            internal: OPAQUE_STRUCTURE
+          - key: inconsistent_documents
+            label: "Inconsistent Documents"
+            internal: INCONSISTENT_INFO
+          - key: high_risk_jurisdiction
+            label: "High Risk Jurisdiction"
+            internal: HIGH_RISK_JURISDICTION
+          - key: unusual_structure
+            label: "Unusual Structure"
+            internal: COMPLEX_STRUCTURE
+          - key: other
+            label: "Other"
+            internal: OTHER
+      severity:
+        type: enum
+        ui-label: "Severity"
+        values:
+          - key: low
+            label: "Low"
+            internal: SOFT
+          - key: medium
+            label: "Medium"
+            internal: ESCALATE
+          - key: high
+            label: "High"
+            internal: HARD_STOP
+          - key: critical
+            label: "Critical"
+            internal: HARD_STOP
+      description:
+        type: str
+        ui-label: "Description"
+    optional:
+      workstream:
+        type: workstream-ref
+        ui-label: "Workstream"
+        autofill-from: session.current_workstream
+      source:
+        type: enum
+        ui-label: "Source"
+        values:
+          - key: screening
+            label: "Screening"
+            internal: SCREENING
+          - key: document_review
+            label: "Document Review"
+            internal: DOCUMENT_REVIEW
+          - key: analyst
+            label: "Analyst"
+            internal: ANALYST
+          - key: system
+            label: "System"
+            internal: SYSTEM
+          - key: rule_engine
+            label: "Rule Engine"
+            internal: RULE_ENGINE
+          - key: external
+            label: "External"
+            internal: EXTERNAL
+        default-key: analyst
+
+  prereqs:
+    - type: state_exists
+      key: case.exists
+
+  expands-to:
+    - verb: red-flag.raise
+      args:
+        case-id: "${arg.case}"
+        workstream-id: "${arg.workstream}"
+        flag-type: "${arg.flag_type.internal}"
+        severity: "${arg.severity.internal}"
+        description: "${arg.description}"
+        source: "${arg.source.internal}"
+
+  sets-state: []
+
+  unlocks:
+    - red-flag.resolve
+    - red-flag.escalate
+
+red-flag.resolve:
+  kind: macro
+
+  ui:
+    label: "Resolve Risk Flag"
+    description: "Close a risk flag with a documented resolution"
+    target-label: "Risk Flag"
+
+  routing:
+    mode-tags: [kyc]
+    operator-domain: red-flag
+
+  target:
+    operates-on: case-ref
+    produces: null
+
+  args:
+    style: keyworded
+    required:
+      flag_id:
+        type: str
+        ui-label: "Risk Flag"
+      resolution:
+        type: enum
+        ui-label: "Resolution"
+        values:
+          - key: false_positive
+            label: "False Positive"
+            internal: FALSE_POSITIVE
+          - key: mitigated
+            label: "Mitigated"
+            internal: MITIGATED
+          - key: accepted_with_conditions
+            label: "Accepted With Conditions"
+            internal: ACCEPTED_WITH_CONDITIONS
+          - key: other
+            label: "Other"
+            internal: OTHER
+    optional:
+      notes:
+        type: str
+        ui-label: "Notes"
+
+  prereqs:
+    - type: state_exists
+      key: case.exists
+
+  expands-to:
+    - verb: red-flag.close
+      args:
+        red-flag-id: "${arg.flag_id}"
+        resolution: "${arg.resolution.internal}"
+        notes: "${arg.notes}"
+
+  sets-state: []
+
+  unlocks: []
+
+red-flag.escalate:
+  kind: macro
+
+  ui:
+    label: "Escalate Risk Flag"
+    description: "Escalate a risk flag to blocking status"
+    target-label: "Risk Flag"
+
+  routing:
+    mode-tags: [kyc]
+    operator-domain: red-flag
+
+  target:
+    operates-on: case-ref
+    produces: null
+
+  args:
+    style: keyworded
+    required:
+      flag_id:
+        type: str
+        ui-label: "Risk Flag"
+    optional: {}
+
+  prereqs:
+    - type: state_exists
+      key: case.exists
+
+  expands-to:
+    - verb: red-flag.set-blocking
+      args:
+        red-flag-id: "${arg.flag_id}"
+
+  sets-state: []
+
+  unlocks: []

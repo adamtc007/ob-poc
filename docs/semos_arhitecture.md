@@ -127,6 +127,30 @@ Validation outcome for the pack:
 - Total SemOS footprints: `252`
 - Tier A missing: `0`
 
+### KYC/UBO Constellation Enablement and Blocker Fixes (2026-03-13)
+
+The March 13 KYC/UBO follow-on work extended the same macro/footprint discipline into the ownership and case-review surface:
+
+- 29 new macro flows were added across `kyc-workstream`, `ubo`, `evidence`, `doc-request`, `screening-ops`, `red-flag`, and `tollgate`
+- `case.request-info` was backfilled onto the live case macro surface
+- missing primitive verb contracts and SemOS footprints were added only where the live registry still had gaps
+- the evidence lifecycle was corrected to avoid macro-to-primitive name collisions by renaming the primitive verbs to action-encoded names:
+  - `evidence.create-requirement`
+  - `evidence.attach-document`
+  - `evidence.mark-verified`
+  - `evidence.mark-rejected`
+  - `evidence.mark-waived`
+- `ubo.discover` now passes through `threshold` and `max-depth` to `ownership.compute`
+- generic `OTHER` enum fallbacks were restored for document-request and risk-flag catch-all values
+
+Validation outcome after enablement plus blocker fixes:
+
+- Registry verbs: `1068`
+- Broken macro refs: `0`
+- Orphan footprints: `0`
+- Total SemOS footprints: `281`
+- Tier A missing: `0`
+
 ### Document Governance Bootstrap (2026-03-12)
 
 Semantic OS now governs the first document-policy control-plane objects needed for document polymorphism:

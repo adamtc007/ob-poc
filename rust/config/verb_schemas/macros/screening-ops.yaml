@@ -1,0 +1,180 @@
+# Screening Ops Macros — Operator-facing wrappers for sanctions/PEP/adverse-media screening
+#
+# INVARIANT: UI labels say "Screening", never "case-screening" or "screening_hits"
+
+screening-ops.run:
+  kind: macro
+
+  ui:
+    label: "Run Screening"
+    description: "Run workstream screening for the current workstream"
+    target-label: "Screening"
+
+  routing:
+    mode-tags: [kyc]
+    operator-domain: screening
+
+  target:
+    operates-on: workstream-ref
+    produces: null
+
+  args:
+    style: keyworded
+    required:
+      workstream:
+        type: workstream-ref
+        ui-label: "Workstream"
+        autofill-from: session.current_workstream
+      screening_type:
+        type: enum
+        ui-label: "Screening Type"
+        values:
+          - key: sanctions
+            label: "Sanctions"
+            internal: SANCTIONS
+          - key: pep
+            label: "PEP"
+            internal: PEP
+          - key: adverse_media
+            label: "Adverse Media"
+            internal: ADVERSE_MEDIA
+          - key: consolidated
+            label: "Full Screening"
+            internal: CONSOLIDATED
+    optional:
+      provider:
+        type: str
+        ui-label: "Provider"
+
+  prereqs:
+    - type: state_exists
+      key: workstream.exists
+
+  expands-to:
+    - verb: screening.run
+      args:
+        workstream-id: "${arg.workstream}"
+        screening-type: "${arg.screening_type.internal}"
+        provider: "${arg.provider}"
+
+  sets-state:
+    - key: screening.completed
+      value: true
+
+  unlocks:
+    - screening-ops.review-hit
+
+screening-ops.review-hit:
+  kind: macro
+
+  ui:
+    label: "Review Screening Hit"
+    description: "Review and adjudicate a screening hit"
+    target-label: "Screening"
+
+  routing:
+    mode-tags: [kyc]
+    operator-domain: screening
+
+  target:
+    operates-on: workstream-ref
+    produces: null
+
+  args:
+    style: keyworded
+    required:
+      screening_id:
+        type: str
+        ui-label: "Screening"
+      determination:
+        type: enum
+        ui-label: "Determination"
+        values:
+          - key: true_match
+            label: "True Match"
+            internal: HIT_CONFIRMED
+          - key: false_positive
+            label: "False Positive"
+            internal: HIT_DISMISSED
+          - key: requires_escalation
+            label: "Requires Escalation"
+            internal: HIT_CONFIRMED
+    optional:
+      notes:
+        type: str
+        ui-label: "Notes"
+      red_flag_id:
+        type: str
+        ui-label: "Risk Flag"
+
+  prereqs:
+    - type: state_exists
+      key: screening.completed
+
+  expands-to:
+    - verb: screening.review-hit
+      args:
+        screening-id: "${arg.screening_id}"
+        status: "${arg.determination.internal}"
+        notes: "${arg.notes}"
+        red-flag-id: "${arg.red_flag_id}"
+
+  sets-state: []
+
+  unlocks:
+    - red-flag.raise
+
+screening-ops.bulk-refresh:
+  kind: macro
+
+  ui:
+    label: "Bulk Refresh Screening"
+    description: "Refresh workstream screenings for the case"
+    target-label: "Screening"
+
+  routing:
+    mode-tags: [kyc]
+    operator-domain: screening
+
+  target:
+    operates-on: case-ref
+    produces: null
+
+  args:
+    style: keyworded
+    required:
+      case:
+        type: case-ref
+        ui-label: "Case"
+        autofill-from: session.current_case
+    optional:
+      screening_type:
+        type: enum
+        ui-label: "Screening Type"
+        values:
+          - key: sanctions
+            label: "Sanctions"
+            internal: SANCTIONS
+          - key: pep
+            label: "PEP"
+            internal: PEP
+          - key: adverse_media
+            label: "Adverse Media"
+            internal: ADVERSE_MEDIA
+          - key: consolidated
+            label: "Full Screening"
+            internal: CONSOLIDATED
+
+  prereqs:
+    - type: state_exists
+      key: case.exists
+
+  expands-to:
+    - verb: screening.bulk-refresh
+      args:
+        case-id: "${arg.case}"
+        screening-type: "${arg.screening_type.internal}"
+
+  sets-state: []
+
+  unlocks: []

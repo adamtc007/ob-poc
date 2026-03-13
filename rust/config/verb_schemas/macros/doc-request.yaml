@@ -1,0 +1,268 @@
+# Document Request Macros — Soliciting and verifying KYC documents
+#
+# INVARIANT: UI labels say "Document Request", never "doc_requests"
+
+doc-request.create:
+  kind: macro
+
+  ui:
+    label: "Create Document Request"
+    description: "Create a document request for a KYC workstream"
+    target-label: "Document Request"
+
+  routing:
+    mode-tags: [kyc]
+    operator-domain: doc-request
+
+  target:
+    operates-on: workstream-ref
+    produces: null
+
+  args:
+    style: keyworded
+    required:
+      workstream:
+        type: workstream-ref
+        ui-label: "Workstream"
+        autofill-from: session.current_workstream
+      document_type:
+        type: enum
+        ui-label: "Document Type"
+        values:
+          - key: passport
+            label: "Passport"
+            internal: PASSPORT
+          - key: id_card
+            label: "ID Card"
+            internal: NATIONAL_ID
+          - key: proof_of_address
+            label: "Proof of Address"
+            internal: PROOF_OF_ADDRESS
+          - key: certificate_incorporation
+            label: "Certificate of Incorporation"
+            internal: CERT_OF_INCORPORATION
+          - key: register_extract
+            label: "Register Extract"
+            internal: REGISTER_OF_SHAREHOLDERS
+          - key: financial_statements
+            label: "Financial Statements"
+            internal: FINANCIAL_STATEMENTS
+          - key: source_of_wealth
+            label: "Source of Wealth"
+            internal: SOURCE_OF_WEALTH
+          - key: share_register
+            label: "Share Register"
+            internal: SHARE_REGISTER
+          - key: board_minutes
+            label: "Board Minutes"
+            internal: BOARD_RESOLUTION
+          - key: articles_of_association
+            label: "Articles of Association"
+            internal: MEMORANDUM_ARTICLES
+          - key: shareholders_agreement
+            label: "Shareholders Agreement"
+            internal: SHAREHOLDERS_AGREEMENT
+          - key: other
+            label: "Other"
+            internal: OTHER
+    optional:
+      due_date:
+        type: date
+        ui-label: "Due Date"
+      priority:
+        type: enum
+        ui-label: "Priority"
+        values:
+          - key: normal
+            label: "Normal"
+            internal: NORMAL
+          - key: high
+            label: "High"
+            internal: HIGH
+          - key: urgent
+            label: "Urgent"
+            internal: URGENT
+        default-key: normal
+
+  prereqs:
+    - type: state_exists
+      key: workstream.exists
+
+  expands-to:
+    - verb: document.create-request
+      args:
+        workstream-id: "${arg.workstream}"
+        doc-type: "${arg.document_type.internal}"
+        due-date: "${arg.due_date}"
+        priority: "${arg.priority.internal}"
+
+  sets-state:
+    - key: docs.requested
+      value: true
+
+  unlocks:
+    - doc-request.send
+
+doc-request.send:
+  kind: macro
+
+  ui:
+    label: "Send Document Request"
+    description: "Mark a document request as formally sent"
+    target-label: "Document Request"
+
+  routing:
+    mode-tags: [kyc]
+    operator-domain: doc-request
+
+  target:
+    operates-on: workstream-ref
+    produces: null
+
+  args:
+    style: keyworded
+    required:
+      request_id:
+        type: str
+        ui-label: "Document Request"
+    optional: {}
+
+  prereqs:
+    - type: state_exists
+      key: docs.requested
+
+  expands-to:
+    - verb: document.mark-requested
+      args:
+        request-id: "${arg.request_id}"
+
+  sets-state: []
+
+  unlocks:
+    - doc-request.respond
+
+doc-request.respond:
+  kind: macro
+
+  ui:
+    label: "Record Document Response"
+    description: "Record that a document response was received"
+    target-label: "Document Request"
+
+  routing:
+    mode-tags: [kyc]
+    operator-domain: doc-request
+
+  target:
+    operates-on: workstream-ref
+    produces: null
+
+  args:
+    style: keyworded
+    required:
+      request_id:
+        type: str
+        ui-label: "Document Request"
+      document_ref:
+        type: str
+        ui-label: "Document Reference"
+    optional: {}
+
+  prereqs:
+    - type: state_exists
+      key: docs.requested
+
+  expands-to:
+    - verb: document.receive-request
+      args:
+        request-id: "${arg.request_id}"
+        document-id: "${arg.document_ref}"
+
+  sets-state: []
+
+  unlocks:
+    - doc-request.verify
+    - doc-request.reject
+
+doc-request.verify:
+  kind: macro
+
+  ui:
+    label: "Verify Document Request"
+    description: "Verify a received document request"
+    target-label: "Document Request"
+
+  routing:
+    mode-tags: [kyc]
+    operator-domain: doc-request
+
+  target:
+    operates-on: workstream-ref
+    produces: null
+
+  args:
+    style: keyworded
+    required:
+      request_id:
+        type: str
+        ui-label: "Document Request"
+    optional:
+      notes:
+        type: str
+        ui-label: "Notes"
+
+  prereqs:
+    - type: state_exists
+      key: docs.requested
+
+  expands-to:
+    - verb: document.verify-request
+      args:
+        request-id: "${arg.request_id}"
+        notes: "${arg.notes}"
+
+  sets-state: []
+
+  unlocks: []
+
+doc-request.reject:
+  kind: macro
+
+  ui:
+    label: "Reject Document Request"
+    description: "Reject a submitted document request"
+    target-label: "Document Request"
+
+  routing:
+    mode-tags: [kyc]
+    operator-domain: doc-request
+
+  target:
+    operates-on: workstream-ref
+    produces: null
+
+  args:
+    style: keyworded
+    required:
+      request_id:
+        type: str
+        ui-label: "Document Request"
+      reason:
+        type: str
+        ui-label: "Reason"
+    optional: {}
+
+  prereqs:
+    - type: state_exists
+      key: docs.requested
+
+  expands-to:
+    - verb: document.reject-request
+      args:
+        request-id: "${arg.request_id}"
+        reason: "${arg.reason}"
+
+  sets-state: []
+
+  unlocks:
+    - doc-request.create
