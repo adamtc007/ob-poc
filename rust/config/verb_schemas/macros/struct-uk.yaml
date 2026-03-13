@@ -185,6 +185,22 @@ struct.uk.authorised.oeic:
         entity_id: "@auditor"
         skip_if_empty: true
 
+    # Assign registrar (optional)
+    - verb: entity.ensure-or-placeholder
+      args:
+        ref: "${arg.registrar}"
+        kind: company
+        placeholder_name: "Registrar TBD"
+        skip_if_empty: true
+      as: "@registrar"
+
+    - verb: cbu.assign-role
+      args:
+        cbu_id: "@cbu"
+        role: registrar
+        entity_id: "@registrar"
+        skip_if_empty: true
+
     # Create trading profile
     - verb: trading-profile.create-draft
       args:
@@ -653,13 +669,17 @@ struct.uk.authorised.ltaf:
         - "@cbu"
         - "@trading-profile"
 
+    # Set LTAF-specific attributes on the CBU
+    - verb: cbu.update
+      args:
+        cbu_id: "@cbu"
+        redemption_notice_days: 90
+
     # Apply LTAF-specific document bundle (extends UK authorised)
     - verb: docs-bundle.apply
       args:
         cbu_id: "@cbu"
         bundle_id: docs.bundle.ltaf-baseline
-
-        redemption_notice_days: 90
 
     # Assign valuation agent (important for LTAFs)
     - verb: entity.ensure-or-placeholder

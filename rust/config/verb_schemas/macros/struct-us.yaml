@@ -216,6 +216,22 @@ struct.us.40act.open-end:
         entity_id: "@auditor"
         skip_if_empty: true
 
+    # Assign legal counsel (optional)
+    - verb: entity.ensure-or-placeholder
+      args:
+        ref: "${arg.legal_counsel}"
+        kind: company
+        placeholder_name: "Legal Counsel TBD"
+        skip_if_empty: true
+      as: "@legal"
+
+    - verb: cbu.assign-role
+      args:
+        cbu_id: "@cbu"
+        role: legal-counsel
+        entity_id: "@legal"
+        skip_if_empty: true
+
     # Create trading profile
     - verb: trading-profile.create-draft
       args:
@@ -429,6 +445,22 @@ struct.us.40act.closed-end:
         cbu_id: "@cbu"
         role: auditor
         entity_id: "@auditor"
+        skip_if_empty: true
+
+    # Assign legal counsel (optional)
+    - verb: entity.ensure-or-placeholder
+      args:
+        ref: "${arg.legal_counsel}"
+        kind: company
+        placeholder_name: "Legal Counsel TBD"
+        skip_if_empty: true
+      as: "@legal"
+
+    - verb: cbu.assign-role
+      args:
+        cbu_id: "@cbu"
+        role: legal-counsel
+        entity_id: "@legal"
         skip_if_empty: true
 
     # Create trading profile

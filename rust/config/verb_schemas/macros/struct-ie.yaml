@@ -188,6 +188,22 @@ struct.ie.ucits.icav:
         entity_id: "@secretary"
         skip_if_empty: true
 
+    # Assign legal counsel (optional)
+    - verb: entity.ensure-or-placeholder
+      args:
+        ref: "${arg.legal_counsel}"
+        kind: company
+        placeholder_name: "Legal Counsel TBD"
+        skip_if_empty: true
+      as: "@legal"
+
+    - verb: cbu.assign-role
+      args:
+        cbu_id: "@cbu"
+        role: legal-counsel
+        entity_id: "@legal"
+        skip_if_empty: true
+
     # Create trading profile
     - verb: trading-profile.create-draft
       args:
@@ -398,6 +414,22 @@ struct.ie.aif.icav:
         cbu_id: "@cbu"
         role: prime-broker
         entity_id: "@pb"
+        skip_if_empty: true
+
+    # Assign company secretary (optional)
+    - verb: entity.ensure-or-placeholder
+      args:
+        ref: "${arg.secretary}"
+        kind: company
+        placeholder_name: "Secretary TBD"
+        skip_if_empty: true
+      as: "@secretary"
+
+    - verb: cbu.assign-role
+      args:
+        cbu_id: "@cbu"
+        role: company-secretary
+        entity_id: "@secretary"
         skip_if_empty: true
 
     # Create trading profile

@@ -242,6 +242,9 @@ domains:
       cbu.rename:
         reads: [cbus]
         writes: [cbus]
+      cbu.update:
+        reads: [cbus]
+        writes: [cbus]
       cbu.set-jurisdiction:
         reads: [cbus, master_jurisdictions]
         writes: [cbus]
@@ -457,6 +460,9 @@ domains:
       entity.update:
         reads: [entities]
         writes: [entities]
+      identifier.attach:
+        reads: [entities]
+        writes: [entity_identifiers]
       entity.delete:
         reads: [entities]
         writes: [entities]
@@ -744,6 +750,11 @@ domains:
         governance_tier: governed
         classification: confidential
         pii: false
+      trading_profile_versions:
+        description: "Version history records for trading mandate profiles"
+        governance_tier: operational
+        classification: internal
+        pii: false
       cbu_matrix_product_overlay:
         description: "Per-cell instrument/market/currency config overlay"
         governance_tier: governed
@@ -765,6 +776,8 @@ domains:
         reads: [cbu_trading_profiles]
       trading-profile.get-active:
         reads: [cbu_trading_profiles]
+      trading-profile.list-versions:
+        reads: [cbu_trading_profiles, trading_profile_versions]
       trading-profile.activate:
         reads: [cbu_trading_profiles]
         writes: [cbu_trading_profiles]
@@ -1075,6 +1088,9 @@ domains:
       kyc-case.create:
         reads: [cbus, deals, client_group, entities]
         writes: [cases]
+      entity-workstream.create:
+        reads: [cases, entities]
+        writes: [entity_workstreams]
       kyc-case.update-status:
         reads: [cases]
         writes: [cases]
