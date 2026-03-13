@@ -69,8 +69,9 @@ party.add:
   prereqs: []
 
   expands-to:
-    - verb: entity.create-${arg.party_type.internal}
+    - verb: entity.create
       args:
+        kind: "${arg.party_type.internal}"
         name: "${arg.name}"
         jurisdiction: "${arg.jurisdiction}"
         nationality: "${arg.nationality}"
@@ -258,7 +259,7 @@ party.search:
   prereqs: []
 
   expands-to:
-    - verb: entity.search
+    - verb: entity.query
       args:
         query: "${arg.query}"
         entity_type: "${arg.party_type.internal}"
@@ -294,7 +295,7 @@ party.details:
   prereqs: []
 
   expands-to:
-    - verb: entity.get
+    - verb: entity.read
       args:
         entity_id: "${arg.party}"
 
@@ -468,7 +469,7 @@ party.assign-identifier:
   prereqs: []
 
   expands-to:
-    - verb: identifier.add
+    - verb: identifier.attach
       args:
         entity_id: "${arg.party}"
         identifier_type: "${arg.identifier_type.internal}"
@@ -538,7 +539,8 @@ party.set-address:
   prereqs: []
 
   expands-to:
-    - verb: address.set
+    # TODO: address.set verb does not exist — using entity.update with address field
+    - verb: entity.update
       args:
         entity_id: "${arg.party}"
         address_type: "${arg.address_type.internal}"

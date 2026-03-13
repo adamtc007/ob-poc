@@ -66,7 +66,7 @@ mandate.create:
       key: structure.exists
 
   expands-to:
-    - verb: trading-profile.create
+    - verb: trading-profile.create-draft
       args:
         cbu_id: "${arg.structure}"
         name: "${arg.name}"
@@ -138,7 +138,7 @@ mandate.add-product:
       key: mandate.exists
 
   expands-to:
-    - verb: trading-profile.add-product
+    - verb: trading-profile.add-component
       args:
         trading_profile_id: "${arg.mandate}"
         product_code: "${arg.product.internal}"
@@ -208,7 +208,8 @@ mandate.set-instruments:
       key: mandate.exists
 
   expands-to:
-    - verb: trading-profile.set-instruments
+    # TODO: redesign to loop add-component per instrument class
+    - verb: trading-profile.add-component
       args:
         trading_profile_id: "${arg.mandate}"
         instruments: "${arg.instruments.internal}"
@@ -275,7 +276,8 @@ mandate.set-markets:
       key: mandate.exists
 
   expands-to:
-    - verb: trading-profile.set-markets
+    # TODO: redesign to loop add-component per market
+    - verb: trading-profile.add-component
       args:
         trading_profile_id: "${arg.mandate}"
         markets: "${arg.markets.internal}"
@@ -311,7 +313,7 @@ mandate.list:
   prereqs: []
 
   expands-to:
-    - verb: trading-profile.list
+    - verb: trading-profile.list-versions
       args:
         cbu_id: "${arg.structure}"
 
@@ -389,7 +391,7 @@ mandate.details:
   prereqs: []
 
   expands-to:
-    - verb: trading-profile.get
+    - verb: trading-profile.read
       args:
         trading_profile_id: "${arg.mandate}"
 

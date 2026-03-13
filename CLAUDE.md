@@ -81,7 +81,8 @@
 > **CBU Role Surface Reconciliation (2026-03-13):** ✅ Complete — active resolver/config/test/doc surfaces now use one public role namespace only: `cbu.assign-role`, `cbu.remove-role`, `cbu.parties`, plus specialist `cbu.assign-*` / `cbu.validate-roles`; legacy `cbu-role.*`, `cbu.role.*`, `cbu-role-v2`, and `cbu_role` naming was removed from active code/config/docs.
 > **Phase 0 Vocabulary Rationalization (Batches 1-3):** ✅ Complete — domain merges/deletions (`case-screening`, `doc-request`, `product-subscription`, `fund-vehicle`, `fund-compartment`, `lifecycle`), type-parameterized family merges (`entity.*`, `ubo.*`, `sla.*`, `trading-profile.*`, `fund.*`), unified `refdata.*` runtime + tests
 > **Schema Consolidation (Migrations 115-121):** ✅ Complete — runtime schemas collapsed to `"ob-poc"` for business data and `sem_reg*` for Semantic OS; retired schemas (`stewardship`, `agent`, `teams`, `feedback`, `events`, `sessions`, `ob_ref`, `ob_kyc`) removed from the live database
-> **Domain Metadata Coverage:** ✅ Complete — `rust/config/sem_os_seeds/domain_metadata.yaml` now covers `306/306` live `"ob-poc"` tables, with SemOS footprint remediation applied for `sem-reg` and `stewardship`
+> **Domain Metadata Coverage:** ✅ Complete — `rust/config/sem_os_seeds/domain_metadata.yaml` now covers `306/306` live `"ob-poc"` tables, with SemOS footprint remediation applied for `sem-reg`, `stewardship`, and the 2026-03-13 CBU Constellation macro-alignment pack
+> **CBU Constellation Remediation Pack (2026-03-13):** ✅ Complete — broken macro verb references were reconciled across the structure/mandate/party/case macro set, orphan SemOS footprints were removed, Tier A macro-referenced footprints were backfilled, client-group replacement footprints were remapped, and final validation closed at `Broken macro refs: 0`, `Orphan footprints: 0`, `Tier A missing: 0`
 
 This is the root project guide for Claude Code. Domain-specific details are in annexes.
 

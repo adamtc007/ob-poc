@@ -189,7 +189,7 @@ struct.ie.ucits.icav:
         skip_if_empty: true
 
     # Create trading profile
-    - verb: trading-profile.create
+    - verb: trading-profile.create-draft
       args:
         cbu_id: "@cbu"
         name: "${arg.name} Trading"
@@ -401,7 +401,7 @@ struct.ie.aif.icav:
         skip_if_empty: true
 
     # Create trading profile
-    - verb: trading-profile.create
+    - verb: trading-profile.create-draft
       args:
         cbu_id: "@cbu"
         name: "${arg.name} Trading"
@@ -552,7 +552,7 @@ struct.ie.hedge.icav:
         skip_if_empty: true
 
     # Update trading profile for hedge fund specifics
-    - verb: trading-profile.update
+    - verb: trading-profile.create-draft
       args:
         trading_profile_id: "@trading-profile"
         profile_type: hedge

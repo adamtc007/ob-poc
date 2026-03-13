@@ -171,7 +171,7 @@ struct.lux.ucits.sicav:
         skip_if_empty: true
 
     # Create trading profile
-    - verb: trading-profile.create
+    - verb: trading-profile.create-draft
       args:
         cbu_id: "@cbu"
         name: "${arg.name} Trading"
@@ -383,7 +383,7 @@ struct.lux.aif.raif:
         skip_if_empty: true
 
     # Create trading profile
-    - verb: trading-profile.create
+    - verb: trading-profile.create-draft
       args:
         cbu_id: "@cbu"
         name: "${arg.name} Trading"
@@ -588,7 +588,7 @@ struct.lux.pe.scsp:
         skip_if_empty: true
 
     # Create trading profile (PE style)
-    - verb: trading-profile.create
+    - verb: trading-profile.create-draft
       args:
         cbu_id: "@cbu"
         name: "${arg.name} Trading"

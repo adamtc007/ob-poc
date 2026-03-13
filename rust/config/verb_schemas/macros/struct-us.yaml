@@ -217,7 +217,7 @@ struct.us.40act.open-end:
         skip_if_empty: true
 
     # Create trading profile
-    - verb: trading-profile.create
+    - verb: trading-profile.create-draft
       args:
         cbu_id: "@cbu"
         name: "${arg.name} Trading"
@@ -432,7 +432,7 @@ struct.us.40act.closed-end:
         skip_if_empty: true
 
     # Create trading profile
-    - verb: trading-profile.create
+    - verb: trading-profile.create-draft
       args:
         cbu_id: "@cbu"
         name: "${arg.name} Trading"
@@ -724,7 +724,7 @@ struct.us.etf.40act:
         skip_if_empty: true
 
     # Create trading profile (ETF style)
-    - verb: trading-profile.create
+    - verb: trading-profile.create-draft
       args:
         cbu_id: "@cbu"
         name: "${arg.name} Trading"
@@ -1002,7 +1002,7 @@ struct.us.private-fund.delaware-lp:
         skip_if_empty: true
 
     # Create trading profile
-    - verb: trading-profile.create
+    - verb: trading-profile.create-draft
       args:
         cbu_id: "@cbu"
         name: "${arg.name} Trading"

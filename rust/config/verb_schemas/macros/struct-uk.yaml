@@ -186,7 +186,7 @@ struct.uk.authorised.oeic:
         skip_if_empty: true
 
     # Create trading profile
-    - verb: trading-profile.create
+    - verb: trading-profile.create-draft
       args:
         cbu_id: "@cbu"
         name: "${arg.name} Trading"
@@ -370,7 +370,7 @@ struct.uk.authorised.aut:
         skip_if_empty: true
 
     # Create trading profile
-    - verb: trading-profile.create
+    - verb: trading-profile.create-draft
       args:
         cbu_id: "@cbu"
         name: "${arg.name} Trading"
@@ -553,7 +553,7 @@ struct.uk.authorised.acs:
         skip_if_empty: true
 
     # Create trading profile
-    - verb: trading-profile.create
+    - verb: trading-profile.create-draft
       args:
         cbu_id: "@cbu"
         name: "${arg.name} Trading"
@@ -678,7 +678,7 @@ struct.uk.authorised.ltaf:
         skip_if_empty: true
 
     # Update trading profile for LTAF specifics
-    - verb: trading-profile.update
+    - verb: trading-profile.create-draft
       args:
         trading_profile_id: "@trading-profile"
         profile_type: ltaf
@@ -1046,7 +1046,7 @@ struct.uk.private-equity.lp:
         skip_if_empty: true
 
     # Create trading profile (PE style)
-    - verb: trading-profile.create
+    - verb: trading-profile.create-draft
       args:
         cbu_id: "@cbu"
         name: "${arg.name} Trading"

@@ -132,7 +132,7 @@ case.add-party:
       key: case.exists
 
   expands-to:
-    - verb: kyc-case.add-party
+    - verb: entity-workstream.create
       args:
         case_id: "${arg.case}"
         entity_id: "${arg.party}"
@@ -248,9 +248,10 @@ case.submit:
       key: case.exists
 
   expands-to:
-    - verb: kyc-case.submit
+    - verb: kyc-case.update-status
       args:
         case_id: "${arg.case}"
+        status: "SUBMITTED"
         notes: "${arg.notes}"
 
   sets-state:
@@ -298,9 +299,10 @@ case.approve:
       key: case.submitted
 
   expands-to:
-    - verb: kyc-case.approve
+    - verb: kyc-case.update-status
       args:
         case_id: "${arg.case}"
+        status: "APPROVED"
         notes: "${arg.notes}"
         next_review_date: "${arg.next_review_date}"
 
@@ -364,9 +366,10 @@ case.reject:
       key: case.submitted
 
   expands-to:
-    - verb: kyc-case.reject
+    - verb: kyc-case.update-status
       args:
         case_id: "${arg.case}"
+        status: "REJECTED"
         reason: "${arg.reason.internal}"
         notes: "${arg.notes}"
 
@@ -424,7 +427,7 @@ case.list:
   prereqs: []
 
   expands-to:
-    - verb: kyc-case.list
+    - verb: kyc-case.list-by-cbu
       args:
         client_id: "${scope.client_id}"
         cbu_id: "${arg.structure}"

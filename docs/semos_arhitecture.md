@@ -109,6 +109,24 @@ The practical SemOS implication is:
 - The legacy runtime schemas `stewardship`, `agent`, `teams`, `feedback`, `events`, `sessions`, `ob_ref`, and `ob_kyc` have been retired.
 - `rust/config/sem_os_seeds/domain_metadata.yaml` now covers `306/306` live `"ob-poc"` tables and includes remediated SemOS footprint metadata for `sem-reg` and stewardship-backed verbs.
 
+### Constellation Macro/SemOS Remediation (2026-03-13)
+
+The March 13 Constellation remediation pack closed a specific metadata-integrity gap between the macro layer and the SemOS overlay:
+
+- broken macro verb references in the CBU Constellation structure, mandate, party, and case macros were reconciled onto live canonical verbs
+- parked gaps with no registered runtime verb remain explicitly marked in macro YAML (`cbu.link-structure`, bulk `trading-profile.set-*`, `address.set`)
+- orphan `verb_data_footprint` entries were removed from `rust/config/sem_os_seeds/domain_metadata.yaml`
+- Tier A SemOS footprint coverage was added for macro-referenced verbs that previously had no overlay entries
+- `client-group` replacement footprints were remapped onto the active verb surface
+
+Validation outcome for the pack:
+
+- Registry verbs: `1064`
+- Broken macro refs: `0`
+- Orphan footprints: `0`
+- Total SemOS footprints: `252`
+- Tier A missing: `0`
+
 ### Document Governance Bootstrap (2026-03-12)
 
 Semantic OS now governs the first document-policy control-plane objects needed for document polymorphism:

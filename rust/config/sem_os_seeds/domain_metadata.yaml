@@ -68,32 +68,74 @@ domains:
         classification: internal
         pii: false
     verb_data_footprint:
-      client-group.create:
-        writes: [client_group]
-      client-group.read:
-        reads: [client_group]
-      client-group.update:
-        reads: [client_group]
-        writes: [client_group]
-      client-group.list:
-        reads: [client_group]
-      client-group.add-entity:
+      client-group.entity-add:
         reads: [client_group, entities]
         writes: [client_group_entity]
-      client-group.add-anchor:
-        reads: [client_group, entities]
-        writes: [client_group_anchor]
-      client-group.add-alias:
+      client-group.entity-remove:
+        reads: [client_group_entity]
+        writes: [client_group_entity]
+      client-group.start-discovery:
         reads: [client_group]
-        writes: [client_group_alias]
-      client-group.resolve:
+        writes: [client_group, client_group_entity]
+      client-group.complete-discovery:
+        reads: [client_group]
+        writes: [client_group]
+      client-group.list-entities:
+        reads: [client_group, client_group_entity, entities]
+      client-group.search-entities:
         reads:
           [
             client_group,
+            client_group_entity,
+            entities,
             client_group_alias,
-            client_group_anchor,
             client_group_alias_embedding,
           ]
+      client-group.set-canonical:
+        reads: [client_group]
+        writes: [client_group]
+      client-group.confirm-entity:
+        reads: [client_group_entity]
+        writes: [client_group_entity]
+      client-group.reject-entity:
+        reads: [client_group_entity]
+        writes: [client_group_entity]
+      client-group.assign-role:
+        reads: [client_group_entity, client_group_entity_roles]
+        writes: [client_group_entity_roles]
+      client-group.remove-role:
+        reads: [client_group_entity_roles]
+        writes: [client_group_entity_roles]
+      client-group.add-relationship:
+        reads: [client_group, entities]
+        writes: [client_group_relationship]
+      client-group.list-relationships:
+        reads: [client_group_relationship, entities]
+      client-group.add-ownership-source:
+        reads: [client_group_relationship]
+        writes: [client_group_relationship_sources]
+      client-group.verify-ownership:
+        reads: [client_group_relationship]
+        writes: [client_group_relationship]
+      client-group.list-roles:
+        reads: [client_group_entity_roles]
+      client-group.discover-entities:
+        reads: [client_group]
+        writes: [client_group_entity, client_group_entity_roles]
+      client-group.tag-add:
+        reads: [client_group_entity]
+        writes: [client_group_entity_tag]
+      client-group.tag-remove:
+        reads: [client_group_entity_tag]
+        writes: [client_group_entity_tag]
+      client-group.list-tags:
+        reads: [client_group_entity_tag]
+      client-group.list-parties:
+        reads: [client_group_entity, entities, client_group_entity_roles]
+      client-group.list-discrepancies:
+        reads: [client_group_entity, client_group_relationship]
+      client-group.list-unverified:
+        reads: [client_group_entity, client_group_relationship]
 
   # ---------------------------------------------------------------------------
   # CBU — Client Business Unit
@@ -542,9 +584,6 @@ domains:
       deal.propose-rate-card:
         reads: [deal_rate_cards]
         writes: [deal_rate_cards]
-      deal.counter-offer:
-        reads: [deal_rate_cards]
-        writes: [deal_rate_cards]
       deal.agree-rate-card:
         reads: [deal_rate_cards]
         writes: [deal_rate_cards]
@@ -798,12 +837,15 @@ domains:
         reads: [cbus, client_group, entities]
       session.load-cluster:
         reads: [cbus, client_group, entities]
-      session.load-cbu:
-        reads: [cbus]
-      session.load-jurisdiction:
-        reads: [cbus, master_jurisdictions]
-      session.unload-cbu:
-        reads: [cbus]
+      session.set-case:
+        reads: [sessions, "kyc.cases"]
+        writes: [sessions]
+      session.set-mandate:
+        reads: [sessions, cbu_trading_profiles]
+        writes: [sessions]
+      session.set-structure:
+        reads: [sessions, cbus]
+        writes: [sessions]
       session.clear: {}
       session.undo: {}
       session.redo: {}
@@ -875,10 +917,6 @@ domains:
       fund.ensure:
         reads: [entity_funds, fund_structure]
         writes: [entities, entity_funds, entity_share_classes, fund_structure]
-      fund.list:
-        reads: [entity_funds]
-      fund.get:
-        reads: [entity_funds, fund_structure]
       fund.list-share-classes:
         reads: [entity_share_classes]
 
@@ -1176,14 +1214,6 @@ domains:
             control_edges,
           ]
         writes: [cbu_entity_roles, cbu_groups, cbu_group_members, control_edges]
-      ubo.discover:
-        reads: [entities, entity_relationships, ubo_registry]
-        writes: [ubo_registry]
-      ubo.list:
-        reads: [ubo_registry]
-      ubo.snapshot:
-        reads: [ubo_registry]
-        writes: [ubo_snapshots]
       control.build-graph:
         reads: [entities, entity_relationships, control_edges]
         writes: [control_edges]
@@ -1385,27 +1415,12 @@ domains:
         classification: internal
         pii: false
     verb_data_footprint:
-      settlement-chain.create:
-        reads: [cbu_settlement_chains]
-        writes: [cbu_settlement_chains]
       settlement-chain.add-hop:
         reads: [cbu_settlement_chains]
         writes: [settlement_chain_hops]
       isda.create:
         reads: [entities]
         writes: [isda_agreements]
-      csa.create:
-        reads: [isda_agreements]
-        writes: [csa_agreements]
-      ssi.create:
-        reads: [cbus]
-        writes: [cbu_ssi]
-      booking-rule.create:
-        reads: [cbu_ssi]
-        writes: [ssi_booking_rules]
-      tax-config.set-status:
-        reads: [cbus]
-        writes: [cbu_tax_status]
       tax-config.set-reporting:
         reads: [cbus]
         writes: [cbu_tax_reporting]
@@ -1501,9 +1516,6 @@ domains:
       ruleset.publish:
         reads: [ruleset]
         writes: [ruleset]
-      rule.create:
-        reads: [ruleset, rule_field_dictionary]
-        writes: [rule]
 
   # ---------------------------------------------------------------------------
   # PRODUCT & SERVICE — Catalog
@@ -1594,10 +1606,19 @@ domains:
     verb_data_footprint:
       product.list:
         reads: [products]
-      product.get:
-        reads: [products, product_services]
       service.list:
         reads: [services]
+
+  # ---------------------------------------------------------------------------
+  # DOCS-BUNDLE — Document Bundle Application
+  # ---------------------------------------------------------------------------
+  docs-bundle:
+    description: "Document bundle application — versioned requirement packs applied to CBUs"
+    tables: {}
+    verb_data_footprint:
+      docs-bundle.apply:
+        reads: [document_requirement_profiles, document_bundle_templates]
+        writes: [cbu_unified_attr_requirements, document_catalog]
 
   # ---------------------------------------------------------------------------
   # DOCUMENT — Document Solicitation & Verification
@@ -1631,15 +1652,30 @@ domains:
         classification: internal
         pii: false
     verb_data_footprint:
+      document.missing-for-entity:
+        reads: [document_catalog, document_requirements, entities]
       document.solicit:
         reads: [document_catalog, document_types]
         writes: [document_catalog]
+      document.solicit-set:
+        reads: [document_catalog, document_requirements]
+        writes: [document_requests]
       document.verify:
         reads: [document_catalog]
         writes: [document_catalog]
       document.reject:
         reads: [document_catalog]
         writes: [document_catalog]
+
+  # ---------------------------------------------------------------------------
+  # REQUIREMENT — Document Requirement Tracking
+  # ---------------------------------------------------------------------------
+  requirement:
+    description: "Document requirement tracking — governed requirement state and completeness checks"
+    tables: {}
+    verb_data_footprint:
+      requirement.unsatisfied:
+        reads: [cbu_unified_attr_requirements, cbu_attr_values, cbu_evidence]
 
   # ---------------------------------------------------------------------------
   # ATTRIBUTE — Governed Attribute Dictionary & Evidence Pipeline
@@ -1715,9 +1751,15 @@ domains:
             screening_requirements,
           ]
         writes: [kyc.screenings]
-      screening.check-pep:
-        reads: [entity_proper_persons, person_pep_status]
-        writes: [person_pep_status]
+      screening.adverse-media:
+        reads: [entities, screening_results]
+        writes: [screening_results, screening_hits]
+      screening.pep:
+        reads: [entities, screening_results]
+        writes: [screening_results, screening_hits]
+      screening.sanctions:
+        reads: [entities, screening_results]
+        writes: [screening_results, screening_hits]
 
   # ---------------------------------------------------------------------------
   # INVESTOR — Investor Register & Holdings
@@ -1746,19 +1788,9 @@ domains:
         classification: confidential
         pii: false
     verb_data_footprint:
-      investor.register:
-        reads: [entities]
-        writes: [investors]
-      investor.list:
-        reads: [investors]
       holding.create:
         reads: [investors]
         writes: [holdings]
-      holding.list:
-        reads: [holdings]
-      movement.record:
-        reads: [holdings]
-        writes: [movements]
 
   # ---------------------------------------------------------------------------
   # TEAM — Team Management & Access Control
@@ -1810,12 +1842,6 @@ domains:
       team.remove-member:
         reads: [memberships]
         writes: [memberships]
-      team.grant-cbu-access:
-        reads: [teams, cbus]
-        writes: [team_cbu_access]
-      team.revoke-cbu-access:
-        reads: [team_cbu_access]
-        writes: [team_cbu_access]
 
   # ---------------------------------------------------------------------------
   # AGENT — Learning & Semantic Pipeline
@@ -2007,15 +2033,7 @@ domains:
         governance_tier: operational
         classification: internal
         pii: false
-    verb_data_footprint:
-      dsl.validate:
-        reads: [dsl_verbs]
-      dsl.execute:
-        reads: [dsl_verbs, dsl_idempotency]
-        writes: [dsl_idempotency, dsl_instances, dsl_generation_log]
-      dsl.generate:
-        reads: [dsl_verbs, verb_pattern_embeddings]
-        writes: [dsl_generation_log]
+    verb_data_footprint: {}
 
   # ---------------------------------------------------------------------------
   # BPMN INTEGRATION — Durable Workflow Orchestration
