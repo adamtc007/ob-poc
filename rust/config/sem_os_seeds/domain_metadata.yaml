@@ -153,6 +153,11 @@ domains:
         governance_tier: governed
         classification: internal
         pii: false
+      cbu_structure_links:
+        description: "Persisted parent-child CBU structure links for cross-border and parallel-fund relationships"
+        governance_tier: governed
+        classification: internal
+        pii: false
       cbu_evidence:
         description: "Document/attestation evidence links per CBU"
         governance_tier: operational
@@ -265,6 +270,11 @@ domains:
       cbu.assign-role:
         reads: [cbu_entity_roles, roles]
         writes: [cbu_entity_roles]
+      cbu.link-structure:
+        reads: [cbus, cbu_structure_links]
+        writes: [cbu_structure_links]
+      cbu.list-structure-links:
+        reads: [cbus, cbu_structure_links]
       cbu.remove-role:
         reads: [cbu_entity_roles]
         writes: [cbu_entity_roles]

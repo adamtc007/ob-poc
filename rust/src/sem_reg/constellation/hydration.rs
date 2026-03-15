@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use sqlx::PgPool;
+use sqlx::{PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
 use super::action_surface::compute_action_surface;
@@ -12,7 +12,10 @@ use super::normalize::normalize_slots;
 use super::query_plan::compile_query_plan;
 use super::summary::{compute_summary, ConstellationSummary};
 use super::validate::ValidatedConstellationMap;
-use crate::sem_reg::reducer::{fetch_slot_overlays, handle_state_derive, SlotReduceResult};
+use crate::sem_reg::reducer::{
+    build_eval_scope_tx, fetch_slot_overlays_tx, get_active_override_tx, reduce_slot,
+    SlotReduceResult,
+};
 
 /// Raw hydration bundle collected before normalization.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -82,22 +85,34 @@ pub async fn hydrate_constellation(
     case_id: Option<Uuid>,
     map: &ValidatedConstellationMap,
 ) -> ConstellationResult<HydratedConstellation> {
+    let mut tx = pool
+        .begin()
+        .await
+        .map_err(|err| ConstellationError::Other(err.into()))?;
+    sqlx::query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ")
+        .execute(&mut *tx)
+        .await
+        .map_err(|err| ConstellationError::Other(err.into()))?;
+
     let _plan = compile_query_plan(map);
     let mut raw = RawHydrationData {
         root: Some(cbu_id),
         ..Default::default()
     };
+    let scope = build_eval_scope_tx(&mut tx, cbu_id, case_id)
+        .await
+        .map_err(|err| ConstellationError::Other(err.into()))?;
 
     for slot in &map.slots_ordered {
         let rows = if slot.def.slot_type == super::map_def::SlotType::EntityGraph {
-            let (rows, edges) = query_entity_graph_rows(pool, slot, &raw).await?;
+            let (rows, edges) = query_entity_graph_rows_tx(&mut tx, slot, &raw).await?;
             raw.graph_edges.insert(slot.name.clone(), edges);
             rows
         } else {
-            query_slot_rows(pool, cbu_id, case_id, slot, &raw).await?
+            query_slot_rows_tx(&mut tx, cbu_id, case_id, slot, &raw).await?
         };
         raw.slot_rows.insert(slot.name.clone(), rows.clone());
-        populate_entity_details(pool, &mut raw, &rows).await?;
+        populate_entity_details_tx(&mut tx, &mut raw, &rows).await?;
 
         if let Some(entity_id) = pick_deterministic_row(&rows).and_then(|row| row.entity_id) {
             if let Some(machine_name) = slot.def.state_machine.as_ref() {
@@ -107,15 +122,24 @@ pub async fn hydrate_constellation(
                         machine_name
                     ))
                 })?;
-                let derived =
-                    handle_state_derive(pool, cbu_id, entity_id, &slot.name, case_id, machine)
-                        .await?;
+                let mut overlays = fetch_slot_overlays_tx(&mut tx, cbu_id, entity_id, case_id)
+                    .await
+                    .map_err(|err| ConstellationError::Other(err.into()))?;
+                overlays.scope = scope.as_scope_data();
+                let override_entry =
+                    get_active_override_tx(&mut tx, cbu_id, case_id, &slot.name)
+                        .await
+                        .map_err(|err| ConstellationError::Other(err.into()))?;
+                let derived = reduce_slot(machine, &slot.name, &overlays, override_entry)
+                    .map_err(|err| ConstellationError::Execution(err.to_string()))?;
                 raw.warnings
                     .insert(slot.name.clone(), derived.consistency_warnings.clone());
                 raw.reducer_results.insert(slot.name.clone(), derived);
             }
 
-            let overlays = fetch_slot_overlays(pool, cbu_id, entity_id, case_id).await?;
+            let overlays = fetch_slot_overlays_tx(&mut tx, cbu_id, entity_id, case_id)
+                .await
+                .map_err(|err| ConstellationError::Other(err.into()))?;
             raw.overlay_rows.insert(
                 slot.name.clone(),
                 raw_overlay_rows_from_slot_data(entity_id, overlays),
@@ -233,12 +257,23 @@ async fn query_slot_rows(
     raw: &RawHydrationData,
 ) -> ConstellationResult<Vec<RawSlotRow>> {
     match slot.def.slot_type {
-        super::map_def::SlotType::Cbu => Ok(vec![RawSlotRow {
-            entity_id: Some(cbu_id),
-            record_id: Some(cbu_id),
-            filter_value: None,
-            created_at: None,
-        }]),
+        super::map_def::SlotType::Cbu => {
+            if slot.def.cardinality == super::map_def::Cardinality::Root {
+                return Ok(vec![RawSlotRow {
+                    entity_id: Some(cbu_id),
+                    record_id: Some(cbu_id),
+                    filter_value: None,
+                    created_at: None,
+                }]);
+            }
+            if let Some(join) = &slot.def.join {
+                if join.via == "cbu_structure_links" {
+                    let rows = query_child_cbu_rows(pool, cbu_id, join).await?;
+                    return Ok(select_occurrence(rows, slot.def.occurrence));
+                }
+            }
+            Ok(Vec::new())
+        }
         super::map_def::SlotType::Entity => {
             if let Some(join) = &slot.def.join {
                 if join.via == "cbu_entity_roles" {
@@ -258,7 +293,7 @@ async fn query_slot_rows(
                     .fetch_all(pool)
                     .await
                     .map_err(|err| ConstellationError::Other(err.into()))?;
-                    return Ok(rows
+                    let rows = rows
                         .into_iter()
                         .map(|(entity_id, created_at)| RawSlotRow {
                             entity_id: Some(entity_id),
@@ -266,7 +301,8 @@ async fn query_slot_rows(
                             filter_value: join.filter_value.clone(),
                             created_at,
                         })
-                        .collect());
+                        .collect::<Vec<_>>();
+                    return Ok(select_occurrence(rows, slot.def.occurrence));
                 }
             }
             Ok(Vec::new())
@@ -281,6 +317,228 @@ async fn query_slot_rows(
             .await
             .map(|(rows, _)| rows),
     }
+}
+
+async fn query_slot_rows_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    cbu_id: Uuid,
+    case_id: Option<Uuid>,
+    slot: &super::validate::ResolvedSlot,
+    raw: &RawHydrationData,
+) -> ConstellationResult<Vec<RawSlotRow>> {
+    match slot.def.slot_type {
+        super::map_def::SlotType::Cbu => {
+            if slot.def.cardinality == super::map_def::Cardinality::Root {
+                return Ok(vec![RawSlotRow {
+                    entity_id: Some(cbu_id),
+                    record_id: Some(cbu_id),
+                    filter_value: None,
+                    created_at: None,
+                }]);
+            }
+            if let Some(join) = &slot.def.join {
+                if join.via == "cbu_structure_links" {
+                    let rows = query_child_cbu_rows_tx(tx, cbu_id, join).await?;
+                    return Ok(select_occurrence(rows, slot.def.occurrence));
+                }
+            }
+            Ok(Vec::new())
+        }
+        super::map_def::SlotType::Entity => {
+            if let Some(join) = &slot.def.join {
+                if join.via == "cbu_entity_roles" {
+                    let filter_value = join.filter_value.clone().unwrap_or_default();
+                    let rows = sqlx::query_as::<_, (Uuid, Option<DateTime<Utc>>)>(
+                        r#"
+                        SELECT cer.entity_id, cer.created_at
+                        FROM "ob-poc".cbu_entity_roles cer
+                        JOIN "ob-poc".roles r ON r.role_id = cer.role_id
+                        WHERE cer.cbu_id = $1
+                          AND REPLACE(LOWER(r.name), '_', '-') = LOWER($2)
+                        ORDER BY cer.created_at DESC NULLS LAST
+                        "#,
+                    )
+                    .bind(cbu_id)
+                    .bind(filter_value)
+                    .fetch_all(&mut **tx)
+                    .await
+                    .map_err(|err| ConstellationError::Other(err.into()))?;
+                    let rows = rows
+                        .into_iter()
+                        .map(|(entity_id, created_at)| RawSlotRow {
+                            entity_id: Some(entity_id),
+                            record_id: Some(entity_id),
+                            filter_value: join.filter_value.clone(),
+                            created_at,
+                        })
+                        .collect::<Vec<_>>();
+                    return Ok(select_occurrence(rows, slot.def.occurrence));
+                }
+            }
+            Ok(Vec::new())
+        }
+        super::map_def::SlotType::Case => query_case_rows_tx(tx, cbu_id, case_id).await,
+        super::map_def::SlotType::Tollgate => {
+            let active_case_id = resolve_case_id(case_id, raw);
+            query_tollgate_rows_tx(tx, active_case_id).await
+        }
+        super::map_def::SlotType::Mandate => query_mandate_rows_tx(tx, cbu_id).await,
+        super::map_def::SlotType::EntityGraph => query_entity_graph_rows_tx(tx, slot, raw)
+            .await
+            .map(|(rows, _)| rows),
+    }
+}
+
+async fn query_child_cbu_rows(
+    pool: &PgPool,
+    parent_cbu_id: Uuid,
+    join: &super::map_def::JoinDef,
+) -> ConstellationResult<Vec<RawSlotRow>> {
+    let filter_column = join.filter_column.as_deref();
+    let filter_value = join.filter_value.as_deref();
+    let rows = match (filter_column, filter_value) {
+        (Some("relationship_selector"), Some(selector)) => {
+            sqlx::query_as::<_, (Uuid, String, Option<DateTime<Utc>>)>(
+                r#"
+                SELECT child_cbu_id, relationship_selector, created_at
+                FROM "ob-poc".cbu_structure_links
+                WHERE parent_cbu_id = $1
+                  AND relationship_selector = $2
+                  AND status = 'ACTIVE'
+                  AND (effective_from IS NULL OR effective_from <= CURRENT_DATE)
+                  AND (effective_to IS NULL OR effective_to >= CURRENT_DATE)
+                ORDER BY created_at DESC NULLS LAST, updated_at DESC
+                "#,
+            )
+            .bind(parent_cbu_id)
+            .bind(selector)
+            .fetch_all(pool)
+            .await
+            .map_err(|err| ConstellationError::Other(err.into()))?
+        }
+        (Some("relationship_type"), Some(relationship_type)) => {
+            sqlx::query_as::<_, (Uuid, String, Option<DateTime<Utc>>)>(
+                r#"
+                SELECT child_cbu_id, relationship_selector, created_at
+                FROM "ob-poc".cbu_structure_links
+                WHERE parent_cbu_id = $1
+                  AND relationship_type = $2
+                  AND status = 'ACTIVE'
+                  AND (effective_from IS NULL OR effective_from <= CURRENT_DATE)
+                  AND (effective_to IS NULL OR effective_to >= CURRENT_DATE)
+                ORDER BY created_at DESC NULLS LAST, updated_at DESC
+                "#,
+            )
+            .bind(parent_cbu_id)
+            .bind(relationship_type.replace('-', "_").to_ascii_uppercase())
+            .fetch_all(pool)
+            .await
+            .map_err(|err| ConstellationError::Other(err.into()))?
+        }
+        _ => {
+            sqlx::query_as::<_, (Uuid, String, Option<DateTime<Utc>>)>(
+                r#"
+                SELECT child_cbu_id, relationship_selector, created_at
+                FROM "ob-poc".cbu_structure_links
+                WHERE parent_cbu_id = $1
+                  AND status = 'ACTIVE'
+                  AND (effective_from IS NULL OR effective_from <= CURRENT_DATE)
+                  AND (effective_to IS NULL OR effective_to >= CURRENT_DATE)
+                ORDER BY created_at DESC NULLS LAST, updated_at DESC
+                "#,
+            )
+            .bind(parent_cbu_id)
+            .fetch_all(pool)
+            .await
+            .map_err(|err| ConstellationError::Other(err.into()))?
+        }
+    };
+
+    Ok(rows
+        .into_iter()
+        .map(|(child_cbu_id, selector, created_at)| RawSlotRow {
+            entity_id: Some(child_cbu_id),
+            record_id: Some(child_cbu_id),
+            filter_value: Some(selector),
+            created_at,
+        })
+        .collect())
+}
+
+async fn query_child_cbu_rows_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    parent_cbu_id: Uuid,
+    join: &super::map_def::JoinDef,
+) -> ConstellationResult<Vec<RawSlotRow>> {
+    let filter_column = join.filter_column.as_deref();
+    let filter_value = join.filter_value.as_deref();
+    let rows = match (filter_column, filter_value) {
+        (Some("relationship_selector"), Some(selector)) => {
+            sqlx::query_as::<_, (Uuid, String, Option<DateTime<Utc>>)>(
+                r#"
+                SELECT child_cbu_id, relationship_selector, created_at
+                FROM "ob-poc".cbu_structure_links
+                WHERE parent_cbu_id = $1
+                  AND relationship_selector = $2
+                  AND status = 'ACTIVE'
+                  AND (effective_from IS NULL OR effective_from <= CURRENT_DATE)
+                  AND (effective_to IS NULL OR effective_to >= CURRENT_DATE)
+                ORDER BY created_at DESC NULLS LAST, updated_at DESC
+                "#,
+            )
+            .bind(parent_cbu_id)
+            .bind(selector)
+            .fetch_all(&mut **tx)
+            .await
+            .map_err(|err| ConstellationError::Other(err.into()))?
+        }
+        (Some("relationship_type"), Some(relationship_type)) => {
+            sqlx::query_as::<_, (Uuid, String, Option<DateTime<Utc>>)>(
+                r#"
+                SELECT child_cbu_id, relationship_selector, created_at
+                FROM "ob-poc".cbu_structure_links
+                WHERE parent_cbu_id = $1
+                  AND relationship_type = $2
+                  AND status = 'ACTIVE'
+                  AND (effective_from IS NULL OR effective_from <= CURRENT_DATE)
+                  AND (effective_to IS NULL OR effective_to >= CURRENT_DATE)
+                ORDER BY created_at DESC NULLS LAST, updated_at DESC
+                "#,
+            )
+            .bind(parent_cbu_id)
+            .bind(relationship_type.replace('-', "_").to_ascii_uppercase())
+            .fetch_all(&mut **tx)
+            .await
+            .map_err(|err| ConstellationError::Other(err.into()))?
+        }
+        _ => {
+            sqlx::query_as::<_, (Uuid, String, Option<DateTime<Utc>>)>(
+                r#"
+                SELECT child_cbu_id, relationship_selector, created_at
+                FROM "ob-poc".cbu_structure_links
+                WHERE parent_cbu_id = $1
+                  AND status = 'ACTIVE'
+                  AND (effective_from IS NULL OR effective_from <= CURRENT_DATE)
+                  AND (effective_to IS NULL OR effective_to >= CURRENT_DATE)
+                ORDER BY created_at DESC NULLS LAST, updated_at DESC
+                "#,
+            )
+            .bind(parent_cbu_id)
+            .fetch_all(&mut **tx)
+            .await
+            .map_err(|err| ConstellationError::Other(err.into()))?
+        }
+    };
+
+    Ok(rows
+        .into_iter()
+        .map(|(child_cbu_id, selector, created_at)| RawSlotRow {
+            entity_id: Some(child_cbu_id),
+            record_id: Some(child_cbu_id),
+            filter_value: Some(selector),
+            created_at,
+        })
+        .collect())
 }
 
 fn resolve_case_id(case_id: Option<Uuid>, raw: &RawHydrationData) -> Option<Uuid> {
@@ -336,6 +594,50 @@ async fn query_case_rows(
         .collect())
 }
 
+async fn query_case_rows_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    cbu_id: Uuid,
+    case_id: Option<Uuid>,
+) -> ConstellationResult<Vec<RawSlotRow>> {
+    let rows = if let Some(case_id) = case_id {
+        sqlx::query_as::<_, (Uuid, Option<DateTime<Utc>>)>(
+            r#"
+            SELECT case_id, opened_at
+            FROM "ob-poc".cases
+            WHERE case_id = $1
+            "#,
+        )
+        .bind(case_id)
+        .fetch_all(&mut **tx)
+        .await
+        .map_err(|err| ConstellationError::Other(err.into()))?
+    } else {
+        sqlx::query_as::<_, (Uuid, Option<DateTime<Utc>>)>(
+            r#"
+            SELECT case_id, opened_at
+            FROM "ob-poc".cases
+            WHERE cbu_id = $1
+            ORDER BY opened_at DESC NULLS LAST
+            LIMIT 1
+            "#,
+        )
+        .bind(cbu_id)
+        .fetch_all(&mut **tx)
+        .await
+        .map_err(|err| ConstellationError::Other(err.into()))?
+    };
+
+    Ok(rows
+        .into_iter()
+        .map(|(record_id, created_at)| RawSlotRow {
+            entity_id: None,
+            record_id: Some(record_id),
+            filter_value: None,
+            created_at,
+        })
+        .collect())
+}
+
 async fn query_tollgate_rows(
     pool: &PgPool,
     case_id: Option<Uuid>,
@@ -373,6 +675,43 @@ async fn query_tollgate_rows(
         .collect())
 }
 
+async fn query_tollgate_rows_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    case_id: Option<Uuid>,
+) -> ConstellationResult<Vec<RawSlotRow>> {
+    let Some(case_id) = case_id else {
+        return Ok(Vec::new());
+    };
+
+    let rows = sqlx::query_as::<_, (Uuid, bool, Option<DateTime<Utc>>)>(
+        r#"
+        SELECT DISTINCT ON (tollgate_id)
+            evaluation_id, passed, evaluated_at
+        FROM "ob-poc".tollgate_evaluations
+        WHERE case_id = $1
+        ORDER BY tollgate_id, evaluated_at DESC NULLS LAST
+        "#,
+    )
+    .bind(case_id)
+    .fetch_all(&mut **tx)
+    .await
+    .map_err(|err| ConstellationError::Other(err.into()))?;
+
+    Ok(rows
+        .into_iter()
+        .map(|(record_id, passed, created_at)| RawSlotRow {
+            entity_id: None,
+            record_id: Some(record_id),
+            filter_value: Some(if passed {
+                String::from("passed")
+            } else {
+                String::from("failed")
+            }),
+            created_at,
+        })
+        .collect())
+}
+
 async fn query_mandate_rows(
     pool: &PgPool,
     cbu_id: Uuid,
@@ -390,6 +729,37 @@ async fn query_mandate_rows(
     )
     .bind(cbu_id)
     .fetch_all(pool)
+    .await
+    .map_err(|err| ConstellationError::Other(err.into()))?;
+
+    Ok(rows
+        .into_iter()
+        .map(|(record_id, status, version, created_at)| RawSlotRow {
+            entity_id: None,
+            record_id: Some(record_id),
+            filter_value: Some(format!("{status}:v{version}")),
+            created_at,
+        })
+        .collect())
+}
+
+async fn query_mandate_rows_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    cbu_id: Uuid,
+) -> ConstellationResult<Vec<RawSlotRow>> {
+    let rows = sqlx::query_as::<_, (Uuid, String, i32, Option<DateTime<Utc>>)>(
+        r#"
+        SELECT profile_id, status, version, created_at
+        FROM "ob-poc".cbu_trading_profiles
+        WHERE cbu_id = $1
+        ORDER BY
+            CASE WHEN status = 'ACTIVE' THEN 0 ELSE 1 END,
+            version DESC,
+            created_at DESC NULLS LAST
+        "#,
+    )
+    .bind(cbu_id)
+    .fetch_all(&mut **tx)
     .await
     .map_err(|err| ConstellationError::Other(err.into()))?;
 
@@ -500,8 +870,111 @@ async fn query_entity_graph_rows(
     Ok((nodes, edges))
 }
 
-async fn populate_entity_details(
-    pool: &PgPool,
+async fn query_entity_graph_rows_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    slot: &super::validate::ResolvedSlot,
+    raw: &RawHydrationData,
+) -> ConstellationResult<(Vec<RawSlotRow>, Vec<RawGraphEdge>)> {
+    let seeds = slot
+        .def
+        .depends_on
+        .iter()
+        .filter_map(|dep| raw.slot_rows.get(dep.slot_name()))
+        .flat_map(|rows| rows.iter())
+        .filter_map(|row| row.entity_id)
+        .collect::<Vec<_>>();
+
+    if seeds.is_empty() {
+        return Ok((Vec::new(), Vec::new()));
+    }
+
+    let max_depth = slot.def.max_depth.unwrap_or(5) as i32;
+    let rows = sqlx::query_as::<_, (Uuid,)>(
+        r#"
+        WITH RECURSIVE ownership_tree AS (
+            SELECT DISTINCT er.to_entity_id AS entity_id, 1 AS depth
+            FROM "ob-poc".entity_relationships er
+            WHERE er.from_entity_id = ANY($1)
+              AND er.relationship_type = 'OWNERSHIP'
+            UNION
+            SELECT er.to_entity_id AS entity_id, ot.depth + 1
+            FROM "ob-poc".entity_relationships er
+            JOIN ownership_tree ot ON er.from_entity_id = ot.entity_id
+            WHERE er.relationship_type = 'OWNERSHIP'
+              AND ot.depth < $2
+        )
+        SELECT DISTINCT entity_id
+        FROM ownership_tree
+        "#,
+    )
+    .bind(&seeds)
+    .bind(max_depth)
+    .fetch_all(&mut **tx)
+    .await
+    .map_err(|err| ConstellationError::Other(err.into()))?;
+
+    let edges = sqlx::query_as::<_, (Uuid, Uuid, Option<f64>, Option<String>, i32)>(
+        r#"
+        WITH RECURSIVE ownership_edges AS (
+            SELECT
+                er.from_entity_id,
+                er.to_entity_id,
+                er.percentage_owned,
+                er.relationship_subtype,
+                1 AS depth
+            FROM "ob-poc".entity_relationships er
+            WHERE er.from_entity_id = ANY($1)
+              AND er.relationship_type = 'OWNERSHIP'
+            UNION
+            SELECT
+                er.from_entity_id,
+                er.to_entity_id,
+                er.percentage_owned,
+                er.relationship_subtype,
+                oe.depth + 1
+            FROM "ob-poc".entity_relationships er
+            JOIN ownership_edges oe ON er.from_entity_id = oe.to_entity_id
+            WHERE er.relationship_type = 'OWNERSHIP'
+              AND oe.depth < $2
+        )
+        SELECT from_entity_id, to_entity_id, percentage_owned, relationship_subtype, depth
+        FROM ownership_edges
+        "#,
+    )
+    .bind(&seeds)
+    .bind(max_depth)
+    .fetch_all(&mut **tx)
+    .await
+    .map_err(|err| ConstellationError::Other(err.into()))?;
+
+    Ok((
+        rows.into_iter()
+            .map(|(entity_id,)| RawSlotRow {
+                entity_id: Some(entity_id),
+                record_id: Some(entity_id),
+                filter_value: None,
+                created_at: None,
+            })
+            .collect(),
+        edges
+            .into_iter()
+            .map(
+                |(from_entity_id, to_entity_id, percentage, ownership_type, depth)| {
+                    RawGraphEdge {
+                        from_entity_id,
+                        to_entity_id,
+                        percentage,
+                        ownership_type,
+                        depth: depth as usize,
+                    }
+                },
+            )
+            .collect(),
+    ))
+}
+
+async fn populate_entity_details_tx(
+    tx: &mut Transaction<'_, Postgres>,
     raw: &mut RawHydrationData,
     rows: &[RawSlotRow],
 ) -> ConstellationResult<()> {
@@ -524,7 +997,7 @@ async fn populate_entity_details(
             "#,
         )
         .bind(entity_id)
-        .fetch_optional(pool)
+        .fetch_optional(&mut **tx)
         .await
         .map_err(|err| ConstellationError::Other(err.into()))?;
         if let Some((name, entity_type)) = detail {
@@ -565,4 +1038,17 @@ fn pick_deterministic_row(rows: &[RawSlotRow]) -> Option<&RawSlotRow> {
             .then(lhs.entity_id.cmp(&rhs.entity_id))
             .then(lhs.record_id.cmp(&rhs.record_id))
     })
+}
+
+fn select_occurrence(rows: Vec<RawSlotRow>, occurrence: Option<usize>) -> Vec<RawSlotRow> {
+    let Some(occurrence) = occurrence else {
+        return rows;
+    };
+    if occurrence == 0 {
+        return Vec::new();
+    }
+    rows.into_iter()
+        .nth(occurrence - 1)
+        .into_iter()
+        .collect()
 }

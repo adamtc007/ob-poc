@@ -1,5 +1,8 @@
 #[cfg(feature = "database")]
 mod tests {
+    use std::fs;
+    use std::path::PathBuf;
+
     use ob_poc::sem_reg::constellation::{
         compile_query_plan, compute_map_revision, load_builtin_constellation_map,
         load_constellation_map, QueryType,
@@ -110,5 +113,55 @@ slots:
                     && query.sql.contains("edge:ownership")
             })
         }));
+    }
+
+    #[test]
+    fn loads_all_constellation_map_yamls() {
+        let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("config/sem_os_seeds/constellation_maps");
+        let mut files = fs::read_dir(dir)
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .filter(|path| path.extension().and_then(|ext| ext.to_str()) == Some("yaml"))
+            .collect::<Vec<_>>();
+        files.sort();
+        assert_eq!(files.len(), 18);
+        for path in files {
+            let yaml = fs::read_to_string(&path).unwrap();
+            let map = load_constellation_map(&yaml).unwrap();
+            assert!(map.constellation.starts_with("struct."));
+        }
+    }
+
+    #[test]
+    fn cross_border_maps_use_structure_link_selectors() {
+        let hedge = load_builtin_constellation_map("struct.hedge.cross-border").unwrap();
+        let us_feeder = hedge.slot_index.get("cbu.us_feeder").unwrap();
+        assert_eq!(
+            us_feeder
+                .def
+                .join
+                .as_ref()
+                .map(|join| join.via.as_str()),
+            Some("cbu_structure_links")
+        );
+        assert_eq!(
+            us_feeder
+                .def
+                .join
+                .as_ref()
+                .and_then(|join| join.filter_value.as_deref()),
+            Some("feeder:us")
+        );
+
+        let pe = load_builtin_constellation_map("struct.pe.cross-border").unwrap();
+        let aggregator = pe.slot_index.get("cbu.aggregator").unwrap();
+        assert_eq!(
+            aggregator
+                .def
+                .join
+                .as_ref()
+                .and_then(|join| join.filter_value.as_deref()),
+            Some("aggregator")
+        );
     }
 }

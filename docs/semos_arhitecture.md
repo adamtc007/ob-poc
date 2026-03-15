@@ -143,6 +143,32 @@ This is now the intended boundary:
 - reducer/constellation runtime turns those governed contracts into session-visible operational state.
 - the React chat UI is a projection/rendering layer only; it does not recompute reducer state client-side.
 
+### Cross-Border Structure Runtime State (2026-03-15)
+
+The cross-border constellation gap for M17/M18 is now closed without changing the reducer or constellation architecture:
+
+- persisted CBU-to-CBU structure facts now live in:
+  - `"ob-poc".cbu_structure_links`
+- the active primitive verb surface now includes:
+  - `cbu.link-structure`
+  - `cbu.list-structure-links`
+- the cross-border constellation maps now hydrate child `cbu` slots from persisted links rather than leaving them as permanently structural placeholders
+- hydration direction is explicitly downward-only:
+  - parent/root CBU -> child linked CBUs
+- slot-level disambiguation is data-backed through selectors such as:
+  - `feeder:us`
+  - `feeder:ie`
+  - `parallel:us`
+  - `aggregator`
+
+This preserves the intended layering:
+
+- SemOS governs the map and verb contracts
+- the runtime persists structure relationships as first-class operational facts
+- constellation hydration projects those facts into the server-side graph returned to the UI
+
+No new reducer semantics were introduced for child CBUs in this pass. Child `cbu` slots remain structural slots that surface `filled` when a persisted link exists and `empty` when it does not.
+
 ### Constellation Macro/SemOS Remediation (2026-03-13)
 
 The March 13 Constellation remediation pack closed a specific metadata-integrity gap between the macro layer and the SemOS overlay:

@@ -23,6 +23,7 @@ pub struct SlotDef {
     pub table: Option<String>,
     pub pk: Option<String>,
     pub join: Option<JoinDef>,
+    pub occurrence: Option<usize>,
     pub cardinality: Cardinality,
     #[serde(default)]
     pub depends_on: Vec<DependencyEntry>,

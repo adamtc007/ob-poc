@@ -198,7 +198,10 @@ pub use attribute_ops::{
     AttributeListSourcesOp, AttributeTraceLineageOp, DocumentCheckExtractionCoverageOp,
     DocumentListAttributesOp,
 };
-pub use cbu_ops::{CbuAddProductOp, CbuDecideOp, CbuDeleteCascadeOp, CbuShowOp};
+pub use cbu_ops::{
+    CbuAddProductOp, CbuDecideOp, CbuDeleteCascadeOp, CbuLinkStructureOp,
+    CbuListStructureLinksOp, CbuShowOp,
+};
 pub use cbu_role_ops::{
     CbuRoleAssignControlOp, CbuRoleAssignFundOp, CbuRoleAssignOwnershipOp, CbuRoleAssignServiceOp,
     CbuRoleAssignSignatoryOp, CbuRoleAssignTrustOp, CbuRoleValidateAllOp,

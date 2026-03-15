@@ -32,7 +32,7 @@ pub struct ResolvedSlot {
 ///
 /// # Examples
 /// ```rust
-/// use ob_poc::sem_reg::constellation::{load_constellation_map, validate_constellation_map};
+/// use ob_poc::sem_reg::constellation::{validate_constellation_map, ConstellationMapDef};
 ///
 /// let yaml = r#"
 /// constellation: demo
@@ -44,8 +44,8 @@ pub struct ResolvedSlot {
 ///     pk: cbu_id
 ///     cardinality: root
 /// "#;
-/// let map = load_constellation_map(yaml).unwrap();
-/// let validated = validate_constellation_map(&map).unwrap();
+/// let definition: ConstellationMapDef = serde_yaml::from_str(yaml).unwrap();
+/// let validated = validate_constellation_map(&definition).unwrap();
 /// assert_eq!(validated.constellation, "demo");
 /// ```
 pub fn validate_constellation_map(
@@ -133,7 +133,10 @@ fn flatten_slots(
 }
 
 fn validate_slot(slot: &ResolvedSlot, names: &HashSet<String>) -> ConstellationResult<()> {
-    if slot.def.cardinality != Cardinality::Root && slot.def.join.is_none() {
+    if slot.def.cardinality != Cardinality::Root
+        && slot.def.slot_type != SlotType::Cbu
+        && slot.def.join.is_none()
+    {
         return Err(ConstellationError::Validation(format!(
             "slot '{}' requires a join definition",
             slot.name

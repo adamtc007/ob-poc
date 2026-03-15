@@ -1,5 +1,5 @@
-constellation: struct.lux.ucits.sicav
-description: Luxembourg UCITS SICAV onboarding constellation
+constellation: struct.lux.aif.raif
+description: Luxembourg AIF RAIF onboarding constellation
 jurisdiction: LU
 slots:
   cbu:
@@ -11,7 +11,7 @@ slots:
       create: cbu.create
       read: cbu.read
       show: cbu.show
-  management_company:
+  aifm:
     type: entity
     entity_kinds: [organization]
     join:
@@ -19,14 +19,12 @@ slots:
       parent_fk: cbu_id
       child_fk: entity_id
       filter_column: role
-      filter_value: management-company
+      filter_value: aifm
     cardinality: mandatory
     depends_on: [cbu]
-    placeholder: true
-    placeholder_detection: name_match
+    placeholder: AIFM TBD
     state_machine: entity_kyc_lifecycle
-    overlays:
-      [entity_ref, workstream, screenings, evidence, red_flags, doc_requests]
+    overlays: [entity_ref, workstream, screenings, evidence, red_flags, doc_requests]
     verbs:
       ensure:
         verb: entity.ensure-or-placeholder
@@ -54,10 +52,9 @@ slots:
       filter_value: depositary
     cardinality: mandatory
     depends_on: [cbu]
-    placeholder: true
+    placeholder: Depositary TBD
     state_machine: entity_kyc_lifecycle
-    overlays:
-      [entity_ref, workstream, screenings, evidence, red_flags, doc_requests]
+    overlays: [entity_ref, workstream, screenings, evidence, red_flags, doc_requests]
     verbs:
       ensure:
         verb: entity.ensure-or-placeholder
@@ -71,6 +68,9 @@ slots:
       add:
         verb: party.add
         when: empty
+      show:
+        verb: entity.read
+        when: filled
   investment_manager:
     type: entity
     entity_kinds: [organization]
@@ -82,10 +82,9 @@ slots:
       filter_value: investment-manager
     cardinality: optional
     depends_on: [cbu]
-    placeholder: true
+    placeholder: Investment Manager TBD
     state_machine: entity_kyc_lifecycle
-    overlays:
-      [entity_ref, workstream, screenings, evidence, red_flags, doc_requests]
+    overlays: [entity_ref, workstream, screenings, evidence, red_flags, doc_requests]
     verbs:
       ensure:
         verb: entity.ensure-or-placeholder
@@ -93,6 +92,105 @@ slots:
       assign:
         verb: cbu.assign-role
         when: placeholder
+      search:
+        verb: party.search
+        when: [placeholder, filled]
+      add:
+        verb: party.add
+        when: empty
+      show:
+        verb: entity.read
+        when: filled
+  administrator:
+    type: entity
+    entity_kinds: [organization]
+    join:
+      via: cbu_entity_roles
+      parent_fk: cbu_id
+      child_fk: entity_id
+      filter_column: role
+      filter_value: administrator
+    cardinality: optional
+    depends_on: [cbu]
+    placeholder: Administrator TBD
+    state_machine: entity_kyc_lifecycle
+    overlays: [entity_ref, workstream, screenings, evidence, red_flags, doc_requests]
+    verbs:
+      ensure:
+        verb: entity.ensure-or-placeholder
+        when: empty
+      assign:
+        verb: cbu.assign-role
+        when: placeholder
+      search:
+        verb: party.search
+        when: [placeholder, filled]
+      add:
+        verb: party.add
+        when: empty
+      show:
+        verb: entity.read
+        when: filled
+  auditor:
+    type: entity
+    entity_kinds: [organization]
+    join:
+      via: cbu_entity_roles
+      parent_fk: cbu_id
+      child_fk: entity_id
+      filter_column: role
+      filter_value: auditor
+    cardinality: optional
+    depends_on: [cbu]
+    placeholder: Auditor TBD
+    state_machine: entity_kyc_lifecycle
+    overlays: [entity_ref, workstream, screenings, evidence, red_flags, doc_requests]
+    verbs:
+      ensure:
+        verb: entity.ensure-or-placeholder
+        when: empty
+      assign:
+        verb: cbu.assign-role
+        when: placeholder
+      search:
+        verb: party.search
+        when: [placeholder, filled]
+      add:
+        verb: party.add
+        when: empty
+      show:
+        verb: entity.read
+        when: filled
+  prime_broker:
+    type: entity
+    entity_kinds: [organization]
+    join:
+      via: cbu_entity_roles
+      parent_fk: cbu_id
+      child_fk: entity_id
+      filter_column: role
+      filter_value: prime-broker
+    cardinality: optional
+    depends_on: [cbu]
+    placeholder: Prime Broker TBD
+    state_machine: entity_kyc_lifecycle
+    overlays: [entity_ref, workstream, screenings, evidence, red_flags, doc_requests]
+    verbs:
+      ensure:
+        verb: entity.ensure-or-placeholder
+        when: empty
+      assign:
+        verb: cbu.assign-role
+        when: placeholder
+      search:
+        verb: party.search
+        when: [placeholder, filled]
+      add:
+        verb: party.add
+        when: empty
+      show:
+        verb: entity.read
+        when: filled
   ownership_chain:
     type: entity_graph
     entity_kinds: [person, organization]
@@ -102,7 +200,7 @@ slots:
       child_fk: to_entity_id
     cardinality: recursive
     max_depth: 5
-    depends_on: [management_company]
+    depends_on: [aifm]
     state_machine: ubo_epistemic_lifecycle
     overlays: [registry, evidence, screenings]
     edge_overlays: [ownership]
@@ -122,7 +220,7 @@ slots:
       parent_fk: cbu_id
       child_fk: case_id
     cardinality: optional
-    depends_on: [management_company]
+    depends_on: [aifm]
     verbs:
       open: case.open
       submit: case.submit

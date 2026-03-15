@@ -273,21 +273,21 @@ struct.hedge.cross-border:
         entity_id: "@depositary"
 
     # Link feeders to master in cross-border structure
-    # PARKED: cbu.link-structure does not exist. Requires new verb in cbu.yaml to model master-feeder/GP-LP-SPV CBU relationships.
-    # - verb: cbu.link-structure
-    #   args:
-    #     parent_cbu_id: "@master"
-    #     child_cbu_id: "@us-feeder"
-    #     relationship_type: feeder
-    #     capital_flow: upstream
+    - verb: cbu.link-structure
+      args:
+        parent_cbu_id: "@master"
+        child_cbu_id: "@us-feeder"
+        relationship_type: feeder
+        relationship_selector: feeder:us
+        capital_flow: upstream
 
-    # PARKED: cbu.link-structure does not exist. Requires new verb in cbu.yaml to model master-feeder/GP-LP-SPV CBU relationships.
-    # - verb: cbu.link-structure
-    #   args:
-    #     parent_cbu_id: "@master"
-    #     child_cbu_id: "@ie-feeder"
-    #     relationship_type: feeder
-    #     capital_flow: upstream
+    - verb: cbu.link-structure
+      args:
+        parent_cbu_id: "@master"
+        child_cbu_id: "@ie-feeder"
+        relationship_type: feeder
+        relationship_selector: feeder:ie
+        capital_flow: upstream
 
   sets-state:
     - key: structure.exists
@@ -468,13 +468,13 @@ struct.pe.cross-border:
       as: "@trading-profile-us"
 
     # Link parallel to main in cross-border structure
-    # PARKED: cbu.link-structure does not exist. Requires new verb in cbu.yaml to model master-feeder/GP-LP-SPV CBU relationships.
-    # - verb: cbu.link-structure
-    #   args:
-    #     parent_cbu_id: "@cbu"
-    #     child_cbu_id: "@us-parallel"
-    #     relationship_type: parallel
-    #     capital_flow: co-invest
+    - verb: cbu.link-structure
+      args:
+        parent_cbu_id: "@cbu"
+        child_cbu_id: "@us-parallel"
+        relationship_type: parallel
+        relationship_selector: parallel:us
+        capital_flow: co-invest
 
     # Create aggregation vehicle for co-investments
     - verb: cbu.create
@@ -486,21 +486,21 @@ struct.pe.cross-border:
         parent_fund_ids: ["@cbu", "@us-parallel"]
       as: "@aggregator"
 
-    # PARKED: cbu.link-structure does not exist. Requires new verb in cbu.yaml to model master-feeder/GP-LP-SPV CBU relationships.
-    # - verb: cbu.link-structure
-    #   args:
-    #     parent_cbu_id: "@cbu"
-    #     child_cbu_id: "@aggregator"
-    #     relationship_type: co-invest-vehicle
-    #     capital_flow: downstream
+    - verb: cbu.link-structure
+      args:
+        parent_cbu_id: "@cbu"
+        child_cbu_id: "@aggregator"
+        relationship_type: aggregator
+        relationship_selector: aggregator
+        capital_flow: downstream
 
-    # PARKED: cbu.link-structure does not exist. Requires new verb in cbu.yaml to model master-feeder/GP-LP-SPV CBU relationships.
-    # - verb: cbu.link-structure
-    #   args:
-    #     parent_cbu_id: "@us-parallel"
-    #     child_cbu_id: "@aggregator"
-    #     relationship_type: co-invest-vehicle
-    #     capital_flow: downstream
+    - verb: cbu.link-structure
+      args:
+        parent_cbu_id: "@us-parallel"
+        child_cbu_id: "@aggregator"
+        relationship_type: aggregator
+        relationship_selector: aggregator
+        capital_flow: downstream
 
   sets-state:
     - key: structure.exists

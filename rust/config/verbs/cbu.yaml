@@ -720,6 +720,106 @@ domains:
           type: uuid
           name: cbu_entity_role_id
           capture: false
+      link-structure:
+        description: Persist a parent-child structure link between two CBUs
+        invocation_phrases:
+          - "link CBU structure"
+          - "link feeder to master"
+          - "link parallel fund"
+          - "connect child CBU to parent"
+          - "attach feeder structure"
+          - "link aggregator to fund"
+        behavior: plugin
+        handler: CbuLinkStructureOp
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: cbu
+          tags: [relationship, write, structure, onboarding]
+          phase_tags: [onboarding]
+          side_effects: state_write
+        args:
+          - name: parent-cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: child-cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: relationship-type
+            type: string
+            required: true
+            description: "FEEDER, PARALLEL, AGGREGATOR, MASTER, or CO_INVEST_VEHICLE"
+          - name: relationship-selector
+            type: string
+            required: false
+            description: "Slot-facing selector such as feeder:us or feeder:ie"
+          - name: capital-flow
+            type: string
+            required: false
+          - name: effective-from
+            type: date
+            required: false
+          - name: effective-to
+            type: date
+            required: false
+        returns:
+          type: uuid
+          name: child_cbu_id
+          capture: true
+      list-structure-links:
+        description: List persisted structure links for a parent or child CBU
+        invocation_phrases:
+          - "list CBU structure links"
+          - "show feeder links"
+          - "show linked structures"
+          - "list cross-border structure"
+        behavior: plugin
+        handler: CbuListStructureLinksOp
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: cbu
+          tags: [read, query, relationship, structure]
+          phase_tags: [onboarding]
+          side_effects: facts_only
+        args:
+          - name: parent-cbu-id
+            type: uuid
+            required: false
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: child-cbu-id
+            type: uuid
+            required: false
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: status
+            type: string
+            required: false
+        returns:
+          type: record_set
       remove-role:
         description: Remove a specific role from an entity within a CBU
         invocation_phrases:

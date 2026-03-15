@@ -2,9 +2,6 @@ use super::error::{ConstellationError, ConstellationResult};
 use super::map_loader::load_constellation_map;
 use super::validate::ValidatedConstellationMap;
 
-const LUX_UCITS_SICAV_YAML: &str =
-    include_str!("../../../config/sem_os_seeds/constellation_maps/struct_lux_ucits_sicav.yaml");
-
 /// Load one of the baked-in constellation maps.
 ///
 /// # Examples
@@ -17,11 +14,22 @@ const LUX_UCITS_SICAV_YAML: &str =
 pub fn load_builtin_constellation_map(
     name: &str,
 ) -> ConstellationResult<ValidatedConstellationMap> {
-    match name {
-        "struct.lux.ucits.sicav" => load_constellation_map(LUX_UCITS_SICAV_YAML),
-        other => Err(ConstellationError::Validation(format!(
-            "unknown built-in constellation map '{}'",
-            other
-        ))),
+    if !name
+        .chars()
+        .all(|ch| ch.is_ascii_alphanumeric() || ch == '.' || ch == '_' || ch == '-')
+    {
+        return Err(ConstellationError::Validation(format!(
+            "invalid built-in constellation map '{}'",
+            name
+        )));
     }
+
+    let filename = format!("{}.yaml", name.replace(['.', '-'], "_"));
+    let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("config/sem_os_seeds/constellation_maps")
+        .join(filename);
+    let yaml = std::fs::read_to_string(&path).map_err(|_| {
+        ConstellationError::Validation(format!("unknown built-in constellation map '{}'", name))
+    })?;
+    load_constellation_map(&yaml)
 }

@@ -128,4 +128,29 @@ mod tests {
                 .any(|warning| warning.contains("deterministic representative"))
         );
     }
+
+    #[test]
+    fn child_cbu_slot_normalizes_as_filled_when_linked() {
+        let map = load_builtin_constellation_map("struct.hedge.cross-border").unwrap();
+        let feeder_cbu_id = Uuid::new_v4();
+        let mut raw = RawHydrationData::default();
+        raw.slot_rows.insert(
+            "cbu.us_feeder".into(),
+            vec![RawSlotRow {
+                entity_id: Some(feeder_cbu_id),
+                record_id: Some(feeder_cbu_id),
+                filter_value: Some(String::from("feeder:us")),
+                created_at: None,
+            }],
+        );
+
+        let hydrated = normalize_slots(&map, Uuid::nil(), None, raw);
+        let feeder = hydrated.slots[0]
+            .children
+            .iter()
+            .find(|slot| slot.name == "cbu.us_feeder")
+            .unwrap();
+        assert_eq!(feeder.effective_state, "filled");
+        assert_eq!(feeder.record_id, Some(feeder_cbu_id));
+    }
 }

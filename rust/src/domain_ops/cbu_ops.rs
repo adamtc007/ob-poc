@@ -14,9 +14,52 @@ use crate::dsl_v2::ast::VerbCall;
 use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
 
 #[cfg(feature = "database")]
+use chrono::NaiveDate;
+#[cfg(feature = "database")]
 use sqlx::PgPool;
 #[cfg(feature = "database")]
 use uuid::Uuid;
+
+#[cfg(feature = "database")]
+fn extract_uuid_alias(
+    verb_call: &VerbCall,
+    ctx: &ExecutionContext,
+    keys: &[&str],
+) -> Option<Uuid> {
+    verb_call.arguments.iter().find_map(|arg| {
+        if !keys.iter().any(|key| arg.key == *key) {
+            return None;
+        }
+        if let Some(symbol) = arg.value.as_symbol() {
+            return ctx.resolve(symbol);
+        }
+        if let Some(uuid) = arg.value.as_uuid() {
+            return Some(uuid);
+        }
+        arg.value
+            .as_string()
+            .and_then(|value| Uuid::parse_str(value).ok())
+    })
+}
+
+#[cfg(feature = "database")]
+fn extract_string_alias(verb_call: &VerbCall, keys: &[&str]) -> Option<String> {
+    verb_call.arguments.iter().find_map(|arg| {
+        if keys.iter().any(|key| arg.key == *key) {
+            return arg.value.as_string().map(ToOwned::to_owned);
+        }
+        None
+    })
+}
+
+#[cfg(feature = "database")]
+fn parse_optional_date(value: Option<String>, arg_name: &str) -> Result<Option<NaiveDate>> {
+    value.map(|raw| {
+        NaiveDate::parse_from_str(&raw, "%Y-%m-%d")
+            .map_err(|err| anyhow::anyhow!("invalid {} '{}': {}", arg_name, raw, err))
+    })
+    .transpose()
+}
 
 // ============================================================================
 // CBU Create (with entity-based idempotency)
@@ -244,6 +287,440 @@ impl CustomOperation for CbuCreateOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(serde_json::json!({
             "error": "Database feature required for cbu.create"
+        })))
+    }
+}
+
+// ============================================================================
+// CBU Structure Links
+// ============================================================================
+
+/// Persist a parent-child structure link between two CBUs.
+#[register_custom_op]
+pub struct CbuLinkStructureOp;
+
+#[async_trait]
+impl CustomOperation for CbuLinkStructureOp {
+    fn domain(&self) -> &'static str {
+        "cbu"
+    }
+
+    fn verb(&self) -> &'static str {
+        "link-structure"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Persists cross-border and parallel-fund structure relationships between CBUs"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let parent_cbu_id =
+            extract_uuid_alias(verb_call, ctx, &["parent-cbu-id", "parent_cbu_id"]).ok_or_else(
+                || anyhow::anyhow!("cbu.link-structure: missing required argument :parent-cbu-id"),
+            )?;
+        let child_cbu_id =
+            extract_uuid_alias(verb_call, ctx, &["child-cbu-id", "child_cbu_id"]).ok_or_else(
+                || anyhow::anyhow!("cbu.link-structure: missing required argument :child-cbu-id"),
+            )?;
+        let relationship_type_raw =
+            extract_string_alias(verb_call, &["relationship-type", "relationship_type"])
+                .ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "cbu.link-structure: missing required argument :relationship-type"
+                    )
+                })?;
+        let relationship_type = relationship_type_raw
+            .replace('-', "_")
+            .to_ascii_uppercase();
+        let relationship_selector = extract_string_alias(
+            verb_call,
+            &["relationship-selector", "relationship_selector"],
+        )
+        .unwrap_or_else(|| relationship_type_raw.to_ascii_lowercase());
+        let capital_flow = extract_string_alias(verb_call, &["capital-flow", "capital_flow"]);
+        let effective_from = parse_optional_date(
+            extract_string_alias(verb_call, &["effective-from", "effective_from"]),
+            "effective-from",
+        )?;
+        let effective_to = parse_optional_date(
+            extract_string_alias(verb_call, &["effective-to", "effective_to"]),
+            "effective-to",
+        )?;
+
+        const ALLOWED_RELATIONSHIP_TYPES: &[&str] =
+            &["FEEDER", "PARALLEL", "AGGREGATOR", "MASTER", "CO_INVEST_VEHICLE"];
+        if !ALLOWED_RELATIONSHIP_TYPES.contains(&relationship_type.as_str()) {
+            return Err(anyhow::anyhow!(
+                "cbu.link-structure: unsupported relationship-type '{}'",
+                relationship_type_raw
+            ));
+        }
+
+        let parent_exists: Option<Uuid> =
+            sqlx::query_scalar(r#"SELECT cbu_id FROM "ob-poc".cbus WHERE cbu_id = $1"#)
+                .bind(parent_cbu_id)
+                .fetch_optional(pool)
+                .await?;
+        if parent_exists.is_none() {
+            return Err(anyhow::anyhow!(
+                "cbu.link-structure: parent CBU not found: {}",
+                parent_cbu_id
+            ));
+        }
+
+        let child_exists: Option<Uuid> =
+            sqlx::query_scalar(r#"SELECT cbu_id FROM "ob-poc".cbus WHERE cbu_id = $1"#)
+                .bind(child_cbu_id)
+                .fetch_optional(pool)
+                .await?;
+        if child_exists.is_none() {
+            return Err(anyhow::anyhow!(
+                "cbu.link-structure: child CBU not found: {}",
+                child_cbu_id
+            ));
+        }
+
+        let mut tx = pool.begin().await?;
+
+        let existing_link_id: Option<Uuid> = sqlx::query_scalar(
+            r#"
+            SELECT link_id
+            FROM "ob-poc".cbu_structure_links
+            WHERE parent_cbu_id = $1
+              AND child_cbu_id = $2
+              AND relationship_type = $3
+              AND status = 'ACTIVE'
+            LIMIT 1
+            "#,
+        )
+        .bind(parent_cbu_id)
+        .bind(child_cbu_id)
+        .bind(&relationship_type)
+        .fetch_optional(&mut *tx)
+        .await?;
+
+        if let Some(link_id) = existing_link_id {
+            sqlx::query(
+                r#"
+                UPDATE "ob-poc".cbu_structure_links
+                SET relationship_selector = $2,
+                    capital_flow = $3,
+                    effective_from = $4,
+                    effective_to = $5,
+                    status = 'ACTIVE',
+                    updated_at = NOW()
+                WHERE link_id = $1
+                "#,
+            )
+            .bind(link_id)
+            .bind(&relationship_selector)
+            .bind(&capital_flow)
+            .bind(effective_from)
+            .bind(effective_to)
+            .execute(&mut *tx)
+            .await?;
+        } else {
+            sqlx::query(
+                r#"
+                INSERT INTO "ob-poc".cbu_structure_links (
+                    parent_cbu_id,
+                    child_cbu_id,
+                    relationship_type,
+                    relationship_selector,
+                    status,
+                    capital_flow,
+                    effective_from,
+                    effective_to
+                )
+                VALUES ($1, $2, $3, $4, 'ACTIVE', $5, $6, $7)
+                "#,
+            )
+            .bind(parent_cbu_id)
+            .bind(child_cbu_id)
+            .bind(&relationship_type)
+            .bind(&relationship_selector)
+            .bind(&capital_flow)
+            .bind(effective_from)
+            .bind(effective_to)
+            .execute(&mut *tx)
+            .await?;
+        }
+
+        tx.commit().await?;
+
+        if let Some(binding) = &verb_call.binding {
+            ctx.bind(binding, child_cbu_id);
+        }
+
+        Ok(ExecutionResult::Uuid(child_cbu_id))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Record(serde_json::json!({
+            "error": "Database feature required for cbu.link-structure"
+        })))
+    }
+}
+
+/// List persisted structure links for a parent or child CBU.
+#[register_custom_op]
+pub struct CbuListStructureLinksOp;
+
+#[async_trait]
+impl CustomOperation for CbuListStructureLinksOp {
+    fn domain(&self) -> &'static str {
+        "cbu"
+    }
+
+    fn verb(&self) -> &'static str {
+        "list-structure-links"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Reads persisted cross-border structure relationships for diagnostics and macros"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let parent_cbu_id = extract_uuid_alias(verb_call, ctx, &["parent-cbu-id", "parent_cbu_id"]);
+        let child_cbu_id = extract_uuid_alias(verb_call, ctx, &["child-cbu-id", "child_cbu_id"]);
+        let status = extract_string_alias(verb_call, &["status"]);
+
+        if parent_cbu_id.is_none() && child_cbu_id.is_none() {
+            return Err(anyhow::anyhow!(
+                "cbu.list-structure-links: one of :parent-cbu-id or :child-cbu-id is required"
+            ));
+        }
+
+        let rows = match (parent_cbu_id, child_cbu_id, status) {
+            (Some(parent), Some(child), Some(status)) => {
+                sqlx::query_as::<_, (Uuid, Uuid, String, Uuid, String, String, String, String, Option<String>, Option<NaiveDate>, Option<NaiveDate>)>(
+                    r#"
+                    SELECT
+                        l.link_id,
+                        l.parent_cbu_id,
+                        p.name,
+                        l.child_cbu_id,
+                        c.name,
+                        l.relationship_type,
+                        l.relationship_selector,
+                        l.status,
+                        l.capital_flow,
+                        l.effective_from,
+                        l.effective_to
+                    FROM "ob-poc".cbu_structure_links l
+                    JOIN "ob-poc".cbus p ON p.cbu_id = l.parent_cbu_id
+                    JOIN "ob-poc".cbus c ON c.cbu_id = l.child_cbu_id
+                    WHERE l.parent_cbu_id = $1
+                      AND l.child_cbu_id = $2
+                      AND l.status = $3
+                    ORDER BY l.created_at DESC
+                    "#,
+                )
+                .bind(parent)
+                .bind(child)
+                .bind(status.to_ascii_uppercase())
+                .fetch_all(pool)
+                .await?
+            }
+            (Some(parent), Some(child), None) => {
+                sqlx::query_as::<_, (Uuid, Uuid, String, Uuid, String, String, String, String, Option<String>, Option<NaiveDate>, Option<NaiveDate>)>(
+                    r#"
+                    SELECT
+                        l.link_id,
+                        l.parent_cbu_id,
+                        p.name,
+                        l.child_cbu_id,
+                        c.name,
+                        l.relationship_type,
+                        l.relationship_selector,
+                        l.status,
+                        l.capital_flow,
+                        l.effective_from,
+                        l.effective_to
+                    FROM "ob-poc".cbu_structure_links l
+                    JOIN "ob-poc".cbus p ON p.cbu_id = l.parent_cbu_id
+                    JOIN "ob-poc".cbus c ON c.cbu_id = l.child_cbu_id
+                    WHERE l.parent_cbu_id = $1
+                      AND l.child_cbu_id = $2
+                    ORDER BY l.created_at DESC
+                    "#,
+                )
+                .bind(parent)
+                .bind(child)
+                .fetch_all(pool)
+                .await?
+            }
+            (Some(parent), None, Some(status)) => {
+                sqlx::query_as::<_, (Uuid, Uuid, String, Uuid, String, String, String, String, Option<String>, Option<NaiveDate>, Option<NaiveDate>)>(
+                    r#"
+                    SELECT
+                        l.link_id,
+                        l.parent_cbu_id,
+                        p.name,
+                        l.child_cbu_id,
+                        c.name,
+                        l.relationship_type,
+                        l.relationship_selector,
+                        l.status,
+                        l.capital_flow,
+                        l.effective_from,
+                        l.effective_to
+                    FROM "ob-poc".cbu_structure_links l
+                    JOIN "ob-poc".cbus p ON p.cbu_id = l.parent_cbu_id
+                    JOIN "ob-poc".cbus c ON c.cbu_id = l.child_cbu_id
+                    WHERE l.parent_cbu_id = $1
+                      AND l.status = $2
+                    ORDER BY l.created_at DESC
+                    "#,
+                )
+                .bind(parent)
+                .bind(status.to_ascii_uppercase())
+                .fetch_all(pool)
+                .await?
+            }
+            (Some(parent), None, None) => {
+                sqlx::query_as::<_, (Uuid, Uuid, String, Uuid, String, String, String, String, Option<String>, Option<NaiveDate>, Option<NaiveDate>)>(
+                    r#"
+                    SELECT
+                        l.link_id,
+                        l.parent_cbu_id,
+                        p.name,
+                        l.child_cbu_id,
+                        c.name,
+                        l.relationship_type,
+                        l.relationship_selector,
+                        l.status,
+                        l.capital_flow,
+                        l.effective_from,
+                        l.effective_to
+                    FROM "ob-poc".cbu_structure_links l
+                    JOIN "ob-poc".cbus p ON p.cbu_id = l.parent_cbu_id
+                    JOIN "ob-poc".cbus c ON c.cbu_id = l.child_cbu_id
+                    WHERE l.parent_cbu_id = $1
+                    ORDER BY l.created_at DESC
+                    "#,
+                )
+                .bind(parent)
+                .fetch_all(pool)
+                .await?
+            }
+            (None, Some(child), Some(status)) => {
+                sqlx::query_as::<_, (Uuid, Uuid, String, Uuid, String, String, String, String, Option<String>, Option<NaiveDate>, Option<NaiveDate>)>(
+                    r#"
+                    SELECT
+                        l.link_id,
+                        l.parent_cbu_id,
+                        p.name,
+                        l.child_cbu_id,
+                        c.name,
+                        l.relationship_type,
+                        l.relationship_selector,
+                        l.status,
+                        l.capital_flow,
+                        l.effective_from,
+                        l.effective_to
+                    FROM "ob-poc".cbu_structure_links l
+                    JOIN "ob-poc".cbus p ON p.cbu_id = l.parent_cbu_id
+                    JOIN "ob-poc".cbus c ON c.cbu_id = l.child_cbu_id
+                    WHERE l.child_cbu_id = $1
+                      AND l.status = $2
+                    ORDER BY l.created_at DESC
+                    "#,
+                )
+                .bind(child)
+                .bind(status.to_ascii_uppercase())
+                .fetch_all(pool)
+                .await?
+            }
+            (None, Some(child), None) => {
+                sqlx::query_as::<_, (Uuid, Uuid, String, Uuid, String, String, String, String, Option<String>, Option<NaiveDate>, Option<NaiveDate>)>(
+                    r#"
+                    SELECT
+                        l.link_id,
+                        l.parent_cbu_id,
+                        p.name,
+                        l.child_cbu_id,
+                        c.name,
+                        l.relationship_type,
+                        l.relationship_selector,
+                        l.status,
+                        l.capital_flow,
+                        l.effective_from,
+                        l.effective_to
+                    FROM "ob-poc".cbu_structure_links l
+                    JOIN "ob-poc".cbus p ON p.cbu_id = l.parent_cbu_id
+                    JOIN "ob-poc".cbus c ON c.cbu_id = l.child_cbu_id
+                    WHERE l.child_cbu_id = $1
+                    ORDER BY l.created_at DESC
+                    "#,
+                )
+                .bind(child)
+                .fetch_all(pool)
+                .await?
+            }
+            (None, None, _) => unreachable!(),
+        };
+
+        Ok(ExecutionResult::RecordSet(
+            rows.into_iter()
+                .map(
+                    |(
+                        link_id,
+                        parent_cbu_id,
+                        parent_name,
+                        child_cbu_id,
+                        child_name,
+                        relationship_type,
+                        relationship_selector,
+                        status,
+                        capital_flow,
+                        effective_from,
+                        effective_to,
+                    )| {
+                        serde_json::json!({
+                            "link_id": link_id,
+                            "parent_cbu_id": parent_cbu_id,
+                            "parent_name": parent_name,
+                            "child_cbu_id": child_cbu_id,
+                            "child_name": child_name,
+                            "relationship_type": relationship_type,
+                            "relationship_selector": relationship_selector,
+                            "status": status,
+                            "capital_flow": capital_flow,
+                            "effective_from": effective_from.map(|value| value.to_string()),
+                            "effective_to": effective_to.map(|value| value.to_string()),
+                        })
+                    },
+                )
+                .collect(),
+        ))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Record(serde_json::json!({
+            "error": "Database feature required for cbu.list-structure-links"
         })))
     }
 }

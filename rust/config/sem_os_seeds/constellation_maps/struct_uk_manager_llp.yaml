@@ -1,0 +1,91 @@
+constellation: struct.uk.manager.llp
+description: United Kingdom manager LLP onboarding constellation
+jurisdiction: UK
+slots:
+  cbu:
+    type: cbu
+    table: cbus
+    pk: cbu_id
+    cardinality: root
+    verbs: { create: cbu.create, read: cbu.read, show: cbu.show }
+  designated_member_1:
+    type: entity
+    entity_kinds: [organization, person]
+    join: { via: cbu_entity_roles, parent_fk: cbu_id, child_fk: entity_id, filter_column: role, filter_value: designated-member }
+    occurrence: 1
+    cardinality: mandatory
+    depends_on: [cbu]
+    placeholder: Designated Member 1 TBD
+    state_machine: entity_kyc_lifecycle
+    overlays: [entity_ref, workstream, screenings, evidence, red_flags, doc_requests]
+    verbs: { ensure: { verb: entity.ensure-or-placeholder, when: empty }, assign: { verb: cbu.assign-role, when: placeholder }, search: { verb: party.search, when: [placeholder, filled] }, add: { verb: party.add, when: empty }, show: { verb: entity.read, when: filled } }
+  designated_member_2:
+    type: entity
+    entity_kinds: [organization, person]
+    join: { via: cbu_entity_roles, parent_fk: cbu_id, child_fk: entity_id, filter_column: role, filter_value: designated-member }
+    occurrence: 2
+    cardinality: mandatory
+    depends_on: [cbu]
+    placeholder: Designated Member 2 TBD
+    state_machine: entity_kyc_lifecycle
+    overlays: [entity_ref, workstream, screenings, evidence, red_flags, doc_requests]
+    verbs: { ensure: { verb: entity.ensure-or-placeholder, when: empty }, assign: { verb: cbu.assign-role, when: placeholder }, search: { verb: party.search, when: [placeholder, filled] }, add: { verb: party.add, when: empty }, show: { verb: entity.read, when: filled } }
+  compliance_officer:
+    type: entity
+    entity_kinds: [person]
+    join: { via: cbu_entity_roles, parent_fk: cbu_id, child_fk: entity_id, filter_column: role, filter_value: compliance-officer }
+    cardinality: optional
+    depends_on: [cbu]
+    placeholder: Compliance Officer TBD
+    state_machine: entity_kyc_lifecycle
+    overlays: [entity_ref, workstream, screenings, evidence, red_flags, doc_requests]
+    verbs: { ensure: { verb: entity.ensure-or-placeholder, when: empty }, assign: { verb: cbu.assign-role, when: placeholder }, search: { verb: party.search, when: [placeholder, filled] }, add: { verb: party.add, when: empty }, show: { verb: entity.read, when: filled } }
+  mlro:
+    type: entity
+    entity_kinds: [person]
+    join: { via: cbu_entity_roles, parent_fk: cbu_id, child_fk: entity_id, filter_column: role, filter_value: mlro }
+    cardinality: optional
+    depends_on: [cbu]
+    placeholder: MLRO TBD
+    state_machine: entity_kyc_lifecycle
+    overlays: [entity_ref, workstream, screenings, evidence, red_flags, doc_requests]
+    verbs: { ensure: { verb: entity.ensure-or-placeholder, when: empty }, assign: { verb: cbu.assign-role, when: placeholder }, search: { verb: party.search, when: [placeholder, filled] }, add: { verb: party.add, when: empty }, show: { verb: entity.read, when: filled } }
+  auditor:
+    type: entity
+    entity_kinds: [organization]
+    join: { via: cbu_entity_roles, parent_fk: cbu_id, child_fk: entity_id, filter_column: role, filter_value: auditor }
+    cardinality: optional
+    depends_on: [cbu]
+    placeholder: Auditor TBD
+    state_machine: entity_kyc_lifecycle
+    overlays: [entity_ref, workstream, screenings, evidence, red_flags, doc_requests]
+    verbs: { ensure: { verb: entity.ensure-or-placeholder, when: empty }, assign: { verb: cbu.assign-role, when: placeholder }, search: { verb: party.search, when: [placeholder, filled] }, add: { verb: party.add, when: empty }, show: { verb: entity.read, when: filled } }
+  ownership_chain:
+    type: entity_graph
+    entity_kinds: [person, organization]
+    join: { via: entity_relationships, parent_fk: from_entity_id, child_fk: to_entity_id }
+    cardinality: recursive
+    max_depth: 5
+    depends_on: [designated_member_1, designated_member_2]
+    state_machine: ubo_epistemic_lifecycle
+    overlays: [registry, evidence, screenings]
+    edge_overlays: [ownership]
+    verbs: { discover: ubo.discover, allege: ubo.allege, verify: ubo.verify, promote: ubo.promote, approve: ubo.approve, reject: ubo.reject }
+  case:
+    type: case
+    table: cases
+    pk: case_id
+    join: { via: cases, parent_fk: cbu_id, child_fk: case_id }
+    cardinality: optional
+    depends_on: [designated_member_1]
+    verbs: { open: case.open, submit: case.submit, approve: case.approve, reject: case.reject, request_info: case.request-info }
+    children:
+      tollgate:
+        type: tollgate
+        table: tollgate_evaluations
+        pk: evaluation_id
+        join: { via: tollgate_evaluations, parent_fk: case_id, child_fk: evaluation_id }
+        cardinality: optional
+        depends_on: [{ slot: case, min_state: placeholder }]
+        verbs: { evaluate: tollgate.evaluate }
+bulk_macros: [role_slots]

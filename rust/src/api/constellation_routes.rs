@@ -71,7 +71,7 @@ struct CbuCaseSummary {
 /// Create API routes for constellation hydration and summary lookup.
 ///
 /// # Examples
-/// ```rust
+/// ```rust,no_run
 /// # #[cfg(feature = "server")]
 /// # {
 /// use ob_poc::api::create_constellation_router;
