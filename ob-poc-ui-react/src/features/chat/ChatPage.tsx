@@ -4,9 +4,10 @@
 
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { chatApi } from "../../api/chat";
+import { scopeApi, type CbuSummary } from "../../api/scope";
 import { isSessionMissingError } from "../../api/sessionStorage";
 import { queryKeys, queryClient } from "../../lib/query";
 import { useChatStore } from "../../stores/chat";
@@ -14,6 +15,7 @@ import {
   ChatSidebar,
   ChatMessage,
   ChatInput,
+  ConstellationPanel,
   ScopePanel,
   VerbBrowser,
 } from "./components";
@@ -24,6 +26,7 @@ export function ChatPage() {
   const { sessionId } = useParams<{ sessionId?: string }>();
   const navigate = useNavigate();
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [selectedCbu, setSelectedCbu] = useState<CbuSummary | null>(null);
   const {
     setCurrentSession,
     currentSession,
@@ -40,6 +43,14 @@ export function ChatPage() {
     enabled: !!sessionId,
   });
   const sessionMissing = isSessionMissingError(error);
+
+  const { data: scopeData } = useQuery({
+    queryKey: queryKeys.scope(sessionId || ""),
+    queryFn: () => scopeApi.getScope(sessionId!),
+    enabled: !!sessionId,
+    retry: (failureCount, err) =>
+      !isSessionMissingError(err) && failureCount < 2,
+  });
 
   useEffect(() => {
     if (!sessionId || !sessionMissing) return;
@@ -61,6 +72,20 @@ export function ChatPage() {
       setCurrentSession(null);
     }
   }, [data, sessionId, setCurrentSession]);
+
+  useEffect(() => {
+    if (!scopeData?.cbus?.length) {
+      setSelectedCbu(null);
+      return;
+    }
+
+    setSelectedCbu((current) => {
+      if (current && scopeData.cbus.some((cbu) => cbu.id === current.id)) {
+        return current;
+      }
+      return scopeData.cbus[0] ?? null;
+    });
+  }, [scopeData]);
 
   // Fetch verb surface when session loads
   useEffect(() => {
@@ -126,6 +151,12 @@ export function ChatPage() {
             : undefined,
         );
       }
+      if (sessionId) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.scope(sessionId) });
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.constellation.all,
+        });
+      }
       setStreaming(false);
     },
     onError: (err) => {
@@ -156,6 +187,12 @@ export function ChatPage() {
       }
       queryClient.invalidateQueries({
         queryKey: queryKeys.chat.session(sessionId!),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.scope(sessionId!),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.constellation.all,
       });
     },
   });
@@ -269,12 +306,22 @@ export function ChatPage() {
 
       {/* Right sidebar - Scope, Verbs, and Deal panels */}
       {!sessionMissing && (
-        <div className="w-72 flex-shrink-0 border-l border-[var(--border-primary)] bg-[var(--bg-secondary)] flex flex-col overflow-hidden">
+        <div className="w-[32rem] flex-shrink-0 border-l border-[var(--border-primary)] bg-[var(--bg-secondary)] flex flex-col overflow-hidden">
           {/* Deal context panel */}
           {sessionId && <DealPanel sessionId={sessionId} />}
 
           {/* Scope panel showing loaded CBUs */}
-          <ScopePanel sessionId={sessionId} />
+          <ScopePanel
+            sessionId={sessionId}
+            selectedCbuId={selectedCbu?.id ?? null}
+            onSelectCbu={setSelectedCbu}
+          />
+
+          <ConstellationPanel
+            selectedCbu={selectedCbu}
+            className="min-h-0"
+            onPromptAgent={handleSend}
+          />
 
           {/* Available commands / verb browser */}
           <VerbBrowser

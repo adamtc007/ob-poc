@@ -72,6 +72,9 @@ pub mod capital_routes;
 pub mod control_routes;
 
 #[cfg(feature = "server")]
+pub mod constellation_routes;
+
+#[cfg(feature = "server")]
 pub mod cbu_session_routes;
 
 #[cfg(feature = "server")]
@@ -145,6 +148,9 @@ pub use capital_routes::create_capital_router;
 
 #[cfg(feature = "server")]
 pub use control_routes::control_routes;
+
+#[cfg(feature = "server")]
+pub use constellation_routes::create_constellation_router;
 
 #[cfg(feature = "server")]
 pub use cbu_session_routes::{

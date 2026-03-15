@@ -33,6 +33,7 @@ mod capital_ops;
 mod cbu_ops;
 mod cbu_role_ops;
 mod client_group_ops;
+mod constellation_ops;
 mod control_compute_ops;
 mod control_ops;
 mod coverage_compute_ops;
@@ -86,6 +87,7 @@ mod semantic_ops;
 mod service_pipeline_ops;
 mod session_ops;
 pub(crate) mod skeleton_build_ops;
+mod state_ops;
 #[cfg(feature = "database")]
 pub use skeleton_build_ops::{
     run_coverage_compute, run_graph_validate, run_outreach_plan, run_tollgate_evaluate,
@@ -198,8 +200,8 @@ pub use attribute_ops::{
 };
 pub use cbu_ops::{CbuAddProductOp, CbuDecideOp, CbuDeleteCascadeOp, CbuShowOp};
 pub use cbu_role_ops::{
-    CbuRoleAssignControlOp, CbuRoleAssignFundOp, CbuRoleAssignOwnershipOp,
-    CbuRoleAssignServiceOp, CbuRoleAssignSignatoryOp, CbuRoleAssignTrustOp, CbuRoleValidateAllOp,
+    CbuRoleAssignControlOp, CbuRoleAssignFundOp, CbuRoleAssignOwnershipOp, CbuRoleAssignServiceOp,
+    CbuRoleAssignSignatoryOp, CbuRoleAssignTrustOp, CbuRoleValidateAllOp,
 };
 pub use document_ops::{DocumentCatalogOp, DocumentExtractOp};
 

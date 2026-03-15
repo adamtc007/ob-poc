@@ -1,0 +1,125 @@
+state_machine: entity_kyc_lifecycle
+description: Entity lifecycle through KYC verification
+states:
+  [
+    approved,
+    verified,
+    evidence_collected,
+    screening_complete,
+    workstream_open,
+    filled,
+    placeholder,
+    empty,
+  ]
+initial: empty
+transitions:
+  - from: empty
+    to: placeholder
+    verbs: [entity.ensure-or-placeholder]
+  - from: empty
+    to: filled
+    verbs: [party.add, cbu.assign-role]
+  - from: placeholder
+    to: filled
+    verbs: [party.search, entity.identify, cbu.assign-role]
+  - from: filled
+    to: workstream_open
+    verbs: [kyc-workstream.add]
+  - from: workstream_open
+    to: screening_complete
+    verbs: [screening.run]
+  - from: workstream_open
+    to: evidence_collected
+    verbs: [evidence.verify]
+  - from: screening_complete
+    to: verified
+    verbs: [kyc-workstream.close]
+  - from: evidence_collected
+    to: verified
+    verbs: [kyc-workstream.close]
+  - from: verified
+    to: approved
+    verbs: [case.approve]
+reducer:
+  overlay_sources:
+    entity_ref:
+      table: cbu_entity_roles
+      join: entity_id
+      provides: [entity_id, role]
+    workstream:
+      table: entity_workstreams
+      join: entity_id
+      provides: [workstream_id, status, risk_rating]
+    screenings:
+      table: screenings
+      join: workstream_id
+      provides: [screening_type, status, result_summary]
+      cardinality: many
+    evidence:
+      table: kyc_ubo_evidence
+      join: registry_id
+      provides: [evidence_type, status, verified_at]
+      cardinality: many
+    red_flags:
+      table: red_flags
+      join: case_id
+      provides: [flag_type, severity, status]
+      cardinality: many
+    doc_requests:
+      table: doc_requests
+      join: workstream_id
+      provides: [request_type, status]
+      cardinality: many
+  conditions:
+    entity_assigned:
+      expr: "entity_ref.entity_id IS NOT NULL"
+    entity_is_placeholder:
+      expr: "entity_ref.role = 'PLACEHOLDER'"
+    workstream_exists:
+      expr: "workstream.status IS NOT NULL"
+    all_screenings_run:
+      expr: "ANY(screenings WHERE status = 'CLEAR') AND NOT ANY(screenings WHERE status = 'PENDING')"
+    all_screenings_clear:
+      expr: "all_screenings_run AND NOT ANY(screenings WHERE status IN ('HIT_PENDING', 'HIT_CONFIRMED'))"
+    no_unreviewed_hits:
+      expr: "NOT ANY(screenings WHERE status = 'HIT_PENDING')"
+    all_evidence_verified:
+      expr: "ANY(evidence WHERE status = 'VERIFIED') AND NOT ANY(evidence WHERE status = 'REQUIRED')"
+    no_blocking_flags:
+      expr: "NOT ANY(red_flags WHERE status = 'OPEN')"
+    all_docs_satisfied:
+      expr: "NOT ANY(doc_requests WHERE status IN ('REQUIRED', 'REQUESTED'))"
+    workstream_closed_verified:
+      expr: "workstream.status = 'COMPLETE' AND workstream.risk_rating IS NOT NULL"
+    case_approved:
+      expr: "scope.case_status = 'APPROVED'"
+  rules:
+    - state: approved
+      requires: [workstream_closed_verified, case_approved, no_blocking_flags]
+    - state: verified
+      requires: [workstream_closed_verified, no_blocking_flags]
+    - state: evidence_collected
+      requires:
+        [
+          workstream_exists,
+          all_evidence_verified,
+          all_docs_satisfied,
+          no_blocking_flags,
+        ]
+    - state: screening_complete
+      requires:
+        [
+          workstream_exists,
+          all_screenings_run,
+          no_unreviewed_hits,
+          no_blocking_flags,
+        ]
+    - state: workstream_open
+      requires: [workstream_exists]
+    - state: filled
+      requires: [entity_assigned]
+      excludes: [entity_is_placeholder]
+    - state: placeholder
+      requires: [entity_assigned, entity_is_placeholder]
+    - state: empty
+      requires: []

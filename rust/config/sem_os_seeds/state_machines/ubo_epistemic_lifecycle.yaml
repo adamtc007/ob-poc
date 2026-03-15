@@ -1,0 +1,70 @@
+state_machine: ubo_epistemic_lifecycle
+description: UBO epistemic lifecycle
+states: [approved, proved, provable, alleged, undiscovered]
+initial: undiscovered
+transitions:
+  - from: undiscovered
+    to: alleged
+    verbs: [ubo.allege]
+  - from: alleged
+    to: provable
+    verbs: [ubo.collect-evidence]
+  - from: provable
+    to: proved
+    verbs: [ubo.verify]
+  - from: proved
+    to: approved
+    verbs: [case.approve]
+reducer:
+  overlay_sources:
+    registry:
+      table: ubo_registry
+      join: entity_id
+      provides: [status]
+    evidence:
+      table: kyc_ubo_evidence
+      join: registry_id
+      provides: [evidence_type, status, verified_at]
+      cardinality: many
+    screenings:
+      table: screenings
+      join: workstream_id
+      provides: [screening_type, status, result_summary]
+      cardinality: many
+  conditions:
+    registry_exists:
+      expr: "registry.status IS NOT NULL"
+    status_is:
+      expr: "registry.status = $1"
+      parameterized: true
+    status_approved:
+      expr: "status_is('APPROVED')"
+    status_proved:
+      expr: "status_is('PROVED')"
+    status_provable:
+      expr: "status_is('PROVABLE')"
+    status_alleged:
+      expr: "status_is('ALLEGED')"
+    has_linked_evidence:
+      expr: "ANY(evidence WHERE status IN ('REQUIRED', 'VERIFIED', 'WAIVED'))"
+    all_evidence_verified:
+      expr: "ALL(evidence WHERE status = 'VERIFIED')"
+    no_blocking_screening:
+      expr: "NOT ANY(screenings WHERE status = 'HIT_CONFIRMED')"
+  rules:
+    - state: approved
+      requires: [status_approved, all_evidence_verified, no_blocking_screening]
+    - state: proved
+      requires: [status_proved, all_evidence_verified]
+      consistency_check:
+        warn_unless: no_blocking_screening
+        warning: Proved UBO still has a blocking screening hit
+    - state: provable
+      requires: [status_provable]
+      consistency_check:
+        warn_unless: has_linked_evidence
+        warning: Provable UBO still lacks fully verified evidence
+    - state: alleged
+      requires: [status_alleged]
+    - state: undiscovered
+      requires: []

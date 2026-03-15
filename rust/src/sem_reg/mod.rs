@@ -89,6 +89,10 @@ pub mod projections;
 // Stewardship Agent: Changeset Layer (Phase 0) + Show Loop (Phase 1)
 pub mod stewardship;
 
+// State reducer core module
+pub mod constellation;
+pub mod reducer;
+
 // Re-export core types at module boundary
 pub use gates::{check_evidence_proof_rule, evaluate_publish_gates, GateResult, PublishGateResult};
 pub use store::SnapshotStore;

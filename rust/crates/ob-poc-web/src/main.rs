@@ -25,11 +25,11 @@ use crate::state::AppState;
 // Import API routers from main ob-poc crate
 use ob_poc::api::{
     control_routes, create_agent_router_with_semantic_and_repl, create_attribute_router,
-    create_cbu_session_router_with_pool, create_client_router, create_deal_router,
-    create_dsl_viewer_router, create_entity_router, create_graph_router, create_resolution_router,
-    create_scoped_entity_router, create_session_graph_router, create_session_store,
-    create_stewardship_router, create_taxonomy_router, create_trading_matrix_router,
-    create_universe_router, service_resource_router,
+    create_cbu_session_router_with_pool, create_client_router, create_constellation_router,
+    create_deal_router, create_dsl_viewer_router, create_entity_router, create_graph_router,
+    create_resolution_router, create_scoped_entity_router, create_session_graph_router,
+    create_session_store, create_stewardship_router, create_taxonomy_router,
+    create_trading_matrix_router, create_universe_router, service_resource_router,
 };
 
 // Import gateway resolver for resolution routes
@@ -922,6 +922,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .merge(create_session_graph_router(pool.clone(), sessions.clone()))
         // Galaxy navigation - universe view and cluster detail
         .merge(create_universe_router(pool.clone()))
+        // Constellation graph hydration API for UI feedback and debugging
+        .merge(create_constellation_router(pool.clone()))
         // Control/ownership routes (board controller, control sphere)
         .merge(control_routes(pool.clone()))
         // Session-scoped entity search (constraint cascade)

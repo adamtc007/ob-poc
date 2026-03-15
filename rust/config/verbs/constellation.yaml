@@ -1,0 +1,53 @@
+domains:
+  constellation:
+    description: Constellation map hydration and structure visualization
+    invocation_hints:
+      - "hydrate constellation"
+      - "constellation summary"
+    verbs:
+      hydrate:
+        description: Hydrate a full constellation with reducer states and action surfaces
+        behavior: plugin
+        handler: ConstellationHydrateOp
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: cbu
+          noun: constellation
+          side_effects: facts_only
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+          - name: case-id
+            type: uuid
+            required: false
+          - name: map-name
+            type: string
+            required: true
+        returns:
+          type: record
+          capture: false
+      summary:
+        description: Constellation summary counts
+        behavior: plugin
+        handler: ConstellationSummaryOp
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: cbu
+          noun: constellation_summary
+          side_effects: facts_only
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+          - name: case-id
+            type: uuid
+            required: false
+          - name: map-name
+            type: string
+            required: true
+        returns:
+          type: record
+          capture: false

@@ -1,0 +1,239 @@
+domains:
+  state:
+    description: Reducer-based slot state derivation and override management
+    invocation_hints:
+      - "derive slot state"
+      - "diagnose state"
+      - "override slot state"
+      - "list state overrides"
+    verbs:
+      derive:
+        description: Compute reducer state for a single slot
+        behavior: plugin
+        handler: StateDeriveOp
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: cbu
+          noun: state
+          side_effects: facts_only
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+          - name: entity-id
+            type: uuid
+            required: true
+          - name: slot-path
+            type: string
+            required: true
+          - name: case-id
+            type: uuid
+            required: false
+          - name: state-machine
+            type: string
+            required: false
+        returns:
+          type: record
+          capture: false
+
+      diagnose:
+        description: Compute a full reducer trace for a single slot
+        behavior: plugin
+        handler: StateDiagnoseOp
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: cbu
+          noun: state_trace
+          side_effects: facts_only
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+          - name: entity-id
+            type: uuid
+            required: true
+          - name: slot-path
+            type: string
+            required: true
+          - name: case-id
+            type: uuid
+            required: false
+          - name: state-machine
+            type: string
+            required: false
+        returns:
+          type: record
+          capture: false
+
+      derive-all:
+        description: Compute reducer state across all discovered slots for a constellation
+        behavior: plugin
+        handler: StateDeriveAllOp
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: cbu
+          noun: state
+          side_effects: facts_only
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+          - name: case-id
+            type: uuid
+            required: false
+          - name: state-machine
+            type: string
+            required: false
+        returns:
+          type: record_set
+          capture: false
+
+      blocked-why:
+        description: Explain why a verb is blocked for a slot
+        behavior: plugin
+        handler: StateBlockedWhyOp
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: cbu
+          noun: blocked_reason
+          side_effects: facts_only
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+          - name: entity-id
+            type: uuid
+            required: true
+          - name: slot-path
+            type: string
+            required: true
+          - name: verb
+            type: string
+            required: true
+          - name: case-id
+            type: uuid
+            required: false
+          - name: state-machine
+            type: string
+            required: false
+        returns:
+          type: record
+          capture: false
+
+      check-consistency:
+        description: Run reducer consistency checks across discovered slots
+        behavior: plugin
+        handler: StateCheckConsistencyOp
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: cbu
+          noun: state_consistency
+          side_effects: facts_only
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+          - name: case-id
+            type: uuid
+            required: false
+          - name: state-machine
+            type: string
+            required: false
+        returns:
+          type: record_set
+          capture: false
+
+      override:
+        description: Create a manual reducer override for a slot
+        behavior: plugin
+        handler: StateOverrideOp
+        metadata:
+          tier: governed
+          source_of_truth: operational
+          scope: cbu
+          noun: state_override
+          side_effects: state_write
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+          - name: entity-id
+            type: uuid
+            required: true
+          - name: slot-path
+            type: string
+            required: true
+          - name: override-state
+            type: string
+            required: true
+          - name: justification
+            type: string
+            required: true
+          - name: authority
+            type: string
+            required: true
+          - name: case-id
+            type: uuid
+            required: false
+          - name: constellation-type
+            type: string
+            required: false
+          - name: state-machine
+            type: string
+            required: false
+          - name: expires-at
+            type: string
+            required: false
+          - name: conditions
+            type: string
+            required: false
+        returns:
+          type: record
+          capture: false
+
+      revoke-override:
+        description: Revoke a reducer override
+        behavior: plugin
+        handler: StateRevokeOverrideOp
+        metadata:
+          tier: governed
+          source_of_truth: operational
+          scope: cbu
+          noun: state_override
+          side_effects: state_write
+        args:
+          - name: override-id
+            type: uuid
+            required: true
+          - name: reason
+            type: string
+            required: true
+          - name: revoked-by
+            type: string
+            required: false
+        returns:
+          type: record
+          capture: false
+
+      list-overrides:
+        description: List active reducer overrides for a CBU
+        behavior: plugin
+        handler: StateListOverridesOp
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: cbu
+          noun: state_override
+          side_effects: facts_only
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+        returns:
+          type: record_set
+          capture: false

@@ -26,6 +26,8 @@ import { queryKeys } from "../../../lib/query";
 interface ScopePanelProps {
   sessionId: string | undefined;
   className?: string;
+  selectedCbuId?: string | null;
+  onSelectCbu?: (cbu: CbuSummary) => void;
 }
 
 function CbuItem({
@@ -169,7 +171,12 @@ function CbuDetailView({
   );
 }
 
-export function ScopePanel({ sessionId, className = "" }: ScopePanelProps) {
+export function ScopePanel({
+  sessionId,
+  className = "",
+  selectedCbuId,
+  onSelectCbu,
+}: ScopePanelProps) {
   const [isExpanded, setIsExpanded] = useState(true);
   const [selectedCbu, setSelectedCbu] = useState<CbuSummary | null>(null);
 
@@ -296,8 +303,11 @@ export function ScopePanel({ sessionId, className = "" }: ScopePanelProps) {
                 <CbuItem
                   key={cbu.id}
                   cbu={cbu}
-                  isSelected={false}
-                  onClick={() => setSelectedCbu(cbu)}
+                  isSelected={selectedCbuId === cbu.id}
+                  onClick={() => {
+                    onSelectCbu?.(cbu);
+                    setSelectedCbu(cbu);
+                  }}
                 />
               ))}
               {cbus.length > 50 && (

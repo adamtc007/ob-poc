@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-> **Last reviewed:** 2026-03-13
+> **Last reviewed:** 2026-03-15
 > **Frontend:** React/TypeScript (`ob-poc-ui-react/`) - Chat UI with scope panel, Inspector, Semantic OS Tab
 > **Backend:** Rust/Axum (`rust/crates/ob-poc-web/`) - Serves React + REST API
 > **Crates:** 22 active Rust crates (16 ob-poc + 6 sem_os_*; esper_* deprecated; ob-poc-graph + viewport removed)
@@ -85,6 +85,8 @@
 > **CBU Constellation Remediation Pack (2026-03-13):** ✅ Complete — broken macro verb references were reconciled across the structure/mandate/party/case macro set, orphan SemOS footprints were removed, Tier A macro-referenced footprints were backfilled, client-group replacement footprints were remapped, and final validation closed at `Broken macro refs: 0`, `Orphan footprints: 0`, `Tier A missing: 0`
 > **KYC/UBO Constellation Enablement (2026-03-13):** ✅ Complete — 29 macro flows were added across `kyc-workstream`, `ubo`, `evidence`, `doc-request`, `screening-ops`, `red-flag`, and `tollgate`; missing primitive verb contracts and SemOS footprints were backfilled; final validation closed at `Registry verbs: 1068`, `Broken macro refs: 0`, `Orphan footprints: 0`, `Total SemOS footprints: 281`, `Tier A missing: 0`
 > **KYC/UBO Blocker Fixes (2026-03-13):** ✅ Complete — evidence macro self-resolution collisions were removed by renaming the primitive evidence verbs, `ubo.discover` now passes through `threshold` and `max-depth`, `OTHER` enum fallbacks were corrected for document requests and risk flags, and the post-fix validation gate stayed at `Broken macro refs: 0`, `Orphan footprints: 0`, `Tier A missing: 0`
+> **State Reducer Runtime (2026-03-15):** ✅ Core + runtime surface live — parser/evaluator/validation, seeded reducer YAMLs, override persistence, `state.*` verbs, REST-backed constellation/reducer hydration, and integration coverage for reducer parsing/eval/validation plus constellation map/action/hydration tests
+> **Constellation Hydration + Session UI (2026-03-15):** ✅ Live — builtin constellation maps, REST routes (`/api/cbu/:id/constellation`, `/summary`, `/cases`, `/api/constellation/by-name`, `/search-cbus`), session-integrated React constellation panel in chat, case selector bound to live CBU cases, ownership-chain node/edge payloads surfaced in the inspector, and slot-to-agent prompt loop wired through the normal chat session input path
 
 This is the root project guide for Claude Code. Domain-specific details are in annexes.
 
@@ -171,6 +173,11 @@ ob-poc-ui-react/
 | `POST /api/session/:id/input` | Unified session input ingress (`kind=utterance|decision_reply|repl_v2`) |
 | `GET /api/session/:id/scope-graph` | Get loaded CBUs (scope) |
 | `GET /api/cbu/:id/graph` | Get single CBU's entity graph |
+| `GET /api/cbu/:id/constellation` | Get hydrated constellation tree for a CBU/case |
+| `GET /api/cbu/:id/constellation/summary` | Get constellation summary metrics |
+| `GET /api/cbu/:id/cases` | List available KYC cases for constellation binding |
+| `GET /api/constellation/by-name` | Resolve a CBU by name and hydrate its constellation |
+| `GET /api/constellation/search-cbus` | Search CBUs for constellation workflows |
 | `GET /api/projections/:id` | Get Inspector projection |
 | `GET /api/sem-os/context` | Get Semantic OS registry stats + recent changesets |
 
@@ -224,6 +231,15 @@ The right-side panel shows loaded CBUs and supports drill-down:
 - **CBU List**: Click any CBU to see its entities
 - **Entity View**: Shows entities within the CBU (persons, organizations)
 - **Auto-refresh**: Updates every 5 seconds to reflect DSL execution
+
+### Constellation Panel
+
+The chat right rail now also includes a session-integrated constellation surface:
+- **Shared CBU focus**: Uses the same selected CBU as the scope panel
+- **Case binding**: Lists available `"ob-poc".cases` for the selected CBU and defaults to the newest case when present
+- **Server-side state**: Renders reducer-derived slot state from `/api/cbu/:id/constellation`
+- **Ownership chain**: Shows graph node/edge payloads for `entity_graph` slots in the slot inspector
+- **Agent loop closure**: “Ask Agent” and “Ask Why Blocked” buttons submit structured prompts through the same `POST /api/session/:id/input` chat path
 
 ### Semantic OS Tab
 

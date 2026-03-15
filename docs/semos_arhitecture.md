@@ -1,8 +1,8 @@
 # Semantic OS — Vision & Scope v3.0
 
 > **Version:** 3.0
-> **Date:** 2026-03-13
-> **Status:** Living document — consolidation of 9 prior specs, updated for the 2026-03-08 runtime schema consolidation, the 2026-03-12 document-governance bootstrap, and the 2026-03-13 NLCI/CBU surface reconciliation
+> **Date:** 2026-03-15
+> **Status:** Living document — consolidation of 9 prior specs, updated for the 2026-03-08 runtime schema consolidation, the 2026-03-12 document-governance bootstrap, the 2026-03-13 NLCI/CBU surface reconciliation, and the 2026-03-15 reducer/constellation runtime cutover
 > **Audience:** Engineering, governance, architecture review
 
 ---
@@ -108,6 +108,40 @@ The practical SemOS implication is:
 - Semantic OS runtime data is consolidated into `sem_reg`, `sem_reg_authoring`, and `sem_reg_pub`.
 - The legacy runtime schemas `stewardship`, `agent`, `teams`, `feedback`, `events`, `sessions`, `ob_ref`, and `ob_kyc` have been retired.
 - `rust/config/sem_os_seeds/domain_metadata.yaml` now covers `306/306` live `"ob-poc"` tables and includes remediated SemOS footprint metadata for `sem-reg` and stewardship-backed verbs.
+
+### Reducer + Constellation Runtime State (2026-03-15)
+
+The SemOS-governed CBU/KYC structure layer is now backed by a live reducer and constellation runtime in `ob-poc`:
+
+- reducer state machines are seeded under:
+  - `rust/config/sem_os_seeds/state_machines/`
+- constellation maps are seeded under:
+  - `rust/config/sem_os_seeds/constellation_maps/`
+- reducer execution lives under:
+  - `rust/src/sem_reg/reducer/`
+- constellation loading, hydration, normalization, action-surface, and summary live under:
+  - `rust/src/sem_reg/constellation/`
+
+Operationally, this means:
+
+- CBU/slot lifecycle state is now derived from formal reducer YAML rather than ad hoc UI logic.
+- Constellation hydration is server-side and REST-addressable:
+  - `GET /api/cbu/:cbu_id/constellation`
+  - `GET /api/cbu/:cbu_id/constellation/summary`
+  - `GET /api/cbu/:cbu_id/cases`
+  - `GET /api/constellation/by-name`
+  - `GET /api/constellation/search-cbus`
+- the chat UI consumes that server-side constellation payload directly, including:
+  - reducer-derived `computed_state` / `effective_state`
+  - available and blocked verbs
+  - override-aware slot status
+  - ownership-chain graph node/edge payloads for `entity_graph` slots
+
+This is now the intended boundary:
+
+- SemOS governs the contracts, metadata, and footprints.
+- reducer/constellation runtime turns those governed contracts into session-visible operational state.
+- the React chat UI is a projection/rendering layer only; it does not recompute reducer state client-side.
 
 ### Constellation Macro/SemOS Remediation (2026-03-13)
 

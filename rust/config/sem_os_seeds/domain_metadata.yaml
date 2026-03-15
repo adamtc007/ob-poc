@@ -3005,3 +3005,94 @@ domains:
         classification: internal
         pii: false
     verb_data_footprint: {}
+
+  # ---------------------------------------------------------------------------
+  # STATE — Reducer State Derivation and Overrides
+  # ---------------------------------------------------------------------------
+  state:
+    description: "Reducer-backed slot state derivation, diagnostics, and manual overrides"
+    tables:
+      state_overrides:
+        description: "Manual reducer overrides with expiry and revocation history"
+        governance_tier: governed
+        classification: confidential
+        pii: false
+    verb_data_footprint:
+      state.derive:
+        reads:
+          - cbu_entity_roles
+          - entity_workstreams
+          - screenings
+          - kyc_ubo_evidence
+          - red_flags
+          - doc_requests
+          - cases
+          - ubo_registry
+          - state_overrides
+      state.diagnose:
+        reads:
+          - cbu_entity_roles
+          - entity_workstreams
+          - screenings
+          - kyc_ubo_evidence
+          - red_flags
+          - doc_requests
+          - cases
+          - ubo_registry
+          - state_overrides
+      state.derive-all:
+        reads:
+          - cbu_entity_roles
+          - entity_workstreams
+          - screenings
+          - kyc_ubo_evidence
+          - red_flags
+          - doc_requests
+          - cases
+          - ubo_registry
+          - state_overrides
+      state.blocked-why:
+        reads:
+          - cbu_entity_roles
+          - entity_workstreams
+          - screenings
+          - kyc_ubo_evidence
+          - red_flags
+          - doc_requests
+          - cases
+          - ubo_registry
+          - state_overrides
+      state.check-consistency:
+        reads:
+          - cbu_entity_roles
+          - entity_workstreams
+          - screenings
+          - kyc_ubo_evidence
+          - red_flags
+          - doc_requests
+          - cases
+          - ubo_registry
+          - state_overrides
+      state.override:
+        reads:
+          - cbu_entity_roles
+          - entity_workstreams
+          - screenings
+          - kyc_ubo_evidence
+          - red_flags
+          - doc_requests
+          - cases
+          - ubo_registry
+          - state_overrides
+        writes:
+          - case_events
+          - state_overrides
+      state.revoke-override:
+        reads:
+          - state_overrides
+        writes:
+          - case_events
+          - state_overrides
+      state.list-overrides:
+        reads:
+          - state_overrides

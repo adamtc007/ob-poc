@@ -46,6 +46,28 @@ export const queryKeys = {
   // Session Scope
   scope: (sessionId: string) => ["scope", sessionId] as const,
 
+  constellation: {
+    all: ["constellation"] as const,
+    detail: (cbuId: string, caseId?: string, mapName?: string) =>
+      [
+        ...queryKeys.constellation.all,
+        "detail",
+        cbuId,
+        caseId ?? null,
+        mapName ?? null,
+      ] as const,
+    summary: (cbuId: string, caseId?: string, mapName?: string) =>
+      [
+        ...queryKeys.constellation.all,
+        "summary",
+        cbuId,
+        caseId ?? null,
+        mapName ?? null,
+      ] as const,
+    cases: (cbuId: string) =>
+      [...queryKeys.constellation.all, "cases", cbuId] as const,
+  },
+
   // Semantic OS
   semOs: {
     all: ["semOs"] as const,
