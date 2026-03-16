@@ -117,7 +117,8 @@ slots:
 
     #[test]
     fn loads_all_constellation_map_yamls() {
-        let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("config/sem_os_seeds/constellation_maps");
+        let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("config/sem_os_seeds/constellation_maps");
         let mut files = fs::read_dir(dir)
             .unwrap()
             .map(|entry| entry.unwrap().path())
@@ -137,11 +138,7 @@ slots:
         let hedge = load_builtin_constellation_map("struct.hedge.cross-border").unwrap();
         let us_feeder = hedge.slot_index.get("cbu.us_feeder").unwrap();
         assert_eq!(
-            us_feeder
-                .def
-                .join
-                .as_ref()
-                .map(|join| join.via.as_str()),
+            us_feeder.def.join.as_ref().map(|join| join.via.as_str()),
             Some("cbu_structure_links")
         );
         assert_eq!(

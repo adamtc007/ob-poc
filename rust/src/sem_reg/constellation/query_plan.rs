@@ -130,7 +130,12 @@ fn query_type_for_slot(slot: &super::validate::ResolvedSlot) -> QueryType {
 fn compile_overlay_sql(slot: &super::validate::ResolvedSlot) -> String {
     let mut sources = slot.def.overlays.clone();
     if !slot.def.edge_overlays.is_empty() {
-        sources.extend(slot.def.edge_overlays.iter().map(|source| format!("edge:{source}")));
+        sources.extend(
+            slot.def
+                .edge_overlays
+                .iter()
+                .map(|source| format!("edge:{source}")),
+        );
     }
     format!(
         "/* overlay batch for slot {} */ SELECT {}",

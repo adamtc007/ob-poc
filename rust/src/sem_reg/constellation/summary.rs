@@ -42,7 +42,10 @@ pub struct OwnershipSummary {
 pub fn compute_summary(hydrated: &HydratedConstellation) -> ConstellationSummary {
     let slots = flatten(&hydrated.slots);
     let total_slots = slots.len();
-    let slots_filled = slots.iter().filter(|slot| slot.effective_state != "empty").count();
+    let slots_filled = slots
+        .iter()
+        .filter(|slot| slot.effective_state != "empty")
+        .count();
     let slots_empty_mandatory = slots
         .iter()
         .filter(|slot| {
@@ -66,7 +69,10 @@ pub fn compute_summary(hydrated: &HydratedConstellation) -> ConstellationSummary
         .iter()
         .filter(|slot| slot.progress > 0 && slot.progress < 100)
         .count();
-    let slots_blocked = slots.iter().filter(|slot| !slot.blocked_verbs.is_empty()).count();
+    let slots_blocked = slots
+        .iter()
+        .filter(|slot| !slot.blocked_verbs.is_empty())
+        .count();
     let blocking_slots = slots.iter().filter(|slot| slot.blocking).count();
     let overall_progress = if total_slots == 0 {
         0

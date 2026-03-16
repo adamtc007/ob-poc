@@ -20,6 +20,8 @@ use uuid::Uuid;
 use sqlx::{postgres::PgRow, PgPool, Row};
 
 #[cfg(feature = "database")]
+use crate::ontology::ontology;
+#[cfg(feature = "database")]
 use entity_gateway::proto::ob::gateway::v1::{
     entity_gateway_client::EntityGatewayClient, SearchMode, SearchRequest,
 };
@@ -180,6 +182,23 @@ pub struct GenericCrudExecutor {
 
 #[cfg(feature = "database")]
 impl GenericCrudExecutor {
+    fn soft_delete_supported(&self, schema: &str, table: &str) -> bool {
+        schema == "ob-poc" && matches!(table, "cbus" | "entities")
+    }
+
+    fn active_row_predicate(
+        &self,
+        schema: &str,
+        table: &str,
+        qualifier: Option<&str>,
+    ) -> Option<String> {
+        self.soft_delete_supported(schema, table)
+            .then(|| match qualifier {
+                Some(alias) => format!(r#"{alias}."deleted_at" IS NULL"#),
+                None => r#""deleted_at" IS NULL"#.to_string(),
+            })
+    }
+
     pub fn new(pool: PgPool) -> Self {
         Self {
             pool,
@@ -836,8 +855,13 @@ impl GenericCrudExecutor {
         }
 
         let where_clause = if conditions.is_empty() {
-            String::new()
+            self.active_row_predicate(&crud.schema, &crud.table, None)
+                .map(|predicate| format!(" WHERE {predicate}"))
+                .unwrap_or_default()
         } else {
+            if let Some(predicate) = self.active_row_predicate(&crud.schema, &crud.table, None) {
+                conditions.push(predicate);
+            }
             format!(" WHERE {}", conditions.join(" AND "))
         };
 
@@ -888,6 +912,7 @@ impl GenericCrudExecutor {
         let mut sets = Vec::new();
         let mut bind_values: Vec<SqlValue> = Vec::new();
         let mut key_value: Option<SqlValue> = None;
+        let mut status_update: Option<(String, String)> = None;
         let mut idx = 1;
 
         for arg_def in &verb.args {
@@ -917,6 +942,11 @@ impl GenericCrudExecutor {
                         }
                     } else {
                         sets.push(format!("\"{}\" = ${}", col, idx));
+                        if col == "status" {
+                            if let Some(status) = value.as_str() {
+                                status_update = Some((col.clone(), status.to_string()));
+                            }
+                        }
                         // Handle lookup args specially - resolve name/code to UUID
                         if arg_def.lookup.is_some() && arg_def.arg_type == ArgType::Uuid {
                             let code = value.as_str().ok_or_else(|| {
@@ -957,6 +987,9 @@ impl GenericCrudExecutor {
                         // No bind value needed for SQL expression
                     } else {
                         sets.push(format!("\"{}\" = ${}", col, idx));
+                        if col == "status" {
+                            status_update = Some((col.clone(), s.to_string()));
+                        }
                         bind_values.push(SqlValue::String(s.to_string()));
                         idx += 1;
                     }
@@ -976,6 +1009,17 @@ impl GenericCrudExecutor {
             bail!("No columns to update for {}.{}", verb.domain, verb.verb);
         }
 
+        if let Some((status_column, target_status)) = status_update.as_ref() {
+            self.validate_lifecycle_transition(
+                crud,
+                key_col,
+                &key_val,
+                status_column,
+                target_status,
+            )
+            .await?;
+        }
+
         // Note: We no longer auto-add updated_at since not all tables have it.
         // Tables that need updated_at should use triggers or explicit set_values in YAML.
 
@@ -987,12 +1031,68 @@ impl GenericCrudExecutor {
             key_col,
             idx
         );
+        let sql =
+            if let Some(predicate) = self.active_row_predicate(&crud.schema, &crud.table, None) {
+                format!("{sql} AND {predicate}")
+            } else {
+                sql
+            };
 
         debug!("UPDATE SQL: {}", sql);
 
         bind_values.push(key_val);
         let affected = self.execute_non_query(&sql, &bind_values).await?;
         Ok(GenericExecutionResult::Affected(affected))
+    }
+
+    #[cfg(feature = "database")]
+    async fn validate_lifecycle_transition(
+        &self,
+        crud: &RuntimeCrudConfig,
+        key_col: &str,
+        key_value: &SqlValue,
+        status_column: &str,
+        target_status: &str,
+    ) -> Result<()> {
+        let Some(entity_type) = ontology().taxonomy().find_entity_type_by_storage(
+            &crud.schema,
+            &crud.table,
+            Some(status_column),
+        ) else {
+            return Ok(());
+        };
+
+        let Some(lifecycle) = ontology().get_lifecycle(entity_type) else {
+            return Ok(());
+        };
+
+        let sql = format!(
+            r#"SELECT "{}" FROM "{}"."{}" WHERE "{}" = $1"#,
+            status_column, crud.schema, crud.table, key_col
+        );
+        let row = self
+            .execute_with_bindings(&sql, std::slice::from_ref(key_value))
+            .await?;
+        let current_status: String = row.try_get(status_column)?;
+
+        // Skip tables whose runtime status vocabulary has not yet been normalized into taxonomy.
+        if !lifecycle.is_valid_state(&current_status) || !lifecycle.is_valid_state(target_status) {
+            return Ok(());
+        }
+
+        if lifecycle.is_valid_transition(&current_status, target_status) {
+            return Ok(());
+        }
+
+        let allowed = lifecycle.valid_next_states(&current_status).join(", ");
+        Err(anyhow!(
+            "Invalid state transition for {}: {} -> {}. Allowed transitions from {}: [{}]",
+            entity_type,
+            current_status,
+            target_status,
+            current_status,
+            allowed
+        ))
     }
 
     // =========================================================================
@@ -1019,10 +1119,17 @@ impl GenericCrudExecutor {
                 .get(&key_arg.name)
                 .ok_or_else(|| anyhow!("Missing key argument: {}", key_arg.name))?;
 
-            let sql = format!(
-                r#"DELETE FROM "{}"."{}" WHERE "{}" = $1"#,
-                crud.schema, crud.table, key_col
-            );
+            let sql = if self.soft_delete_supported(&crud.schema, &crud.table) {
+                format!(
+                    r#"UPDATE "{}"."{}" SET deleted_at = NOW() WHERE "{}" = $1 AND deleted_at IS NULL"#,
+                    crud.schema, crud.table, key_col
+                )
+            } else {
+                format!(
+                    r#"DELETE FROM "{}"."{}" WHERE "{}" = $1"#,
+                    crud.schema, crud.table, key_col
+                )
+            };
 
             debug!("DELETE SQL: {}", sql);
 
@@ -1066,12 +1173,26 @@ impl GenericCrudExecutor {
                 bail!("Delete requires at least one WHERE condition (maps_to columns)");
             }
 
-            let sql = format!(
-                r#"DELETE FROM "{}"."{}" WHERE {}"#,
-                crud.schema,
-                crud.table,
+            let where_sql = if let Some(predicate) =
+                self.active_row_predicate(&crud.schema, &crud.table, None)
+            {
+                where_clauses.push(predicate);
                 where_clauses.join(" AND ")
-            );
+            } else {
+                where_clauses.join(" AND ")
+            };
+
+            let sql = if self.soft_delete_supported(&crud.schema, &crud.table) {
+                format!(
+                    r#"UPDATE "{}"."{}" SET deleted_at = NOW() WHERE {}"#,
+                    crud.schema, crud.table, where_sql
+                )
+            } else {
+                format!(
+                    r#"DELETE FROM "{}"."{}" WHERE {}"#,
+                    crud.schema, crud.table, where_sql
+                )
+            };
 
             debug!("DELETE SQL (compound): {}", sql);
 
@@ -1677,10 +1798,18 @@ impl GenericCrudExecutor {
             .get(&fk_arg.name)
             .ok_or_else(|| anyhow!("Missing FK argument: {}", fk_arg.name))?;
 
-        let sql = format!(
-            r#"SELECT * FROM "{}"."{}" WHERE "{}" = $1"#,
-            crud.schema, crud.table, fk_col
-        );
+        let sql =
+            if let Some(predicate) = self.active_row_predicate(&crud.schema, &crud.table, None) {
+                format!(
+                    r#"SELECT * FROM "{}"."{}" WHERE "{}" = $1 AND {}"#,
+                    crud.schema, crud.table, fk_col, predicate
+                )
+            } else {
+                format!(
+                    r#"SELECT * FROM "{}"."{}" WHERE "{}" = $1"#,
+                    crud.schema, crud.table, fk_col
+                )
+            };
 
         debug!("LIST_BY_FK SQL: {}", sql);
 
@@ -1746,6 +1875,7 @@ impl GenericCrudExecutor {
             WHERE cer."{}" = $1
             AND (cer.effective_from IS NULL OR cer.effective_from <= $2)
             AND (cer.effective_to IS NULL OR cer.effective_to >= $2)
+            AND e.deleted_at IS NULL
             ORDER BY e.name, r.name"#,
             crud.schema, junction, crud.schema, crud.schema, crud.schema, fk_col
         );
@@ -1798,12 +1928,29 @@ impl GenericCrudExecutor {
             .get(&filter_arg.name)
             .ok_or_else(|| anyhow!("Missing filter argument"))?;
 
-        let sql = format!(
-            r#"SELECT p.* FROM "{}"."{}" p
-               JOIN "{}"."{}" j ON p."{}" = j."{}"
-               WHERE j."{}" = $1"#,
-            crud.schema, primary, crud.schema, join_table, join_col, join_col, filter_col
-        );
+        let sql =
+            if let Some(predicate) = self.active_row_predicate(&crud.schema, primary, Some("p")) {
+                format!(
+                    r#"SELECT p.* FROM "{}"."{}" p
+                   JOIN "{}"."{}" j ON p."{}" = j."{}"
+                   WHERE j."{}" = $1 AND {}"#,
+                    crud.schema,
+                    primary,
+                    crud.schema,
+                    join_table,
+                    join_col,
+                    join_col,
+                    filter_col,
+                    predicate
+                )
+            } else {
+                format!(
+                    r#"SELECT p.* FROM "{}"."{}" p
+                   JOIN "{}"."{}" j ON p."{}" = j."{}"
+                   WHERE j."{}" = $1"#,
+                    crud.schema, primary, crud.schema, join_table, join_col, join_col, filter_col
+                )
+            };
 
         debug!("SELECT_WITH_JOIN SQL: {}", sql);
 
@@ -3753,10 +3900,17 @@ impl GenericCrudExecutor {
         // Fallback to direct SQL if EntityGateway unavailable or no match
         let schema = lookup.schema.as_deref().unwrap_or("public");
         let search_col = lookup.search_key.primary_column();
-        let sql = format!(
-            r#"SELECT "{}" FROM "{}"."{}" WHERE "{}" = $1"#,
-            lookup.primary_key, schema, lookup.table, search_col
-        );
+        let sql = if self.soft_delete_supported(schema, &lookup.table) {
+            format!(
+                r#"SELECT "{}" FROM "{}"."{}" WHERE "{}" = $1 AND deleted_at IS NULL"#,
+                lookup.primary_key, schema, lookup.table, search_col
+            )
+        } else {
+            format!(
+                r#"SELECT "{}" FROM "{}"."{}" WHERE "{}" = $1"#,
+                lookup.primary_key, schema, lookup.table, search_col
+            )
+        };
 
         debug!(
             "LOOKUP SQL fallback: {} with search_key={}",

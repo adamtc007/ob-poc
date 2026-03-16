@@ -201,7 +201,9 @@ impl CustomOperation for OwnershipSnapshotListOp {
         let snapshot_data: Vec<serde_json::Value> =
             futures::future::try_join_all(snapshots.iter().map(|s| async {
                 let owner_name: Option<String> = sqlx::query_scalar(
-                    r#"SELECT name FROM "ob-poc".entities WHERE entity_id = $1"#,
+                    r#"SELECT name FROM "ob-poc".entities
+                       WHERE entity_id = $1
+                         AND deleted_at IS NULL"#,
                 )
                 .bind(s.2)
                 .fetch_optional(pool)
@@ -756,7 +758,9 @@ impl CustomOperation for OwnershipReconcileFindingsOp {
         let finding_data: Vec<serde_json::Value> =
             futures::future::try_join_all(findings.iter().map(|f| async {
                 let owner_name: Option<String> = sqlx::query_scalar(
-                    r#"SELECT name FROM "ob-poc".entities WHERE entity_id = $1"#,
+                    r#"SELECT name FROM "ob-poc".entities
+                       WHERE entity_id = $1
+                         AND deleted_at IS NULL"#,
                 )
                 .bind(f.2)
                 .fetch_optional(pool)

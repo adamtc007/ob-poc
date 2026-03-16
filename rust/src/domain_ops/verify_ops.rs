@@ -672,7 +672,8 @@ impl CustomOperation for VerifyAgainstRegistryOp {
                       lc.company_name, lc.registration_number, lc.jurisdiction as lc_jurisdiction
                FROM "ob-poc".entities e
                LEFT JOIN "ob-poc".entity_limited_companies lc ON e.entity_id = lc.entity_id
-               WHERE e.entity_id = $1"#,
+               WHERE e.entity_id = $1
+                 AND e.deleted_at IS NULL"#,
             entity_id
         )
         .fetch_optional(pool)

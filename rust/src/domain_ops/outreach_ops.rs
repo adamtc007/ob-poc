@@ -181,6 +181,7 @@ impl CustomOperation for OutreachListOverdueOp {
             FROM "ob-poc".outreach_requests r
             JOIN "ob-poc".entities e ON e.entity_id = r.target_entity_id
             WHERE r.status IN ('SENT', 'REMINDED', 'PENDING')
+              AND e.deleted_at IS NULL
               AND r.deadline_date IS NOT NULL
               AND r.deadline_date < CURRENT_DATE - $1::integer
             ORDER BY r.deadline_date ASC

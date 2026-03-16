@@ -121,12 +121,10 @@ mod tests {
             .iter()
             .find(|slot| slot.name == "management_company")
             .unwrap();
-        assert!(
-            manco
-                .warnings
-                .iter()
-                .any(|warning| warning.contains("deterministic representative"))
-        );
+        assert!(manco
+            .warnings
+            .iter()
+            .any(|warning| warning.contains("deterministic representative")));
     }
 
     #[test]

@@ -349,7 +349,7 @@ impl CustomOperation for PartnershipReconcileOp {
                 pc.capital_contributed
             FROM "ob-poc".partnership_capital pc
             JOIN "ob-poc".entities e ON pc.partner_entity_id = e.entity_id
-            WHERE pc.partnership_entity_id = $1 AND pc.is_active = true
+            WHERE pc.partnership_entity_id = $1 AND pc.is_active = true AND e.deleted_at IS NULL
             ORDER BY pc.partner_type, pc.profit_share_pct DESC NULLS LAST
             "#,
         )
@@ -516,7 +516,7 @@ impl CustomOperation for PartnershipAnalyzeControlOp {
                 ) as is_natural_person
             FROM "ob-poc".partnership_capital pc
             JOIN "ob-poc".entities e ON pc.partner_entity_id = e.entity_id
-            WHERE pc.partnership_entity_id = $1 AND pc.is_active = true
+            WHERE pc.partnership_entity_id = $1 AND pc.is_active = true AND e.deleted_at IS NULL
             ORDER BY pc.partner_type, pc.profit_share_pct DESC NULLS LAST
             "#,
         )

@@ -234,7 +234,8 @@ impl CustomOperation for UboComputeChainsOp {
             r#"SELECT e.entity_id, e.name, et.entity_category
                FROM "ob-poc".entities e
                JOIN "ob-poc".entity_types et ON e.entity_type_id = et.entity_type_id
-               WHERE e.entity_id = ANY($1)"#,
+               WHERE e.entity_id = ANY($1)
+                 AND e.deleted_at IS NULL"#,
         )
         .bind(&entity_id_vec)
         .fetch_all(pool)

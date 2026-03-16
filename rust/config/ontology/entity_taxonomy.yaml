@@ -229,12 +229,12 @@ entities:
     category: kyc
 
     db:
-      schema: kyc
+      schema: ob-poc
       table: cases
       pk: case_id
 
     search_keys:
-      - column: case_reference
+      - column: case_ref
         unique: true
       - columns: [cbu_id, case_type]
         unique: false
@@ -242,33 +242,53 @@ entities:
     lifecycle:
       status_column: status
       states:
-        - OPEN
-        - IN_PROGRESS
-        - PENDING_DECISION
+        - INTAKE
+        - DISCOVERY
+        - ASSESSMENT
+        - REVIEW
+        - BLOCKED
         - APPROVED
         - REJECTED
-        - CLOSED
-        - CANCELLED
+        - WITHDRAWN
+        - EXPIRED
+        - REFER_TO_REGULATOR
+        - DO_NOT_ONBOARD
       transitions:
-        - from: OPEN
-          to: [IN_PROGRESS, CANCELLED]
-        - from: IN_PROGRESS
-          to: [PENDING_DECISION, CLOSED, CANCELLED]
-        - from: PENDING_DECISION
-          to: [APPROVED, REJECTED, IN_PROGRESS]
+        - from: INTAKE
+          to: [DISCOVERY, WITHDRAWN]
+        - from: DISCOVERY
+          to: [ASSESSMENT, BLOCKED, WITHDRAWN]
+        - from: ASSESSMENT
+          to: [REVIEW, BLOCKED, WITHDRAWN]
+        - from: REVIEW
+          to:
+            [
+              APPROVED,
+              REJECTED,
+              REFER_TO_REGULATOR,
+              DO_NOT_ONBOARD,
+              BLOCKED,
+              WITHDRAWN,
+            ]
+        - from: BLOCKED
+          to: [DISCOVERY, ASSESSMENT, REVIEW, WITHDRAWN]
         - from: APPROVED
-          to: [CLOSED]
+          to: []
         - from: REJECTED
-          to: [CLOSED, IN_PROGRESS]
-        - from: CLOSED
-          to: [] # Terminal state
-        - from: CANCELLED
-          to: [] # Terminal state
-      initial_state: OPEN
+          to: []
+        - from: WITHDRAWN
+          to: []
+        - from: EXPIRED
+          to: []
+        - from: REFER_TO_REGULATOR
+          to: []
+        - from: DO_NOT_ONBOARD
+          to: []
+      initial_state: INTAKE
 
     implicit_create:
       allowed: true
-      canonical_verb: kyc.create-case
+      canonical_verb: kyc-case.create
       required_args: [cbu-id, case-type]
 
   # ===========================================================================
@@ -279,7 +299,7 @@ entities:
     category: kyc
 
     db:
-      schema: kyc
+      schema: ob-poc
       table: entity_workstreams
       pk: workstream_id
 
@@ -291,27 +311,49 @@ entities:
       status_column: status
       states:
         - PENDING
-        - IN_PROGRESS
+        - COLLECT
+        - VERIFY
+        - SCREEN
+        - ASSESS
         - COMPLETE
         - BLOCKED
-        - WAIVED
+        - ENHANCED_DD
       transitions:
         - from: PENDING
-          to: [IN_PROGRESS, WAIVED]
-        - from: IN_PROGRESS
-          to: [COMPLETE, BLOCKED]
+          to: [COLLECT, BLOCKED, ENHANCED_DD]
+        - from: COLLECT
+          to: [VERIFY, BLOCKED, ENHANCED_DD]
+        - from: VERIFY
+          to: [SCREEN, BLOCKED, ENHANCED_DD]
+        - from: SCREEN
+          to: [ASSESS, BLOCKED, ENHANCED_DD]
+        - from: ASSESS
+          to: [COMPLETE, BLOCKED, ENHANCED_DD]
         - from: BLOCKED
-          to: [IN_PROGRESS, WAIVED]
+          to: [COLLECT, VERIFY, SCREEN, ASSESS, ENHANCED_DD]
         - from: COMPLETE
           to: [] # Terminal
-        - from: WAIVED
-          to: [] # Terminal
+        - from: ENHANCED_DD
+          to: [ASSESS, BLOCKED]
       initial_state: PENDING
 
     implicit_create:
       allowed: true
-      canonical_verb: kyc.create-workstream
+      canonical_verb: entity-workstream.create
       required_args: [case-id, entity-id]
+
+  # ===========================================================================
+  # Entity Workstream (alias for KYC workstream)
+  # ===========================================================================
+  entity_workstream:
+    description: "Alias for KYC workstream"
+    category: kyc
+    alias_for: kyc_workstream
+
+    db:
+      schema: ob-poc
+      table: entity_workstreams
+      pk: workstream_id
 
   # ===========================================================================
   # Document

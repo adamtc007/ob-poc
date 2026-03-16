@@ -2,7 +2,7 @@
 
 > **Version:** 3.0
 > **Date:** 2026-03-16
-> **Status:** Living document — consolidation of 9 prior specs, updated for the 2026-03-08 runtime schema consolidation, the 2026-03-12 document-governance bootstrap, the 2026-03-13 NLCI/CBU surface reconciliation, the 2026-03-15 reducer/constellation runtime cutover, and the 2026-03-16 DB harness/runtime verification pass
+> **Status:** Living document — consolidation of 9 prior specs, updated for the 2026-03-08 runtime schema consolidation, the 2026-03-12 document-governance bootstrap, the 2026-03-13 NLCI/CBU surface reconciliation, the 2026-03-15 reducer/constellation runtime cutover, the 2026-03-16 DB harness/runtime verification pass, and the 2026-03-16 CODEX data-integrity/parser/serialization remediation
 > **Audience:** Engineering, governance, architecture review
 
 ---
@@ -191,6 +191,52 @@ The concrete fixes required to get there are part of the durable runtime now:
   - `entity_trusts.trust_name`
 
 This matters at the architecture boundary because SemOS-governed metadata is only useful if the live runtime, test harness, and schema actually agree on the operational contract.
+
+### Governance Bootstrap + Runtime Remediation State (2026-03-16)
+
+The March 16 remediation closed the gap between the governed Semantic OS object model and the live `ob-poc` runtime/bootstrap path without rerouting initial seeding through the authoring changeset workflow.
+
+Transport-side outcome:
+
+- scanner/bootstrap remains the initial seeding path for governed KYC objects
+- taxonomy, taxonomy-node, view, membership-rule, and KYC verb snapshots can now publish at governed tier directly from the existing seed/scanner flow
+- `phase_tags` propagation is verified through republish/backfill rather than treated as a missing-schema problem
+
+Model/runtime outcome:
+
+- governed verb contracts now carry:
+  - `harm_class`
+  - `action_class`
+  - `precondition_states`
+- ontology-backed lifecycle enforcement is live in runtime mutation paths for normalized entities such as `kyc-case` and `entity-workstream`
+- reducer-state persistence is now exercised against the live DB through `sem_reg.reducer_states`
+
+Operational integrity outcome:
+
+- critical Tier 0 data-integrity defects were corrected in the live code/migration path:
+  - conflicting `ubo_registry` FK cascade
+  - stale `kyc_ubo_evidence` FK target
+  - duplicate FK constraint pairs
+  - archive table type mismatch
+  - duplicate `intent_events` table split
+  - DSL parser empty-string / boolean-word-boundary defects
+- soft-delete is now the active runtime pattern for `cbus` and `entities`
+- high-traffic read paths across session loading, visualization, graph traversal, KYC/workstream views, control/ownership analysis, and related repositories now exclude rows where `deleted_at IS NOT NULL`
+
+Verification state for this remediation slice:
+
+- `cargo check` green against the live DB-backed workspace
+- governed bootstrap scan completes through the existing scanner path
+- DB regression coverage exists for:
+  - soft delete
+  - reducer persistence
+  - generic lifecycle guard enforcement
+
+This leaves Semantic OS in a more coherent architectural position:
+
+- initial bootstrap uses the fast seeded scanner path
+- ongoing governed authoring still belongs to the changeset/stewardship pipeline
+- runtime query surfaces now better respect the same lifecycle/governance invariants as the registry layer
 
 ### Constellation Macro/SemOS Remediation (2026-03-13)
 

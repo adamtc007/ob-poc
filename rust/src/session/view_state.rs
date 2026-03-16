@@ -355,23 +355,21 @@ impl ViewState {
                         target, product
                     )
                 }
-                BatchOperation::SetStatus { status } => {
-                    match status.as_str() {
-                        "VALIDATION_PENDING" => {
-                            format!("(cbu.submit-for-validation :cbu-id \"{}\")", target)
-                        }
-                        "UPDATE_PENDING_PROOF" => {
-                            format!("(cbu.request-proof-update :cbu-id \"{}\")", target)
-                        }
-                        "DISCOVERED" => {
-                            format!("(cbu.reopen-validation :cbu-id \"{}\")", target)
-                        }
-                        _ => format!(
-                            ";; unsupported direct status transition for {}\n(cbu.read :cbu-id \"{}\")",
-                            status, target
-                        ),
+                BatchOperation::SetStatus { status } => match status.as_str() {
+                    "VALIDATION_PENDING" => {
+                        format!("(cbu.submit-for-validation :cbu-id \"{}\")", target)
                     }
-                }
+                    "UPDATE_PENDING_PROOF" => {
+                        format!("(cbu.request-proof-update :cbu-id \"{}\")", target)
+                    }
+                    "DISCOVERED" => {
+                        format!("(cbu.reopen-validation :cbu-id \"{}\")", target)
+                    }
+                    _ => format!(
+                        ";; unsupported direct status transition for {}\n(cbu.read :cbu-id \"{}\")",
+                        status, target
+                    ),
+                },
                 BatchOperation::AssignRole { entity_id, role } => {
                     format!(
                         "(cbu.assign-role :cbu-id \"{}\" :entity-id \"{}\" :role \"{}\")",

@@ -12,7 +12,7 @@
 //! Tool handlers receive a `SemRegToolContext` containing a PgPool reference
 //! and an `ActorContext`. Each handler returns a `SemRegToolResult`.
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
@@ -1727,7 +1727,7 @@ async fn handle_record_decision(
         None => return SemRegToolResult::err("Missing required parameter: description"),
     };
 
-    let manifest: HashMap<Uuid, Uuid> = args
+    let manifest: BTreeMap<Uuid, Uuid> = args
         .get("snapshot_manifest")
         .and_then(|v| serde_json::from_value(v.clone()).ok())
         .unwrap_or_default();

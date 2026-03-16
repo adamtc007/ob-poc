@@ -475,12 +475,14 @@ async fn check_terminus_integrity(
             FROM "ob-poc".entity_relationships er2
             JOIN "ob-poc".entities er ON er.entity_id = er2.from_entity_id
             WHERE er.entity_id = ANY($1)
+              AND er.deleted_at IS NULL
               AND er2.is_regulated = true
             UNION
             SELECT e.entity_id
             FROM "ob-poc".entities e
             JOIN "ob-poc".entity_types et ON e.entity_type_id = et.entity_type_id
             WHERE e.entity_id = ANY($1)
+              AND e.deleted_at IS NULL
               AND et.type_code IN ('government', 'public_authority', 'listed_company')
             "#,
         )

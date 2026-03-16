@@ -2,9 +2,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 
 use uuid::Uuid;
 
-use super::hydrated::{
-    HydratedConstellation, HydratedGraphEdge, HydratedGraphNode, HydratedSlot,
-};
+use super::hydrated::{HydratedConstellation, HydratedGraphEdge, HydratedGraphNode, HydratedSlot};
 use super::hydration::{RawGraphEdge, RawHydrationData, RawOverlayRow, RawSlotRow};
 use super::map_def::Cardinality;
 use super::validate::ValidatedConstellationMap;
@@ -255,16 +253,14 @@ fn normalize_graph(
     });
     let mut normalized_warnings = warnings;
     if let Some(max_depth) = slot.def.max_depth.filter(|_| {
-        graph_edges.iter()
+        graph_edges
+            .iter()
             .map(|edge| edge.depth)
             .max()
             .map(|depth| depth >= slot.def.max_depth.unwrap_or(0))
             .unwrap_or(false)
     }) {
-        normalized_warnings.push(format!(
-            "graph reached configured max depth {}",
-            max_depth
-        ));
+        normalized_warnings.push(format!("graph reached configured max depth {}", max_depth));
     }
     HydratedSlot {
         name: slot.name.clone(),

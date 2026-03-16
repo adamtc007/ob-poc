@@ -89,6 +89,7 @@
 > **Constellation Hydration + Session UI (2026-03-15):** ✅ Live — builtin constellation maps, REST routes (`/api/cbu/:id/constellation`, `/summary`, `/cases`, `/api/constellation/by-name`, `/search-cbus`), session-integrated React constellation panel in chat, case selector bound to live CBU cases, ownership-chain node/edge payloads surfaced in the inspector, and slot-to-agent prompt loop wired through the normal chat session input path
 > **Cross-Border CBU Structure Runtime (2026-03-15):** ✅ Live — persisted `"ob-poc".cbu_structure_links`, `cbu.link-structure` + `cbu.list-structure-links`, downward child-`cbu` hydration for `struct.hedge.cross-border` and `struct.pe.cross-border`, selector-backed feeder/parallel/aggregator slots, and cross-border macro steps unparked onto the real verb surface
 > **DB Integration Harness + Cross-Border Verification (2026-03-16):** ✅ Complete — runtime verb registry bootstrap is fixed in test context, `db_integration` now self-provisions lagging `cbu_structure_links` schema in local harness runs, reducer evidence overlays are aligned to the live `ubo_registry` / `kyc_ubo_evidence` schema, generic `entity.create` now fills required extension-table name columns such as `company_name`, and both `cargo clippy -p ob-poc -- -D warnings` and `cargo test -p ob-poc --test db_integration` are green
+> **Architecture Remediation Pack (2026-03-16):** ✅ Transport/model/runtime remediation landed — critical FK/archive/intent-event fixes, DSL parser empty-string + boolean boundary fix, KYC lifecycle reconciliation onto ontology-backed guards, governed-tier bootstrap for taxonomy/view/membership/KYC verb seeds through the scanner path, reducer-state persistence, governed verb metadata enrichment (`harm_class`, `action_class`, `phase_tags` verification), and soft-delete enforcement for live `cbus` / `entities` across high-traffic runtime reads with DB regression coverage in `soft_delete_db`, `generic_lifecycle_guard_db`, and `reducer_persistence_db`
 
 This is the root project guide for Claude Code. Domain-specific details are in annexes.
 
@@ -141,6 +142,11 @@ npx md-to-pdf migrations/OB_POC_SCHEMA_ENTITY_OVERVIEW.md
 # Refresh schema exports from the live source DB
 cargo x schema-export
 ```
+
+Current schema export target:
+- canonical dump: `migrations/master-schema.sql`
+- convenience copy: `schema_export.sql`
+- source DB: local `data_designer` via `pg_dump`
 
 ---
 

@@ -145,8 +145,9 @@ pub struct SnapshotMeta {
 }
 
 impl SnapshotMeta {
-    /// Create metadata for a new operational object (auto-approved).
-    pub fn new_operational(
+    /// Create metadata for a new object at the specified governance tier.
+    pub fn new_at_tier(
+        governance_tier: GovernanceTier,
         object_type: ObjectType,
         object_id: Uuid,
         created_by: impl Into<String>,
@@ -157,7 +158,7 @@ impl SnapshotMeta {
             version_major: 1,
             version_minor: 0,
             status: SnapshotStatus::Active,
-            governance_tier: GovernanceTier::Operational,
+            governance_tier,
             trust_class: TrustClass::Convenience,
             security_label: SecurityLabel::default(),
             change_type: ChangeType::Created,
@@ -166,6 +167,20 @@ impl SnapshotMeta {
             approved_by: Some("auto".into()),
             predecessor_id: None,
         }
+    }
+
+    /// Create metadata for a new operational object (auto-approved).
+    pub fn new_operational(
+        object_type: ObjectType,
+        object_id: Uuid,
+        created_by: impl Into<String>,
+    ) -> Self {
+        Self::new_at_tier(
+            GovernanceTier::Operational,
+            object_type,
+            object_id,
+            created_by,
+        )
     }
 }
 
@@ -501,6 +516,19 @@ mod tests {
         let meta =
             SnapshotMeta::new_operational(ObjectType::VerbContract, Uuid::new_v4(), "scanner");
         assert_eq!(meta.governance_tier, GovernanceTier::Operational);
+        assert_eq!(meta.trust_class, TrustClass::Convenience);
+        assert_eq!(meta.approved_by.as_deref(), Some("auto"));
+    }
+
+    #[test]
+    fn test_snapshot_meta_new_at_tier() {
+        let meta = SnapshotMeta::new_at_tier(
+            GovernanceTier::Governed,
+            ObjectType::VerbContract,
+            Uuid::new_v4(),
+            "scanner",
+        );
+        assert_eq!(meta.governance_tier, GovernanceTier::Governed);
         assert_eq!(meta.trust_class, TrustClass::Convenience);
         assert_eq!(meta.approved_by.as_deref(), Some("auto"));
     }

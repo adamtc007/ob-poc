@@ -244,17 +244,22 @@ impl CustomOperation for SessionLoadUniverseOp {
                 FROM "ob-poc".cbus c
                 LEFT JOIN "ob-poc".cbu_groups g ON g.manco_entity_id = $1
                 LEFT JOIN "ob-poc".cbu_group_members gm ON gm.group_id = g.group_id AND gm.cbu_id = c.cbu_id
-                WHERE c.commercial_client_entity_id = $1
+                WHERE c.deleted_at IS NULL
+                  AND (
+                       c.commercial_client_entity_id = $1
                    OR gm.cbu_id IS NOT NULL
+                  )
                 "#,
                 client_id
             )
             .fetch_all(pool)
             .await?
         } else {
-            sqlx::query_scalar!(r#"SELECT cbu_id as "cbu_id!" FROM "ob-poc".cbus"#)
-                .fetch_all(pool)
-                .await?
+            sqlx::query_scalar!(
+                r#"SELECT cbu_id as "cbu_id!" FROM "ob-poc".cbus WHERE deleted_at IS NULL"#
+            )
+            .fetch_all(pool)
+            .await?
         };
 
         let session = ctx.get_or_create_session_mut();
@@ -311,7 +316,7 @@ impl CustomOperation for SessionLoadGalaxyOp {
         let jurisdiction = get_required_string(verb_call, "jurisdiction")?;
 
         let cbu_ids: Vec<Uuid> = sqlx::query_scalar!(
-            r#"SELECT cbu_id as "cbu_id!" FROM "ob-poc".cbus WHERE jurisdiction = $1"#,
+            r#"SELECT cbu_id as "cbu_id!" FROM "ob-poc".cbus WHERE jurisdiction = $1 AND deleted_at IS NULL"#,
             jurisdiction
         )
         .fetch_all(pool)
@@ -418,7 +423,7 @@ impl CustomOperation for SessionLoadClusterOp {
 
         // Get apex entity name for response
         let apex_name: String = sqlx::query_scalar!(
-            r#"SELECT name as "name!" FROM "ob-poc".entities WHERE entity_id = $1"#,
+            r#"SELECT name as "name!" FROM "ob-poc".entities WHERE entity_id = $1 AND deleted_at IS NULL"#,
             apex_entity_id
         )
         .fetch_optional(pool)
@@ -467,6 +472,7 @@ impl CustomOperation for SessionLoadClusterOp {
             WHERE cge.group_id = $1
               AND cge.cbu_id IS NOT NULL
               AND cge.membership_type NOT IN ('historical', 'rejected')
+              AND c.deleted_at IS NULL
               AND ($2::text IS NULL OR c.jurisdiction = $2)
             "#,
         )
@@ -541,7 +547,10 @@ impl CustomOperation for SessionLoadSystemOp {
         let cbu_id = get_required_uuid(verb_call, "cbu-id", ctx)?;
 
         let cbu = sqlx::query!(
-            r#"SELECT cbu_id, name, jurisdiction FROM "ob-poc".cbus WHERE cbu_id = $1"#,
+            r#"SELECT cbu_id, name, jurisdiction
+               FROM "ob-poc".cbus
+               WHERE cbu_id = $1
+                 AND deleted_at IS NULL"#,
             cbu_id
         )
         .fetch_optional(pool)
@@ -605,7 +614,7 @@ impl CustomOperation for SessionUnloadSystemOp {
         let cbu_id = get_required_uuid(verb_call, "cbu-id", ctx)?;
 
         let name: String = sqlx::query_scalar!(
-            r#"SELECT name FROM "ob-poc".cbus WHERE cbu_id = $1"#,
+            r#"SELECT name FROM "ob-poc".cbus WHERE cbu_id = $1 AND deleted_at IS NULL"#,
             cbu_id
         )
         .fetch_optional(pool)
@@ -681,7 +690,10 @@ impl CustomOperation for SessionFilterJurisdictionOp {
         }
 
         let matching_cbu_ids: Vec<Uuid> = sqlx::query_scalar!(
-            r#"SELECT cbu_id as "cbu_id!" FROM "ob-poc".cbus WHERE cbu_id = ANY($1) AND jurisdiction = $2"#,
+            r#"SELECT cbu_id as "cbu_id!" FROM "ob-poc".cbus
+               WHERE cbu_id = ANY($1)
+                 AND jurisdiction = $2
+                 AND deleted_at IS NULL"#,
             &current_cbu_ids,
             &jurisdiction
         )
@@ -907,6 +919,7 @@ impl CustomOperation for SessionInfoOp {
                 SELECT jurisdiction, COUNT(*) as count
                 FROM "ob-poc".cbus
                 WHERE cbu_id = ANY($1)
+                  AND deleted_at IS NULL
                 GROUP BY jurisdiction
                 ORDER BY count DESC
                 "#,
@@ -989,7 +1002,8 @@ impl CustomOperation for SessionListOp {
                 SELECT cbu_id, name, jurisdiction
                 FROM "ob-poc".cbus
                 WHERE cbu_id = ANY($1)
-                AND ($2::text IS NULL OR jurisdiction = $2)
+                  AND deleted_at IS NULL
+                  AND ($2::text IS NULL OR jurisdiction = $2)
                 ORDER BY name
                 LIMIT $3
                 "#,
@@ -1275,7 +1289,10 @@ impl CustomOperation for SessionSetStructureOp {
 
         // Fetch CBU details
         let cbu = sqlx::query!(
-            r#"SELECT cbu_id, name, jurisdiction FROM "ob-poc".cbus WHERE cbu_id = $1"#,
+            r#"SELECT cbu_id, name, jurisdiction
+               FROM "ob-poc".cbus
+               WHERE cbu_id = $1
+                 AND deleted_at IS NULL"#,
             structure_id
         )
         .fetch_optional(pool)

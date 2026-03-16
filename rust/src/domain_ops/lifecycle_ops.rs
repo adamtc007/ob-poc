@@ -944,3 +944,221 @@ mod tests {
         assert_eq!(op.verb(), "execute-plan");
     }
 }
+
+/// Compatibility alias for `service-resource.provision-lifecycle`.
+#[register_custom_op]
+pub struct ServiceResourceProvisionLifecycleOp;
+
+#[async_trait]
+impl CustomOperation for ServiceResourceProvisionLifecycleOp {
+    fn domain(&self) -> &'static str {
+        "service-resource"
+    }
+    fn verb(&self) -> &'static str {
+        "provision-lifecycle"
+    }
+    fn rationale(&self) -> &'static str {
+        "Compatibility alias for lifecycle.provision"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        LifecycleProvisionOp.execute(verb_call, ctx, pool).await
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Record(serde_json::json!({})))
+    }
+}
+
+/// Compatibility alias for `service-resource.analyze-lifecycle-gaps`.
+#[register_custom_op]
+pub struct ServiceResourceAnalyzeLifecycleGapsOp;
+
+#[async_trait]
+impl CustomOperation for ServiceResourceAnalyzeLifecycleGapsOp {
+    fn domain(&self) -> &'static str {
+        "service-resource"
+    }
+    fn verb(&self) -> &'static str {
+        "analyze-lifecycle-gaps"
+    }
+    fn rationale(&self) -> &'static str {
+        "Compatibility alias for lifecycle.analyze-gaps"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        LifecycleAnalyzeGapsOp.execute(verb_call, ctx, pool).await
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::RecordSet(vec![]))
+    }
+}
+
+/// Compatibility alias for `service-resource.check-lifecycle-readiness`.
+#[register_custom_op]
+pub struct ServiceResourceCheckLifecycleReadinessOp;
+
+#[async_trait]
+impl CustomOperation for ServiceResourceCheckLifecycleReadinessOp {
+    fn domain(&self) -> &'static str {
+        "service-resource"
+    }
+    fn verb(&self) -> &'static str {
+        "check-lifecycle-readiness"
+    }
+    fn rationale(&self) -> &'static str {
+        "Compatibility alias for lifecycle.check-readiness"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        LifecycleCheckReadinessOp
+            .execute(verb_call, ctx, pool)
+            .await
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Record(serde_json::json!({})))
+    }
+}
+
+/// Compatibility alias for `service-resource.discover-lifecycles`.
+#[register_custom_op]
+pub struct ServiceResourceDiscoverLifecyclesOp;
+
+#[async_trait]
+impl CustomOperation for ServiceResourceDiscoverLifecyclesOp {
+    fn domain(&self) -> &'static str {
+        "service-resource"
+    }
+    fn verb(&self) -> &'static str {
+        "discover-lifecycles"
+    }
+    fn rationale(&self) -> &'static str {
+        "Compatibility alias for lifecycle.discover"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        LifecycleDiscoverOp.execute(verb_call, ctx, pool).await
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Record(serde_json::json!({})))
+    }
+}
+
+/// Compatibility alias for `service-resource.generate-lifecycle-plan`.
+#[register_custom_op]
+pub struct ServiceResourceGenerateLifecyclePlanOp;
+
+#[async_trait]
+impl CustomOperation for ServiceResourceGenerateLifecyclePlanOp {
+    fn domain(&self) -> &'static str {
+        "service-resource"
+    }
+    fn verb(&self) -> &'static str {
+        "generate-lifecycle-plan"
+    }
+    fn rationale(&self) -> &'static str {
+        "Compatibility alias for lifecycle.generate-plan"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        LifecycleGeneratePlanOp.execute(verb_call, ctx, pool).await
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Record(serde_json::json!({})))
+    }
+}
+
+/// Compatibility alias for `service-resource.execute-lifecycle-plan`.
+#[register_custom_op]
+pub struct ServiceResourceExecuteLifecyclePlanOp;
+
+#[async_trait]
+impl CustomOperation for ServiceResourceExecuteLifecyclePlanOp {
+    fn domain(&self) -> &'static str {
+        "service-resource"
+    }
+    fn verb(&self) -> &'static str {
+        "execute-lifecycle-plan"
+    }
+    fn rationale(&self) -> &'static str {
+        "Compatibility alias for lifecycle.execute-plan"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        LifecycleExecutePlanOp.execute(verb_call, ctx, pool).await
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Record(serde_json::json!({})))
+    }
+}

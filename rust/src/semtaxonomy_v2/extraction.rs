@@ -96,6 +96,8 @@ mod tests {
         }"#;
 
         let error = parse_structured_intent_plan(raw).expect_err("plan should fail");
-        assert!(error.to_string().contains("structured intent validation failed"));
+        assert!(error
+            .to_string()
+            .contains("structured intent validation failed"));
     }
 }

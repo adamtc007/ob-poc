@@ -91,10 +91,15 @@ impl ContextDiscoveryService {
                 c.jurisdiction,
                 c.client_type,
                 c.cbu_category,
-                (SELECT COUNT(*) FROM "ob-poc".cbu_entity_roles cer WHERE cer.cbu_id = c.cbu_id) as "entity_count!",
+                (SELECT COUNT(*)
+                   FROM "ob-poc".cbu_entity_roles cer
+                   JOIN "ob-poc".entities e ON e.entity_id = cer.entity_id
+                  WHERE cer.cbu_id = c.cbu_id
+                    AND e.deleted_at IS NULL) as "entity_count!",
                 (SELECT COUNT(DISTINCT role_id) FROM "ob-poc".cbu_entity_roles cer WHERE cer.cbu_id = c.cbu_id) as "role_count!"
             FROM "ob-poc".cbus c
             WHERE c.cbu_id = $1
+              AND c.deleted_at IS NULL
             "#,
             cbu_id
         )
@@ -200,6 +205,7 @@ impl ContextDiscoveryService {
             LEFT JOIN "ob-poc".entities e ON e.entity_id = ia.counterparty_entity_id
             WHERE ia.cbu_id = $1
               AND ia.is_active = true
+              AND (e.entity_id IS NULL OR e.deleted_at IS NULL)
             ORDER BY ia.agreement_date DESC
             "#,
             cbu_id

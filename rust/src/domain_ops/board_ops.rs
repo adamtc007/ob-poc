@@ -76,6 +76,8 @@ impl CustomOperation for BoardAnalyzeControlOp {
             JOIN "ob-poc".roles r ON bc.role_id = r.role_id
             LEFT JOIN "ob-poc".entities ap ON bc.appointed_by_entity_id = ap.entity_id
             WHERE bc.entity_id = $1
+              AND p.deleted_at IS NULL
+              AND (ap.entity_id IS NULL OR ap.deleted_at IS NULL)
               AND bc.is_active = true
               AND (bc.resignation_date IS NULL OR bc.resignation_date > CURRENT_DATE)
             ORDER BY bc.appointment_date
@@ -112,6 +114,7 @@ impl CustomOperation for BoardAnalyzeControlOp {
             FROM "ob-poc".appointment_rights ar
             JOIN "ob-poc".entities e ON ar.holder_entity_id = e.entity_id
             WHERE ar.target_entity_id = $1
+              AND e.deleted_at IS NULL
               AND ar.is_active = true
               AND (ar.effective_to IS NULL OR ar.effective_to > CURRENT_DATE)
             "#,

@@ -103,7 +103,9 @@ impl CustomOperation for UboMarkDeceasedOp {
             r#"SELECT EXISTS (
                 SELECT 1 FROM "ob-poc".entities e
                 JOIN "ob-poc".entity_types et ON e.entity_type_id = et.entity_type_id
-                WHERE e.entity_id = $1 AND et.entity_category = 'PERSON'
+                WHERE e.entity_id = $1
+                  AND e.deleted_at IS NULL
+                  AND et.entity_category = 'PERSON'
             )"#,
         )
         .bind(entity_id)
@@ -118,11 +120,14 @@ impl CustomOperation for UboMarkDeceasedOp {
         }
 
         // Get person details for audit
-        let person_name: Option<String> =
-            sqlx::query_scalar(r#"SELECT name FROM "ob-poc".entities WHERE entity_id = $1"#)
-                .bind(entity_id)
-                .fetch_optional(pool)
-                .await?;
+        let person_name: Option<String> = sqlx::query_scalar(
+            r#"SELECT name FROM "ob-poc".entities
+                   WHERE entity_id = $1
+                     AND deleted_at IS NULL"#,
+        )
+        .bind(entity_id)
+        .fetch_optional(pool)
+        .await?;
 
         // Begin transaction
         let mut tx = pool.begin().await?;
@@ -343,7 +348,8 @@ impl CustomOperation for UboConvergenceSupersedeOp {
                           r.ownership_type, e.name as from_name
                    FROM "ob-poc".entity_relationships r
                    JOIN "ob-poc".entities e ON e.entity_id = r.from_entity_id
-                   WHERE r.relationship_id = $1"#,
+                   WHERE r.relationship_id = $1
+                     AND e.deleted_at IS NULL"#,
         )
         .bind(old_relationship_id)
         .fetch_optional(pool)

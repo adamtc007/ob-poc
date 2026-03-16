@@ -300,6 +300,163 @@ function findGraphNode(
   return nodes.find((node) => node.entity_id === entityId);
 }
 
+function OwnershipGraphCanvas({
+  nodes,
+  edges,
+}: {
+  nodes: HydratedGraphNode[];
+  edges: HydratedSlot["graph_edges"];
+}) {
+  if (nodes.length === 0) {
+    return (
+      <div className="rounded-md border border-dashed border-[var(--border-primary)] px-3 py-6 text-center text-sm text-[var(--text-muted)]">
+        No ownership graph nodes available.
+      </div>
+    );
+  }
+
+  const targetDepths = new Map<string, number>();
+  const targetIds = new Set(edges.map((edge) => edge.to_entity_id));
+
+  for (const edge of edges) {
+    const current = targetDepths.get(edge.to_entity_id);
+    const nextDepth = Math.max(edge.depth, 1);
+    if (current == null || nextDepth < current) {
+      targetDepths.set(edge.to_entity_id, nextDepth);
+    }
+  }
+
+  const grouped = new Map<number, HydratedGraphNode[]>();
+  for (const node of nodes) {
+    const depth =
+      targetDepths.get(node.entity_id) ??
+      (targetIds.has(node.entity_id) ? 1 : 0);
+    const bucket = grouped.get(depth) ?? [];
+    bucket.push(node);
+    grouped.set(depth, bucket);
+  }
+
+  for (const bucket of grouped.values()) {
+    bucket.sort((lhs, rhs) =>
+      (lhs.name ?? lhs.entity_id).localeCompare(rhs.name ?? rhs.entity_id),
+    );
+  }
+
+  const columns = Array.from(grouped.keys()).sort((lhs, rhs) => lhs - rhs);
+  const columnWidth = 220;
+  const rowHeight = 92;
+  const paddingX = 40;
+  const paddingY = 36;
+  const nodeWidth = 150;
+  const nodeHeight = 50;
+  const canvasWidth = Math.max(
+    420,
+    columns.length * columnWidth + paddingX * 2,
+  );
+  const maxRows = Math.max(
+    ...Array.from(grouped.values()).map((bucket) => bucket.length),
+    1,
+  );
+  const canvasHeight = Math.max(220, maxRows * rowHeight + paddingY * 2);
+  const positions = new Map<string, { x: number; y: number }>();
+
+  for (const column of columns) {
+    const bucket = grouped.get(column) ?? [];
+    bucket.forEach((node, index) => {
+      positions.set(node.entity_id, {
+        x: paddingX + columns.indexOf(column) * columnWidth + 12,
+        y: paddingY + index * rowHeight,
+      });
+    });
+  }
+
+  return (
+    <div className="overflow-x-auto rounded-md border border-[var(--border-primary)] bg-[var(--bg-secondary)] p-2">
+      <svg width={canvasWidth} height={canvasHeight} className="block">
+        {edges.map((edge, index) => {
+          const from = positions.get(edge.from_entity_id);
+          const to = positions.get(edge.to_entity_id);
+          if (!from || !to) {
+            return null;
+          }
+          return (
+            <g key={`${edge.from_entity_id}-${edge.to_entity_id}-${index}`}>
+              <line
+                x1={from.x + nodeWidth}
+                y1={from.y + nodeHeight / 2}
+                x2={to.x}
+                y2={to.y + nodeHeight / 2}
+                stroke="var(--border-primary)"
+                strokeWidth="2"
+              />
+              <text
+                x={(from.x + nodeWidth + to.x) / 2}
+                y={(from.y + to.y) / 2 + nodeHeight / 2 - 6}
+                fill="var(--text-muted)"
+                fontSize="10"
+                textAnchor="middle"
+              >
+                {edge.percentage != null
+                  ? `${edge.percentage}%`
+                  : (edge.ownership_type ?? "")}
+              </text>
+            </g>
+          );
+        })}
+        {nodes.map((node) => {
+          const position = positions.get(node.entity_id);
+          if (!position) {
+            return null;
+          }
+          return (
+            <g key={node.entity_id}>
+              <rect
+                x={position.x}
+                y={position.y}
+                rx="10"
+                ry="10"
+                width={nodeWidth}
+                height={nodeHeight}
+                fill="var(--bg-primary)"
+                stroke="var(--border-primary)"
+              />
+              <text
+                x={position.x + 12}
+                y={position.y + 20}
+                fill="var(--text-primary)"
+                fontSize="12"
+                fontWeight="600"
+              >
+                {(node.name ?? node.entity_id).slice(0, 24)}
+              </text>
+              <text
+                x={position.x + 12}
+                y={position.y + 36}
+                fill="var(--text-muted)"
+                fontSize="10"
+              >
+                {(node.entity_type ?? "unknown").slice(0, 24)}
+              </text>
+            </g>
+          );
+        })}
+        {columns.map((column) => (
+          <text
+            key={column}
+            x={paddingX + columns.indexOf(column) * columnWidth + nodeWidth / 2}
+            y={18}
+            fill="var(--text-muted)"
+            fontSize="10"
+            textAnchor="middle"
+          >
+            Depth {column}
+          </text>
+        ))}
+      </svg>
+    </div>
+  );
+}
+
 function SlotInspector({
   slot,
   hydrated,
@@ -436,6 +593,12 @@ function SlotInspector({
             <div className="rounded-md bg-[var(--bg-secondary)] px-3 py-2">
               Edges: {slot.graph_edge_count ?? 0}
             </div>
+          </div>
+          <div className="mt-3">
+            <OwnershipGraphCanvas
+              nodes={slot.graph_nodes}
+              edges={slot.graph_edges}
+            />
           </div>
           <div className="mt-3 space-y-2">
             {slot.graph_nodes.length > 0 ? (
@@ -684,6 +847,12 @@ export function ConstellationPanel({
     );
     return fromPath ?? allSlots[0] ?? null;
   }, [allSlots, constellationQuery.data, selectedSlotPath]);
+  const selectedCase = useMemo(
+    () =>
+      (casesQuery.data ?? []).find((item) => item.case_id === caseIdApplied) ??
+      null,
+    [caseIdApplied, casesQuery.data],
+  );
 
   const refreshAll = async () => {
     await Promise.all([constellationQuery.refetch(), summaryQuery.refetch()]);
@@ -780,6 +949,41 @@ export function ConstellationPanel({
             Clear
           </button>
         </div>
+        {selectedCase && (
+          <div className="mt-3 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-primary)] px-3 py-3 text-sm">
+            <div className="text-[11px] uppercase tracking-[0.14em] text-[var(--text-muted)]">
+              Active Case
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <div>
+                <div className="text-[11px] uppercase tracking-[0.12em] text-[var(--text-muted)]">
+                  Type
+                </div>
+                <div className="mt-1 text-[var(--text-primary)]">
+                  {selectedCase.case_type ?? "Unknown"}
+                </div>
+              </div>
+              <div>
+                <div className="text-[11px] uppercase tracking-[0.12em] text-[var(--text-muted)]">
+                  Status
+                </div>
+                <div className="mt-1 text-[var(--text-primary)]">
+                  {selectedCase.status ?? "Unknown"}
+                </div>
+              </div>
+              <div className="col-span-2">
+                <div className="text-[11px] uppercase tracking-[0.12em] text-[var(--text-muted)]">
+                  Opened
+                </div>
+                <div className="mt-1 text-[var(--text-primary)]">
+                  {selectedCase.opened_at
+                    ? new Date(selectedCase.opened_at).toLocaleString()
+                    : "Unknown"}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
         {casesQuery.data && casesQuery.data.length === 0 && (
           <div className="mt-2 text-xs text-[var(--text-muted)]">
             No cases found for this CBU. Constellation is showing structure-only

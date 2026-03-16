@@ -88,10 +88,7 @@ pub fn create_constellation_router(pool: PgPool) -> Router {
             "/api/cbu/:cbu_id/constellation/summary",
             get(get_constellation_summary),
         )
-        .route(
-            "/api/constellation/by-name",
-            get(get_constellation_by_name),
-        )
+        .route("/api/constellation/by-name", get(get_constellation_by_name))
         .route(
             "/api/constellation/search-cbus",
             get(search_constellation_cbus),
@@ -131,19 +128,18 @@ async fn get_constellation_cases(
     State(state): State<ConstellationAppState>,
     Path(cbu_id): Path<Uuid>,
 ) -> Result<Json<Vec<CbuCaseSummary>>, (StatusCode, String)> {
-    let rows =
-        sqlx::query_as::<_, (Uuid, Option<String>, Option<String>, Option<DateTime<Utc>>)>(
-            r#"
+    let rows = sqlx::query_as::<_, (Uuid, Option<String>, Option<String>, Option<DateTime<Utc>>)>(
+        r#"
             SELECT case_id, status, case_type, opened_at
             FROM "ob-poc".cases
             WHERE cbu_id = $1
             ORDER BY opened_at DESC NULLS LAST
             "#,
-        )
-        .bind(cbu_id)
-        .fetch_all(&state.pool)
-        .await
-        .map_err(internal_error)?;
+    )
+    .bind(cbu_id)
+    .fetch_all(&state.pool)
+    .await
+    .map_err(internal_error)?;
 
     Ok(Json(
         rows.into_iter()

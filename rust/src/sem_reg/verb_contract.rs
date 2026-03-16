@@ -51,6 +51,15 @@ pub struct VerbContractBody {
     /// Empty = no phase restriction.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub phase_tags: Vec<String>,
+    /// Safety tier for routing and confirmation policy.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub harm_class: Option<HarmClass>,
+    /// Normalized action family for deterministic intent routing.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub action_class: Option<ActionClass>,
+    /// Required lifecycle states extracted from verb lifecycle metadata.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub precondition_states: Vec<String>,
     /// Whether this verb requires a subject entity (default true).
     #[serde(default = "default_true")]
     pub requires_subject: bool,
@@ -63,6 +72,37 @@ pub struct VerbContractBody {
     /// CRUD table/schema/operation mapping (when behavior = "crud").
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub crud_mapping: Option<VerbCrudMapping>,
+}
+
+/// Safety tier for routing and confirmation policy.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum HarmClass {
+    ReadOnly,
+    Reversible,
+    Irreversible,
+    Destructive,
+}
+
+/// Normalized action family for deterministic intent routing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ActionClass {
+    List,
+    Read,
+    Search,
+    Describe,
+    Create,
+    Update,
+    Delete,
+    Assign,
+    Remove,
+    Import,
+    Compute,
+    Review,
+    Approve,
+    Reject,
+    Execute,
 }
 
 /// CRUD table/operation mapping captured from verb YAML.
@@ -231,6 +271,9 @@ mod tests {
             invocation_phrases: vec!["create CBU".into(), "new CBU".into()],
             subject_kinds: vec!["cbu".into()],
             phase_tags: vec!["onboarding".into()],
+            harm_class: Some(HarmClass::Reversible),
+            action_class: Some(ActionClass::Create),
+            precondition_states: vec![],
             requires_subject: true,
             produces_focus: true,
             metadata: Some(VerbContractMetadata {
@@ -253,6 +296,9 @@ mod tests {
         assert_eq!(back.invocation_phrases.len(), 2);
         assert_eq!(back.subject_kinds, vec!["cbu"]);
         assert_eq!(back.phase_tags, vec!["onboarding"]);
+        assert_eq!(back.harm_class, Some(HarmClass::Reversible));
+        assert_eq!(back.action_class, Some(ActionClass::Create));
+        assert!(back.precondition_states.is_empty());
         assert!(back.requires_subject);
         assert!(back.produces_focus);
         let meta = back.metadata.unwrap();
@@ -277,6 +323,9 @@ mod tests {
             invocation_phrases: vec![],
             subject_kinds: vec![],
             phase_tags: vec![],
+            harm_class: None,
+            action_class: None,
+            precondition_states: vec![],
             requires_subject: true,
             produces_focus: false,
             metadata: None,
@@ -287,5 +336,8 @@ mod tests {
         let back: VerbContractBody = serde_json::from_value(json).unwrap();
         assert_eq!(back.fqn, "session.info");
         assert!(back.args.is_empty());
+        assert_eq!(back.harm_class, None);
+        assert_eq!(back.action_class, None);
+        assert!(back.precondition_states.is_empty());
     }
 }

@@ -21,11 +21,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 #[cfg(feature = "database")]
-fn extract_uuid_alias(
-    verb_call: &VerbCall,
-    ctx: &ExecutionContext,
-    keys: &[&str],
-) -> Option<Uuid> {
+fn extract_uuid_alias(verb_call: &VerbCall, ctx: &ExecutionContext, keys: &[&str]) -> Option<Uuid> {
     verb_call.arguments.iter().find_map(|arg| {
         if !keys.iter().any(|key| arg.key == *key) {
             return None;
@@ -54,11 +50,12 @@ fn extract_string_alias(verb_call: &VerbCall, keys: &[&str]) -> Option<String> {
 
 #[cfg(feature = "database")]
 fn parse_optional_date(value: Option<String>, arg_name: &str) -> Result<Option<NaiveDate>> {
-    value.map(|raw| {
-        NaiveDate::parse_from_str(&raw, "%Y-%m-%d")
-            .map_err(|err| anyhow::anyhow!("invalid {} '{}': {}", arg_name, raw, err))
-    })
-    .transpose()
+    value
+        .map(|raw| {
+            NaiveDate::parse_from_str(&raw, "%Y-%m-%d")
+                .map_err(|err| anyhow::anyhow!("invalid {} '{}': {}", arg_name, raw, err))
+        })
+        .transpose()
 }
 
 #[cfg(feature = "database")]
@@ -156,6 +153,7 @@ impl CustomOperation for CbuCreateOp {
                 JOIN "ob-poc".cbus c ON c.cbu_id = cer.cbu_id
                 JOIN "ob-poc".roles r ON r.role_id = cer.role_id
                 WHERE cer.entity_id = $1
+                  AND c.deleted_at IS NULL
                   AND r.name = 'ASSET_OWNER'
                   AND (cer.effective_to IS NULL OR cer.effective_to > CURRENT_DATE)
                 LIMIT 1
@@ -330,14 +328,14 @@ impl CustomOperation for CbuLinkStructureOp {
         ctx: &mut ExecutionContext,
         pool: &PgPool,
     ) -> Result<ExecutionResult> {
-        let parent_cbu_id =
-            extract_uuid_alias(verb_call, ctx, &["parent-cbu-id", "parent_cbu_id"]).ok_or_else(
-                || anyhow::anyhow!("cbu.link-structure: missing required argument :parent-cbu-id"),
-            )?;
-        let child_cbu_id =
-            extract_uuid_alias(verb_call, ctx, &["child-cbu-id", "child_cbu_id"]).ok_or_else(
-                || anyhow::anyhow!("cbu.link-structure: missing required argument :child-cbu-id"),
-            )?;
+        let parent_cbu_id = extract_uuid_alias(verb_call, ctx, &["parent-cbu-id", "parent_cbu_id"])
+            .ok_or_else(|| {
+                anyhow::anyhow!("cbu.link-structure: missing required argument :parent-cbu-id")
+            })?;
+        let child_cbu_id = extract_uuid_alias(verb_call, ctx, &["child-cbu-id", "child_cbu_id"])
+            .ok_or_else(|| {
+                anyhow::anyhow!("cbu.link-structure: missing required argument :child-cbu-id")
+            })?;
         let relationship_type_raw =
             extract_string_alias(verb_call, &["relationship-type", "relationship_type"])
                 .ok_or_else(|| {
@@ -347,18 +345,20 @@ impl CustomOperation for CbuLinkStructureOp {
                 })?;
         let relationship_type = normalize_relationship_type(&relationship_type_raw);
         let qualifier = extract_string_alias(verb_call, &["qualifier"]);
-        let relationship_selector =
-            extract_string_alias(verb_call, &["relationship-selector", "relationship_selector"])
-                .or_else(|| {
-                    qualifier.as_ref().map(|value| {
-                        format!(
-                            "{}:{}",
-                            relationship_type_raw.to_ascii_lowercase(),
-                            value.to_ascii_lowercase()
-                        )
-                    })
-                })
-                .unwrap_or_else(|| relationship_type_raw.to_ascii_lowercase());
+        let relationship_selector = extract_string_alias(
+            verb_call,
+            &["relationship-selector", "relationship_selector"],
+        )
+        .or_else(|| {
+            qualifier.as_ref().map(|value| {
+                format!(
+                    "{}:{}",
+                    relationship_type_raw.to_ascii_lowercase(),
+                    value.to_ascii_lowercase()
+                )
+            })
+        })
+        .unwrap_or_else(|| relationship_type_raw.to_ascii_lowercase());
         let capital_flow_raw = extract_string_alias(verb_call, &["capital-flow", "capital_flow"]);
         let capital_flow = capital_flow_raw.as_deref().map(normalize_capital_flow);
         let effective_from = parse_optional_date(
@@ -370,8 +370,13 @@ impl CustomOperation for CbuLinkStructureOp {
             "effective-to",
         )?;
 
-        const ALLOWED_RELATIONSHIP_TYPES: &[&str] =
-            &["FEEDER", "PARALLEL", "AGGREGATOR", "MASTER", "CO_INVEST_VEHICLE"];
+        const ALLOWED_RELATIONSHIP_TYPES: &[&str] = &[
+            "FEEDER",
+            "PARALLEL",
+            "AGGREGATOR",
+            "MASTER",
+            "CO_INVEST_VEHICLE",
+        ];
         if !ALLOWED_RELATIONSHIP_TYPES.contains(&relationship_type.as_str()) {
             return Err(anyhow::anyhow!(
                 "cbu.link-structure: unsupported relationship-type '{}'",
@@ -388,11 +393,12 @@ impl CustomOperation for CbuLinkStructureOp {
             }
         }
 
-        let parent_exists: Option<Uuid> =
-            sqlx::query_scalar(r#"SELECT cbu_id FROM "ob-poc".cbus WHERE cbu_id = $1"#)
-                .bind(parent_cbu_id)
-                .fetch_optional(pool)
-                .await?;
+        let parent_exists: Option<Uuid> = sqlx::query_scalar(
+            r#"SELECT cbu_id FROM "ob-poc".cbus WHERE cbu_id = $1 AND deleted_at IS NULL"#,
+        )
+        .bind(parent_cbu_id)
+        .fetch_optional(pool)
+        .await?;
         if parent_exists.is_none() {
             return Err(anyhow::anyhow!(
                 "cbu.link-structure: parent CBU not found: {}",
@@ -400,11 +406,12 @@ impl CustomOperation for CbuLinkStructureOp {
             ));
         }
 
-        let child_exists: Option<Uuid> =
-            sqlx::query_scalar(r#"SELECT cbu_id FROM "ob-poc".cbus WHERE cbu_id = $1"#)
-                .bind(child_cbu_id)
-                .fetch_optional(pool)
-                .await?;
+        let child_exists: Option<Uuid> = sqlx::query_scalar(
+            r#"SELECT cbu_id FROM "ob-poc".cbus WHERE cbu_id = $1 AND deleted_at IS NULL"#,
+        )
+        .bind(child_cbu_id)
+        .fetch_optional(pool)
+        .await?;
         if child_exists.is_none() {
             return Err(anyhow::anyhow!(
                 "cbu.link-structure: child CBU not found: {}",
@@ -554,7 +561,22 @@ impl CustomOperation for CbuListStructureLinksOp {
 
         let rows = match (parent_cbu_id, child_cbu_id, status) {
             (Some(parent), Some(child), Some(status)) => {
-                sqlx::query_as::<_, (Uuid, Uuid, String, Uuid, String, String, String, String, Option<String>, Option<NaiveDate>, Option<NaiveDate>)>(
+                sqlx::query_as::<
+                    _,
+                    (
+                        Uuid,
+                        Uuid,
+                        String,
+                        Uuid,
+                        String,
+                        String,
+                        String,
+                        String,
+                        Option<String>,
+                        Option<NaiveDate>,
+                        Option<NaiveDate>,
+                    ),
+                >(
                     r#"
                     SELECT
                         l.link_id,
@@ -584,7 +606,22 @@ impl CustomOperation for CbuListStructureLinksOp {
                 .await?
             }
             (Some(parent), Some(child), None) => {
-                sqlx::query_as::<_, (Uuid, Uuid, String, Uuid, String, String, String, String, Option<String>, Option<NaiveDate>, Option<NaiveDate>)>(
+                sqlx::query_as::<
+                    _,
+                    (
+                        Uuid,
+                        Uuid,
+                        String,
+                        Uuid,
+                        String,
+                        String,
+                        String,
+                        String,
+                        Option<String>,
+                        Option<NaiveDate>,
+                        Option<NaiveDate>,
+                    ),
+                >(
                     r#"
                     SELECT
                         l.link_id,
@@ -612,7 +649,22 @@ impl CustomOperation for CbuListStructureLinksOp {
                 .await?
             }
             (Some(parent), None, Some(status)) => {
-                sqlx::query_as::<_, (Uuid, Uuid, String, Uuid, String, String, String, String, Option<String>, Option<NaiveDate>, Option<NaiveDate>)>(
+                sqlx::query_as::<
+                    _,
+                    (
+                        Uuid,
+                        Uuid,
+                        String,
+                        Uuid,
+                        String,
+                        String,
+                        String,
+                        String,
+                        Option<String>,
+                        Option<NaiveDate>,
+                        Option<NaiveDate>,
+                    ),
+                >(
                     r#"
                     SELECT
                         l.link_id,
@@ -640,7 +692,22 @@ impl CustomOperation for CbuListStructureLinksOp {
                 .await?
             }
             (Some(parent), None, None) => {
-                sqlx::query_as::<_, (Uuid, Uuid, String, Uuid, String, String, String, String, Option<String>, Option<NaiveDate>, Option<NaiveDate>)>(
+                sqlx::query_as::<
+                    _,
+                    (
+                        Uuid,
+                        Uuid,
+                        String,
+                        Uuid,
+                        String,
+                        String,
+                        String,
+                        String,
+                        Option<String>,
+                        Option<NaiveDate>,
+                        Option<NaiveDate>,
+                    ),
+                >(
                     r#"
                     SELECT
                         l.link_id,
@@ -666,7 +733,22 @@ impl CustomOperation for CbuListStructureLinksOp {
                 .await?
             }
             (None, Some(child), Some(status)) => {
-                sqlx::query_as::<_, (Uuid, Uuid, String, Uuid, String, String, String, String, Option<String>, Option<NaiveDate>, Option<NaiveDate>)>(
+                sqlx::query_as::<
+                    _,
+                    (
+                        Uuid,
+                        Uuid,
+                        String,
+                        Uuid,
+                        String,
+                        String,
+                        String,
+                        String,
+                        Option<String>,
+                        Option<NaiveDate>,
+                        Option<NaiveDate>,
+                    ),
+                >(
                     r#"
                     SELECT
                         l.link_id,
@@ -694,7 +776,22 @@ impl CustomOperation for CbuListStructureLinksOp {
                 .await?
             }
             (None, Some(child), None) => {
-                sqlx::query_as::<_, (Uuid, Uuid, String, Uuid, String, String, String, String, Option<String>, Option<NaiveDate>, Option<NaiveDate>)>(
+                sqlx::query_as::<
+                    _,
+                    (
+                        Uuid,
+                        Uuid,
+                        String,
+                        Uuid,
+                        String,
+                        String,
+                        String,
+                        String,
+                        Option<String>,
+                        Option<NaiveDate>,
+                        Option<NaiveDate>,
+                    ),
+                >(
                     r#"
                     SELECT
                         l.link_id,
@@ -795,8 +892,9 @@ impl CustomOperation for CbuUnlinkStructureOp {
         pool: &PgPool,
     ) -> Result<ExecutionResult> {
         let link_id = get_required_uuid(verb_call, "link-id")?;
-        let reason = extract_string_alias(verb_call, &["reason"])
-            .ok_or_else(|| anyhow::anyhow!("cbu.unlink-structure: missing required argument :reason"))?;
+        let reason = extract_string_alias(verb_call, &["reason"]).ok_or_else(|| {
+            anyhow::anyhow!("cbu.unlink-structure: missing required argument :reason")
+        })?;
 
         let result = sqlx::query(
             r#"
@@ -902,7 +1000,10 @@ impl CustomOperation for CbuAddProductOp {
                     anyhow::anyhow!("cbu.add-product: Unresolved reference @{}", ref_name)
                 })?;
                 let row = sqlx::query!(
-                    r#"SELECT cbu_id, name FROM "ob-poc".cbus WHERE cbu_id = $1"#,
+                    r#"SELECT cbu_id, name
+                       FROM "ob-poc".cbus
+                       WHERE cbu_id = $1
+                         AND deleted_at IS NULL"#,
                     resolved_id
                 )
                 .fetch_optional(pool)
@@ -914,7 +1015,10 @@ impl CustomOperation for CbuAddProductOp {
             } else if let Some(uuid_val) = cbu_id_arg.value.as_uuid() {
                 // It's a UUID
                 let row = sqlx::query!(
-                    r#"SELECT cbu_id, name FROM "ob-poc".cbus WHERE cbu_id = $1"#,
+                    r#"SELECT cbu_id, name
+                       FROM "ob-poc".cbus
+                       WHERE cbu_id = $1
+                         AND deleted_at IS NULL"#,
                     uuid_val
                 )
                 .fetch_optional(pool)
@@ -927,7 +1031,10 @@ impl CustomOperation for CbuAddProductOp {
                 // It's a string - try as UUID first, then as name
                 if let Ok(uuid_val) = Uuid::parse_str(str_val) {
                     let row = sqlx::query!(
-                        r#"SELECT cbu_id, name FROM "ob-poc".cbus WHERE cbu_id = $1"#,
+                        r#"SELECT cbu_id, name
+                           FROM "ob-poc".cbus
+                           WHERE cbu_id = $1
+                             AND deleted_at IS NULL"#,
                         uuid_val
                     )
                     .fetch_optional(pool)
@@ -939,7 +1046,10 @@ impl CustomOperation for CbuAddProductOp {
                 } else {
                     // Look up by name (case-insensitive)
                     let row = sqlx::query!(
-                        r#"SELECT cbu_id, name FROM "ob-poc".cbus WHERE LOWER(name) = LOWER($1)"#,
+                        r#"SELECT cbu_id, name
+                           FROM "ob-poc".cbus
+                           WHERE LOWER(name) = LOWER($1)
+                             AND deleted_at IS NULL"#,
                         str_val
                     )
                     .fetch_optional(pool)
@@ -1189,7 +1299,9 @@ impl CustomOperation for CbuShowOp {
         let cbu = sqlx::query!(
             r#"SELECT cbu_id, name, jurisdiction, client_type, cbu_category,
                       nature_purpose, description, created_at, updated_at
-               FROM "ob-poc".cbus WHERE cbu_id = $1"#,
+               FROM "ob-poc".cbus
+               WHERE cbu_id = $1
+                 AND deleted_at IS NULL"#,
             cbu_id
         )
         .fetch_optional(pool)
@@ -1208,8 +1320,9 @@ impl CustomOperation for CbuShowOp {
                LEFT JOIN "ob-poc".entity_partnerships p ON e.entity_id = p.entity_id
                LEFT JOIN "ob-poc".entity_trusts t ON e.entity_id = t.entity_id
                WHERE cer.cbu_id = $1
-               AND (cer.effective_from IS NULL OR cer.effective_from <= $2)
-               AND (cer.effective_to IS NULL OR cer.effective_to >= $2)
+                 AND e.deleted_at IS NULL
+                 AND (cer.effective_from IS NULL OR cer.effective_from <= $2)
+                 AND (cer.effective_to IS NULL OR cer.effective_to >= $2)
                ORDER BY e.name"#,
             cbu_id,
             as_of_date
@@ -1285,6 +1398,7 @@ impl CustomOperation for CbuShowOp {
                JOIN "ob-poc".cases c ON c.case_id = w.case_id
                JOIN "ob-poc".entities e ON e.entity_id = w.entity_id
                WHERE c.cbu_id = $1
+                 AND e.deleted_at IS NULL
                ORDER BY s.screening_type, e.name"#,
             cbu_id
         )
@@ -1504,7 +1618,10 @@ impl CustomOperation for CbuDecideOp {
 
         // Get current CBU
         let cbu = sqlx::query!(
-            r#"SELECT name, status FROM "ob-poc".cbus WHERE cbu_id = $1"#,
+            r#"SELECT name, status
+               FROM "ob-poc".cbus
+               WHERE cbu_id = $1
+                 AND deleted_at IS NULL"#,
             cbu_id
         )
         .fetch_optional(pool)
@@ -1552,7 +1669,10 @@ impl CustomOperation for CbuDecideOp {
 
         // 1. Update CBU status
         sqlx::query!(
-            r#"UPDATE "ob-poc".cbus SET status = $1, updated_at = now() WHERE cbu_id = $2"#,
+            r#"UPDATE "ob-poc".cbus
+               SET status = $1, updated_at = now()
+               WHERE cbu_id = $2
+                 AND deleted_at IS NULL"#,
             new_cbu_status,
             cbu_id
         )
@@ -1688,7 +1808,7 @@ impl CustomOperation for CbuDeleteCascadeOp {
 
         // Verify CBU exists
         let cbu = sqlx::query!(
-            r#"SELECT name FROM "ob-poc".cbus WHERE cbu_id = $1"#,
+            r#"SELECT name FROM "ob-poc".cbus WHERE cbu_id = $1 AND deleted_at IS NULL"#,
             cbu_id
         )
         .fetch_optional(pool)
@@ -1704,479 +1824,103 @@ impl CustomOperation for CbuDeleteCascadeOp {
         // Begin transaction
         let mut tx = pool.begin().await?;
 
-        // =====================================================================
-        // Phase 1: Delete from kyc schema tables
-        // =====================================================================
+        // The historical multi-table hard-delete cascade has drifted too far from
+        // the live schema to remain safe. Tier 3 replaces it with a soft-delete
+        // flow that detaches the CBU from active runtime paths while preserving
+        // root records for audit and recovery.
 
-        // "ob-poc".screenings (via workstreams via cases)
         let result = sqlx::query(
-            r#"DELETE FROM "ob-poc".screenings WHERE workstream_id IN (
-                SELECT workstream_id FROM "ob-poc".entity_workstreams WHERE case_id IN (
-                    SELECT case_id FROM "ob-poc".cases WHERE cbu_id = $1
-                )
-            )"#,
+            r#"UPDATE "ob-poc".client_group_entity
+               SET cbu_id = NULL, updated_at = NOW()
+               WHERE cbu_id = $1"#,
         )
         .bind(cbu_id)
         .execute(&mut *tx)
         .await?;
         deleted_counts.insert(
-            "\"ob-poc\".screenings".to_string(),
+            "client_group_entity_unlinked".to_string(),
             result.rows_affected() as i64,
         );
 
-        // "ob-poc".doc_requests (via workstreams)
         let result = sqlx::query(
-            r#"DELETE FROM "ob-poc".doc_requests WHERE workstream_id IN (
-                SELECT workstream_id FROM "ob-poc".entity_workstreams WHERE case_id IN (
-                    SELECT case_id FROM "ob-poc".cases WHERE cbu_id = $1
-                )
-            )"#,
+            r#"DELETE FROM "ob-poc".cbu_group_members
+               WHERE cbu_id = $1"#,
         )
         .bind(cbu_id)
         .execute(&mut *tx)
         .await?;
         deleted_counts.insert(
-            "\"ob-poc\".doc_requests".to_string(),
+            "cbu_group_members".to_string(),
             result.rows_affected() as i64,
         );
 
-        // "ob-poc".red_flags
         let result = sqlx::query(
-            r#"DELETE FROM "ob-poc".red_flags WHERE case_id IN (
-                SELECT case_id FROM "ob-poc".cases WHERE cbu_id = $1
-            )"#,
+            r#"DELETE FROM "ob-poc".cbu_structure_links
+               WHERE parent_cbu_id = $1 OR child_cbu_id = $1"#,
         )
         .bind(cbu_id)
         .execute(&mut *tx)
         .await?;
         deleted_counts.insert(
-            "\"ob-poc\".red_flags".to_string(),
+            "cbu_structure_links".to_string(),
             result.rows_affected() as i64,
         );
-
-        // "ob-poc".case_events
-        let result = sqlx::query(
-            r#"DELETE FROM "ob-poc".case_events WHERE case_id IN (
-                SELECT case_id FROM "ob-poc".cases WHERE cbu_id = $1
-            )"#,
-        )
-        .bind(cbu_id)
-        .execute(&mut *tx)
-        .await?;
-        deleted_counts.insert(
-            "\"ob-poc\".case_events".to_string(),
-            result.rows_affected() as i64,
-        );
-
-        // "ob-poc".entity_workstreams
-        let result = sqlx::query(
-            r#"DELETE FROM "ob-poc".entity_workstreams WHERE case_id IN (
-                SELECT case_id FROM "ob-poc".cases WHERE cbu_id = $1
-            )"#,
-        )
-        .bind(cbu_id)
-        .execute(&mut *tx)
-        .await?;
-        deleted_counts.insert(
-            "\"ob-poc\".entity_workstreams".to_string(),
-            result.rows_affected() as i64,
-        );
-
-        // "ob-poc".cases
-        let result = sqlx::query(r#"DELETE FROM "ob-poc".cases WHERE cbu_id = $1"#)
-            .bind(cbu_id)
-            .execute(&mut *tx)
-            .await?;
-        deleted_counts.insert(
-            "\"ob-poc\".cases".to_string(),
-            result.rows_affected() as i64,
-        );
-
-        // "ob-poc".share_classes
-        let result = sqlx::query(r#"DELETE FROM "ob-poc".share_classes WHERE cbu_id = $1"#)
-            .bind(cbu_id)
-            .execute(&mut *tx)
-            .await?;
-        deleted_counts.insert(
-            "\"ob-poc\".share_classes".to_string(),
-            result.rows_affected() as i64,
-        );
-
-        // =====================================================================
-        // Phase 2: Delete from custody schema tables
-        // =====================================================================
-
-        // "ob-poc".ssi_booking_rules
-        let result = sqlx::query(r#"DELETE FROM "ob-poc".ssi_booking_rules WHERE cbu_id = $1"#)
-            .bind(cbu_id)
-            .execute(&mut *tx)
-            .await?;
-        deleted_counts.insert(
-            "\"ob-poc\".ssi_booking_rules".to_string(),
-            result.rows_affected() as i64,
-        );
-
-        // "ob-poc".cbu_ssi_agent_override (via cbu_ssi)
-        let result = sqlx::query(
-            r#"DELETE FROM "ob-poc".cbu_ssi_agent_override WHERE ssi_id IN (
-                SELECT ssi_id FROM "ob-poc".cbu_ssi WHERE cbu_id = $1
-            )"#,
-        )
-        .bind(cbu_id)
-        .execute(&mut *tx)
-        .await?;
-        deleted_counts.insert(
-            "\"ob-poc\".cbu_ssi_agent_override".to_string(),
-            result.rows_affected() as i64,
-        );
-
-        // "ob-poc".cbu_ssi
-        let result = sqlx::query(r#"DELETE FROM "ob-poc".cbu_ssi WHERE cbu_id = $1"#)
-            .bind(cbu_id)
-            .execute(&mut *tx)
-            .await?;
-        deleted_counts.insert(
-            "\"ob-poc\".cbu_ssi".to_string(),
-            result.rows_affected() as i64,
-        );
-
-        // "ob-poc".cbu_instrument_universe
-        let result =
-            sqlx::query(r#"DELETE FROM "ob-poc".cbu_instrument_universe WHERE cbu_id = $1"#)
-                .bind(cbu_id)
-                .execute(&mut *tx)
-                .await?;
-        deleted_counts.insert(
-            "\"ob-poc\".cbu_instrument_universe".to_string(),
-            result.rows_affected() as i64,
-        );
-
-        // "ob-poc".csa_agreements (via isda_agreements)
-        let result = sqlx::query(
-            r#"DELETE FROM "ob-poc".csa_agreements WHERE isda_id IN (
-                SELECT isda_id FROM "ob-poc".isda_agreements WHERE cbu_id = $1
-            )"#,
-        )
-        .bind(cbu_id)
-        .execute(&mut *tx)
-        .await?;
-        deleted_counts.insert(
-            "\"ob-poc\".csa_agreements".to_string(),
-            result.rows_affected() as i64,
-        );
-
-        // "ob-poc".isda_product_coverage (via isda_agreements)
-        let result = sqlx::query(
-            r#"DELETE FROM "ob-poc".isda_product_coverage WHERE isda_id IN (
-                SELECT isda_id FROM "ob-poc".isda_agreements WHERE cbu_id = $1
-            )"#,
-        )
-        .bind(cbu_id)
-        .execute(&mut *tx)
-        .await?;
-        deleted_counts.insert(
-            "\"ob-poc\".isda_product_coverage".to_string(),
-            result.rows_affected() as i64,
-        );
-
-        // "ob-poc".isda_agreements
-        let result = sqlx::query(r#"DELETE FROM "ob-poc".isda_agreements WHERE cbu_id = $1"#)
-            .bind(cbu_id)
-            .execute(&mut *tx)
-            .await?;
-        deleted_counts.insert(
-            "\"ob-poc\".isda_agreements".to_string(),
-            result.rows_affected() as i64,
-        );
-
-        // =====================================================================
-        // Phase 3: Delete from ob-poc schema tables (CBU-dependent)
-        // =====================================================================
-
-        // resource_instance_attributes (via cbu_resource_instances)
-        let result = sqlx::query(
-            r#"DELETE FROM "ob-poc".resource_instance_attributes WHERE instance_id IN (
-                SELECT instance_id FROM "ob-poc".cbu_resource_instances WHERE cbu_id = $1
-            )"#,
-        )
-        .bind(cbu_id)
-        .execute(&mut *tx)
-        .await?;
-        deleted_counts.insert(
-            "resource_instance_attributes".to_string(),
-            result.rows_affected() as i64,
-        );
-
-        // resource_instance_dependencies (via cbu_resource_instances)
-        let result = sqlx::query(
-            r#"DELETE FROM "ob-poc".resource_instance_dependencies WHERE instance_id IN (
-                SELECT instance_id FROM "ob-poc".cbu_resource_instances WHERE cbu_id = $1
-            ) OR depends_on_instance_id IN (
-                SELECT instance_id FROM "ob-poc".cbu_resource_instances WHERE cbu_id = $1
-            )"#,
-        )
-        .bind(cbu_id)
-        .execute(&mut *tx)
-        .await?;
-        deleted_counts.insert(
-            "resource_instance_dependencies".to_string(),
-            result.rows_affected() as i64,
-        );
-
-        // cbu_resource_instances
-        let result =
-            sqlx::query(r#"DELETE FROM "ob-poc".cbu_resource_instances WHERE cbu_id = $1"#)
-                .bind(cbu_id)
-                .execute(&mut *tx)
-                .await?;
-        deleted_counts.insert(
-            "cbu_resource_instances".to_string(),
-            result.rows_affected() as i64,
-        );
-
-        // service_delivery_map
-        let result = sqlx::query(r#"DELETE FROM "ob-poc".service_delivery_map WHERE cbu_id = $1"#)
-            .bind(cbu_id)
-            .execute(&mut *tx)
-            .await?;
-        deleted_counts.insert(
-            "service_delivery_map".to_string(),
-            result.rows_affected() as i64,
-        );
-
-        // cbu_evidence
-        let result = sqlx::query(r#"DELETE FROM "ob-poc".cbu_evidence WHERE cbu_id = $1"#)
-            .bind(cbu_id)
-            .execute(&mut *tx)
-            .await?;
-        deleted_counts.insert("cbu_evidence".to_string(), result.rows_affected() as i64);
-
-        // ubo_evidence (via ubo_registry)
-        let result = sqlx::query(
-            r#"DELETE FROM "ob-poc".kyc_ubo_evidence WHERE ubo_id IN (
-                SELECT ubo_id FROM "ob-poc".kyc_ubo_registry WHERE cbu_id = $1
-            )"#,
-        )
-        .bind(cbu_id)
-        .execute(&mut *tx)
-        .await?;
-        deleted_counts.insert("ubo_evidence".to_string(), result.rows_affected() as i64);
-
-        // ubo_registry
-        let result = sqlx::query(r#"DELETE FROM "ob-poc".kyc_ubo_registry WHERE cbu_id = $1"#)
-            .bind(cbu_id)
-            .execute(&mut *tx)
-            .await?;
-        deleted_counts.insert("ubo_registry".to_string(), result.rows_affected() as i64);
-
-        // ubo_snapshots
-        let result = sqlx::query(r#"DELETE FROM "ob-poc".ubo_snapshots WHERE cbu_id = $1"#)
-            .bind(cbu_id)
-            .execute(&mut *tx)
-            .await?;
-        deleted_counts.insert("ubo_snapshots".to_string(), result.rows_affected() as i64);
-
-        // case_evaluation_snapshots (via "ob-poc".cases - already deleted cases but snapshot may remain)
-        // Note: FK may reference deleted case, so we use cbu_id directly
-        let result = sqlx::query(
-            r#"DELETE FROM "ob-poc".case_evaluation_snapshots WHERE case_id IN (
-                SELECT case_id FROM "ob-poc".cases WHERE cbu_id = $1
-            )"#,
-        )
-        .bind(cbu_id)
-        .execute(&mut *tx)
-        .await
-        .unwrap_or_else(|_| sqlx::postgres::PgQueryResult::default());
-        deleted_counts.insert(
-            "case_evaluation_snapshots".to_string(),
-            result.rows_affected() as i64,
-        );
-
-        // kyc_investigations
-        let result = sqlx::query(r#"DELETE FROM "ob-poc".kyc_investigations WHERE cbu_id = $1"#)
-            .bind(cbu_id)
-            .execute(&mut *tx)
-            .await?;
-        deleted_counts.insert(
-            "kyc_investigations".to_string(),
-            result.rows_affected() as i64,
-        );
-
-        // kyc_decisions
-        let result = sqlx::query(r#"DELETE FROM "ob-poc".kyc_decisions WHERE cbu_id = $1"#)
-            .bind(cbu_id)
-            .execute(&mut *tx)
-            .await?;
-        deleted_counts.insert("kyc_decisions".to_string(), result.rows_affected() as i64);
-
-        // screenings (legacy ob-poc schema)
-        let result = sqlx::query(
-            r#"DELETE FROM "ob-poc".screenings WHERE investigation_id IN (
-            SELECT investigation_id FROM "ob-poc".kyc_investigations WHERE cbu_id = $1
-        )"#,
-        )
-        .bind(cbu_id)
-        .execute(&mut *tx)
-        .await
-        .unwrap_or_else(|_| sqlx::postgres::PgQueryResult::default());
-        deleted_counts.insert("screenings".to_string(), result.rows_affected() as i64);
-
-        // document_catalog
-        let result = sqlx::query(r#"DELETE FROM "ob-poc".document_catalog WHERE cbu_id = $1"#)
-            .bind(cbu_id)
-            .execute(&mut *tx)
-            .await?;
-        deleted_counts.insert(
-            "document_catalog".to_string(),
-            result.rows_affected() as i64,
-        );
-
-        // client_allegations
-        let result = sqlx::query(r#"DELETE FROM "ob-poc".client_allegations WHERE cbu_id = $1"#)
-            .bind(cbu_id)
-            .execute(&mut *tx)
-            .await?;
-        deleted_counts.insert(
-            "client_allegations".to_string(),
-            result.rows_affected() as i64,
-        );
-
-        // cbu_trading_profiles
-        let result = sqlx::query(r#"DELETE FROM "ob-poc".cbu_trading_profiles WHERE cbu_id = $1"#)
-            .bind(cbu_id)
-            .execute(&mut *tx)
-            .await?;
-        deleted_counts.insert(
-            "cbu_trading_profiles".to_string(),
-            result.rows_affected() as i64,
-        );
-
-        // cbu_layout_overrides
-        let result = sqlx::query(r#"DELETE FROM "ob-poc".cbu_layout_overrides WHERE cbu_id = $1"#)
-            .bind(cbu_id)
-            .execute(&mut *tx)
-            .await?;
-        deleted_counts.insert(
-            "cbu_layout_overrides".to_string(),
-            result.rows_affected() as i64,
-        );
-
-        // cbu_change_log
-        let result = sqlx::query(r#"DELETE FROM "ob-poc".cbu_change_log WHERE cbu_id = $1"#)
-            .bind(cbu_id)
-            .execute(&mut *tx)
-            .await?;
-        deleted_counts.insert("cbu_change_log".to_string(), result.rows_affected() as i64);
-
-        // =====================================================================
-        // Phase 4: Handle entities (with shared-entity check)
-        // =====================================================================
 
         let mut entities_deleted: i64 = 0;
         let mut entities_preserved: i64 = 0;
 
         if delete_entities {
-            // Get entities linked ONLY to this CBU (not shared with other CBUs)
+            // Soft-delete entities that are only reachable through this still-active CBU.
             let exclusive_entities: Vec<Uuid> = sqlx::query_scalar(
-                r#"SELECT entity_id FROM "ob-poc".cbu_entity_roles
-                   WHERE cbu_id = $1
-                   AND entity_id NOT IN (
-                       SELECT entity_id FROM "ob-poc".cbu_entity_roles
-                       WHERE cbu_id != $1
-                   )"#,
+                r#"SELECT DISTINCT cer.entity_id
+                   FROM "ob-poc".cbu_entity_roles cer
+                   WHERE cer.cbu_id = $1
+                     AND NOT EXISTS (
+                         SELECT 1
+                         FROM "ob-poc".cbu_entity_roles other
+                         JOIN "ob-poc".cbus c ON c.cbu_id = other.cbu_id
+                         WHERE other.entity_id = cer.entity_id
+                           AND other.cbu_id <> $1
+                           AND c.deleted_at IS NULL
+                     )"#,
             )
             .bind(cbu_id)
             .fetch_all(&mut *tx)
             .await?;
 
-            // Count entities that are shared (preserved)
             let shared_count: Option<i64> = sqlx::query_scalar(
-                r#"SELECT COUNT(DISTINCT entity_id)::bigint FROM "ob-poc".cbu_entity_roles
-                   WHERE cbu_id = $1
-                   AND entity_id IN (
-                       SELECT entity_id FROM "ob-poc".cbu_entity_roles
-                       WHERE cbu_id != $1
-                   )"#,
+                r#"SELECT COUNT(DISTINCT cer.entity_id)::bigint
+                   FROM "ob-poc".cbu_entity_roles cer
+                   WHERE cer.cbu_id = $1
+                     AND EXISTS (
+                         SELECT 1
+                         FROM "ob-poc".cbu_entity_roles other
+                         JOIN "ob-poc".cbus c ON c.cbu_id = other.cbu_id
+                         WHERE other.entity_id = cer.entity_id
+                           AND other.cbu_id <> $1
+                           AND c.deleted_at IS NULL
+                     )"#,
             )
             .bind(cbu_id)
             .fetch_one(&mut *tx)
             .await?;
             entities_preserved = shared_count.unwrap_or(0);
 
-            // Delete entity extension table records for exclusive entities
             for entity_id in &exclusive_entities {
-                // Delete from all extension tables (ignore errors for tables that don't have the entity)
                 let _ = sqlx::query(
-                    r#"DELETE FROM "ob-poc".entity_proper_persons WHERE entity_id = $1"#,
+                    r#"UPDATE "ob-poc".entities
+                       SET deleted_at = NOW(), updated_at = NOW()
+                       WHERE entity_id = $1
+                         AND deleted_at IS NULL"#,
                 )
                 .bind(entity_id)
                 .execute(&mut *tx)
                 .await;
-                let _ = sqlx::query(
-                    r#"DELETE FROM "ob-poc".entity_limited_companies WHERE entity_id = $1"#,
-                )
-                .bind(entity_id)
-                .execute(&mut *tx)
-                .await;
-                let _ =
-                    sqlx::query(r#"DELETE FROM "ob-poc".entity_partnerships WHERE entity_id = $1"#)
-                        .bind(entity_id)
-                        .execute(&mut *tx)
-                        .await;
-                let _ = sqlx::query(r#"DELETE FROM "ob-poc".entity_trusts WHERE entity_id = $1"#)
-                    .bind(entity_id)
-                    .execute(&mut *tx)
-                    .await;
-                let _ = sqlx::query(r#"DELETE FROM "ob-poc".entity_funds WHERE entity_id = $1"#)
-                    .bind(entity_id)
-                    .execute(&mut *tx)
-                    .await;
-                let _ = sqlx::query(
-                    r#"DELETE FROM "ob-poc".entity_share_classes WHERE entity_id = $1"#,
-                )
-                .bind(entity_id)
-                .execute(&mut *tx)
-                .await;
-                let _ = sqlx::query(r#"DELETE FROM "ob-poc".entity_manco WHERE entity_id = $1"#)
-                    .bind(entity_id)
-                    .execute(&mut *tx)
-                    .await;
-
-                // Delete from entity_kyc_status
-                let _ =
-                    sqlx::query(r#"DELETE FROM "ob-poc".entity_kyc_status WHERE entity_id = $1"#)
-                        .bind(entity_id)
-                        .execute(&mut *tx)
-                        .await;
-
-                // Delete from entity_relationships (both sides - covers ownership, control, trust_role)
-                let _ = sqlx::query(
-                    r#"DELETE FROM "ob-poc".entity_relationships
-                       WHERE from_entity_id = $1 OR to_entity_id = $1"#,
-                )
-                .bind(entity_id)
-                .execute(&mut *tx)
-                .await;
-
-                // Delete attribute_observations for this entity
-                let _ = sqlx::query(
-                    r#"DELETE FROM "ob-poc".attribute_observations WHERE entity_id = $1"#,
-                )
-                .bind(entity_id)
-                .execute(&mut *tx)
-                .await;
-
-                // Delete from base entities table
-                let _ = sqlx::query(r#"DELETE FROM "ob-poc".entities WHERE entity_id = $1"#)
-                    .bind(entity_id)
-                    .execute(&mut *tx)
-                    .await;
             }
 
             entities_deleted = exclusive_entities.len() as i64;
         }
 
-        // Delete cbu_entity_roles (always - removes role links even for preserved entities)
         let result = sqlx::query(r#"DELETE FROM "ob-poc".cbu_entity_roles WHERE cbu_id = $1"#)
             .bind(cbu_id)
             .execute(&mut *tx)
@@ -2186,14 +1930,15 @@ impl CustomOperation for CbuDeleteCascadeOp {
             result.rows_affected() as i64,
         );
 
-        // =====================================================================
-        // Phase 5: Delete the CBU itself
-        // =====================================================================
-
-        let result = sqlx::query(r#"DELETE FROM "ob-poc".cbus WHERE cbu_id = $1"#)
-            .bind(cbu_id)
-            .execute(&mut *tx)
-            .await?;
+        let result = sqlx::query(
+            r#"UPDATE "ob-poc".cbus
+               SET deleted_at = NOW(), updated_at = NOW()
+               WHERE cbu_id = $1
+                 AND deleted_at IS NULL"#,
+        )
+        .bind(cbu_id)
+        .execute(&mut *tx)
+        .await?;
         deleted_counts.insert("cbus".to_string(), result.rows_affected() as i64);
 
         // Commit transaction
@@ -2317,6 +2062,7 @@ impl CustomOperation for CbuCreateFromClientGroupOp {
             LEFT JOIN "ob-poc".entity_funds ef ON ef.entity_id = e.entity_id
             WHERE cge.group_id = $1
               AND cge.membership_type NOT IN ('historical', 'rejected')
+              AND e.deleted_at IS NULL
               AND ($2::text IS NULL OR ef.gleif_category = $2)
               AND ($3::text IS NULL OR EXISTS (
                   SELECT 1 FROM "ob-poc".client_group_entity_roles cger2

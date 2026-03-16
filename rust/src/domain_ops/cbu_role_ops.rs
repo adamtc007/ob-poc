@@ -1077,7 +1077,7 @@ impl CustomOperation for CbuRoleValidateAllOp {
 
         // Check for basic role requirements based on CBU category
         let cbu = sqlx::query!(
-            r#"SELECT cbu_category, client_type FROM "ob-poc".cbus WHERE cbu_id = $1"#,
+            r#"SELECT cbu_category, client_type FROM "ob-poc".cbus WHERE cbu_id = $1 AND deleted_at IS NULL"#,
             cbu_id
         )
         .fetch_optional(pool)

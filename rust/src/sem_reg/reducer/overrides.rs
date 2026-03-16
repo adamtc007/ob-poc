@@ -2,7 +2,7 @@ use anyhow::{anyhow, Context, Result};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use sqlx::PgPool;
+use sqlx::{PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
 const NIL_UUID: &str = "00000000-0000-0000-0000-000000000000";
@@ -85,6 +85,42 @@ pub async fn get_active_override(
     .bind(case_id)
     .bind(slot_path)
     .fetch_optional(pool)
+    .await
+    {
+        Ok(value) => Ok(value),
+        Err(error) if is_missing_relation_error(&error, "state_overrides") => Ok(None),
+        Err(error) => Err(error).context("failed to load active reducer override"),
+    }
+}
+
+pub(crate) async fn get_active_override_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    cbu_id: Uuid,
+    case_id: Option<Uuid>,
+    slot_path: &str,
+) -> Result<Option<StateOverride>> {
+    match sqlx::query_as::<_, StateOverride>(
+        r#"
+        SELECT
+            id, cbu_id, case_id, constellation_type, slot_path,
+            computed_state, override_state, justification, authority,
+            conditions, reducer_revision, created_at, expires_at,
+            revoked_at, revoked_by, revoke_reason
+        FROM "ob-poc".state_overrides
+        WHERE cbu_id = $1
+          AND COALESCE(case_id, $2::uuid) = COALESCE($3, $2::uuid)
+          AND slot_path = $4
+          AND revoked_at IS NULL
+          AND (expires_at IS NULL OR expires_at > now())
+        ORDER BY created_at DESC
+        LIMIT 1
+        "#,
+    )
+    .bind(cbu_id)
+    .bind(Uuid::parse_str(NIL_UUID)?)
+    .bind(case_id)
+    .bind(slot_path)
+    .fetch_optional(&mut **tx)
     .await
     {
         Ok(value) => Ok(value),
@@ -267,8 +303,10 @@ pub async fn revoke_override(
 
 fn is_missing_relation_error(error: &sqlx::Error, relation_name: &str) -> bool {
     match error {
-        sqlx::Error::Database(db_error) => db_error.code().as_deref() == Some("42P01")
-            && db_error.message().contains(relation_name),
+        sqlx::Error::Database(db_error) => {
+            db_error.code().as_deref() == Some("42P01")
+                && db_error.message().contains(relation_name)
+        }
         _ => false,
     }
 }

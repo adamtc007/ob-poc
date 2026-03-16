@@ -215,6 +215,9 @@ fn crud_contract(
         invocation_phrases: vec![],
         subject_kinds: vec![],
         phase_tags: vec![],
+        harm_class: None,
+        action_class: None,
+        precondition_states: vec![],
         requires_subject: action != "create" && action != "list",
         produces_focus: action == "create",
         metadata: Some(VerbContractMetadata {

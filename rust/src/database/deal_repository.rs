@@ -483,6 +483,7 @@ impl DealRepository {
             FROM "ob-poc".deal_participants dp
             JOIN "ob-poc".entities e ON e.entity_id = dp.entity_id
             WHERE dp.deal_id = $1
+              AND e.deleted_at IS NULL
             ORDER BY dp.is_primary DESC NULLS LAST, dp.participant_role, e.name
             "#,
         )
@@ -563,6 +564,7 @@ impl DealRepository {
                     AND cer.entity_id = part.entity_id
                 )
             )
+            AND cbu.deleted_at IS NULL
             ORDER BY orq.created_at DESC
             "#,
         )

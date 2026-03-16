@@ -52,12 +52,10 @@ mod tests {
             .iter()
             .find(|verb| verb.verb == "entity.ensure-or-placeholder")
             .unwrap();
-        assert!(
-            blocked
-                .reasons
-                .iter()
-                .any(|reason| reason.message.contains("dependency 'cbu'"))
-        );
+        assert!(blocked
+            .reasons
+            .iter()
+            .any(|reason| reason.message.contains("dependency 'cbu'")));
     }
 
     #[test]
@@ -88,7 +86,10 @@ mod tests {
             .iter()
             .find(|slot| slot.name == "management_company")
             .unwrap();
-        assert!(manco.available_verbs.iter().any(|verb| verb == "entity.read"));
+        assert!(manco
+            .available_verbs
+            .iter()
+            .any(|verb| verb == "entity.read"));
     }
 
     #[test]
@@ -127,9 +128,16 @@ mod tests {
             .children
             .iter()
             .find(|slot| slot.name == "case")
-            .and_then(|slot| slot.children.iter().find(|slot| slot.name == "case.tollgate"))
+            .and_then(|slot| {
+                slot.children
+                    .iter()
+                    .find(|slot| slot.name == "case.tollgate")
+            })
             .unwrap();
-        assert!(tollgate.available_verbs.iter().any(|verb| verb == "tollgate.evaluate"));
+        assert!(tollgate
+            .available_verbs
+            .iter()
+            .any(|verb| verb == "tollgate.evaluate"));
     }
 
     #[test]
@@ -143,14 +151,16 @@ mod tests {
             .children
             .iter()
             .find(|slot| slot.name == "case")
-            .and_then(|slot| slot.children.iter().find(|slot| slot.name == "case.tollgate"))
+            .and_then(|slot| {
+                slot.children
+                    .iter()
+                    .find(|slot| slot.name == "case.tollgate")
+            })
             .unwrap();
         assert!(tollgate.available_verbs.is_empty());
-        assert!(
-            tollgate
-                .blocked_verbs
-                .iter()
-                .any(|verb| verb.verb == "tollgate.evaluate")
-        );
+        assert!(tollgate
+            .blocked_verbs
+            .iter()
+            .any(|verb| verb.verb == "tollgate.evaluate"));
     }
 }

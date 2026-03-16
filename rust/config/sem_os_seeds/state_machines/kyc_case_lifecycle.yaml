@@ -1,0 +1,94 @@
+state_machine: kyc_case_lifecycle
+description: KYC case lifecycle derived from case status
+states:
+  [
+    intake,
+    discovery,
+    assessment,
+    review,
+    blocked,
+    approved,
+    rejected,
+    withdrawn,
+    expired,
+    refer_to_regulator,
+    do_not_onboard,
+  ]
+initial: intake
+transitions:
+  - from: intake
+    to: discovery
+    verbs: [kyc-case.update-status]
+  - from: discovery
+    to: assessment
+    verbs: [kyc-case.update-status]
+  - from: assessment
+    to: review
+    verbs: [kyc-case.update-status, kyc-case.set-risk-rating]
+  - from: review
+    to: approved
+    verbs: [kyc-case.update-status]
+  - from: review
+    to: rejected
+    verbs: [kyc-case.close]
+  - from: review
+    to: refer_to_regulator
+    verbs: [kyc-case.escalate]
+  - from: blocked
+    to: discovery
+    verbs: [kyc-case.reopen]
+  - from: blocked
+    to: withdrawn
+    verbs: [kyc-case.close]
+  - from: approved
+    to: review
+    verbs: [kyc-case.reopen]
+reducer:
+  overlay_sources: {}
+  conditions:
+    status_is:
+      expr: "scope.case_status = $1"
+      parameterized: true
+    discovery_status:
+      expr: "status_is('DISCOVERY')"
+    assessment_status:
+      expr: "status_is('ASSESSMENT')"
+    review_status:
+      expr: "status_is('REVIEW')"
+    blocked_status:
+      expr: "status_is('BLOCKED')"
+    approved_status:
+      expr: "status_is('APPROVED')"
+    rejected_status:
+      expr: "status_is('REJECTED')"
+    withdrawn_status:
+      expr: "status_is('WITHDRAWN')"
+    expired_status:
+      expr: "status_is('EXPIRED')"
+    refer_to_regulator_status:
+      expr: "status_is('REFER_TO_REGULATOR')"
+    do_not_onboard_status:
+      expr: "status_is('DO_NOT_ONBOARD')"
+  rules:
+    - state: do_not_onboard
+      requires: [do_not_onboard_status]
+    - state: refer_to_regulator
+      requires: [refer_to_regulator_status]
+    - state: expired
+      requires: [expired_status]
+    - state: withdrawn
+      requires: [withdrawn_status]
+    - state: rejected
+      requires: [rejected_status]
+    - state: approved
+      requires: [approved_status]
+    - state: blocked
+      requires: [blocked_status]
+    - state: review
+      requires: [review_status]
+    - state: assessment
+      requires: [assessment_status]
+    - state: discovery
+      requires: [discovery_status]
+    - state: intake
+      requires: []

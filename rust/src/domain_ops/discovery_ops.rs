@@ -597,6 +597,7 @@ async fn search_entities_via_db(
                 OR e.name_norm ILIKE LOWER($1)
                 OR e.entity_id::text ILIKE $1
             )
+              AND e.deleted_at IS NULL
               AND (
                   $2::text[] IS NULL
                   OR LOWER(COALESCE(NULLIF(et.type_code, ''), e.bods_entity_type, 'entity')) = ANY($2)
@@ -632,6 +633,7 @@ async fn search_entities_via_db(
                 END AS match_score
             FROM "ob-poc".cbus c
             WHERE $5::boolean = true
+              AND c.deleted_at IS NULL
               AND (
                   c.name ILIKE $1
                   OR c.description ILIKE $1
@@ -836,6 +838,7 @@ async fn load_entity_record(pool: &PgPool, entity_id: Uuid) -> Result<(String, S
         SELECT name
         FROM "ob-poc".cbus
         WHERE cbu_id = $1
+          AND deleted_at IS NULL
         "#,
     )
     .bind(entity_id)
@@ -881,6 +884,7 @@ async fn load_entity_record(pool: &PgPool, entity_id: Uuid) -> Result<(String, S
         FROM "ob-poc".entities e
         LEFT JOIN "ob-poc".entity_types et ON et.entity_type_id = e.entity_type_id
         WHERE e.entity_id = $1
+          AND e.deleted_at IS NULL
         "#,
     )
     .bind(entity_id)

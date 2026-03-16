@@ -299,7 +299,7 @@ fn compile_macro(
         .collect();
 
     // Build snapshot manifest from verb_snapshot_pins for all expanded verbs.
-    let snapshot_manifest: HashMap<Uuid, Uuid> = verb_snapshot_pins
+    let snapshot_manifest: BTreeMap<Uuid, Uuid> = verb_snapshot_pins
         .map(|pins| {
             expanded_verbs
                 .iter()
@@ -403,10 +403,10 @@ fn compile_primitive(
     };
 
     // Build snapshot manifest for the envelope (single verb for primitives).
-    let snapshot_manifest: HashMap<Uuid, Uuid> = verb_snapshot_pins
+    let snapshot_manifest: BTreeMap<Uuid, Uuid> = verb_snapshot_pins
         .and_then(|pins| pins.get(fqn))
         .map(|(obj_id, snap_id)| {
-            let mut m = HashMap::new();
+            let mut m = BTreeMap::new();
             m.insert(*obj_id, *snap_id);
             m
         })

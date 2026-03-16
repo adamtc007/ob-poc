@@ -6,11 +6,13 @@
 //! existing domain structure and governance patterns.
 
 pub mod derivation_seeds;
+pub mod membership_rule_seeds;
 pub mod policy_seeds;
 pub mod taxonomy_seeds;
 pub mod view_seeds;
 
 pub use derivation_seeds::{seed_derivation_specs, DerivationSeedReport};
+pub use membership_rule_seeds::{seed_kyc_membership_rules, MembershipRuleSeedReport};
 pub use policy_seeds::{seed_policies, PolicySeedReport};
 pub use taxonomy_seeds::{seed_taxonomies, TaxonomySeedReport};
 pub use view_seeds::{seed_views, ViewSeedReport};

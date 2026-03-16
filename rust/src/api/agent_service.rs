@@ -1278,8 +1278,7 @@ impl AgentService {
                             intent_hints: vec![IntentHint {
                                 intent: "entity-scope-unresolved".to_string(),
                                 confidence: "low".to_string(),
-                                reason: "Entity search did not resolve a usable scope"
-                                    .to_string(),
+                                reason: "Entity search did not resolve a usable scope".to_string(),
                             }],
                             grounding_strategy: Some("scope_unresolved".to_string()),
                             grounding_confidence: Some("low".to_string()),
@@ -4438,7 +4437,7 @@ impl AgentService {
                         entity_bindings: std::collections::BTreeMap::new(),
                         external_lookup_digests: vec![],
                         macro_audit_digests: vec![],
-                        snapshot_manifest: std::collections::HashMap::new(),
+                        snapshot_manifest: std::collections::BTreeMap::new(),
                     },
                     external_lookups: vec![],
                     macro_audits: vec![],

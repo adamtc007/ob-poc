@@ -182,7 +182,11 @@ mod db_tests {
             .load_verbs()
             .expect("ConfigLoader should load verb YAML for db_integration");
         assert!(
-            config.domains.get("cbu").and_then(|d| d.verbs.get("create")).is_some(),
+            config
+                .domains
+                .get("cbu")
+                .and_then(|d| d.verbs.get("create"))
+                .is_some(),
             "loaded verb config should include cbu.create"
         );
 
@@ -400,7 +404,10 @@ mod db_tests {
             name
         );
 
-        let err = db.execute_dsl(&dsl).await.expect_err("self-link should fail");
+        let err = db
+            .execute_dsl(&dsl)
+            .await
+            .expect_err("self-link should fail");
         assert!(err.to_string().contains("self"));
 
         db.cleanup().await?;
@@ -439,7 +446,10 @@ mod db_tests {
 
         let terminated = read_structure_link(&db.pool, parent_id, child_id).await?;
         assert_eq!(terminated.status, "TERMINATED");
-        assert_eq!(terminated.terminated_reason.as_deref(), Some("fund wound down"));
+        assert_eq!(
+            terminated.terminated_reason.as_deref(),
+            Some("fund wound down")
+        );
 
         db.cleanup().await?;
         Ok(())

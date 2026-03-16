@@ -296,7 +296,7 @@ impl EntityService {
             r#"
             SELECT entity_id, entity_type_id, external_id, name, created_at, updated_at
             FROM "ob-poc".entities
-            WHERE entity_id = $1
+            WHERE entity_id = $1 AND deleted_at IS NULL
             "#,
         )
         .bind(entity_id)
@@ -313,7 +313,7 @@ impl EntityService {
             r#"
             SELECT entity_id, entity_type_id, external_id, name, created_at, updated_at
             FROM "ob-poc".entities
-            WHERE name = $1
+            WHERE name = $1 AND deleted_at IS NULL
             "#,
         )
         .bind(name)
@@ -369,12 +369,13 @@ impl EntityService {
         Ok(result.rows_affected() > 0)
     }
 
-    /// Delete entity (cascades to proper_persons if applicable)
+    /// Soft-delete entity (preserves dependent records)
     pub async fn delete_entity(&self, entity_id: Uuid) -> Result<bool> {
         let result = sqlx::query(
             r#"
-            DELETE FROM "ob-poc".entities
-            WHERE entity_id = $1
+            UPDATE "ob-poc".entities
+            SET deleted_at = NOW()
+            WHERE entity_id = $1 AND deleted_at IS NULL
             "#,
         )
         .bind(entity_id)
@@ -383,7 +384,7 @@ impl EntityService {
         .context("Failed to delete entity")?;
 
         if result.rows_affected() > 0 {
-            info!("Deleted entity {}", entity_id);
+            info!("Soft-deleted entity {}", entity_id);
         }
 
         Ok(result.rows_affected() > 0)
@@ -401,7 +402,7 @@ impl EntityService {
             r#"
             SELECT entity_id, entity_type_id, external_id, name, created_at, updated_at
             FROM "ob-poc".entities
-            WHERE entity_type_id = $1
+            WHERE entity_type_id = $1 AND deleted_at IS NULL
             ORDER BY created_at DESC
             LIMIT $2
             "#,

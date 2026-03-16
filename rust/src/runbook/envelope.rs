@@ -19,7 +19,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
-use std::collections::HashMap;
 use uuid::Uuid;
 
 use crate::dsl_v2::macros::ExpansionLimits;
@@ -60,7 +59,7 @@ pub struct EnvelopeCore {
     ///
     /// Empty when sem_reg is unavailable (graceful degradation).
     #[serde(default)]
-    pub snapshot_manifest: HashMap<Uuid, Uuid>,
+    pub snapshot_manifest: BTreeMap<Uuid, Uuid>,
 }
 
 // ---------------------------------------------------------------------------
@@ -98,7 +97,7 @@ impl ReplayEnvelope {
                 entity_bindings: BTreeMap::new(),
                 external_lookup_digests: Vec::new(),
                 macro_audit_digests: Vec::new(),
-                snapshot_manifest: HashMap::new(),
+                snapshot_manifest: BTreeMap::new(),
             },
             external_lookups: Vec::new(),
             macro_audits: Vec::new(),
@@ -114,7 +113,7 @@ impl ReplayEnvelope {
                 entity_bindings: bindings,
                 external_lookup_digests: Vec::new(),
                 macro_audit_digests: Vec::new(),
-                snapshot_manifest: HashMap::new(),
+                snapshot_manifest: BTreeMap::new(),
             },
             external_lookups: Vec::new(),
             macro_audits: Vec::new(),

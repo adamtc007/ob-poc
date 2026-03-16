@@ -157,9 +157,12 @@ impl CbuEntityRolesService {
             r#"
             SELECT cer.cbu_entity_role_id, cer.cbu_id, cer.entity_id, e.name as entity_name, cer.role_id, r.name as role_name
             FROM "ob-poc".cbu_entity_roles cer
+            JOIN "ob-poc".cbus c ON cer.cbu_id = c.cbu_id
             JOIN "ob-poc".entities e ON cer.entity_id = e.entity_id
             JOIN "ob-poc".roles r ON cer.role_id = r.role_id
             WHERE cer.cbu_id = $1
+              AND c.deleted_at IS NULL
+              AND e.deleted_at IS NULL
             ORDER BY r.name, e.name
             "#,
         )
@@ -183,9 +186,13 @@ impl CbuEntityRolesService {
             r#"
             SELECT cer.cbu_entity_role_id, cer.cbu_id, cer.entity_id, e.name as entity_name, cer.role_id, r.name as role_name
             FROM "ob-poc".cbu_entity_roles cer
+            JOIN "ob-poc".cbus c ON cer.cbu_id = c.cbu_id
             JOIN "ob-poc".entities e ON cer.entity_id = e.entity_id
             JOIN "ob-poc".roles r ON cer.role_id = r.role_id
-            WHERE cer.cbu_id = $1 AND cer.role_id = $2
+            WHERE cer.cbu_id = $1
+              AND cer.role_id = $2
+              AND c.deleted_at IS NULL
+              AND e.deleted_at IS NULL
             ORDER BY e.name
             "#,
         )

@@ -47,6 +47,8 @@ use super::runtime_registry::{runtime_registry, RuntimeBehavior};
 use super::submission::{DslSubmission, SubmissionError, SubmissionLimits};
 #[cfg(feature = "database")]
 use crate::domain_ops::CustomOperationRegistry;
+#[cfg(feature = "database")]
+use crate::domain_ops::{verify_plugin_verb_coverage, verify_plugin_verb_coverage_strict};
 
 #[cfg(feature = "database")]
 use sqlx::PgPool;
@@ -1076,9 +1078,26 @@ pub struct DslExecutor {
 }
 
 impl DslExecutor {
-    /// Create a new executor with a database pool
+    /// Create a new executor with a database pool.
+    ///
+    /// Verifies at construction time that every YAML `behavior: plugin` verb has a
+    /// registered `CustomOperation`.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// # use ob_poc::dsl_v2::executor::DslExecutor;
+    /// # use sqlx::PgPool;
+    /// # fn demo(pool: PgPool) {
+    /// let executor = DslExecutor::new(pool);
+    /// let _ = executor.events();
+    /// # }
+    /// ```
     #[cfg(feature = "database")]
     pub fn new(pool: PgPool) -> Self {
+        let custom_ops = CustomOperationRegistry::new();
+        verify_plugin_verb_coverage_strict(&custom_ops);
+
         Self {
             generic_executor: GenericCrudExecutor::new(pool.clone()),
             idempotency: super::idempotency::IdempotencyManager::new(pool.clone()),
@@ -1086,8 +1105,36 @@ impl DslExecutor {
                 pool.clone(),
             ),
             pool,
-            custom_ops: CustomOperationRegistry::new(),
+            custom_ops,
             events: None,
+        }
+    }
+
+    /// Verify that all YAML plugin verbs are backed by registered custom operations.
+    ///
+    /// Returns the fully-qualified YAML plugin verbs that are missing handlers.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// # use ob_poc::dsl_v2::executor::DslExecutor;
+    /// # use sqlx::PgPool;
+    /// # fn demo(pool: PgPool) {
+    /// let executor = DslExecutor::new(pool);
+    /// let _ = executor.verify_registry_coverage();
+    /// # }
+    /// ```
+    #[cfg(feature = "database")]
+    pub fn verify_registry_coverage(&self) -> std::result::Result<(), Vec<String>> {
+        let result = verify_plugin_verb_coverage(&self.custom_ops);
+        if result.yaml_missing_op.is_empty() {
+            Ok(())
+        } else {
+            Err(result
+                .yaml_missing_op
+                .into_iter()
+                .map(|(domain, verb)| format!("{domain}.{verb}"))
+                .collect())
         }
     }
 
@@ -2742,5 +2789,18 @@ mod tests {
         ctx.bind("test", id);
         assert_eq!(ctx.resolve("test"), Some(id));
         assert_eq!(ctx.resolve("nonexistent"), None);
+    }
+
+    #[cfg(feature = "database")]
+    #[tokio::test]
+    async fn test_executor_registry_coverage_is_clean() {
+        use sqlx::postgres::PgPoolOptions;
+
+        let pool = PgPoolOptions::new()
+            .max_connections(1)
+            .connect_lazy("postgres://localhost/nonexistent")
+            .expect("lazy pool creation should not fail");
+        let executor = DslExecutor::new(pool);
+        assert_eq!(executor.verify_registry_coverage(), Ok(()));
     }
 }

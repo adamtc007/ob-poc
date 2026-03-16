@@ -198,7 +198,10 @@ fn load_known_verbs() -> ConstellationResult<HashSet<String>> {
     Ok(known)
 }
 
-fn load_known_verbs_from_dir(path: &PathBuf, known: &mut HashSet<String>) -> ConstellationResult<()> {
+fn load_known_verbs_from_dir(
+    path: &PathBuf,
+    known: &mut HashSet<String>,
+) -> ConstellationResult<()> {
     for entry in std::fs::read_dir(path).map_err(|err| ConstellationError::Other(err.into()))? {
         let entry = entry.map_err(|err| ConstellationError::Other(err.into()))?;
         let path = entry.path();

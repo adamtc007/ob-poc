@@ -33,8 +33,8 @@ pub use compiler::{
 };
 pub use extraction::parse_structured_intent_plan;
 pub use failure::{
-    AmbiguityReason, BindingFailure, CompilerFailure, CompilerFailureKind,
-    DiscriminationFailure, ResolutionFailure,
+    AmbiguityReason, BindingFailure, CompilerFailure, CompilerFailureKind, DiscriminationFailure,
+    ResolutionFailure,
 };
 pub use intent_schema::{
     IntentIdentifier, IntentParameter, IntentQualifier, IntentStep, IntentTarget,

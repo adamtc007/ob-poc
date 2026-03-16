@@ -1073,7 +1073,7 @@ impl CustomOperation for DilutionListOp {
         let instrument_data: Vec<serde_json::Value> =
             futures::future::try_join_all(instruments.iter().map(|i| async {
                 let holder_name: Option<String> = sqlx::query_scalar(
-                    r#"SELECT name FROM "ob-poc".entities WHERE entity_id = $1"#,
+                    r#"SELECT name FROM "ob-poc".entities WHERE entity_id = $1 AND deleted_at IS NULL"#,
                 )
                 .bind(i.3)
                 .fetch_optional(pool)

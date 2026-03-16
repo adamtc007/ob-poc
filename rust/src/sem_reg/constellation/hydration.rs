@@ -134,10 +134,9 @@ pub async fn hydrate_constellation(
                     .await
                     .map_err(ConstellationError::Other)?;
                 overlays.scope = scope.as_scope_data();
-                let override_entry =
-                    get_active_override_tx(&mut tx, cbu_id, case_id, &slot.name)
-                        .await
-                        .map_err(ConstellationError::Other)?;
+                let override_entry = get_active_override_tx(&mut tx, cbu_id, case_id, &slot.name)
+                    .await
+                    .map_err(ConstellationError::Other)?;
                 let derived = reduce_slot(machine, &slot.name, &overlays, override_entry)
                     .map_err(|err| ConstellationError::Execution(err.to_string()))?;
                 raw.warnings
@@ -443,9 +442,8 @@ async fn query_child_cbu_rows(
             .await
             .map_err(|err| ConstellationError::Other(err.into()))?
         }
-        _ => {
-            sqlx::query_as::<_, (Uuid, String, Option<DateTime<Utc>>)>(
-                r#"
+        _ => sqlx::query_as::<_, (Uuid, String, Option<DateTime<Utc>>)>(
+            r#"
                 SELECT child_cbu_id, relationship_selector, created_at
                 FROM "ob-poc".cbu_structure_links
                 WHERE parent_cbu_id = $1
@@ -454,12 +452,11 @@ async fn query_child_cbu_rows(
                   AND (effective_to IS NULL OR effective_to >= CURRENT_DATE)
                 ORDER BY created_at DESC NULLS LAST, updated_at DESC
                 "#,
-            )
-            .bind(parent_cbu_id)
-            .fetch_all(pool)
-            .await
-            .map_err(|err| ConstellationError::Other(err.into()))?
-        }
+        )
+        .bind(parent_cbu_id)
+        .fetch_all(pool)
+        .await
+        .map_err(|err| ConstellationError::Other(err.into()))?,
     };
 
     Ok(rows
@@ -519,9 +516,8 @@ async fn query_child_cbu_rows_tx(
             .await
             .map_err(|err| ConstellationError::Other(err.into()))?
         }
-        _ => {
-            sqlx::query_as::<_, (Uuid, String, Option<DateTime<Utc>>)>(
-                r#"
+        _ => sqlx::query_as::<_, (Uuid, String, Option<DateTime<Utc>>)>(
+            r#"
                 SELECT child_cbu_id, relationship_selector, created_at
                 FROM "ob-poc".cbu_structure_links
                 WHERE parent_cbu_id = $1
@@ -530,12 +526,11 @@ async fn query_child_cbu_rows_tx(
                   AND (effective_to IS NULL OR effective_to >= CURRENT_DATE)
                 ORDER BY created_at DESC NULLS LAST, updated_at DESC
                 "#,
-            )
-            .bind(parent_cbu_id)
-            .fetch_all(&mut **tx)
-            .await
-            .map_err(|err| ConstellationError::Other(err.into()))?
-        }
+        )
+        .bind(parent_cbu_id)
+        .fetch_all(&mut **tx)
+        .await
+        .map_err(|err| ConstellationError::Other(err.into()))?,
     };
 
     Ok(rows
@@ -762,10 +757,7 @@ async fn query_tollgate_rows_tx(
         .collect())
 }
 
-async fn query_mandate_rows(
-    pool: &PgPool,
-    cbu_id: Uuid,
-) -> ConstellationResult<Vec<RawSlotRow>> {
+async fn query_mandate_rows(pool: &PgPool, cbu_id: Uuid) -> ConstellationResult<Vec<RawSlotRow>> {
     let rows = sqlx::query_as::<_, (Uuid, String, i32, Option<DateTime<Utc>>)>(
         r#"
         SELECT profile_id, status, version, created_at
@@ -1023,14 +1015,12 @@ async fn query_entity_graph_rows_tx(
         edges
             .into_iter()
             .map(
-                |(from_entity_id, to_entity_id, percentage, ownership_type, depth)| {
-                    RawGraphEdge {
-                        from_entity_id,
-                        to_entity_id,
-                        percentage,
-                        ownership_type,
-                        depth: depth as usize,
-                    }
+                |(from_entity_id, to_entity_id, percentage, ownership_type, depth)| RawGraphEdge {
+                    from_entity_id,
+                    to_entity_id,
+                    percentage,
+                    ownership_type,
+                    depth: depth as usize,
                 },
             )
             .collect(),
@@ -1134,8 +1124,5 @@ fn select_occurrence(rows: Vec<RawSlotRow>, occurrence: Option<usize>) -> Vec<Ra
     if occurrence == 0 {
         return Vec::new();
     }
-    rows.into_iter()
-        .nth(occurrence - 1)
-        .into_iter()
-        .collect()
+    rows.into_iter().nth(occurrence - 1).into_iter().collect()
 }

@@ -381,7 +381,9 @@ mod tests {
     fn test_invalid_nlci_plan_fixture_fails_invariant_check() {
         let failures = check_nlci_plan_fixture(&load_fixture("invalid_dsl_shaped_action.json"));
         assert_eq!(failures.len(), 1);
-        assert!(failures[0].actual.contains("structured actions, not DSL text"));
+        assert!(failures[0]
+            .actual
+            .contains("structured actions, not DSL text"));
     }
 
     #[test]
@@ -390,6 +392,8 @@ mod tests {
             "invalid_step_count_mismatch_semantic_ir.json",
         ));
         assert_eq!(failures.len(), 1);
-        assert!(failures[0].actual.contains("step count must match semantic IR step count"));
+        assert!(failures[0]
+            .actual
+            .contains("step count must match semantic IR step count"));
     }
 }

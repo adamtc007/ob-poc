@@ -1065,14 +1065,12 @@ fn session_scenarios() -> Vec<TestScenario> {
 
 #[cfg(feature = "database")]
 fn cbu_scenarios() -> Vec<TestScenario> {
-    vec![
-        TestScenario::matched(
-            "assign role",
-            "assign custody role to BNY",
-            "cbu.assign-role",
-        )
-        .with_category("cbu"),
-    ]
+    vec![TestScenario::matched(
+        "assign role",
+        "assign custody role to BNY",
+        "cbu.assign-role",
+    )
+    .with_category("cbu")]
 }
 
 #[cfg(feature = "database")]

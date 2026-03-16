@@ -135,7 +135,10 @@ pub use kyc_case_ops::{
 };
 pub use lifecycle_ops::{
     LifecycleAnalyzeGapsOp, LifecycleCheckReadinessOp, LifecycleDiscoverOp, LifecycleExecutePlanOp,
-    LifecycleGeneratePlanOp, LifecycleProvisionOp,
+    LifecycleGeneratePlanOp, LifecycleProvisionOp, ServiceResourceAnalyzeLifecycleGapsOp,
+    ServiceResourceCheckLifecycleReadinessOp, ServiceResourceDiscoverLifecyclesOp,
+    ServiceResourceExecuteLifecyclePlanOp, ServiceResourceGenerateLifecyclePlanOp,
+    ServiceResourceProvisionLifecycleOp,
 };
 pub use matrix_overlay_ops::{MatrixCompareProductsOp, MatrixEffectiveOp, MatrixUnifiedGapsOp};
 pub use onboarding::OnboardingAutoCompleteOp;
@@ -199,8 +202,8 @@ pub use attribute_ops::{
     DocumentListAttributesOp,
 };
 pub use cbu_ops::{
-    CbuAddProductOp, CbuDecideOp, CbuDeleteCascadeOp, CbuLinkStructureOp,
-    CbuListStructureLinksOp, CbuShowOp,
+    CbuAddProductOp, CbuDecideOp, CbuDeleteCascadeOp, CbuLinkStructureOp, CbuListStructureLinksOp,
+    CbuShowOp,
 };
 pub use cbu_role_ops::{
     CbuRoleAssignControlOp, CbuRoleAssignFundOp, CbuRoleAssignOwnershipOp, CbuRoleAssignServiceOp,
@@ -228,7 +231,9 @@ pub use resource_ops::{
     ResourceActivateOp, ResourceCreateOp, ResourceDecommissionOp, ResourceSetAttrOp,
     ResourceSuspendOp, ResourceValidateAttrsOp,
 };
-pub use screening_ops::{ScreeningAdverseMediaOp, ScreeningPepOp, ScreeningSanctionsOp};
+pub use screening_ops::{
+    ScreeningAdverseMediaOp, ScreeningBulkRefreshOp, ScreeningPepOp, ScreeningSanctionsOp,
+};
 pub use ubo_graph_ops::{
     UboConvergenceSupersedeOp, UboMarkDeceasedOp, UboTransferControlOp, UboWaiveVerificationOp,
 };

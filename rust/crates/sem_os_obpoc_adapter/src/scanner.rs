@@ -7,15 +7,18 @@
 
 use std::collections::BTreeMap;
 
-use dsl_core::config::types::{ArgConfig, VerbConfig, VerbsConfig};
+use dsl_core::config::types::{
+    ActionClass as DslActionClass, ArgConfig, CrudOperation, HarmClass as DslHarmClass, VerbConfig,
+    VerbMetadata, VerbsConfig,
+};
 
 use sem_os_core::{
     attribute_def::{AttributeDataType, AttributeDefBody, AttributeSource},
     entity_type_def::{DbTableMapping, EntityTypeDefBody},
     types::{Classification, HandlingControl, SecurityLabel},
     verb_contract::{
-        VerbArgDef, VerbArgLookup, VerbContractBody, VerbContractMetadata, VerbCrudMapping,
-        VerbPrecondition, VerbProducesSpec, VerbReturnSpec,
+        ActionClass, HarmClass, VerbArgDef, VerbArgLookup, VerbContractBody, VerbContractMetadata,
+        VerbCrudMapping, VerbPrecondition, VerbProducesSpec, VerbReturnSpec,
     },
 };
 
@@ -152,6 +155,16 @@ pub fn verb_config_to_contract(
         }
     };
 
+    let harm_class = Some(infer_harm_class(action, config.metadata.as_ref()));
+
+    let action_class = Some(infer_action_class(action, config));
+
+    let precondition_states = config
+        .lifecycle
+        .as_ref()
+        .map(|lc| lc.requires_states.clone())
+        .unwrap_or_default();
+
     let requires_subject = config
         .metadata
         .as_ref()
@@ -186,12 +199,167 @@ pub fn verb_config_to_contract(
         invocation_phrases: config.invocation_phrases.clone(),
         subject_kinds,
         phase_tags,
+        harm_class,
+        action_class,
+        precondition_states,
         requires_subject,
         produces_focus,
         metadata,
         crud_mapping,
         reads_from: vec![],
         writes_to: vec![],
+    }
+}
+
+fn to_contract_harm_class(harm_class: DslHarmClass) -> HarmClass {
+    match harm_class {
+        DslHarmClass::ReadOnly => HarmClass::ReadOnly,
+        DslHarmClass::Reversible => HarmClass::Reversible,
+        DslHarmClass::Irreversible => HarmClass::Irreversible,
+        DslHarmClass::Destructive => HarmClass::Destructive,
+    }
+}
+
+fn to_contract_action_class(action_class: DslActionClass) -> ActionClass {
+    match action_class {
+        DslActionClass::List => ActionClass::List,
+        DslActionClass::Read => ActionClass::Read,
+        DslActionClass::Search => ActionClass::Search,
+        DslActionClass::Describe => ActionClass::Describe,
+        DslActionClass::Create => ActionClass::Create,
+        DslActionClass::Update => ActionClass::Update,
+        DslActionClass::Delete => ActionClass::Delete,
+        DslActionClass::Assign => ActionClass::Assign,
+        DslActionClass::Remove => ActionClass::Remove,
+        DslActionClass::Import => ActionClass::Import,
+        DslActionClass::Compute => ActionClass::Compute,
+        DslActionClass::Review => ActionClass::Review,
+        DslActionClass::Approve => ActionClass::Approve,
+        DslActionClass::Reject => ActionClass::Reject,
+        DslActionClass::Execute => ActionClass::Execute,
+    }
+}
+
+fn infer_harm_class(verb_name: &str, metadata: Option<&VerbMetadata>) -> HarmClass {
+    if let Some(explicit) = metadata.and_then(|metadata| metadata.harm_class) {
+        return to_contract_harm_class(explicit);
+    }
+
+    let normalized_name = verb_name.to_ascii_lowercase();
+    let side_effects = metadata.and_then(|meta| meta.side_effects.as_deref());
+    let dangerous = metadata.is_some_and(|meta| meta.dangerous);
+
+    if matches!(side_effects, Some("facts_only")) {
+        return HarmClass::ReadOnly;
+    }
+
+    if dangerous
+        || [
+            "purge",
+            "destroy",
+            "wipe",
+            "nuke",
+            "truncate",
+            "hard-delete",
+        ]
+        .iter()
+        .any(|needle| normalized_name.contains(needle))
+    {
+        return HarmClass::Destructive;
+    }
+
+    if [
+        "delete",
+        "deactivate",
+        "retire",
+        "archive",
+        "close",
+        "publish",
+    ]
+    .iter()
+    .any(|needle| normalized_name.contains(needle))
+    {
+        return HarmClass::Irreversible;
+    }
+
+    if matches!(side_effects, Some("state_write")) {
+        return HarmClass::Reversible;
+    }
+
+    if normalized_name.starts_with("list")
+        || normalized_name.starts_with("show")
+        || normalized_name.starts_with("get")
+        || normalized_name.starts_with("read")
+        || normalized_name.starts_with("search")
+        || normalized_name.starts_with("describe")
+        || normalized_name.starts_with("trace")
+    {
+        HarmClass::ReadOnly
+    } else {
+        HarmClass::Reversible
+    }
+}
+
+fn infer_action_class(verb_name: &str, config: &VerbConfig) -> ActionClass {
+    if let Some(explicit) = config
+        .metadata
+        .as_ref()
+        .and_then(|metadata| metadata.action_class)
+    {
+        return to_contract_action_class(explicit);
+    }
+
+    if let Some(crud) = &config.crud {
+        return match crud.operation {
+            CrudOperation::Select
+            | CrudOperation::ListByFk
+            | CrudOperation::ListParties
+            | CrudOperation::SelectWithJoin => {
+                if verb_name.starts_with("list") {
+                    ActionClass::List
+                } else {
+                    ActionClass::Read
+                }
+            }
+            CrudOperation::Insert | CrudOperation::EntityCreate => ActionClass::Create,
+            CrudOperation::Update | CrudOperation::EntityUpsert | CrudOperation::Upsert => {
+                ActionClass::Update
+            }
+            CrudOperation::Delete => ActionClass::Delete,
+            CrudOperation::Link | CrudOperation::RoleLink => ActionClass::Assign,
+            CrudOperation::Unlink | CrudOperation::RoleUnlink => ActionClass::Remove,
+        };
+    }
+
+    let normalized_name = verb_name.to_ascii_lowercase();
+    let primary = normalized_name
+        .split(['-', '.'])
+        .find(|segment| !segment.is_empty())
+        .unwrap_or(normalized_name.as_str());
+    match primary {
+        "list" => ActionClass::List,
+        "show" | "get" | "read" => ActionClass::Read,
+        "search" | "find" | "discover" => ActionClass::Search,
+        "describe" => ActionClass::Describe,
+        "create" | "ensure" | "upsert" => ActionClass::Create,
+        "update" | "edit" | "change" | "set" => ActionClass::Update,
+        "delete" | "destroy" | "purge" => ActionClass::Delete,
+        "assign" | "bind" | "link" | "subscribe" => ActionClass::Assign,
+        "remove" | "unlink" | "unsubscribe" => ActionClass::Remove,
+        "import" | "load" | "ingest" => ActionClass::Import,
+        "compute" | "calculate" | "analyze" | "analyse" => ActionClass::Compute,
+        "review" | "validate" => ActionClass::Review,
+        "approve" | "publish" => ActionClass::Approve,
+        "reject" => ActionClass::Reject,
+        "run" | "execute" => ActionClass::Execute,
+        _ => match config
+            .metadata
+            .as_ref()
+            .and_then(|meta| meta.side_effects.as_deref())
+        {
+            Some("facts_only") => ActionClass::Read,
+            _ => ActionClass::Update,
+        },
     }
 }
 
@@ -590,6 +758,9 @@ mod tests {
         assert!(contract.args[1].lookup.is_some());
         assert_eq!(contract.invocation_phrases.len(), 2);
         assert!(contract.produces.is_some());
+        assert_eq!(contract.harm_class, Some(super::HarmClass::Reversible));
+        assert_eq!(contract.action_class, Some(super::ActionClass::Create));
+        assert!(contract.precondition_states.is_empty());
     }
 
     #[test]
@@ -785,6 +956,34 @@ mod tests {
         assert_eq!(contract.phase_tags, vec!["specific-phase".to_string()]);
     }
 
+    #[test]
+    fn test_classification_and_precondition_states_propagate() {
+        let mut config = sample_verb_config();
+        config.lifecycle = Some(VerbLifecycle {
+            entity_arg: None,
+            requires_states: vec!["review".into(), "approved".into()],
+            transitions_to: None,
+            transitions_to_arg: None,
+            precondition_checks: vec![],
+            writes_tables: vec![],
+            reads_tables: vec![],
+        });
+        config.metadata = Some(VerbMetadata {
+            harm_class: Some(DslHarmClass::Irreversible),
+            action_class: Some(DslActionClass::Approve),
+            ..Default::default()
+        });
+
+        let contract = verb_config_to_contract("kyc-case", "approve", &config);
+
+        assert_eq!(contract.harm_class, Some(super::HarmClass::Irreversible));
+        assert_eq!(contract.action_class, Some(super::ActionClass::Approve));
+        assert_eq!(
+            contract.precondition_states,
+            vec!["review".to_string(), "approved".to_string()]
+        );
+    }
+
     // ── Domain metadata enrichment tests ─────────────────────────
 
     const ENRICHMENT_YAML: &str = r#"
@@ -839,6 +1038,9 @@ domains:
                 invocation_phrases: vec![],
                 subject_kinds: vec![],
                 phase_tags: vec![],
+                harm_class: None,
+                action_class: None,
+                precondition_states: vec![],
                 requires_subject: true,
                 produces_focus: false,
                 metadata: None,
@@ -861,6 +1063,9 @@ domains:
                 invocation_phrases: vec![],
                 subject_kinds: vec![],
                 phase_tags: vec![],
+                harm_class: None,
+                action_class: None,
+                precondition_states: vec![],
                 requires_subject: true,
                 produces_focus: false,
                 metadata: None,
@@ -901,6 +1106,9 @@ domains:
             invocation_phrases: vec![],
             subject_kinds: vec![],
             phase_tags: vec![],
+            harm_class: None,
+            action_class: None,
+            precondition_states: vec![],
             requires_subject: true,
             produces_focus: false,
             metadata: None,

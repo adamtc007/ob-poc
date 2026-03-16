@@ -17,6 +17,10 @@ use sqlx::PgPool;
 
 use crate::dsl_v2::ast::VerbCall;
 use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
+use crate::ontology::{
+    is_terminal_state as lifecycle_is_terminal_state,
+    is_valid_transition as lifecycle_is_valid_transition, ontology,
+};
 
 use super::helpers::{extract_string, extract_string_opt, extract_uuid, extract_uuid_opt};
 use super::CustomOperation;
@@ -428,41 +432,6 @@ mod tests {
     }
 }
 
-// ============================================================================
-// Case Status Transition Map
-// ============================================================================
-
-/// Allowed case status transitions.
-/// Key = current status, Value = set of valid next statuses.
-/// Terminal statuses have no outbound transitions — use `kyc-case.close` instead.
-const CASE_TRANSITIONS: &[(&str, &[&str])] = &[
-    ("INTAKE", &["DISCOVERY", "WITHDRAWN"]),
-    ("DISCOVERY", &["ASSESSMENT", "BLOCKED", "WITHDRAWN"]),
-    ("ASSESSMENT", &["REVIEW", "BLOCKED", "WITHDRAWN"]),
-    (
-        "REVIEW",
-        &[
-            "APPROVED",
-            "REJECTED",
-            "REFER_TO_REGULATOR",
-            "DO_NOT_ONBOARD",
-            "BLOCKED",
-            "WITHDRAWN",
-        ],
-    ),
-    (
-        "BLOCKED",
-        &["DISCOVERY", "ASSESSMENT", "REVIEW", "WITHDRAWN"],
-    ),
-    // Terminal states — no outbound transitions (use kyc-case.close)
-    ("APPROVED", &[]),
-    ("REJECTED", &[]),
-    ("WITHDRAWN", &[]),
-    ("EXPIRED", &[]),
-    ("REFER_TO_REGULATOR", &[]),
-    ("DO_NOT_ONBOARD", &[]),
-];
-
 /// Terminal statuses allowed when closing a KYC case.
 const CLOSE_STATUSES: &[&str] = &[
     "APPROVED",
@@ -474,20 +443,23 @@ const CLOSE_STATUSES: &[&str] = &[
 ];
 
 /// Check whether a case status transition is valid.
-///
-/// Returns `true` if `from → to` is in the allowed transition map.
-/// Returns `false` if `from` is unknown or `to` is not in the allowed set.
 fn is_valid_transition(from: &str, to: &str) -> bool {
-    CASE_TRANSITIONS
-        .iter()
-        .find(|(status, _)| *status == from)
-        .map(|(_, allowed)| allowed.contains(&to))
-        .unwrap_or(false)
+    let lifecycle = ontology()
+        .get_lifecycle("kyc_case")
+        .expect("kyc_case lifecycle must be configured in ontology");
+    lifecycle_is_valid_transition(lifecycle, from, to)
 }
 
 /// Check whether the target status is a terminal status (must use `close` verb).
 fn is_terminal_status(status: &str) -> bool {
-    CLOSE_STATUSES.contains(&status)
+    let lifecycle = ontology()
+        .get_lifecycle("kyc_case")
+        .expect("kyc_case lifecycle must be configured in ontology");
+    CLOSE_STATUSES.contains(&status) && lifecycle_is_terminal_state(lifecycle, status)
+}
+
+fn valid_next_statuses(status: &str) -> String {
+    ontology().valid_next_states("kyc_case", status).join(", ")
 }
 
 // ============================================================================
@@ -550,11 +522,7 @@ impl CustomOperation for KycCaseUpdateStatusOp {
                 current_status,
                 requested_status,
                 current_status,
-                CASE_TRANSITIONS
-                    .iter()
-                    .find(|(s, _)| *s == current_status.as_str())
-                    .map(|(_, allowed)| allowed.join(", "))
-                    .unwrap_or_else(|| "none".to_string())
+                valid_next_statuses(&current_status)
             ));
         }
 
@@ -770,6 +738,7 @@ impl CustomOperation for KycCaseStateOp {
             FROM "ob-poc".cases c
             JOIN "ob-poc".cbus cb ON c.cbu_id = cb.cbu_id
             WHERE c.case_id = $1
+              AND cb.deleted_at IS NULL
             "#,
             case_id
         )
@@ -795,6 +764,7 @@ impl CustomOperation for KycCaseStateOp {
             FROM "ob-poc".entity_workstreams w
             JOIN "ob-poc".entities e ON w.entity_id = e.entity_id
             WHERE w.case_id = $1
+              AND e.deleted_at IS NULL
             ORDER BY w.created_at
             "#,
             case_id
@@ -1035,6 +1005,7 @@ impl CustomOperation for WorkstreamStateOp {
             JOIN "ob-poc".entities e ON w.entity_id = e.entity_id
             JOIN "ob-poc".cases c ON w.case_id = c.case_id
             WHERE w.workstream_id = $1
+              AND e.deleted_at IS NULL
             "#,
             workstream_id
         )

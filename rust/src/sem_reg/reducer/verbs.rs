@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
-use sqlx::PgPool;
+use sqlx::{PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
 use super::ast::{
@@ -51,12 +51,15 @@ pub async fn handle_state_derive(
     let override_entry = get_active_override(pool, cbu_id, case_id, slot_path).await?;
     let scope = build_eval_scope(pool, cbu_id, case_id).await?;
     overlays.scope = scope.as_scope_data();
-    Ok(reduce_slot(
-        state_machine,
-        slot_path,
-        &overlays,
-        override_entry,
-    )?)
+    let result = reduce_slot(state_machine, slot_path, &overlays, override_entry)?;
+    persist_reducer_state(
+        pool,
+        &infer_entity_type(state_machine, slot_path),
+        entity_id,
+        &result,
+    )
+    .await?;
+    Ok(result)
 }
 
 /// Compute a full reducer trace for a single slot.
@@ -543,6 +546,37 @@ pub(crate) async fn build_eval_scope(
     Ok(scope)
 }
 
+pub(crate) async fn build_eval_scope_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    cbu_id: Uuid,
+    case_id: Option<Uuid>,
+) -> Result<EvalScope> {
+    let mut scope = EvalScope {
+        cbu_id: Some(cbu_id),
+        case_id,
+        case_status: None,
+        fields: HashMap::new(),
+    };
+
+    if let Some(case_id) = case_id {
+        if let Some(status) = sqlx::query_scalar::<_, String>(
+            r#"
+            SELECT status
+            FROM "ob-poc".cases
+            WHERE case_id = $1
+            "#,
+        )
+        .bind(case_id)
+        .fetch_optional(&mut **tx)
+        .await?
+        {
+            scope.case_status = Some(status);
+        }
+    }
+
+    Ok(scope)
+}
+
 fn evaluate_rules_traced(
     rules: &[super::RuleDef],
     results: &HashMap<String, bool>,
@@ -668,8 +702,58 @@ async fn evaluate_slot_contexts(
         overlays.slots = slot_records.clone();
         let override_entry = get_active_override(pool, cbu_id, case_id, &context.slot_path).await?;
         let result = reduce_slot(state_machine, &context.slot_path, &overlays, override_entry)?;
+        persist_reducer_state(
+            pool,
+            &infer_entity_type(state_machine, &context.slot_path),
+            context.entity_id,
+            &result,
+        )
+        .await?;
         evaluated.push(result);
     }
 
     Ok(evaluated)
+}
+
+async fn persist_reducer_state(
+    pool: &PgPool,
+    entity_type: &str,
+    entity_id: Uuid,
+    result: &SlotReduceResult,
+) -> Result<()> {
+    sqlx::query(
+        r#"
+        INSERT INTO sem_reg.reducer_states (
+            entity_type, entity_id, current_state, lane, phase, computed_at
+        ) VALUES (
+            $1, $2, $3, $4, $5, now()
+        )
+        ON CONFLICT (entity_type, entity_id)
+        DO UPDATE SET
+            current_state = EXCLUDED.current_state,
+            lane = EXCLUDED.lane,
+            phase = EXCLUDED.phase,
+            computed_at = EXCLUDED.computed_at
+        "#,
+    )
+    .bind(entity_type)
+    .bind(entity_id)
+    .bind(&result.effective_state)
+    .bind(Option::<String>::None)
+    .bind(Some(result.computed_state.clone()))
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+fn infer_entity_type(state_machine: &ValidatedStateMachine, slot_path: &str) -> String {
+    if state_machine.name.starts_with("entity_") {
+        "entity".to_string()
+    } else if state_machine.name.starts_with("kyc_case_") {
+        "kyc-case".to_string()
+    } else if state_machine.name.starts_with("ubo_") {
+        "ubo".to_string()
+    } else {
+        slot_path.split('.').next().unwrap_or("entity").to_string()
+    }
 }

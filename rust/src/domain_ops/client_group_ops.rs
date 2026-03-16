@@ -400,6 +400,7 @@ impl CustomOperation for ClientGroupEntityListOp {
             FROM "ob-poc".client_group_entity cge
             JOIN "ob-poc".entities e ON e.entity_id = cge.entity_id
             WHERE cge.group_id = $1
+              AND e.deleted_at IS NULL
               AND ($2::TEXT IS NULL OR cge.membership_type = $2)
             ORDER BY e.name
             LIMIT $3
@@ -635,6 +636,7 @@ impl CustomOperation for ClientGroupTagListOp {
             FROM "ob-poc".client_group_entity_tag cget
             JOIN "ob-poc".entities e ON e.entity_id = cget.entity_id
             WHERE cget.group_id = $1
+              AND e.deleted_at IS NULL
               AND ($2::UUID IS NULL OR cget.entity_id = $2)
               AND ($3::TEXT IS NULL OR cget.persona IS NULL OR cget.persona = $3)
             ORDER BY e.name, cget.tag
@@ -830,6 +832,7 @@ impl CustomOperation for ClientGroupDiscoverEntitiesOp {
             FROM "ob-poc".entities e
             LEFT JOIN "ob-poc".entity_types et ON et.entity_type_id = e.entity_type_id
             WHERE LOWER(e.name) LIKE ANY($2::TEXT[])
+              AND e.deleted_at IS NULL
             ORDER BY e.name
             LIMIT 100
             "#,
@@ -1361,6 +1364,8 @@ impl CustomOperation for ClientGroupListRolesOp {
             JOIN "ob-poc".roles r ON r.role_id = cer.role_id
             LEFT JOIN "ob-poc".entities te ON te.entity_id = cer.target_entity_id
             WHERE cge.group_id = $1
+              AND e.deleted_at IS NULL
+              AND (te.entity_id IS NULL OR te.deleted_at IS NULL)
               AND ($2::UUID IS NULL OR cge.entity_id = $2)
               AND ($3::UUID IS NULL OR cer.role_id = $3)
               AND (cer.effective_to IS NULL OR cer.effective_to > CURRENT_DATE)
@@ -1461,6 +1466,7 @@ impl CustomOperation for ClientGroupPartiesOp {
                 AND (cer.effective_to IS NULL OR cer.effective_to > CURRENT_DATE)
             LEFT JOIN "ob-poc".roles r ON r.role_id = cer.role_id
             WHERE cge.group_id = $1
+              AND e.deleted_at IS NULL
               AND cge.membership_type != 'historical'
               AND ($2 OR cge.membership_type = 'in_group')
               AND ($3::TEXT IS NULL OR r.role_category = $3)
@@ -1634,6 +1640,8 @@ impl CustomOperation for ClientGroupListRelationshipsOp {
             JOIN "ob-poc".entities pe ON pe.entity_id = r.parent_entity_id
             JOIN "ob-poc".entities ce ON ce.entity_id = r.child_entity_id
             WHERE r.group_id = $1
+              AND pe.deleted_at IS NULL
+              AND ce.deleted_at IS NULL
               AND ($2::UUID IS NULL OR r.parent_entity_id = $2 OR r.child_entity_id = $2)
               AND ($3::TEXT IS NULL OR r.relationship_kind = $3)
             ORDER BY pe.name, ce.name
@@ -2062,6 +2070,8 @@ impl CustomOperation for ClientGroupListDiscrepanciesOp {
             JOIN "ob-poc".entities pe ON pe.entity_id = d.parent_entity_id
             JOIN "ob-poc".entities ce ON ce.entity_id = d.child_entity_id
             WHERE d.group_id = $1
+              AND pe.deleted_at IS NULL
+              AND ce.deleted_at IS NULL
               AND d.ownership_spread >= $2
             ORDER BY d.ownership_spread DESC
             "#,

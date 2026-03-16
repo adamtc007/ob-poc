@@ -100,6 +100,9 @@ mod invariants {
                 invocation_phrases: vec![],
                 subject_kinds: vec![],
                 phase_tags: vec![],
+                harm_class: None,
+                action_class: None,
+                precondition_states: vec![],
                 requires_subject: true,
                 produces_focus: false,
                 metadata: None,
@@ -206,7 +209,7 @@ mod invariants {
         let (verb_oid, verb_sid) = db.publish_verb(&verb_fqn).await?;
 
         // Create decision with snapshot manifest
-        let mut manifest = std::collections::HashMap::new();
+        let mut manifest = std::collections::BTreeMap::new();
         manifest.insert(attr_oid, attr_sid);
         manifest.insert(verb_oid, verb_sid);
 

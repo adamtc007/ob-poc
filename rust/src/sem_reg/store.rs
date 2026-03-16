@@ -58,10 +58,10 @@ impl SnapshotStore {
                 predecessor_id, change_type, change_rationale,
                 created_by, approved_by, definition
             ) VALUES (
-                $1, $2, $3,
-                $4, $5, $6,
-                $7, $8, $9,
-                $10, $11, $12,
+                $1, $2::sem_reg.object_type, $3,
+                $4, $5, $6::sem_reg.snapshot_status,
+                $7::sem_reg.governance_tier, $8::sem_reg.trust_class, $9,
+                $10, $11::sem_reg.change_type, $12,
                 $13, $14, $15
             )
             RETURNING snapshot_id
@@ -444,10 +444,10 @@ impl SnapshotStore {
                 predecessor_id, change_type, change_rationale,
                 created_by, approved_by, definition
             ) VALUES (
-                $1, $2, $3,
-                $4, $5, $6,
-                $7, $8, $9,
-                $10, $11, $12,
+                $1, $2::sem_reg.object_type, $3,
+                $4, $5, $6::sem_reg.snapshot_status,
+                $7::sem_reg.governance_tier, $8::sem_reg.trust_class, $9,
+                $10, $11::sem_reg.change_type, $12,
                 $13, $14, $15
             )
             RETURNING snapshot_id

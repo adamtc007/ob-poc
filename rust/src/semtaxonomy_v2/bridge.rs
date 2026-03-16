@@ -148,15 +148,18 @@ fn normalized_entity(step: &OutcomeStep, outcome: &OutcomeIntent) -> String {
     }
 }
 
-fn target_from_legacy(outcome: &OutcomeIntent, session_entity_id: Option<Uuid>) -> Option<IntentTarget> {
+fn target_from_legacy(
+    outcome: &OutcomeIntent,
+    session_entity_id: Option<Uuid>,
+) -> Option<IntentTarget> {
     if let Some(subject) = outcome.subject.as_ref() {
         return Some(IntentTarget {
-        identifier: subject.uuid.map(|uuid| IntentIdentifier {
-            value: uuid.to_string(),
-            identifier_type: "uuid".to_string(),
-        }),
-        reference: Some(subject.mention.clone()),
-        filter: None,
+            identifier: subject.uuid.map(|uuid| IntentIdentifier {
+                value: uuid.to_string(),
+                identifier_type: "uuid".to_string(),
+            }),
+            reference: Some(subject.mention.clone()),
+            filter: None,
         });
     }
 
@@ -176,14 +179,14 @@ fn semantic_target_from_legacy(
 ) -> Option<SemanticTarget> {
     if let Some(subject) = outcome.subject.as_ref() {
         return Some(SemanticTarget {
-        subject_kind: subject
-            .kind_hint
-            .clone()
-            .unwrap_or_else(|| outcome.domain_concept.clone()),
-        identifier: subject.uuid.map(|uuid| uuid.to_string()),
-        identifier_type: subject.uuid.map(|_| "uuid".to_string()),
-        reference: Some(subject.mention.clone()),
-        filter: None,
+            subject_kind: subject
+                .kind_hint
+                .clone()
+                .unwrap_or_else(|| outcome.domain_concept.clone()),
+            identifier: subject.uuid.map(|uuid| uuid.to_string()),
+            identifier_type: subject.uuid.map(|_| "uuid".to_string()),
+            reference: Some(subject.mention.clone()),
+            filter: None,
         });
     }
 
@@ -196,7 +199,10 @@ fn semantic_target_from_legacy(
     })
 }
 
-fn binding_mode_from_legacy(outcome: &OutcomeIntent, session_entity_id: Option<Uuid>) -> BindingMode {
+fn binding_mode_from_legacy(
+    outcome: &OutcomeIntent,
+    session_entity_id: Option<Uuid>,
+) -> BindingMode {
     if let Some(subject) = &outcome.subject {
         if subject.uuid.is_some() {
             return BindingMode::Identifier;
@@ -270,15 +276,13 @@ mod tests {
             coder_handoff: Default::default(),
         };
 
-        let envelope =
-            compiler_input_from_outcome_intent(
-                &outcome,
-                None,
-                Some(Uuid::parse_str("123e4567-e89b-12d3-a456-426614174000").expect("valid uuid")),
-                None,
-                Some("cbu"),
-                Some("Current CBU"),
-            );
+        let envelope = compiler_input_from_outcome_intent(
+            &outcome,
+            None,
+            Some(Uuid::parse_str("123e4567-e89b-12d3-a456-426614174000").expect("valid uuid")),
+            Some("cbu"),
+            Some("Current CBU"),
+        );
 
         assert_eq!(envelope.structured_intent.steps.len(), 1);
         assert_eq!(envelope.structured_intent.steps[0].action, "read");

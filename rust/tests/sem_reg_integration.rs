@@ -118,6 +118,9 @@ mod integration {
                 invocation_phrases: vec![],
                 subject_kinds: vec![],
                 phase_tags: vec![],
+                harm_class: None,
+                action_class: None,
+                precondition_states: vec![],
                 requires_subject: true,
                 produces_focus: false,
                 metadata: None,
@@ -258,7 +261,7 @@ mod integration {
             .await?;
 
         // 6. Record decision with snapshot manifest
-        let mut snapshot_manifest = std::collections::HashMap::new();
+        let mut snapshot_manifest = std::collections::BTreeMap::new();
         snapshot_manifest.insert(attr_oid, attr_sid);
         let decision = DecisionRecord {
             decision_id: Uuid::new_v4(),

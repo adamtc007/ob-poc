@@ -1,4 +1,4 @@
-//! Minimal compiler-backed CBU path for the first NLCI cutover slice.
+//! Minimal compiler-backed deterministic slice for the first NLCI cutover.
 
 use anyhow::{anyhow, Result};
 use std::sync::Arc;
@@ -15,7 +15,7 @@ use super::phases::{
 };
 use super::{CompilerCandidate, CompilerInputEnvelope, CompilerSelection, SemanticStep};
 
-/// Build the minimal CBU compiler used for the first real cutover path.
+/// Build the minimal deterministic compiler used for the first real cutover path.
 ///
 /// # Examples
 ///
@@ -34,7 +34,7 @@ pub fn build_minimal_cbu_compiler() -> Arc<dyn IntentCompiler> {
     })
 }
 
-/// True when the compiler-backed CBU slice supports this legacy intent.
+/// True when the compiler-backed deterministic slice supports this legacy intent.
 ///
 /// # Examples
 ///
@@ -80,8 +80,8 @@ pub fn supports_cbu_compiler_slice(input: &CompilerInputEnvelope) -> bool {
     matches!(
         input.semantic_ir.steps.first(),
         Some(step)
-            if step.entity == "cbu"
-                && matches!(step.action.as_str(), "create" | "read" | "update")
+            if matches!(step.entity.as_str(), "cbu" | "entity" | "kyc-case" | "ubo" | "ubo.registry")
+                && supports_entity_action(step.entity.as_str(), step.action.as_str())
     )
 }
 
@@ -98,13 +98,18 @@ impl SurfaceObjectResolver for CbuSurfaceResolver {
         input: SurfaceObjectResolutionInput,
     ) -> Result<SurfaceObjectResolutionOutput> {
         let step = first_step(&input.envelope)?;
-        if step.entity != "cbu" {
-            return Err(anyhow!("CBU compiler only supports entity 'cbu'"));
+        if !supports_entity_action(step.entity.as_str(), step.action.as_str()) {
+            return Err(anyhow!(
+                "minimal compiler does not support entity '{}' with action '{}'",
+                step.entity,
+                step.action
+            ));
         }
+        let resolved_surface_entity = step.entity.clone();
 
         Ok(SurfaceObjectResolutionOutput {
             semantic_ir: input.envelope.semantic_ir,
-            resolved_surface_entity: "cbu".to_string(),
+            resolved_surface_entity,
         })
     }
 }
@@ -115,7 +120,7 @@ impl OperationResolver for CbuOperationResolver {
         input: OperationResolutionInput,
     ) -> Result<OperationResolutionOutput> {
         let step = first_step_from_surface(&input.surface)?;
-        let verb = resolve_cbu_verb(step)?;
+        let verb = resolve_minimal_slice_verb(step)?;
         Ok(OperationResolutionOutput {
             surface: input.surface,
             resolved_operations: vec![verb.to_string()],
@@ -124,10 +129,7 @@ impl OperationResolver for CbuOperationResolver {
 }
 
 impl super::compiler::BindingResolver for CbuBindingResolver {
-    fn resolve_binding(
-        &self,
-        input: BindingResolutionInput,
-    ) -> Result<BindingResolutionOutput> {
+    fn resolve_binding(&self, input: BindingResolutionInput) -> Result<BindingResolutionOutput> {
         let step = first_step_from_operation(&input.operation)?;
         let verb = input
             .operation
@@ -168,15 +170,14 @@ impl super::compiler::BindingResolver for CbuBindingResolver {
             "cbu.rename" => {
                 let cbu_id = resolve_cbu_id(step).map_err(|message| anyhow!(message))?;
                 bindings.push(("cbu-id".to_string(), cbu_id));
-                let name = required_parameter(step, "name")
-                    .map_err(|message| anyhow!(message))?;
+                let name = required_parameter(step, "name").map_err(|message| anyhow!(message))?;
                 bindings.push(("name".to_string(), name));
             }
             "cbu.set-jurisdiction" => {
                 let cbu_id = resolve_cbu_id(step).map_err(|message| anyhow!(message))?;
                 bindings.push(("cbu-id".to_string(), cbu_id));
-                let jurisdiction = required_parameter(step, "jurisdiction")
-                    .map_err(|message| anyhow!(message))?;
+                let jurisdiction =
+                    required_parameter(step, "jurisdiction").map_err(|message| anyhow!(message))?;
                 bindings.push(("jurisdiction".to_string(), jurisdiction));
             }
             "cbu.set-client-type" => {
@@ -200,14 +201,11 @@ impl super::compiler::BindingResolver for CbuBindingResolver {
             "cbu.set-category" => {
                 let cbu_id = resolve_cbu_id(step).map_err(|message| anyhow!(message))?;
                 bindings.push(("cbu-id".to_string(), cbu_id));
-                let category =
-                    required_parameter_any(step, &["category", "cbu-category"])
-                        .map_err(|message| anyhow!(message))?;
+                let category = required_parameter_any(step, &["category", "cbu-category"])
+                    .map_err(|message| anyhow!(message))?;
                 bindings.push(("category".to_string(), category));
             }
-            "cbu.submit-for-validation"
-            | "cbu.request-proof-update"
-            | "cbu.reopen-validation" => {
+            "cbu.submit-for-validation" | "cbu.request-proof-update" | "cbu.reopen-validation" => {
                 let cbu_id = resolve_cbu_id(step).map_err(|message| anyhow!(message))?;
                 bindings.push(("cbu-id".to_string(), cbu_id));
             }
@@ -227,6 +225,27 @@ impl super::compiler::BindingResolver for CbuBindingResolver {
             "cbu.read" => {
                 let cbu_id = resolve_cbu_id(step).map_err(|message| anyhow!(message))?;
                 bindings.push(("cbu-id".to_string(), cbu_id));
+            }
+            "entity.create"
+            | "entity.list"
+            | "entity.update"
+            | "kyc-case.create"
+            | "kyc-case.assign"
+            | "kyc-case.set-risk-rating"
+            | "kyc-case.escalate"
+            | "kyc-case.close"
+            | "kyc-case.reopen"
+            | "ubo.registry.create"
+            | "ubo.registry.promote"
+            | "ubo.registry.advance"
+            | "ubo.registry.waive"
+            | "ubo.registry.reject" => {
+                bindings = passthrough_bindings(step);
+                ensure_primary_binding(step, &mut bindings, &verb)?;
+            }
+            "entity.read" | "kyc-case.read" | "kyc-case.list-by-cbu" => {
+                bindings = passthrough_bindings(step);
+                ensure_primary_binding(step, &mut bindings, &verb)?;
             }
             _ => return Err(anyhow!("unsupported CBU verb {verb}")),
         }
@@ -287,7 +306,15 @@ impl CompositionBinder for CbuCompositionBinder {
             .selected_candidate
             .clone()
             .ok_or_else(|| anyhow!("discrimination returned no selected candidate"))?;
-        let requires_confirmation = candidate.verb_id != "cbu.read";
+        let requires_confirmation = !matches!(
+            candidate.verb_id.as_str(),
+            "cbu.read"
+                | "cbu.list"
+                | "entity.read"
+                | "entity.list"
+                | "kyc-case.read"
+                | "kyc-case.list-by-cbu"
+        );
 
         Ok(CompositionOutput {
             candidates: input.discrimination.candidates.candidates.clone(),
@@ -330,6 +357,18 @@ fn first_step_from_operation(operation: &OperationResolutionOutput) -> Result<&S
         .steps
         .first()
         .ok_or_else(|| anyhow!("operation resolution output contains no semantic step"))
+}
+
+fn resolve_minimal_slice_verb(step: &SemanticStep) -> Result<&'static str> {
+    match step.entity.as_str() {
+        "cbu" => resolve_cbu_verb(step),
+        "entity" => resolve_entity_verb(step),
+        "kyc-case" => resolve_kyc_case_verb(step),
+        "ubo" | "ubo.registry" => resolve_ubo_registry_verb(step),
+        other => Err(anyhow!(
+            "minimal compiler only supports cbu, entity, kyc-case, and ubo.registry, got {other}"
+        )),
+    }
 }
 
 fn resolve_cbu_verb(step: &SemanticStep) -> Result<&'static str> {
@@ -414,6 +453,114 @@ fn resolve_cbu_verb(step: &SemanticStep) -> Result<&'static str> {
     }
 }
 
+fn resolve_entity_verb(step: &SemanticStep) -> Result<&'static str> {
+    match step.action.as_str() {
+        "create" => Ok("entity.create"),
+        "read" => {
+            if has_parameter(step, "entity-type")
+                || has_parameter(step, "jurisdiction")
+                || has_parameter(step, "status")
+                || has_parameter(step, "limit")
+                || has_parameter(step, "offset")
+                || (!has_bound_identifier(step)
+                    && qualifier_mentions_any(
+                        step,
+                        &["list", "show all", "entities", "companies", "browse"],
+                    ))
+            {
+                Ok("entity.list")
+            } else {
+                Ok("entity.read")
+            }
+        }
+        "update" => Ok("entity.update"),
+        other => Err(anyhow!(
+            "entity compiler slice only supports create/read/update actions, got {other}"
+        )),
+    }
+}
+
+fn resolve_kyc_case_verb(step: &SemanticStep) -> Result<&'static str> {
+    match step.action.as_str() {
+        "create" => Ok("kyc-case.create"),
+        "read" => {
+            if has_parameter(step, "cbu-id")
+                || has_parameter(step, "status")
+                || (!has_bound_identifier(step)
+                    && qualifier_mentions_any(step, &["list", "cases", "show all"]))
+            {
+                Ok("kyc-case.list-by-cbu")
+            } else {
+                Ok("kyc-case.read")
+            }
+        }
+        "update" => {
+            if has_parameter(step, "risk-rating") {
+                Ok("kyc-case.set-risk-rating")
+            } else if has_parameter(step, "analyst-id") || has_parameter(step, "reviewer-id") {
+                Ok("kyc-case.assign")
+            } else if has_parameter(step, "escalation-level") {
+                Ok("kyc-case.escalate")
+            } else if has_parameter(step, "reopen-reason")
+                || has_parameter(step, "new-case-type")
+                || has_parameter(step, "new-status")
+                || qualifier_mentions_any(step, &["reopen", "remediate", "restart"])
+            {
+                Ok("kyc-case.reopen")
+            } else if has_parameter(step, "status")
+                && qualifier_mentions_any(
+                    step,
+                    &[
+                        "close",
+                        "approve",
+                        "reject",
+                        "withdraw",
+                        "expire",
+                        "regulator",
+                    ],
+                )
+            {
+                Ok("kyc-case.close")
+            } else if has_parameter(step, "status") {
+                Ok("kyc-case.update-status")
+            } else {
+                Err(anyhow!(
+                    "kyc-case compiler slice only supports update intents for status, risk-rating, assignment, escalation, close, or reopen"
+                ))
+            }
+        }
+        other => Err(anyhow!(
+            "kyc-case compiler slice only supports create/read/update actions, got {other}"
+        )),
+    }
+}
+
+fn resolve_ubo_registry_verb(step: &SemanticStep) -> Result<&'static str> {
+    match step.action.as_str() {
+        "create" => Ok("ubo.registry.create"),
+        "update" => {
+            if has_parameter(step, "new-status") {
+                Ok("ubo.registry.advance")
+            } else if has_parameter(step, "authority") {
+                Ok("ubo.registry.waive")
+            } else if has_parameter(step, "reason")
+                && qualifier_mentions_any(step, &["reject", "not confirmed"])
+            {
+                Ok("ubo.registry.reject")
+            } else if qualifier_mentions_any(step, &["promote", "identify", "confirm"]) {
+                Ok("ubo.registry.promote")
+            } else {
+                Err(anyhow!(
+                    "ubo.registry compiler slice only supports create and update intents for promote, advance, waive, or reject"
+                ))
+            }
+        }
+        other => Err(anyhow!(
+            "ubo.registry compiler slice only supports create/update actions, got {other}"
+        )),
+    }
+}
+
 fn resolve_cbu_id(step: &SemanticStep) -> std::result::Result<String, String> {
     if let Some(target) = &step.target {
         if let Some(identifier) = &target.identifier {
@@ -424,7 +571,9 @@ fn resolve_cbu_id(step: &SemanticStep) -> std::result::Result<String, String> {
 }
 
 fn has_parameter(step: &SemanticStep, name: &str) -> bool {
-    step.parameters.iter().any(|parameter| parameter.name == name)
+    step.parameters
+        .iter()
+        .any(|parameter| parameter.name == name)
 }
 
 fn has_bound_identifier(step: &SemanticStep) -> bool {
@@ -471,6 +620,68 @@ fn qualifier_mentions_any(step: &SemanticStep, needles: &[&str]) -> bool {
             .iter()
             .any(|needle| haystack.contains(&needle.to_ascii_lowercase()))
     })
+}
+
+fn supports_entity_action(entity: &str, action: &str) -> bool {
+    match entity {
+        "cbu" | "entity" | "kyc-case" => matches!(action, "create" | "read" | "update"),
+        "ubo" | "ubo.registry" => matches!(action, "create" | "update"),
+        _ => false,
+    }
+}
+
+fn passthrough_bindings(step: &SemanticStep) -> Vec<(String, String)> {
+    step.parameters
+        .iter()
+        .map(|parameter| (parameter.name.clone(), parameter.value.clone()))
+        .collect()
+}
+
+fn ensure_primary_binding(
+    step: &SemanticStep,
+    bindings: &mut Vec<(String, String)>,
+    verb: &str,
+) -> Result<()> {
+    let required_binding = match verb {
+        "entity.read" | "entity.update" => Some(("entity-id", "entity")),
+        "kyc-case.read"
+        | "kyc-case.update-status"
+        | "kyc-case.assign"
+        | "kyc-case.set-risk-rating"
+        | "kyc-case.escalate"
+        | "kyc-case.close"
+        | "kyc-case.reopen" => Some(("case-id", "kyc case")),
+        "kyc-case.list-by-cbu" => Some(("cbu-id", "cbu")),
+        "ubo.registry.promote"
+        | "ubo.registry.advance"
+        | "ubo.registry.waive"
+        | "ubo.registry.reject" => Some(("registry-id", "ubo registry")),
+        _ => None,
+    };
+
+    if let Some((binding_name, label)) = required_binding {
+        if !bindings.iter().any(|(name, _)| name == binding_name) {
+            bindings.push((
+                binding_name.to_string(),
+                resolve_target_id(step, label).map_err(anyhow::Error::msg)?,
+            ));
+        }
+    }
+
+    Ok(())
+}
+
+fn resolve_target_id(step: &SemanticStep, label: &str) -> std::result::Result<String, String> {
+    step.target
+        .as_ref()
+        .and_then(|target| target.identifier.as_ref())
+        .cloned()
+        .ok_or_else(|| {
+            format!(
+                "minimal compiler requires a bound target identifier for {}",
+                label
+            )
+        })
 }
 
 #[cfg(test)]
@@ -539,6 +750,66 @@ mod tests {
         }
     }
 
+    fn make_input_for_entity(
+        entity: &str,
+        action: &str,
+        params: Vec<(&str, &str)>,
+        target_id: Option<&str>,
+        session_entity_kind: Option<&str>,
+    ) -> CompilerInputEnvelope {
+        CompilerInputEnvelope {
+            structured_intent: StructuredIntentPlan {
+                steps: vec![IntentStep {
+                    action: action.to_string(),
+                    entity: entity.to_string(),
+                    target: Some(super::super::IntentTarget {
+                        identifier: None,
+                        reference: Some("current".to_string()),
+                        filter: None,
+                    }),
+                    qualifiers: vec![],
+                    parameters: params
+                        .iter()
+                        .map(|(name, value)| IntentParameter {
+                            name: (*name).to_string(),
+                            value: (*value).to_string(),
+                        })
+                        .collect(),
+                    confidence: "high".to_string(),
+                }],
+                composition: Some("single_step".to_string()),
+                data_flow: vec![],
+            },
+            semantic_ir: SemanticIr {
+                steps: vec![SemanticStep {
+                    action: action.to_string(),
+                    entity: entity.to_string(),
+                    binding_mode: BindingMode::SessionReference,
+                    target: Some(SemanticTarget {
+                        subject_kind: session_entity_kind.unwrap_or(entity).to_string(),
+                        identifier: target_id.map(str::to_string),
+                        identifier_type: target_id.map(|_| "uuid".to_string()),
+                        reference: Some("current".to_string()),
+                        filter: None,
+                    }),
+                    parameters: params
+                        .iter()
+                        .map(|(name, value)| IntentParameter {
+                            name: (*name).to_string(),
+                            value: (*value).to_string(),
+                        })
+                        .collect(),
+                    qualifiers: vec![],
+                }],
+                composition: Some("single_step".to_string()),
+            },
+            session_id: None,
+            session_entity_id: target_id.map(str::to_string),
+            session_entity_kind: session_entity_kind.map(str::to_string),
+            session_entity_name: Some("Current Entity".to_string()),
+        }
+    }
+
     #[test]
     fn compiler_supports_cbu_read_slice() {
         let compiler = build_minimal_cbu_compiler();
@@ -553,6 +824,36 @@ mod tests {
             output.selection.expect("selection should exist").verb_id,
             "cbu.read"
         );
+    }
+
+    #[test]
+    fn compiler_supports_entity_read_slice() {
+        let compiler = build_minimal_cbu_compiler();
+        let output = compiler
+            .compile(make_input_for_entity(
+                "entity",
+                "read",
+                vec![],
+                Some("123e4567-e89b-12d3-a456-426614174101"),
+                Some("entity"),
+            ))
+            .expect("compile should succeed");
+        assert_eq!(
+            output.selection.expect("selection should exist").verb_id,
+            "entity.read"
+        );
+    }
+
+    #[test]
+    fn supports_kyc_case_read_slice() {
+        let input = make_input_for_entity(
+            "kyc-case",
+            "read",
+            vec![],
+            Some("123e4567-e89b-12d3-a456-426614174102"),
+            Some("kyc-case"),
+        );
+        assert!(supports_cbu_compiler_slice(&input));
     }
 
     #[test]

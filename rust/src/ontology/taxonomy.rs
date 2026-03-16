@@ -191,6 +191,69 @@ impl EntityTaxonomy {
         self.entities.get(entity_type).map(|e| &e.db)
     }
 
+    /// Find the canonical entity type for a DB table and optional lifecycle status column.
+    ///
+    /// When multiple entity types share the same table, this prefers a definition whose
+    /// lifecycle status column matches `status_column`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ob_poc::ontology::taxonomy::EntityTaxonomy;
+    ///
+    /// let yaml = r#"
+    /// version: "1.0"
+    /// entities:
+    ///   cbu:
+    ///     description: "Client Business Unit"
+    ///     category: subject
+    ///     db: { schema: ob-poc, table: cbus, pk: cbu_id }
+    ///     lifecycle:
+    ///       status_column: status
+    ///       states: [DRAFT, ACTIVE]
+    ///       transitions:
+    ///         - from: DRAFT
+    ///           to: [ACTIVE]
+    ///       initial_state: DRAFT
+    /// relationships: []
+    /// reference_tables: {}
+    /// "#;
+    ///
+    /// let taxonomy = EntityTaxonomy::from_yaml(yaml).unwrap();
+    /// assert_eq!(
+    ///     taxonomy.find_entity_type_by_storage("ob-poc", "cbus", Some("status")),
+    ///     Some("cbu")
+    /// );
+    /// ```
+    pub fn find_entity_type_by_storage(
+        &self,
+        schema: &str,
+        table: &str,
+        status_column: Option<&str>,
+    ) -> Option<&str> {
+        self.entities
+            .iter()
+            .find_map(|(entity_type, entity_def)| {
+                if entity_def.db.schema != schema || entity_def.db.table != table {
+                    return None;
+                }
+
+                match (status_column, entity_def.lifecycle.as_ref()) {
+                    (Some(column), Some(lifecycle)) if lifecycle.status_column == column => {
+                        Some(entity_type.as_str())
+                    }
+                    (Some(_), _) => None,
+                    (None, _) => Some(entity_type.as_str()),
+                }
+            })
+            .or_else(|| {
+                self.entities.iter().find_map(|(entity_type, entity_def)| {
+                    (entity_def.db.schema == schema && entity_def.db.table == table)
+                        .then_some(entity_type.as_str())
+                })
+            })
+    }
+
     /// Resolve an entity type alias to its canonical type.
     pub fn resolve_alias<'a>(&'a self, entity_type: &'a str) -> &'a str {
         self.entities
@@ -297,5 +360,18 @@ reference_tables: {}
         assert_eq!(lifecycle.initial_state, "DRAFT");
         assert!(lifecycle.is_valid_transition("DRAFT", "ACTIVE"));
         assert!(!lifecycle.is_valid_transition("ACTIVE", "DRAFT"));
+    }
+
+    #[test]
+    fn test_find_entity_type_by_storage() {
+        let taxonomy = EntityTaxonomy::from_yaml(TEST_YAML).unwrap();
+        assert_eq!(
+            taxonomy.find_entity_type_by_storage("ob-poc", "cbus", Some("status")),
+            Some("cbu")
+        );
+        assert_eq!(
+            taxonomy.find_entity_type_by_storage("ob-poc", "cbus", None),
+            Some("cbu")
+        );
     }
 }

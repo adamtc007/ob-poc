@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 91pfA5PzJrT6VvcPTHe59icz7xlY97sSAi0mPbuJJNMkzChqylEHC2ZOTkhCTFq
+\restrict rhJIVSjvWbVHyLUiAJoo68GLc3w2XFhnqjiZbejSchy6bisyzhJTnqholQ3qEiW
 
 -- Dumped from database version 18.1 (Homebrew)
 -- Dumped by pg_dump version 18.1 (Homebrew)
@@ -7844,6 +7844,28 @@ CREATE TABLE "ob-poc".cbu_entity_roles (
 
 
 --
+-- Name: cbu_entity_roles_history; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".cbu_entity_roles_history (
+    history_id uuid DEFAULT uuidv7() NOT NULL,
+    cbu_entity_role_id uuid NOT NULL,
+    cbu_id uuid NOT NULL,
+    entity_id uuid NOT NULL,
+    role_id uuid NOT NULL,
+    target_entity_id uuid,
+    ownership_percentage numeric(5,2),
+    effective_from date,
+    effective_to date,
+    created_at timestamp with time zone,
+    updated_at timestamp with time zone,
+    operation text NOT NULL,
+    changed_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT cbu_entity_roles_history_operation_check CHECK ((operation = ANY (ARRAY['UPDATE'::text, 'DELETE'::text])))
+);
+
+
+--
 -- Name: cbu_evidence; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -8088,7 +8110,8 @@ CREATE TABLE "ob-poc".entities (
     founding_date date,
     dissolution_date date,
     is_publicly_listed boolean DEFAULT false,
-    name_norm text
+    name_norm text,
+    deleted_at timestamp with time zone
 );
 
 
@@ -8823,6 +8846,7 @@ CREATE TABLE "ob-poc".cbus (
     product_id uuid,
     status character varying(30) DEFAULT 'DISCOVERED'::character varying,
     kyc_scope_template character varying(50),
+    deleted_at timestamp with time zone,
     CONSTRAINT chk_cbu_category CHECK (((cbu_category IS NULL) OR ((cbu_category)::text = ANY (ARRAY[('FUND_MANDATE'::character varying)::text, ('CORPORATE_GROUP'::character varying)::text, ('INSTITUTIONAL_ACCOUNT'::character varying)::text, ('RETAIL_CLIENT'::character varying)::text, ('FAMILY_TRUST'::character varying)::text, ('CORRESPONDENT_BANK'::character varying)::text, ('INTERNAL_TEST'::character varying)::text])))),
     CONSTRAINT chk_cbu_status CHECK (((status)::text = ANY (ARRAY[('DISCOVERED'::character varying)::text, ('VALIDATION_PENDING'::character varying)::text, ('VALIDATED'::character varying)::text, ('UPDATE_PENDING_PROOF'::character varying)::text, ('VALIDATION_FAILED'::character varying)::text])))
 );
@@ -20256,6 +20280,21 @@ CREATE TABLE sem_reg.plan_steps (
 
 
 --
+-- Name: reducer_states; Type: TABLE; Schema: sem_reg; Owner: -
+--
+
+CREATE TABLE sem_reg.reducer_states (
+    reducer_state_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    entity_type text NOT NULL,
+    entity_id uuid NOT NULL,
+    current_state text NOT NULL,
+    lane text,
+    phase text,
+    computed_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: run_records; Type: TABLE; Schema: sem_reg; Owner: -
 --
 
@@ -21331,6 +21370,14 @@ ALTER TABLE ONLY "ob-poc".cbu_cross_border_config
 
 ALTER TABLE ONLY "ob-poc".cbu_entity_roles
     ADD CONSTRAINT cbu_entity_roles_cbu_id_entity_id_role_id_key UNIQUE (cbu_id, entity_id, role_id);
+
+
+--
+-- Name: cbu_entity_roles_history cbu_entity_roles_history_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".cbu_entity_roles_history
+    ADD CONSTRAINT cbu_entity_roles_history_pkey PRIMARY KEY (history_id);
 
 
 --
@@ -24814,6 +24861,22 @@ ALTER TABLE ONLY sem_reg.plan_steps
 
 
 --
+-- Name: reducer_states reducer_states_entity_type_entity_id_key; Type: CONSTRAINT; Schema: sem_reg; Owner: -
+--
+
+ALTER TABLE ONLY sem_reg.reducer_states
+    ADD CONSTRAINT reducer_states_entity_type_entity_id_key UNIQUE (entity_type, entity_id);
+
+
+--
+-- Name: reducer_states reducer_states_pkey; Type: CONSTRAINT; Schema: sem_reg; Owner: -
+--
+
+ALTER TABLE ONLY sem_reg.reducer_states
+    ADD CONSTRAINT reducer_states_pkey PRIMARY KEY (reducer_state_id);
+
+
+--
 -- Name: run_records run_records_pkey; Type: CONSTRAINT; Schema: sem_reg; Owner: -
 --
 
@@ -25628,6 +25691,27 @@ CREATE INDEX idx_cbu_entity_roles_entity ON "ob-poc".cbu_entity_roles USING btre
 
 
 --
+-- Name: idx_cbu_entity_roles_history_cbu_id; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cbu_entity_roles_history_cbu_id ON "ob-poc".cbu_entity_roles_history USING btree (cbu_id);
+
+
+--
+-- Name: idx_cbu_entity_roles_history_changed_at; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cbu_entity_roles_history_changed_at ON "ob-poc".cbu_entity_roles_history USING btree (changed_at DESC);
+
+
+--
+-- Name: idx_cbu_entity_roles_history_entity_id; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cbu_entity_roles_history_entity_id ON "ob-poc".cbu_entity_roles_history USING btree (entity_id);
+
+
+--
 -- Name: idx_cbu_entity_roles_role; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -26003,6 +26087,13 @@ CREATE INDEX idx_cbu_unified_attr_conflicts ON "ob-poc".cbu_unified_attr_require
 --
 
 CREATE INDEX idx_cbu_unified_attr_required ON "ob-poc".cbu_unified_attr_requirements USING btree (cbu_id, requirement_strength) WHERE (requirement_strength = 'required'::text);
+
+
+--
+-- Name: idx_cbus_active; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cbus_active ON "ob-poc".cbus USING btree (cbu_id) WHERE (deleted_at IS NULL);
 
 
 --
@@ -27123,6 +27214,13 @@ CREATE INDEX idx_ef_entity ON "ob-poc".entity_feature USING btree (entity_id);
 --
 
 CREATE INDEX idx_ef_token ON "ob-poc".entity_feature USING btree (token_norm);
+
+
+--
+-- Name: idx_entities_active; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_entities_active ON "ob-poc".entities USING btree (entity_id) WHERE (deleted_at IS NULL);
 
 
 --
@@ -30413,6 +30511,13 @@ CREATE INDEX idx_outbox_claimable ON sem_reg.outbox_events USING btree (outbox_s
 --
 
 CREATE INDEX idx_plan_steps_plan_id ON sem_reg.plan_steps USING btree (plan_id);
+
+
+--
+-- Name: idx_reducer_states_entity; Type: INDEX; Schema: sem_reg; Owner: -
+--
+
+CREATE INDEX idx_reducer_states_entity ON sem_reg.reducer_states USING btree (entity_type, entity_id);
 
 
 --
@@ -35209,5 +35314,5 @@ ALTER TABLE ONLY sem_reg_authoring.validation_reports
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 91pfA5PzJrT6VvcPTHe59icz7xlY97sSAi0mPbuJJNMkzChqylEHC2ZOTkhCTFq
+\unrestrict rhJIVSjvWbVHyLUiAJoo68GLc3w2XFhnqjiZbejSchy6bisyzhJTnqholQ3qEiW
 

@@ -88,6 +88,7 @@ impl CustomOperation for TrustAnalyzeControlOp {
                 FROM "ob-poc".trust_parties tp
                 JOIN "ob-poc".entities e ON tp.entity_id = e.entity_id
                 WHERE tp.trust_id = $1 AND tp.is_active = true
+                  AND e.deleted_at IS NULL
                 ORDER BY tp.party_role
                 "#,
             )
@@ -109,6 +110,7 @@ impl CustomOperation for TrustAnalyzeControlOp {
             FROM "ob-poc".trust_provisions tp
             LEFT JOIN "ob-poc".entities e ON tp.holder_entity_id = e.entity_id
             WHERE tp.cbu_id = $1 AND tp.trust_entity_id = $2 AND tp.is_active = true
+              AND (e.entity_id IS NULL OR e.deleted_at IS NULL)
             ORDER BY tp.provision_type
             "#,
         )
@@ -345,6 +347,7 @@ impl CustomOperation for TrustIdentifyUbosOp {
             FROM "ob-poc".trust_provisions tp
             LEFT JOIN "ob-poc".entities e ON tp.holder_entity_id = e.entity_id
             WHERE tp.cbu_id = $1 AND tp.trust_entity_id = $2 AND tp.is_active = true
+              AND (e.entity_id IS NULL OR e.deleted_at IS NULL)
             "#,
         )
         .bind(cbu_id)

@@ -271,3 +271,108 @@ impl CustomOperation for ScreeningAdverseMediaOp {
         ))
     }
 }
+
+/// Refresh screening coverage for all workstreams in a case.
+#[register_custom_op]
+pub struct ScreeningBulkRefreshOp;
+
+#[async_trait]
+impl CustomOperation for ScreeningBulkRefreshOp {
+    fn domain(&self) -> &'static str {
+        "screening"
+    }
+
+    fn verb(&self) -> &'static str {
+        "bulk-refresh"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Ensures required pending screenings exist for every workstream in a case"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        use uuid::Uuid;
+
+        let case_id: Uuid = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "case-id")
+            .and_then(|a| {
+                if let Some(name) = a.value.as_symbol() {
+                    ctx.resolve(name)
+                } else {
+                    a.value.as_uuid()
+                }
+            })
+            .ok_or_else(|| anyhow::anyhow!("Missing case-id argument"))?;
+
+        let screening_type = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "screening-type")
+            .and_then(|a| a.value.as_string())
+            .map(str::to_string);
+
+        let target_types: Vec<String> = match screening_type.as_deref() {
+            Some(kind) => vec![kind.to_string()],
+            None => vec![
+                "SANCTIONS".to_string(),
+                "PEP".to_string(),
+                "ADVERSE_MEDIA".to_string(),
+            ],
+        };
+
+        let workstream_ids: Vec<Uuid> = sqlx::query_scalar(
+            r#"
+            SELECT workstream_id
+            FROM "ob-poc".entity_workstreams
+            WHERE case_id = $1
+            "#,
+        )
+        .bind(case_id)
+        .fetch_all(pool)
+        .await?;
+
+        let mut inserted = 0_u64;
+        for workstream_id in workstream_ids {
+            for screening_type in &target_types {
+                let screening_id = Uuid::new_v4();
+                let result = sqlx::query(
+                    r#"
+                    INSERT INTO "ob-poc".screenings
+                        (screening_id, workstream_id, screening_type, status)
+                    SELECT $1, $2, $3, 'PENDING'
+                    WHERE NOT EXISTS (
+                        SELECT 1
+                        FROM "ob-poc".screenings
+                        WHERE workstream_id = $2 AND screening_type = $3
+                    )
+                    "#,
+                )
+                .bind(screening_id)
+                .bind(workstream_id)
+                .bind(screening_type)
+                .execute(pool)
+                .await?;
+                inserted += result.rows_affected();
+            }
+        }
+
+        Ok(ExecutionResult::Affected(inserted))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow::anyhow!("Database feature required"))
+    }
+}

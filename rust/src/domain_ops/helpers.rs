@@ -206,11 +206,12 @@ pub async fn resolve_cbu_id(
 
     // Fall back to cbu-name lookup
     if let Some(cbu_name) = extract_string_opt(verb_call, "cbu-name") {
-        let row: Option<(Uuid,)> =
-            sqlx::query_as(r#"SELECT cbu_id FROM "ob-poc".cbus WHERE name = $1"#)
-                .bind(&cbu_name)
-                .fetch_optional(pool)
-                .await?;
+        let row: Option<(Uuid,)> = sqlx::query_as(
+            r#"SELECT cbu_id FROM "ob-poc".cbus WHERE name = $1 AND deleted_at IS NULL"#,
+        )
+        .bind(&cbu_name)
+        .fetch_optional(pool)
+        .await?;
 
         return row
             .map(|(id,)| id)
@@ -282,6 +283,7 @@ pub async fn extract_entity_ref(
                         r#"SELECT e.entity_id FROM "ob-poc".entities e
                            JOIN "ob-poc".entity_proper_persons p ON p.entity_id = e.entity_id
                            WHERE CONCAT(p.first_name, ' ', p.last_name) ILIKE $1
+                           AND e.deleted_at IS NULL
                            LIMIT 1"#,
                     )
                     .bind(name)
@@ -293,6 +295,7 @@ pub async fn extract_entity_ref(
                         r#"SELECT e.entity_id FROM "ob-poc".entities e
                            JOIN "ob-poc".entity_funds f ON f.entity_id = e.entity_id
                            WHERE e.name ILIKE $1
+                           AND e.deleted_at IS NULL
                            LIMIT 1"#,
                     )
                     .bind(name)
@@ -304,6 +307,7 @@ pub async fn extract_entity_ref(
                         r#"SELECT e.entity_id FROM "ob-poc".entities e
                            JOIN "ob-poc".entity_manco m ON m.entity_id = e.entity_id
                            WHERE e.name ILIKE $1
+                           AND e.deleted_at IS NULL
                            LIMIT 1"#,
                     )
                     .bind(name)
@@ -315,6 +319,7 @@ pub async fn extract_entity_ref(
                         r#"SELECT e.entity_id FROM "ob-poc".entities e
                            JOIN "ob-poc".entity_limited_companies c ON c.entity_id = e.entity_id
                            WHERE c.company_name ILIKE $1
+                           AND e.deleted_at IS NULL
                            LIMIT 1"#,
                     )
                     .bind(name)
@@ -324,7 +329,11 @@ pub async fn extract_entity_ref(
                 _ => {
                     // Generic entity lookup by name
                     sqlx::query_scalar(
-                        r#"SELECT entity_id FROM "ob-poc".entities WHERE name ILIKE $1 LIMIT 1"#,
+                        r#"SELECT entity_id
+                           FROM "ob-poc".entities
+                           WHERE name ILIKE $1
+                             AND deleted_at IS NULL
+                           LIMIT 1"#,
                     )
                     .bind(name)
                     .fetch_optional(pool)

@@ -413,6 +413,7 @@ impl CustomOperation for CapitalOwnershipChainOp {
                 FROM "ob-poc".entity_relationships er
                 JOIN "ob-poc".entities e ON er.from_entity_id = e.entity_id
                 WHERE er.to_entity_id = $1
+                  AND e.deleted_at IS NULL
                   AND er.relationship_type = 'ownership'
                   AND (er.effective_to IS NULL OR er.effective_to > CURRENT_DATE)
                   AND COALESCE(er.percentage, 0) >= $2
@@ -430,6 +431,7 @@ impl CustomOperation for CapitalOwnershipChainOp {
                 JOIN "ob-poc".entity_relationships er ON er.to_entity_id = oc.owner_id
                 JOIN "ob-poc".entities e ON er.from_entity_id = e.entity_id
                 WHERE er.relationship_type = 'ownership'
+                  AND e.deleted_at IS NULL
                   AND (er.effective_to IS NULL OR er.effective_to > CURRENT_DATE)
                   AND oc.depth < 10
                   AND NOT (er.from_entity_id = ANY(oc.path))
@@ -735,7 +737,10 @@ impl CustomOperation for CapitalShareClassCreateOp {
 
         // Validate issuer exists
         let issuer_exists: bool = sqlx::query_scalar(
-            r#"SELECT EXISTS(SELECT 1 FROM "ob-poc".entities WHERE entity_id = $1)"#,
+            r#"SELECT EXISTS(
+                   SELECT 1 FROM "ob-poc".entities
+                   WHERE entity_id = $1 AND deleted_at IS NULL
+               )"#,
         )
         .bind(issuer_entity_id)
         .fetch_one(pool)
@@ -1640,12 +1645,15 @@ impl CustomOperation for CapitalCapTableOp {
             extract_string_opt(verb_call, "basis").unwrap_or_else(|| "OUTSTANDING".to_string());
 
         // Get issuer name
-        let issuer_name: String =
-            sqlx::query_scalar(r#"SELECT name FROM "ob-poc".entities WHERE entity_id = $1"#)
-                .bind(issuer_entity_id)
-                .fetch_optional(pool)
-                .await?
-                .ok_or_else(|| anyhow!("Issuer entity {} not found", issuer_entity_id))?;
+        let issuer_name: String = sqlx::query_scalar(
+            r#"SELECT name FROM "ob-poc".entities
+                   WHERE entity_id = $1
+                     AND deleted_at IS NULL"#,
+        )
+        .bind(issuer_entity_id)
+        .fetch_optional(pool)
+        .await?
+        .ok_or_else(|| anyhow!("Issuer entity {} not found", issuer_entity_id))?;
 
         // Get share classes
         let share_classes: Vec<(Uuid, String, String, rust_decimal::Decimal, rust_decimal::Decimal)> = sqlx::query_as(

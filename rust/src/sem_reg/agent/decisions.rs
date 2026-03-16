@@ -7,7 +7,7 @@
 //!
 //! Decision records are strictly INSERT-only (immutable audit trail).
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use anyhow::Result;
 use chrono::{DateTime, Utc};
@@ -58,7 +58,7 @@ pub struct DecisionRecord {
     ///
     /// Every registry snapshot that was consulted to make this decision
     /// is recorded here. This enables exact-point-in-time audit replay.
-    pub snapshot_manifest: HashMap<Uuid, Uuid>,
+    pub snapshot_manifest: BTreeMap<Uuid, Uuid>,
     /// Confidence in the decision (0.0–1.0).
     pub confidence: f64,
     /// Whether this decision was flagged for human review.
@@ -289,7 +289,7 @@ mod tests {
 
     #[test]
     fn test_decision_record_serde_roundtrip() {
-        let mut manifest = HashMap::new();
+        let mut manifest = BTreeMap::new();
         let obj_id = Uuid::new_v4();
         let snap_id = Uuid::new_v4();
         manifest.insert(obj_id, snap_id);
@@ -385,7 +385,7 @@ mod tests {
             evidence_against: vec![],
             negative_evidence: vec![],
             policy_verdicts: vec![],
-            snapshot_manifest: HashMap::new(),
+            snapshot_manifest: BTreeMap::new(),
             confidence: 1.0,
             escalation_flag: false,
             escalation_id: None,

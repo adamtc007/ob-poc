@@ -293,10 +293,12 @@ impl GovernedDocumentRequirementsService {
                 FROM "ob-poc".cbu_entity_roles cer
                 JOIN "ob-poc".cbus c ON c.cbu_id = cer.cbu_id
                 WHERE cer.entity_id = e.entity_id
+                  AND c.deleted_at IS NULL
                 ORDER BY cer.created_at DESC NULLS LAST
                 LIMIT 1
             ) cbu_link ON true
             WHERE e.entity_id = $1
+              AND e.deleted_at IS NULL
             "#,
         )
         .bind(entity_id)

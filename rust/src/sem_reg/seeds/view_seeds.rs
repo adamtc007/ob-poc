@@ -13,7 +13,7 @@ use uuid::Uuid;
 use crate::sem_reg::{
     ids::{definition_hash, object_id_for},
     store::SnapshotStore,
-    types::{ChangeType, ObjectType, SnapshotMeta},
+    types::{ChangeType, GovernanceTier, ObjectType, SnapshotMeta},
     view_def::{SortDirection, ViewColumn, ViewDefBody, ViewFilter, ViewSortField},
 };
 
@@ -296,8 +296,12 @@ pub async fn seed_views(
                     println!("  SKIP view: {} (unchanged)", view.fqn);
                 }
             } else {
-                let mut meta =
-                    SnapshotMeta::new_operational(ObjectType::ViewDef, object_id, "seed");
+                let mut meta = SnapshotMeta::new_at_tier(
+                    GovernanceTier::Governed,
+                    ObjectType::ViewDef,
+                    object_id,
+                    "seed",
+                );
                 meta.predecessor_id = Some(existing_row.snapshot_id);
                 meta.version_major = existing_row.version_major;
                 meta.version_minor = existing_row.version_minor + 1;
@@ -310,7 +314,12 @@ pub async fn seed_views(
                 }
             }
         } else {
-            let meta = SnapshotMeta::new_operational(ObjectType::ViewDef, object_id, "seed");
+            let meta = SnapshotMeta::new_at_tier(
+                GovernanceTier::Governed,
+                ObjectType::ViewDef,
+                object_id,
+                "seed",
+            );
             SnapshotStore::insert_snapshot(pool, &meta, &definition, Some(set_id)).await?;
             report.views_published += 1;
             if verbose {

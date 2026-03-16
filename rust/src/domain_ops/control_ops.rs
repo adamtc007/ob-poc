@@ -68,6 +68,7 @@ impl CustomOperation for ControlAnalyzeOp {
             FROM "ob-poc".entities e
             JOIN "ob-poc".entity_types et ON e.entity_type_id = et.entity_type_id
             WHERE e.entity_id = $1
+              AND e.deleted_at IS NULL
             "#,
         )
         .bind(entity_id)
@@ -92,6 +93,7 @@ impl CustomOperation for ControlAnalyzeOp {
                 FROM "ob-poc".entity_relationships er
                 JOIN "ob-poc".entities e ON er.from_entity_id = e.entity_id
                 WHERE er.to_entity_id = $1
+                  AND e.deleted_at IS NULL
                   AND er.relationship_type = 'ownership'
                   AND (er.effective_to IS NULL OR er.effective_to > CURRENT_DATE)
                   AND er.percentage >= $2
@@ -132,6 +134,7 @@ impl CustomOperation for ControlAnalyzeOp {
             FROM "ob-poc".entity_relationships er
             JOIN "ob-poc".entities e ON er.from_entity_id = e.entity_id
             WHERE er.to_entity_id = $1
+              AND e.deleted_at IS NULL
               AND er.relationship_type = 'control'
               AND er.control_type = 'voting_rights'
               AND (er.effective_to IS NULL OR er.effective_to > CURRENT_DATE)
@@ -187,6 +190,7 @@ impl CustomOperation for ControlAnalyzeOp {
                 WHERE bc.entity_id = $1
                   AND (bc.ended_at IS NULL OR bc.ended_at > CURRENT_DATE)
                   AND bc.appointed_by_entity_id IS NOT NULL
+                  AND (e.entity_id IS NULL OR e.deleted_at IS NULL)
                 GROUP BY bc.appointed_by_entity_id, e.name
             )
             SELECT
@@ -249,6 +253,7 @@ impl CustomOperation for ControlAnalyzeOp {
                 FROM "ob-poc".trust_provisions tp
                 JOIN "ob-poc".entities e ON tp.holder_entity_id = e.entity_id
                 WHERE tp.trust_entity_id = $1
+                  AND e.deleted_at IS NULL
                   AND (tp.effective_to IS NULL OR tp.effective_to > CURRENT_DATE)
                   AND (tp.provision_type IN ('TRUSTEE_DISCRETIONARY', 'PROTECTOR', 'APPOINTOR_POWER', 'TRUSTEE_REMOVAL')
                        OR tp.has_discretion = true)
@@ -299,6 +304,7 @@ impl CustomOperation for ControlAnalyzeOp {
                 FROM "ob-poc".partnership_capital pc
                 JOIN "ob-poc".entities e ON pc.partner_entity_id = e.entity_id
                 WHERE pc.partnership_entity_id = $1
+                  AND e.deleted_at IS NULL
                   AND pc.partner_type = 'GP'
                   AND pc.is_active = true
                 "#,
@@ -333,6 +339,7 @@ impl CustomOperation for ControlAnalyzeOp {
             JOIN "ob-poc".entities e ON cer.entity_id = e.entity_id
             JOIN "ob-poc".roles r ON cer.role_id = r.role_id
             WHERE cer.target_entity_id = $1
+              AND e.deleted_at IS NULL
               AND r.name IN ('CEO', 'MANAGING_DIRECTOR', 'EXECUTIVE_DIRECTOR', 'CFO')
               AND (cer.effective_to IS NULL OR cer.effective_to > CURRENT_DATE)
             "#,
@@ -517,6 +524,7 @@ impl CustomOperation for ControlBuildGraphOp {
                     FROM "ob-poc".entities e
                     JOIN "ob-poc".entity_types et ON e.entity_type_id = et.entity_type_id
                     WHERE e.entity_id = $1
+                      AND e.deleted_at IS NULL
 
                     UNION ALL
 
@@ -534,6 +542,7 @@ impl CustomOperation for ControlBuildGraphOp {
                     JOIN "ob-poc".entities e ON er.from_entity_id = e.entity_id
                     JOIN "ob-poc".entity_types et ON e.entity_type_id = et.entity_type_id
                     WHERE cg.depth < $2
+                      AND e.deleted_at IS NULL
                       AND (er.effective_to IS NULL OR er.effective_to > CURRENT_DATE)
                       AND er.relationship_type IN ('ownership', 'control', 'trust_role')
                 )
@@ -728,6 +737,7 @@ impl CustomOperation for ControlIdentifyUbosOp {
                 JOIN "ob-poc".entities e ON oc.current_entity_id = e.entity_id
                 JOIN "ob-poc".entity_proper_persons pp ON pp.entity_id = e.entity_id
                 WHERE oc.effective_percentage >= $2
+                  AND e.deleted_at IS NULL
                 ORDER BY oc.current_entity_id, oc.effective_percentage DESC
             )
             SELECT
@@ -774,6 +784,7 @@ impl CustomOperation for ControlIdentifyUbosOp {
             JOIN "ob-poc".entities e ON bc.appointed_by_entity_id = e.entity_id
             JOIN "ob-poc".entity_proper_persons pp ON pp.entity_id = e.entity_id
             WHERE bc.appointed_by_entity_id IS NOT NULL
+              AND e.deleted_at IS NULL
               AND (bc.ended_at IS NULL OR bc.ended_at > CURRENT_DATE)
 
             UNION
@@ -792,6 +803,7 @@ impl CustomOperation for ControlIdentifyUbosOp {
             JOIN "ob-poc".entities e ON tp.holder_entity_id = e.entity_id
             JOIN "ob-poc".entity_proper_persons pp ON pp.entity_id = e.entity_id
             WHERE tp.provision_type IN ('TRUSTEE_DISCRETIONARY', 'PROTECTOR', 'APPOINTOR_POWER')
+              AND e.deleted_at IS NULL
               AND (tp.effective_to IS NULL OR tp.effective_to > CURRENT_DATE)
 
             UNION
@@ -810,6 +822,7 @@ impl CustomOperation for ControlIdentifyUbosOp {
             JOIN "ob-poc".entities e ON pc.partner_entity_id = e.entity_id
             JOIN "ob-poc".entity_proper_persons pp ON pp.entity_id = e.entity_id
             WHERE pc.partner_type = 'GP'
+              AND e.deleted_at IS NULL
               AND pc.is_active = true
             "#,
         )
@@ -1010,6 +1023,7 @@ impl CustomOperation for ControlTraceChainOp {
                     FROM "ob-poc".entities e
                     JOIN "ob-poc".entity_types et ON e.entity_type_id = et.entity_type_id
                     WHERE e.entity_id = $1
+                      AND e.deleted_at IS NULL
                     "#,
                 )
                 .bind(entity_id)
@@ -1313,11 +1327,12 @@ impl CustomOperation for ShowBoardControllerOp {
         let cbu_id = get_required_uuid(verb_call, "cbu-id")?;
 
         // Get CBU info
-        let cbu_info: Option<(String,)> =
-            sqlx::query_as(r#"SELECT name FROM "ob-poc".cbus WHERE cbu_id = $1"#)
-                .bind(cbu_id)
-                .fetch_optional(pool)
-                .await?;
+        let cbu_info: Option<(String,)> = sqlx::query_as(
+            r#"SELECT name FROM "ob-poc".cbus WHERE cbu_id = $1 AND deleted_at IS NULL"#,
+        )
+        .bind(cbu_id)
+        .fetch_optional(pool)
+        .await?;
 
         let cbu_name = cbu_info
             .ok_or_else(|| anyhow!("CBU not found: {}", cbu_id))?
@@ -1353,6 +1368,7 @@ impl CustomOperation for ShowBoardControllerOp {
                        EXISTS(SELECT 1 FROM "ob-poc".entity_proper_persons pp WHERE pp.entity_id = e.entity_id)
                 FROM "ob-poc".entities e
                 WHERE e.entity_id = $1
+                  AND e.deleted_at IS NULL
                 "#,
             )
             .bind(override_row.controller_entity_id)
@@ -1410,6 +1426,7 @@ impl CustomOperation for ShowBoardControllerOp {
                 JOIN "ob-poc".entities e ON bc.appointed_by_entity_id = e.entity_id
                 WHERE bc.entity_id IN (SELECT entity_id FROM cbu_entities)
                   AND bc.appointed_by_entity_id IS NOT NULL
+                  AND e.deleted_at IS NULL
                   AND (bc.ended_at IS NULL OR bc.ended_at > CURRENT_DATE)
                 GROUP BY bc.appointed_by_entity_id, e.name
             )
@@ -1494,6 +1511,7 @@ impl CustomOperation for ShowBoardControllerOp {
             FROM "ob-poc".entity_relationships er
             JOIN "ob-poc".entities e ON er.from_entity_id = e.entity_id
             WHERE er.to_entity_id IN (SELECT entity_id FROM cbu_entities)
+              AND e.deleted_at IS NULL
               AND er.relationship_type IN ('ownership', 'control')
               AND er.percentage > 50
               AND (er.effective_to IS NULL OR er.effective_to > CURRENT_DATE)
@@ -1557,6 +1575,7 @@ impl CustomOperation for ShowBoardControllerOp {
             FROM "ob-poc".entity_relationships er
             JOIN "ob-poc".entities e ON er.from_entity_id = e.entity_id
             WHERE er.to_entity_id IN (SELECT entity_id FROM cbu_entities)
+              AND e.deleted_at IS NULL
               AND er.source = 'GLEIF'
               AND er.relationship_type = 'control'
               AND er.control_type = 'ULTIMATE_ACCOUNTING_CONSOLIDATION'
@@ -1803,7 +1822,10 @@ impl CustomOperation for SetBoardControllerOp {
 
         // Verify entity exists
         let entity_exists: bool = sqlx::query_scalar(
-            r#"SELECT EXISTS(SELECT 1 FROM "ob-poc".entities WHERE entity_id = $1)"#,
+            r#"SELECT EXISTS(
+                   SELECT 1 FROM "ob-poc".entities
+                   WHERE entity_id = $1 AND deleted_at IS NULL
+               )"#,
         )
         .bind(controller_entity_id)
         .fetch_one(pool)

@@ -16,9 +16,7 @@ pub mod verbs;
 pub use action_surface::compute_action_surface;
 pub use builtin::load_builtin_constellation_map;
 pub use error::{ConstellationError, ConstellationResult};
-pub use hydrated::{
-    HydratedConstellation, HydratedGraphEdge, HydratedGraphNode, HydratedSlot,
-};
+pub use hydrated::{HydratedConstellation, HydratedGraphEdge, HydratedGraphNode, HydratedSlot};
 pub use hydration::{
     discover_state_machine_slot_contexts, hydrate_constellation, hydrate_constellation_summary,
     ConstellationSlotContext, RawGraphEdge, RawHydrationData, RawOverlayRow, RawSlotRow,

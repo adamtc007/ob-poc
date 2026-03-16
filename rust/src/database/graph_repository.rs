@@ -210,6 +210,7 @@ impl PgGraphRepository {
             LEFT JOIN "ob-poc".entity_trusts etr ON etr.entity_id = e.entity_id
             LEFT JOIN "ob-poc".entity_funds ef ON ef.entity_id = e.entity_id
             WHERE cer.cbu_id = $1
+              AND e.deleted_at IS NULL
             "#,
         )
         .bind(cbu_id)
@@ -371,6 +372,7 @@ impl PgGraphRepository {
             SELECT cbu_id, name, jurisdiction, client_type, commercial_client_entity_id
             FROM "ob-poc".cbus
             WHERE cbu_id = $1
+              AND deleted_at IS NULL
             "#,
         )
         .bind(cbu_id)
@@ -411,6 +413,7 @@ impl PgGraphRepository {
                 LEFT JOIN "ob-poc".entity_trusts etr ON etr.entity_id = e.entity_id
                 LEFT JOIN "ob-poc".entity_funds ef ON ef.entity_id = e.entity_id
                 WHERE e.entity_id = $1
+                  AND e.deleted_at IS NULL
 
                 UNION ALL
 
@@ -441,6 +444,7 @@ impl PgGraphRepository {
                 LEFT JOIN "ob-poc".entity_trusts etr ON etr.entity_id = e.entity_id
                 LEFT JOIN "ob-poc".entity_funds ef ON ef.entity_id = e.entity_id
                 WHERE oc.depth < 20  -- Prevent infinite loops
+                  AND e.deleted_at IS NULL
             )
             SELECT entity_id, name, entity_type, jurisdiction, depth
             FROM ownership_chain
@@ -462,6 +466,7 @@ impl PgGraphRepository {
             SELECT cbu_id, name, jurisdiction, client_type, commercial_client_entity_id
             FROM "ob-poc".cbus
             WHERE jurisdiction = $1
+              AND deleted_at IS NULL
             "#,
         )
         .bind(jurisdiction)
@@ -896,6 +901,7 @@ impl GraphRepository for PgGraphRepository {
             LEFT JOIN "ob-poc".entity_trusts etr ON etr.entity_id = e.entity_id
             LEFT JOIN "ob-poc".entity_funds ef ON ef.entity_id = e.entity_id
             WHERE e.entity_id = ANY($1)
+              AND e.deleted_at IS NULL
             "#,
         )
         .bind(&entity_ids)
@@ -909,6 +915,7 @@ impl GraphRepository for PgGraphRepository {
             FROM "ob-poc".cbus c
             JOIN "ob-poc".cbu_entity_roles cer ON cer.cbu_id = c.cbu_id
             WHERE cer.entity_id = ANY($1)
+              AND c.deleted_at IS NULL
             "#,
         )
         .bind(&entity_ids)
@@ -965,6 +972,7 @@ impl GraphRepository for PgGraphRepository {
             SELECT cbu_id, name, jurisdiction, client_type, commercial_client_entity_id
             FROM "ob-poc".cbus
             WHERE commercial_client_entity_id IS NOT NULL
+              AND deleted_at IS NULL
             "#,
         )
         .fetch_all(&self.pool)
@@ -1035,6 +1043,7 @@ impl GraphRepository for PgGraphRepository {
                     JOIN "ob-poc".entity_types et ON et.entity_type_id = e.entity_type_id
                     JOIN "ob-poc".cbu_entity_roles cer ON cer.entity_id = e.entity_id
                     WHERE cer.cbu_id = $1
+                      AND e.deleted_at IS NULL
                       AND e.name ILIKE $2
                     "#,
                 )
@@ -1057,6 +1066,8 @@ impl GraphRepository for PgGraphRepository {
                     JOIN "ob-poc".cbu_entity_roles cer ON cer.entity_id = e.entity_id
                     JOIN "ob-poc".cbus c ON c.cbu_id = cer.cbu_id
                     WHERE c.jurisdiction = $1
+                      AND c.deleted_at IS NULL
+                      AND e.deleted_at IS NULL
                       AND e.name ILIKE $2
                     "#,
                 )
@@ -1078,6 +1089,7 @@ impl GraphRepository for PgGraphRepository {
                     FROM "ob-poc".entities e
                     JOIN "ob-poc".entity_types et ON et.entity_type_id = e.entity_type_id
                     WHERE e.name ILIKE $1
+                      AND e.deleted_at IS NULL
                     LIMIT 100
                     "#,
                 )
@@ -1125,6 +1137,7 @@ impl GraphRepository for PgGraphRepository {
                     JOIN "ob-poc".roles r ON r.role_id = cer.role_id
                     JOIN "ob-poc".entities e ON e.entity_id = cer.entity_id
                     WHERE cer.cbu_id = $1
+                      AND e.deleted_at IS NULL
                       AND e.name ILIKE $2
                     "#,
                 )
@@ -1147,6 +1160,8 @@ impl GraphRepository for PgGraphRepository {
                     JOIN "ob-poc".entities e ON e.entity_id = cer.entity_id
                     JOIN "ob-poc".cbus c ON c.cbu_id = cer.cbu_id
                     WHERE c.jurisdiction = $1
+                      AND c.deleted_at IS NULL
+                      AND e.deleted_at IS NULL
                       AND e.name ILIKE $2
                     "#,
                 )
@@ -1168,6 +1183,7 @@ impl GraphRepository for PgGraphRepository {
                     JOIN "ob-poc".roles r ON r.role_id = cer.role_id
                     JOIN "ob-poc".entities e ON e.entity_id = cer.entity_id
                     WHERE e.name ILIKE $1
+                      AND e.deleted_at IS NULL
                     LIMIT 100
                     "#,
                 )

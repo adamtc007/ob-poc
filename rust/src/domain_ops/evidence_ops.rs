@@ -491,3 +491,183 @@ impl CustomOperation for EvidenceWaiveOp {
         Err(anyhow!("Database feature required"))
     }
 }
+
+/// Compatibility alias for `evidence.create-requirement`.
+#[register_custom_op]
+pub struct EvidenceCreateRequirementOp;
+
+#[async_trait]
+impl CustomOperation for EvidenceCreateRequirementOp {
+    fn domain(&self) -> &'static str {
+        "evidence"
+    }
+    fn verb(&self) -> &'static str {
+        "create-requirement"
+    }
+    fn rationale(&self) -> &'static str {
+        "Compatibility alias for evidence.require"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        EvidenceRequireOp.execute(verb_call, ctx, pool).await
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow!("Database feature required"))
+    }
+}
+
+/// Compatibility alias for `evidence.attach-document`.
+#[register_custom_op]
+pub struct EvidenceAttachDocumentOp;
+
+#[async_trait]
+impl CustomOperation for EvidenceAttachDocumentOp {
+    fn domain(&self) -> &'static str {
+        "evidence"
+    }
+    fn verb(&self) -> &'static str {
+        "attach-document"
+    }
+    fn rationale(&self) -> &'static str {
+        "Compatibility alias for evidence.link"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        EvidenceLinkOp.execute(verb_call, ctx, pool).await
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow!("Database feature required"))
+    }
+}
+
+/// Compatibility alias for `evidence.mark-verified`.
+#[register_custom_op]
+pub struct EvidenceMarkVerifiedOp;
+
+#[async_trait]
+impl CustomOperation for EvidenceMarkVerifiedOp {
+    fn domain(&self) -> &'static str {
+        "evidence"
+    }
+    fn verb(&self) -> &'static str {
+        "mark-verified"
+    }
+    fn rationale(&self) -> &'static str {
+        "Compatibility alias for evidence.verify"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        EvidenceVerifyOp.execute(verb_call, ctx, pool).await
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow!("Database feature required"))
+    }
+}
+
+/// Compatibility alias for `evidence.mark-rejected`.
+#[register_custom_op]
+pub struct EvidenceMarkRejectedOp;
+
+#[async_trait]
+impl CustomOperation for EvidenceMarkRejectedOp {
+    fn domain(&self) -> &'static str {
+        "evidence"
+    }
+    fn verb(&self) -> &'static str {
+        "mark-rejected"
+    }
+    fn rationale(&self) -> &'static str {
+        "Compatibility alias for evidence.reject"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        EvidenceRejectOp.execute(verb_call, ctx, pool).await
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow!("Database feature required"))
+    }
+}
+
+/// Compatibility alias for `evidence.mark-waived`.
+#[register_custom_op]
+pub struct EvidenceMarkWaivedOp;
+
+#[async_trait]
+impl CustomOperation for EvidenceMarkWaivedOp {
+    fn domain(&self) -> &'static str {
+        "evidence"
+    }
+    fn verb(&self) -> &'static str {
+        "mark-waived"
+    }
+    fn rationale(&self) -> &'static str {
+        "Compatibility alias for evidence.waive"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        EvidenceWaiveOp.execute(verb_call, ctx, pool).await
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow!("Database feature required"))
+    }
+}

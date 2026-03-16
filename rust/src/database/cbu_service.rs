@@ -96,7 +96,7 @@ impl CbuService {
             r#"
             SELECT cbu_id, name, description, nature_purpose, source_of_funds, client_type, jurisdiction, cbu_category, created_at, updated_at
             FROM "ob-poc".cbus
-            WHERE cbu_id = $1
+            WHERE cbu_id = $1 AND deleted_at IS NULL
             "#,
         )
         .bind(cbu_id)
@@ -113,7 +113,7 @@ impl CbuService {
             r#"
             SELECT cbu_id, name, description, nature_purpose, source_of_funds, client_type, jurisdiction, cbu_category, created_at, updated_at
             FROM "ob-poc".cbus
-            WHERE name = $1
+            WHERE name = $1 AND deleted_at IS NULL
             "#,
         )
         .bind(name)
@@ -130,6 +130,7 @@ impl CbuService {
             r#"
             SELECT cbu_id, name, description, nature_purpose, source_of_funds, client_type, jurisdiction, cbu_category, created_at, updated_at
             FROM "ob-poc".cbus
+            WHERE deleted_at IS NULL
             ORDER BY created_at DESC
             LIMIT $1 OFFSET $2
             "#,
@@ -158,7 +159,7 @@ impl CbuService {
                 description = COALESCE($2, description),
                 nature_purpose = COALESCE($3, nature_purpose),
                 updated_at = NOW()
-            WHERE cbu_id = $4
+            WHERE cbu_id = $4 AND deleted_at IS NULL
             "#,
         )
         .bind(name)
@@ -176,12 +177,13 @@ impl CbuService {
         Ok(result.rows_affected() > 0)
     }
 
-    /// Delete CBU
+    /// Soft-delete CBU
     pub async fn delete_cbu(&self, cbu_id: Uuid) -> Result<bool> {
         let result = sqlx::query(
             r#"
-            DELETE FROM "ob-poc".cbus
-            WHERE cbu_id = $1
+            UPDATE "ob-poc".cbus
+            SET deleted_at = NOW()
+            WHERE cbu_id = $1 AND deleted_at IS NULL
             "#,
         )
         .bind(cbu_id)
@@ -190,7 +192,7 @@ impl CbuService {
         .context("Failed to delete CBU")?;
 
         if result.rows_affected() > 0 {
-            info!("Deleted CBU {}", cbu_id);
+            info!("Soft-deleted CBU {}", cbu_id);
         }
 
         Ok(result.rows_affected() > 0)

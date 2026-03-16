@@ -19,7 +19,7 @@ mod service;
 mod taxonomy;
 mod types;
 
-pub use lifecycle::{is_valid_state, is_valid_transition, valid_next_states};
+pub use lifecycle::{is_terminal_state, is_valid_state, is_valid_transition, valid_next_states};
 pub use semantic_stage::SemanticStageRegistry;
 pub use service::{ontology, OntologyService};
 pub use taxonomy::EntityTaxonomy;

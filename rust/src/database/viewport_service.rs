@@ -171,6 +171,7 @@ impl ViewportService {
                 created_at
             FROM "ob-poc".cbus
             WHERE cbu_id = $1
+              AND deleted_at IS NULL
             "#,
         )
         .bind(cbu_id)
@@ -196,6 +197,7 @@ impl ViewportService {
             JOIN "ob-poc".entities e ON cer.entity_id = e.entity_id
             JOIN "ob-poc".entity_types et ON e.entity_type_id = et.entity_type_id
             WHERE cer.cbu_id = $1
+              AND e.deleted_at IS NULL
             "#,
             cbu_id
         )
@@ -288,6 +290,7 @@ impl ViewportService {
             LEFT JOIN "ob-poc".entity_limited_companies lc ON e.entity_id = lc.entity_id
             LEFT JOIN "ob-poc".entity_proper_persons pp ON e.entity_id = pp.entity_id
             WHERE cer.cbu_id = $1
+              AND e.deleted_at IS NULL
               AND COALESCE(cer.ownership_percentage::float / 100.0, 1.0) >= $2
             ORDER BY COALESCE(cer.ownership_percentage::float / 100.0, 1.0) DESC, r.name, e.name
             "#,
@@ -479,6 +482,7 @@ impl ViewportService {
             LEFT JOIN "ob-poc".entity_limited_companies lc ON e.entity_id = lc.entity_id
             LEFT JOIN "ob-poc".entity_proper_persons pp ON e.entity_id = pp.entity_id
             WHERE e.entity_id = $1
+              AND e.deleted_at IS NULL
             "#,
             entity_id
         )
@@ -524,7 +528,9 @@ impl ViewportService {
             FROM "ob-poc".entity_relationships er
             JOIN "ob-poc".entities e_from ON er.from_entity_id = e_from.entity_id
             JOIN "ob-poc".entities e_to ON er.to_entity_id = e_to.entity_id
-            WHERE er.from_entity_id = $1 OR er.to_entity_id = $1
+            WHERE (er.from_entity_id = $1 OR er.to_entity_id = $1)
+              AND e_from.deleted_at IS NULL
+              AND e_to.deleted_at IS NULL
               AND er.effective_to IS NULL
             ORDER BY er.relationship_type, er.percentage DESC NULLS LAST
             "#,

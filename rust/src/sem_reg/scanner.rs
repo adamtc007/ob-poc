@@ -18,8 +18,10 @@ use dsl_core::config::loader::ConfigLoader;
 use super::{
     ids::{definition_hash, object_id_for},
     store::SnapshotStore,
-    types::{ChangeType, ObjectType, SnapshotMeta},
+    types::{ChangeType, GovernanceTier, ObjectType, SnapshotMeta},
 };
+
+const GOVERNED_VERB_DOMAINS: &[&str] = &["kyc-case", "entity-workstream", "ubo.registry"];
 
 // Re-export pure conversion functions from the adapter so existing call sites work.
 // Note: suggest_security_label is NOT re-exported because it returns sem_os_core types
@@ -93,6 +95,9 @@ pub struct ScanReport {
     pub views_published: usize,
     pub views_skipped: usize,
     pub views_updated: usize,
+    pub membership_rules_published: usize,
+    pub membership_rules_skipped: usize,
+    pub membership_rules_updated: usize,
     pub policies_published: usize,
     pub policies_skipped: usize,
     pub policies_updated: usize,
@@ -136,6 +141,13 @@ impl std::fmt::Display for ScanReport {
         )?;
         writeln!(
             f,
+            "  Memberships:     {} published, {} updated, {} skipped",
+            self.membership_rules_published,
+            self.membership_rules_updated,
+            self.membership_rules_skipped
+        )?;
+        writeln!(
+            f,
             "  Policies:        {} published, {} updated, {} skipped",
             self.policies_published, self.policies_updated, self.policies_skipped
         )?;
@@ -152,9 +164,22 @@ impl std::fmt::Display for ScanReport {
             + self.taxonomies_published
             + self.taxonomy_nodes_published
             + self.views_published
+            + self.membership_rules_published
             + self.policies_published
             + self.derivation_specs_published;
         write!(f, "  Total new snapshots: {}", total)
+    }
+}
+
+fn is_governed_kyc_domain(domain: &str) -> bool {
+    GOVERNED_VERB_DOMAINS.contains(&domain)
+}
+
+fn governance_tier_for_verb_domain(domain: &str) -> GovernanceTier {
+    if is_governed_kyc_domain(domain) {
+        GovernanceTier::Governed
+    } else {
+        GovernanceTier::Operational
     }
 }
 
@@ -202,6 +227,10 @@ pub async fn run_onboarding_scan(
         report.taxonomy_nodes_published = tax_report.nodes_published;
         let view_report = super::seeds::seed_views(pool, Uuid::nil(), true, verbose).await?;
         report.views_published = view_report.views_published;
+        let membership_report =
+            super::seeds::seed_kyc_membership_rules(pool, Uuid::nil(), true, verbose, &contracts)
+                .await?;
+        report.membership_rules_published = membership_report.membership_rules_published;
         let policy_report = super::seeds::seed_policies(pool, Uuid::nil(), true, verbose).await?;
         report.policies_published = policy_report.policies_published;
         let derivation_report =
@@ -216,6 +245,7 @@ pub async fn run_onboarding_scan(
             report.taxonomies_published, report.taxonomy_nodes_published
         );
         println!("  {} views", report.views_published);
+        println!("  {} membership rules", report.membership_rules_published);
         println!("  {} policies", report.policies_published);
         println!("  {} derivation specs", report.derivation_specs_published);
         return Ok(report);
@@ -248,8 +278,12 @@ pub async fn run_onboarding_scan(
                 }
             } else {
                 // Definition changed — publish successor snapshot
-                let mut meta =
-                    SnapshotMeta::new_operational(ObjectType::VerbContract, object_id, "scanner");
+                let mut meta = SnapshotMeta::new_at_tier(
+                    governance_tier_for_verb_domain(&contract.domain),
+                    ObjectType::VerbContract,
+                    object_id,
+                    "scanner",
+                );
                 meta.predecessor_id = Some(existing_row.snapshot_id);
                 meta.version_major = existing_row.version_major;
                 meta.version_minor = existing_row.version_minor + 1;
@@ -264,7 +298,12 @@ pub async fn run_onboarding_scan(
             continue;
         }
 
-        let meta = SnapshotMeta::new_operational(ObjectType::VerbContract, object_id, "scanner");
+        let meta = SnapshotMeta::new_at_tier(
+            governance_tier_for_verb_domain(&contract.domain),
+            ObjectType::VerbContract,
+            object_id,
+            "scanner",
+        );
         SnapshotStore::insert_snapshot(pool, &meta, &definition, Some(set_id)).await?;
         report.verb_contracts_published += 1;
 
@@ -381,7 +420,17 @@ pub async fn run_onboarding_scan(
     report.views_skipped = view_report.views_skipped;
     report.views_updated = view_report.views_updated;
 
-    // 10. Seed policies
+    // 10. Seed membership rules required for KYC taxonomy overlap
+    if verbose {
+        println!("\nSeeding membership rules...");
+    }
+    let membership_report =
+        super::seeds::seed_kyc_membership_rules(pool, set_id, dry_run, verbose, &contracts).await?;
+    report.membership_rules_published = membership_report.membership_rules_published;
+    report.membership_rules_skipped = membership_report.membership_rules_skipped;
+    report.membership_rules_updated = membership_report.membership_rules_updated;
+
+    // 11. Seed policies
     if verbose {
         println!("\nSeeding policies...");
     }
@@ -390,7 +439,7 @@ pub async fn run_onboarding_scan(
     report.policies_skipped = policy_report.policies_skipped;
     report.policies_updated = policy_report.policies_updated;
 
-    // 11. Seed derivation specs
+    // 12. Seed derivation specs
     if verbose {
         println!("\nSeeding derivation specs...");
     }

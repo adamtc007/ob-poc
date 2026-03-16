@@ -732,6 +732,7 @@ impl CustomOperation for DocumentCheckExtractionCoverageOp {
             FROM "ob-poc".entities e
             JOIN "ob-poc".entity_types et ON et.entity_type_id = e.entity_type_id
             WHERE e.entity_id = $1
+              AND e.deleted_at IS NULL
             "#,
             entity_id
         )

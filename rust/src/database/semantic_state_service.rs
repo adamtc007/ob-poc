@@ -23,7 +23,7 @@ pub async fn derive_semantic_state(
 ) -> Result<SemanticState, sqlx::Error> {
     // 1. Get CBU info
     let cbu = sqlx::query!(
-        r#"SELECT name FROM "ob-poc".cbus WHERE cbu_id = $1"#,
+        r#"SELECT name FROM "ob-poc".cbus WHERE cbu_id = $1 AND deleted_at IS NULL"#,
         cbu_id
     )
     .fetch_one(pool)

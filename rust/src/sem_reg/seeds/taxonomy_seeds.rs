@@ -23,7 +23,7 @@ use crate::sem_reg::{
     ids::{definition_hash, object_id_for},
     store::SnapshotStore,
     taxonomy_def::{TaxonomyDefBody, TaxonomyNodeBody},
-    types::{ChangeType, ObjectType, SnapshotMeta},
+    types::{ChangeType, GovernanceTier, ObjectType, SnapshotMeta},
 };
 
 /// Report from taxonomy seeding.
@@ -724,7 +724,12 @@ async fn publish_idempotent(
                 println!("  SKIP {}: {} (unchanged)", label, fqn);
             }
         } else {
-            let mut meta = SnapshotMeta::new_operational(object_type, object_id, "seed");
+            let mut meta = SnapshotMeta::new_at_tier(
+                governance_tier_for(object_type),
+                object_type,
+                object_id,
+                "seed",
+            );
             meta.predecessor_id = Some(existing_row.snapshot_id);
             meta.version_major = existing_row.version_major;
             meta.version_minor = existing_row.version_minor + 1;
@@ -737,7 +742,12 @@ async fn publish_idempotent(
             }
         }
     } else {
-        let meta = SnapshotMeta::new_operational(object_type, object_id, "seed");
+        let meta = SnapshotMeta::new_at_tier(
+            governance_tier_for(object_type),
+            object_type,
+            object_id,
+            "seed",
+        );
         SnapshotStore::insert_snapshot(pool, &meta, definition, Some(set_id)).await?;
         *published += 1;
         if verbose {
@@ -746,6 +756,13 @@ async fn publish_idempotent(
     }
 
     Ok(())
+}
+
+fn governance_tier_for(object_type: ObjectType) -> GovernanceTier {
+    match object_type {
+        ObjectType::TaxonomyDef | ObjectType::TaxonomyNode => GovernanceTier::Governed,
+        _ => GovernanceTier::Operational,
+    }
 }
 
 #[cfg(test)]

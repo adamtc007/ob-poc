@@ -26,10 +26,10 @@ use nom::{
     branch::alt,
     bytes::complete::{escaped_transform, tag},
     character::complete::{alpha1, alphanumeric1, char, digit1, multispace0, multispace1, none_of},
-    combinator::{all_consuming, cut, map, opt, recognize, value},
+    combinator::{all_consuming, cut, map, not, opt, peek, recognize, value},
     error::{context, ContextError, ParseError as NomParseError, VerboseError},
     multi::many0,
-    sequence::{delimited, pair, preceded, tuple},
+    sequence::{delimited, pair, preceded, terminated, tuple},
     IResult,
 };
 use nom_locate::LocatedSpan;
@@ -309,7 +309,10 @@ fn boolean_literal_with_span<'a, E: NomParseError<NomSpan<'a>>>(
     input: NomSpan<'a>,
 ) -> IResult<NomSpan<'a>, AstNode, E> {
     let start = input.location_offset();
-    let (input, b) = alt((value(true, tag("true")), value(false, tag("false"))))(input)?;
+    let (input, b) = alt((
+        value(true, terminated(tag("true"), not(peek(alphanumeric1)))),
+        value(false, terminated(tag("false"), not(peek(alphanumeric1)))),
+    ))(input)?;
     let end = input.location_offset();
     Ok((
         input,
@@ -322,7 +325,7 @@ fn null_literal_with_span<'a, E: NomParseError<NomSpan<'a>>>(
     input: NomSpan<'a>,
 ) -> IResult<NomSpan<'a>, AstNode, E> {
     let start = input.location_offset();
-    let (input, _) = tag("nil")(input)?;
+    let (input, _) = terminated(tag("nil"), not(peek(alphanumeric1)))(input)?;
     let end = input.location_offset();
     Ok((
         input,
@@ -337,17 +340,22 @@ fn string_literal_with_span<'a, E: NomParseError<NomSpan<'a>>>(
     let start = input.location_offset();
     let (input, s) = delimited(
         char('"'),
-        escaped_transform(
-            none_of("\"\\"),
-            '\\',
-            alt((
-                value('\n', char('n')),
-                value('\r', char('r')),
-                value('\t', char('t')),
-                value('\\', char('\\')),
-                value('"', char('"')),
-            )),
-        ),
+        alt((
+            escaped_transform(
+                none_of("\"\\"),
+                '\\',
+                alt((
+                    value('\n', char('n')),
+                    value('\r', char('r')),
+                    value('\t', char('t')),
+                    value('\\', char('\\')),
+                    value('"', char('"')),
+                )),
+            ),
+            // Handle empty string: if we immediately see the closing quote,
+            // escaped_transform would fail (requires ≥1 char), so return empty.
+            value(String::new(), peek(char('"'))),
+        )),
         char('"'),
     )(input)?;
     let end = input.location_offset();
@@ -1031,6 +1039,50 @@ mod tests {
                 assert_eq!(span.start, 16);
                 assert_eq!(span.end, 25); // @mySymbol = 9 chars
             }
+        }
+    }
+
+    #[test]
+    fn test_empty_string_parses() {
+        let input = r#"(test.verb :value "")"#;
+        let result = parse_program(input).unwrap();
+
+        if let Statement::VerbCall(vc) = &result.statements[0] {
+            assert_eq!(vc.arguments[0].value.as_string(), Some(""));
+        } else {
+            panic!("Expected VerbCall");
+        }
+    }
+
+    #[test]
+    fn test_boolean_word_boundary() {
+        // "trueblood" in a keyword value context should NOT parse as boolean true
+        let input = r#"(test.verb :flag true)"#;
+        let result = parse_program(input).unwrap();
+        if let Statement::VerbCall(vc) = &result.statements[0] {
+            assert!(vc.arguments[0].value.as_boolean().is_some());
+        }
+
+        // Verify "trueblood" does not parse as boolean — it should parse as a
+        // plain string/identifier, not as `true` with leftover `blood`
+        let input2 = r#"(test.verb :name "trueblood")"#;
+        let result2 = parse_program(input2).unwrap();
+        if let Statement::VerbCall(vc) = &result2.statements[0] {
+            assert_eq!(vc.arguments[0].value.as_string(), Some("trueblood"));
+        }
+    }
+
+    #[test]
+    fn test_nil_word_boundary() {
+        // Standalone nil should parse
+        let input = r#"(test.verb :value nil)"#;
+        let result = parse_program(input).unwrap();
+        if let Statement::VerbCall(vc) = &result.statements[0] {
+            assert!(
+                matches!(&vc.arguments[0].value, AstNode::Literal(Literal::Null, _)),
+                "Expected Literal::Null, got {:?}",
+                vc.arguments[0].value
+            );
         }
     }
 }

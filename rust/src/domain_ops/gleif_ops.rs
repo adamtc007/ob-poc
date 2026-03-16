@@ -1792,6 +1792,7 @@ impl CustomOperation for GleifImportToClientGroupOp {
                 LEFT JOIN "ob-poc".entity_limited_companies elc ON elc.entity_id = e.entity_id
                 LEFT JOIN "ob-poc".entity_funds ef ON ef.entity_id = e.entity_id
                 WHERE COALESCE(elc.lei, ef.lei) = ANY($1)
+                  AND e.deleted_at IS NULL
                 "#,
                 )
                 .bind(imported_leis)
@@ -1820,6 +1821,7 @@ impl CustomOperation for GleifImportToClientGroupOp {
             LEFT JOIN "ob-poc".entity_limited_companies elc_child ON elc_child.entity_id = e.entity_id
             LEFT JOIN "ob-poc".entity_funds ef_child ON ef_child.entity_id = e.entity_id
             WHERE pr.relationship_type = 'FUND_MANAGER'
+              AND e.deleted_at IS NULL
               AND pr.relationship_status = 'ACTIVE'
               AND COALESCE(elc_child.lei, ef_child.lei) = ANY($1)
             "#,
@@ -1945,10 +1947,14 @@ impl CustomOperation for GleifImportToClientGroupOp {
 
                 // Get ManCo name for denormalized storage
                 let manco_name: Option<String> = if let Some(manco_eid) = manco_entity_id {
-                    sqlx::query_scalar(r#"SELECT name FROM "ob-poc".entities WHERE entity_id = $1"#)
-                        .bind(manco_eid)
-                        .fetch_optional(pool)
-                        .await?
+                    sqlx::query_scalar(
+                        r#"SELECT name FROM "ob-poc".entities
+                           WHERE entity_id = $1
+                             AND deleted_at IS NULL"#,
+                    )
+                    .bind(manco_eid)
+                    .fetch_optional(pool)
+                    .await?
                 } else {
                     None
                 };

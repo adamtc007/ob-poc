@@ -600,6 +600,7 @@ impl VisualizationRepository {
             CbuSummaryView,
             r#"SELECT cbu_id, name, jurisdiction, client_type, cbu_category, created_at, updated_at
                FROM "ob-poc".cbus
+               WHERE deleted_at IS NULL
                ORDER BY name"#
         )
         .fetch_all(&self.pool)
@@ -613,7 +614,8 @@ impl VisualizationRepository {
             CbuSummaryView,
             r#"SELECT cbu_id, name, jurisdiction, client_type, cbu_category, created_at, updated_at
                FROM "ob-poc".cbus
-               WHERE cbu_id = $1"#,
+               WHERE cbu_id = $1
+                 AND deleted_at IS NULL"#,
             cbu_id
         )
         .fetch_optional(&self.pool)
@@ -627,7 +629,8 @@ impl VisualizationRepository {
             CbuView,
             r#"SELECT cbu_id, name, jurisdiction, client_type, commercial_client_entity_id
                FROM "ob-poc".cbus
-               WHERE cbu_id = $1"#,
+               WHERE cbu_id = $1
+                 AND deleted_at IS NULL"#,
             cbu_id
         )
         .fetch_one(&self.pool)
@@ -650,7 +653,8 @@ impl VisualizationRepository {
                LEFT JOIN "ob-poc".entity_limited_companies lc ON e.entity_id = lc.entity_id
                LEFT JOIN "ob-poc".entity_partnerships p ON e.entity_id = p.entity_id
                LEFT JOIN "ob-poc".entity_trusts t ON e.entity_id = t.entity_id
-               WHERE e.entity_id = $1"#,
+               WHERE e.entity_id = $1
+                 AND e.deleted_at IS NULL"#,
             entity_id
         )
         .fetch_one(&self.pool)
@@ -678,6 +682,7 @@ impl VisualizationRepository {
                LEFT JOIN "ob-poc".entity_partnerships p ON e.entity_id = p.entity_id
                LEFT JOIN "ob-poc".entity_trusts t ON e.entity_id = t.entity_id
                WHERE cer.cbu_id = $1 AND r.name = $2
+                 AND e.deleted_at IS NULL
                LIMIT 1"#,
             cbu_id,
             role
@@ -707,7 +712,8 @@ impl VisualizationRepository {
                LEFT JOIN "ob-poc".entity_partnerships p ON e.entity_id = p.entity_id
                LEFT JOIN "ob-poc".entity_trusts t ON e.entity_id = t.entity_id
                LEFT JOIN "ob-poc".entity_proper_persons pp ON e.entity_id = pp.entity_id
-               WHERE cer.cbu_id = $1 AND r.name = $2"#,
+               WHERE cer.cbu_id = $1 AND r.name = $2
+                 AND e.deleted_at IS NULL"#,
             cbu_id,
             role
         )
@@ -742,6 +748,7 @@ impl VisualizationRepository {
                LEFT JOIN "ob-poc".entity_trusts t ON e.entity_id = t.entity_id
                LEFT JOIN "ob-poc".entity_proper_persons pp ON e.entity_id = pp.entity_id
                WHERE cer.cbu_id = $1
+                 AND e.deleted_at IS NULL
                ORDER BY r.name, e.name"#,
             cbu_id
         )
@@ -769,7 +776,9 @@ impl VisualizationRepository {
                JOIN "ob-poc".cbu_entity_roles cer ON e.entity_id = cer.entity_id
                JOIN "ob-poc".roles r ON cer.role_id = r.role_id
                LEFT JOIN "ob-poc".entity_proper_persons pp ON e.entity_id = pp.entity_id
-               WHERE cer.cbu_id = $1 AND et.type_code LIKE 'PROPER_PERSON%'
+               WHERE cer.cbu_id = $1
+                 AND et.type_code LIKE 'PROPER_PERSON%'
+                 AND e.deleted_at IS NULL
                ORDER BY e.name, r.name"#,
             cbu_id
         )
@@ -925,7 +934,7 @@ impl VisualizationRepository {
     pub async fn get_cbu_basic(&self, cbu_id: Uuid) -> Result<Option<CbuBasicView>> {
         let row = sqlx::query!(
             r#"SELECT cbu_id, name, jurisdiction, client_type, cbu_category
-               FROM "ob-poc".cbus WHERE cbu_id = $1"#,
+               FROM "ob-poc".cbus WHERE cbu_id = $1 AND deleted_at IS NULL"#,
             cbu_id
         )
         .fetch_optional(&self.pool)
@@ -949,7 +958,8 @@ impl VisualizationRepository {
         let rows = sqlx::query!(
             r#"SELECT cbu_id, name, client_type, jurisdiction, cbu_category
                FROM "ob-poc".cbus
-               WHERE ($1::text IS NULL OR name ILIKE '%' || $1 || '%')
+               WHERE deleted_at IS NULL
+                 AND ($1::text IS NULL OR name ILIKE '%' || $1 || '%')
                ORDER BY name
                LIMIT $2"#,
             search,
@@ -977,7 +987,8 @@ impl VisualizationRepository {
                FROM "ob-poc".cbu_entity_roles cer
                JOIN "ob-poc".entities e ON cer.entity_id = e.entity_id
                JOIN "ob-poc".entity_types et ON e.entity_type_id = et.entity_type_id
-               WHERE cer.cbu_id = $1"#,
+               WHERE cer.cbu_id = $1
+                 AND e.deleted_at IS NULL"#,
             cbu_id
         )
         .fetch_all(&self.pool)
@@ -1070,7 +1081,8 @@ impl VisualizationRepository {
             r#"SELECT e.entity_id, e.name, et.type_code
                FROM "ob-poc".entities e
                JOIN "ob-poc".entity_types et ON e.entity_type_id = et.entity_type_id
-               WHERE e.entity_id = $1"#,
+               WHERE e.entity_id = $1
+                 AND e.deleted_at IS NULL"#,
             entity_id
         )
         .fetch_optional(&self.pool)
@@ -1089,7 +1101,8 @@ impl VisualizationRepository {
             r#"SELECT DISTINCT cer.cbu_id, c.name as cbu_name
                FROM "ob-poc".cbu_entity_roles cer
                JOIN "ob-poc".cbus c ON cer.cbu_id = c.cbu_id
-               WHERE cer.entity_id = $1"#,
+               WHERE cer.entity_id = $1
+                 AND c.deleted_at IS NULL"#,
             entity_id
         )
         .fetch_all(&self.pool)
@@ -1383,7 +1396,7 @@ impl VisualizationRepository {
                       i.agreement_date, i.is_active,
                       e.name as "counterparty_name?"
                FROM "ob-poc".isda_agreements i
-               LEFT JOIN "ob-poc".entities e ON e.entity_id = i.counterparty_entity_id
+               LEFT JOIN "ob-poc".entities e ON e.entity_id = i.counterparty_entity_id AND e.deleted_at IS NULL
                WHERE i.cbu_id = $1"#,
             cbu_id
         )
@@ -1441,7 +1454,8 @@ impl VisualizationRepository {
                FROM "ob-poc".entity_workstreams w
                JOIN "ob-poc".cases c ON c.case_id = w.case_id
                JOIN "ob-poc".entities e ON e.entity_id = w.entity_id
-               WHERE c.cbu_id = $1"#,
+               WHERE c.cbu_id = $1
+                 AND e.deleted_at IS NULL"#,
             cbu_id
         )
         .fetch_all(&self.pool)
@@ -1472,7 +1486,7 @@ impl VisualizationRepository {
                FROM "ob-poc".doc_requests dr
                JOIN "ob-poc".entity_workstreams w ON w.workstream_id = dr.workstream_id
                JOIN "ob-poc".cases c ON c.case_id = w.case_id
-               LEFT JOIN "ob-poc".entities e ON e.entity_id = w.entity_id
+               LEFT JOIN "ob-poc".entities e ON e.entity_id = w.entity_id AND e.deleted_at IS NULL
                WHERE c.cbu_id = $1"#,
             cbu_id
         )
@@ -1505,7 +1519,8 @@ impl VisualizationRepository {
                JOIN "ob-poc".entity_workstreams w ON w.workstream_id = s.workstream_id
                JOIN "ob-poc".cases c ON c.case_id = w.case_id
                JOIN "ob-poc".entities e ON e.entity_id = w.entity_id
-               WHERE c.cbu_id = $1"#,
+               WHERE c.cbu_id = $1
+                 AND e.deleted_at IS NULL"#,
             cbu_id
         )
         .fetch_all(&self.pool)
@@ -1557,6 +1572,8 @@ impl VisualizationRepository {
                JOIN "ob-poc".entity_types from_et ON from_e.entity_type_id = from_et.entity_type_id
                JOIN "ob-poc".entity_types to_et ON to_e.entity_type_id = to_et.entity_type_id
                WHERE v.cbu_id = $1
+                 AND from_e.deleted_at IS NULL
+                 AND to_e.deleted_at IS NULL
                ORDER BY r.relationship_type, from_e.name"#,
             cbu_id
         )
@@ -1601,8 +1618,8 @@ impl VisualizationRepository {
                 se.name as "subject_name?",
                 pe.name as "ubo_name?"
                FROM "ob-poc".ubo_registry u
-               LEFT JOIN "ob-poc".entities se ON se.entity_id = u.subject_entity_id
-               LEFT JOIN "ob-poc".entities pe ON pe.entity_id = u.ubo_proper_person_id
+               LEFT JOIN "ob-poc".entities se ON se.entity_id = u.subject_entity_id AND se.deleted_at IS NULL
+               LEFT JOIN "ob-poc".entities pe ON pe.entity_id = u.ubo_proper_person_id AND pe.deleted_at IS NULL
                WHERE u.cbu_id = $1"#,
             cbu_id
         )
@@ -1637,14 +1654,20 @@ impl VisualizationRepository {
                 owner.name as "owner_name?",
                 owned.name as "owned_name?"
                FROM "ob-poc".entity_relationships r
-               LEFT JOIN "ob-poc".entities owner ON owner.entity_id = r.from_entity_id
-               LEFT JOIN "ob-poc".entities owned ON owned.entity_id = r.to_entity_id
+               LEFT JOIN "ob-poc".entities owner ON owner.entity_id = r.from_entity_id AND owner.deleted_at IS NULL
+               LEFT JOIN "ob-poc".entities owned ON owned.entity_id = r.to_entity_id AND owned.deleted_at IS NULL
                WHERE r.relationship_type = 'ownership'
                AND (r.to_entity_id IN (
-                   SELECT entity_id FROM "ob-poc".cbu_entity_roles WHERE cbu_id = $1
+                   SELECT cer.entity_id
+                   FROM "ob-poc".cbu_entity_roles cer
+                   JOIN "ob-poc".entities e ON e.entity_id = cer.entity_id
+                   WHERE cer.cbu_id = $1 AND e.deleted_at IS NULL
                )
                OR r.from_entity_id IN (
-                   SELECT entity_id FROM "ob-poc".cbu_entity_roles WHERE cbu_id = $1
+                   SELECT cer.entity_id
+                   FROM "ob-poc".cbu_entity_roles cer
+                   JOIN "ob-poc".entities e ON e.entity_id = cer.entity_id
+                   WHERE cer.cbu_id = $1 AND e.deleted_at IS NULL
                ))"#,
             cbu_id
         )
@@ -1676,14 +1699,20 @@ impl VisualizationRepository {
                 controller.name as "controller_name?",
                 controlled.name as "controlled_name?"
                FROM "ob-poc".entity_relationships r
-               LEFT JOIN "ob-poc".entities controller ON controller.entity_id = r.from_entity_id
-               LEFT JOIN "ob-poc".entities controlled ON controlled.entity_id = r.to_entity_id
+               LEFT JOIN "ob-poc".entities controller ON controller.entity_id = r.from_entity_id AND controller.deleted_at IS NULL
+               LEFT JOIN "ob-poc".entities controlled ON controlled.entity_id = r.to_entity_id AND controlled.deleted_at IS NULL
                WHERE r.relationship_type = 'control'
                AND (r.to_entity_id IN (
-                   SELECT entity_id FROM "ob-poc".cbu_entity_roles WHERE cbu_id = $1
+                   SELECT cer.entity_id
+                   FROM "ob-poc".cbu_entity_roles cer
+                   JOIN "ob-poc".entities e ON e.entity_id = cer.entity_id
+                   WHERE cer.cbu_id = $1 AND e.deleted_at IS NULL
                )
                OR r.from_entity_id IN (
-                   SELECT entity_id FROM "ob-poc".cbu_entity_roles WHERE cbu_id = $1
+                   SELECT cer.entity_id
+                   FROM "ob-poc".cbu_entity_roles cer
+                   JOIN "ob-poc".entities e ON e.entity_id = cer.entity_id
+                   WHERE cer.cbu_id = $1 AND e.deleted_at IS NULL
                ))"#,
             cbu_id
         )
@@ -1728,11 +1757,15 @@ impl VisualizationRepository {
                FROM "ob-poc".entity_parent_relationships epr
                JOIN "ob-poc".entities child_e ON epr.child_entity_id = child_e.entity_id
                JOIN "ob-poc".entity_types child_et ON child_e.entity_type_id = child_et.entity_type_id
-               LEFT JOIN "ob-poc".entities parent_e ON epr.parent_entity_id = parent_e.entity_id
+               LEFT JOIN "ob-poc".entities parent_e ON epr.parent_entity_id = parent_e.entity_id AND parent_e.deleted_at IS NULL
                LEFT JOIN "ob-poc".entity_types parent_et ON parent_e.entity_type_id = parent_et.entity_type_id
                WHERE epr.relationship_type IN ('FUND_MANAGER', 'UMBRELLA_FUND', 'MASTER_FUND')
+               AND child_e.deleted_at IS NULL
                AND epr.child_entity_id IN (
-                   SELECT entity_id FROM "ob-poc".cbu_entity_roles WHERE cbu_id = $1
+                   SELECT cer.entity_id
+                   FROM "ob-poc".cbu_entity_roles cer
+                   JOIN "ob-poc".entities e ON e.entity_id = cer.entity_id
+                   WHERE cer.cbu_id = $1 AND e.deleted_at IS NULL
                )
                ORDER BY epr.relationship_type, child_e.name"#,
             cbu_id
@@ -1921,6 +1954,7 @@ impl VisualizationRepository {
                LEFT JOIN "ob-poc".entity_partnerships p ON p.entity_id = e.entity_id
                LEFT JOIN "ob-poc".entity_trusts t ON t.entity_id = e.entity_id
                WHERE w.case_id = $1
+                 AND e.deleted_at IS NULL
                ORDER BY w.discovery_depth, w.created_at"#,
             case_id
         )
@@ -2162,7 +2196,7 @@ impl VisualizationRepository {
                FROM "ob-poc".cbu_instrument_universe u
                JOIN "ob-poc".instrument_classes ic ON ic.class_id = u.instrument_class_id
                LEFT JOIN "ob-poc".markets m ON m.market_id = u.market_id
-               LEFT JOIN "ob-poc".entities e ON e.entity_id = u.counterparty_entity_id
+               LEFT JOIN "ob-poc".entities e ON e.entity_id = u.counterparty_entity_id AND e.deleted_at IS NULL
                WHERE u.cbu_id = $1 AND u.is_active = true
                ORDER BY ic.code, m.mic, e.name"#,
             cbu_id
@@ -2199,7 +2233,7 @@ impl VisualizationRepository {
                 i.agreement_date
                FROM "ob-poc".isda_agreements i
                JOIN "ob-poc".entities e ON e.entity_id = i.counterparty_entity_id
-               WHERE i.cbu_id = $1 AND i.is_active = true
+               WHERE i.cbu_id = $1 AND i.is_active = true AND e.deleted_at IS NULL
                ORDER BY e.name"#,
             cbu_id
         )
@@ -2256,6 +2290,7 @@ impl VisualizationRepository {
                JOIN "ob-poc".entities e ON e.entity_id = cer.entity_id
                JOIN "ob-poc".roles r ON r.role_id = cer.role_id
                WHERE cer.cbu_id = $1
+                 AND e.deleted_at IS NULL
                  AND r.name IN ('INVESTMENT_MANAGER', 'DELEGATED_IM', 'SUB_ADVISOR')
                ORDER BY e.name"#,
             cbu_id

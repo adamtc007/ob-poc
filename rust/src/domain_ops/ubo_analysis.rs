@@ -74,7 +74,8 @@ impl CustomOperation for UboCalculateOp {
             JOIN "ob-poc".entities e ON e.entity_id = cer.entity_id
             JOIN "ob-poc".roles r ON r.role_id = cer.role_id
             WHERE cer.cbu_id = $1
-            AND r.name IN ('Primary Entity', 'Main Entity', 'Client')
+              AND e.deleted_at IS NULL
+              AND r.name IN ('Primary Entity', 'Main Entity', 'Client')
             LIMIT 1
             "#,
             cbu_id
@@ -390,6 +391,7 @@ impl CustomOperation for UboListOwnersOp {
             JOIN "ob-poc".entities e ON r.from_entity_id = e.entity_id
             JOIN "ob-poc".entity_types et ON e.entity_type_id = et.entity_type_id
             WHERE r.to_entity_id = $1
+              AND e.deleted_at IS NULL
               AND r.relationship_type = 'ownership'
               AND (r.effective_from IS NULL OR r.effective_from <= $2)
               AND (r.effective_to IS NULL OR r.effective_to >= $2)

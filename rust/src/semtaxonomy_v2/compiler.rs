@@ -59,10 +59,7 @@ pub trait BindingResolver: Send + Sync {
     /// ```ignore
     /// // Implemented by the NLCI compiler binding-resolution phase.
     /// ```
-    fn resolve_binding(
-        &self,
-        input: BindingResolutionInput,
-    ) -> Result<BindingResolutionOutput>;
+    fn resolve_binding(&self, input: BindingResolutionInput) -> Result<BindingResolutionOutput>;
 }
 
 /// Candidate selection phase.
@@ -73,10 +70,8 @@ pub trait CandidateSelector: Send + Sync {
     /// ```ignore
     /// // Implemented by the NLCI compiler candidate-selection phase.
     /// ```
-    fn select_candidates(
-        &self,
-        input: CandidateSelectionInput,
-    ) -> Result<CandidateSelectionOutput>;
+    fn select_candidates(&self, input: CandidateSelectionInput)
+        -> Result<CandidateSelectionOutput>;
 }
 
 /// Discrimination phase.
@@ -131,11 +126,9 @@ pub struct CompilerPipeline {
 impl IntentCompiler for CompilerPipeline {
     fn compile(&self, input: CompilerInputEnvelope) -> Result<CompilerOutput> {
         input.validate_invariants()?;
-        let surface = self.surface_object_resolver.resolve_surface(
-            SurfaceObjectResolutionInput {
-                envelope: input,
-            },
-        )?;
+        let surface = self
+            .surface_object_resolver
+            .resolve_surface(SurfaceObjectResolutionInput { envelope: input })?;
         let operation = self
             .operation_resolver
             .resolve_operation(OperationResolutionInput { surface })?;
@@ -245,10 +238,7 @@ mod tests {
 
     impl Discriminator for RecordingDiscriminator {
         fn discriminate(&self, input: DiscriminationInput) -> Result<DiscriminationOutput> {
-            self.0
-                .lock()
-                .expect("lock poisoned")
-                .push("discrimination");
+            self.0.lock().expect("lock poisoned").push("discrimination");
             Ok(DiscriminationOutput {
                 selected_candidate: input.candidates.candidates.first().cloned(),
                 candidates: input.candidates,
@@ -320,7 +310,9 @@ mod tests {
             composition_binder: Arc::new(RecordingCompositionBinder(calls.clone())),
         };
 
-        let output = pipeline.compile(valid_input()).expect("compile should succeed");
+        let output = pipeline
+            .compile(valid_input())
+            .expect("compile should succeed");
         assert_eq!(
             *calls.lock().expect("lock poisoned"),
             vec![
