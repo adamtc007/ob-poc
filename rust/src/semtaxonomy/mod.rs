@@ -413,45 +413,43 @@ pub fn extract_entity_candidates(utterance: &str) -> Vec<String> {
 ///
 /// ```ignore
 /// let mut state = ob_poc::semtaxonomy::SageSession::default();
-/// ob_poc::semtaxonomy::hydrate_sage_session(
-///     &mut state,
-///     Some(serde_json::json!({"query": "Allianz"})),
-///     None,
-///     Some("deal".to_string()),
-///     None,
-///     vec![],
-///     None,
-///     vec![],
-/// );
+/// let hydration = ob_poc::semtaxonomy::SageSessionHydration {
+///     cascade_result: Some(serde_json::json!({"query": "Allianz"})),
+///     domain_scope: Some("deal".to_string()),
+///     ..Default::default()
+/// };
+/// ob_poc::semtaxonomy::hydrate_sage_session(&mut state, hydration);
 /// assert_eq!(state.domain_scope.as_deref(), Some("deal"));
 /// ```
-pub fn hydrate_sage_session(
-    session: &mut SageSession,
-    cascade_result: Option<Value>,
-    active_entity: Option<EntityRef>,
-    entity_candidates: Vec<EntityCandidate>,
-    domain_scope: Option<String>,
-    aspect: Option<String>,
-    verb_surface: Vec<VerbSurfaceEntry>,
-    entity_state: Option<Value>,
-    domain_state_summaries: Vec<DomainStateSummary>,
-    intent_hints: Vec<IntentHint>,
-    grounding_strategy: Option<String>,
-    grounding_confidence: Option<String>,
-) {
-    if let Some(cascade_result) = cascade_result {
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct SageSessionHydration {
+    pub cascade_result: Option<Value>,
+    pub active_entity: Option<EntityRef>,
+    pub entity_candidates: Vec<EntityCandidate>,
+    pub domain_scope: Option<String>,
+    pub aspect: Option<String>,
+    pub verb_surface: Vec<VerbSurfaceEntry>,
+    pub entity_state: Option<Value>,
+    pub domain_state_summaries: Vec<DomainStateSummary>,
+    pub intent_hints: Vec<IntentHint>,
+    pub grounding_strategy: Option<String>,
+    pub grounding_confidence: Option<String>,
+}
+
+pub fn hydrate_sage_session(session: &mut SageSession, hydration: SageSessionHydration) {
+    if let Some(cascade_result) = hydration.cascade_result {
         session.cascade_result = Some(cascade_result);
     }
-    session.active_entity = active_entity;
-    session.entity_candidates = entity_candidates;
-    session.domain_scope = domain_scope;
-    session.aspect = aspect;
-    session.verb_surface = verb_surface;
-    session.entity_state = entity_state;
-    session.domain_state_summaries = domain_state_summaries;
-    session.likely_intents = intent_hints;
-    session.grounding_strategy = grounding_strategy;
-    session.grounding_confidence = grounding_confidence;
+    session.active_entity = hydration.active_entity;
+    session.entity_candidates = hydration.entity_candidates;
+    session.domain_scope = hydration.domain_scope;
+    session.aspect = hydration.aspect;
+    session.verb_surface = hydration.verb_surface;
+    session.entity_state = hydration.entity_state;
+    session.domain_state_summaries = hydration.domain_state_summaries;
+    session.likely_intents = hydration.intent_hints;
+    session.grounding_strategy = hydration.grounding_strategy;
+    session.grounding_confidence = hydration.grounding_confidence;
 }
 
 #[cfg(test)]

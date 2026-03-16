@@ -61,7 +61,7 @@ fn validate_condition_graph(
     definition: &StateMachineDefinition,
 ) -> ReducerResult<()> {
     for (name, body) in conditions {
-        validate_body(name, body, conditions, overlay_sources, definition)?;
+        validate_body(name, body, conditions, overlay_sources)?;
         let max_param = max_param_index(body);
         let declared_parameterized = definition
             .reducer
@@ -89,7 +89,6 @@ fn validate_body(
     body: &ConditionBody,
     conditions: &HashMap<String, ConditionBody>,
     overlay_sources: &HashMap<String, OverlaySourceDef>,
-    definition: &StateMachineDefinition,
 ) -> ReducerResult<()> {
     match body {
         ConditionBody::Leaf { expr, compare } => {
@@ -121,23 +120,11 @@ fn validate_body(
         }
         ConditionBody::And(items) | ConditionBody::Or(items) => {
             for item in items {
-                validate_body(
-                    condition_name,
-                    item,
-                    conditions,
-                    overlay_sources,
-                    definition,
-                )?;
+                validate_body(condition_name, item, conditions, overlay_sources)?;
             }
         }
         ConditionBody::Not(item) => {
-            validate_body(
-                condition_name,
-                item,
-                conditions,
-                overlay_sources,
-                definition,
-            )?;
+            validate_body(condition_name, item, conditions, overlay_sources)?;
         }
     }
     Ok(())

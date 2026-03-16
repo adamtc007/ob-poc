@@ -1216,21 +1216,24 @@ impl AgentService {
                 EntityScopeOutcome::Ambiguous(scopes) => {
                     hydrate_sage_session(
                         &mut state,
-                        cascade_result.clone().or(Some(search.clone())),
-                        None,
-                        entity_candidates.clone(),
-                        domain_scope.clone(),
-                        session.context.stage_focus.clone(),
-                        Vec::new(),
-                        None,
-                        Vec::new(),
-                        vec![IntentHint {
-                            intent: "entity-scope-ambiguous".to_string(),
-                            confidence: "low".to_string(),
-                            reason: "Multiple entity candidates remained after search".to_string(),
-                        }],
-                        Some("scope_ambiguity".to_string()),
-                        Some("low".to_string()),
+                        crate::semtaxonomy::SageSessionHydration {
+                            cascade_result: cascade_result.clone().or(Some(search.clone())),
+                            active_entity: None,
+                            entity_candidates: entity_candidates.clone(),
+                            domain_scope: domain_scope.clone(),
+                            aspect: session.context.stage_focus.clone(),
+                            verb_surface: Vec::new(),
+                            entity_state: None,
+                            domain_state_summaries: Vec::new(),
+                            intent_hints: vec![IntentHint {
+                                intent: "entity-scope-ambiguous".to_string(),
+                                confidence: "low".to_string(),
+                                reason: "Multiple entity candidates remained after search"
+                                    .to_string(),
+                            }],
+                            grounding_strategy: Some("scope_ambiguity".to_string()),
+                            grounding_confidence: Some("low".to_string()),
+                        },
                     );
                     session.semtaxonomy_session = Some(state);
                     let options = scopes
@@ -1263,21 +1266,24 @@ impl AgentService {
                 EntityScopeOutcome::Unresolved if fresh_entity_reference => {
                     hydrate_sage_session(
                         &mut state,
-                        Some(search.clone()),
-                        None,
-                        entity_candidates.clone(),
-                        domain_scope.clone(),
-                        session.context.stage_focus.clone(),
-                        Vec::new(),
-                        None,
-                        Vec::new(),
-                        vec![IntentHint {
-                            intent: "entity-scope-unresolved".to_string(),
-                            confidence: "low".to_string(),
-                            reason: "Entity search did not resolve a usable scope".to_string(),
-                        }],
-                        Some("scope_unresolved".to_string()),
-                        Some("low".to_string()),
+                        crate::semtaxonomy::SageSessionHydration {
+                            cascade_result: Some(search.clone()),
+                            active_entity: None,
+                            entity_candidates: entity_candidates.clone(),
+                            domain_scope: domain_scope.clone(),
+                            aspect: session.context.stage_focus.clone(),
+                            verb_surface: Vec::new(),
+                            entity_state: None,
+                            domain_state_summaries: Vec::new(),
+                            intent_hints: vec![IntentHint {
+                                intent: "entity-scope-unresolved".to_string(),
+                                confidence: "low".to_string(),
+                                reason: "Entity search did not resolve a usable scope"
+                                    .to_string(),
+                            }],
+                            grounding_strategy: Some("scope_unresolved".to_string()),
+                            grounding_confidence: Some("low".to_string()),
+                        },
                     );
                     session.semtaxonomy_session = Some(state);
                     let message = "I could not identify the entity from that utterance. Give me the full name or a more specific reference.".to_string();
@@ -1369,7 +1375,7 @@ impl AgentService {
         let action_class = Self::classify_action(&request.message);
         let signal_domains = Self::signal_driven_domains(entity_state.as_ref());
         for domain in &signal_domains {
-            Self::push_discovery_domain(&mut inferred_domains, &domain);
+            Self::push_discovery_domain(&mut inferred_domains, domain);
         }
         if matches!(action_class, Some("create")) {
             let lower = request.message.to_ascii_lowercase();
@@ -1590,17 +1596,19 @@ impl AgentService {
 
         hydrate_sage_session(
             &mut state,
-            cascade_result.clone(),
-            active_entity.clone(),
-            entity_candidates,
-            domain_scope.clone(),
-            session.context.stage_focus.clone(),
-            action_surface.clone().unwrap_or_default(),
-            entity_state.clone(),
-            domain_state_summaries,
-            intent_hints,
-            grounding_strategy,
-            grounding_confidence,
+            crate::semtaxonomy::SageSessionHydration {
+                cascade_result: cascade_result.clone(),
+                active_entity: active_entity.clone(),
+                entity_candidates,
+                domain_scope: domain_scope.clone(),
+                aspect: session.context.stage_focus.clone(),
+                verb_surface: action_surface.clone().unwrap_or_default(),
+                entity_state: entity_state.clone(),
+                domain_state_summaries,
+                intent_hints,
+                grounding_strategy,
+                grounding_confidence,
+            },
         );
         session.semtaxonomy_session = Some(state);
 
@@ -1621,13 +1629,10 @@ impl AgentService {
                 step2_entity_state(scope, entity_state.as_ref(), valid_transitions.as_ref());
             step3_select_verb(&request.message, &state_model)
         } else {
-            action_surface
-                .as_ref()
-                .map(|surface| {
-                    let state_model = build_generic_state(&entity_type_for_actions, surface);
-                    step3_select_verb(&request.message, &state_model)
-                })
-                .flatten()
+            action_surface.as_ref().and_then(|surface| {
+                let state_model = build_generic_state(&entity_type_for_actions, surface);
+                step3_select_verb(&request.message, &state_model)
+            })
         };
         let dsl = selected_verb
             .as_ref()

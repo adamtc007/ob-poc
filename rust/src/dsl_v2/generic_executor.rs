@@ -1989,6 +1989,28 @@ impl GenericCrudExecutor {
             }
         }
 
+        if let Some(name_column) = self.infer_extension_name_column(&extension_table) {
+            let quoted = format!("\"{}\"", name_column);
+            if !columns.iter().any(|column| column == &quoted) {
+                if let Some(name) = args.get("name").and_then(|value| value.as_str()) {
+                    columns.push(quoted);
+                    placeholders.push(format!("${}", idx));
+                    bind_values.push(SqlValue::String(name.to_string()));
+                }
+            }
+        }
+
+        if let Some(name_column) = self.infer_extension_name_column(&extension_table) {
+            let quoted = format!("\"{}\"", name_column);
+            if !columns.iter().any(|column| column == &quoted) {
+                if let Some(name) = args.get("name").and_then(|value| value.as_str()) {
+                    columns.push(quoted);
+                    placeholders.push(format!("${}", idx));
+                    bind_values.push(SqlValue::String(name.to_string()));
+                }
+            }
+        }
+
         let ext_sql = format!(
             r#"INSERT INTO "{}"."{}" ({}) VALUES ({})"#,
             crud.schema,
@@ -2137,6 +2159,18 @@ impl GenericCrudExecutor {
                         bind_values.push(self.json_to_sql_value(value, arg_def)?);
                     }
                     idx += 1;
+                }
+            }
+        }
+
+        if let Some(name_column) = self.infer_extension_name_column(&extension_table) {
+            let quoted = format!("\"{}\"", name_column);
+            if !columns.iter().any(|column| column == &quoted) {
+                if let Some(name) = args.get("name").and_then(|value| value.as_str()) {
+                    columns.push(quoted.clone());
+                    placeholders.push(format!("${}", idx));
+                    update_cols.push(format!("{quoted} = EXCLUDED.{quoted}"));
+                    bind_values.push(SqlValue::String(name.to_string()));
                 }
             }
         }
@@ -3317,6 +3351,18 @@ impl GenericCrudExecutor {
             }
         }
 
+        if let Some(name_column) = self.infer_extension_name_column(&extension_table) {
+            let quoted = format!("\"{}\"", name_column);
+            if !columns.iter().any(|column| column == &quoted) {
+                if let Some(name) = args.get("name").and_then(|value| value.as_str()) {
+                    columns.push(quoted.clone());
+                    placeholders.push(format!("${}", idx));
+                    update_cols.push(format!("{quoted} = EXCLUDED.{quoted}"));
+                    bind_values.push(SqlValue::String(name.to_string()));
+                }
+            }
+        }
+
         let has_isin = columns.iter().any(|c| c == "\"isin\"");
         let conflict_col = if has_isin { "isin" } else { "entity_id" };
 
@@ -3405,6 +3451,15 @@ impl GenericCrudExecutor {
             "entity_funds" => "entity_id",
             "entity_share_classes" => "entity_id",
             _ => "id",
+        }
+    }
+
+    fn infer_extension_name_column(&self, table: &str) -> Option<&'static str> {
+        match table {
+            "entity_limited_companies" => Some("company_name"),
+            "entity_partnerships" => Some("partnership_name"),
+            "entity_trusts" => Some("trust_name"),
+            _ => None,
         }
     }
 

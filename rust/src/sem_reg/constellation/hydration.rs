@@ -17,6 +17,14 @@ use crate::sem_reg::reducer::{
     SlotReduceResult,
 };
 
+fn is_missing_relation_error(error: &sqlx::Error, relation_name: &str) -> bool {
+    let relation = format!("\"ob-poc\".{}", relation_name);
+    matches!(error, sqlx::Error::Database(db_error)
+        if db_error.code().as_deref() == Some("42P01")
+            && (db_error.message().contains(&relation)
+                || db_error.message().contains(relation_name)))
+}
+
 /// Raw hydration bundle collected before normalization.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct RawHydrationData {
@@ -101,7 +109,7 @@ pub async fn hydrate_constellation(
     };
     let scope = build_eval_scope_tx(&mut tx, cbu_id, case_id)
         .await
-        .map_err(|err| ConstellationError::Other(err.into()))?;
+        .map_err(ConstellationError::Other)?;
 
     for slot in &map.slots_ordered {
         let rows = if slot.def.slot_type == super::map_def::SlotType::EntityGraph {
@@ -124,12 +132,12 @@ pub async fn hydrate_constellation(
                 })?;
                 let mut overlays = fetch_slot_overlays_tx(&mut tx, cbu_id, entity_id, case_id)
                     .await
-                    .map_err(|err| ConstellationError::Other(err.into()))?;
+                    .map_err(ConstellationError::Other)?;
                 overlays.scope = scope.as_scope_data();
                 let override_entry =
                     get_active_override_tx(&mut tx, cbu_id, case_id, &slot.name)
                         .await
-                        .map_err(|err| ConstellationError::Other(err.into()))?;
+                        .map_err(ConstellationError::Other)?;
                 let derived = reduce_slot(machine, &slot.name, &overlays, override_entry)
                     .map_err(|err| ConstellationError::Execution(err.to_string()))?;
                 raw.warnings
@@ -139,7 +147,7 @@ pub async fn hydrate_constellation(
 
             let overlays = fetch_slot_overlays_tx(&mut tx, cbu_id, entity_id, case_id)
                 .await
-                .map_err(|err| ConstellationError::Other(err.into()))?;
+                .map_err(ConstellationError::Other)?;
             raw.overlay_rows.insert(
                 slot.name.clone(),
                 raw_overlay_rows_from_slot_data(entity_id, overlays),
@@ -566,6 +574,13 @@ async fn query_case_rows(
         .bind(case_id)
         .fetch_all(pool)
         .await
+        .or_else(|err| {
+            if is_missing_relation_error(&err, "cases") {
+                Ok(Vec::new())
+            } else {
+                Err(err)
+            }
+        })
         .map_err(|err| ConstellationError::Other(err.into()))?
     } else {
         sqlx::query_as::<_, (Uuid, Option<DateTime<Utc>>)>(
@@ -580,6 +595,13 @@ async fn query_case_rows(
         .bind(cbu_id)
         .fetch_all(pool)
         .await
+        .or_else(|err| {
+            if is_missing_relation_error(&err, "cases") {
+                Ok(Vec::new())
+            } else {
+                Err(err)
+            }
+        })
         .map_err(|err| ConstellationError::Other(err.into()))?
     };
 
@@ -610,6 +632,13 @@ async fn query_case_rows_tx(
         .bind(case_id)
         .fetch_all(&mut **tx)
         .await
+        .or_else(|err| {
+            if is_missing_relation_error(&err, "cases") {
+                Ok(Vec::new())
+            } else {
+                Err(err)
+            }
+        })
         .map_err(|err| ConstellationError::Other(err.into()))?
     } else {
         sqlx::query_as::<_, (Uuid, Option<DateTime<Utc>>)>(
@@ -624,6 +653,13 @@ async fn query_case_rows_tx(
         .bind(cbu_id)
         .fetch_all(&mut **tx)
         .await
+        .or_else(|err| {
+            if is_missing_relation_error(&err, "cases") {
+                Ok(Vec::new())
+            } else {
+                Err(err)
+            }
+        })
         .map_err(|err| ConstellationError::Other(err.into()))?
     };
 
@@ -658,6 +694,13 @@ async fn query_tollgate_rows(
     .bind(case_id)
     .fetch_all(pool)
     .await
+    .or_else(|err| {
+        if is_missing_relation_error(&err, "tollgate_evaluations") {
+            Ok(Vec::new())
+        } else {
+            Err(err)
+        }
+    })
     .map_err(|err| ConstellationError::Other(err.into()))?;
 
     Ok(rows
@@ -695,6 +738,13 @@ async fn query_tollgate_rows_tx(
     .bind(case_id)
     .fetch_all(&mut **tx)
     .await
+    .or_else(|err| {
+        if is_missing_relation_error(&err, "tollgate_evaluations") {
+            Ok(Vec::new())
+        } else {
+            Err(err)
+        }
+    })
     .map_err(|err| ConstellationError::Other(err.into()))?;
 
     Ok(rows
@@ -730,6 +780,13 @@ async fn query_mandate_rows(
     .bind(cbu_id)
     .fetch_all(pool)
     .await
+    .or_else(|err| {
+        if is_missing_relation_error(&err, "cbu_trading_profiles") {
+            Ok(Vec::new())
+        } else {
+            Err(err)
+        }
+    })
     .map_err(|err| ConstellationError::Other(err.into()))?;
 
     Ok(rows
@@ -761,6 +818,13 @@ async fn query_mandate_rows_tx(
     .bind(cbu_id)
     .fetch_all(&mut **tx)
     .await
+    .or_else(|err| {
+        if is_missing_relation_error(&err, "cbu_trading_profiles") {
+            Ok(Vec::new())
+        } else {
+            Err(err)
+        }
+    })
     .map_err(|err| ConstellationError::Other(err.into()))?;
 
     Ok(rows
@@ -1006,6 +1070,29 @@ async fn populate_entity_details_tx(
                 serde_json::json!({
                     "name": name,
                     "entity_type": entity_type,
+                }),
+            );
+            continue;
+        }
+
+        let cbu_detail = sqlx::query_as::<_, (String, Option<String>)>(
+            r#"
+            SELECT name, jurisdiction
+            FROM "ob-poc".cbus
+            WHERE cbu_id = $1
+            "#,
+        )
+        .bind(entity_id)
+        .fetch_optional(&mut **tx)
+        .await
+        .map_err(|err| ConstellationError::Other(err.into()))?;
+        if let Some((name, jurisdiction)) = cbu_detail {
+            raw.entity_details.insert(
+                entity_id,
+                serde_json::json!({
+                    "name": name,
+                    "entity_type": "cbu",
+                    "jurisdiction": jurisdiction,
                 }),
             );
         }

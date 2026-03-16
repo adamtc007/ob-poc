@@ -118,22 +118,8 @@ pub fn build_seed_bundle_with_metadata(
         .collect();
 
     // 4. Compute deterministic bundle hash
-    let bundle_hash = SeedBundle::compute_hash(
-        &verb_contracts,
-        &attributes,
-        &entity_types,
-        &taxonomies,
-        &policies,
-        &views,
-        &derivation_specs,
-        &[],
-        &[],
-        &[],
-    )
-    .expect("SeedBundle canonical JSON serialization should never fail");
-
-    SeedBundle {
-        bundle_hash,
+    let mut bundle = SeedBundle {
+        bundle_hash: String::new(),
         verb_contracts,
         attributes,
         entity_types,
@@ -144,7 +130,10 @@ pub fn build_seed_bundle_with_metadata(
         requirement_profiles: vec![],
         proof_obligations: vec![],
         evidence_strategies: vec![],
-    }
+    };
+    bundle.bundle_hash = SeedBundle::compute_hash(&bundle)
+        .expect("SeedBundle canonical JSON serialization should never fail");
+    bundle
 }
 
 #[cfg(test)]

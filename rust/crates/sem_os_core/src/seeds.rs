@@ -35,18 +35,29 @@ impl SeedBundle {
     ///
     /// Returns `Err` if canonical JSON serialization fails (should not happen
     /// in practice, but avoids a panic in production).
-    pub fn compute_hash(
-        verb_contracts: &[VerbContractSeed],
-        attributes: &[AttributeSeed],
-        entity_types: &[EntityTypeSeed],
-        taxonomies: &[TaxonomySeed],
-        policies: &[PolicySeed],
-        views: &[ViewSeed],
-        derivation_specs: &[DerivationSpecSeed],
-        requirement_profiles: &[RequirementProfileSeed],
-        proof_obligations: &[ProofObligationSeed],
-        evidence_strategies: &[EvidenceStrategySeed],
-    ) -> std::result::Result<String, serde_json::Error> {
+    ///
+    /// # Examples
+    /// ```rust
+    /// use sem_os_core::seeds::SeedBundle;
+    ///
+    /// let bundle = SeedBundle {
+    ///     bundle_hash: String::new(),
+    ///     verb_contracts: vec![],
+    ///     attributes: vec![],
+    ///     entity_types: vec![],
+    ///     taxonomies: vec![],
+    ///     policies: vec![],
+    ///     views: vec![],
+    ///     derivation_specs: vec![],
+    ///     requirement_profiles: vec![],
+    ///     proof_obligations: vec![],
+    ///     evidence_strategies: vec![],
+    /// };
+    ///
+    /// let hash = SeedBundle::compute_hash(&bundle).unwrap();
+    /// assert!(hash.starts_with("v1:"));
+    /// ```
+    pub fn compute_hash(bundle: &Self) -> std::result::Result<String, serde_json::Error> {
         #[derive(Serialize)]
         struct Canonical<'a> {
             verb_contracts: Vec<&'a VerbContractSeed>,
@@ -61,34 +72,34 @@ impl SeedBundle {
             evidence_strategies: Vec<&'a EvidenceStrategySeed>,
         }
 
-        let mut vc: Vec<&VerbContractSeed> = verb_contracts.iter().collect();
+        let mut vc: Vec<&VerbContractSeed> = bundle.verb_contracts.iter().collect();
         vc.sort_by_key(|s| &s.fqn);
 
-        let mut at: Vec<&AttributeSeed> = attributes.iter().collect();
+        let mut at: Vec<&AttributeSeed> = bundle.attributes.iter().collect();
         at.sort_by_key(|s| &s.fqn);
 
-        let mut et: Vec<&EntityTypeSeed> = entity_types.iter().collect();
+        let mut et: Vec<&EntityTypeSeed> = bundle.entity_types.iter().collect();
         et.sort_by_key(|s| &s.fqn);
 
-        let mut tx: Vec<&TaxonomySeed> = taxonomies.iter().collect();
+        let mut tx: Vec<&TaxonomySeed> = bundle.taxonomies.iter().collect();
         tx.sort_by_key(|s| &s.fqn);
 
-        let mut ps: Vec<&PolicySeed> = policies.iter().collect();
+        let mut ps: Vec<&PolicySeed> = bundle.policies.iter().collect();
         ps.sort_by_key(|s| &s.fqn);
 
-        let mut vi: Vec<&ViewSeed> = views.iter().collect();
+        let mut vi: Vec<&ViewSeed> = bundle.views.iter().collect();
         vi.sort_by_key(|s| &s.fqn);
 
-        let mut ds: Vec<&DerivationSpecSeed> = derivation_specs.iter().collect();
+        let mut ds: Vec<&DerivationSpecSeed> = bundle.derivation_specs.iter().collect();
         ds.sort_by_key(|s| &s.fqn);
 
-        let mut rp: Vec<&RequirementProfileSeed> = requirement_profiles.iter().collect();
+        let mut rp: Vec<&RequirementProfileSeed> = bundle.requirement_profiles.iter().collect();
         rp.sort_by_key(|s| &s.fqn);
 
-        let mut pob: Vec<&ProofObligationSeed> = proof_obligations.iter().collect();
+        let mut pob: Vec<&ProofObligationSeed> = bundle.proof_obligations.iter().collect();
         pob.sort_by_key(|s| &s.fqn);
 
-        let mut es: Vec<&EvidenceStrategySeed> = evidence_strategies.iter().collect();
+        let mut es: Vec<&EvidenceStrategySeed> = bundle.evidence_strategies.iter().collect();
         es.sort_by_key(|s| &s.fqn);
 
         let canonical = Canonical {
@@ -191,7 +202,20 @@ mod tests {
     }
 
     fn empty_hash(verbs: &[VerbContractSeed], attrs: &[AttributeSeed]) -> String {
-        SeedBundle::compute_hash(verbs, attrs, &[], &[], &[], &[], &[], &[], &[], &[]).unwrap()
+        SeedBundle::compute_hash(&SeedBundle {
+            bundle_hash: String::new(),
+            verb_contracts: verbs.to_vec(),
+            attributes: attrs.to_vec(),
+            entity_types: vec![],
+            taxonomies: vec![],
+            policies: vec![],
+            views: vec![],
+            derivation_specs: vec![],
+            requirement_profiles: vec![],
+            proof_obligations: vec![],
+            evidence_strategies: vec![],
+        })
+        .unwrap()
     }
 
     #[test]

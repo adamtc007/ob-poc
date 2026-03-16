@@ -61,6 +61,16 @@ fn parse_optional_date(value: Option<String>, arg_name: &str) -> Result<Option<N
     .transpose()
 }
 
+#[cfg(feature = "database")]
+fn normalize_relationship_type(raw: &str) -> String {
+    raw.replace('-', "_").to_ascii_uppercase()
+}
+
+#[cfg(feature = "database")]
+fn normalize_capital_flow(raw: &str) -> String {
+    raw.replace('-', "_").to_ascii_uppercase()
+}
+
 // ============================================================================
 // CBU Create (with entity-based idempotency)
 // ============================================================================
@@ -335,15 +345,22 @@ impl CustomOperation for CbuLinkStructureOp {
                         "cbu.link-structure: missing required argument :relationship-type"
                     )
                 })?;
-        let relationship_type = relationship_type_raw
-            .replace('-', "_")
-            .to_ascii_uppercase();
-        let relationship_selector = extract_string_alias(
-            verb_call,
-            &["relationship-selector", "relationship_selector"],
-        )
-        .unwrap_or_else(|| relationship_type_raw.to_ascii_lowercase());
-        let capital_flow = extract_string_alias(verb_call, &["capital-flow", "capital_flow"]);
+        let relationship_type = normalize_relationship_type(&relationship_type_raw);
+        let qualifier = extract_string_alias(verb_call, &["qualifier"]);
+        let relationship_selector =
+            extract_string_alias(verb_call, &["relationship-selector", "relationship_selector"])
+                .or_else(|| {
+                    qualifier.as_ref().map(|value| {
+                        format!(
+                            "{}:{}",
+                            relationship_type_raw.to_ascii_lowercase(),
+                            value.to_ascii_lowercase()
+                        )
+                    })
+                })
+                .unwrap_or_else(|| relationship_type_raw.to_ascii_lowercase());
+        let capital_flow_raw = extract_string_alias(verb_call, &["capital-flow", "capital_flow"]);
+        let capital_flow = capital_flow_raw.as_deref().map(normalize_capital_flow);
         let effective_from = parse_optional_date(
             extract_string_alias(verb_call, &["effective-from", "effective_from"]),
             "effective-from",
@@ -360,6 +377,15 @@ impl CustomOperation for CbuLinkStructureOp {
                 "cbu.link-structure: unsupported relationship-type '{}'",
                 relationship_type_raw
             ));
+        }
+        if let Some(flow) = capital_flow.as_deref() {
+            const ALLOWED_CAPITAL_FLOWS: &[&str] = &["UPSTREAM", "DOWNSTREAM", "CO_INVEST"];
+            if !ALLOWED_CAPITAL_FLOWS.contains(&flow) {
+                return Err(anyhow::anyhow!(
+                    "cbu.link-structure: unsupported capital-flow '{}'",
+                    capital_flow_raw.unwrap_or_default()
+                ));
+            }
         }
 
         let parent_exists: Option<Uuid> =
@@ -500,11 +526,29 @@ impl CustomOperation for CbuListStructureLinksOp {
     ) -> Result<ExecutionResult> {
         let parent_cbu_id = extract_uuid_alias(verb_call, ctx, &["parent-cbu-id", "parent_cbu_id"]);
         let child_cbu_id = extract_uuid_alias(verb_call, ctx, &["child-cbu-id", "child_cbu_id"]);
+        let cbu_id = extract_uuid_alias(verb_call, ctx, &["cbu-id", "cbu_id"]);
+        let direction = extract_string_alias(verb_call, &["direction"])
+            .unwrap_or_else(|| String::from("parent"))
+            .to_ascii_lowercase();
         let status = extract_string_alias(verb_call, &["status"]);
+
+        if !matches!(direction.as_str(), "parent" | "child") {
+            return Err(anyhow::anyhow!(
+                "cbu.list-structure-links: direction must be 'parent' or 'child'"
+            ));
+        }
+
+        let (parent_cbu_id, child_cbu_id) = match (parent_cbu_id, child_cbu_id, cbu_id) {
+            (Some(parent), child, _) => (Some(parent), child),
+            (None, Some(child), _) => (None, Some(child)),
+            (None, None, Some(cbu_id)) if direction == "child" => (None, Some(cbu_id)),
+            (None, None, Some(cbu_id)) => (Some(cbu_id), None),
+            (None, None, None) => (None, None),
+        };
 
         if parent_cbu_id.is_none() && child_cbu_id.is_none() {
             return Err(anyhow::anyhow!(
-                "cbu.list-structure-links: one of :parent-cbu-id or :child-cbu-id is required"
+                "cbu.list-structure-links: one of :cbu-id, :parent-cbu-id or :child-cbu-id is required"
             ));
         }
 
@@ -721,6 +765,66 @@ impl CustomOperation for CbuListStructureLinksOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(serde_json::json!({
             "error": "Database feature required for cbu.list-structure-links"
+        })))
+    }
+}
+
+/// Terminate an active persisted structure link between CBUs.
+#[register_custom_op]
+pub struct CbuUnlinkStructureOp;
+
+#[async_trait]
+impl CustomOperation for CbuUnlinkStructureOp {
+    fn domain(&self) -> &'static str {
+        "cbu"
+    }
+
+    fn verb(&self) -> &'static str {
+        "unlink-structure"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Terminates an active cross-border structure relationship without deleting history"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let link_id = get_required_uuid(verb_call, "link-id")?;
+        let reason = extract_string_alias(verb_call, &["reason"])
+            .ok_or_else(|| anyhow::anyhow!("cbu.unlink-structure: missing required argument :reason"))?;
+
+        let result = sqlx::query(
+            r#"
+            UPDATE "ob-poc".cbu_structure_links
+            SET status = 'TERMINATED',
+                terminated_at = NOW(),
+                terminated_reason = $2,
+                updated_at = NOW()
+            WHERE link_id = $1
+              AND status = 'ACTIVE'
+            "#,
+        )
+        .bind(link_id)
+        .bind(reason)
+        .execute(pool)
+        .await?;
+
+        Ok(ExecutionResult::Affected(result.rows_affected()))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Record(serde_json::json!({
+            "error": "Database feature required for cbu.unlink-structure"
         })))
     }
 }

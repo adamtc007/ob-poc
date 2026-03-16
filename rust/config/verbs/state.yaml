@@ -153,7 +153,7 @@ domains:
         behavior: plugin
         handler: StateOverrideOp
         metadata:
-          tier: governed
+          tier: intent
           source_of_truth: operational
           scope: cbu
           noun: state_override
@@ -201,7 +201,7 @@ domains:
         behavior: plugin
         handler: StateRevokeOverrideOp
         metadata:
-          tier: governed
+          tier: intent
           source_of_truth: operational
           scope: cbu
           noun: state_override

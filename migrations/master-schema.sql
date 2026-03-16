@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict yUxr5JCzoVL69M3qwEgLoc27VmlnK1r9fmxKFfaWVEKaGofhepFitIJzK5YU6Gz
+\restrict 91pfA5PzJrT6VvcPTHe59icz7xlY97sSAi0mPbuJJNMkzChqylEHC2ZOTkhCTFq
 
 -- Dumped from database version 18.1 (Homebrew)
 -- Dumped by pg_dump version 18.1 (Homebrew)
@@ -8564,6 +8564,29 @@ CREATE TABLE "ob-poc".cbu_ssi_agent_override (
     reason character varying(255),
     is_active boolean DEFAULT true,
     created_at timestamp with time zone DEFAULT now()
+);
+
+
+--
+-- Name: cbu_structure_links; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".cbu_structure_links (
+    link_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    parent_cbu_id uuid NOT NULL,
+    child_cbu_id uuid NOT NULL,
+    relationship_type character varying(32) NOT NULL,
+    relationship_selector character varying(64) NOT NULL,
+    status character varying(20) DEFAULT 'ACTIVE'::character varying NOT NULL,
+    capital_flow character varying(32),
+    effective_from date,
+    effective_to date,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    terminated_at timestamp with time zone,
+    terminated_reason text,
+    CONSTRAINT cbu_structure_links_no_self_link CHECK ((parent_cbu_id <> child_cbu_id)),
+    CONSTRAINT cbu_structure_links_status_check CHECK (((status)::text = ANY ((ARRAY['ACTIVE'::character varying, 'TERMINATED'::character varying, 'SUSPENDED'::character varying])::text[])))
 );
 
 
@@ -21575,6 +21598,14 @@ ALTER TABLE ONLY "ob-poc".cbu_ssi
 
 
 --
+-- Name: cbu_structure_links cbu_structure_links_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".cbu_structure_links
+    ADD CONSTRAINT cbu_structure_links_pkey PRIMARY KEY (link_id);
+
+
+--
 -- Name: cbu_subscriptions cbu_subscriptions_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -25898,6 +25929,13 @@ CREATE INDEX idx_cbu_ssi_lookup ON "ob-poc".cbu_ssi USING btree (cbu_id, status)
 
 
 --
+-- Name: idx_cbu_structure_links_parent_selector; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cbu_structure_links_parent_selector ON "ob-poc".cbu_structure_links USING btree (parent_cbu_id, relationship_selector) WHERE ((status)::text = 'ACTIVE'::text);
+
+
+--
 -- Name: idx_cbu_subscriptions_contract; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -30182,6 +30220,13 @@ CREATE INDEX ubo_determination_runs_idx_udr_subject ON "ob-poc".ubo_determinatio
 
 
 --
+-- Name: uq_cbu_structure_links_active; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_cbu_structure_links_active ON "ob-poc".cbu_structure_links USING btree (parent_cbu_id, child_cbu_id, relationship_type) WHERE ((status)::text = 'ACTIVE'::text);
+
+
+--
 -- Name: uq_cger_role_target; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -31814,6 +31859,22 @@ ALTER TABLE ONLY "ob-poc".cbu_ssi
 
 ALTER TABLE ONLY "ob-poc".cbu_ssi
     ADD CONSTRAINT cbu_ssi_market_id_fkey FOREIGN KEY (market_id) REFERENCES "ob-poc".markets(market_id);
+
+
+--
+-- Name: cbu_structure_links cbu_structure_links_child_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".cbu_structure_links
+    ADD CONSTRAINT cbu_structure_links_child_cbu_id_fkey FOREIGN KEY (child_cbu_id) REFERENCES "ob-poc".cbus(cbu_id) ON DELETE CASCADE;
+
+
+--
+-- Name: cbu_structure_links cbu_structure_links_parent_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".cbu_structure_links
+    ADD CONSTRAINT cbu_structure_links_parent_cbu_id_fkey FOREIGN KEY (parent_cbu_id) REFERENCES "ob-poc".cbus(cbu_id) ON DELETE CASCADE;
 
 
 --
@@ -35148,5 +35209,5 @@ ALTER TABLE ONLY sem_reg_authoring.validation_reports
 -- PostgreSQL database dump complete
 --
 
-\unrestrict yUxr5JCzoVL69M3qwEgLoc27VmlnK1r9fmxKFfaWVEKaGofhepFitIJzK5YU6Gz
+\unrestrict 91pfA5PzJrT6VvcPTHe59icz7xlY97sSAi0mPbuJJNMkzChqylEHC2ZOTkhCTFq
 

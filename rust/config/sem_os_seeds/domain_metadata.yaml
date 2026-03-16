@@ -275,6 +275,9 @@ domains:
         writes: [cbu_structure_links]
       cbu.list-structure-links:
         reads: [cbus, cbu_structure_links]
+      cbu.unlink-structure:
+        reads: [cbu_structure_links]
+        writes: [cbu_structure_links]
       cbu.remove-role:
         reads: [cbu_entity_roles]
         writes: [cbu_entity_roles]

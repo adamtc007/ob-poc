@@ -158,10 +158,10 @@ fn route(intent: &crate::sage::OutcomeIntent) -> UtteranceDisposition {
             })
         }
         crate::sage::IntentPolarity::Write => {
-            UtteranceDisposition::Delegate(crate::sage::DelegateIntent {
+            UtteranceDisposition::Delegate(Box::new(crate::sage::DelegateIntent {
                 summary: intent.summary.clone(),
                 outcome: intent.clone(),
-            })
+            }))
         }
     }
 }

@@ -336,9 +336,9 @@ fn confidence_for(
 ) -> SageConfidence {
     let margin = pre.domain_score - pre.runner_up_domain_score;
 
-    if pre.sage_only && !domain_concept.is_empty() {
-        SageConfidence::High
-    } else if !domain_concept.is_empty() && pre.domain_score >= 10 && margin >= 4 {
+    if !domain_concept.is_empty()
+        && (pre.sage_only || (pre.domain_score >= 10 && margin >= 4))
+    {
         SageConfidence::High
     } else if !domain_concept.is_empty() && pre.domain_score >= 6 && margin >= 2 {
         SageConfidence::Medium

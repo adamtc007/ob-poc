@@ -1,13 +1,13 @@
 # CLAUDE.md
 
-> **Last reviewed:** 2026-03-15
+> **Last reviewed:** 2026-03-16
 > **Frontend:** React/TypeScript (`ob-poc-ui-react/`) - Chat UI with scope panel, Inspector, Semantic OS Tab
 > **Backend:** Rust/Axum (`rust/crates/ob-poc-web/`) - Serves React + REST API
 > **Crates:** 22 active Rust crates (16 ob-poc + 6 sem_os_*; esper_* deprecated; ob-poc-graph + viewport removed)
 > **Verbs:** 1,263 canonical verbs, 15,940 intent patterns (DB-sourced)
 > **MCP Tools:** ~102 tools (DSL, verbs, learning, session, batch, research, taxonomy, sem_reg, stewardship, db_introspect, session_verb_surface)
 > **Migrations:** 123 schema migrations (001-077 + 072b seed + 078-091 sem_reg + 087-089 agent/runbook + 092-098 sem_os standalone + stewardship + 099-100 authoring + 101-102 standalone remediation + 103 CCIR telemetry + 115-123 schema consolidation + document governance bootstrap)
-> **Schema Overview:** `migrations/OB_POC_SCHEMA_ENTITY_OVERVIEW.md` — living doc for the consolidated database; runtime business tables now live under `"ob-poc"`, Semantic OS tables under `sem_reg*`, and fresh schema dumps live in `docs/master-schema.sql` + `migrations/master-schema.sql`
+> **Schema Overview:** `migrations/OB_POC_SCHEMA_ENTITY_OVERVIEW.md` — living doc for the consolidated database; runtime business tables now live under `"ob-poc"`, Semantic OS tables under `sem_reg*`, and the canonical schema dump lives in `migrations/master-schema.sql`
 > **Embeddings:** Candle local (384-dim, BGE-small-en-v1.5) - 15,940 patterns vectorized
 > **React Migration (077):** ✅ Complete - egui/WASM replaced with React/TypeScript, 3-panel chat layout
 > **Verb Phrase Generation:** ✅ Complete - V1 YAML auto-generates phrases on load (no V2 registry)
@@ -88,6 +88,7 @@
 > **State Reducer Runtime (2026-03-15):** ✅ Core + runtime surface live — parser/evaluator/validation, seeded reducer YAMLs, override persistence, `state.*` verbs, REST-backed constellation/reducer hydration, and integration coverage for reducer parsing/eval/validation plus constellation map/action/hydration tests
 > **Constellation Hydration + Session UI (2026-03-15):** ✅ Live — builtin constellation maps, REST routes (`/api/cbu/:id/constellation`, `/summary`, `/cases`, `/api/constellation/by-name`, `/search-cbus`), session-integrated React constellation panel in chat, case selector bound to live CBU cases, ownership-chain node/edge payloads surfaced in the inspector, and slot-to-agent prompt loop wired through the normal chat session input path
 > **Cross-Border CBU Structure Runtime (2026-03-15):** ✅ Live — persisted `"ob-poc".cbu_structure_links`, `cbu.link-structure` + `cbu.list-structure-links`, downward child-`cbu` hydration for `struct.hedge.cross-border` and `struct.pe.cross-border`, selector-backed feeder/parallel/aggregator slots, and cross-border macro steps unparked onto the real verb surface
+> **DB Integration Harness + Cross-Border Verification (2026-03-16):** ✅ Complete — runtime verb registry bootstrap is fixed in test context, `db_integration` now self-provisions lagging `cbu_structure_links` schema in local harness runs, reducer evidence overlays are aligned to the live `ubo_registry` / `kyc_ubo_evidence` schema, generic `entity.create` now fills required extension-table name columns such as `company_name`, and both `cargo clippy -p ob-poc -- -D warnings` and `cargo test -p ob-poc --test db_integration` are green
 
 This is the root project guide for Claude Code. Domain-specific details are in annexes.
 

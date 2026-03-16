@@ -212,11 +212,11 @@ pub fn validate_graphs(graphs: &[StateGraph]) -> Result<()> {
                         graph.graph_id
                     )
                 })?;
-                if !verbs
+                if verbs
                     .domains
                     .get(domain)
                     .and_then(|cfg| cfg.verbs.get(verb))
-                    .is_some()
+                    .is_none()
                 {
                     return Err(anyhow!(
                         "graph '{}' references missing verb '{}'",

@@ -3976,16 +3976,15 @@ async fn execute_session_dsl_raw(
 
             // AUTO-UPDATE SESSION ENTITY_ID: If this is a "cbu" session and we just created
             // the first CBU, update the session's primary entity_id to match
-            if session.entity_type == "cbu"
-                && session.entity_id.is_none()
-                && context.active_cbu.is_some()
-            {
-                let cbu_id = context.active_cbu.as_ref().unwrap().id;
-                tracing::info!(
-                    "[EXEC] Auto-setting session.entity_id to newly created CBU: {}",
-                    cbu_id
-                );
-                session.set_entity_id(cbu_id);
+            if session.entity_type == "cbu" && session.entity_id.is_none() {
+                if let Some(active_cbu) = context.active_cbu.as_ref() {
+                    let cbu_id = active_cbu.id;
+                    tracing::info!(
+                        "[EXEC] Auto-setting session.entity_id to newly created CBU: {}",
+                        cbu_id
+                    );
+                    session.set_entity_id(cbu_id);
+                }
             }
 
             session.context = context;

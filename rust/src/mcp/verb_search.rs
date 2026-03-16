@@ -947,10 +947,10 @@ impl HybridVerbSearcher {
         }
 
         // 3. User-specific learned (SEMANTIC match) - top-k for ambiguity detection
-        if results.is_empty() && user_id.is_some() {
-            if let Some(ref embedding) = query_embedding {
+        if results.is_empty() {
+            if let (Some(user_id), Some(embedding)) = (user_id, query_embedding.as_ref()) {
                 let user_results = self
-                    .search_user_learned_semantic_with_embedding(user_id.unwrap(), embedding, 3)
+                    .search_user_learned_semantic_with_embedding(user_id, embedding, 3)
                     .await?;
                 for result in user_results {
                     if self.matches_domain(&result.verb, domain_filter)

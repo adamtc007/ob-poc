@@ -323,7 +323,7 @@ impl OutcomeIntent {
             explain: SageExplain {
                 understanding: format!(
                     "So you want to {}.",
-                    utterance.trim()[..utterance.trim().len().min(60)].to_string()
+                    &utterance.trim()[..utterance.trim().len().min(60)]
                 ),
                 mode: "needs_clarification".to_string(),
                 scope_summary: None,

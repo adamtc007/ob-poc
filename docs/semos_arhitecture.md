@@ -1,8 +1,8 @@
 # Semantic OS — Vision & Scope v3.0
 
 > **Version:** 3.0
-> **Date:** 2026-03-15
-> **Status:** Living document — consolidation of 9 prior specs, updated for the 2026-03-08 runtime schema consolidation, the 2026-03-12 document-governance bootstrap, the 2026-03-13 NLCI/CBU surface reconciliation, and the 2026-03-15 reducer/constellation runtime cutover
+> **Date:** 2026-03-16
+> **Status:** Living document — consolidation of 9 prior specs, updated for the 2026-03-08 runtime schema consolidation, the 2026-03-12 document-governance bootstrap, the 2026-03-13 NLCI/CBU surface reconciliation, the 2026-03-15 reducer/constellation runtime cutover, and the 2026-03-16 DB harness/runtime verification pass
 > **Audience:** Engineering, governance, architecture review
 
 ---
@@ -168,6 +168,29 @@ This preserves the intended layering:
 - constellation hydration projects those facts into the server-side graph returned to the UI
 
 No new reducer semantics were introduced for child CBUs in this pass. Child `cbu` slots remain structural slots that surface `filled` when a persisted link exists and `empty` when it does not.
+
+### Runtime Verification State (2026-03-16)
+
+The runtime cutover above is now verified by the live `ob-poc` harness and code-quality gates rather than only by focused unit slices:
+
+- `cargo clippy -p ob-poc -- -D warnings` is green
+- `cargo test -p ob-poc --test db_integration` is green
+- `cargo test -p ob-poc -- constellation` is green
+
+The concrete fixes required to get there are part of the durable runtime now:
+
+- the DB integration harness explicitly bootstraps verb config lookup in test context, so baseline verbs such as `cbu.create` resolve under `runtime_registry()`
+- local harness runs tolerate lagging `cbu_structure_links` schema by provisioning the cross-border structure table and supporting indexes when absent
+- reducer evidence overlays now match the live UBO schema:
+  - `kyc_ubo_evidence.ubo_id`
+  - `ubo_registry.ubo_id`
+  - `ubo_registry.subject_entity_id`
+- generic `entity.create` / `entity.ensure` now project the canonical `name` field into required extension-table columns such as:
+  - `entity_limited_companies.company_name`
+  - `entity_partnerships.partnership_name`
+  - `entity_trusts.trust_name`
+
+This matters at the architecture boundary because SemOS-governed metadata is only useful if the live runtime, test harness, and schema actually agree on the operational contract.
 
 ### Constellation Macro/SemOS Remediation (2026-03-13)
 

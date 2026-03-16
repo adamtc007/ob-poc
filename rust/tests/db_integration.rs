@@ -6,7 +6,9 @@
 #[cfg(feature = "database")]
 mod db_tests {
     use anyhow::Result;
+    use ob_poc::dsl_v2::runtime_registry::runtime_registry;
     use sqlx::PgPool;
+    use std::path::PathBuf;
     use uuid::Uuid;
 
     use ob_poc::dsl_v2::{compile, parse_program, DslExecutor, ExecutionContext};
@@ -22,11 +24,56 @@ mod db_tests {
 
     impl TestDb {
         async fn new() -> Result<Self> {
+            let config_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("config");
+            std::env::set_var("DSL_CONFIG_DIR", &config_dir);
+
             let url = std::env::var("TEST_DATABASE_URL")
                 .or_else(|_| std::env::var("DATABASE_URL"))
                 .unwrap_or_else(|_| "postgresql:///data_designer".into());
 
             let pool = PgPool::connect(&url).await?;
+            sqlx::query(
+                r#"
+                CREATE TABLE IF NOT EXISTS "ob-poc".cbu_structure_links (
+                    link_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    parent_cbu_id UUID NOT NULL REFERENCES "ob-poc".cbus(cbu_id) ON DELETE CASCADE,
+                    child_cbu_id UUID NOT NULL REFERENCES "ob-poc".cbus(cbu_id) ON DELETE CASCADE,
+                    relationship_type VARCHAR(32) NOT NULL,
+                    relationship_selector VARCHAR(64) NOT NULL,
+                    status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
+                    capital_flow VARCHAR(32),
+                    effective_from DATE,
+                    effective_to DATE,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    terminated_at TIMESTAMPTZ,
+                    terminated_reason TEXT,
+                    CONSTRAINT cbu_structure_links_no_self_link CHECK (parent_cbu_id <> child_cbu_id),
+                    CONSTRAINT cbu_structure_links_status_check
+                        CHECK (status IN ('ACTIVE', 'TERMINATED', 'SUSPENDED'))
+                )
+                "#,
+            )
+            .execute(&pool)
+            .await?;
+            sqlx::query(
+                r#"
+                CREATE UNIQUE INDEX IF NOT EXISTS uq_cbu_structure_links_active
+                    ON "ob-poc".cbu_structure_links(parent_cbu_id, child_cbu_id, relationship_type)
+                    WHERE status = 'ACTIVE'
+                "#,
+            )
+            .execute(&pool)
+            .await?;
+            sqlx::query(
+                r#"
+                CREATE INDEX IF NOT EXISTS idx_cbu_structure_links_parent_selector
+                    ON "ob-poc".cbu_structure_links(parent_cbu_id, relationship_selector)
+                    WHERE status = 'ACTIVE'
+                "#,
+            )
+            .execute(&pool)
+            .await?;
             let prefix = format!("test_{}", &Uuid::new_v4().to_string()[..8]);
             Ok(Self { pool, prefix })
         }
@@ -73,6 +120,16 @@ mod db_tests {
 
             // Delete ob-poc tables in reverse dependency order
             sqlx::query(
+                r#"DELETE FROM "ob-poc".cbu_structure_links
+                   WHERE parent_cbu_id IN (SELECT cbu_id FROM "ob-poc".cbus WHERE name LIKE $1)
+                      OR child_cbu_id IN (SELECT cbu_id FROM "ob-poc".cbus WHERE name LIKE $1)"#,
+            )
+            .bind(&pattern)
+            .execute(&self.pool)
+            .await
+            .ok();
+
+            sqlx::query(
                 r#"DELETE FROM "ob-poc".document_catalog WHERE cbu_id IN
                    (SELECT cbu_id FROM "ob-poc".cbus WHERE name LIKE $1)"#,
             )
@@ -113,6 +170,31 @@ mod db_tests {
             executor.execute_plan(&plan, &mut ctx).await?;
             Ok(ctx)
         }
+    }
+
+    #[test]
+    fn test_runtime_registry_contains_baseline_verbs() {
+        let config_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("config");
+        std::env::set_var("DSL_CONFIG_DIR", &config_dir);
+
+        let loader = dsl_core::config::loader::ConfigLoader::from_env();
+        let config = loader
+            .load_verbs()
+            .expect("ConfigLoader should load verb YAML for db_integration");
+        assert!(
+            config.domains.get("cbu").and_then(|d| d.verbs.get("create")).is_some(),
+            "loaded verb config should include cbu.create"
+        );
+
+        let registry = runtime_registry();
+        assert!(
+            registry.get("cbu", "create").is_some(),
+            "runtime registry should include cbu.create"
+        );
+        assert!(
+            registry.get("entity", "ensure-or-placeholder").is_some(),
+            "runtime registry should include entity.ensure-or-placeholder"
+        );
     }
 
     // Helper: Read CBU back from DB
@@ -195,6 +277,47 @@ mod db_tests {
         entity_type: Option<String>,
     }
 
+    #[derive(Debug, sqlx::FromRow)]
+    #[allow(dead_code)]
+    struct StructureLinkRow {
+        link_id: Uuid,
+        parent_cbu_id: Uuid,
+        child_cbu_id: Uuid,
+        relationship_type: String,
+        relationship_selector: String,
+        status: String,
+        capital_flow: Option<String>,
+        terminated_reason: Option<String>,
+    }
+
+    async fn read_structure_link(
+        pool: &PgPool,
+        parent_cbu_id: Uuid,
+        child_cbu_id: Uuid,
+    ) -> Result<StructureLinkRow> {
+        let row = sqlx::query_as::<_, StructureLinkRow>(
+            r#"SELECT
+                  link_id,
+                  parent_cbu_id,
+                  child_cbu_id,
+                  relationship_type,
+                  relationship_selector,
+                  status,
+                  capital_flow,
+                  terminated_reason
+               FROM "ob-poc".cbu_structure_links
+               WHERE parent_cbu_id = $1
+                 AND child_cbu_id = $2
+               ORDER BY created_at DESC
+               LIMIT 1"#,
+        )
+        .bind(parent_cbu_id)
+        .bind(child_cbu_id)
+        .fetch_one(pool)
+        .await?;
+        Ok(row)
+    }
+
     // =========================================================================
     // ROUND-TRIP TESTS
     // =========================================================================
@@ -220,6 +343,204 @@ mod db_tests {
         assert_eq!(record.name, name);
         assert_eq!(record.jurisdiction.as_deref(), Some("GB"));
         assert_eq!(record.client_type.as_deref(), Some("corporate"));
+
+        db.cleanup().await?;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_cbu_link_structure_round_trip() -> Result<()> {
+        let db = TestDb::new().await?;
+        let parent_name = db.name("Master");
+        let child_name = db.name("Feeder");
+
+        let dsl = format!(
+            r#"
+            (cbu.create :name "{}" :jurisdiction "KY" :as @parent)
+            (cbu.create :name "{}" :jurisdiction "US" :as @child)
+            (cbu.link-structure
+              :parent-cbu-id @parent
+              :child-cbu-id @child
+              :relationship-type "feeder"
+              :qualifier "US"
+              :capital-flow "upstream"
+              :as @linked)
+        "#,
+            parent_name, child_name
+        );
+
+        let ctx = db.execute_dsl(&dsl).await?;
+        let parent_id = ctx.resolve("parent").expect("parent should be bound");
+        let child_id = ctx.resolve("child").expect("child should be bound");
+        assert_eq!(ctx.resolve("linked"), Some(child_id));
+
+        let link = read_structure_link(&db.pool, parent_id, child_id).await?;
+        assert_eq!(link.relationship_type, "FEEDER");
+        assert_eq!(link.relationship_selector, "feeder:us");
+        assert_eq!(link.status, "ACTIVE");
+        assert_eq!(link.capital_flow.as_deref(), Some("UPSTREAM"));
+
+        db.cleanup().await?;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_cbu_link_structure_rejects_self_link() -> Result<()> {
+        let db = TestDb::new().await?;
+        let name = db.name("SelfLink");
+        let dsl = format!(
+            r#"
+            (cbu.create :name "{}" :jurisdiction "LU" :as @cbu)
+            (cbu.link-structure
+              :parent-cbu-id @cbu
+              :child-cbu-id @cbu
+              :relationship-type "feeder"
+              :relationship-selector "feeder:us")
+        "#,
+            name
+        );
+
+        let err = db.execute_dsl(&dsl).await.expect_err("self-link should fail");
+        assert!(err.to_string().contains("self"));
+
+        db.cleanup().await?;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_cbu_unlink_structure_terminates_link() -> Result<()> {
+        let db = TestDb::new().await?;
+        let parent_name = db.name("Parent");
+        let child_name = db.name("Child");
+
+        let setup_dsl = format!(
+            r#"
+            (cbu.create :name "{}" :jurisdiction "KY" :as @parent)
+            (cbu.create :name "{}" :jurisdiction "IE" :as @child)
+            (cbu.link-structure
+              :parent-cbu-id @parent
+              :child-cbu-id @child
+              :relationship-type "feeder"
+              :relationship-selector "feeder:ie")
+        "#,
+            parent_name, child_name
+        );
+        let ctx = db.execute_dsl(&setup_dsl).await?;
+        let parent_id = ctx.resolve("parent").expect("parent should be bound");
+        let child_id = ctx.resolve("child").expect("child should be bound");
+        let link = read_structure_link(&db.pool, parent_id, child_id).await?;
+
+        let unlink_dsl = format!(
+            r#"(cbu.unlink-structure :link-id "{}" :reason "fund wound down")"#,
+            link.link_id
+        );
+        let unlink_ctx = db.execute_dsl(&unlink_dsl).await?;
+        assert!(unlink_ctx.effective_symbols().is_empty());
+
+        let terminated = read_structure_link(&db.pool, parent_id, child_id).await?;
+        assert_eq!(terminated.status, "TERMINATED");
+        assert_eq!(terminated.terminated_reason.as_deref(), Some("fund wound down"));
+
+        db.cleanup().await?;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_cross_border_constellation_hydrates_child_cbus_from_links() -> Result<()> {
+        use ob_poc::sem_reg::constellation::{hydrate_constellation, load_constellation_map};
+
+        let db = TestDb::new().await?;
+        let master_name = db.name("CrossBorderMaster");
+        let us_name = db.name("CrossBorderUsFeeder");
+        let ie_name = db.name("CrossBorderIeFeeder");
+
+        let dsl = format!(
+            r#"
+            (cbu.create :name "{}" :jurisdiction "KY" :as @master)
+            (cbu.create :name "{}" :jurisdiction "US" :as @us)
+            (cbu.create :name "{}" :jurisdiction "IE" :as @ie)
+            (cbu.link-structure
+              :parent-cbu-id @master
+              :child-cbu-id @us
+              :relationship-type "feeder"
+              :relationship-selector "feeder:us")
+            (cbu.link-structure
+              :parent-cbu-id @master
+              :child-cbu-id @ie
+              :relationship-type "feeder"
+              :relationship-selector "feeder:ie")
+        "#,
+            master_name, us_name, ie_name
+        );
+        let ctx = db.execute_dsl(&dsl).await?;
+        let master_id = ctx.resolve("master").expect("master should be bound");
+        let us_id = ctx.resolve("us").expect("us feeder should be bound");
+
+        let yaml = r#"
+constellation: test.cross-border
+jurisdiction: XB
+slots:
+  cbu:
+    type: cbu
+    table: cbus
+    pk: cbu_id
+    cardinality: root
+    verbs: { read: cbu.read }
+    children:
+      us_feeder:
+        type: cbu
+        join:
+          {
+            via: cbu_structure_links,
+            parent_fk: parent_cbu_id,
+            child_fk: child_cbu_id,
+            filter_column: relationship_selector,
+            filter_value: feeder:us,
+          }
+        cardinality: optional
+        depends_on: [cbu]
+        verbs: { show: cbu.read }
+      ie_feeder:
+        type: cbu
+        join:
+          {
+            via: cbu_structure_links,
+            parent_fk: parent_cbu_id,
+            child_fk: child_cbu_id,
+            filter_column: relationship_selector,
+            filter_value: feeder:ie,
+          }
+        cardinality: optional
+        depends_on: [cbu]
+        verbs: { show: cbu.read }
+"#;
+        let map = load_constellation_map(yaml).unwrap();
+        let hydrated = hydrate_constellation(&db.pool, master_id, None, &map).await?;
+        let root = hydrated
+            .slots
+            .iter()
+            .find(|slot| slot.name == "cbu")
+            .expect("root slot present");
+        let us_feeder = root
+            .children
+            .iter()
+            .find(|slot| slot.name == "cbu.us_feeder")
+            .expect("us feeder slot present");
+        assert_eq!(us_feeder.effective_state, "filled");
+        assert_eq!(us_feeder.record_id, Some(us_id));
+
+        let feeder_view = hydrate_constellation(&db.pool, us_id, None, &map).await?;
+        let feeder_root = feeder_view
+            .slots
+            .iter()
+            .find(|slot| slot.name == "cbu")
+            .expect("feeder root slot present");
+        let feeder_child = feeder_root
+            .children
+            .iter()
+            .find(|slot| slot.name == "cbu.us_feeder")
+            .expect("feeder child slot present");
+        assert_eq!(feeder_child.effective_state, "empty");
 
         db.cleanup().await?;
         Ok(())

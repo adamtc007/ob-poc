@@ -10,7 +10,7 @@ pub enum UtteranceDisposition {
     /// Sage serves directly with a facts-only path.
     Serve(ServeIntent),
     /// Coder resolves a mutation candidate that requires confirmation.
-    Delegate(DelegateIntent),
+    Delegate(Box<DelegateIntent>),
 }
 
 /// Read-only intent served without exposing DSL to the user.

@@ -156,22 +156,8 @@ fn build_test_seed_bundle() -> SeedBundle {
         "entity.proper-person",
     )];
 
-    let bundle_hash = SeedBundle::compute_hash(
-        &verb_contracts,
-        &attributes,
-        &entity_types,
-        &taxonomies,
-        &policies,
-        &views,
-        &[],
-        &[],
-        &[],
-        &[],
-    )
-    .expect("test seed bundle hash");
-
-    SeedBundle {
-        bundle_hash,
+    let mut bundle = SeedBundle {
+        bundle_hash: String::new(),
         verb_contracts,
         attributes,
         entity_types,
@@ -182,7 +168,9 @@ fn build_test_seed_bundle() -> SeedBundle {
         requirement_profiles: vec![],
         proof_obligations: vec![],
         evidence_strategies: vec![],
-    }
+    };
+    bundle.bundle_hash = SeedBundle::compute_hash(&bundle).expect("test seed bundle hash");
+    bundle
 }
 
 // ── Scenario 1: Gate Suite Outcomes ───────────────────────────
@@ -392,12 +380,8 @@ async fn test_manifest_stability(client: &dyn SemOsClient) {
     let fqn = format!("test.manifest-{unique}");
 
     let verb_contracts = vec![make_verb_contract_seed(&fqn, "test", "Manifest test verb")];
-    let bundle_hash =
-        SeedBundle::compute_hash(&verb_contracts, &[], &[], &[], &[], &[], &[], &[], &[], &[])
-            .expect("test seed bundle hash");
-
     let bundle = SeedBundle {
-        bundle_hash,
+        bundle_hash: String::new(),
         verb_contracts,
         attributes: vec![],
         entity_types: vec![],
@@ -408,6 +392,10 @@ async fn test_manifest_stability(client: &dyn SemOsClient) {
         requirement_profiles: vec![],
         proof_obligations: vec![],
         evidence_strategies: vec![],
+    };
+    let bundle = SeedBundle {
+        bundle_hash: SeedBundle::compute_hash(&bundle).expect("test seed bundle hash"),
+        ..bundle
     };
 
     let resp = client
