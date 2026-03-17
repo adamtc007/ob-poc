@@ -1360,6 +1360,7 @@ impl AgentSession {
             dsl: None,
             sage_explain: None,
             coder_proposal: None,
+            discovery_bootstrap: None,
         });
         self.updated_at = Utc::now();
         id
@@ -1382,6 +1383,7 @@ impl AgentSession {
             dsl,
             sage_explain: None,
             coder_proposal: None,
+            discovery_bootstrap: None,
         });
         self.updated_at = Utc::now();
         id
@@ -1471,6 +1473,9 @@ pub struct ChatMessage {
     /// Coder proposal payload for this message.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub coder_proposal: Option<ob_poc_types::chat::CoderProposalPayload>,
+    /// Sem OS discovery bootstrap payload for this message.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub discovery_bootstrap: Option<ob_poc_types::chat::DiscoveryBootstrapPayload>,
 }
 
 /// Role of a message sender
@@ -2271,6 +2276,22 @@ pub struct SessionContext {
     /// Updated via REPL edit events, used to compute diff on execute
     #[serde(skip_serializing_if = "Option::is_none")]
     pub current_dsl: Option<String>,
+
+    /// Selected discovery domain from the Sage bootstrap navigator.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub discovery_selected_domain: Option<String>,
+
+    /// Selected constellation family from the Sage bootstrap navigator.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub discovery_selected_family: Option<String>,
+
+    /// Selected concrete constellation from the Sage bootstrap navigator.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub discovery_selected_constellation: Option<String>,
+
+    /// Structured answers collected during Sage bootstrap.
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub discovery_answers: HashMap<String, String>,
 }
 
 /// Primary domain keys tracked across the session

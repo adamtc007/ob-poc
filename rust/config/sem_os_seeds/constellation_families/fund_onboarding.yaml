@@ -1,0 +1,28 @@
+fqn: family.fund_onboarding
+family_id: fund_onboarding
+label: Fund Onboarding
+description: Family for selecting the right fund onboarding constellation.
+domain_id: onboarding
+selection_rules:
+  - condition: jurisdiction == 'IE'
+    target_constellation: struct.ie.ucits.icav
+    priority: 10
+constellation_refs:
+  - constellation_id: struct.ie.ucits.icav
+    label: Irish UCITS ICAV
+    jurisdiction: IE
+    entity_kind: fund
+    triggers:
+      - icav
+      - ucits
+candidate_jurisdictions:
+  - IE
+candidate_entity_kinds:
+  - fund
+grounding_threshold:
+  required_input_keys:
+    - objective
+    - jurisdiction
+    - entity_kind
+  requires_entity_instance: false
+  allows_draft_instance: true

@@ -13,6 +13,7 @@
 //! and a deterministic fingerprint of the allowed verb set.
 
 use serde::Serialize;
+use std::collections::HashMap;
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -92,6 +93,14 @@ pub struct OrchestratorContext {
     pub recent_sage_intents: Vec<crate::sage::RecentIntent>,
     /// Optional NLCI compiler hook for the deterministic replacement pipeline.
     pub nlci_compiler: Option<Arc<dyn IntentCompiler>>,
+    /// Selected discovery domain from the Sage bootstrap navigator.
+    pub discovery_selected_domain: Option<String>,
+    /// Selected discovery family from the Sage bootstrap navigator.
+    pub discovery_selected_family: Option<String>,
+    /// Selected discovery constellation from the Sage bootstrap navigator.
+    pub discovery_selected_constellation: Option<String>,
+    /// Structured answers collected during the discovery bootstrap.
+    pub discovery_answers: HashMap<String, String>,
 }
 
 /// Where the utterance originated.
@@ -347,8 +356,14 @@ async fn prepare_turn_context(
 
     let use_generic_task_subject =
         should_use_generic_task_subject_for_sage(ctx.stage_focus.as_deref(), sage_intent);
-    let envelope =
-        resolve_sem_reg_verbs(ctx, semreg_entity_kind.as_deref(), use_generic_task_subject).await;
+    let envelope = resolve_sem_reg_verbs(
+        ctx,
+        utterance,
+        sage_intent,
+        semreg_entity_kind.as_deref(),
+        use_generic_task_subject,
+    )
+    .await;
 
     let fail_policy = if ctx.policy_gate.semreg_fail_closed() {
         VerbSurfaceFailPolicy::FailClosed
@@ -395,19 +410,16 @@ fn can_use_coder_for_serve(
         return true;
     }
 
-    let allowed = prepared.surface.allowed_fqns();
+    let allowed = if prepared.envelope.is_unavailable() || prepared.envelope.is_deny_all() {
+        std::collections::HashSet::new()
+    } else {
+        prepared.surface.allowed_fqns()
+    };
     if !allowed.is_empty() {
         return allowed.contains(&coder_result.verb_fqn);
     }
 
-    if !prepared.envelope.is_unavailable() && !prepared.envelope.is_deny_all() {
-        return prepared
-            .envelope
-            .allowed_verbs
-            .contains(&coder_result.verb_fqn);
-    }
-
-    !ctx.policy_gate.semreg_fail_closed()
+    false
 }
 
 #[cfg(feature = "database")]
@@ -464,6 +476,124 @@ async fn build_sage_serve_outcome(
         pending_mutation: None,
         auto_execute: can_auto_execute_serve_result(&coder_result.verb_fqn),
         sage_intent: Some(intent.clone()),
+    };
+    emit_telemetry(ctx, utterance, &mut outcome).await;
+    Ok(outcome)
+}
+
+#[cfg(feature = "database")]
+async fn build_semos_discovery_outcome(
+    ctx: &OrchestratorContext,
+    utterance: &str,
+    prepared: PreparedTurnContext,
+    sage_intent: Option<crate::sage::OutcomeIntent>,
+) -> anyhow::Result<OrchestratorOutcome> {
+    let prompt = prepared
+        .envelope
+        .first_discovery_question()
+        .map(str::to_string)
+        .or_else(|| {
+            prepared
+                .envelope
+                .discovery_surface
+                .as_ref()
+                .and_then(|surface| {
+                    if surface.missing_inputs.is_empty() {
+                        None
+                    } else {
+                        Some(format!(
+                            "I need a bit more context before grounding this session: {}.",
+                            surface
+                                .missing_inputs
+                                .iter()
+                                .map(|input| input.label.as_str())
+                                .collect::<Vec<_>>()
+                                .join(", ")
+                        ))
+                    }
+                })
+        })
+        .unwrap_or_else(|| "I need a bit more context before grounding this session.".to_string());
+
+    let pipeline_result = PipelineResult {
+        intent: StructuredIntent::empty(),
+        verb_candidates: vec![],
+        dsl: String::new(),
+        dsl_hash: None,
+        valid: false,
+        validation_error: Some(prompt),
+        unresolved_refs: vec![],
+        missing_required: prepared
+            .envelope
+            .discovery_surface
+            .as_ref()
+            .map(|surface| {
+                surface
+                    .missing_inputs
+                    .iter()
+                    .map(|input| input.key.clone())
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default(),
+        outcome: PipelineOutcome::NeedsUserInput,
+        scope_resolution: None,
+        scope_context: ctx.scope.clone(),
+    };
+    let mut trace = default_trace_for_runtime(ctx, utterance, &prepared);
+    trace.blocked_reason = Some("Sem OS discovery stage requires clarification".into());
+
+    let mut outcome = OrchestratorOutcome {
+        pipeline_result,
+        context_envelope: Some(prepared.envelope),
+        surface: Some(prepared.surface),
+        lookup_result: prepared.lookup_result,
+        trace,
+        journey_decision: None,
+        pending_mutation: None,
+        auto_execute: false,
+        sage_intent,
+    };
+    emit_telemetry(ctx, utterance, &mut outcome).await;
+    Ok(outcome)
+}
+
+#[cfg(feature = "database")]
+async fn build_semos_unavailable_outcome(
+    ctx: &OrchestratorContext,
+    utterance: &str,
+    prepared: PreparedTurnContext,
+    sage_intent: Option<crate::sage::OutcomeIntent>,
+) -> anyhow::Result<OrchestratorOutcome> {
+    let pipeline_result = PipelineResult {
+        intent: StructuredIntent::empty(),
+        verb_candidates: vec![],
+        dsl: String::new(),
+        dsl_hash: None,
+        valid: false,
+        validation_error: Some(
+            "Sem OS is unavailable. This Sage session cannot continue and should be restarted once Sem OS is healthy."
+                .to_string(),
+        ),
+        unresolved_refs: vec![],
+        missing_required: vec![],
+        outcome: PipelineOutcome::NoAllowedVerbs,
+        scope_resolution: None,
+        scope_context: ctx.scope.clone(),
+    };
+    let mut trace = default_trace_for_runtime(ctx, utterance, &prepared);
+    trace.blocked_reason = Some("Sem OS unavailable; session terminated".into());
+    trace.semreg_unavailable = true;
+
+    let mut outcome = OrchestratorOutcome {
+        pipeline_result,
+        context_envelope: Some(prepared.envelope),
+        surface: Some(prepared.surface),
+        lookup_result: prepared.lookup_result,
+        trace,
+        journey_decision: None,
+        pending_mutation: None,
+        auto_execute: false,
+        sage_intent,
     };
     emit_telemetry(ctx, utterance, &mut outcome).await;
     Ok(outcome)
@@ -916,6 +1046,24 @@ pub async fn handle_utterance(
     match route(&intent) {
         UtteranceDisposition::Serve(_) => {
             let prepared = prepare_turn_context(ctx, utterance, Some(&intent)).await;
+            if prepared.envelope.is_unavailable() {
+                return build_semos_unavailable_outcome(
+                    ctx,
+                    utterance,
+                    prepared,
+                    Some(intent.clone()),
+                )
+                .await;
+            }
+            if prepared.envelope.is_discovery_stage() {
+                return build_semos_discovery_outcome(
+                    ctx,
+                    utterance,
+                    prepared,
+                    Some(intent.clone()),
+                )
+                .await;
+            }
             let coder_stage = run_coder_stage(ctx, Some(&intent));
             let serve_candidate = coder_stage
                 .result
@@ -960,6 +1108,24 @@ pub async fn handle_utterance(
         }
         UtteranceDisposition::Delegate(delegate) => {
             let prepared = prepare_turn_context(ctx, utterance, Some(&intent)).await;
+            if prepared.envelope.is_unavailable() {
+                return build_semos_unavailable_outcome(
+                    ctx,
+                    utterance,
+                    prepared,
+                    Some(intent.clone()),
+                )
+                .await;
+            }
+            if prepared.envelope.is_discovery_stage() {
+                return build_semos_discovery_outcome(
+                    ctx,
+                    utterance,
+                    prepared,
+                    Some(intent.clone()),
+                )
+                .await;
+            }
             let trace = default_trace_for_runtime(ctx, utterance, &prepared);
             let mut outcome = OrchestratorOutcome {
                 pipeline_result: PipelineResult {
@@ -1148,8 +1314,14 @@ pub async fn legacy_handle_utterance(
     // -- Step 2: SemReg context resolution -> ContextEnvelope --
     let use_generic_task_subject =
         should_use_generic_task_subject_for_sage(ctx.stage_focus.as_deref(), sage_intent.as_ref());
-    let envelope =
-        resolve_sem_reg_verbs(ctx, semreg_entity_kind.as_deref(), use_generic_task_subject).await;
+    let envelope = resolve_sem_reg_verbs(
+        ctx,
+        utterance,
+        sage_intent.as_ref(),
+        semreg_entity_kind.as_deref(),
+        use_generic_task_subject,
+    )
+    .await;
 
     // -- Step 2.5: Compute SessionVerbSurface (all governance layers) --
     let fail_policy = if policy.semreg_fail_closed() {
@@ -1177,6 +1349,33 @@ pub async fn legacy_handle_utterance(
         "SessionVerbSurface computed"
     );
 
+    if envelope.is_unavailable() {
+        let prepared = PreparedTurnContext {
+            lookup_result,
+            dominant_entity_name,
+            dominant_entity_kind,
+            entity_candidates,
+            sem_reg_verb_names: None,
+            envelope,
+            surface,
+        };
+        return build_semos_unavailable_outcome(ctx, utterance, prepared, sage_intent.clone())
+            .await;
+    }
+
+    if envelope.is_discovery_stage() {
+        let prepared = PreparedTurnContext {
+            lookup_result,
+            dominant_entity_name,
+            dominant_entity_kind,
+            entity_candidates,
+            sem_reg_verb_names: None,
+            envelope,
+            surface,
+        };
+        return build_semos_discovery_outcome(ctx, utterance, prepared, sage_intent.clone()).await;
+    }
+
     // Extract verb names for trace (backward-compatible with sem_reg_verb_filter)
     let sem_reg_verb_names: Option<Vec<String>> = if envelope.is_unavailable() {
         None
@@ -1187,7 +1386,12 @@ pub async fn legacy_handle_utterance(
     // -- Stage A: Discover candidates (no DSL generation yet) --
     // Use SessionVerbSurface's allowed FQN set as pre-constraint for verb search.
     // This consolidates SemReg + AgentMode + workflow filtering into one set.
-    let surface_allowed: std::collections::HashSet<String> = surface.allowed_fqns();
+    let surface_allowed: std::collections::HashSet<String> =
+        if envelope.is_unavailable() || envelope.is_deny_all() {
+            std::collections::HashSet::new()
+        } else {
+            surface.allowed_fqns()
+        };
     let searcher = (*ctx.verb_searcher).clone();
 
     if sage_fast_path_enabled {
@@ -1197,23 +1401,7 @@ pub async fn legacy_handle_utterance(
                 && si.pending_clarifications.is_empty();
             let confidence_ok =
                 matches!(si.confidence, SageConfidence::High | SageConfidence::Medium);
-            let verb_allowed = if !surface_allowed.is_empty() {
-                surface_allowed.contains(&coder_result.verb_fqn)
-                    || allow_data_management_structure_fast_path(
-                        ctx.stage_focus.as_deref(),
-                        si,
-                        &coder_result.verb_fqn,
-                    )
-            } else if !envelope.is_unavailable() && !envelope.is_deny_all() {
-                envelope.allowed_verbs.contains(&coder_result.verb_fqn)
-                    || allow_data_management_structure_fast_path(
-                        ctx.stage_focus.as_deref(),
-                        si,
-                        &coder_result.verb_fqn,
-                    )
-            } else {
-                !policy.semreg_fail_closed()
-            };
+            let verb_allowed = surface_allowed.contains(&coder_result.verb_fqn);
 
             if sage_only && confidence_ok && coder_result.missing_args.is_empty() && verb_allowed {
                 let fast_path_result =
@@ -1283,15 +1471,7 @@ pub async fn legacy_handle_utterance(
 
     let pipeline = {
         let p = IntentPipeline::with_pool(searcher, ctx.pool.clone());
-        if !surface_allowed.is_empty() {
-            p.with_allowed_verbs(surface_allowed.clone())
-        } else if !envelope.is_unavailable() && !envelope.is_deny_all() {
-            // Fallback: if surface is empty but envelope has verbs, use envelope directly
-            // (safety net for edge cases)
-            p.with_allowed_verbs(envelope.allowed_verbs.clone())
-        } else {
-            p
-        }
+        p.with_allowed_verbs(surface_allowed.clone())
     };
 
     let rewrite = data_management_rewrite(ctx.stage_focus.as_deref(), utterance);
@@ -1391,30 +1571,18 @@ pub async fn legacy_handle_utterance(
 
     if envelope.is_unavailable() {
         semreg_unavailable = true;
-        if matches!(
-            surface.fail_policy_applied,
-            VerbSurfaceFailPolicy::FailClosed
-        ) {
-            // FailClosed: only safe-harbor verbs survive
-            let before_count = filtered_candidates.len();
-            filtered_candidates.retain(|v| surface_allowed.contains(&v.verb));
-            if filtered_candidates.is_empty() && before_count > 0 {
-                tracing::warn!("SemReg unavailable -- fail-closed (safe-harbor only)");
-                blocked_reason =
-                    Some("SemReg unavailable (fail-closed: only safe-harbor verbs)".into());
-            }
-        } else {
-            tracing::info!("SemReg unavailable -- fail-open (permissive mode)");
+        let before_count = filtered_candidates.len();
+        filtered_candidates.clear();
+        if before_count > 0 {
+            tracing::warn!("SemReg unavailable -- blocking utterance discovery");
+            blocked_reason =
+                Some("SemReg unavailable (utterance discovery requires Sem OS)".into());
         }
     } else if envelope.is_deny_all() {
         sem_reg_denied_all = true;
-        if policy.semreg_fail_closed() {
-            tracing::warn!("SemReg returned DenyAll -- fail-closed (strict mode)");
-            blocked_reason = Some("SemReg denied all verbs for this subject (strict mode)".into());
-            filtered_candidates.clear();
-        } else {
-            tracing::warn!("SemReg returned DenyAll -- fail-open (permissive mode)");
-        }
+        tracing::warn!("SemReg returned DenyAll -- blocking utterance discovery");
+        blocked_reason = Some("SemReg denied all verbs for this subject".into());
+        filtered_candidates.clear();
     } else {
         // Post-filter against consolidated surface (SemReg + AgentMode + workflow)
         let before_count = filtered_candidates.len();
@@ -1431,24 +1599,12 @@ pub async fn legacy_handle_utterance(
         });
         if filtered_candidates.is_empty() && before_count > 0 {
             sem_reg_denied_all = true;
-            if policy.semreg_fail_closed() {
-                tracing::warn!(
-                    before = before_count,
-                    surface_count = surface_allowed.len(),
-                    strict = true,
-                    "SessionVerbSurface filtered ALL verb candidates -- fail-closed"
-                );
-                blocked_reason =
-                    Some("All verb candidates excluded by governance surface (strict mode)".into());
-            } else {
-                tracing::warn!(
-                    before = before_count,
-                    surface_count = surface_allowed.len(),
-                    strict = false,
-                    "SessionVerbSurface filtered ALL verb candidates -- falling back to unfiltered (permissive)"
-                );
-                filtered_candidates = discovery_result.verb_candidates.clone();
-            }
+            tracing::warn!(
+                before = before_count,
+                surface_count = surface_allowed.len(),
+                "SessionVerbSurface filtered ALL verb candidates -- blocking utterance discovery"
+            );
+            blocked_reason = Some("All verb candidates excluded by governance surface".into());
         }
     }
 
@@ -1482,7 +1638,7 @@ pub async fn legacy_handle_utterance(
     let mut journey_used: Option<JourneyMetadata> = None;
     let mut journey_decision_out: Option<ob_poc_types::DecisionPacket> = None;
 
-    let mut result = if (sem_reg_denied_all || semreg_unavailable) && policy.semreg_fail_closed() {
+    let mut result = if sem_reg_denied_all || semreg_unavailable {
         PipelineResult {
             intent: StructuredIntent::empty(),
             verb_candidates: filtered_candidates,
@@ -1492,7 +1648,7 @@ pub async fn legacy_handle_utterance(
             validation_error: Some(
                 blocked_reason
                     .clone()
-                    .unwrap_or_else(|| "SemReg blocked (strict mode)".into()),
+                    .unwrap_or_else(|| "SemReg blocked utterance discovery".into()),
             ),
             unresolved_refs: vec![],
             missing_required: vec![],
@@ -1582,7 +1738,7 @@ pub async fn legacy_handle_utterance(
         if let Some(ref verb_fqn) = selected_verb_fqn {
             toctou_performed = true;
             let new_envelope =
-                resolve_sem_reg_verbs(ctx, semreg_entity_kind.as_deref(), false).await;
+                resolve_sem_reg_verbs(ctx, "", None, semreg_entity_kind.as_deref(), false).await;
 
             if let Some(toctou) = envelope.toctou_recheck(&new_envelope, verb_fqn) {
                 use crate::agent::context_envelope::TocTouResult;
@@ -2369,7 +2525,7 @@ pub async fn handle_utterance_with_forced_verb(
     // Even though the user selected this verb, we still validate it against
     // the current SemReg allowed set. This closes the TOCTOU gap where the
     // verb was allowed at discovery time but may have been revoked since.
-    let envelope = resolve_sem_reg_verbs(ctx, semreg_entity_kind.as_deref(), false).await;
+    let envelope = resolve_sem_reg_verbs(ctx, "", None, semreg_entity_kind.as_deref(), false).await;
 
     let sem_reg_verb_names: Option<Vec<String>> = if envelope.is_unavailable() {
         None
@@ -2649,22 +2805,26 @@ fn default_trace_for_runtime(
 #[cfg(feature = "database")]
 pub(crate) async fn resolve_sem_reg_verbs(
     ctx: &OrchestratorContext,
+    utterance: &str,
+    sage_intent: Option<&crate::sage::OutcomeIntent>,
     entity_kind: Option<&str>,
     use_generic_task_subject: bool,
 ) -> ContextEnvelope {
-    // Route through SemOsClient when available (DI boundary), fallback to direct call.
+    // Route through SemOsClient when available (DI boundary). Utterance
+    // discovery no longer falls back to direct sem_reg calls.
     if let Some(ref client) = ctx.sem_os_client {
-        resolve_via_client(client.as_ref(), ctx, entity_kind, use_generic_task_subject).await
+        resolve_via_client(
+            client.as_ref(),
+            ctx,
+            utterance,
+            sage_intent,
+            entity_kind,
+            use_generic_task_subject,
+        )
+        .await
     } else {
-        #[cfg(feature = "database")]
-        {
-            resolve_via_direct(ctx, entity_kind, use_generic_task_subject).await
-        }
-        #[cfg(not(feature = "database"))]
-        {
-            tracing::warn!("sem_reg context resolution requires database feature or SemOsClient");
-            ContextEnvelope::unavailable()
-        }
+        tracing::warn!("SemOsClient unavailable; blocking utterance discovery");
+        ContextEnvelope::unavailable()
     }
 }
 
@@ -2672,6 +2832,8 @@ pub(crate) async fn resolve_sem_reg_verbs(
 async fn resolve_via_client(
     client: &dyn SemOsClient,
     ctx: &OrchestratorContext,
+    utterance: &str,
+    sage_intent: Option<&crate::sage::OutcomeIntent>,
     entity_kind: Option<&str>,
     use_generic_task_subject: bool,
 ) -> ContextEnvelope {
@@ -2707,13 +2869,20 @@ async fn resolve_via_client(
     };
     let request = sem_os_core::context_resolution::ContextResolutionRequest {
         subject,
-        intent: None,
+        intent_summary: sage_intent.map(|intent| intent.summary.clone()),
+        raw_utterance: Some(utterance.to_string()),
         actor: core_actor,
         goals: ctx.goals.clone(),
         constraints: Default::default(),
         evidence_mode,
         point_in_time: None,
         entity_kind: entity_kind.map(|s| s.to_string()),
+        discovery: sem_os_core::context_resolution::DiscoveryContext {
+            selected_domain_id: ctx.discovery_selected_domain.clone(),
+            selected_family_id: ctx.discovery_selected_family.clone(),
+            selected_constellation_id: ctx.discovery_selected_constellation.clone(),
+            known_inputs: ctx.discovery_answers.clone(),
+        },
     };
     let principal =
         sem_os_core::principal::Principal::in_process(&ctx.actor.actor_id, ctx.actor.roles.clone());
@@ -2731,75 +2900,6 @@ async fn resolve_via_client(
         }
         Err(e) => {
             tracing::warn!(error = %e, source = "sem_reg", "SemReg context resolution failed (client)");
-            ContextEnvelope::unavailable()
-        }
-    }
-}
-
-/// Resolve verbs via direct sem_reg call (legacy path, before full cutover).
-#[cfg(feature = "database")]
-async fn resolve_via_direct(
-    ctx: &OrchestratorContext,
-    entity_kind: Option<&str>,
-    use_generic_task_subject: bool,
-) -> ContextEnvelope {
-    use crate::sem_reg::context_resolution::{
-        resolve_context, ContextResolutionRequest, EvidenceMode, SubjectRef,
-    };
-
-    let subject = if use_generic_task_subject {
-        SubjectRef::TaskId(ctx.session_id.unwrap_or_else(Uuid::new_v4))
-    } else if let Some(entity_id) = ctx.dominant_entity_id {
-        SubjectRef::EntityId(entity_id)
-    } else if let Some(case_id) = ctx.case_id {
-        SubjectRef::CaseId(case_id)
-    } else {
-        // Default generic chat/repl sessions to TaskId instead of CaseId.
-        // CaseId triggers a lookup in "ob-poc".kyc_cases, which may not exist
-        // in non-KYC deployments and would force SemReg into unavailable mode.
-        SubjectRef::TaskId(ctx.session_id.unwrap_or_else(Uuid::new_v4))
-    };
-    let evidence_mode = if matches!(
-        ctx.stage_focus.as_deref(),
-        Some("semos-data-management" | "semos-data")
-    ) {
-        // Data-management workflows need operational verbs for domain actions
-        // like deal/cbu/document/product management.
-        EvidenceMode::Exploratory
-    } else {
-        EvidenceMode::default()
-    };
-    let request = ContextResolutionRequest {
-        subject,
-        intent: None,
-        actor: ctx.actor.clone(),
-        goals: ctx.goals.clone(),
-        constraints: Default::default(),
-        evidence_mode,
-        point_in_time: None,
-        entity_kind: entity_kind.map(|s| s.to_string()),
-    };
-
-    match resolve_context(&ctx.pool, &request).await {
-        Ok(response) => {
-            // Bridge local ContextResolutionResponse → sem_os_core ContextResolutionResponse
-            // (structurally identical but different crate types — serde round-trip)
-            let core_response: sem_os_core::context_resolution::ContextResolutionResponse = {
-                let json =
-                    serde_json::to_value(&response).expect("ContextResolutionResponse serializes");
-                serde_json::from_value(json).expect("ContextResolutionResponse round-trips")
-            };
-            let envelope = ContextEnvelope::from_resolution(&core_response);
-            tracing::debug!(
-                allowed_count = envelope.allowed_verbs.len(),
-                pruned_count = envelope.pruned_count(),
-                fingerprint = %envelope.fingerprint_str(),
-                "SemReg context resolution completed (direct)"
-            );
-            envelope
-        }
-        Err(e) => {
-            tracing::warn!(error = %e, source = "sem_reg", "SemReg context resolution failed (direct)");
             ContextEnvelope::unavailable()
         }
     }
@@ -2827,13 +2927,15 @@ pub async fn resolve_allowed_verbs(
     };
     let request = sem_os_core::context_resolution::ContextResolutionRequest {
         subject,
-        intent: None,
+        intent_summary: None,
+        raw_utterance: None,
         actor: core_actor,
         goals: vec![],
         constraints: Default::default(),
         evidence_mode: EvidenceMode::default(),
         point_in_time: None,
         entity_kind: None,
+        discovery: Default::default(),
     };
     let principal =
         sem_os_core::principal::Principal::in_process(&actor.actor_id, actor.roles.clone());
@@ -3256,6 +3358,10 @@ mod tests {
             pre_sage_entity_name: Some("Current CBU".to_string()),
             recent_sage_intents: vec![],
             nlci_compiler: Some(crate::semtaxonomy_v2::build_minimal_cbu_compiler()),
+            discovery_selected_domain: None,
+            discovery_selected_family: None,
+            discovery_selected_constellation: None,
+            discovery_answers: HashMap::new(),
         }
     }
 

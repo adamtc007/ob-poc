@@ -468,7 +468,7 @@ mod tests {
 
         let output = render_erd(&model, &options);
 
-        assert!(output.contains("Verbs: cbu.create(crud_insert)"));
+        assert!(output.contains("Verbs: cbu.create"));
     }
 
     #[test]

@@ -20,7 +20,7 @@ import {
   VerbBrowser,
 } from "./components";
 import { DealPanel } from "../deal/components";
-import type { DecisionReply } from "../../types/chat";
+import type { DecisionReply, DiscoverySelection } from "../../types/chat";
 
 export function ChatPage() {
   const { sessionId } = useParams<{ sessionId?: string }>();
@@ -197,6 +197,51 @@ export function ChatPage() {
     },
   });
 
+  const discoverySelectionMutation = useMutation({
+    mutationFn: (selection: DiscoverySelection) => {
+      if (!sessionId) throw new Error("No session selected");
+      return chatApi.sendDiscoverySelection(sessionId, selection);
+    },
+    onMutate: (selection) => {
+      addMessage({
+        id: `temp-discovery-${Date.now()}`,
+        role: "user",
+        content: selection.label || selection.value || selection.selection_id,
+        timestamp: new Date().toISOString(),
+      });
+      setStreaming(true);
+    },
+    onSuccess: (response) => {
+      addMessage(response.message);
+      if (response.available_verbs?.length) {
+        setAvailableVerbs(
+          response.available_verbs,
+          response.surface_fingerprint
+            ? {
+                fingerprint: response.surface_fingerprint,
+                totalRegistry: 0,
+                finalCount: response.available_verbs.length,
+              }
+            : undefined,
+        );
+      }
+      if (sessionId) {
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.chat.session(sessionId),
+        });
+        queryClient.invalidateQueries({ queryKey: queryKeys.scope(sessionId) });
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.constellation.all,
+        });
+      }
+      setStreaming(false);
+    },
+    onError: (err) => {
+      console.error("[ChatPage] sendDiscoverySelection failed:", err);
+      setStreaming(false);
+    },
+  });
+
   const handleSend = useCallback(
     (message: string) => {
       sendMutation.mutate(message);
@@ -224,6 +269,13 @@ export function ChatPage() {
       });
     },
     [replyMutation],
+  );
+
+  const handleDiscoverySelection = useCallback(
+    (selection: DiscoverySelection) => {
+      discoverySelectionMutation.mutate(selection);
+    },
+    [discoverySelectionMutation],
   );
 
   return (
@@ -275,6 +327,7 @@ export function ChatPage() {
                     key={message.id}
                     message={message}
                     onDecisionReply={handleDecisionReply}
+                    onDiscoverySelection={handleDiscoverySelection}
                   />
                 ))
               )}
@@ -297,7 +350,11 @@ export function ChatPage() {
           onSend={handleSend}
           onCancel={handleCancel}
           isStreaming={isStreaming}
-          disabled={!sessionId || sendMutation.isPending}
+          disabled={
+            !sessionId ||
+            sendMutation.isPending ||
+            discoverySelectionMutation.isPending
+          }
           placeholder={
             sessionId ? "Type a message..." : "Select or create a session first"
           }

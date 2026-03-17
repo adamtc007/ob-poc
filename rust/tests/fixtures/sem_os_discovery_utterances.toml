@@ -1,0 +1,81 @@
+# ============================================================================
+# SEM OS DISCOVERY HARNESS FIXTURES
+# ============================================================================
+# Purpose: Measure utterance -> discovery universe/domain/family/constellation
+# accuracy for the Sem OS discovery-stage resolver.
+#
+# Run:
+#   DATABASE_URL="postgresql:///data_designer" \
+#   cargo test --features database --test semos_discovery_hit_rate -- --ignored --nocapture
+#
+# Optional:
+#   SEMOS_DISCOVERY_FILTER=raw_preserved
+#   SEMOS_DISCOVERY_DOMAIN_THRESHOLD=0.80
+#   SEMOS_DISCOVERY_FAMILY_THRESHOLD=0.80
+#   SEMOS_DISCOVERY_CONSTELLATION_TOP1_THRESHOLD=0.60
+#   SEMOS_DISCOVERY_CONSTELLATION_TOP3_THRESHOLD=0.90
+#   SEMOS_DISCOVERY_READINESS_THRESHOLD=0.80
+# ============================================================================
+
+[[test]]
+name = "basic_onboarding_domain_and_family"
+utterance = "I need to onboard a new fund"
+expected_domain = "onboarding"
+expected_family = "fund_onboarding"
+expected_readiness = "family_ready"
+
+[[test]]
+name = "irish_fund_with_bootstrap_hints"
+utterance = "Please onboard a new Irish fund"
+jurisdiction_hint = "IE"
+entity_kind_hint = "fund"
+expected_domain = "onboarding"
+expected_family = "fund_onboarding"
+expected_constellation = "struct.ie.ucits.icav"
+expected_readiness = "constellation_ready"
+
+[[test]]
+name = "raw_utterance_preserved_over_summary"
+utterance = "Please help me onboard a new Irish UCITS ICAV"
+intent_summary = "help with onboarding"
+jurisdiction_hint = "IE"
+entity_kind_hint = "fund"
+expected_domain = "onboarding"
+expected_family = "fund_onboarding"
+expected_constellation = "struct.ie.ucits.icav"
+expected_readiness = "constellation_ready"
+notes = "Raw utterance contains UCITS/ICAV triggers that are absent from the summary."
+
+[[test]]
+name = "selected_domain_narrows_ambiguous_request"
+utterance = "I need help with this new client setup"
+selected_domain = "onboarding"
+expected_domain = "onboarding"
+expected_family = "fund_onboarding"
+expected_readiness = "family_ready"
+
+[[test]]
+name = "selected_family_narrows_to_constellation"
+utterance = "I need help with onboarding"
+selected_domain = "onboarding"
+selected_family = "fund_onboarding"
+jurisdiction_hint = "IE"
+entity_kind_hint = "fund"
+expected_domain = "onboarding"
+expected_family = "fund_onboarding"
+expected_constellation = "struct.ie.ucits.icav"
+expected_readiness = "constellation_ready"
+
+[[test]]
+name = "question_answer_inputs_drive_readiness"
+utterance = "Onboarding support please"
+intent_summary = "fund onboarding"
+selected_domain = "onboarding"
+selected_family = "fund_onboarding"
+jurisdiction_hint = "IE"
+entity_kind_hint = "fund"
+known_inputs.objective = "onboard a new fund"
+expected_domain = "onboarding"
+expected_family = "fund_onboarding"
+expected_constellation = "struct.ie.ucits.icav"
+expected_readiness = "constellation_ready"

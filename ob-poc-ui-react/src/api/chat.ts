@@ -19,6 +19,8 @@ import type {
   DecisionReply,
   ChatMessage,
   CoderProposal,
+  DiscoverySelection,
+  DiscoveryBootstrap,
   SageExplain,
   VerbProfile,
 } from "../types/chat";
@@ -35,6 +37,7 @@ interface BackendMessage {
   timestamp?: string;
   sage_explain?: SageExplain;
   coder_proposal?: CoderProposal;
+  discovery_bootstrap?: DiscoveryBootstrap;
 }
 
 interface BackendSession {
@@ -81,6 +84,7 @@ function mapBackendSession(backend: BackendSession): ChatSession {
       timestamp: msg.timestamp || backend.created_at,
       sage_explain: msg.sage_explain,
       coder_proposal: msg.coder_proposal,
+      discovery_bootstrap: msg.discovery_bootstrap,
     })),
   };
 }
@@ -223,76 +227,15 @@ export const chatApi = {
     sessionId: string,
     request: SendMessageRequest,
   ): Promise<SendMessageResponse> {
-    let envelope: {
-      kind: "chat";
-      response: {
-        message?: string;
-        response?: string;
-        dsl?: { source?: string } | string;
-        generated_dsl?: string;
-        session_state?: string;
-        unresolved_refs?: unknown[];
-        verb_disambiguation?: unknown;
-        intent_tier?: unknown;
-        clarification?: unknown;
-        error?: string;
-        sage_explain?: SageExplain;
-        coder_proposal?: CoderProposal;
-        available_verbs?: VerbProfile[];
-        surface_fingerprint?: string;
-        // Backend DecisionPacket for client group/deal/verb clarification
-        decision?: {
-          packet_id: string;
-          kind: string;
-          prompt: string;
-          choices: Array<{
-            id: string;
-            label: string;
-            description: string;
-            is_escape?: boolean;
-          }>;
-          payload: unknown;
-          confirm_token?: string;
-        };
-      };
-    };
+    let envelope: ChatInputEnvelope;
     try {
-      envelope = await api.post<{
-        kind: "chat";
-        response: {
-          message?: string;
-          response?: string;
-          dsl?: { source?: string } | string;
-          generated_dsl?: string;
-          session_state?: string;
-          unresolved_refs?: unknown[];
-          verb_disambiguation?: unknown;
-          intent_tier?: unknown;
-          clarification?: unknown;
-          error?: string;
-          sage_explain?: SageExplain;
-          coder_proposal?: CoderProposal;
-          available_verbs?: VerbProfile[];
-          surface_fingerprint?: string;
-          // Backend DecisionPacket for client group/deal/verb clarification
-          decision?: {
-            packet_id: string;
-            kind: string;
-            prompt: string;
-            choices: Array<{
-              id: string;
-              label: string;
-              description: string;
-              is_escape?: boolean;
-            }>;
-            payload: unknown;
-            confirm_token?: string;
-          };
-        };
-      }>(`/session/${sessionId}/input`, {
-        kind: "utterance",
-        message: request.message,
-      });
+      envelope = await api.post<ChatInputEnvelope>(
+        `/session/${sessionId}/input`,
+        {
+          kind: "utterance",
+          message: request.message,
+        },
+      );
     } catch (error) {
       if (isSessionMissingError(error)) {
         pruneSessionIdFromStorage(sessionId);
@@ -300,92 +243,7 @@ export const chatApi = {
       throw error;
     }
     const response = envelope.response;
-
-    // Extract content from response - backend uses 'message' field
-    let content = response.message || response.response || "";
-
-    // If no message but we have DSL, show the DSL source
-    if (!content && response.dsl) {
-      if (typeof response.dsl === "string") {
-        content = response.dsl;
-      } else if (response.dsl.source) {
-        content = `Generated DSL:\n\`\`\`lisp\n${response.dsl.source}\n\`\`\``;
-      }
-    }
-
-    // Fallback to generated_dsl
-    if (!content && response.generated_dsl) {
-      content = response.generated_dsl;
-    }
-
-    // Show error if present
-    if (response.error) {
-      content = `Error: ${response.error}`;
-    }
-
-    // Map backend response to our format
-    const assistantMessage: ChatMessage = {
-      id: `${sessionId}-${Date.now()}`,
-      role: "assistant",
-      content: content || "No response from server.",
-      timestamp: new Date().toISOString(),
-      sage_explain: response.sage_explain,
-      coder_proposal: response.coder_proposal,
-    };
-
-    // Check for decision packets
-    if (response.verb_disambiguation) {
-      const disambiguation = response.verb_disambiguation as {
-        options?: Array<{ verb_fqn: string; description?: string }>;
-      };
-      assistantMessage.decision_packet = {
-        id: `verb-${Date.now()}`,
-        kind: "clarification",
-        payload: {
-          question: "Which operation did you mean?",
-          options: (disambiguation.options || []).map((opt, idx) => ({
-            id: `opt-${idx}`,
-            label: opt.verb_fqn,
-            description: opt.description,
-            value: opt.verb_fqn,
-          })),
-        },
-      };
-    } else if (response.clarification) {
-      const clarification = response.clarification as {
-        question?: string;
-        options?: Array<{ id: string; label: string; value: unknown }>;
-      };
-      assistantMessage.decision_packet = {
-        id: `clarify-${Date.now()}`,
-        kind: "clarification",
-        payload: {
-          question: clarification.question || "Please clarify:",
-          options: (clarification.options || []).map((opt, idx) => ({
-            id: opt.id || `opt-${idx}`,
-            label: opt.label,
-            value: opt.value,
-          })),
-        },
-      };
-    } else if (response.decision) {
-      // Handle backend DecisionPacket for client group/deal selection
-      // Maps backend DecisionPacket to frontend ClarificationPayload format
-      assistantMessage.decision_packet = {
-        id: response.decision.packet_id,
-        kind: "clarification", // All clarify kinds map to 'clarification'
-        payload: {
-          question: response.decision.prompt,
-          options: response.decision.choices.map((choice) => ({
-            id: choice.id,
-            label: choice.label,
-            description: choice.description,
-            value: choice.id, // Use ID as value for selection
-          })),
-        },
-        confirm_token: response.decision.confirm_token,
-      };
-    }
+    const assistantMessage = buildAssistantMessage(sessionId, response);
 
     // Update local storage message count
     const stored = localStorage.getItem(CHAT_SESSIONS_STORAGE_KEY);
@@ -409,6 +267,52 @@ export const chatApi = {
       session = await chatApi.getSession(sessionId);
     } catch (e) {
       console.warn("[chat] Failed to re-fetch session after chat:", e);
+    }
+
+    return {
+      message: assistantMessage,
+      session: session || {
+        id: sessionId,
+        title: "",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        messages: [],
+      },
+      available_verbs: response.available_verbs,
+      surface_fingerprint: response.surface_fingerprint,
+    };
+  },
+
+  async sendDiscoverySelection(
+    sessionId: string,
+    selection: DiscoverySelection,
+  ): Promise<SendMessageResponse> {
+    let envelope: ChatInputEnvelope;
+    try {
+      envelope = await api.post<ChatInputEnvelope>(
+        `/session/${sessionId}/input`,
+        {
+          kind: "discovery_selection",
+          selection,
+        },
+      );
+    } catch (error) {
+      if (isSessionMissingError(error)) {
+        pruneSessionIdFromStorage(sessionId);
+      }
+      throw error;
+    }
+    const response = envelope.response;
+    const assistantMessage = buildAssistantMessage(sessionId, response);
+
+    let session: ChatSession | undefined;
+    try {
+      session = await chatApi.getSession(sessionId);
+    } catch (e) {
+      console.warn(
+        "[chat] Failed to re-fetch session after discovery selection:",
+        e,
+      );
     }
 
     return {
@@ -578,5 +482,125 @@ export const chatApi = {
     return `${protocol}//${window.location.host}/api/session/${sessionId}/stream`;
   },
 };
+
+interface ChatInputEnvelope {
+  kind: "chat";
+  response: {
+    message?: string;
+    response?: string;
+    dsl?: { source?: string } | string;
+    generated_dsl?: string;
+    session_state?: string;
+    unresolved_refs?: unknown[];
+    verb_disambiguation?: unknown;
+    intent_tier?: unknown;
+    clarification?: unknown;
+    error?: string;
+    sage_explain?: SageExplain;
+    coder_proposal?: CoderProposal;
+    discovery_bootstrap?: DiscoveryBootstrap;
+    available_verbs?: VerbProfile[];
+    surface_fingerprint?: string;
+    decision?: {
+      packet_id: string;
+      kind: string;
+      prompt: string;
+      choices: Array<{
+        id: string;
+        label: string;
+        description: string;
+        is_escape?: boolean;
+      }>;
+      payload: unknown;
+      confirm_token?: string;
+    };
+  };
+}
+
+function buildAssistantMessage(
+  sessionId: string,
+  response: ChatInputEnvelope["response"],
+): ChatMessage {
+  let content = response.message || response.response || "";
+
+  if (!content && response.dsl) {
+    if (typeof response.dsl === "string") {
+      content = response.dsl;
+    } else if (response.dsl.source) {
+      content = `Generated DSL:\n\`\`\`lisp\n${response.dsl.source}\n\`\`\``;
+    }
+  }
+
+  if (!content && response.generated_dsl) {
+    content = response.generated_dsl;
+  }
+
+  if (response.error) {
+    content = `Error: ${response.error}`;
+  }
+
+  const assistantMessage: ChatMessage = {
+    id: `${sessionId}-${Date.now()}`,
+    role: "assistant",
+    content: content || "No response from server.",
+    timestamp: new Date().toISOString(),
+    sage_explain: response.sage_explain,
+    coder_proposal: response.coder_proposal,
+    discovery_bootstrap: response.discovery_bootstrap,
+  };
+
+  if (response.verb_disambiguation) {
+    const disambiguation = response.verb_disambiguation as {
+      options?: Array<{ verb_fqn: string; description?: string }>;
+    };
+    assistantMessage.decision_packet = {
+      id: `verb-${Date.now()}`,
+      kind: "clarification",
+      payload: {
+        question: "Which operation did you mean?",
+        options: (disambiguation.options || []).map((opt, idx) => ({
+          id: `opt-${idx}`,
+          label: opt.verb_fqn,
+          description: opt.description,
+          value: opt.verb_fqn,
+        })),
+      },
+    };
+  } else if (response.clarification) {
+    const clarification = response.clarification as {
+      question?: string;
+      options?: Array<{ id: string; label: string; value: unknown }>;
+    };
+    assistantMessage.decision_packet = {
+      id: `clarify-${Date.now()}`,
+      kind: "clarification",
+      payload: {
+        question: clarification.question || "Please clarify:",
+        options: (clarification.options || []).map((opt, idx) => ({
+          id: opt.id || `opt-${idx}`,
+          label: opt.label,
+          value: opt.value,
+        })),
+      },
+    };
+  } else if (response.decision) {
+    assistantMessage.decision_packet = {
+      id: response.decision.packet_id,
+      kind: "clarification",
+      payload: {
+        question: response.decision.prompt,
+        options: response.decision.choices.map((choice) => ({
+          id: choice.id,
+          label: choice.label,
+          description: choice.description,
+          value: choice.id,
+        })),
+      },
+      confirm_token: response.decision.confirm_token,
+    };
+  }
+
+  return assistantMessage;
+}
 
 export default chatApi;

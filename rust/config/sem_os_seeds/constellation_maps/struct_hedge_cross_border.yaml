@@ -243,6 +243,7 @@ slots:
     join: { via: cases, parent_fk: cbu_id, child_fk: case_id }
     cardinality: optional
     depends_on: [aifm]
+    state_machine: kyc_case_lifecycle
     verbs:
       {
         open: case.open,
@@ -263,7 +264,7 @@ slots:
             child_fk: evaluation_id,
           }
         cardinality: optional
-        depends_on: [{ slot: case, min_state: placeholder }]
+        depends_on: [{ slot: case, min_state: intake }]
         verbs: { evaluate: tollgate.evaluate }
   mandate:
     type: mandate
@@ -272,6 +273,6 @@ slots:
     join: { via: cbu_trading_profiles, parent_fk: cbu_id, child_fk: profile_id }
     cardinality: optional
     depends_on:
-      [{ slot: cbu, min_state: filled }, { slot: case, min_state: placeholder }]
+      [{ slot: cbu, min_state: filled }, { slot: case, min_state: intake }]
     verbs: { create: mandate.create }
 bulk_macros: [role_slots]

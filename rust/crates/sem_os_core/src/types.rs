@@ -72,6 +72,12 @@ pub enum ObjectType {
     EntityTypeDef,
     RelationshipTypeDef,
     VerbContract,
+    MacroDef,
+    UniverseDef,
+    ConstellationFamilyDef,
+    ConstellationMap,
+    StateMachine,
+    StateGraph,
     TaxonomyDef,
     TaxonomyNode,
     MembershipRule,
@@ -537,6 +543,16 @@ mod tests {
     fn test_object_type_display() {
         assert_eq!(ObjectType::VerbContract.to_string(), "verb_contract");
         assert_eq!(ObjectType::AttributeDef.to_string(), "attribute_def");
+        assert_eq!(ObjectType::MacroDef.to_string(), "macro_def");
+        assert_eq!(ObjectType::UniverseDef.to_string(), "universe_def");
+        assert_eq!(
+            ObjectType::ConstellationFamilyDef.to_string(),
+            "constellation_family_def"
+        );
+        assert_eq!(
+            ObjectType::ConstellationMap.to_string(),
+            "constellation_map"
+        );
     }
 
     #[test]

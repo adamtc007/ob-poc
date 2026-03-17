@@ -340,6 +340,9 @@ pub struct ChatResponse {
     /// Typed Coder/REPL proposal for UI rendering.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub coder_proposal: Option<CoderProposalPayload>,
+    /// Typed Sem OS discovery/bootstrap payload for onboarding-stage sessions.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub discovery_bootstrap: Option<DiscoveryBootstrapPayload>,
 }
 
 /// User-facing Sage explanation payload.
@@ -365,6 +368,69 @@ pub struct CoderProposalPayload {
     pub change_summary: Vec<String>,
     pub requires_confirmation: bool,
     pub ready_to_execute: bool,
+}
+
+/// Typed Sem OS discovery-stage payload for onboarding/bootstrap rendering.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DiscoveryBootstrapPayload {
+    pub grounding_readiness: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub matched_universes: Vec<DiscoveryUniverseOption>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub matched_domains: Vec<DiscoveryDomainOption>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub matched_families: Vec<DiscoveryFamilyOption>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub matched_constellations: Vec<DiscoveryConstellationOption>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub missing_inputs: Vec<DiscoveryInputPrompt>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub entry_questions: Vec<DiscoveryQuestionPrompt>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DiscoveryUniverseOption {
+    pub universe_id: String,
+    pub name: String,
+    pub score: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DiscoveryDomainOption {
+    pub domain_id: String,
+    pub label: String,
+    pub score: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DiscoveryFamilyOption {
+    pub family_id: String,
+    pub label: String,
+    pub domain_id: String,
+    pub score: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DiscoveryConstellationOption {
+    pub constellation_id: String,
+    pub label: String,
+    pub score: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DiscoveryInputPrompt {
+    pub key: String,
+    pub label: String,
+    pub required: bool,
+    pub input_type: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DiscoveryQuestionPrompt {
+    pub question_id: String,
+    pub prompt: String,
+    pub maps_to: String,
+    pub priority: u8,
 }
 
 /// Verb surface response for the REST endpoint.

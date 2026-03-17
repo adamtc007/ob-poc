@@ -7,6 +7,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type {
   ChatMessage as ChatMessageType,
+  DiscoverySelection,
   ToolCall,
 } from "../../../types/chat";
 import { cn, formatTime } from "../../../lib/utils";
@@ -15,6 +16,7 @@ import { DecisionCard } from "./DecisionCard";
 interface ChatMessageProps {
   message: ChatMessageType;
   onDecisionReply?: (packetId: string, reply: unknown) => void;
+  onDiscoverySelection?: (selection: DiscoverySelection) => void;
 }
 
 function ToolCallDisplay({ toolCall }: { toolCall: ToolCall }) {
@@ -128,7 +130,143 @@ function CoderProposalCard({ message }: { message: ChatMessageType }) {
   );
 }
 
-export function ChatMessage({ message, onDecisionReply }: ChatMessageProps) {
+function DiscoveryBootstrapCard({
+  message,
+  onDiscoverySelection,
+}: {
+  message: ChatMessageType;
+  onDiscoverySelection?: (selection: DiscoverySelection) => void;
+}) {
+  const bootstrap = message.discovery_bootstrap;
+  if (!bootstrap) return null;
+
+  return (
+    <div className="mt-2 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-tertiary)] p-3 text-sm">
+      <div className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+        Sage Bootstrap
+      </div>
+      <div className="mt-2 flex flex-wrap gap-2 text-xs text-[var(--text-secondary)]">
+        <span className="rounded bg-[var(--bg-secondary)] px-2 py-1">
+          readiness: {bootstrap.grounding_readiness.replaceAll("_", " ")}
+        </span>
+      </div>
+
+      {bootstrap.entry_questions && bootstrap.entry_questions.length > 0 && (
+        <div className="mt-3">
+          <div className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+            Next Questions
+          </div>
+          <ul className="mt-2 list-disc pl-5 text-xs text-[var(--text-secondary)]">
+            {bootstrap.entry_questions.map((item) => (
+              <li key={item.question_id}>{item.prompt}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {bootstrap.matched_domains && bootstrap.matched_domains.length > 0 && (
+        <div className="mt-3">
+          <div className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+            Likely Work Areas
+          </div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {bootstrap.matched_domains.map((item) => (
+              <button
+                key={item.domain_id}
+                type="button"
+                className="rounded bg-[var(--bg-secondary)] px-2 py-1 text-xs text-[var(--text-primary)] transition hover:bg-[var(--accent-blue)] hover:text-white"
+                onClick={() =>
+                  onDiscoverySelection?.({
+                    selection_kind: "domain",
+                    selection_id: item.domain_id,
+                    label: item.label,
+                  })
+                }
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {bootstrap.matched_families && bootstrap.matched_families.length > 0 && (
+        <div className="mt-3">
+          <div className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+            Candidate Families
+          </div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {bootstrap.matched_families.map((item) => (
+              <button
+                key={item.family_id}
+                type="button"
+                className="rounded bg-[var(--bg-secondary)] px-2 py-1 text-xs text-[var(--text-primary)] transition hover:bg-[var(--accent-blue)] hover:text-white"
+                onClick={() =>
+                  onDiscoverySelection?.({
+                    selection_kind: "family",
+                    selection_id: item.family_id,
+                    label: item.label,
+                  })
+                }
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {bootstrap.matched_constellations &&
+        bootstrap.matched_constellations.length > 0 && (
+          <div className="mt-3">
+            <div className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+              Candidate Constellations
+            </div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {bootstrap.matched_constellations.map((item) => (
+                <button
+                  key={item.constellation_id}
+                  type="button"
+                  className="rounded bg-[var(--bg-secondary)] px-2 py-1 text-xs text-[var(--text-primary)] transition hover:bg-[var(--accent-blue)] hover:text-white"
+                  onClick={() =>
+                    onDiscoverySelection?.({
+                      selection_kind: "constellation",
+                      selection_id: item.constellation_id,
+                      label: item.label,
+                    })
+                  }
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+      {bootstrap.missing_inputs && bootstrap.missing_inputs.length > 0 && (
+        <div className="mt-3">
+          <div className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+            Still Needed
+          </div>
+          <ul className="mt-2 list-disc pl-5 text-xs text-[var(--text-secondary)]">
+            {bootstrap.missing_inputs.map((item) => (
+              <li key={item.key}>
+                {item.label}
+                {item.required ? " (required)" : ""}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function ChatMessage({
+  message,
+  onDecisionReply,
+  onDiscoverySelection,
+}: ChatMessageProps) {
   const isUser = message.role === "user";
   const isSystem = message.role === "system";
 
@@ -188,6 +326,10 @@ export function ChatMessage({ message, onDecisionReply }: ChatMessageProps) {
         {!isUser && (
           <>
             <SageExplainCard message={message} />
+            <DiscoveryBootstrapCard
+              message={message}
+              onDiscoverySelection={onDiscoverySelection}
+            />
             <CoderProposalCard message={message} />
           </>
         )}

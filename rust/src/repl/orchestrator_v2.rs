@@ -2072,8 +2072,8 @@ impl ReplOrchestratorV2 {
         // Phase 4 CCIR: Resolve SemReg ContextEnvelope and pre-constrain verb search.
         // This injects `allowed_verbs` into MatchContext, which flows through to
         // VerbSearchIntentMatcher → HybridVerbSearcher::search() via the Phase 3
-        // allowed_verbs parameter. Graceful degradation: if SemOS unavailable or
-        // returns DenyAll, search proceeds unconstrained with a governance warning.
+        // allowed_verbs parameter. REPL matching is fail-closed: if Sem OS is
+        // unavailable, the allowed set is empty.
         let mut sem_reg_fingerprint: Option<String> = None;
         let mut sem_reg_pruned_count: usize = 0;
         if let Some(ref client) = self.sem_os_client {
@@ -2090,9 +2090,16 @@ impl ReplOrchestratorV2 {
                     session_id = %session.id,
                     "REPL: SemReg DenyAll — verb search will return empty"
                 );
+                match_ctx.allowed_verbs = Some(envelope.allowed_verbs.clone());
             }
 
-            if !envelope.is_unavailable() {
+            if envelope.is_unavailable() {
+                tracing::warn!(
+                    session_id = %session.id,
+                    "REPL: SemReg unavailable — blocking unconstrained verb matching"
+                );
+                match_ctx.allowed_verbs = Some(std::collections::HashSet::new());
+            } else {
                 sem_reg_fingerprint = Some(envelope.fingerprint_str().to_string());
                 sem_reg_pruned_count = envelope.pruned_count();
                 match_ctx.allowed_verbs = Some(envelope.allowed_verbs.clone());
@@ -2104,6 +2111,12 @@ impl ReplOrchestratorV2 {
                     "REPL: SemReg pre-constraint applied to MatchContext"
                 );
             }
+        } else {
+            tracing::warn!(
+                session_id = %session.id,
+                "REPL: SemOsClient unavailable — blocking unconstrained verb matching"
+            );
+            match_ctx.allowed_verbs = Some(std::collections::HashSet::new());
         }
 
         // Phase 2: Try IntentService with context-aware matching first.

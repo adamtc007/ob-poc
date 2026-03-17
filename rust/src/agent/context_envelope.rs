@@ -13,7 +13,9 @@ use std::collections::HashSet;
 use uuid::Uuid;
 
 use sem_os_core::abac::AccessDecision;
-use sem_os_core::context_resolution::ContextResolutionResponse;
+use sem_os_core::context_resolution::{
+    ContextResolutionResponse, DiscoverySurface, ResolutionStage,
+};
 
 /// Structured result of SemReg context resolution.
 ///
@@ -39,6 +41,11 @@ pub struct ContextEnvelope {
     pub snapshot_set_id: Option<String>,
     /// When this envelope was computed.
     pub computed_at: DateTime<Utc>,
+    /// Whether Sem OS is still in discovery mode for this session.
+    pub resolution_stage: ResolutionStage,
+    /// Discovery-stage surface returned by Sem OS, when the session is not grounded yet.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub discovery_surface: Option<DiscoverySurface>,
     /// Whether this is a "deny all" result (resolution succeeded, zero verbs).
     deny_all: bool,
     /// Whether SemReg was unavailable (resolution failed or not configured).
@@ -225,6 +232,8 @@ impl ContextEnvelope {
             governance_signals: gov_signals,
             snapshot_set_id: None,
             computed_at: Utc::now(),
+            resolution_stage: response.resolution_stage,
+            discovery_surface: response.discovery_surface.clone(),
             deny_all,
             unavailable: false,
         }
@@ -241,6 +250,8 @@ impl ContextEnvelope {
             governance_signals: vec![],
             snapshot_set_id: None,
             computed_at: Utc::now(),
+            resolution_stage: ResolutionStage::Grounded,
+            discovery_surface: None,
             deny_all: false,
             unavailable: true,
         }
@@ -257,6 +268,8 @@ impl ContextEnvelope {
             governance_signals: vec![],
             snapshot_set_id: None,
             computed_at: Utc::now(),
+            resolution_stage: ResolutionStage::Grounded,
+            discovery_surface: None,
             deny_all: true,
             unavailable: false,
         }
@@ -275,6 +288,19 @@ impl ContextEnvelope {
     /// True if SemReg was unavailable (not configured or resolution failed).
     pub fn is_unavailable(&self) -> bool {
         self.unavailable
+    }
+
+    /// True when Sem OS is asking the caller to continue discovery instead of executing.
+    pub fn is_discovery_stage(&self) -> bool {
+        self.resolution_stage == ResolutionStage::Discovery
+    }
+
+    /// First discovery-stage question Sem OS wants the caller to ask, if any.
+    pub fn first_discovery_question(&self) -> Option<&str> {
+        self.discovery_surface
+            .as_ref()
+            .and_then(|surface| surface.entry_questions.first())
+            .map(|question| question.prompt.as_str())
     }
 
     /// Backward-compatible label matching old `SemRegVerbPolicy::label()`.
@@ -312,6 +338,8 @@ impl ContextEnvelope {
             governance_signals: vec![],
             snapshot_set_id: None,
             computed_at: Utc::now(),
+            resolution_stage: ResolutionStage::Grounded,
+            discovery_surface: None,
             deny_all: false,
             unavailable: false,
         }

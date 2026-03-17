@@ -844,6 +844,9 @@ pub struct ChatMessage {
     /// Coder proposal payload for this message.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub coder_proposal: Option<ob_poc_types::chat::CoderProposalPayload>,
+    /// Sem OS discovery bootstrap payload for this message.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub discovery_bootstrap: Option<ob_poc_types::chat::DiscoveryBootstrapPayload>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -2111,6 +2114,7 @@ impl UnifiedSession {
             dsl: None,
             sage_explain: None,
             coder_proposal: None,
+            discovery_bootstrap: None,
         });
         self.updated_at = Utc::now();
         id
@@ -2134,6 +2138,7 @@ impl UnifiedSession {
             dsl,
             sage_explain: None,
             coder_proposal: None,
+            discovery_bootstrap: None,
         });
         self.updated_at = Utc::now();
         id
@@ -2151,6 +2156,7 @@ impl UnifiedSession {
             dsl: None,
             sage_explain: None,
             coder_proposal: None,
+            discovery_bootstrap: None,
         });
         self.updated_at = Utc::now();
         id
@@ -3516,6 +3522,7 @@ impl From<ChatMessage> for crate::api::session::ChatMessage {
             dsl: msg.dsl,
             sage_explain: msg.sage_explain,
             coder_proposal: msg.coder_proposal,
+            discovery_bootstrap: msg.discovery_bootstrap,
         }
     }
 }

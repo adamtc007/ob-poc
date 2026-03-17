@@ -6,9 +6,10 @@
 //! `InProcessClient` wraps `Arc<dyn CoreService>` and delegates all calls here.
 //! `HttpClient` calls `sem_os_server` over HTTP, which itself holds a CoreService.
 
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use async_trait::async_trait;
+use chrono::Utc;
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
@@ -23,8 +24,19 @@ use crate::{
             ValidationReport,
         },
     },
-    context_resolution::{ContextResolutionRequest, ContextResolutionResponse},
+    constellation_family_def::{ConstellationFamilyDefBody, ConstellationRef},
+    constellation_map_def::ConstellationMapDefBody,
+    context_resolution::{
+        compute_composite_access, compute_confidence, evaluate_policies,
+        evaluate_verb_preconditions, filter_and_rank_attributes, filter_and_rank_verbs,
+        generate_disambiguation, generate_governance_signals, rank_views_by_overlap,
+        ContextResolutionRequest, ContextResolutionResponse, DiscoverySurface, DslCandidate,
+        EvidenceSummary, GovernanceSignal, GroundedActionSurface, GroundingReadiness,
+        RankedConstellation, RankedConstellationFamily, RankedUniverse, RankedUniverseDomain,
+        RankedView, ResolutionStage, ResolvedSubject, SubjectMemberships, SubjectRelationships,
+    },
     error::SemOsError,
+    grounding::{compute_slot_action_surface, ConstellationModel},
     ports::{
         AuditStore, BootstrapAuditStore, ChangesetStore, EvidenceInstanceStore, ObjectStore,
         OutboxStore, ProjectionWriter, SnapshotStore,
@@ -32,7 +44,10 @@ use crate::{
     principal::Principal,
     proto::*,
     seeds::SeedBundle,
+    state_machine_def::StateMachineDefBody,
     types::*,
+    universe_def::{GroundingInput, UniverseDefBody, UniverseDomain},
+    view_def::ViewDefBody,
 };
 
 pub type Result<T> = std::result::Result<T, SemOsError>;
@@ -289,22 +304,664 @@ impl CoreServiceImpl {
     }
 }
 
+fn render_grounded_dsl(action_id: &str, subject: &crate::context_resolution::SubjectRef) -> String {
+    format!("{action_id} :subject {}", subject.id())
+}
+
+fn score_slot_against_request(
+    slot_name: &str,
+    verbs: &[String],
+    intent: Option<&str>,
+    goals: &[String],
+) -> i32 {
+    let mut score = 0;
+    let mut haystacks = Vec::new();
+    if let Some(intent) = intent {
+        haystacks.push(intent.to_ascii_lowercase());
+    }
+    haystacks.extend(goals.iter().map(|goal| goal.to_ascii_lowercase()));
+    if haystacks.is_empty() {
+        return 0;
+    }
+
+    let slot_terms = slot_name
+        .split('.')
+        .map(|term| term.replace('_', " "))
+        .collect::<Vec<_>>();
+    for haystack in haystacks {
+        for term in &slot_terms {
+            if haystack.contains(term) {
+                score += 2;
+            }
+        }
+        for verb in verbs {
+            let normalized = verb.replace(['.', '-'], " ");
+            if haystack.contains(&normalized) {
+                score += 4;
+            } else {
+                for term in normalized.split_whitespace() {
+                    if haystack.contains(term) {
+                        score += 1;
+                    }
+                }
+            }
+        }
+    }
+    score
+}
+
+fn build_grounded_action_surface(
+    subject: &crate::context_resolution::SubjectRef,
+    req: &ContextResolutionRequest,
+    constellation_rows: &[SnapshotRow],
+    state_machine_rows: &[SnapshotRow],
+) -> Option<GroundedActionSurface> {
+    let state_machines = state_machine_rows
+        .iter()
+        .filter_map(|row| {
+            row.parse_definition::<StateMachineDefBody>()
+                .ok()
+                .map(|body| (body.state_machine.clone(), body))
+        })
+        .collect::<HashMap<_, _>>();
+
+    let mut best: Option<(i32, GroundedActionSurface)> = None;
+    for row in constellation_rows {
+        let Ok(map) = row.parse_definition::<ConstellationMapDefBody>() else {
+            continue;
+        };
+        let model = ConstellationModel::from_parts(map.clone(), state_machines.clone());
+        for (slot_name, slot) in &model.slots {
+            if slot.def.verbs.is_empty() {
+                continue;
+            }
+            let verbs = slot
+                .def
+                .verbs
+                .values()
+                .map(|entry| entry.verb_fqn().to_string())
+                .collect::<Vec<_>>();
+            let score = score_slot_against_request(
+                slot_name,
+                &verbs,
+                request_summary(req),
+                &req.goals,
+            );
+            if score <= 0 && (request_summary(req).is_some() || request_raw_utterance(req).is_some()) {
+                continue;
+            }
+
+            let mut slot_states = HashMap::new();
+            if let Some(state_machine) = slot
+                .def
+                .state_machine
+                .as_ref()
+                .and_then(|name| model.state_machines.get(name))
+            {
+                slot_states.insert(slot_name.clone(), state_machine.initial.clone());
+            }
+
+            let Ok(surface) = compute_slot_action_surface(&model, &slot_states, slot_name) else {
+                continue;
+            };
+            let dsl_candidates = surface
+                .valid_actions
+                .iter()
+                .map(|action| DslCandidate {
+                    action_id: action.action_id.clone(),
+                    dsl: render_grounded_dsl(&action.action_id, subject),
+                    executable: action.requires_subject,
+                })
+                .collect::<Vec<_>>();
+
+            let grounded = GroundedActionSurface {
+                resolved_subject: subject.clone(),
+                resolved_constellation: Some(model.constellation.clone()),
+                resolved_slot_path: Some(slot_name.clone()),
+                resolved_node_id: Some(format!("{}:{}", model.constellation, slot_name)),
+                resolved_state_machine: slot.def.state_machine.clone(),
+                current_state: slot_states.get(slot_name).cloned(),
+                valid_actions: surface.valid_actions,
+                blocked_actions: surface.blocked_actions,
+                dsl_candidates,
+            };
+
+            match &best {
+                Some((best_score, _)) if score <= *best_score => {}
+                _ => best = Some((score, grounded)),
+            }
+        }
+    }
+
+    best.map(|(_, grounded)| grounded)
+}
+
+fn is_discovery_stage(req: &ContextResolutionRequest) -> bool {
+    matches!(
+        req.subject,
+        crate::context_resolution::SubjectRef::TaskId(_)
+    ) && req.entity_kind.is_none()
+}
+
+fn request_entity_kind(req: &ContextResolutionRequest) -> Option<&str> {
+    req.entity_kind
+        .as_deref()
+        .or_else(|| req.discovery.known_inputs.get("entity_kind").map(String::as_str))
+}
+
+fn request_summary(req: &ContextResolutionRequest) -> Option<&str> {
+    req.intent_summary.as_deref()
+}
+
+fn request_raw_utterance(req: &ContextResolutionRequest) -> Option<&str> {
+    req.raw_utterance.as_deref()
+}
+
+fn combined_request_text(req: &ContextResolutionRequest) -> String {
+    let mut parts = Vec::new();
+
+    if let Some(raw) = request_raw_utterance(req).map(str::trim).filter(|v| !v.is_empty()) {
+        parts.push(raw.to_string());
+    }
+    if let Some(summary) = request_summary(req).map(str::trim).filter(|v| !v.is_empty()) {
+        if !parts.iter().any(|part| part == summary) {
+            parts.push(summary.to_string());
+        }
+    }
+    if !req.goals.is_empty() {
+        let goals = req.goals.join(" ");
+        if !goals.trim().is_empty() {
+            parts.push(goals);
+        }
+    }
+    for value in req.discovery.known_inputs.values() {
+        let value = value.trim();
+        if !value.is_empty() {
+            parts.push(value.to_string());
+        }
+    }
+
+    parts.join(" ")
+}
+
+fn request_jurisdiction(req: &ContextResolutionRequest) -> Option<&str> {
+    req.constraints
+        .jurisdiction
+        .as_deref()
+        .or_else(|| req.discovery.known_inputs.get("jurisdiction").map(String::as_str))
+}
+
+fn has_objective(req: &ContextResolutionRequest) -> bool {
+    request_summary(req).is_some_and(|value| !value.trim().is_empty())
+        || request_raw_utterance(req).is_some_and(|value| !value.trim().is_empty())
+        || req
+            .discovery
+            .known_inputs
+            .get("objective")
+            .is_some_and(|value| !value.trim().is_empty())
+}
+
+fn score_domain(
+    domain: &UniverseDomain,
+    request_text: &str,
+    req: &ContextResolutionRequest,
+) -> f64 {
+    if let Some(selected_domain_id) = req.discovery.selected_domain_id.as_deref() {
+        return if selected_domain_id == domain.domain_id {
+            10.0
+        } else {
+            0.0
+        };
+    }
+
+    let lowered = request_text.to_lowercase();
+    let mut score = 0.0;
+
+    for tag in &domain.objective_tags {
+        if lowered.contains(&tag.to_lowercase()) {
+            score += 0.45;
+        }
+    }
+
+    for signal in &domain.utterance_signals {
+        if lowered.contains(&signal.pattern.to_lowercase()) {
+            score += signal.weight;
+        }
+    }
+
+    if let Some(entity_kind) = request_entity_kind(req) {
+        if domain
+            .candidate_entity_kinds
+            .iter()
+            .any(|kind| kind == entity_kind)
+        {
+            score += 0.35;
+        }
+    }
+
+    score
+}
+
+fn score_constellation_ref(
+    constellation: &ConstellationRef,
+    family: &ConstellationFamilyDefBody,
+    request_text: &str,
+    req: &ContextResolutionRequest,
+) -> f64 {
+    if let Some(selected_constellation_id) = req.discovery.selected_constellation_id.as_deref() {
+        return if selected_constellation_id == constellation.constellation_id {
+            10.0
+        } else {
+            0.0
+        };
+    }
+
+    let lowered = request_text.to_lowercase();
+    let mut score = 0.0;
+
+    if let Some(entity_kind) = request_entity_kind(req) {
+        if constellation.entity_kind.as_deref() == Some(entity_kind) {
+            score += 0.4;
+        }
+    }
+
+    if let Some(jurisdiction) = request_jurisdiction(req) {
+        if constellation.jurisdiction.as_deref() == Some(jurisdiction) {
+            score += 0.4;
+        }
+    }
+
+    if family
+        .candidate_entity_kinds
+        .iter()
+        .any(|kind| lowered.contains(&kind.to_lowercase()))
+    {
+        score += 0.1;
+    }
+
+    for trigger in &constellation.triggers {
+        if lowered.contains(&trigger.to_lowercase()) {
+            score += 0.2;
+        }
+    }
+
+    score
+}
+
+fn compute_grounding_readiness(
+    family: Option<&ConstellationFamilyDefBody>,
+    req: &ContextResolutionRequest,
+    matched_constellations: &[RankedConstellation],
+) -> GroundingReadiness {
+    let Some(family) = family else {
+        return GroundingReadiness::NotReady;
+    };
+
+    let has_all_required_inputs =
+        family
+            .grounding_threshold
+            .required_input_keys
+            .iter()
+            .all(|key| match key.as_str() {
+                "objective" => has_objective(req),
+                "jurisdiction" => request_jurisdiction(req).is_some(),
+                "entity_kind" => request_entity_kind(req).is_some(),
+                _ => false,
+            });
+
+    if matched_constellations.is_empty() {
+        GroundingReadiness::FamilyReady
+    } else if has_all_required_inputs {
+        GroundingReadiness::ConstellationReady
+    } else {
+        GroundingReadiness::FamilyReady
+    }
+}
+
+fn build_discovery_surface(
+    req: &ContextResolutionRequest,
+    universe_rows: &[SnapshotRow],
+    family_rows: &[SnapshotRow],
+) -> Option<DiscoverySurface> {
+    let request_text = combined_request_text(req);
+
+    let universes: Vec<UniverseDefBody> = universe_rows
+        .iter()
+        .filter_map(|row| row.parse_definition::<UniverseDefBody>().ok())
+        .collect();
+    let families: Vec<ConstellationFamilyDefBody> = family_rows
+        .iter()
+        .filter_map(|row| row.parse_definition::<ConstellationFamilyDefBody>().ok())
+        .collect();
+
+    if universes.is_empty() && families.is_empty() {
+        return None;
+    }
+
+    let mut matched_universes = Vec::new();
+    let mut matched_domains = Vec::new();
+    for universe in &universes {
+        let mut best_domain_score: f64 = 0.0;
+        for domain in &universe.domains {
+            let score = score_domain(domain, &request_text, req);
+            best_domain_score = best_domain_score.max(score);
+            matched_domains.push(RankedUniverseDomain {
+                universe_fqn: universe.fqn.clone(),
+                domain_id: domain.domain_id.clone(),
+                label: domain.label.clone(),
+                score,
+            });
+        }
+
+        matched_universes.push(RankedUniverse {
+            fqn: universe.fqn.clone(),
+            universe_id: universe.universe_id.clone(),
+            name: universe.name.clone(),
+            score: best_domain_score.max(0.1),
+        });
+    }
+
+    matched_universes.sort_by(|a, b| b.score.total_cmp(&a.score));
+    matched_domains.sort_by(|a, b| b.score.total_cmp(&a.score));
+
+    let top_domain = matched_domains
+        .first()
+        .map(|domain| domain.domain_id.as_str());
+    let lowered_request = request_text.to_lowercase();
+    let mut matched_families = Vec::new();
+    let mut matched_constellations = Vec::new();
+
+    for family in &families {
+        let mut score = 0.0;
+        if top_domain == Some(family.domain_id.as_str()) {
+            score += 0.5;
+        }
+        if let Some(selected_family_id) = req.discovery.selected_family_id.as_deref() {
+            if selected_family_id == family.family_id {
+                score += 10.0;
+            } else {
+                score = 0.0;
+            }
+        }
+        if let Some(entity_kind) = request_entity_kind(req) {
+            if family
+                .candidate_entity_kinds
+                .iter()
+                .any(|kind| kind == entity_kind)
+            {
+                score += 0.35;
+            }
+        }
+        if let Some(jurisdiction) = request_jurisdiction(req) {
+            if family
+                .candidate_jurisdictions
+                .iter()
+                .any(|value| value == jurisdiction)
+            {
+                score += 0.35;
+            }
+        }
+        if lowered_request.contains(&family.label.to_lowercase()) {
+            score += 0.25;
+        }
+
+        matched_families.push(RankedConstellationFamily {
+            fqn: family.fqn.clone(),
+            family_id: family.family_id.clone(),
+            label: family.label.clone(),
+            domain_id: family.domain_id.clone(),
+            score,
+            grounding_threshold: family.grounding_threshold.clone(),
+        });
+
+        for constellation in &family.constellation_refs {
+            matched_constellations.push(RankedConstellation {
+                family_fqn: family.fqn.clone(),
+                constellation_id: constellation.constellation_id.clone(),
+                label: constellation.label.clone(),
+                score: score + score_constellation_ref(constellation, family, &request_text, req),
+            });
+        }
+    }
+
+    matched_families.sort_by(|a, b| b.score.total_cmp(&a.score));
+    matched_constellations.sort_by(|a, b| b.score.total_cmp(&a.score));
+    matched_constellations.truncate(8);
+
+    let top_family = matched_families
+        .first()
+        .and_then(|family_rank| families.iter().find(|family| family.fqn == family_rank.fqn));
+
+    let missing_inputs = top_family
+        .map(|family| {
+            family
+                .grounding_threshold
+                .required_input_keys
+                .iter()
+                .filter_map(|key| match key.as_str() {
+                    "objective" if !has_objective(req) => Some(GroundingInput {
+                        key: "objective".to_string(),
+                        label: "Objective".to_string(),
+                        required: true,
+                        input_type: "string".to_string(),
+                    }),
+                    "jurisdiction" if request_jurisdiction(req).is_none() => {
+                        Some(GroundingInput {
+                            key: "jurisdiction".to_string(),
+                            label: "Jurisdiction".to_string(),
+                            required: true,
+                            input_type: "string".to_string(),
+                        })
+                    }
+                    "entity_kind" if request_entity_kind(req).is_none() => Some(GroundingInput {
+                        key: "entity_kind".to_string(),
+                        label: "Entity kind".to_string(),
+                        required: true,
+                        input_type: "string".to_string(),
+                    }),
+                    _ => None,
+                })
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+
+    let entry_questions = matched_domains
+        .first()
+        .and_then(|top_domain| {
+            universes
+                .iter()
+                .flat_map(|universe| universe.domains.iter())
+                .find(|domain| domain.domain_id == top_domain.domain_id)
+                .map(|domain| domain.entry_questions.clone())
+        })
+        .unwrap_or_default();
+
+    let readiness = compute_grounding_readiness(top_family, req, &matched_constellations);
+
+    Some(DiscoverySurface {
+        matched_universes,
+        matched_domains,
+        matched_families,
+        matched_constellations,
+        missing_inputs,
+        entry_questions,
+        grounding_readiness: readiness,
+    })
+}
+
 #[async_trait]
 impl CoreService for CoreServiceImpl {
     async fn resolve_context(
         &self,
         _principal: &Principal,
-        _req: ContextResolutionRequest,
+        req: ContextResolutionRequest,
     ) -> Result<ContextResolutionResponse> {
-        // The full 12-step pipeline exists in the monolith
-        // (rust/src/sem_reg/context_resolution.rs) and is invoked via the
-        // PgPool-based path in agent/orchestrator.rs. Wiring it here requires
-        // additional port trait methods (BulkLoadStore) — tracked separately.
-        Err(SemOsError::MigrationPending(
-            "context resolution pipeline not yet wired to standalone service \
-             (requires BulkLoadStore port for Steps 1-2c)"
-                .into(),
-        ))
+        let active = self.snapshots.load_active_snapshots().await?;
+        let mut view_rows = Vec::new();
+        let mut verb_rows = Vec::new();
+        let mut attr_rows = Vec::new();
+        let mut policy_rows = Vec::new();
+        let mut universe_rows = Vec::new();
+        let mut family_rows = Vec::new();
+        let mut constellation_rows = Vec::new();
+        let mut state_machine_rows = Vec::new();
+
+        for row in active {
+            match row.object_type {
+                ObjectType::ViewDef => view_rows.push(row),
+                ObjectType::VerbContract => verb_rows.push(row),
+                ObjectType::AttributeDef => attr_rows.push(row),
+                ObjectType::PolicyRule => policy_rows.push(row),
+                ObjectType::UniverseDef => universe_rows.push(row),
+                ObjectType::ConstellationFamilyDef => family_rows.push(row),
+                ObjectType::ConstellationMap => constellation_rows.push(row),
+                ObjectType::StateMachine => state_machine_rows.push(row),
+                _ => {}
+            }
+        }
+
+        let views = view_rows
+            .iter()
+            .filter_map(|row| {
+                row.parse_definition::<ViewDefBody>()
+                    .ok()
+                    .map(|body| (row.clone(), body))
+            })
+            .collect::<Vec<_>>();
+
+        let memberships = SubjectMemberships::default();
+        let relationships = SubjectRelationships::default();
+        let resolved_subject = ResolvedSubject {
+            entity_type_fqn: req.entity_kind.clone(),
+            jurisdiction: req
+                .constraints
+                .jurisdiction
+                .clone()
+                .or_else(|| req.actor.jurisdictions.first().cloned()),
+            state: None,
+        };
+
+        let mut applicable_views = rank_views_by_overlap(&views, &resolved_subject, &memberships);
+        applicable_views.sort_by(|a, b| {
+            b.overlap_score
+                .partial_cmp(&a.overlap_score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+
+        let top_view = applicable_views.first().map(|view| &view.body);
+        let mut candidate_verbs = filter_and_rank_verbs(
+            &verb_rows,
+            &req.actor,
+            req.evidence_mode,
+            top_view,
+            req.entity_kind.as_deref(),
+            &memberships,
+            &relationships,
+        );
+        candidate_verbs.sort_by(|a, b| {
+            b.rank_score
+                .partial_cmp(&a.rank_score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        candidate_verbs.truncate(2048);
+
+        let mut candidate_attributes = filter_and_rank_attributes(
+            &attr_rows,
+            &req.actor,
+            req.evidence_mode,
+            top_view,
+            &memberships,
+        );
+        candidate_attributes.sort_by(|a, b| {
+            b.rank_score
+                .partial_cmp(&a.rank_score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        candidate_attributes.truncate(2048);
+
+        let required_preconditions = evaluate_verb_preconditions(&candidate_verbs);
+        let policy_verdicts = evaluate_policies(&policy_rows, &candidate_verbs, &req.actor);
+        let security_handling = compute_composite_access(&candidate_verbs, &policy_verdicts);
+        let governance_signals: Vec<GovernanceSignal> =
+            generate_governance_signals(&candidate_verbs, &candidate_attributes, req.evidence_mode);
+        let confidence = compute_confidence(
+            &applicable_views,
+            &candidate_verbs,
+            &required_preconditions,
+            &candidate_attributes,
+        );
+        let grounded_action_surface = build_grounded_action_surface(
+            &req.subject,
+            &req,
+            &constellation_rows,
+            &state_machine_rows,
+        );
+        let discovery_surface = if is_discovery_stage(&req) {
+            build_discovery_surface(&req, &universe_rows, &family_rows)
+        } else {
+            None
+        };
+        let resolution_stage = if discovery_surface.is_some() {
+            ResolutionStage::Discovery
+        } else {
+            ResolutionStage::Grounded
+        };
+        let candidate_verbs = if discovery_surface.is_some() {
+            Vec::new()
+        } else {
+            candidate_verbs
+        };
+        let candidate_attributes = if discovery_surface.is_some() {
+            Vec::new()
+        } else {
+            candidate_attributes
+        };
+        let required_preconditions = if discovery_surface.is_some() {
+            Vec::new()
+        } else {
+            required_preconditions
+        };
+        let policy_verdicts = if discovery_surface.is_some() {
+            Vec::new()
+        } else {
+            policy_verdicts
+        };
+        let grounded_action_surface = if discovery_surface.is_some() {
+            None
+        } else {
+            grounded_action_surface
+        };
+
+        Ok(ContextResolutionResponse {
+            as_of_time: req.point_in_time.unwrap_or_else(Utc::now),
+            resolved_at: Utc::now(),
+            applicable_views,
+            candidate_verbs,
+            candidate_attributes,
+            required_preconditions,
+            disambiguation_questions: generate_disambiguation(
+                &views
+                    .iter()
+                    .map(|(row, body)| RankedView {
+                        view_snapshot_id: row.snapshot_id,
+                        view_id: row.object_id,
+                        fqn: body.fqn.clone(),
+                        name: body.name.clone(),
+                        overlap_score: 0.0,
+                        body: body.clone(),
+                    })
+                    .collect::<Vec<_>>(),
+                &[],
+            ),
+            evidence: EvidenceSummary::default(),
+            policy_verdicts,
+            security_handling,
+            governance_signals,
+            confidence,
+            grounded_action_surface,
+            resolution_stage,
+            discovery_surface,
+        })
     }
 
     async fn get_manifest(&self, snapshot_set_id: &str) -> Result<GetManifestResponse> {
@@ -361,6 +1018,43 @@ impl CoreService for CoreServiceImpl {
             .verb_contracts
             .iter()
             .map(|s| (ObjectType::VerbContract, s.fqn.as_str(), &s.payload))
+            .chain(
+                bundle
+                    .macro_defs
+                    .iter()
+                    .map(|s| (ObjectType::MacroDef, s.fqn.as_str(), &s.payload)),
+            )
+            .chain(
+                bundle
+                    .universes
+                    .iter()
+                    .map(|s| (ObjectType::UniverseDef, s.fqn.as_str(), &s.payload)),
+            )
+            .chain(bundle.constellation_families.iter().map(|s| {
+                (
+                    ObjectType::ConstellationFamilyDef,
+                    s.fqn.as_str(),
+                    &s.payload,
+                )
+            }))
+            .chain(
+                bundle
+                    .constellation_maps
+                    .iter()
+                    .map(|s| (ObjectType::ConstellationMap, s.fqn.as_str(), &s.payload)),
+            )
+            .chain(
+                bundle
+                    .state_machines
+                    .iter()
+                    .map(|s| (ObjectType::StateMachine, s.fqn.as_str(), &s.payload)),
+            )
+            .chain(
+                bundle
+                    .state_graphs
+                    .iter()
+                    .map(|s| (ObjectType::StateGraph, s.fqn.as_str(), &s.payload)),
+            )
             .chain(
                 bundle
                     .attributes
@@ -1117,6 +1811,10 @@ fn parse_uuid(s: &str, field_name: &str) -> Result<Uuid> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::abac::ActorContext;
+    use crate::context_resolution::{EvidenceMode, ResolutionConstraints, SubjectRef};
+    use chrono::Utc;
+    use serde_json::json;
 
     #[test]
     fn test_parse_uuid_valid() {
@@ -1137,5 +1835,134 @@ mod tests {
             }
             other => panic!("Expected InvalidInput, got {other:?}"),
         }
+    }
+
+    fn snapshot_row(
+        object_type: ObjectType,
+        definition: serde_json::Value,
+        fqn: &str,
+    ) -> SnapshotRow {
+        SnapshotRow {
+            snapshot_id: Uuid::new_v4(),
+            snapshot_set_id: None,
+            object_type,
+            object_id: crate::ids::object_id_for(object_type, fqn),
+            version_major: 1,
+            version_minor: 0,
+            status: SnapshotStatus::Active,
+            governance_tier: GovernanceTier::Operational,
+            trust_class: TrustClass::Convenience,
+            security_label: json!({}),
+            effective_from: Utc::now(),
+            effective_until: None,
+            predecessor_id: None,
+            change_type: ChangeType::Created,
+            change_rationale: None,
+            created_by: "test".into(),
+            approved_by: Some("auto".into()),
+            definition,
+            created_at: Utc::now(),
+        }
+    }
+
+    #[test]
+    fn discovery_surface_ranks_matching_domain_and_family() {
+        let req = ContextResolutionRequest {
+            subject: SubjectRef::TaskId(Uuid::new_v4()),
+            intent_summary: Some("onboard a new Irish fund".into()),
+            raw_utterance: Some("Please help me onboard a new Irish fund".into()),
+            actor: ActorContext {
+                actor_id: "test-user".into(),
+                roles: vec!["analyst".into()],
+                department: None,
+                clearance: Some(Classification::Internal),
+                jurisdictions: vec!["IE".into()],
+            },
+            goals: vec![],
+            constraints: ResolutionConstraints {
+                jurisdiction: Some("IE".into()),
+                risk_posture: None,
+                thresholds: HashMap::new(),
+            },
+            evidence_mode: EvidenceMode::default(),
+            point_in_time: None,
+            entity_kind: Some("fund".into()),
+            discovery: DiscoveryContext::default(),
+        };
+
+        let universe = snapshot_row(
+            ObjectType::UniverseDef,
+            json!({
+                "fqn": "universe.client_lifecycle",
+                "universe_id": "client_lifecycle",
+                "name": "Client Lifecycle",
+                "description": "Discovery universe",
+                "version": "1.0",
+                "domains": [{
+                    "domain_id": "onboarding",
+                    "label": "Onboarding",
+                    "description": "New entity work",
+                    "objective_tags": ["onboarding"],
+                    "utterance_signals": [{"signal_type": "keyword", "pattern": "onboard", "weight": 1.0}],
+                    "candidate_entity_kinds": ["fund"],
+                    "candidate_family_ids": ["fund_onboarding"],
+                    "required_grounding_inputs": [],
+                    "entry_questions": [{
+                        "question_id": "q1",
+                        "prompt": "What are you onboarding?",
+                        "maps_to": "objective",
+                        "priority": 1
+                    }],
+                    "allowed_discovery_actions": ["research.search"]
+                }]
+            }),
+            "universe.client_lifecycle",
+        );
+        let family = snapshot_row(
+            ObjectType::ConstellationFamilyDef,
+            json!({
+                "fqn": "family.fund_onboarding",
+                "family_id": "fund_onboarding",
+                "label": "Fund Onboarding",
+                "description": "Fund onboarding family",
+                "domain_id": "onboarding",
+                "selection_rules": [],
+                "constellation_refs": [{
+                    "constellation_id": "struct.ie.ucits.icav",
+                    "label": "Irish UCITS ICAV",
+                    "jurisdiction": "IE",
+                    "entity_kind": "fund",
+                    "triggers": ["irish", "fund"]
+                }],
+                "candidate_jurisdictions": ["IE"],
+                "candidate_entity_kinds": ["fund"],
+                "grounding_threshold": {
+                    "required_input_keys": ["objective", "jurisdiction", "entity_kind"],
+                    "requires_entity_instance": false,
+                    "allows_draft_instance": true
+                }
+            }),
+            "family.fund_onboarding",
+        );
+
+        let surface = build_discovery_surface(&req, &[universe], &[family]).expect("surface");
+        assert_eq!(
+            surface
+                .matched_domains
+                .first()
+                .map(|d| d.domain_id.as_str()),
+            Some("onboarding")
+        );
+        assert_eq!(
+            surface
+                .matched_families
+                .first()
+                .map(|family| family.family_id.as_str()),
+            Some("fund_onboarding")
+        );
+        assert_eq!(
+            surface.grounding_readiness,
+            GroundingReadiness::ConstellationReady
+        );
     }
 }

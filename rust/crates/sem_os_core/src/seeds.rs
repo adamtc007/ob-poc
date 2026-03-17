@@ -13,6 +13,18 @@ pub struct SeedBundle {
     /// Prefixed with "v1:" to allow future hash algorithm migration.
     pub bundle_hash: String,
     pub verb_contracts: Vec<VerbContractSeed>,
+    #[serde(default)]
+    pub macro_defs: Vec<MacroDefSeed>,
+    #[serde(default)]
+    pub universes: Vec<UniverseSeed>,
+    #[serde(default)]
+    pub constellation_families: Vec<ConstellationFamilySeed>,
+    #[serde(default)]
+    pub constellation_maps: Vec<ConstellationMapSeed>,
+    #[serde(default)]
+    pub state_machines: Vec<StateMachineSeed>,
+    #[serde(default)]
+    pub state_graphs: Vec<StateGraphSeed>,
     pub attributes: Vec<AttributeSeed>,
     pub entity_types: Vec<EntityTypeSeed>,
     pub taxonomies: Vec<TaxonomySeed>,
@@ -43,6 +55,12 @@ impl SeedBundle {
     /// let bundle = SeedBundle {
     ///     bundle_hash: String::new(),
     ///     verb_contracts: vec![],
+    ///     macro_defs: vec![],
+    ///     universes: vec![],
+    ///     constellation_families: vec![],
+    ///     constellation_maps: vec![],
+    ///     state_machines: vec![],
+    ///     state_graphs: vec![],
     ///     attributes: vec![],
     ///     entity_types: vec![],
     ///     taxonomies: vec![],
@@ -61,6 +79,12 @@ impl SeedBundle {
         #[derive(Serialize)]
         struct Canonical<'a> {
             verb_contracts: Vec<&'a VerbContractSeed>,
+            macro_defs: Vec<&'a MacroDefSeed>,
+            universes: Vec<&'a UniverseSeed>,
+            constellation_families: Vec<&'a ConstellationFamilySeed>,
+            constellation_maps: Vec<&'a ConstellationMapSeed>,
+            state_machines: Vec<&'a StateMachineSeed>,
+            state_graphs: Vec<&'a StateGraphSeed>,
             attributes: Vec<&'a AttributeSeed>,
             entity_types: Vec<&'a EntityTypeSeed>,
             taxonomies: Vec<&'a TaxonomySeed>,
@@ -74,6 +98,24 @@ impl SeedBundle {
 
         let mut vc: Vec<&VerbContractSeed> = bundle.verb_contracts.iter().collect();
         vc.sort_by_key(|s| &s.fqn);
+
+        let mut md: Vec<&MacroDefSeed> = bundle.macro_defs.iter().collect();
+        md.sort_by_key(|s| &s.fqn);
+
+        let mut un: Vec<&UniverseSeed> = bundle.universes.iter().collect();
+        un.sort_by_key(|s| &s.fqn);
+
+        let mut cf: Vec<&ConstellationFamilySeed> = bundle.constellation_families.iter().collect();
+        cf.sort_by_key(|s| &s.fqn);
+
+        let mut cm: Vec<&ConstellationMapSeed> = bundle.constellation_maps.iter().collect();
+        cm.sort_by_key(|s| &s.fqn);
+
+        let mut sm: Vec<&StateMachineSeed> = bundle.state_machines.iter().collect();
+        sm.sort_by_key(|s| &s.fqn);
+
+        let mut sg: Vec<&StateGraphSeed> = bundle.state_graphs.iter().collect();
+        sg.sort_by_key(|s| &s.fqn);
 
         let mut at: Vec<&AttributeSeed> = bundle.attributes.iter().collect();
         at.sort_by_key(|s| &s.fqn);
@@ -104,6 +146,12 @@ impl SeedBundle {
 
         let canonical = Canonical {
             verb_contracts: vc,
+            macro_defs: md,
+            universes: un,
+            constellation_families: cf,
+            constellation_maps: cm,
+            state_machines: sm,
+            state_graphs: sg,
             attributes: at,
             entity_types: et,
             taxonomies: tx,
@@ -124,6 +172,42 @@ impl SeedBundle {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VerbContractSeed {
+    pub fqn: String,
+    pub payload: serde_json::Value,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MacroDefSeed {
+    pub fqn: String,
+    pub payload: serde_json::Value,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UniverseSeed {
+    pub fqn: String,
+    pub payload: serde_json::Value,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConstellationFamilySeed {
+    pub fqn: String,
+    pub payload: serde_json::Value,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConstellationMapSeed {
+    pub fqn: String,
+    pub payload: serde_json::Value,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StateMachineSeed {
+    pub fqn: String,
+    pub payload: serde_json::Value,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StateGraphSeed {
     pub fqn: String,
     pub payload: serde_json::Value,
 }
@@ -205,6 +289,12 @@ mod tests {
         SeedBundle::compute_hash(&SeedBundle {
             bundle_hash: String::new(),
             verb_contracts: verbs.to_vec(),
+            macro_defs: vec![],
+            universes: vec![],
+            constellation_families: vec![],
+            constellation_maps: vec![],
+            state_machines: vec![],
+            state_graphs: vec![],
             attributes: attrs.to_vec(),
             entity_types: vec![],
             taxonomies: vec![],
@@ -259,6 +349,12 @@ mod tests {
         let bundle = SeedBundle {
             bundle_hash: "v1:abc123".into(),
             verb_contracts: vec![make_verb("cbu.create")],
+            macro_defs: vec![],
+            universes: vec![],
+            constellation_families: vec![],
+            constellation_maps: vec![],
+            state_machines: vec![],
+            state_graphs: vec![],
             attributes: vec![make_attr("cbu.name")],
             entity_types: vec![EntityTypeSeed {
                 fqn: "cbu".into(),
@@ -297,6 +393,12 @@ mod tests {
         let restored: SeedBundle = serde_json::from_str(&json_str).unwrap();
         assert_eq!(restored.bundle_hash, bundle.bundle_hash);
         assert_eq!(restored.verb_contracts.len(), 1);
+        assert!(restored.macro_defs.is_empty());
+        assert!(restored.universes.is_empty());
+        assert!(restored.constellation_families.is_empty());
+        assert!(restored.constellation_maps.is_empty());
+        assert!(restored.state_machines.is_empty());
+        assert!(restored.state_graphs.is_empty());
         assert_eq!(restored.attributes.len(), 1);
         assert_eq!(restored.entity_types.len(), 1);
         assert_eq!(restored.taxonomies.len(), 1);
@@ -319,6 +421,26 @@ mod tests {
             serde_json::to_value(AttributeSeed {
                 fqn: "a.s".into(),
                 payload: json!(2),
+            })
+            .unwrap(),
+            serde_json::to_value(MacroDefSeed {
+                fqn: "m.d".into(),
+                payload: json!(20),
+            })
+            .unwrap(),
+            serde_json::to_value(ConstellationMapSeed {
+                fqn: "c.m".into(),
+                payload: json!(21),
+            })
+            .unwrap(),
+            serde_json::to_value(StateMachineSeed {
+                fqn: "s.m".into(),
+                payload: json!(22),
+            })
+            .unwrap(),
+            serde_json::to_value(StateGraphSeed {
+                fqn: "s.g".into(),
+                payload: json!(23),
             })
             .unwrap(),
             serde_json::to_value(EntityTypeSeed {

@@ -17,6 +17,7 @@ export interface ChatMessage {
   tool_calls?: ToolCall[];
   sage_explain?: SageExplain;
   coder_proposal?: CoderProposal;
+  discovery_bootstrap?: DiscoveryBootstrap;
 }
 
 export interface SageExplain {
@@ -33,6 +34,69 @@ export interface CoderProposal {
   change_summary?: string[];
   requires_confirmation: boolean;
   ready_to_execute: boolean;
+}
+
+export interface DiscoveryBootstrap {
+  grounding_readiness: string;
+  matched_universes?: DiscoveryUniverseOption[];
+  matched_domains?: DiscoveryDomainOption[];
+  matched_families?: DiscoveryFamilyOption[];
+  matched_constellations?: DiscoveryConstellationOption[];
+  missing_inputs?: DiscoveryInputPrompt[];
+  entry_questions?: DiscoveryQuestionPrompt[];
+}
+
+export interface DiscoveryUniverseOption {
+  universe_id: string;
+  name: string;
+  score: number;
+}
+
+export interface DiscoveryDomainOption {
+  domain_id: string;
+  label: string;
+  score: number;
+}
+
+export interface DiscoveryFamilyOption {
+  family_id: string;
+  label: string;
+  domain_id: string;
+  score: number;
+}
+
+export interface DiscoveryConstellationOption {
+  constellation_id: string;
+  label: string;
+  score: number;
+}
+
+export interface DiscoveryInputPrompt {
+  key: string;
+  label: string;
+  required: boolean;
+  input_type: string;
+}
+
+export interface DiscoveryQuestionPrompt {
+  question_id: string;
+  prompt: string;
+  maps_to: string;
+  priority: number;
+}
+
+export type DiscoverySelectionKind =
+  | "domain"
+  | "family"
+  | "constellation"
+  | "question_answer";
+
+export interface DiscoverySelection {
+  selection_kind: DiscoverySelectionKind;
+  selection_id: string;
+  label?: string;
+  maps_to?: string;
+  value?: string;
 }
 
 /** Tool call information */

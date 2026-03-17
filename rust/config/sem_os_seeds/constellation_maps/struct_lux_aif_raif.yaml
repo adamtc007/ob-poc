@@ -221,6 +221,7 @@ slots:
       child_fk: case_id
     cardinality: optional
     depends_on: [aifm]
+    state_machine: kyc_case_lifecycle
     verbs:
       open: case.open
       submit: case.submit
@@ -239,7 +240,7 @@ slots:
         cardinality: optional
         depends_on:
           - slot: case
-            min_state: placeholder
+            min_state: intake
         verbs:
           evaluate: tollgate.evaluate
   mandate:
@@ -255,7 +256,7 @@ slots:
       - slot: cbu
         min_state: filled
       - slot: case
-        min_state: placeholder
+        min_state: intake
     verbs:
       create: mandate.create
 bulk_macros:

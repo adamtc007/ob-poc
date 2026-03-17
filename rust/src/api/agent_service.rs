@@ -380,6 +380,9 @@ pub struct AgentChatResponse {
     /// Typed Coder/REPL proposal payload for UI rendering.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub coder_proposal: Option<ob_poc_types::chat::CoderProposalPayload>,
+    /// Typed Sem OS discovery/bootstrap payload for onboarding-stage sessions.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub discovery_bootstrap: Option<ob_poc_types::chat::DiscoveryBootstrapPayload>,
 }
 
 // Re-export AgentCommand from ob_poc_types as the single source of truth
@@ -1798,6 +1801,7 @@ impl AgentService {
                     None,
                     sage_explain.clone(),
                     coder_proposal.clone(),
+                    None,
                 );
 
                 return Ok(Some(AgentChatResponse {
@@ -1816,6 +1820,7 @@ impl AgentService {
                     decision: None,
                     sage_explain,
                     coder_proposal,
+                    discovery_bootstrap: None,
                 }));
             }
         }
@@ -1826,6 +1831,7 @@ impl AgentService {
             dsl,
             sage_explain.clone(),
             coder_proposal.clone(),
+            None,
         );
 
         Ok(Some(AgentChatResponse {
@@ -1850,6 +1856,7 @@ impl AgentService {
             decision: None,
             sage_explain,
             coder_proposal,
+            discovery_bootstrap: None,
         }))
     }
 
@@ -1963,6 +1970,7 @@ impl AgentService {
             decision: Some(packet),
             sage_explain: None,
             coder_proposal: None,
+            discovery_bootstrap: None,
         }
     }
 
@@ -2272,6 +2280,13 @@ impl AgentService {
             pre_sage_entity_name: Self::current_sage_entity_name(session),
             recent_sage_intents: session.recent_sage_intents.clone(),
             nlci_compiler: Some(crate::semtaxonomy_v2::build_minimal_cbu_compiler()),
+            discovery_selected_domain: session.context.discovery_selected_domain.clone(),
+            discovery_selected_family: session.context.discovery_selected_family.clone(),
+            discovery_selected_constellation: session
+                .context
+                .discovery_selected_constellation
+                .clone(),
+            discovery_answers: session.context.discovery_answers.clone(),
         }
     }
 
@@ -2470,12 +2485,97 @@ impl AgentService {
         dsl: Option<String>,
         sage_explain: Option<ob_poc_types::chat::SageExplainPayload>,
         coder_proposal: Option<ob_poc_types::chat::CoderProposalPayload>,
+        discovery_bootstrap: Option<ob_poc_types::chat::DiscoveryBootstrapPayload>,
     ) {
         session.add_agent_message(content, None, dsl);
         if let Some(last) = session.messages.last_mut() {
             last.sage_explain = sage_explain;
             last.coder_proposal = coder_proposal;
+            last.discovery_bootstrap = discovery_bootstrap;
         }
+    }
+
+    #[cfg(feature = "database")]
+    fn to_discovery_bootstrap_payload(
+        envelope: Option<&crate::agent::context_envelope::ContextEnvelope>,
+    ) -> Option<ob_poc_types::chat::DiscoveryBootstrapPayload> {
+        let surface = envelope?.discovery_surface.as_ref()?;
+
+        Some(ob_poc_types::chat::DiscoveryBootstrapPayload {
+            grounding_readiness: match surface.grounding_readiness {
+                sem_os_core::context_resolution::GroundingReadiness::NotReady => "not_ready",
+                sem_os_core::context_resolution::GroundingReadiness::FamilyReady => "family_ready",
+                sem_os_core::context_resolution::GroundingReadiness::ConstellationReady => {
+                    "constellation_ready"
+                }
+                sem_os_core::context_resolution::GroundingReadiness::Grounded => "grounded",
+            }
+            .to_string(),
+            matched_universes: surface
+                .matched_universes
+                .iter()
+                .map(|item| ob_poc_types::chat::DiscoveryUniverseOption {
+                    universe_id: item.universe_id.clone(),
+                    name: item.name.clone(),
+                    score: item.score,
+                })
+                .collect(),
+            matched_domains: surface
+                .matched_domains
+                .iter()
+                .map(|item| ob_poc_types::chat::DiscoveryDomainOption {
+                    domain_id: item.domain_id.clone(),
+                    label: item.label.clone(),
+                    score: item.score,
+                })
+                .collect(),
+            matched_families: surface
+                .matched_families
+                .iter()
+                .map(|item| ob_poc_types::chat::DiscoveryFamilyOption {
+                    family_id: item.family_id.clone(),
+                    label: item.label.clone(),
+                    domain_id: item.domain_id.clone(),
+                    score: item.score,
+                })
+                .collect(),
+            matched_constellations: surface
+                .matched_constellations
+                .iter()
+                .map(|item| ob_poc_types::chat::DiscoveryConstellationOption {
+                    constellation_id: item.constellation_id.clone(),
+                    label: item.label.clone(),
+                    score: item.score,
+                })
+                .collect(),
+            missing_inputs: surface
+                .missing_inputs
+                .iter()
+                .map(|input| ob_poc_types::chat::DiscoveryInputPrompt {
+                    key: input.key.clone(),
+                    label: input.label.clone(),
+                    required: input.required,
+                    input_type: input.input_type.clone(),
+                })
+                .collect(),
+            entry_questions: surface
+                .entry_questions
+                .iter()
+                .map(|question| ob_poc_types::chat::DiscoveryQuestionPrompt {
+                    question_id: question.question_id.clone(),
+                    prompt: question.prompt.clone(),
+                    maps_to: question.maps_to.clone(),
+                    priority: question.priority,
+                })
+                .collect(),
+        })
+    }
+
+    #[cfg(not(feature = "database"))]
+    fn to_discovery_bootstrap_payload(
+        _envelope: Option<&crate::agent::context_envelope::ContextEnvelope>,
+    ) -> Option<ob_poc_types::chat::DiscoveryBootstrapPayload> {
+        None
     }
 
     fn scope_feedback_response(
@@ -2488,6 +2588,7 @@ impl AgentService {
             message.clone(),
             None,
             Some(sage_explain.clone()),
+            None,
             None,
         );
         AgentChatResponse {
@@ -2506,6 +2607,7 @@ impl AgentService {
             decision: None,
             sage_explain: Some(sage_explain),
             coder_proposal: None,
+            discovery_bootstrap: None,
         }
     }
 
@@ -2544,7 +2646,14 @@ impl AgentService {
             actor,
             crate::agent::orchestrator::UtteranceSource::Chat,
         );
-        let envelope = crate::agent::orchestrator::resolve_sem_reg_verbs(&ctx, None, false).await;
+        let envelope = crate::agent::orchestrator::resolve_sem_reg_verbs(
+            &ctx,
+            "",
+            None,
+            ctx.pre_sage_entity_kind.as_deref(),
+            false,
+        )
+        .await;
         Ok(envelope)
     }
 
@@ -2738,6 +2847,7 @@ impl AgentService {
                         decision: None,
                         sage_explain: None,
                         coder_proposal: None,
+                        discovery_bootstrap: None,
                     });
                 }
             }
@@ -3115,18 +3225,34 @@ impl AgentService {
         );
         let orch_outcome =
             crate::agent::orchestrator::handle_utterance(&orch_ctx, &request.message).await;
-        let (result, journey_match, journey_decision, pending_mutation, auto_execute, sage_intent) =
-            match orch_outcome {
-                Ok(o) => (
+        let (
+            result,
+            journey_match,
+            journey_decision,
+            pending_mutation,
+            auto_execute,
+            sage_intent,
+            discovery_bootstrap,
+        ) = match orch_outcome {
+            Ok(o) => {
+                #[cfg(feature = "database")]
+                let discovery_bootstrap =
+                    Self::to_discovery_bootstrap_payload(o.context_envelope.as_ref());
+                #[cfg(not(feature = "database"))]
+                let discovery_bootstrap = None;
+
+                (
                     Ok(o.pipeline_result),
                     o.trace.journey_match,
                     o.journey_decision,
                     o.pending_mutation,
                     o.auto_execute,
                     o.sage_intent,
-                ),
-                Err(e) => (Err(e), None, None, None, false, None),
-            };
+                    discovery_bootstrap,
+                )
+            }
+            Err(e) => (Err(e), None, None, None, false, None, None),
+        };
         if let Some(intent) = sage_intent.as_ref() {
             Self::push_recent_sage_intent(session, intent);
         }
@@ -3174,6 +3300,7 @@ impl AgentService {
                         None,
                         sage_explain_payload.clone(),
                         coder_proposal.clone(),
+                        None,
                     );
                     return Ok(AgentChatResponse {
                         message: msg,
@@ -3191,6 +3318,7 @@ impl AgentService {
                         decision: None,
                         sage_explain: sage_explain_payload.clone(),
                         coder_proposal,
+                        discovery_bootstrap: None,
                     });
                 }
 
@@ -3244,6 +3372,7 @@ impl AgentService {
                             None,
                             sage_explain_payload.clone(),
                             None,
+                            None,
                         );
                         return Ok(AgentChatResponse {
                             message: msg,
@@ -3262,6 +3391,7 @@ impl AgentService {
                             decision: None,
                             sage_explain: sage_explain_payload.clone(),
                             coder_proposal: None,
+                            discovery_bootstrap: None,
                         });
                     }
                 }
@@ -3270,7 +3400,45 @@ impl AgentService {
                 if matches!(r.outcome, PipelineOutcome::ScopeCandidates) {
                     if let Some(err) = r.validation_error {
                         let err = Self::with_pivot_feedback(&pivot_feedback, err);
+                        if Self::is_fatal_semos_error(&err) {
+                            return Ok(self.fail_closed_session(&err, session));
+                        }
                         return Ok(self.fail(&err, session));
+                    }
+                }
+
+                if matches!(r.outcome, PipelineOutcome::NeedsUserInput) {
+                    if let Some(bootstrap) = discovery_bootstrap.clone() {
+                        let message = r.validation_error.clone().unwrap_or_else(|| {
+                            "Sem OS is still grounding this session.".to_string()
+                        });
+                        let message = Self::with_pivot_feedback(&pivot_feedback, message);
+                        Self::add_agent_message_with_payloads(
+                            session,
+                            message.clone(),
+                            None,
+                            sage_explain_payload.clone(),
+                            None,
+                            Some(bootstrap.clone()),
+                        );
+                        return Ok(AgentChatResponse {
+                            message,
+                            session_state: SessionState::New,
+                            can_execute: false,
+                            dsl_source: None,
+                            ast: None,
+                            disambiguation: None,
+                            commands: None,
+                            unresolved_refs: None,
+                            current_ref_index: None,
+                            dsl_hash: None,
+                            verb_disambiguation: None,
+                            intent_tier: None,
+                            decision: None,
+                            sage_explain: sage_explain_payload.clone(),
+                            coder_proposal: None,
+                            discovery_bootstrap: Some(bootstrap),
+                        });
                     }
                 }
 
@@ -3356,6 +3524,7 @@ impl AgentService {
                         Some(r.dsl.clone()),
                         sage_explain_payload.clone(),
                         coder_proposal.clone(),
+                        None,
                     );
                     let mut response = self.staged_response(r.dsl, msg);
                     response.sage_explain = sage_explain_payload.clone();
@@ -3375,6 +3544,7 @@ impl AgentService {
                             None,
                             sage_explain_payload.clone(),
                             None,
+                            None,
                         );
                         return Ok(AgentChatResponse {
                             message: msg,
@@ -3392,6 +3562,7 @@ impl AgentService {
                             decision: Some(jd),
                             sage_explain: sage_explain_payload.clone(),
                             coder_proposal: None,
+                            discovery_bootstrap: None,
                         });
                     }
                 }
@@ -3436,6 +3607,9 @@ impl AgentService {
                 // Pipeline gave an error message? Return it
                 if let Some(err) = r.validation_error {
                     let err = Self::with_pivot_feedback(&pivot_feedback, err);
+                    if Self::is_fatal_semos_error(&err) {
+                        return Ok(self.fail_closed_session(&err, session));
+                    }
                     return Ok(self.fail(&err, session));
                 }
             }
@@ -3844,6 +4018,7 @@ impl AgentService {
             decision: Some(packet),
             sage_explain: None,
             coder_proposal: None,
+            discovery_bootstrap: None,
         })
     }
 
@@ -3957,6 +4132,7 @@ impl AgentService {
             decision: Some(packet),
             sage_explain: None,
             coder_proposal: None,
+            discovery_bootstrap: None,
         })
     }
 
@@ -4077,6 +4253,7 @@ impl AgentService {
             decision: None,
             sage_explain: None,
             coder_proposal: None,
+            discovery_bootstrap: None,
         })
     }
 
@@ -4172,6 +4349,9 @@ impl AgentService {
 
                 // Pipeline gave an error
                 if let Some(err) = r.validation_error {
+                    if Self::is_fatal_semos_error(&err) {
+                        return Ok(self.fail_closed_session(&err, session));
+                    }
                     return Ok(self.fail(&err, session));
                 }
 
@@ -4325,6 +4505,7 @@ impl AgentService {
                                     decision: None,
                                     sage_explain: None,
                                     coder_proposal: None,
+                                    discovery_bootstrap: None,
                                 });
                             }
                         }
@@ -4358,6 +4539,7 @@ impl AgentService {
                     decision: None,
                     sage_explain: None,
                     coder_proposal: None,
+                    discovery_bootstrap: None,
                 })
             }
             Err(e) => {
@@ -4495,6 +4677,7 @@ impl AgentService {
             decision: None,
             sage_explain: None,
             coder_proposal: None,
+            discovery_bootstrap: None,
         })
     }
 
@@ -4683,6 +4866,7 @@ impl AgentService {
             decision: None,
             sage_explain: None,
             coder_proposal: None,
+            discovery_bootstrap: None,
         }
     }
 
@@ -4706,7 +4890,36 @@ impl AgentService {
             decision: None,
             sage_explain: None,
             coder_proposal: None,
+            discovery_bootstrap: None,
         }
+    }
+
+    fn fail_closed_session(&self, msg: &str, session: &mut UnifiedSession) -> AgentChatResponse {
+        session.transition(SessionEvent::Close);
+        session.add_agent_message(msg.to_string(), None, None);
+        AgentChatResponse {
+            message: msg.to_string(),
+
+            session_state: SessionState::Closed,
+            can_execute: false,
+            dsl_source: None,
+            ast: None,
+            disambiguation: None,
+            commands: None,
+            unresolved_refs: None,
+            current_ref_index: None,
+            dsl_hash: None,
+            verb_disambiguation: None,
+            intent_tier: None,
+            decision: None,
+            sage_explain: None,
+            coder_proposal: None,
+            discovery_bootstrap: None,
+        }
+    }
+
+    fn is_fatal_semos_error(msg: &str) -> bool {
+        msg.contains("Sem OS is unavailable")
     }
 
     /// Build a structured verb disambiguation response for the UI
@@ -4829,6 +5042,7 @@ impl AgentService {
             decision: None,
             sage_explain: None,
             coder_proposal: None,
+            discovery_bootstrap: None,
         }
     }
 
@@ -4907,6 +5121,7 @@ impl AgentService {
             decision: None,
             sage_explain: None,
             coder_proposal: None,
+            discovery_bootstrap: None,
         }
     }
 

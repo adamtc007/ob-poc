@@ -3,7 +3,9 @@ use std::collections::{HashMap, HashSet};
 use sem_os_core::affinity::{
     discover_dsl, AffinityEdge, AffinityGraph, AffinityKind, AffinityProvenance, DataRef, TableRef,
 };
-use sem_os_core::verb_contract::{VerbArgDef, VerbArgLookup, VerbContractBody, VerbCrudMapping};
+use sem_os_core::verb_contract::{
+    ActionClass, HarmClass, VerbArgDef, VerbArgLookup, VerbContractBody, VerbCrudMapping,
+};
 
 fn verb_contracts() -> Vec<VerbContractBody> {
     vec![
@@ -36,6 +38,9 @@ fn verb_contracts() -> Vec<VerbContractBody> {
             invocation_phrases: vec!["set up depositary".to_owned()],
             subject_kinds: vec![],
             phase_tags: vec![],
+            harm_class: Some(HarmClass::Reversible),
+            action_class: Some(ActionClass::Assign),
+            precondition_states: vec![],
             requires_subject: false,
             produces_focus: false,
             metadata: None,
@@ -66,6 +71,9 @@ fn verb_contracts() -> Vec<VerbContractBody> {
             invocation_phrases: vec!["create legal entity".to_owned()],
             subject_kinds: vec![],
             phase_tags: vec![],
+            harm_class: Some(HarmClass::Reversible),
+            action_class: Some(ActionClass::Create),
+            precondition_states: vec![],
             requires_subject: false,
             produces_focus: false,
             metadata: None,

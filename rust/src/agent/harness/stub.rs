@@ -61,6 +61,10 @@ pub fn build_stub_context(
         pre_sage_entity_name: None,
         recent_sage_intents: vec![],
         nlci_compiler: Some(crate::semtaxonomy_v2::build_minimal_cbu_compiler()),
+        discovery_selected_domain: None,
+        discovery_selected_family: None,
+        discovery_selected_constellation: None,
+        discovery_answers: std::collections::HashMap::new(),
     }
 }
 

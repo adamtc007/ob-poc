@@ -151,7 +151,7 @@ mod tests {
                 entity_bindings: bindings,
                 external_lookup_digests: vec![],
                 macro_audit_digests: vec![],
-                snapshot_manifest: std::collections::HashMap::new(),
+                snapshot_manifest: BTreeMap::new(),
             },
             external_lookups: vec![],
             macro_audits: vec![],
@@ -562,7 +562,7 @@ mod proptests {
                         entity_bindings,
                         external_lookup_digests,
                         macro_audit_digests,
-                        snapshot_manifest: std::collections::HashMap::new(),
+                        snapshot_manifest: BTreeMap::new(),
                     }
                 },
             )
@@ -644,7 +644,7 @@ mod proptests {
                 },
                 external_lookup_digests: vec!["abc123".into()],
                 macro_audit_digests: vec!["def456".into()],
-                snapshot_manifest: std::collections::HashMap::new(),
+                snapshot_manifest: BTreeMap::new(),
             },
             external_lookups: vec![ExternalLookup {
                 source: "gleif".into(),
@@ -700,7 +700,7 @@ mod proptests {
             },
             external_lookup_digests: vec!["digest1".into(), "digest2".into()],
             macro_audit_digests: vec!["macro_digest".into()],
-            snapshot_manifest: std::collections::HashMap::new(),
+            snapshot_manifest: BTreeMap::new(),
         };
         let bytes = canonical_bytes_for_envelope_core(&core);
         let decoded: crate::runbook::envelope::EnvelopeCore =

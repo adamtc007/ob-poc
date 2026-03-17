@@ -29,12 +29,14 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::abac::{evaluate_abac, AccessDecision, AccessPurpose, ActorContext};
+use crate::constellation_family_def::GroundingThreshold;
 #[cfg(test)]
 use crate::membership::MembershipKind;
 use crate::membership::{MembershipCondition, MembershipRuleBody};
 use crate::policy_rule::PolicyRuleBody;
 use crate::relationship_type_def::RelationshipTypeDefBody;
 use crate::types::{GovernanceTier, SnapshotRow, TrustClass};
+use crate::universe_def::{EntryQuestion, GroundingInput};
 use crate::view_def::ViewDefBody;
 
 // ── Evidence Mode ─────────────────────────────────────────────
@@ -103,9 +105,12 @@ pub struct ResolutionConstraints {
 pub struct ContextResolutionRequest {
     /// What we are resolving context for.
     pub subject: SubjectRef,
-    /// Optional natural language intent (used for embedding ranking in Phase 9).
+    /// Optional Sage-produced intent summary.
     #[serde(default)]
-    pub intent: Option<String>,
+    pub intent_summary: Option<String>,
+    /// Raw user utterance for non-lossy Sem OS interpretation.
+    #[serde(default)]
+    pub raw_utterance: Option<String>,
     /// Who is asking — drives ABAC evaluation.
     pub actor: ActorContext,
     /// What the actor is trying to achieve.
@@ -125,6 +130,26 @@ pub struct ContextResolutionRequest {
     /// kind are filtered out.
     #[serde(default)]
     pub entity_kind: Option<String>,
+    /// Explicit discovery navigation hints captured during Sage bootstrap.
+    #[serde(default)]
+    pub discovery: DiscoveryContext,
+}
+
+/// Explicit discovery-stage hints threaded into Sem OS resolution.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct DiscoveryContext {
+    /// Selected work-area/domain identifier.
+    #[serde(default)]
+    pub selected_domain_id: Option<String>,
+    /// Selected constellation family identifier.
+    #[serde(default)]
+    pub selected_family_id: Option<String>,
+    /// Selected concrete constellation identifier.
+    #[serde(default)]
+    pub selected_constellation_id: Option<String>,
+    /// Structured answers collected during bootstrap.
+    #[serde(default)]
+    pub known_inputs: std::collections::HashMap<String, String>,
 }
 
 // ── Response ──────────────────────────────────────────────────
@@ -156,6 +181,91 @@ pub struct ContextResolutionResponse {
     pub governance_signals: Vec<GovernanceSignal>,
     /// Overall confidence in the resolution (0.0–1.0).
     pub confidence: f64,
+    /// Grounded Sem OS action surface for the resolved subject/slot/node.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub grounded_action_surface: Option<GroundedActionSurface>,
+    /// Whether Sem OS is still navigating discovery or is fully grounded.
+    #[serde(default)]
+    pub resolution_stage: ResolutionStage,
+    /// Discovery-stage navigation surface for empty or under-grounded sessions.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub discovery_surface: Option<DiscoverySurface>,
+}
+
+/// Top-level stage of the single Sem OS resolution pipeline.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ResolutionStage {
+    Discovery,
+    #[default]
+    Grounded,
+}
+
+/// Discovery-stage navigation surface returned before full grounding.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DiscoverySurface {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub matched_universes: Vec<RankedUniverse>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub matched_domains: Vec<RankedUniverseDomain>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub matched_families: Vec<RankedConstellationFamily>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub matched_constellations: Vec<RankedConstellation>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub missing_inputs: Vec<GroundingInput>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub entry_questions: Vec<EntryQuestion>,
+    pub grounding_readiness: GroundingReadiness,
+}
+
+/// Ranked discovery universe match.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RankedUniverse {
+    pub fqn: String,
+    pub universe_id: String,
+    pub name: String,
+    pub score: f64,
+}
+
+/// Ranked domain match inside a discovery universe.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RankedUniverseDomain {
+    pub universe_fqn: String,
+    pub domain_id: String,
+    pub label: String,
+    pub score: f64,
+}
+
+/// Ranked constellation family match.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RankedConstellationFamily {
+    pub fqn: String,
+    pub family_id: String,
+    pub label: String,
+    pub domain_id: String,
+    pub score: f64,
+    pub grounding_threshold: GroundingThreshold,
+}
+
+/// Ranked concrete constellation suggestion from a family.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RankedConstellation {
+    pub family_fqn: String,
+    pub constellation_id: String,
+    pub label: String,
+    pub score: f64,
+}
+
+/// Readiness for switching from discovery to grounded resolution.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum GroundingReadiness {
+    #[default]
+    NotReady,
+    FamilyReady,
+    ConstellationReady,
+    Grounded,
 }
 
 // ── Supporting Types ──────────────────────────────────────────
@@ -200,6 +310,84 @@ pub struct VerbCandidate {
     pub access_decision: AccessDecision,
     /// Whether this verb's output can be used as proof evidence.
     pub usable_for_proof: bool,
+}
+
+/// The grounded slot/node/action result Sem OS should eventually make canonical.
+///
+/// This structure is intentionally additive to the existing context-resolution
+/// response so callers can migrate to the single pipeline incrementally while
+/// Sem OS absorbs the legacy reducer/constellation runtime.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GroundedActionSurface {
+    /// The subject Sem OS resolved this action surface for.
+    pub resolved_subject: SubjectRef,
+    /// Constellation map selected for this context.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resolved_constellation: Option<String>,
+    /// Slot path selected inside the bound constellation.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resolved_slot_path: Option<String>,
+    /// Node identifier inside the hydrated instance graph, if one was bound.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resolved_node_id: Option<String>,
+    /// State machine governing the resolved slot/node, if any.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resolved_state_machine: Option<String>,
+    /// Current effective state of the resolved slot/node.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub current_state: Option<String>,
+    /// Valid primitive or macro actions for the resolved slot/node.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub valid_actions: Vec<GroundedActionOption>,
+    /// Blocked primitive or macro actions with concrete reasons.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub blocked_actions: Vec<BlockedActionOption>,
+    /// DSL candidates Sem OS can render deterministically for execution.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub dsl_candidates: Vec<DslCandidate>,
+}
+
+/// A grounded action Sem OS considers valid from the current slot/node state.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GroundedActionOption {
+    /// Canonical action identifier — primitive verb or macro verb.
+    pub action_id: String,
+    /// Action kind, e.g. `primitive`, `macro`, or `diagnostic`.
+    pub action_kind: String,
+    /// Human-readable description for UI and agent ranking.
+    pub description: String,
+    /// Whether executing this action requires a subject binding.
+    #[serde(default)]
+    pub requires_subject: bool,
+    /// Optional rationale for why this action is currently valid.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rationale: Option<String>,
+}
+
+/// A grounded action Sem OS considers blocked from the current slot/node state.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BlockedActionOption {
+    /// Canonical action identifier — primitive verb or macro verb.
+    pub action_id: String,
+    /// Action kind, e.g. `primitive`, `macro`, or `diagnostic`.
+    pub action_kind: String,
+    /// Human-readable description for UI and agent ranking.
+    pub description: String,
+    /// Concrete reasons this action is currently blocked.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub reasons: Vec<String>,
+}
+
+/// A deterministic DSL candidate emitted from a grounded Sem OS action.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DslCandidate {
+    /// The canonical action from which this DSL rendering was produced.
+    pub action_id: String,
+    /// DSL statement or macro invocation text.
+    pub dsl: String,
+    /// Whether this DSL candidate is directly executable without clarification.
+    #[serde(default)]
+    pub executable: bool,
 }
 
 /// An attribute candidate with ranking and tier metadata.
@@ -1198,13 +1386,15 @@ mod tests {
     fn test_request() -> ContextResolutionRequest {
         ContextResolutionRequest {
             subject: SubjectRef::EntityId(Uuid::new_v4()),
-            intent: Some("discover UBO structure".into()),
+            intent_summary: Some("discover UBO structure".into()),
+            raw_utterance: Some("Help me discover the UBO structure".into()),
             actor: test_actor(),
             goals: vec!["resolve_ubo".into()],
             constraints: ResolutionConstraints::default(),
             evidence_mode: EvidenceMode::Normal,
             point_in_time: None,
             entity_kind: None,
+            discovery: DiscoveryContext::default(),
         }
     }
 

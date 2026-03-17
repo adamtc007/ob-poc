@@ -47,8 +47,9 @@ use ob_poc_types::{
         SearchKeyField as ApiSearchKeyField, SearchKeyFieldType,
         UnresolvedRefResponse as ApiUnresolvedRefResponse,
     },
-    AstArgument, AstSpan, AstStatement, AstValue, BoundEntityInfo, ChatResponse, DslState,
-    SessionInputRequest, SessionInputResponse, SessionStateEnum,
+    AstArgument, AstSpan, AstStatement, AstValue, BoundEntityInfo, ChatResponse,
+    DiscoverySelection, DiscoverySelectionKind, DslState, SessionInputRequest,
+    SessionInputResponse, SessionStateEnum,
 };
 
 use axum::{
@@ -561,6 +562,20 @@ async fn session_input(
                 response: Box::new(response),
             }))
         }
+        SessionInputRequest::DiscoverySelection { selection } => {
+            let message = apply_discovery_selection(&state, session_id, &selection).await?;
+            let chat_req = ChatRequest {
+                message,
+                cbu_id: None,
+                disambiguation_response: None,
+            };
+            let response = chat_session(State(state), Path(session_id), headers, Json(chat_req))
+                .await?
+                .0;
+            Ok(Json(SessionInputResponse::Chat {
+                response: Box::new(response),
+            }))
+        }
         SessionInputRequest::DecisionReply { packet_id, reply } => {
             let decision_req = ob_poc_types::DecisionReplyRequest { packet_id, reply };
             let response = crate::api::agent_learning_routes::handle_decision_reply(
@@ -606,6 +621,85 @@ async fn session_input(
                 let _ = input;
                 Err(StatusCode::NOT_IMPLEMENTED)
             }
+        }
+    }
+}
+
+async fn apply_discovery_selection(
+    state: &AgentState,
+    session_id: Uuid,
+    selection: &DiscoverySelection,
+) -> Result<String, StatusCode> {
+    let mut sessions = state.sessions.write().await;
+    let session = sessions.entry(session_id).or_insert_with(|| {
+        let mut new_session = UnifiedSession::new_for_entity(None, "cbu", None, None);
+        new_session.id = session_id;
+        new_session
+    });
+
+    match selection.selection_kind {
+        DiscoverySelectionKind::Domain => {
+            session.context.discovery_selected_domain = Some(selection.selection_id.clone());
+            session.context.discovery_selected_family = None;
+            session.context.discovery_selected_constellation = None;
+        }
+        DiscoverySelectionKind::Family => {
+            session.context.discovery_selected_family = Some(selection.selection_id.clone());
+            session.context.discovery_selected_constellation = None;
+        }
+        DiscoverySelectionKind::Constellation => {
+            session.context.discovery_selected_constellation = Some(selection.selection_id.clone());
+        }
+        DiscoverySelectionKind::QuestionAnswer => {
+            let answer_key = selection
+                .maps_to
+                .clone()
+                .unwrap_or_else(|| selection.selection_id.clone());
+            let answer_value = selection
+                .value
+                .clone()
+                .or_else(|| selection.label.clone())
+                .unwrap_or_else(|| selection.selection_id.clone());
+            session
+                .context
+                .discovery_answers
+                .insert(answer_key, answer_value);
+        }
+    }
+
+    session.updated_at = chrono::Utc::now();
+    session.dirty = true;
+
+    Ok(build_discovery_selection_message(selection))
+}
+
+fn build_discovery_selection_message(selection: &DiscoverySelection) -> String {
+    let label = selection
+        .label
+        .as_deref()
+        .unwrap_or(selection.selection_id.as_str());
+
+    match selection.selection_kind {
+        DiscoverySelectionKind::Domain => {
+            format!("I am working in the {label} work area.")
+        }
+        DiscoverySelectionKind::Family => {
+            format!("Use the {label} constellation family for this session.")
+        }
+        DiscoverySelectionKind::Constellation => {
+            format!("Use the {label} constellation for this session.")
+        }
+        DiscoverySelectionKind::QuestionAnswer => {
+            let target = selection
+                .maps_to
+                .as_deref()
+                .unwrap_or("this discovery question");
+            let value = selection
+                .value
+                .as_deref()
+                .or(selection.label.as_deref())
+                .unwrap_or(selection.selection_id.as_str());
+            format!("For {target}, the answer is {value}.")
         }
     }
 }
@@ -2283,6 +2377,39 @@ fn generate_options_from_envelope_inner(
 ) -> String {
     use std::collections::BTreeMap;
 
+    if envelope.is_discovery_stage() {
+        let mut lines = vec!["Sem OS is still grounding this session.".to_string()];
+        if let Some(surface) = envelope.discovery_surface.as_ref() {
+            if let Some(question) = surface.entry_questions.first() {
+                lines.push(format!("Next question: {}", question.prompt));
+            }
+            if !surface.matched_domains.is_empty() {
+                lines.push(format!(
+                    "Likely work area: {}",
+                    surface
+                        .matched_domains
+                        .iter()
+                        .take(3)
+                        .map(|domain| domain.label.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ));
+            }
+            if !surface.missing_inputs.is_empty() {
+                lines.push(format!(
+                    "Still needed: {}",
+                    surface
+                        .missing_inputs
+                        .iter()
+                        .map(|input| input.label.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ));
+            }
+        }
+        return lines.join("\n");
+    }
+
     // 1. Apply AgentMode filter — mirrors Stage A.3 in handle_utterance()
     let mode_filtered: Vec<&crate::agent::context_envelope::VerbCandidateSummary> = envelope
         .allowed_verb_contracts
@@ -2718,6 +2845,7 @@ async fn chat_session(
                 surface_fingerprint: None,
                 sage_explain: None,
                 coder_proposal: None,
+                discovery_bootstrap: None,
             }));
         }
         #[cfg(not(feature = "database"))]
@@ -2742,6 +2870,7 @@ async fn chat_session(
                 surface_fingerprint: None,
                 sage_explain: None,
                 coder_proposal: None,
+                discovery_bootstrap: None,
             }));
         }
     }
@@ -2778,6 +2907,7 @@ async fn chat_session(
                 surface_fingerprint: None,
                 sage_explain: None,
                 coder_proposal: None,
+                discovery_bootstrap: None,
             }));
         }
     };
@@ -2887,6 +3017,7 @@ async fn chat_session(
         surface_fingerprint,
         sage_explain: response.sage_explain,
         coder_proposal: response.coder_proposal,
+        discovery_bootstrap: response.discovery_bootstrap,
     }))
 }
 

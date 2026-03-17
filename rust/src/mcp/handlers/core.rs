@@ -1571,7 +1571,6 @@ impl ToolHandlers {
         let searcher = self.get_verb_searcher().await?;
 
         // Resolve SemReg allowed verbs BEFORE search (Phase 3: pre-constrained)
-        let mut sem_reg_filtered = false;
         let envelope = if let Some(ref client) = self.sem_os_client {
             let actor = crate::policy::ActorResolver::from_env();
             let env =
@@ -1583,20 +1582,32 @@ impl ToolHandlers {
         };
 
         // Determine the allowed_verbs constraint for the search
-        let allowed_verbs_ref = match &envelope {
+        let empty_allowed_verbs = std::collections::HashSet::new();
+        let (allowed_verbs_ref, sem_reg_filtered, blocked_reason) = match &envelope {
             Some(env) if env.is_deny_all() => {
                 tracing::warn!("verb_search: SemReg DenyAll — search will return empty");
-                sem_reg_filtered = true;
-                // Pass an empty set — nothing will match
-                Some(&env.allowed_verbs)
+                (
+                    Some(&env.allowed_verbs),
+                    true,
+                    Some("Sem OS denied all verbs for this subject"),
+                )
             }
-            Some(env) if !env.is_unavailable() => {
-                sem_reg_filtered = true;
-                Some(&env.allowed_verbs)
+            Some(env) if env.is_unavailable() => {
+                tracing::warn!("verb_search: SemReg unavailable — search will return empty");
+                (
+                    Some(&empty_allowed_verbs),
+                    true,
+                    Some("Sem OS unavailable for utterance discovery"),
+                )
             }
-            _ => {
-                // No SemOS client or SemReg unavailable: graceful degradation
-                None
+            Some(env) => (Some(&env.allowed_verbs), true, None),
+            None => {
+                tracing::warn!("verb_search: SemOsClient unavailable — search will return empty");
+                (
+                    Some(&empty_allowed_verbs),
+                    true,
+                    Some("Sem OS client unavailable for utterance discovery"),
+                )
             }
         };
 
@@ -1609,6 +1620,7 @@ impl ToolHandlers {
             "query": query,
             "domain_filter": domain,
             "sem_reg_filtered": sem_reg_filtered,
+            "blocked_reason": blocked_reason,
             "results": results.iter().map(|r| json!({
                 "verb": r.verb,
                 "score": r.score,
@@ -1661,6 +1673,10 @@ impl ToolHandlers {
             pre_sage_entity_name: None,
             recent_sage_intents: vec![],
             nlci_compiler: Some(crate::semtaxonomy_v2::build_minimal_cbu_compiler()),
+            discovery_selected_domain: None,
+            discovery_selected_family: None,
+            discovery_selected_constellation: None,
+            discovery_answers: std::collections::HashMap::new(),
         };
         let outcome = crate::agent::orchestrator::handle_utterance(&orch_ctx, instruction).await?;
         let result = outcome.pipeline_result;

@@ -76,6 +76,7 @@ slots:
     join: { via: cases, parent_fk: cbu_id, child_fk: case_id }
     cardinality: optional
     depends_on: [acs_operator]
+    state_machine: kyc_case_lifecycle
     verbs: { open: case.open, submit: case.submit, approve: case.approve, reject: case.reject, request_info: case.request-info }
     children:
       tollgate:
@@ -84,7 +85,7 @@ slots:
         pk: evaluation_id
         join: { via: tollgate_evaluations, parent_fk: case_id, child_fk: evaluation_id }
         cardinality: optional
-        depends_on: [{ slot: case, min_state: placeholder }]
+        depends_on: [{ slot: case, min_state: intake }]
         verbs: { evaluate: tollgate.evaluate }
   mandate:
     type: mandate
@@ -92,6 +93,6 @@ slots:
     pk: profile_id
     join: { via: cbu_trading_profiles, parent_fk: cbu_id, child_fk: profile_id }
     cardinality: optional
-    depends_on: [{ slot: cbu, min_state: filled }, { slot: case, min_state: placeholder }]
+    depends_on: [{ slot: cbu, min_state: filled }, { slot: case, min_state: intake }]
     verbs: { create: mandate.create }
 bulk_macros: [role_slots]

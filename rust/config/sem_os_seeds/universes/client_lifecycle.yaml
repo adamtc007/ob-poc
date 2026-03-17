@@ -1,0 +1,45 @@
+fqn: universe.client_lifecycle
+universe_id: client_lifecycle
+name: Client Lifecycle
+description: Discovery universe for onboarding, maintenance, KYC, and deal work.
+version: "1.0"
+default_entry_domain: onboarding
+domains:
+  - domain_id: onboarding
+    label: Onboarding
+    description: New client and structure setup work.
+    objective_tags:
+      - onboarding
+      - new_entity
+      - structure_setup
+    utterance_signals:
+      - signal_type: keyword
+        pattern: onboard
+        weight: 1.0
+      - signal_type: keyword
+        pattern: new fund
+        weight: 0.9
+    candidate_entity_kinds:
+      - fund
+      - cbu
+      - entity
+    candidate_family_ids:
+      - fund_onboarding
+    required_grounding_inputs:
+      - key: objective
+        label: Objective
+        required: true
+        input_type: string
+      - key: new_or_existing
+        label: New or existing
+        required: true
+        input_type: enum
+    entry_questions:
+      - question_id: onboarding_scope
+        prompt: What are you onboarding?
+        maps_to: objective
+        priority: 1
+    allowed_discovery_actions:
+      - research.search
+      - entity.resolve
+      - session.clarify

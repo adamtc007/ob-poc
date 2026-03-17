@@ -9,6 +9,7 @@
 
 pub mod metadata;
 pub mod onboarding;
+pub mod pipeline_seeds;
 pub mod scanner;
 pub mod seeds;
 
@@ -47,6 +48,12 @@ pub fn build_seed_bundle_with_metadata(
     let mut verb_contract_bodies = scanner::scan_verb_contracts(verbs_config);
     let mut entity_type_bodies = scanner::infer_entity_types_from_verbs(verbs_config);
     let attribute_bodies = scanner::infer_attributes_from_verbs(verbs_config, &entity_type_bodies);
+    let macro_defs = pipeline_seeds::scan_macro_defs().unwrap_or_default();
+    let universes = pipeline_seeds::scan_universes().unwrap_or_default();
+    let constellation_families = pipeline_seeds::scan_constellation_families().unwrap_or_default();
+    let constellation_maps = pipeline_seeds::scan_constellation_maps().unwrap_or_default();
+    let state_machines = pipeline_seeds::scan_state_machines().unwrap_or_default();
+    let state_graphs = pipeline_seeds::scan_state_graphs().unwrap_or_default();
 
     // 2. Enrich with DomainMetadata if available
     if let Some(meta) = domain_metadata {
@@ -121,6 +128,12 @@ pub fn build_seed_bundle_with_metadata(
     let mut bundle = SeedBundle {
         bundle_hash: String::new(),
         verb_contracts,
+        macro_defs,
+        universes,
+        constellation_families,
+        constellation_maps,
+        state_machines,
+        state_graphs,
         attributes,
         entity_types,
         taxonomies,
@@ -211,6 +224,10 @@ mod tests {
         assert!(!bundle.bundle_hash.is_empty());
         assert!(bundle.bundle_hash.starts_with("v1:"));
         assert!(!bundle.verb_contracts.is_empty());
+        assert!(!bundle.macro_defs.is_empty());
+        assert!(!bundle.constellation_maps.is_empty());
+        assert!(!bundle.state_machines.is_empty());
+        assert!(!bundle.state_graphs.is_empty());
         assert!(!bundle.attributes.is_empty());
         assert!(!bundle.taxonomies.is_empty());
         assert!(!bundle.policies.is_empty());

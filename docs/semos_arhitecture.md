@@ -1,8 +1,8 @@
 # Semantic OS — Vision & Scope v3.0
 
 > **Version:** 3.0
-> **Date:** 2026-03-16
-> **Status:** Living document — consolidation of 9 prior specs, updated for the 2026-03-08 runtime schema consolidation, the 2026-03-12 document-governance bootstrap, the 2026-03-13 NLCI/CBU surface reconciliation, the 2026-03-15 reducer/constellation runtime cutover, the 2026-03-16 DB harness/runtime verification pass, and the 2026-03-16 CODEX data-integrity/parser/serialization remediation
+> **Date:** 2026-03-17
+> **Status:** Living document — consolidation of 9 prior specs, updated for the 2026-03-08 runtime schema consolidation, the 2026-03-12 document-governance bootstrap, the 2026-03-13 NLCI/CBU surface reconciliation, the 2026-03-15 reducer/constellation runtime cutover, the 2026-03-16 DB harness/runtime verification pass, the 2026-03-16 CODEX data-integrity/parser/serialization remediation, and the 2026-03-17 discovery-universe + single-pipeline cutover
 > **Audience:** Engineering, governance, architecture review
 
 ---
@@ -26,6 +26,77 @@ Semantic OS enforces governance through **three complementary layers**:
 | **GovernedQuery** | What compiles | Proc macro checks against bincode cache at compile time |
 
 The system is deployed as a **standalone service** (6 Rust crates) with port-trait isolation, REST+JWT API, outbox-driven projections, and optional in-process mode for the ob-poc monolith.
+
+### Current Discovery/Bootstrap State (2026-03-17)
+
+The intended single-pipeline model is now materially reflected in the live agent path:
+
+`utterance -> Sage bootstrap -> Sem OS resolve_context() -> discovery surface or grounded action surface`
+
+Key properties of the current implementation:
+
+- `resolve_context()` remains the single Sem OS entrypoint; discovery is an internal stage, not a separate public resolver
+- empty or under-grounded Sage sessions return a discovery surface, not a broad global verb inventory
+- Sem OS is fail-closed for Sage-side utterance discovery; if Sem OS is unavailable, the session is closed rather than widened onto a legacy fallback path
+- the chat/session API now carries a typed discovery bootstrap payload to the UI
+- the chat UI renders the discovery bootstrap surface directly and allows domain/family/constellation selections to flow back into the same session
+- those selections are persisted in session state and threaded into Sem OS as structured discovery hints
+
+The discovery surface currently includes:
+
+- `matched_domains`
+- `matched_families`
+- `matched_constellations`
+- `missing_inputs`
+- `entry_questions`
+- `grounding_readiness`
+
+This is the active bridge between ambiguous onboarding/opening turns and grounded constellation execution.
+
+### Non-Lossy Utterance Contract (2026-03-17)
+
+The Sem OS request contract no longer overloads one field to mean both “what the user said” and “what Sage inferred.”
+
+`ContextResolutionRequest` now carries:
+
+- `raw_utterance`
+- `intent_summary`
+- structured `discovery` hints (`selected_domain_id`, `selected_family_id`, `selected_constellation_id`, `known_inputs`)
+
+This matters for branching correctness. A later branch in the single pipeline must still be able to inspect the original utterance, even if an earlier branch already produced a narrower Sage summary. The active discovery scorer now combines:
+
+- raw utterance
+- Sage summary
+- goals
+- structured discovery answers
+
+with explicit structured selections taking precedence over text scoring.
+
+### Discovery Harness State (2026-03-17)
+
+There is now a dedicated Sem OS discovery harness:
+
+- [semos_discovery_hit_rate.rs](/Users/adamtc007/Developer/ob-poc/rust/tests/semos_discovery_hit_rate.rs)
+- [sem_os_discovery_utterances.toml](/Users/adamtc007/Developer/ob-poc/rust/tests/fixtures/sem_os_discovery_utterances.toml)
+
+The harness measures:
+
+- utterance -> top-1 domain
+- utterance -> top-1 family
+- utterance -> top-1 / top-3 constellation
+- grounding-readiness accuracy
+
+It also includes a regression case where the raw utterance contains trigger tokens absent from `intent_summary`, specifically to catch lossy-branch behavior.
+
+Current baseline on the small authored discovery corpus:
+
+- domain top-1: 100%
+- family top-1: 100%
+- constellation top-1: 100%
+- constellation top-3: 100%
+- readiness exact: 100%
+
+This should be read as “the new path is coherent and measurable,” not “global discovery quality is solved.” The authored universe/family set is still small, so future value comes from growing the corpus and watching this harness instead of the legacy verb-hit benchmark.
 
 ### Current Agent Integration State (2026-03-13)
 
