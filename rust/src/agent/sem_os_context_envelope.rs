@@ -1,4 +1,4 @@
-//! ContextEnvelope — structured SemReg resolution result.
+//! SemOsContextEnvelope — structured Sem OS resolution result.
 //!
 //! Replaces the flat `SemRegVerbPolicy` enum with a rich envelope that preserves:
 //! - Allowed verb set with contract summaries
@@ -17,13 +17,13 @@ use sem_os_core::context_resolution::{
     ContextResolutionResponse, DiscoverySurface, ResolutionStage,
 };
 
-/// Structured result of SemReg context resolution.
+/// Structured result of Sem OS context resolution.
 ///
 /// Carries the full resolution output — not just a bare `HashSet<String>`.
-/// Every orchestrator call produces one of these (or `unavailable()` if SemReg
+/// Every orchestrator call produces one of these (or `unavailable()` if Sem OS
 /// is not configured).
 #[derive(Debug, Clone, Serialize)]
-pub struct ContextEnvelope {
+pub struct SemOsContextEnvelope {
     /// Verbs explicitly allowed by ABAC + tier + preconditions.
     pub allowed_verbs: HashSet<String>,
     /// Summary of each allowed verb contract (for downstream consumers).
@@ -48,7 +48,7 @@ pub struct ContextEnvelope {
     pub discovery_surface: Option<DiscoverySurface>,
     /// Whether this is a "deny all" result (resolution succeeded, zero verbs).
     deny_all: bool,
-    /// Whether SemReg was unavailable (resolution failed or not configured).
+    /// Whether Sem OS was unavailable (resolution failed or not configured).
     unavailable: bool,
 }
 
@@ -163,7 +163,7 @@ pub enum TocTouResult {
     },
 }
 
-impl ContextEnvelope {
+impl SemOsContextEnvelope {
     /// Build from a successful `ContextResolutionResponse`.
     ///
     /// Partitions candidate_verbs into allowed (AccessDecision::Allow) and
@@ -223,7 +223,7 @@ impl ContextEnvelope {
 
         let deny_all = allowed.is_empty();
 
-        ContextEnvelope {
+        SemOsContextEnvelope {
             allowed_verbs: allowed,
             allowed_verb_contracts: allowed_contracts,
             pruned_verbs: pruned,
@@ -241,7 +241,7 @@ impl ContextEnvelope {
 
     /// Create an "unavailable" envelope (SemReg not configured or resolution failed).
     pub fn unavailable() -> Self {
-        ContextEnvelope {
+        SemOsContextEnvelope {
             allowed_verbs: HashSet::new(),
             allowed_verb_contracts: vec![],
             pruned_verbs: vec![],
@@ -259,7 +259,7 @@ impl ContextEnvelope {
 
     /// Create a "deny all" envelope (resolution succeeded, zero verbs allowed).
     pub fn deny_all() -> Self {
-        ContextEnvelope {
+        SemOsContextEnvelope {
             allowed_verbs: HashSet::new(),
             allowed_verb_contracts: vec![],
             pruned_verbs: vec![],
@@ -329,7 +329,7 @@ impl ContextEnvelope {
     pub fn test_with_verbs(verbs: &[&str]) -> Self {
         let allowed: HashSet<String> = verbs.iter().map(|v| v.to_string()).collect();
         let fingerprint = AllowedVerbSetFingerprint::compute(&allowed);
-        ContextEnvelope {
+        SemOsContextEnvelope {
             allowed_verbs: allowed,
             allowed_verb_contracts: vec![],
             pruned_verbs: vec![],
@@ -353,7 +353,7 @@ impl ContextEnvelope {
     /// Returns `None` if this envelope is unavailable (no TOCTOU possible).
     pub fn toctou_recheck(
         &self,
-        new_envelope: &ContextEnvelope,
+        new_envelope: &SemOsContextEnvelope,
         selected_verb: &str,
     ) -> Option<TocTouResult> {
         // No recheck possible if either envelope is unavailable
@@ -453,7 +453,7 @@ mod tests {
 
     #[test]
     fn test_unavailable_envelope() {
-        let env = ContextEnvelope::unavailable();
+        let env = SemOsContextEnvelope::unavailable();
         assert!(env.is_unavailable());
         assert!(!env.is_deny_all());
         assert_eq!(env.label(), "unavailable");
@@ -462,7 +462,7 @@ mod tests {
 
     #[test]
     fn test_deny_all_envelope() {
-        let env = ContextEnvelope::deny_all();
+        let env = SemOsContextEnvelope::deny_all();
         assert!(env.is_deny_all());
         assert!(!env.is_unavailable());
         assert_eq!(env.label(), "deny_all");
@@ -471,7 +471,7 @@ mod tests {
 
     #[test]
     fn test_is_allowed() {
-        let mut env = ContextEnvelope::unavailable();
+        let mut env = SemOsContextEnvelope::unavailable();
         env.unavailable = false;
         env.allowed_verbs.insert("kyc.open-case".into());
         assert!(env.is_allowed("kyc.open-case"));
@@ -480,13 +480,13 @@ mod tests {
 
     #[test]
     fn test_label_backward_compat() {
-        let unav = ContextEnvelope::unavailable();
+        let unav = SemOsContextEnvelope::unavailable();
         assert_eq!(unav.label(), "unavailable");
 
-        let deny = ContextEnvelope::deny_all();
+        let deny = SemOsContextEnvelope::deny_all();
         assert_eq!(deny.label(), "deny_all");
 
-        let mut allowed = ContextEnvelope::unavailable();
+        let mut allowed = SemOsContextEnvelope::unavailable();
         allowed.unavailable = false;
         allowed.allowed_verbs.insert("a.b".into());
         assert_eq!(allowed.label(), "allowed_set");
@@ -494,7 +494,7 @@ mod tests {
 
     #[test]
     fn test_pruned_count() {
-        let mut env = ContextEnvelope::deny_all();
+        let mut env = SemOsContextEnvelope::deny_all();
         env.pruned_verbs.push(PrunedVerb {
             fqn: "a.b".into(),
             reason: PruneReason::AbacDenied {
@@ -519,7 +519,7 @@ mod tests {
 
     #[test]
     fn test_envelope_serialization() {
-        let env = ContextEnvelope::unavailable();
+        let env = SemOsContextEnvelope::unavailable();
         let json = serde_json::to_string(&env).unwrap();
         assert!(json.contains("allowed_verbs"));
         assert!(json.contains("fingerprint"));
@@ -540,8 +540,8 @@ mod tests {
         assert_ne!(fp1, fp3);
     }
 
-    fn make_envelope_with_verbs(verbs: &[&str]) -> ContextEnvelope {
-        let mut env = ContextEnvelope::unavailable();
+    fn make_envelope_with_verbs(verbs: &[&str]) -> SemOsContextEnvelope {
+        let mut env = SemOsContextEnvelope::unavailable();
         env.unavailable = false;
         for v in verbs {
             env.allowed_verbs.insert(v.to_string());
@@ -590,7 +590,7 @@ mod tests {
 
     #[test]
     fn test_toctou_unavailable_returns_none() {
-        let unavailable = ContextEnvelope::unavailable();
+        let unavailable = SemOsContextEnvelope::unavailable();
         let fresh = make_envelope_with_verbs(&["cbu.create"]);
         assert!(unavailable.toctou_recheck(&fresh, "cbu.create").is_none());
 

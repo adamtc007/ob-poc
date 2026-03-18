@@ -38,7 +38,7 @@ pub mod errors;
 pub mod executor;
 pub mod response;
 #[cfg(feature = "vnext-repl")]
-pub mod sem_reg_filter;
+pub mod sem_os_filter;
 #[cfg(feature = "vnext-repl")]
 pub mod step_executor_bridge;
 pub mod types;
@@ -69,7 +69,7 @@ pub use response::{
     MissingField, OrchestratorResponse, Remediation, StepPreview,
 };
 #[cfg(feature = "vnext-repl")]
-pub use sem_reg_filter::{filter_verbs_against_allowed_set, DeniedVerb, SemRegFilterResult};
+pub use sem_os_filter::{filter_verbs_against_allowed_set, SemOsDeniedVerb, SemOsFilterResult};
 pub use types::{
     CompiledRunbook, CompiledRunbookId, CompiledRunbookStatus, CompiledStep, ExecutionMode,
     ParkReason, StepCursor,

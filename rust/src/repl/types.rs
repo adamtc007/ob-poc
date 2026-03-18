@@ -55,7 +55,7 @@ pub struct MatchContext {
     #[serde(default)]
     pub bindings: Vec<(String, Uuid)>,
 
-    /// SemReg-allowed verb FQNs (from ContextEnvelope).
+    /// Sem OS-allowed verb FQNs (from SemOsContextEnvelope).
     /// When set, verb search only returns verbs in this set.
     #[serde(skip)]
     pub allowed_verbs: Option<HashSet<String>>,

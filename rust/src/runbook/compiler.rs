@@ -49,7 +49,7 @@ use super::response::{
     ClarificationContext, ClarificationRequest, CompiledRunbookSummary, MissingField,
     OrchestratorResponse, StepPreview,
 };
-use super::sem_reg_filter::filter_verbs_against_allowed_set;
+use super::sem_os_filter::filter_verbs_against_allowed_set;
 use super::types::{CompiledRunbook, CompiledStep, ExecutionMode};
 use super::verb_classifier::VerbClassification;
 

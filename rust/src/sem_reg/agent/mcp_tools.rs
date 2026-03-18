@@ -13,6 +13,7 @@
 //! and an `ActorContext`. Each handler returns a `SemRegToolResult`.
 
 use std::collections::{BTreeMap, HashMap};
+use std::sync::Arc;
 
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
@@ -25,12 +26,14 @@ use super::escalation::{
 };
 use super::plans::{AgentPlan, AgentPlanStatus, PlanStep, PlanStepStatus, PlanStore};
 use crate::sem_reg::abac::ActorContext;
-use crate::sem_reg::context_resolution::{
-    resolve_context, ContextResolutionRequest, EvidenceMode, SubjectRef,
-};
 use crate::sem_reg::enforce::{enforce_read, enforce_read_label, redacted_stub, EnforceResult};
 use crate::sem_reg::store::SnapshotStore;
 use crate::sem_reg::types::ObjectType;
+use sem_os_core::context_resolution::{
+    ContextResolutionRequest, DiscoveryContext, EvidenceMode, SubjectRef,
+};
+use sem_os_core::service::{CoreService, CoreServiceImpl};
+use sem_os_postgres::PgStores;
 
 // ── Grounding Context ─────────────────────────────────────────
 
@@ -104,6 +107,41 @@ impl SemRegToolResult {
             error: Some(msg.into()),
         }
     }
+}
+
+fn build_sem_os_service(pool: &PgPool) -> Arc<dyn CoreService> {
+    let stores = PgStores::new(pool.clone());
+    Arc::new(
+        CoreServiceImpl::new(
+            Arc::new(stores.snapshots),
+            Arc::new(stores.objects),
+            Arc::new(stores.changesets),
+            Arc::new(stores.audit),
+            Arc::new(stores.outbox),
+            Arc::new(stores.evidence),
+            Arc::new(stores.projections),
+        )
+        .with_bootstrap_audit(Arc::new(stores.bootstrap_audit))
+        .with_authoring(Arc::new(stores.authoring))
+        .with_scratch_runner(Arc::new(stores.scratch_runner))
+        .with_cleanup(Arc::new(stores.cleanup)),
+    )
+}
+
+fn to_sem_os_actor(actor: &ActorContext) -> sem_os_core::abac::ActorContext {
+    let json = serde_json::to_value(actor).expect("ActorContext serializes");
+    serde_json::from_value(json).expect("ActorContext round-trips")
+}
+
+async fn resolve_context_via_sem_os(
+    pool: &PgPool,
+    actor: &ActorContext,
+    request: ContextResolutionRequest,
+) -> sem_os_core::service::Result<sem_os_core::context_resolution::ContextResolutionResponse> {
+    let principal =
+        sem_os_core::principal::Principal::in_process(&actor.actor_id, actor.roles.clone());
+    let service = build_sem_os_service(pool);
+    service.resolve_context(&principal, request).await
 }
 
 // ── Tool Spec ─────────────────────────────────────────────────
@@ -1291,13 +1329,15 @@ async fn handle_resolve_context(
 
     let request = ContextResolutionRequest {
         subject,
-        intent,
-        actor: ctx.actor.clone(),
+        intent_summary: intent,
+        raw_utterance: None,
+        actor: to_sem_os_actor(ctx.actor),
         goals: vec![],
         constraints: Default::default(),
         evidence_mode: mode,
         point_in_time: None,
         entity_kind: None,
+        discovery: DiscoveryContext::default(),
     };
 
     let mode_str = match mode {
@@ -1307,7 +1347,7 @@ async fn handle_resolve_context(
         EvidenceMode::Governance => "governance",
     };
 
-    match resolve_context(ctx.pool, &request).await {
+    match resolve_context_via_sem_os(ctx.pool, ctx.actor, request).await {
         Ok(response) => {
             // Build grounding context from the resolution response
             let mut grounding = GroundingContext::empty();
@@ -1407,16 +1447,18 @@ async fn handle_apply_view(
 
     let request = ContextResolutionRequest {
         subject,
-        intent: None,
-        actor: ctx.actor.clone(),
+        intent_summary: None,
+        raw_utterance: None,
+        actor: to_sem_os_actor(ctx.actor),
         goals: vec![],
         constraints: Default::default(),
         evidence_mode: EvidenceMode::Normal,
         point_in_time: None,
         entity_kind: None,
+        discovery: DiscoveryContext::default(),
     };
 
-    match resolve_context(ctx.pool, &request).await {
+    match resolve_context_via_sem_os(ctx.pool, ctx.actor, request).await {
         Ok(response) => SemRegToolResult::ok(serde_json::json!({
             "view_fqn": view_fqn,
             "view_snapshot_id": view_row.snapshot_id,
@@ -2228,16 +2270,18 @@ async fn handle_identify_gaps(
 
     let request = ContextResolutionRequest {
         subject,
-        intent: None,
-        actor: ctx.actor.clone(),
+        intent_summary: None,
+        raw_utterance: None,
+        actor: to_sem_os_actor(ctx.actor),
         goals: vec!["identify_evidence_gaps".into()],
         constraints: Default::default(),
         evidence_mode: mode,
         point_in_time: None,
         entity_kind: None,
+        discovery: DiscoveryContext::default(),
     };
 
-    match resolve_context(ctx.pool, &request).await {
+    match resolve_context_via_sem_os(ctx.pool, ctx.actor, request).await {
         Ok(response) => {
             let mut gaps = Vec::new();
 

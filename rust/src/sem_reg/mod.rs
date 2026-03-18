@@ -77,9 +77,6 @@ pub mod onboarding;
 // Evidence instance layer (migration 090)
 pub mod evidence_instances;
 
-// Phase 7: Context resolution API
-pub mod context_resolution;
-
 // Phase 8: Agent control plane + MCP tools
 pub mod agent;
 
@@ -130,11 +127,6 @@ pub use gates::{
     GateMode, GateSeverity, UnifiedPublishGateResult,
 };
 pub use registry::PublishOutcome;
-
-// Re-export Phase 7 types
-pub use context_resolution::{
-    resolve_context, ContextResolutionRequest, ContextResolutionResponse, EvidenceMode, SubjectRef,
-};
 
 // Re-export Phase 8 types
 pub use agent::{

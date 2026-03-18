@@ -1,7 +1,7 @@
 //! Discovery domain CustomOps for the SemTaxonomy replacement path.
 //!
 //! These verbs expose a read-only discovery surface over existing entity search,
-//! SemReg registry/schema tooling, and lightweight operational context queries.
+//! Sem OS registry/schema tooling, and lightweight operational context queries.
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
@@ -12,7 +12,7 @@ use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet};
 use uuid::Uuid;
 
-use super::sem_reg_helpers::{build_actor_from_ctx, get_bool_arg, get_string_arg};
+use super::sem_os_helpers::{build_actor_from_ctx, get_bool_arg, get_string_arg};
 use super::{CustomOperation, ExecutionContext, ExecutionResult, VerbCall};
 use crate::dsl_v2::gateway_resolver::gateway_addr;
 use crate::sem_reg::agent::mcp_tools::{dispatch_tool, SemRegToolContext, SemRegToolResult};
@@ -312,7 +312,7 @@ fn tool_error(result: SemRegToolResult) -> Result<Value> {
             "{}",
             result
                 .error
-                .unwrap_or_else(|| "Unknown SemReg tool error".to_string())
+                .unwrap_or_else(|| "Unknown Sem OS tool error".to_string())
         ))
     }
 }
@@ -2388,7 +2388,7 @@ impl CustomOperation for DiscoveryVerbDetailOp {
     }
 
     fn rationale(&self) -> &'static str {
-        "Returns a normalized verb contract from YAML config and SemReg governance detail"
+        "Returns a normalized verb contract from YAML config and Sem OS governance detail"
     }
 
     #[cfg(feature = "database")]
@@ -2782,7 +2782,7 @@ impl CustomOperation for DiscoverySearchDataOp {
     }
 
     fn rationale(&self) -> &'static str {
-        "Wraps SemReg search with entity/domain scope and a normalized data-search result envelope"
+        "Wraps Sem OS search with entity/domain scope and a normalized data-search result envelope"
     }
 
     #[cfg(feature = "database")]

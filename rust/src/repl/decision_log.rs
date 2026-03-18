@@ -196,12 +196,12 @@ pub struct VerbDecision {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub precondition_filter: Option<PreconditionFilterLog>,
 
-    /// SemReg ContextEnvelope fingerprint (SHA-256 of sorted allowed verb FQNs).
-    /// Populated when SemOS client is available and ContextEnvelope is resolved.
+    /// Sem OS context-envelope fingerprint (SHA-256 of sorted allowed verb FQNs).
+    /// Populated when SemOS client is available and SemOsContextEnvelope is resolved.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub context_envelope_fingerprint: Option<String>,
 
-    /// Number of verbs pruned by SemReg context resolution.
+    /// Number of verbs pruned by Sem OS context resolution.
     /// Zero when SemOS unavailable or when no pruning occurred.
     #[serde(default)]
     pub pruned_verbs_count: usize,

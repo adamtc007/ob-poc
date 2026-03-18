@@ -9,7 +9,7 @@ use async_trait::async_trait;
 
 use ob_poc_macros::register_custom_op;
 
-use super::sem_reg_helpers::{delegate_to_stew_tool, delegate_to_tool};
+use super::sem_os_helpers::{delegate_to_stew_tool, delegate_to_tool};
 use super::{CustomOperation, ExecutionContext, ExecutionResult, VerbCall};
 
 #[cfg(feature = "database")]
@@ -338,7 +338,7 @@ impl CustomOperation for GovernanceRollbackOp {
         _ctx: &mut ExecutionContext,
         pool: &PgPool,
     ) -> Result<ExecutionResult> {
-        use super::sem_reg_helpers::get_string_arg;
+        use super::sem_os_helpers::get_string_arg;
 
         let target = get_string_arg(verb_call, "target-snapshot-set-id").ok_or_else(|| {
             anyhow::anyhow!("governance.rollback requires target-snapshot-set-id")

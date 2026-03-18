@@ -25,18 +25,23 @@
 mod integration {
     use anyhow::Result;
     use chrono::Utc;
+    use sem_os_core::context_resolution::{
+        ContextResolutionRequest, DiscoveryContext, EvidenceMode, SubjectRef,
+    };
+    use sem_os_core::service::{CoreService, CoreServiceImpl};
+    use sem_os_postgres::PgStores;
     use serde_json::json;
     use sqlx::PgPool;
+    use std::sync::Arc;
     use uuid::Uuid;
 
     use ob_poc::sem_reg::attribute_def::AttributeDataType;
-    use ob_poc::sem_reg::{check_evidence_proof_rule, resolve_context, ContextResolutionRequest};
     use ob_poc::sem_reg::{
-        evaluate_abac, AccessDecision, AccessPurpose, ActorContext, AgentPlan, AgentPlanStatus,
-        AttributeDefBody, ChangeType, Classification, DecisionRecord, DecisionStore, EvidenceMode,
-        GovernanceTier, LineageStore, MetricsStore, ObjectType, PlanStep, PlanStepStatus,
-        PlanStore, RegistryService, SecurityLabel, SnapshotMeta, SnapshotRow, SnapshotStatus,
-        SnapshotStore, SubjectRef, TrustClass, VerbContractBody,
+        check_evidence_proof_rule, evaluate_abac, AccessDecision, AccessPurpose, ActorContext,
+        AgentPlan, AgentPlanStatus, AttributeDefBody, ChangeType, Classification, DecisionRecord,
+        DecisionStore, GovernanceTier, LineageStore, MetricsStore, ObjectType, PlanStep,
+        PlanStepStatus, PlanStore, RegistryService, SecurityLabel, SnapshotMeta, SnapshotRow,
+        SnapshotStatus, SnapshotStore, TrustClass, VerbContractBody,
     };
 
     // Import types not re-exported at module boundary
@@ -176,6 +181,47 @@ mod integration {
         }
     }
 
+    fn build_sem_os_service(pool: &PgPool) -> Arc<dyn CoreService> {
+        let stores = PgStores::new(pool.clone());
+        Arc::new(
+            CoreServiceImpl::new(
+                Arc::new(stores.snapshots),
+                Arc::new(stores.objects),
+                Arc::new(stores.changesets),
+                Arc::new(stores.audit),
+                Arc::new(stores.outbox),
+                Arc::new(stores.evidence),
+                Arc::new(stores.projections),
+            )
+            .with_bootstrap_audit(Arc::new(stores.bootstrap_audit))
+            .with_authoring(Arc::new(stores.authoring))
+            .with_scratch_runner(Arc::new(stores.scratch_runner))
+            .with_cleanup(Arc::new(stores.cleanup)),
+        )
+    }
+
+    fn to_sem_os_actor(actor: &ActorContext) -> sem_os_core::abac::ActorContext {
+        sem_os_core::abac::ActorContext {
+            actor_id: actor.actor_id.clone(),
+            roles: actor.roles.clone(),
+            department: actor.department.clone(),
+            clearance: actor.clearance,
+            jurisdictions: actor.jurisdictions.clone(),
+        }
+    }
+
+    async fn resolve_context_via_sem_os(
+        pool: &PgPool,
+        actor: &ActorContext,
+        request: ContextResolutionRequest,
+    ) -> sem_os_core::service::Result<sem_os_core::context_resolution::ContextResolutionResponse>
+    {
+        let service = build_sem_os_service(pool);
+        let principal =
+            sem_os_core::principal::Principal::in_process(&actor.actor_id, actor.roles.clone());
+        service.resolve_context(&principal, request).await
+    }
+
     // ═══════════════════════════════════════════════════════════════════════
     // Scenario 1: UBO Discovery E2E
     // ═══════════════════════════════════════════════════════════════════════
@@ -203,17 +249,20 @@ mod integration {
         let (verb_oid, verb_sid) = db.publish_verb(&verb_fqn, "UBO Discovery").await?;
 
         // 2. Resolve context
+        let actor = test_actor();
         let request = ContextResolutionRequest {
             subject: SubjectRef::EntityId(Uuid::new_v4()),
-            intent: Some("discover UBO".into()),
-            actor: test_actor(),
+            intent_summary: Some("discover UBO".into()),
+            raw_utterance: Some("discover UBO".into()),
+            actor: to_sem_os_actor(&actor),
             goals: vec!["ownership_discovery".into()],
             constraints: Default::default(),
             evidence_mode: EvidenceMode::Normal,
             point_in_time: None,
             entity_kind: None,
+            discovery: DiscoveryContext::default(),
         };
-        let response = resolve_context(&db.pool, &request).await?;
+        let response = resolve_context_via_sem_os(&db.pool, &actor, request).await?;
         assert!(
             response.confidence >= 0.0,
             "Confidence should be non-negative"
@@ -1317,16 +1366,18 @@ mod integration {
 
         let request = ContextResolutionRequest {
             subject: SubjectRef::EntityId(subject_id),
-            intent: None,
-            actor,
+            intent_summary: None,
+            raw_utterance: None,
+            actor: to_sem_os_actor(&actor),
             goals: vec!["test_taxonomy_filter".into()],
             constraints: Default::default(),
             evidence_mode: EvidenceMode::Exploratory,
             point_in_time: None,
             entity_kind: None,
+            discovery: DiscoveryContext::default(),
         };
 
-        let response = resolve_context(&db.pool, &request).await?;
+        let response = resolve_context_via_sem_os(&db.pool, &actor, request).await?;
 
         // Collect verb FQNs from response
         let verb_fqns: Vec<&str> = response

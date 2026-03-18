@@ -174,9 +174,9 @@ pub struct ReplOrchestratorV2 {
     /// Pool for unified orchestrator (Phase 1.4 hardening).
     #[cfg(feature = "database")]
     unified_orch_pool: Option<sqlx::PgPool>,
-    /// Semantic OS client for SemReg context resolution (Phase 4 CCIR).
-    /// When set, `match_verb_for_input()` resolves a ContextEnvelope and
-    /// pre-constrains verb search to SemReg-allowed verbs.
+    /// Semantic OS client for Sem OS context resolution (Phase 4 CCIR).
+    /// When set, `match_verb_for_input()` resolves a SemOsContextEnvelope and
+    /// pre-constrains verb search to Sem OS-allowed verbs.
     sem_os_client: Option<Arc<dyn SemOsClient>>,
 }
 
@@ -229,7 +229,7 @@ impl ReplOrchestratorV2 {
 
     /// Attach a database pool for the unified orchestrator (Phase 1.4).
     /// When set, `match_verb_for_input()` routes through the orchestrator
-    /// for SemReg filtering and IntentTrace logging.
+    /// for Sem OS filtering and IntentTrace logging.
     #[cfg(feature = "database")]
     pub fn with_unified_orchestrator(mut self, pool: sqlx::PgPool) -> Self {
         self.unified_orch_pool = Some(pool);
@@ -284,9 +284,9 @@ impl ReplOrchestratorV2 {
         self
     }
 
-    /// Attach a Semantic OS client for SemReg context resolution (Phase 4 CCIR).
+    /// Attach a Semantic OS client for Sem OS context resolution (Phase 4 CCIR).
     ///
-    /// When set, `match_verb_for_input()` resolves a ContextEnvelope and
+    /// When set, `match_verb_for_input()` resolves a SemOsContextEnvelope and
     /// pre-constrains verb search via `MatchContext.allowed_verbs`.
     pub fn with_sem_os_client(mut self, client: Arc<dyn SemOsClient>) -> Self {
         self.sem_os_client = Some(client);
@@ -2056,7 +2056,7 @@ impl ReplOrchestratorV2 {
     ) -> ReplResponseV2 {
         // Phase 1.4: If unified orchestrator is available, log trace info.
         // The REPL's multi-phase flow (clarification, sentence gen, confirmation)
-        // is preserved — orchestrator provides SemReg context and trace only.
+        // is preserved — orchestrator provides Sem OS context and trace only.
         #[cfg(feature = "database")]
         if let Some(ref _pool) = self.unified_orch_pool {
             tracing::debug!(
@@ -2069,13 +2069,13 @@ impl ReplOrchestratorV2 {
         let mut match_ctx = self.build_match_context(session);
         let context_stack = self.build_context_stack(session);
 
-        // Phase 4 CCIR: Resolve SemReg ContextEnvelope and pre-constrain verb search.
+        // Phase 4 CCIR: Resolve SemOsContextEnvelope and pre-constrain verb search.
         // This injects `allowed_verbs` into MatchContext, which flows through to
         // VerbSearchIntentMatcher → HybridVerbSearcher::search() via the Phase 3
         // allowed_verbs parameter. REPL matching is fail-closed: if Sem OS is
         // unavailable, the allowed set is empty.
-        let mut sem_reg_fingerprint: Option<String> = None;
-        let mut sem_reg_pruned_count: usize = 0;
+        let mut sem_os_fingerprint: Option<String> = None;
+        let mut sem_os_pruned_count: usize = 0;
         if let Some(ref client) = self.sem_os_client {
             let actor = crate::policy::ActorResolver::from_env();
             let envelope = crate::agent::orchestrator::resolve_allowed_verbs(
@@ -2088,7 +2088,7 @@ impl ReplOrchestratorV2 {
             if envelope.is_deny_all() {
                 tracing::warn!(
                     session_id = %session.id,
-                    "REPL: SemReg DenyAll — verb search will return empty"
+                    "REPL: Sem OS deny-all — verb search will return empty"
                 );
                 match_ctx.allowed_verbs = Some(envelope.allowed_verbs.clone());
             }
@@ -2096,19 +2096,19 @@ impl ReplOrchestratorV2 {
             if envelope.is_unavailable() {
                 tracing::warn!(
                     session_id = %session.id,
-                    "REPL: SemReg unavailable — blocking unconstrained verb matching"
+                    "REPL: Sem OS unavailable — blocking unconstrained verb matching"
                 );
                 match_ctx.allowed_verbs = Some(std::collections::HashSet::new());
             } else {
-                sem_reg_fingerprint = Some(envelope.fingerprint_str().to_string());
-                sem_reg_pruned_count = envelope.pruned_count();
+                sem_os_fingerprint = Some(envelope.fingerprint_str().to_string());
+                sem_os_pruned_count = envelope.pruned_count();
                 match_ctx.allowed_verbs = Some(envelope.allowed_verbs.clone());
                 tracing::debug!(
                     session_id = %session.id,
                     allowed_count = envelope.allowed_verbs.len(),
                     fingerprint = %envelope.fingerprint_str(),
-                    pruned_count = sem_reg_pruned_count,
-                    "REPL: SemReg pre-constraint applied to MatchContext"
+                    pruned_count = sem_os_pruned_count,
+                    "REPL: Sem OS pre-constraint applied to MatchContext"
                 );
             }
         } else {
@@ -2131,8 +2131,8 @@ impl ReplOrchestratorV2 {
                         content,
                         svc,
                         outcome,
-                        sem_reg_fingerprint.clone(),
-                        sem_reg_pruned_count,
+                        sem_os_fingerprint.clone(),
+                        sem_os_pruned_count,
                     );
                 }
                 Err(e) => {
@@ -2211,8 +2211,8 @@ impl ReplOrchestratorV2 {
         original_input: &str,
         svc: &IntentService,
         outcome: VerbMatchOutcome,
-        sem_reg_fingerprint: Option<String>,
-        sem_reg_pruned_count: usize,
+        sem_os_fingerprint: Option<String>,
+        sem_os_pruned_count: usize,
     ) -> ReplResponseV2 {
         match outcome {
             VerbMatchOutcome::Matched {
@@ -2282,8 +2282,8 @@ impl ReplOrchestratorV2 {
                             used_template_path: false,
                             template_id: None,
                             precondition_filter: None,
-                            context_envelope_fingerprint: sem_reg_fingerprint.clone(),
-                            pruned_verbs_count: sem_reg_pruned_count,
+                            context_envelope_fingerprint: sem_os_fingerprint.clone(),
+                            pruned_verbs_count: sem_os_pruned_count,
                         },
                         ExtractionDecision {
                             method: extraction_method,
@@ -2442,8 +2442,8 @@ impl ReplOrchestratorV2 {
                             used_template_path: false,
                             template_id: None,
                             precondition_filter: None,
-                            context_envelope_fingerprint: sem_reg_fingerprint.clone(),
-                            pruned_verbs_count: sem_reg_pruned_count,
+                            context_envelope_fingerprint: sem_os_fingerprint.clone(),
+                            pruned_verbs_count: sem_os_pruned_count,
                         },
                         ExtractionDecision::default(),
                         None,
@@ -2515,8 +2515,8 @@ impl ReplOrchestratorV2 {
                             used_template_path: false,
                             template_id: None,
                             precondition_filter: None,
-                            context_envelope_fingerprint: sem_reg_fingerprint.clone(),
-                            pruned_verbs_count: sem_reg_pruned_count,
+                            context_envelope_fingerprint: sem_os_fingerprint.clone(),
+                            pruned_verbs_count: sem_os_pruned_count,
                         },
                         ExtractionDecision::default(),
                         None,

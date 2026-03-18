@@ -308,7 +308,7 @@ impl CustomOperation for MaintenanceReindexEmbeddingsOp {
         _ctx: &mut ExecutionContext,
         _pool: &PgPool,
     ) -> Result<ExecutionResult> {
-        use super::sem_reg_helpers::get_bool_arg;
+        use super::sem_os_helpers::get_bool_arg;
 
         let force = get_bool_arg(verb_call, "force").unwrap_or(false);
 

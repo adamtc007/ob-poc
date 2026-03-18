@@ -1,18 +1,19 @@
-//! SemReg verb filter for the compilation pipeline (§6.2 Step 4).
+//! Sem OS verb filter for the compilation pipeline (§6.2 Step 4).
 //!
 //! After macro expansion, DAG assembly, and pack constraint checking, the
 //! expanded verb set is filtered against the Semantic Registry's context
-//! resolution. Verbs that SemReg denies are rejected before write_set
+//! resolution. Verbs that Sem OS denies are rejected before write_set
 //! derivation or storage.
 //!
 //! ## Design
 //!
-//! - **Optional**: The `SemRegFilter` is `Option<SemRegFilter>`. When `None`,
-//!   SemReg filtering is skipped (graceful degradation).
-//! - **Fail-open on unavailability**: If `resolve_context()` returns an error
-//!   (DB down, timeout), the filter logs a warning and allows all verbs. This
-//!   matches the existing pattern in `agent/orchestrator.rs`.
-//! - **Fail-closed on explicit deny**: If SemReg resolves successfully but
+//! - **Optional**: The filter can be omitted by the caller. When no allowed
+//!   set is supplied, filtering is skipped upstream.
+//!   Sem OS filtering is skipped by the caller.
+//! - **Fail-closed on unavailability**: If `resolve_context()` cannot produce
+//!   an allowed set, callers must block execution rather than widening to a
+//!   registry fallback.
+//! - **Fail-closed on explicit deny**: If Sem OS resolves successfully but
 //!   denies verbs, those verbs are rejected.
 
 use std::collections::HashSet;
@@ -20,25 +21,25 @@ use std::collections::HashSet;
 use serde::{Deserialize, Serialize};
 
 // ---------------------------------------------------------------------------
-// SemRegFilterResult
+// SemOsFilterResult
 // ---------------------------------------------------------------------------
 
-/// Result of filtering expanded verbs against SemReg.
+/// Result of filtering expanded verbs against Sem OS.
 #[derive(Debug, Clone)]
-pub struct SemRegFilterResult {
-    /// Verbs that SemReg allows (or all verbs if SemReg is unavailable).
+pub struct SemOsFilterResult {
+    /// Verbs that Sem OS allows.
     pub allowed: Vec<String>,
 
-    /// Verbs denied with reasons (empty if all allowed or SemReg unavailable).
-    pub denied_with_reasons: Vec<DeniedVerb>,
+    /// Verbs denied with reasons (empty if all allowed).
+    pub denied_with_reasons: Vec<SemOsDeniedVerb>,
 
-    /// Whether SemReg was actually consulted (false if unavailable/skipped).
-    pub sem_reg_consulted: bool,
+    /// Whether Sem OS was actually consulted (false if unavailable/skipped).
+    pub sem_os_consulted: bool,
 }
 
-/// A verb that was denied by SemReg.
+/// A verb that was denied by Sem OS.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DeniedVerb {
+pub struct SemOsDeniedVerb {
     /// The verb FQN that was denied.
     pub verb: String,
 
@@ -46,13 +47,13 @@ pub struct DeniedVerb {
     pub reason: String,
 }
 
-impl SemRegFilterResult {
-    /// All verbs allowed (SemReg unavailable or not configured).
+impl SemOsFilterResult {
+    /// All verbs allowed when the caller chooses to bypass filtering.
     pub fn allow_all(verbs: &[String]) -> Self {
         Self {
             allowed: verbs.to_vec(),
             denied_with_reasons: vec![],
-            sem_reg_consulted: false,
+            sem_os_consulted: false,
         }
     }
 
@@ -62,7 +63,7 @@ impl SemRegFilterResult {
     }
 
     /// Get the first denied verb (for error reporting).
-    pub fn first_denied(&self) -> Option<&DeniedVerb> {
+    pub fn first_denied(&self) -> Option<&SemOsDeniedVerb> {
         self.denied_with_reasons.first()
     }
 }
@@ -71,24 +72,24 @@ impl SemRegFilterResult {
 // filter_verbs_against_allowed_set — pure function
 // ---------------------------------------------------------------------------
 
-/// Filter a set of expanded verbs against an allowed set from SemReg.
+/// Filter a set of expanded verbs against an allowed set from Sem OS.
 ///
-/// This is a pure function that doesn't call SemReg directly — the caller
+/// This is a pure function that doesn't call Sem OS directly — the caller
 /// is responsible for obtaining the allowed set (via `resolve_context()`
 /// or `ContextEnvelope`).
 ///
 /// # Arguments
 ///
 /// * `expanded_verbs` — verbs from macro expansion
-/// * `allowed_verbs` — verbs allowed by SemReg (from `resolve_context().candidate_verbs`)
+/// * `allowed_verbs` — verbs allowed by Sem OS (from `resolve_context().candidate_verbs`)
 ///
 /// # Returns
 ///
-/// A `SemRegFilterResult` with allowed and denied verbs.
+/// A `SemOsFilterResult` with allowed and denied verbs.
 pub fn filter_verbs_against_allowed_set(
     expanded_verbs: &[String],
     allowed_verbs: &HashSet<String>,
-) -> SemRegFilterResult {
+) -> SemOsFilterResult {
     let mut allowed = Vec::new();
     let mut denied = Vec::new();
 
@@ -96,20 +97,20 @@ pub fn filter_verbs_against_allowed_set(
         if allowed_verbs.contains(verb) {
             allowed.push(verb.clone());
         } else {
-            denied.push(DeniedVerb {
+            denied.push(SemOsDeniedVerb {
                 verb: verb.clone(),
                 reason: format!(
-                    "Verb '{}' is not in the SemReg allowed set for the current context",
+                    "Verb '{}' is not in the Sem OS allowed set for the current context",
                     verb
                 ),
             });
         }
     }
 
-    SemRegFilterResult {
+    SemOsFilterResult {
         allowed,
         denied_with_reasons: denied,
-        sem_reg_consulted: true,
+        sem_os_consulted: true,
     }
 }
 
@@ -132,7 +133,7 @@ mod tests {
         let result = filter_verbs_against_allowed_set(&expanded, &allowed);
         assert!(!result.has_denials());
         assert_eq!(result.allowed.len(), 2);
-        assert!(result.sem_reg_consulted);
+        assert!(result.sem_os_consulted);
     }
 
     #[test]
@@ -168,9 +169,9 @@ mod tests {
     #[test]
     fn test_allow_all_bypass() {
         let verbs = vec!["a".to_string(), "b".to_string()];
-        let result = SemRegFilterResult::allow_all(&verbs);
+        let result = SemOsFilterResult::allow_all(&verbs);
         assert!(!result.has_denials());
-        assert!(!result.sem_reg_consulted);
+        assert!(!result.sem_os_consulted);
         assert_eq!(result.allowed.len(), 2);
     }
 

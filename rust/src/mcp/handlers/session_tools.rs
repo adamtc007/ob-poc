@@ -312,7 +312,7 @@ impl ToolHandlers {
     /// Computes the `SessionVerbSurface` by running the 8-step governance pipeline
     /// (AgentMode → Workflow Phase → SemReg CCIR → Lifecycle → Actor → FailPolicy → Rank).
     pub(super) async fn session_verb_surface(&self, args: Value) -> Result<Value> {
-        use crate::agent::context_envelope::ContextEnvelope;
+        use crate::agent::sem_os_context_envelope::SemOsContextEnvelope;
         use crate::agent::verb_surface::{
             compute_session_verb_surface, VerbSurfaceContext, VerbSurfaceFailPolicy,
         };
@@ -324,7 +324,7 @@ impl ToolHandlers {
         // In the MCP context we use defaults for most fields since there's no
         // active chat session — the tool is introspection-only.
         let agent_mode = self.agent_mode;
-        let envelope = ContextEnvelope::unavailable();
+        let envelope = SemOsContextEnvelope::unavailable();
         let ctx = VerbSurfaceContext {
             agent_mode,
             stage_focus: None,

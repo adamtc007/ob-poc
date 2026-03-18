@@ -24,6 +24,7 @@ ob-poc-macros = { path = "crates/ob-poc-macros" }
 sem_os_core = { path = "crates/sem_os_core" }
 sem_os_client = { path = "crates/sem_os_client" }
 sem_os_obpoc_adapter = { path = "crates/sem_os_obpoc_adapter" }
+sem_os_postgres = { path = "crates/sem_os_postgres" }
 governed_query_proc = { path = "crates/governed_query_proc" }
 
 # Auto-registration for custom operations
@@ -123,7 +124,6 @@ smallvec = { version = "1.11", features = ["serde"] }
 bpmn-lite-core = { path = "../bpmn-lite/bpmn-lite-core" }
 bpmn-lite-server = { path = "../bpmn-lite/bpmn-lite-server" }
 sem_os_core = { path = "crates/sem_os_core" }
-sem_os_postgres = { path = "crates/sem_os_postgres" }
 tokio-stream = "0.1"
 proptest = "1.4"
 toml = "0.8"

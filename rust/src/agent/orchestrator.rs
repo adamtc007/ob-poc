@@ -4,12 +4,12 @@
 //! Chat API, MCP `dsl_generate`, and REPL. Wraps `IntentPipeline` with:
 //!
 //! - **Entity linking** via `LookupService` (Phase 4 dedup)
-//! - **SemReg context resolution** -> `ContextEnvelope` (Phase 2B CCIR)
+//! - **Sem OS context resolution** -> `SemOsContextEnvelope` (Phase 2B CCIR)
 //! - **Direct DSL bypass gating** by actor role (Phase 2.1)
 //! - **IntentTrace** structured audit logging (Phase 5)
 //!
 //! Phase 2B replaced the flat `SemRegVerbPolicy` enum with a rich
-//! `ContextEnvelope` that preserves pruning reasons, governance signals,
+//! `SemOsContextEnvelope` that preserves pruning reasons, governance signals,
 //! and a deterministic fingerprint of the allowed verb set.
 
 use serde::Serialize;
@@ -20,7 +20,7 @@ use uuid::Uuid;
 #[cfg(feature = "database")]
 use sqlx::PgPool;
 
-use crate::agent::context_envelope::ContextEnvelope;
+use crate::agent::sem_os_context_envelope::SemOsContextEnvelope;
 use crate::agent::telemetry;
 use crate::agent::verb_surface::{
     compute_session_verb_surface, SessionVerbSurface, VerbSurfaceContext, VerbSurfaceFailPolicy,
@@ -77,7 +77,7 @@ pub struct OrchestratorContext {
     /// publish and business verbs. Default: Governed.
     pub agent_mode: AgentMode,
     /// Workflow goals derived from session stage_focus (e.g., ["kyc"], ["onboarding"]).
-    /// Threaded into SemReg ContextResolutionRequest to filter verbs by phase_tags.
+    /// Threaded into the Sem OS ContextResolutionRequest to filter verbs by phase_tags.
     /// Empty means no goal filtering (all verbs pass).
     pub goals: Vec<String>,
     /// Session workflow focus (e.g., "semos-kyc", "semos-onboarding").
@@ -115,10 +115,10 @@ pub enum UtteranceSource {
 /// Full outcome of orchestrator processing.
 pub struct OrchestratorOutcome {
     pub pipeline_result: PipelineResult,
-    /// Rich context envelope from SemReg resolution (replaces flat `sem_reg_verbs`).
+    /// Rich context envelope from Sem OS resolution (replaces flat `sem_reg_verbs`).
     /// Contains allowed verbs, pruned verbs with reasons, fingerprint, governance signals.
     #[cfg(feature = "database")]
-    pub context_envelope: Option<ContextEnvelope>,
+    pub context_envelope: Option<SemOsContextEnvelope>,
     /// Consolidated verb surface computed for this turn (all governance layers applied).
     /// When present, replaces ad-hoc inline SemReg + AgentMode filtering.
     #[cfg(feature = "database")]
@@ -152,7 +152,7 @@ struct PreparedTurnContext {
     dominant_entity_kind: Option<String>,
     entity_candidates: Vec<String>,
     sem_reg_verb_names: Option<Vec<String>>,
-    envelope: ContextEnvelope,
+    envelope: SemOsContextEnvelope,
     surface: SessionVerbSurface,
 }
 
@@ -627,7 +627,7 @@ pub struct IntentTrace {
     pub chosen_verb_pre_semreg: Option<String>,
     /// Verb chosen AFTER SemReg filtering (this drives DSL generation)
     pub chosen_verb_post_semreg: Option<String>,
-    /// SemReg policy classification (via ContextEnvelope::label())
+    /// Sem OS policy classification (via SemOsContextEnvelope::label())
     pub semreg_policy: String,
     /// Set when SemReg was unavailable but pipeline continued (non-strict)
     pub semreg_unavailable: bool,
@@ -641,7 +641,7 @@ pub struct IntentTrace {
     pub macro_denied_verbs: Vec<String>,
     /// Entity kind of the dominant entity (e.g., "cbu", "fund")
     pub dominant_entity_kind: Option<String>,
-    /// Whether entity-kind filtering was applied in SemReg context resolution
+    /// Whether entity-kind filtering was applied in Sem OS context resolution
     pub entity_kind_filtered: bool,
     /// Whether telemetry was persisted to agent.intent_events
     pub telemetry_persisted: bool,
@@ -994,7 +994,7 @@ fn can_skip_fast_path_parse_validation(verb_fqn: &str) -> bool {
 ///
 /// Flow:
 /// 1. Entity linking (if LookupService available)
-/// 2. SemReg context resolution -> `ContextEnvelope`
+/// 2. Sem OS context resolution -> `SemOsContextEnvelope`
 /// 3. Build IntentPipeline, run candidate discovery
 /// 4. Apply SemReg filter to candidates
 /// 5. For matched-path outcomes: re-generate DSL via forced-verb if SemReg
@@ -1311,7 +1311,7 @@ pub async fn legacy_handle_utterance(
         .map(|lr| lr.entities.iter().map(|e| e.mention_text.clone()).collect())
         .unwrap_or_default();
 
-    // -- Step 2: SemReg context resolution -> ContextEnvelope --
+    // -- Step 2: Sem OS context resolution -> SemOsContextEnvelope --
     let use_generic_task_subject =
         should_use_generic_task_subject_for_sage(ctx.stage_focus.as_deref(), sage_intent.as_ref());
     let envelope = resolve_sem_reg_verbs(
@@ -1741,7 +1741,7 @@ pub async fn legacy_handle_utterance(
                 resolve_sem_reg_verbs(ctx, "", None, semreg_entity_kind.as_deref(), false).await;
 
             if let Some(toctou) = envelope.toctou_recheck(&new_envelope, verb_fqn) {
-                use crate::agent::context_envelope::TocTouResult;
+                use crate::agent::sem_os_context_envelope::TocTouResult;
                 match &toctou {
                     TocTouResult::StillAllowed => {
                         toctou_result_str = Some("still_allowed".to_string());
@@ -2044,7 +2044,7 @@ fn build_trace(
     chosen_verb_pre_semreg: &Option<String>,
     chosen_verb_post_semreg: &Option<String>,
     result: &PipelineResult,
-    envelope: &ContextEnvelope,
+    envelope: &SemOsContextEnvelope,
     bypass_used: Option<String>,
     sem_reg_denied_all: bool,
     semreg_unavailable: bool,
@@ -2521,7 +2521,7 @@ pub async fn handle_utterance_with_forced_verb(
         .map(|lr| lr.entities.iter().map(|e| e.mention_text.clone()).collect())
         .unwrap_or_default();
 
-    // -- SemReg context resolution for forced-verb path --
+    // -- Sem OS context resolution for forced-verb path --
     // Even though the user selected this verb, we still validate it against
     // the current SemReg allowed set. This closes the TOCTOU gap where the
     // verb was allowed at discovery time but may have been revoked since.
@@ -2798,7 +2798,7 @@ fn default_trace_for_runtime(
     }
 }
 
-/// Resolve SemReg context and return a `ContextEnvelope`.
+/// Resolve Sem OS context and return a `SemOsContextEnvelope`.
 ///
 /// Returns a rich envelope preserving allowed verbs, pruned verbs with reasons,
 /// deterministic fingerprint, evidence gaps, and governance signals.
@@ -2809,7 +2809,7 @@ pub(crate) async fn resolve_sem_reg_verbs(
     sage_intent: Option<&crate::sage::OutcomeIntent>,
     entity_kind: Option<&str>,
     use_generic_task_subject: bool,
-) -> ContextEnvelope {
+) -> SemOsContextEnvelope {
     // Route through SemOsClient when available (DI boundary). Utterance
     // discovery no longer falls back to direct sem_reg calls.
     if let Some(ref client) = ctx.sem_os_client {
@@ -2824,7 +2824,7 @@ pub(crate) async fn resolve_sem_reg_verbs(
         .await
     } else {
         tracing::warn!("SemOsClient unavailable; blocking utterance discovery");
-        ContextEnvelope::unavailable()
+        SemOsContextEnvelope::unavailable()
     }
 }
 
@@ -2836,7 +2836,7 @@ async fn resolve_via_client(
     sage_intent: Option<&crate::sage::OutcomeIntent>,
     entity_kind: Option<&str>,
     use_generic_task_subject: bool,
-) -> ContextEnvelope {
+) -> SemOsContextEnvelope {
     use sem_os_core::context_resolution::{EvidenceMode, SubjectRef};
 
     let subject = if use_generic_task_subject {
@@ -2889,7 +2889,7 @@ async fn resolve_via_client(
 
     match client.resolve_context(&principal, request).await {
         Ok(response) => {
-            let envelope = ContextEnvelope::from_resolution(&response);
+            let envelope = SemOsContextEnvelope::from_resolution(&response);
             tracing::debug!(
                 allowed_count = envelope.allowed_verbs.len(),
                 pruned_count = envelope.pruned_count(),
@@ -2900,7 +2900,7 @@ async fn resolve_via_client(
         }
         Err(e) => {
             tracing::warn!(error = %e, source = "sem_reg", "SemReg context resolution failed (client)");
-            ContextEnvelope::unavailable()
+            SemOsContextEnvelope::unavailable()
         }
     }
 }
@@ -2908,13 +2908,13 @@ async fn resolve_via_client(
 /// Resolve the SemReg allowed verb set using only a SemOsClient + actor context.
 ///
 /// This is a lightweight entry point for MCP tools (verb_search, dsl_execute) that
-/// don't have a full OrchestratorContext. Returns a `ContextEnvelope`.
+/// don't have a full OrchestratorContext. Returns a `SemOsContextEnvelope`.
 #[cfg(feature = "database")]
 pub async fn resolve_allowed_verbs(
     client: &dyn SemOsClient,
     actor: &ActorContext,
     session_id: Option<Uuid>,
-) -> ContextEnvelope {
+) -> SemOsContextEnvelope {
     use sem_os_core::context_resolution::{EvidenceMode, SubjectRef};
 
     // Resolve against a neutral task subject for generic sessions. This avoids
@@ -2942,7 +2942,7 @@ pub async fn resolve_allowed_verbs(
 
     match client.resolve_context(&principal, request).await {
         Ok(response) => {
-            let envelope = ContextEnvelope::from_resolution(&response);
+            let envelope = SemOsContextEnvelope::from_resolution(&response);
             tracing::debug!(
                 allowed_count = envelope.allowed_verbs.len(),
                 pruned_count = envelope.pruned_count(),
@@ -2953,7 +2953,7 @@ pub async fn resolve_allowed_verbs(
         }
         Err(e) => {
             tracing::warn!(error = %e, source = "sem_reg", "SemReg lightweight resolve failed");
-            ContextEnvelope::unavailable()
+            SemOsContextEnvelope::unavailable()
         }
     }
 }
@@ -3090,16 +3090,16 @@ mod tests {
 
     #[test]
     fn test_context_envelope_labels_backward_compat() {
-        // Verify ContextEnvelope labels match the old SemRegVerbPolicy labels
-        let unav = ContextEnvelope::unavailable();
+        // Verify SemOsContextEnvelope labels match the old SemRegVerbPolicy labels
+        let unav = SemOsContextEnvelope::unavailable();
         assert_eq!(unav.label(), "unavailable");
 
-        let deny = ContextEnvelope::deny_all();
+        let deny = SemOsContextEnvelope::deny_all();
         assert_eq!(deny.label(), "deny_all");
 
-        let _allowed = ContextEnvelope::unavailable();
+        let _allowed = SemOsContextEnvelope::unavailable();
         // Build a non-unavailable, non-deny-all envelope
-        let env = ContextEnvelope::deny_all();
+        let env = SemOsContextEnvelope::deny_all();
         // Use deny_all as base, add a verb to make it an allowed_set
         // We test label through the from_resolution path indirectly;
         // here just test the enum labels are backward-compatible
@@ -3918,8 +3918,8 @@ mod tests {
 
     #[test]
     fn test_deny_all_not_treated_as_unavailable() {
-        let deny = ContextEnvelope::deny_all();
-        let unavail = ContextEnvelope::unavailable();
+        let deny = SemOsContextEnvelope::deny_all();
+        let unavail = SemOsContextEnvelope::unavailable();
 
         assert_eq!(deny.label(), "deny_all");
         assert_eq!(unavail.label(), "unavailable");

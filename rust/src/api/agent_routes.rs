@@ -1586,7 +1586,7 @@ async fn cancel_subsession(
 
 /// Generate help text showing all available MCP tools/commands.
 ///
-/// Retained as a **fallback** for when SemReg is unavailable.
+/// Retained as a **fallback** for when Sem OS is unavailable.
 /// The primary path is `generate_options_from_envelope()`.
 #[allow(dead_code)]
 fn generate_commands_help() -> String {
@@ -2116,14 +2116,14 @@ fn generate_verbs_help(domain_filter: Option<&str>) -> String {
 }
 
 // =============================================================================
-// SemReg-sourced options (single source of truth for verb discovery)
+// Sem OS-sourced options (single source of truth for verb discovery)
 // =============================================================================
 
 /// Build an s-expression signature for a verb by looking up its args in the
 /// `RuntimeVerbRegistry` (the same global static the DSL parser/compiler uses).
 ///
 /// Returns `None` if the verb is not found in the YAML-sourced registry (possible
-/// for SemReg-only verbs without YAML definitions — unlikely but handled).
+/// for Sem OS-only verbs without YAML definitions — unlikely but handled).
 fn build_sexpr_signature(fqn: &str) -> Option<String> {
     use crate::dsl_v2::config::types::ArgType;
 
@@ -2173,7 +2173,7 @@ fn build_sexpr_signature(fqn: &str) -> Option<String> {
     Some(parts.join(" "))
 }
 
-/// Build structured verb profiles from a `ContextEnvelope`.
+/// Build structured verb profiles from a `SemOsContextEnvelope`.
 ///
 /// Produces a `Vec<VerbProfile>` with full s-expression signatures and typed
 /// argument details.  Uses the `SessionVerbSurface` when available to respect
@@ -2184,7 +2184,7 @@ fn build_sexpr_signature(fqn: &str) -> Option<String> {
 /// When no surface is available, falls back to the envelope-based path.
 #[cfg(feature = "database")]
 fn build_verb_profiles(
-    envelope: &crate::agent::context_envelope::ContextEnvelope,
+    envelope: &crate::agent::sem_os_context_envelope::SemOsContextEnvelope,
     agent_mode: &sem_os_core::authoring::agent_mode::AgentMode,
     surface: Option<&crate::agent::verb_surface::SessionVerbSurface>,
 ) -> Vec<ob_poc_types::chat::VerbProfile> {
@@ -2237,7 +2237,7 @@ fn build_verb_profiles(
             .unwrap_or_default()
     };
 
-    // If SemReg returned verb contracts, use those (constrained universe)
+    // If Sem OS returned verb contracts, use those (constrained universe)
     if !envelope.allowed_verb_contracts.is_empty() {
         return envelope
             .allowed_verb_contracts
@@ -2259,11 +2259,11 @@ fn build_verb_profiles(
             .collect();
     }
 
-    // Fallback: SemReg returned no verb contracts.
+    // Fallback: Sem OS returned no verb contracts.
     // SI-1: use SessionVerbSurface (which respects FailPolicy) instead of raw registry.
     if let Some(surface) = surface {
         tracing::debug!(
-            "SemReg returned empty verb contracts; using SessionVerbSurface ({} verbs, policy={:?})",
+            "Sem OS returned empty verb contracts; using SessionVerbSurface ({} verbs, policy={:?})",
             surface.verbs.len(),
             surface.fail_policy_applied,
         );
@@ -2324,7 +2324,7 @@ fn workflow_label_from_stage_focus(stage_focus: Option<&str>) -> &str {
     }
 }
 
-/// Format a `ContextEnvelope` as a user-facing markdown options response.
+/// Format a `SemOsContextEnvelope` as a user-facing markdown options response.
 ///
 /// This is the **single source of truth** formatter for `/options`, `/verbs`,
 /// `/commands`, and natural-language "what are my options?" triggers.
@@ -2337,7 +2337,7 @@ fn workflow_label_from_stage_focus(stage_focus: Option<&str>) -> &str {
 /// fallback path instead of the ungoverned `RuntimeVerbRegistry`.
 #[cfg(feature = "database")]
 fn generate_options_from_envelope(
-    envelope: &crate::agent::context_envelope::ContextEnvelope,
+    envelope: &crate::agent::sem_os_context_envelope::SemOsContextEnvelope,
     session: &UnifiedSession,
     agent_mode: &sem_os_core::authoring::agent_mode::AgentMode,
     surface: Option<&crate::agent::verb_surface::SessionVerbSurface>,
@@ -2351,7 +2351,7 @@ fn generate_options_from_envelope(
 /// lists the available domains from the allowed set.
 #[cfg(feature = "database")]
 fn generate_options_from_envelope_filtered(
-    envelope: &crate::agent::context_envelope::ContextEnvelope,
+    envelope: &crate::agent::sem_os_context_envelope::SemOsContextEnvelope,
     session: &UnifiedSession,
     agent_mode: &sem_os_core::authoring::agent_mode::AgentMode,
     domain_filter: &str,
@@ -2369,7 +2369,7 @@ fn generate_options_from_envelope_filtered(
 /// Shared implementation for both filtered and unfiltered options rendering.
 #[cfg(feature = "database")]
 fn generate_options_from_envelope_inner(
-    envelope: &crate::agent::context_envelope::ContextEnvelope,
+    envelope: &crate::agent::sem_os_context_envelope::SemOsContextEnvelope,
     session: &UnifiedSession,
     agent_mode: &sem_os_core::authoring::agent_mode::AgentMode,
     domain_filter: Option<&str>,
@@ -2411,14 +2411,14 @@ fn generate_options_from_envelope_inner(
     }
 
     // 1. Apply AgentMode filter — mirrors Stage A.3 in handle_utterance()
-    let mode_filtered: Vec<&crate::agent::context_envelope::VerbCandidateSummary> = envelope
+    let mode_filtered: Vec<&crate::agent::sem_os_context_envelope::VerbCandidateSummary> = envelope
         .allowed_verb_contracts
         .iter()
         .filter(|v| agent_mode.is_verb_allowed(&v.fqn))
         .collect();
 
     // 2. Apply optional domain filter
-    let candidates: Vec<&crate::agent::context_envelope::VerbCandidateSummary> =
+    let candidates: Vec<&crate::agent::sem_os_context_envelope::VerbCandidateSummary> =
         if let Some(df) = domain_filter {
             mode_filtered
                 .into_iter()
@@ -2474,7 +2474,7 @@ fn generate_options_from_envelope_inner(
             let mut output = String::new();
             output.push_str(&format!("# Available Options — {} Workflow\n\n", workflow,));
             let policy_note = if surf.is_safe_harbor() {
-                " *(safe-harbor — SemReg not constrained)*"
+                " *(safe-harbor — Sem OS not constrained)*"
             } else {
                 ""
             };
@@ -2558,7 +2558,7 @@ fn generate_options_from_envelope_inner(
                 }
                 output.push('\n');
             }
-            output.push_str("---\n*Showing full verb registry (SemReg not constrained).*\n");
+            output.push_str("---\n*Showing full verb registry (Sem OS not constrained).*\n");
             return output;
         }
 
@@ -2597,13 +2597,15 @@ fn generate_options_from_envelope_inner(
             }
         }
 
-        output.push_str("---\n*Showing full verb registry (SemReg not constrained).*\n");
+        output.push_str("---\n*Showing full verb registry (Sem OS not constrained).*\n");
         return output;
     }
 
     // 5. Group by domain, sort within each domain by rank_score descending
-    let mut domains: BTreeMap<&str, Vec<&crate::agent::context_envelope::VerbCandidateSummary>> =
-        BTreeMap::new();
+    let mut domains: BTreeMap<
+        &str,
+        Vec<&crate::agent::sem_os_context_envelope::VerbCandidateSummary>,
+    > = BTreeMap::new();
     for v in &candidates {
         let domain = v.fqn.split('.').next().unwrap_or("unknown");
         domains.entry(domain).or_default().push(v);
@@ -2737,7 +2739,7 @@ async fn chat_session(
     // ALL verb discovery now flows through `resolve_options()` → `resolve_sem_reg_verbs()`,
     // the **same** function the orchestrator calls in `handle_utterance()`.
     // Old static helpers (`generate_commands_help`, `generate_verbs_help`) are kept as
-    // fallbacks only — used when SemReg is unavailable.
+    // fallbacks only — used when Sem OS is unavailable.
     let trimmed_msg = req.message.trim().to_lowercase();
     let parts: Vec<&str> = trimmed_msg.split_whitespace().collect();
 
@@ -2759,7 +2761,7 @@ async fn chat_session(
         | ["show", "my", "options"]
         | ["what", "can", "i", "do"]
         | ["what", "can", "i", "do?"]
-        // Existing commands now SemReg-sourced
+        // Existing commands now Sem OS-sourced
         | ["/help"]
         | ["/commands"]
         | ["show", "commands"]
@@ -2819,7 +2821,7 @@ async fn chat_session(
                         tracing::warn!(
                             session_id = %session.id,
                             error = %e,
-                            "SemReg unavailable for options — falling back to static help"
+                            "Sem OS unavailable for options — falling back to static help"
                         );
                         let msg = match &kind {
                             OptionsKind::Filtered(df) => generate_verbs_help(Some(df)),
@@ -2982,7 +2984,7 @@ async fn chat_session(
                 tracing::warn!(
                     session_id = %session.id,
                     error = %e,
-                    "SemReg unavailable for verb profiles"
+                    "Sem OS unavailable for verb profiles"
                 );
                 (None, None)
             }
@@ -3240,7 +3242,7 @@ async fn execute_session_dsl_raw(
             }
         };
 
-        // SemReg verb validation: check all verb FQNs in parsed AST are allowed
+        // Sem OS verb validation: check all verb FQNs in parsed AST are allowed
         if let Some(ref client) = state.sem_os_client {
             use dsl_core::Statement;
             let actor = crate::policy::ActorResolver::from_env();
@@ -3256,13 +3258,13 @@ async fn execute_session_dsl_raw(
                 if policy_gate.semreg_fail_closed() {
                     tracing::warn!(
                         session = %session_id,
-                        "execute_session_dsl: SemReg unavailable — blocked in strict mode"
+                        "execute_session_dsl: Sem OS unavailable — blocked in strict mode"
                     );
                     return Ok(Json(ExecuteResponse {
                         success: false,
                         results: Vec::new(),
                         errors: vec![
-                            "SemReg unavailable — execution blocked in strict mode".to_string()
+                            "Sem OS unavailable — execution blocked in strict mode".to_string()
                         ],
                         new_state: current_state.into(),
                         bindings: None,
@@ -3271,12 +3273,12 @@ async fn execute_session_dsl_raw(
             } else if envelope.is_deny_all() {
                 tracing::warn!(
                     session = %session_id,
-                    "execute_session_dsl: SemReg deny-all — blocking execution"
+                    "execute_session_dsl: Sem OS deny-all — blocking execution"
                 );
                 return Ok(Json(ExecuteResponse {
                     success: false,
                     results: Vec::new(),
-                    errors: vec!["SemReg denied execution: no verbs are allowed".to_string()],
+                    errors: vec!["Sem OS denied execution: no verbs are allowed".to_string()],
                     new_state: current_state.into(),
                     bindings: None,
                 }));
@@ -3298,13 +3300,13 @@ async fn execute_session_dsl_raw(
                     tracing::warn!(
                         session = %session_id,
                         denied = ?denied_verbs,
-                        "execute_session_dsl: SemReg denied verbs"
+                        "execute_session_dsl: Sem OS denied verbs"
                     );
                     return Ok(Json(ExecuteResponse {
                         success: false,
                         results: Vec::new(),
                         errors: vec![format!(
-                            "SemReg denied execution: verbs not in allowed set: {}",
+                            "Sem OS denied execution: verbs not in allowed set: {}",
                             denied_verbs.join(", ")
                         )],
                         new_state: current_state.into(),
@@ -4501,7 +4503,7 @@ async fn get_session_context(
 /// GET /api/session/:id/verb-surface - Get the current session's visible verb surface
 ///
 /// Returns the `SessionVerbSurface` computed from the session's current context
-/// (agent mode, workflow focus, SemReg envelope, entity state). Supports optional
+/// (agent mode, workflow focus, Sem OS envelope, entity state). Supports optional
 /// domain filtering and excluded verb inclusion.
 ///
 /// Query parameters:
@@ -4512,7 +4514,7 @@ async fn get_session_verb_surface(
     Path(session_id): Path<Uuid>,
     Query(query): Query<VerbSurfaceQuery>,
 ) -> Result<Json<ob_poc_types::chat::VerbSurfaceResponse>, StatusCode> {
-    use crate::agent::context_envelope::ContextEnvelope;
+    use crate::agent::sem_os_context_envelope::SemOsContextEnvelope;
     use crate::agent::verb_surface::{
         compute_session_verb_surface, VerbSurfaceContext, VerbSurfaceFailPolicy,
     };
@@ -4527,7 +4529,7 @@ async fn get_session_verb_surface(
     };
     let agent_mode = sem_os_core::authoring::agent_mode::AgentMode::default();
 
-    // Resolve real SemReg verb set via the same path as the chat pipeline.
+    // Resolve real Sem OS verb set via the same path as the chat pipeline.
     // On failure, fall back to unavailable envelope with FailOpen (this is a
     // read-only UI population endpoint, not a governance enforcement point).
     let actor = crate::sem_reg::abac::ActorContext {
@@ -4541,10 +4543,10 @@ async fn get_session_verb_surface(
         Ok(env) => (env, VerbSurfaceFailPolicy::FailOpen),
         Err(e) => {
             tracing::warn!(
-                "[get_session_verb_surface] SemReg resolution failed, falling back: {e}"
+                "[get_session_verb_surface] Sem OS resolution failed, falling back: {e}"
             );
             (
-                ContextEnvelope::unavailable(),
+                SemOsContextEnvelope::unavailable(),
                 VerbSurfaceFailPolicy::default(),
             )
         }

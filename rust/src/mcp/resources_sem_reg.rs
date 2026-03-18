@@ -1,4 +1,4 @@
-//! Semantic Registry MCP Resource handlers.
+//! Semantic Registry MCP resource handlers backed by Sem OS.
 //!
 //! Implements 9 `sem_reg://` resource URIs for the MCP `resources/list` and
 //! `resources/read` surface. Each handler reads from `RegistryService`,
@@ -9,18 +9,21 @@
 
 use serde_json::json;
 use sqlx::PgPool;
+use std::sync::Arc;
 
 use super::protocol::{Resource, ResourceReadResult, ResourceTemplate};
 use crate::sem_reg::{
     abac::ActorContext,
-    context_resolution::{
-        resolve_context, ContextResolutionRequest, EvidenceMode, ResolutionConstraints, SubjectRef,
-    },
     enforce::{enforce_read, EnforceResult},
     projections::metrics::MetricsStore,
     store::SnapshotStore,
     types::{ObjectType, SnapshotRow},
 };
+use sem_os_core::context_resolution::{
+    ContextResolutionRequest, DiscoveryContext, EvidenceMode, ResolutionConstraints, SubjectRef,
+};
+use sem_os_core::service::{CoreService, CoreServiceImpl};
+use sem_os_postgres::PgStores;
 
 // ── Resource listing ──────────────────────────────────────────
 
@@ -228,7 +231,7 @@ async fn read_by_fqn(
     }
 }
 
-/// Context resolution handler.
+/// Sem OS context-resolution handler for the compatibility `sem_reg://context/*` URI.
 async fn read_context(
     uri: &str,
     pool: &PgPool,
@@ -242,16 +245,18 @@ async fn read_context(
 
     let req = ContextResolutionRequest {
         subject: SubjectRef::EntityId(subject_uuid),
-        intent: None,
-        actor: actor.clone(),
+        intent_summary: None,
+        raw_utterance: None,
+        actor: to_sem_os_actor(actor),
         goals: vec![],
         constraints: ResolutionConstraints::default(),
         evidence_mode: EvidenceMode::Normal,
         point_in_time: None,
         entity_kind: None,
+        discovery: DiscoveryContext::default(),
     };
 
-    match resolve_context(pool, &req).await {
+    match resolve_context_via_sem_os(pool, actor, req).await {
         Ok(resp) => match serde_json::to_value(&resp) {
             Ok(v) => ResourceReadResult::json_content(uri, &v),
             Err(e) => {
@@ -264,6 +269,41 @@ async fn read_context(
             ResourceReadResult::not_found(uri)
         }
     }
+}
+
+fn to_sem_os_actor(actor: &ActorContext) -> sem_os_core::abac::ActorContext {
+    let json = serde_json::to_value(actor).expect("ActorContext serializes");
+    serde_json::from_value(json).expect("ActorContext round-trips")
+}
+
+fn build_core_service(pool: &PgPool) -> Arc<dyn CoreService> {
+    let stores = PgStores::new(pool.clone());
+    Arc::new(
+        CoreServiceImpl::new(
+            Arc::new(stores.snapshots),
+            Arc::new(stores.objects),
+            Arc::new(stores.changesets),
+            Arc::new(stores.audit),
+            Arc::new(stores.outbox),
+            Arc::new(stores.evidence),
+            Arc::new(stores.projections),
+        )
+        .with_bootstrap_audit(Arc::new(stores.bootstrap_audit))
+        .with_authoring(Arc::new(stores.authoring))
+        .with_scratch_runner(Arc::new(stores.scratch_runner))
+        .with_cleanup(Arc::new(stores.cleanup)),
+    )
+}
+
+async fn resolve_context_via_sem_os(
+    pool: &PgPool,
+    actor: &ActorContext,
+    request: ContextResolutionRequest,
+) -> sem_os_core::service::Result<sem_os_core::context_resolution::ContextResolutionResponse> {
+    let principal =
+        sem_os_core::principal::Principal::in_process(&actor.actor_id, actor.roles.clone());
+    let service = build_core_service(pool);
+    service.resolve_context(&principal, request).await
 }
 
 /// Coverage report handler.

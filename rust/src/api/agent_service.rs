@@ -1913,7 +1913,7 @@ impl AgentService {
         None
     }
 
-    /// Map Semantic OS stage focus to SemReg phase-tag goals.
+    /// Map Semantic OS stage focus to Sem OS phase-tag goals.
     ///
     /// `semos-data-management` is intentionally expanded to include:
     /// - `data` (registry/data stewardship verbs)
@@ -2257,7 +2257,7 @@ impl AgentService {
     ) -> crate::agent::orchestrator::OrchestratorContext {
         use crate::agent::orchestrator::OrchestratorContext;
 
-        // Map stage_focus to SemReg goals for verb phase_tag filtering.
+        // Map stage_focus to Sem OS goals for verb phase_tag filtering.
         let goals = Self::stage_focus_goals(session.context.stage_focus.as_deref());
 
         OrchestratorContext {
@@ -2497,7 +2497,7 @@ impl AgentService {
 
     #[cfg(feature = "database")]
     fn to_discovery_bootstrap_payload(
-        envelope: Option<&crate::agent::context_envelope::ContextEnvelope>,
+        envelope: Option<&crate::agent::sem_os_context_envelope::SemOsContextEnvelope>,
     ) -> Option<ob_poc_types::chat::DiscoveryBootstrapPayload> {
         let surface = envelope?.discovery_surface.as_ref()?;
 
@@ -2573,7 +2573,7 @@ impl AgentService {
 
     #[cfg(not(feature = "database"))]
     fn to_discovery_bootstrap_payload(
-        _envelope: Option<&crate::agent::context_envelope::ContextEnvelope>,
+        _envelope: Option<&crate::agent::sem_os_context_envelope::SemOsContextEnvelope>,
     ) -> Option<ob_poc_types::chat::DiscoveryBootstrapPayload> {
         None
     }
@@ -2634,13 +2634,13 @@ impl AgentService {
     ///
     /// Uses the **same** `build_orchestrator_context()` + `resolve_sem_reg_verbs()`
     /// path as `process_chat()` / `handle_utterance()`, guaranteeing the returned
-    /// `ContextEnvelope` carries the identical verb set the agent pipeline would use.
+    /// `SemOsContextEnvelope` carries the identical verb set the agent pipeline would use.
     #[cfg(feature = "database")]
     pub async fn resolve_options(
         &self,
         session: &crate::session::UnifiedSession,
         actor: crate::sem_reg::abac::ActorContext,
-    ) -> Result<crate::agent::context_envelope::ContextEnvelope, String> {
+    ) -> Result<crate::agent::sem_os_context_envelope::SemOsContextEnvelope, String> {
         let ctx = self.build_orchestrator_context(
             session,
             actor,

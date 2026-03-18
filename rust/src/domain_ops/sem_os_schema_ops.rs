@@ -10,7 +10,7 @@ use std::collections::BTreeSet;
 
 use ob_poc_macros::register_custom_op;
 
-use super::sem_reg_helpers::{delegate_to_tool, get_bool_arg, get_int_arg, get_string_arg};
+use super::sem_os_helpers::{delegate_to_tool, get_bool_arg, get_int_arg, get_string_arg};
 use super::{CustomOperation, ExecutionContext, ExecutionResult, VerbCall};
 use crate::dsl_v2::verb_registry::registry;
 use crate::ontology::{ontology, SearchKeyDef};

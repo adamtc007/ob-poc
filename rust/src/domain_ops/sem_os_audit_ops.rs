@@ -8,7 +8,7 @@ use async_trait::async_trait;
 
 use ob_poc_macros::register_custom_op;
 
-use super::sem_reg_helpers::delegate_to_tool;
+use super::sem_os_helpers::delegate_to_tool;
 use super::{CustomOperation, ExecutionContext, ExecutionResult, VerbCall};
 
 #[cfg(feature = "database")]

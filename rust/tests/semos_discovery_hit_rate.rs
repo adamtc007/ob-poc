@@ -86,11 +86,19 @@ struct StaticSnapshotStore {
 
 #[async_trait]
 impl SnapshotStore for StaticSnapshotStore {
-    async fn resolve(&self, _fqn: &Fqn, _as_of: Option<&SnapshotSetId>) -> Result<SnapshotRow, SemOsError> {
+    async fn resolve(
+        &self,
+        _fqn: &Fqn,
+        _as_of: Option<&SnapshotSetId>,
+    ) -> Result<SnapshotRow, SemOsError> {
         unimplemented!("resolve is not used by semos_discovery_hit_rate")
     }
 
-    async fn publish(&self, _principal: &Principal, _req: PublishInput) -> Result<SnapshotSetId, SemOsError> {
+    async fn publish(
+        &self,
+        _principal: &Principal,
+        _req: PublishInput,
+    ) -> Result<SnapshotSetId, SemOsError> {
         unimplemented!("publish is not used by semos_discovery_hit_rate")
     }
 
@@ -125,7 +133,11 @@ impl SnapshotStore for StaticSnapshotStore {
         unimplemented!("publish_batch_into_set is not used by semos_discovery_hit_rate")
     }
 
-    async fn find_dependents(&self, _fqn: &str, _limit: i64) -> Result<Vec<DependentSnapshot>, SemOsError> {
+    async fn find_dependents(
+        &self,
+        _fqn: &str,
+        _limit: i64,
+    ) -> Result<Vec<DependentSnapshot>, SemOsError> {
         Ok(Vec::new())
     }
 
@@ -144,14 +156,21 @@ struct NoopBootstrapAuditStore;
 
 #[async_trait]
 impl ObjectStore for NoopObjectStore {
-    async fn load_typed(&self, _snapshot_id: &SnapshotId, _fqn: &Fqn) -> Result<TypedObject, SemOsError> {
+    async fn load_typed(
+        &self,
+        _snapshot_id: &SnapshotId,
+        _fqn: &Fqn,
+    ) -> Result<TypedObject, SemOsError> {
         unimplemented!("load_typed is not used by semos_discovery_hit_rate")
     }
 }
 
 #[async_trait]
 impl ChangesetStore for NoopChangesetStore {
-    async fn create_changeset(&self, _input: CreateChangesetInput) -> Result<Changeset, SemOsError> {
+    async fn create_changeset(
+        &self,
+        _input: CreateChangesetInput,
+    ) -> Result<Changeset, SemOsError> {
         unimplemented!("create_changeset is not used by semos_discovery_hit_rate")
     }
 
@@ -184,7 +203,10 @@ impl ChangesetStore for NoopChangesetStore {
         unimplemented!("add_entry is not used by semos_discovery_hit_rate")
     }
 
-    async fn list_entries(&self, _changeset_id: uuid::Uuid) -> Result<Vec<ChangesetEntry>, SemOsError> {
+    async fn list_entries(
+        &self,
+        _changeset_id: uuid::Uuid,
+    ) -> Result<Vec<ChangesetEntry>, SemOsError> {
         unimplemented!("list_entries is not used by semos_discovery_hit_rate")
     }
 
@@ -196,7 +218,10 @@ impl ChangesetStore for NoopChangesetStore {
         unimplemented!("submit_review is not used by semos_discovery_hit_rate")
     }
 
-    async fn list_reviews(&self, _changeset_id: uuid::Uuid) -> Result<Vec<ChangesetReview>, SemOsError> {
+    async fn list_reviews(
+        &self,
+        _changeset_id: uuid::Uuid,
+    ) -> Result<Vec<ChangesetReview>, SemOsError> {
         unimplemented!("list_reviews is not used by semos_discovery_hit_rate")
     }
 }
@@ -233,7 +258,11 @@ impl OutboxStore for NoopOutboxStore {
 
 #[async_trait]
 impl EvidenceInstanceStore for NoopEvidenceStore {
-    async fn record(&self, _principal: &Principal, _instance: EvidenceInstance) -> Result<(), SemOsError> {
+    async fn record(
+        &self,
+        _principal: &Principal,
+        _instance: EvidenceInstance,
+    ) -> Result<(), SemOsError> {
         Ok(())
     }
 }
@@ -273,7 +302,10 @@ impl BootstrapAuditStore for NoopBootstrapAuditStore {
 }
 
 fn test_principal() -> Principal {
-    Principal::in_process("sem-os-discovery-harness", vec!["admin".into(), "analyst".into()])
+    Principal::in_process(
+        "sem-os-discovery-harness",
+        vec!["admin".into(), "analyst".into()],
+    )
 }
 
 fn test_actor() -> ActorContext {
@@ -295,7 +327,8 @@ fn metadata_path() -> std::path::PathBuf {
 }
 
 fn load_fixture() -> DiscoveryFixture {
-    let content = std::fs::read_to_string(fixture_path()).expect("failed to read discovery fixture");
+    let content =
+        std::fs::read_to_string(fixture_path()).expect("failed to read discovery fixture");
     toml::from_str(&content).expect("failed to parse discovery fixture")
 }
 
@@ -350,7 +383,8 @@ fn snapshot_row(
         status: SnapshotStatus::Active,
         governance_tier: GovernanceTier::Operational,
         trust_class: TrustClass::Convenience,
-        security_label: serde_json::to_value(SecurityLabel::default()).expect("security label json"),
+        security_label: serde_json::to_value(SecurityLabel::default())
+            .expect("security label json"),
         effective_from: Utc::now(),
         effective_until: None,
         predecessor_id: None,
@@ -432,10 +466,7 @@ fn parse_threshold(name: &str, default: f64) -> f64 {
 }
 
 fn normalized_readiness(value: &str) -> String {
-    value
-        .trim()
-        .replace(['-', '_'], "")
-        .to_ascii_lowercase()
+    value.trim().replace(['-', '_'], "").to_ascii_lowercase()
 }
 
 #[tokio::test]
@@ -457,10 +488,7 @@ async fn semos_discovery_hit_rate() {
     let mut results = Vec::new();
 
     println!("\n=======================================================================");
-    println!(
-        "  SEM OS DISCOVERY HIT RATE -- {} utterances",
-        cases.len()
-    );
+    println!("  SEM OS DISCOVERY HIT RATE -- {} utterances", cases.len());
     println!("=======================================================================\n");
 
     for case in &cases {
@@ -531,7 +559,12 @@ async fn semos_discovery_hit_rate() {
                 .case
                 .expected_constellation
                 .as_ref()
-                .is_some_and(|expected| result.top3_constellations.iter().any(|value| value == expected))
+                .is_some_and(|expected| {
+                    result
+                        .top3_constellations
+                        .iter()
+                        .any(|value| value == expected)
+                })
         })
         .count();
 

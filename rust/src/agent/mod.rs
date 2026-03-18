@@ -3,10 +3,10 @@
 //! Contains the agent learning infrastructure for continuous improvement.
 //! Navigation commands go through the unified intent pipeline (view.* and session.* verbs).
 
-pub mod context_envelope;
 pub mod harness;
 pub mod learning;
 pub mod orchestrator;
+pub mod sem_os_context_envelope;
 pub mod telemetry;
 pub mod verb_surface;
 

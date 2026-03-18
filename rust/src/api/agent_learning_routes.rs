@@ -896,7 +896,7 @@ pub(crate) async fn handle_decision_reply(
                 Err(e) => {
                     tracing::warn!("[handle_decision_reply] SemReg resolution failed: {e}");
                     (
-                        crate::agent::context_envelope::ContextEnvelope::unavailable(),
+                        crate::agent::sem_os_context_envelope::SemOsContextEnvelope::unavailable(),
                         VerbSurfaceFailPolicy::default(),
                     )
                 }

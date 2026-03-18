@@ -61,7 +61,7 @@
 > **SemOS Document Governance Bootstrap (122-123):** ✅ In progress in runtime - `RequirementProfileDef`, `ProofObligationDef`, and `EvidenceStrategyDef` are now first-class governed object types; active published snapshots flow into `sem_reg_pub.active_requirement_profiles`, `sem_reg_pub.active_proof_obligations`, and `sem_reg_pub.active_evidence_strategies`; KYC/entity document flows can now compute governed requirement matrices via `document.compute-requirements`, with immutable audit bindings landing in `"ob-poc".policy_version_bindings`
 > **Stewardship Agent (Phase 0-1, Migrations 096-098):** ✅ Complete - Changeset authoring layer, 23 MCP tools, guardrails engine (G01-G15), basis records, conflict detection, idempotency, Show Loop with 4 viewports (Focus/Inspector/Diff/Gates), SSE streaming, REST endpoints, 11 integration tests
 > **Governed Registry Authoring (v0.4, Migrations 099-102):** ✅ Complete + Standalone Verified - Research→Governed two-plane model, 7 governance verbs (propose/validate/dry-run/plan/publish/rollback/diff), content-addressed idempotency (SHA-256), AgentMode gating (Research vs Governed), validation pipeline (Stage 1 artifact integrity + Stage 2 dry-run), batch publish with topological sort, governance audit log, retention/cleanup, 9-state ChangeSetStatus (incl. UnderReview/Approved from stewardship), 321 unit tests + 26 integration tests + 10 HTTP integration tests, 8 CLI subcommands, 10 REST routes, standalone sem_os_server deployment verified
-> **CCIR — Context-Constrained Intent Resolution (Migration 103):** ✅ Complete - ContextEnvelope replaces SemRegVerbPolicy, structured PruneReason (7 variants), deterministic AllowedVerbSetFingerprint (SHA-256), TOCTOU recheck, pre-constrained verb search (allowed verbs threaded into HybridVerbSearcher), SemReg enforcement at dsl_execute, legacy V1 module cleanup (4 modules deleted: ~2,700 LOC), 16 unit tests
+> **CCIR — Context-Constrained Intent Resolution (Migration 103):** ✅ Complete + Sem OS envelope cutover (2026-03-18) - `SemOsContextEnvelope` replaces `SemRegVerbPolicy`, structured `PruneReason` (7 variants), deterministic `AllowedVerbSetFingerprint` (SHA-256), TOCTOU recheck, pre-constrained verb search (allowed verbs threaded into `HybridVerbSearcher`), Sem OS enforcement at `dsl_execute`, legacy V1 module cleanup (4 modules deleted: ~2,700 LOC), 16 unit tests
 > **SessionVerbSurface:** ✅ Complete - Consolidated governance layer composition (SemReg CCIR + AgentMode + workflow phase + lifecycle + actor gating), 8-step compute pipeline, dual fingerprints (surface `vs1:` + SemReg `v1:`), FailClosed safe-harbor (~30 verbs), MCP tool `session_verb_surface`, REST endpoint `GET /api/session/:id/verb-surface`, ChatResponse enrichment, React VerbBrowser governance badges, 13 unit tests
 > **Semantic OS Tab:** ✅ Complete - Agent-driven workflow selection UI (`/semantic-os`), goals→phase_tags verb scoping in SemReg, DecisionPacket workflow prompt (Onboarding/KYC/Data Management/Stewardship), session sidebar + registry context panel, `GET /api/sem-os/context` endpoint
 > **SemOS Data Management Structure Contract:** ✅ Complete - noun-only exploration in `semos-data-management` / `semos-data` is structure-first, rewrites to `schema.entity.describe` / `schema.entity.*`, and instance-bound content verbs requiring `*-id` are blocked unless the user explicitly targets an instance
@@ -579,12 +579,12 @@ User says: "spin up a fund for Acme"
 **Key Files:**
 - `rust/src/policy/gate.rs` — `PolicyGate`, `ActorResolver`, `PolicySnapshot`
 - `rust/src/agent/orchestrator.rs` — Accepts `PolicyGate`, SemReg fail-closed, IntentTrace with PolicySnapshot
-  - `ContextEnvelope` replaces `SemRegVerbPolicy`: carries allowed verbs, pruned verbs with structured `PruneReason`, fingerprint, evidence gaps, governance signals
+  - `SemOsContextEnvelope` replaces `SemRegVerbPolicy`: carries allowed verbs, pruned verbs with structured `PruneReason`, fingerprint, evidence gaps, governance signals, and discovery bootstrap surface
   - Pre-constrained verb search: allowed verbs threaded into `IntentPipeline.with_allowed_verbs()` → `HybridVerbSearcher` (Phase 3 CCIR)
   - AST-based macro governance: `parse_program()` + `VerbCall::full_name()` extracts verbs from macro expansions
   - IntentTrace fields: `selection_source` (discovery/user_choice/macro/semreg), `macro_semreg_checked`, `macro_denied_verbs`, `forced_verb`, `allowed_verbs_fingerprint`, `pruned_verbs_count`, `toctou_recheck_performed`, `toctou_result`, `toctou_new_fingerprint`
   - `/select-verb` retired (410 Gone) — verb selection routed through `POST /api/session/:id/input` (`kind=decision_reply`) → orchestrator forced-verb
-- `rust/src/agent/context_envelope.rs` — `ContextEnvelope`, `PruneReason` (7 variants), `AllowedVerbSetFingerprint`, `TocTouResult`, 16 unit tests
+- `rust/src/agent/sem_os_context_envelope.rs` — `SemOsContextEnvelope`, `PruneReason` (7 variants), `AllowedVerbSetFingerprint`, `TocTouResult`, 16 unit tests
 - `rust/src/session/unified.rs` — `RunSheet.runnable_dsl()` returns only Draft/Ready entries (prevents re-executing already-run entries)
 - `rust/src/agent/telemetry/` — Append-only intent telemetry (PII-safe)
   - `mod.rs`: `IntentEventRow` model, `outcome_label()`, `candidates_to_json()`
@@ -7587,26 +7587,27 @@ DATABASE_URL="postgresql:///data_designer" \
 | 3 | **CCIR Phase 3:** SemReg allowed verbs threaded as **pre-constraint** into `HybridVerbSearcher.search()` (not just post-filter) | `agent/orchestrator.rs`, `mcp/intent_pipeline.rs`, `mcp/verb_search.rs` |
 | 4 | `LookupService` results reused via orchestrator (no double verb/entity search) | `agent/orchestrator.rs` |
 | 5 | `IntentTrace` structured audit with CCIR fields (fingerprint, pruned count, TOCTOU) | `agent/orchestrator.rs` |
-| 2B-C | **CCIR:** `ContextEnvelope` replaces `SemRegVerbPolicy`, structured `PruneReason`, fingerprint, TOCTOU recheck | `agent/context_envelope.rs` (NEW), `agent/orchestrator.rs` |
+| 2B-C | **CCIR:** `SemOsContextEnvelope` replaces `SemRegVerbPolicy`, structured `PruneReason`, fingerprint, TOCTOU recheck | `agent/sem_os_context_envelope.rs` (NEW), `agent/orchestrator.rs` |
 | — | **Legacy cleanup:** Delete 4 V1 modules (~2,700 LOC) — `session/agent_context.rs`, `session/enhanced_context.rs`, `session/verb_discovery.rs`, `api/verb_discovery_routes.rs`, `lint/agent_context_lint.rs` | Session, API, lint |
-| — | **dsl_execute SemReg gate:** MCP `dsl_execute` validates every verb FQN in parsed AST against ContextEnvelope before execution | `mcp/handlers/core.rs` |
+| — | **dsl_execute Sem OS gate:** MCP `dsl_execute` validates every verb FQN in parsed AST against `SemOsContextEnvelope` before execution | `mcp/handlers/core.rs` |
 | — | **Scanner improvement:** `subject_kinds` 3-level fallback chain + `domain_to_subject_kind()` heuristic | `sem_os_obpoc_adapter/scanner.rs` |
 | — | **ownership.refresh:** New pipeline verb running all 5 ownership steps in sequence | `domain_ops/manco_ops.rs` |
 | — | **Session V2 cleanup:** `ClientContext`/`JourneyContext` structs deleted, replaced with opaque JSON | `repl/session_v2.rs` |
 
 **CCIR (Context-Constrained Intent Resolution):**
 
-The `ContextEnvelope` (replacing `SemRegVerbPolicy`) carries the full SemReg resolution output:
+The `SemOsContextEnvelope` (replacing `SemRegVerbPolicy`) carries the full Sem OS resolution output:
 
 ```
-SemReg resolve_context()
+Sem OS resolve_context()
     │
     ▼
-ContextEnvelope {
+SemOsContextEnvelope {
     allowed_verbs: HashSet<String>,          // Verbs passing ABAC + tier + preconditions
     pruned_verbs: Vec<PrunedVerb>,           // Verbs rejected with structured reasons
     fingerprint: AllowedVerbSetFingerprint,  // SHA-256 of sorted FQNs (format: v1:<hex>)
     evidence_gaps, governance_signals,       // Governance intelligence
+    resolution_stage, discovery_surface,     // Discovery bootstrap for ungrounded sessions
     snapshot_set_id,                         // Provenance
 }
     │
@@ -7620,7 +7621,7 @@ ContextEnvelope {
 
 **PruneReason variants:** `AbacDenied`, `EntityKindMismatch`, `TierExcluded`, `TaxonomyNoOverlap`, `PreconditionFailed`, `AgentModeBlocked`, `PolicyDenied`
 
-**Key Architectural Decision:** SemReg verb filtering is now **pre-constrained** (allowed verbs threaded into `HybridVerbSearcher.search()`) with a post-filter safety net retained. Direct DSL bypass removed — all paths flow through SemReg-filtered pipeline. Graceful degradation: if SemReg is unavailable, falls back to unfiltered results with governance warning.
+**Key Architectural Decision:** Sem OS verb filtering is now **pre-constrained** (allowed verbs threaded into `HybridVerbSearcher.search()`) with a post-filter safety net retained. Direct DSL bypass removed, and utterance discovery is fail-closed when Sem OS is unavailable instead of widening to the full registry.
 
 **Env Vars for MCP ActorContext:**
 - `MCP_ACTOR_ID` — actor identifier (default: `mcp_anonymous`)
@@ -7633,8 +7634,8 @@ ContextEnvelope {
 - MCP: least-privilege `viewer` by default — env vars required to escalate (no hardcoded operator)
 - Chat: `operator` role (intentional — internal tool). TODO: derive from auth token when plumbed
 - Direct DSL bypass (`dsl:` prefix) removed — all DSL flows through SemReg-filtered pipeline
-- `dsl_execute` validates verb FQNs against ContextEnvelope before execution
-- SemReg failure: structured `warn!` with fallback flag, trace shows `sem_reg_verb_filter: null` — never silent
+- `dsl_execute` validates verb FQNs against `SemOsContextEnvelope` before execution
+- Sem OS failure: structured `warn!` with fail-closed behavior for utterance discovery — never silent
 - Trace levels: INFO = summary (verb, confidence, source), DEBUG = full detail (utterance, entities, candidates)
 
 ### DSL Execution Governance Matrix

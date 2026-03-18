@@ -8,7 +8,7 @@ use async_trait::async_trait;
 
 use ob_poc_macros::register_custom_op;
 
-use super::sem_reg_helpers::delegate_to_stew_tool;
+use super::sem_os_helpers::delegate_to_stew_tool;
 use super::{CustomOperation, ExecutionContext, ExecutionResult, VerbCall};
 
 #[cfg(feature = "database")]
@@ -167,10 +167,10 @@ impl CustomOperation for ChangesetListOp {
         ctx: &mut ExecutionContext,
         pool: &PgPool,
     ) -> Result<ExecutionResult> {
-        use super::sem_reg_helpers::get_string_arg;
+        use super::sem_os_helpers::get_string_arg;
 
         // Build args with optional status filter
-        let mut args = super::sem_reg_helpers::extract_args_as_json(verb_call, ctx);
+        let mut args = super::sem_os_helpers::extract_args_as_json(verb_call, ctx);
         if let Some(status) = get_string_arg(verb_call, "status") {
             if let Some(map) = args.as_object_mut() {
                 map.insert("status".to_string(), serde_json::json!(status));
@@ -178,7 +178,7 @@ impl CustomOperation for ChangesetListOp {
         }
 
         // Delegate to stew_list_changesets which handles filtering
-        let actor = super::sem_reg_helpers::build_actor_from_ctx(ctx);
+        let actor = super::sem_os_helpers::build_actor_from_ctx(ctx);
         let tool_ctx = crate::sem_reg::agent::mcp_tools::SemRegToolContext {
             pool,
             actor: &actor,
@@ -190,7 +190,7 @@ impl CustomOperation for ChangesetListOp {
         )
         .await
         {
-            return super::sem_reg_helpers::convert_tool_result(result);
+            return super::sem_os_helpers::convert_tool_result(result);
         }
 
         // Fallback: direct query for changeset listing

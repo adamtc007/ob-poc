@@ -16,7 +16,7 @@
 //! - Verb FQNs
 //! - Verb scores or search results
 //! - Entity UUIDs (those come from entity linking at Stage 3)
-//! - ContextEnvelope (that's post-SemReg, also Stage 2)
+//! - SemOsContextEnvelope (that's post-Sem OS, also Stage 2)
 
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;

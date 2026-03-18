@@ -381,13 +381,11 @@ fn build_grounded_action_surface(
                 .values()
                 .map(|entry| entry.verb_fqn().to_string())
                 .collect::<Vec<_>>();
-            let score = score_slot_against_request(
-                slot_name,
-                &verbs,
-                request_summary(req),
-                &req.goals,
-            );
-            if score <= 0 && (request_summary(req).is_some() || request_raw_utterance(req).is_some()) {
+            let score =
+                score_slot_against_request(slot_name, &verbs, request_summary(req), &req.goals);
+            if score <= 0
+                && (request_summary(req).is_some() || request_raw_utterance(req).is_some())
+            {
                 continue;
             }
 
@@ -444,9 +442,12 @@ fn is_discovery_stage(req: &ContextResolutionRequest) -> bool {
 }
 
 fn request_entity_kind(req: &ContextResolutionRequest) -> Option<&str> {
-    req.entity_kind
-        .as_deref()
-        .or_else(|| req.discovery.known_inputs.get("entity_kind").map(String::as_str))
+    req.entity_kind.as_deref().or_else(|| {
+        req.discovery
+            .known_inputs
+            .get("entity_kind")
+            .map(String::as_str)
+    })
 }
 
 fn request_summary(req: &ContextResolutionRequest) -> Option<&str> {
@@ -460,10 +461,16 @@ fn request_raw_utterance(req: &ContextResolutionRequest) -> Option<&str> {
 fn combined_request_text(req: &ContextResolutionRequest) -> String {
     let mut parts = Vec::new();
 
-    if let Some(raw) = request_raw_utterance(req).map(str::trim).filter(|v| !v.is_empty()) {
+    if let Some(raw) = request_raw_utterance(req)
+        .map(str::trim)
+        .filter(|v| !v.is_empty())
+    {
         parts.push(raw.to_string());
     }
-    if let Some(summary) = request_summary(req).map(str::trim).filter(|v| !v.is_empty()) {
+    if let Some(summary) = request_summary(req)
+        .map(str::trim)
+        .filter(|v| !v.is_empty())
+    {
         if !parts.iter().any(|part| part == summary) {
             parts.push(summary.to_string());
         }
@@ -485,10 +492,12 @@ fn combined_request_text(req: &ContextResolutionRequest) -> String {
 }
 
 fn request_jurisdiction(req: &ContextResolutionRequest) -> Option<&str> {
-    req.constraints
-        .jurisdiction
-        .as_deref()
-        .or_else(|| req.discovery.known_inputs.get("jurisdiction").map(String::as_str))
+    req.constraints.jurisdiction.as_deref().or_else(|| {
+        req.discovery
+            .known_inputs
+            .get("jurisdiction")
+            .map(String::as_str)
+    })
 }
 
 fn has_objective(req: &ContextResolutionRequest) -> bool {
@@ -745,14 +754,12 @@ fn build_discovery_surface(
                         required: true,
                         input_type: "string".to_string(),
                     }),
-                    "jurisdiction" if request_jurisdiction(req).is_none() => {
-                        Some(GroundingInput {
-                            key: "jurisdiction".to_string(),
-                            label: "Jurisdiction".to_string(),
-                            required: true,
-                            input_type: "string".to_string(),
-                        })
-                    }
+                    "jurisdiction" if request_jurisdiction(req).is_none() => Some(GroundingInput {
+                        key: "jurisdiction".to_string(),
+                        label: "Jurisdiction".to_string(),
+                        required: true,
+                        input_type: "string".to_string(),
+                    }),
                     "entity_kind" if request_entity_kind(req).is_none() => Some(GroundingInput {
                         key: "entity_kind".to_string(),
                         label: "Entity kind".to_string(),

@@ -15,7 +15,9 @@ use std::collections::{HashMap, HashSet};
 
 use sem_os_core::authoring::agent_mode::AgentMode;
 
-use crate::agent::context_envelope::{AllowedVerbSetFingerprint, ContextEnvelope, PruneReason};
+use crate::agent::sem_os_context_envelope::{
+    AllowedVerbSetFingerprint, PruneReason, SemOsContextEnvelope,
+};
 use crate::dsl_v2::runtime_registry::{runtime_registry, RuntimeVerb};
 
 // ── Core types ──────────────────────────────────────────────────
@@ -33,7 +35,7 @@ pub struct SessionVerbSurface {
     /// SHA-256 fingerprint of the final visible set + filter context.
     /// Distinct from `semreg_fingerprint` (SI-2).
     pub surface_fingerprint: SurfaceFingerprint,
-    /// CCIR-internal fingerprint from the ContextEnvelope (if available).
+    /// CCIR-internal fingerprint from the SemOsContextEnvelope (if available).
     pub semreg_fingerprint: Option<AllowedVerbSetFingerprint>,
     /// Which fail policy was applied (FailClosed or FailOpen).
     pub fail_policy_applied: VerbSurfaceFailPolicy,
@@ -217,9 +219,9 @@ pub struct VerbSurfaceContext<'a> {
     pub agent_mode: AgentMode,
     /// Session workflow focus (e.g., "semos-kyc", "semos-onboarding").
     pub stage_focus: Option<&'a str>,
-    /// SemReg context resolution result.
-    pub envelope: &'a ContextEnvelope,
-    /// Fail policy when SemReg is unavailable.
+    /// Sem OS context resolution result.
+    pub envelope: &'a SemOsContextEnvelope,
+    /// Fail policy when Sem OS is unavailable.
     pub fail_policy: VerbSurfaceFailPolicy,
     /// Current entity state (e.g., "open", "in_review") for lifecycle filtering.
     /// If None, lifecycle filtering is skipped.
@@ -234,7 +236,7 @@ pub struct VerbSurfaceContext<'a> {
 /// 1. Base set from RuntimeVerbRegistry
 /// 2. AgentMode filter
 /// 3. Workflow phase filter
-/// 4. SemReg CCIR (ContextEnvelope)
+/// 4. Sem OS context resolution (SemOsContextEnvelope)
 /// 5. Lifecycle state filter
 /// 6. Actor gating (extension point)
 /// 7. FailPolicy check
@@ -609,14 +611,14 @@ impl SessionVerbSurface {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::agent::context_envelope::ContextEnvelope;
+    use crate::agent::sem_os_context_envelope::SemOsContextEnvelope;
 
-    fn make_envelope_with(verbs: &[&str]) -> ContextEnvelope {
-        ContextEnvelope::test_with_verbs(verbs)
+    fn make_envelope_with(verbs: &[&str]) -> SemOsContextEnvelope {
+        SemOsContextEnvelope::test_with_verbs(verbs)
     }
 
-    fn make_unavailable_envelope() -> ContextEnvelope {
-        ContextEnvelope::unavailable()
+    fn make_unavailable_envelope() -> SemOsContextEnvelope {
+        SemOsContextEnvelope::unavailable()
     }
 
     #[test]

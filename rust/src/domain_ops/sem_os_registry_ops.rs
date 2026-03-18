@@ -8,7 +8,7 @@ use async_trait::async_trait;
 
 use ob_poc_macros::register_custom_op;
 
-use super::sem_reg_helpers::delegate_to_tool;
+use super::sem_os_helpers::delegate_to_tool;
 use super::{CustomOperation, ExecutionContext, ExecutionResult, VerbCall};
 
 #[cfg(feature = "database")]
@@ -80,7 +80,7 @@ impl CustomOperation for RegistryDescribeObjectOp {
         ctx: &mut ExecutionContext,
         pool: &PgPool,
     ) -> Result<ExecutionResult> {
-        use super::sem_reg_helpers::get_string_arg;
+        use super::sem_os_helpers::get_string_arg;
 
         let object_type = get_string_arg(verb_call, "object-type")
             .or_else(|| get_string_arg(verb_call, "object_type"));
@@ -141,7 +141,7 @@ impl CustomOperation for RegistryListObjectsOp {
         ctx: &mut ExecutionContext,
         pool: &PgPool,
     ) -> Result<ExecutionResult> {
-        use super::sem_reg_helpers::get_string_arg;
+        use super::sem_os_helpers::get_string_arg;
 
         let object_type = get_string_arg(verb_call, "object-type")
             .or_else(|| get_string_arg(verb_call, "object_type"))
@@ -171,7 +171,7 @@ registry_op!(
     RegistryResolveContextOp,
     "resolve-context",
     "sem_reg_resolve_context",
-    "Delegates to sem_reg_resolve_context MCP tool"
+    "Delegates to the Sem OS context-resolution MCP tool"
 );
 
 // ── Verb Surface & Producers ───────────────────────────────────────
@@ -283,7 +283,7 @@ registry_op!(
     RegistrySnapshotHistoryOp,
     "snapshot-history",
     "sem_reg_resolve_context",
-    "Delegates to sem_reg context resolution with history mode"
+    "Delegates to Sem OS context resolution with history mode"
 );
 
 registry_op!(

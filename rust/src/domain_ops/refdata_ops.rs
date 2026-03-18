@@ -6,7 +6,7 @@ use serde_json::Value as JsonValue;
 #[cfg(feature = "database")]
 use sqlx::{PgPool, Postgres, QueryBuilder};
 
-use super::sem_reg_helpers::{get_bool_arg, get_int_arg, get_string_arg};
+use super::sem_os_helpers::{get_bool_arg, get_int_arg, get_string_arg};
 use super::{CustomOperation, ExecutionContext, ExecutionResult, VerbCall};
 
 #[derive(Clone, Copy)]
