@@ -13,7 +13,7 @@ use super::summary::ConstellationSummary;
 /// ```rust,no_run
 /// # async fn demo(pool: &sqlx::PgPool) -> anyhow::Result<()> {
 /// use uuid::Uuid;
-/// use ob_poc::sem_reg::constellation::handle_constellation_hydrate;
+/// use ob_poc::constellation::handle_constellation_hydrate;
 ///
 /// let _ = handle_constellation_hydrate(
 ///     pool,
@@ -43,7 +43,7 @@ pub async fn handle_constellation_hydrate(
 /// ```rust,no_run
 /// # async fn demo(pool: &sqlx::PgPool) -> anyhow::Result<()> {
 /// use uuid::Uuid;
-/// use ob_poc::sem_reg::constellation::handle_constellation_summary;
+/// use ob_poc::constellation::handle_constellation_summary;
 ///
 /// let _ = handle_constellation_summary(
 ///     pool,

@@ -2,7 +2,7 @@
 mod tests {
     use std::collections::HashMap;
 
-    use ob_poc::sem_reg::reducer::{
+    use ob_poc::state_reducer::{
         evaluate_rules, parse_condition_body, ConditionEvaluator, FieldValue, OverlayRow, RuleDef,
         ScopeData, SlotOverlayData, SlotRecord,
     };

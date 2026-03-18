@@ -457,7 +457,7 @@ mod db_tests {
 
     #[tokio::test]
     async fn test_cross_border_constellation_hydrates_child_cbus_from_links() -> Result<()> {
-        use ob_poc::sem_reg::constellation::{hydrate_constellation, load_constellation_map};
+        use ob_poc::constellation::{hydrate_constellation, load_constellation_map};
 
         let db = TestDb::new().await?;
         let master_name = db.name("CrossBorderMaster");

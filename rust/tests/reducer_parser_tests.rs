@@ -1,6 +1,6 @@
 #[cfg(feature = "database")]
 mod tests {
-    use ob_poc::sem_reg::reducer::{
+    use ob_poc::state_reducer::{
         parse_condition_body, AggFn, CompareOp, ConditionBody, Expr, Literal, Predicate,
         SlotPredicate, Value,
     };

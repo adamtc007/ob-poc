@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::sem_reg::reducer::BlockedVerb;
+use crate::state_reducer::BlockedVerb;
 
 use super::hydrated::{HydratedConstellation, HydratedSlot};
 use super::map_def::{Cardinality, DependencyEntry, VerbPaletteEntry};
@@ -10,7 +10,7 @@ use super::validate::ValidatedConstellationMap;
 ///
 /// # Examples
 /// ```rust
-/// use ob_poc::sem_reg::constellation::{compute_action_surface, load_builtin_constellation_map, normalize_slots, RawHydrationData};
+/// use ob_poc::constellation::{compute_action_surface, load_builtin_constellation_map, normalize_slots, RawHydrationData};
 /// use uuid::Uuid;
 ///
 /// let map = load_builtin_constellation_map("struct.lux.ucits.sicav").unwrap();
@@ -79,7 +79,7 @@ fn decorate_slot(
                     } else {
                         let mut reasons = unmet_dependencies;
                         if !state_allowed {
-                            reasons.push(crate::sem_reg::reducer::BlockReason {
+                            reasons.push(crate::state_reducer::BlockReason {
                                 message: format!(
                                     "slot '{}' is in state '{}' but '{}' requires one of [{}]",
                                     slot.name,
@@ -116,10 +116,10 @@ fn dependency_block_reason(
     dep: &DependencyEntry,
     states: &HashMap<String, String>,
     map: &ValidatedConstellationMap,
-) -> Option<crate::sem_reg::reducer::BlockReason> {
+) -> Option<crate::state_reducer::BlockReason> {
     match states.get(dep.slot_name()) {
         Some(state) if state_at_least(map, dep.slot_name(), state, dep.min_state()) => None,
-        Some(state) => Some(crate::sem_reg::reducer::BlockReason {
+        Some(state) => Some(crate::state_reducer::BlockReason {
             message: format!(
                 "dependency '{}' is in state '{}' but requires '{}'",
                 dep.slot_name(),
@@ -127,7 +127,7 @@ fn dependency_block_reason(
                 dep.min_state()
             ),
         }),
-        None => Some(crate::sem_reg::reducer::BlockReason {
+        None => Some(crate::state_reducer::BlockReason {
             message: format!(
                 "dependency '{}' is missing; requires '{}'",
                 dep.slot_name(),

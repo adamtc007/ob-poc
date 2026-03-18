@@ -20,7 +20,7 @@ fn is_missing_relation_error(error: &sqlx::Error, relation_name: &str) -> bool {
 /// ```rust,no_run
 /// # async fn demo(pool: &sqlx::PgPool) -> anyhow::Result<()> {
 /// use uuid::Uuid;
-/// use ob_poc::sem_reg::reducer::fetch_slot_overlays;
+/// use ob_poc::state_reducer::fetch_slot_overlays;
 ///
 /// let _ = fetch_slot_overlays(pool, Uuid::new_v4(), Uuid::new_v4(), None).await?;
 /// # Ok(())

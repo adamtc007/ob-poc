@@ -11,7 +11,7 @@ use super::validate::ValidatedConstellationMap;
 ///
 /// # Examples
 /// ```rust
-/// use ob_poc::sem_reg::constellation::{load_builtin_constellation_map, normalize_slots, RawHydrationData};
+/// use ob_poc::constellation::{load_builtin_constellation_map, normalize_slots, RawHydrationData};
 /// use uuid::Uuid;
 ///
 /// let map = load_builtin_constellation_map("struct.lux.ucits.sicav").unwrap();
@@ -116,7 +116,7 @@ fn normalize_singular(
     rows: &[RawSlotRow],
     overlays: &[RawOverlayRow],
     mut warnings: Vec<String>,
-    reducer_result: Option<&crate::sem_reg::reducer::SlotReduceResult>,
+    reducer_result: Option<&crate::state_reducer::SlotReduceResult>,
 ) -> HydratedSlot {
     let chosen = pick_deterministic(rows);
     if rows.len() > 1 && slot.def.cardinality != Cardinality::Recursive {

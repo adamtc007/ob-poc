@@ -8,7 +8,7 @@ use super::validate::validate_constellation_map;
 ///
 /// # Examples
 /// ```rust
-/// use ob_poc::sem_reg::constellation::load_constellation_map;
+/// use ob_poc::constellation::load_constellation_map;
 ///
 /// let yaml = r#"
 /// constellation: demo
@@ -37,7 +37,7 @@ pub fn load_constellation_map(
 ///
 /// # Examples
 /// ```rust
-/// use ob_poc::sem_reg::constellation::compute_map_revision;
+/// use ob_poc::constellation::compute_map_revision;
 ///
 /// assert_eq!(compute_map_revision("demo").len(), 16);
 /// ```

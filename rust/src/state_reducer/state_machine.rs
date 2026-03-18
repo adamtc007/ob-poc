@@ -88,7 +88,7 @@ pub struct ValidatedStateMachine {
 ///
 /// # Examples
 /// ```rust
-/// use ob_poc::sem_reg::reducer::load_state_machine;
+/// use ob_poc::state_reducer::load_state_machine;
 ///
 /// let yaml = r#"
 /// state_machine: demo
@@ -117,7 +117,7 @@ pub fn load_state_machine(yaml: &str) -> ReducerResult<ValidatedStateMachine> {
 ///
 /// # Examples
 /// ```rust
-/// use ob_poc::sem_reg::reducer::compute_reducer_revision;
+/// use ob_poc::state_reducer::compute_reducer_revision;
 ///
 /// assert_eq!(compute_reducer_revision("demo").len(), 16);
 /// ```

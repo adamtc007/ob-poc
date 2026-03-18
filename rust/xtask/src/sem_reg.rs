@@ -539,8 +539,10 @@ pub async fn ctx_resolve(
     as_of_str: Option<&str>,
     json_output: bool,
 ) -> Result<()> {
-    use ob_poc::sem_reg::context_resolution::{ContextResolutionRequest, EvidenceMode, SubjectRef};
-    use ob_poc::sem_reg::{abac::ActorContext, resolve_context};
+    use ob_poc::sem_reg::abac::ActorContext;
+    use sem_os_core::context_resolution::{
+        ContextResolutionRequest, DiscoveryContext, EvidenceMode, SubjectRef,
+    };
 
     let pool = connect().await?;
 
@@ -613,18 +615,32 @@ pub async fn ctx_resolve(
         ),
     };
 
+    // Convert ob_poc ActorContext → sem_os_core ActorContext via JSON round-trip
+    let sem_os_actor: sem_os_core::abac::ActorContext = {
+        let json = serde_json::to_value(&actor).expect("ActorContext serializes");
+        serde_json::from_value(json).expect("ActorContext round-trips")
+    };
+
     let req = ContextResolutionRequest {
         subject,
-        intent: None,
-        actor,
+        intent_summary: None,
+        raw_utterance: None,
+        actor: sem_os_actor,
         goals: vec![],
         constraints: Default::default(),
         evidence_mode,
         point_in_time,
         entity_kind: None,
+        discovery: DiscoveryContext::default(),
     };
 
-    let response = resolve_context(&pool, &req).await?;
+    let service = ob_poc::sem_reg::agent::mcp_tools::build_sem_os_service(&pool);
+    let principal =
+        sem_os_core::principal::Principal::in_process(&actor.actor_id, actor.roles.clone());
+    let response = service
+        .resolve_context(&principal, req)
+        .await
+        .map_err(|e| anyhow::anyhow!("context resolution failed: {}", e))?;
 
     if json_output {
         let json = serde_json::to_string_pretty(&response)?;

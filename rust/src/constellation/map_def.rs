@@ -111,7 +111,7 @@ impl DependencyEntry {
     ///
     /// # Examples
     /// ```rust
-    /// use ob_poc::sem_reg::constellation::DependencyEntry;
+    /// use ob_poc::constellation::DependencyEntry;
     ///
     /// let dep = DependencyEntry::Simple(String::from("cbu"));
     /// assert_eq!(dep.slot_name(), "cbu");
@@ -127,7 +127,7 @@ impl DependencyEntry {
     ///
     /// # Examples
     /// ```rust
-    /// use ob_poc::sem_reg::constellation::DependencyEntry;
+    /// use ob_poc::constellation::DependencyEntry;
     ///
     /// let dep = DependencyEntry::Simple(String::from("cbu"));
     /// assert_eq!(dep.min_state(), "filled");
@@ -156,7 +156,7 @@ impl VerbPaletteEntry {
     ///
     /// # Examples
     /// ```rust
-    /// use ob_poc::sem_reg::constellation::VerbPaletteEntry;
+    /// use ob_poc::constellation::VerbPaletteEntry;
     ///
     /// let entry = VerbPaletteEntry::Simple(String::from("cbu.read"));
     /// assert_eq!(entry.verb_fqn(), "cbu.read");
@@ -172,7 +172,7 @@ impl VerbPaletteEntry {
     ///
     /// # Examples
     /// ```rust
-    /// use ob_poc::sem_reg::constellation::{VerbAvailability, VerbPaletteEntry};
+    /// use ob_poc::constellation::{VerbAvailability, VerbPaletteEntry};
     ///
     /// let entry = VerbPaletteEntry::Gated {
     ///     verb: String::from("entity.read"),

@@ -31,7 +31,7 @@ pub struct OwnershipSummary {
 ///
 /// # Examples
 /// ```rust
-/// use ob_poc::sem_reg::constellation::{compute_summary, load_builtin_constellation_map, normalize_slots, RawHydrationData};
+/// use ob_poc::constellation::{compute_summary, load_builtin_constellation_map, normalize_slots, RawHydrationData};
 /// use uuid::Uuid;
 ///
 /// let map = load_builtin_constellation_map("struct.lux.ucits.sicav").unwrap();

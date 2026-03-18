@@ -132,6 +132,7 @@ pub async fn delegate_to_tool(
     let tool_ctx = SemRegToolContext {
         pool,
         actor: &actor,
+        sem_os_service: None,
     };
     let args = extract_args_as_json(verb_call, ctx);
     let result = crate::sem_reg::agent::mcp_tools::dispatch_tool(&tool_ctx, tool_name, &args).await;
@@ -150,6 +151,7 @@ pub async fn delegate_to_stew_tool(
     let tool_ctx = SemRegToolContext {
         pool,
         actor: &actor,
+        sem_os_service: None,
     };
     let args = extract_args_as_json(verb_call, ctx);
 

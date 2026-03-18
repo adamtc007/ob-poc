@@ -2,7 +2,7 @@
 mod tests {
     use uuid::Uuid;
 
-    use ob_poc::sem_reg::constellation::{
+    use ob_poc::constellation::{
         compute_summary, load_builtin_constellation_map, normalize_slots, Cardinality,
         HydratedSlot, RawGraphEdge, RawHydrationData, RawSlotRow, SlotType,
     };
@@ -61,7 +61,7 @@ mod tests {
 
     #[test]
     fn summary_counts_blocking_slots() {
-        let summary = compute_summary(&ob_poc::sem_reg::constellation::HydratedConstellation {
+        let summary = compute_summary(&ob_poc::constellation::HydratedConstellation {
             constellation: String::from("demo"),
             description: None,
             jurisdiction: String::from("LU"),

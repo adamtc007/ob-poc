@@ -143,7 +143,7 @@ impl AggResult {
     ///
     /// # Examples
     /// ```rust
-    /// use ob_poc::sem_reg::reducer::{AggResult, CompareOp, Literal};
+    /// use ob_poc::state_reducer::{AggResult, CompareOp, Literal};
     ///
     /// assert!(AggResult::Count(2).compare(CompareOp::Gt, &Literal::Num(1.0)));
     /// ```
@@ -159,7 +159,7 @@ impl AggResult {
     ///
     /// # Examples
     /// ```rust
-    /// use ob_poc::sem_reg::reducer::AggResult;
+    /// use ob_poc::state_reducer::AggResult;
     ///
     /// assert!(AggResult::Count(1).as_bool());
     /// assert!(!AggResult::Count(0).as_bool());
@@ -250,7 +250,7 @@ impl EvalScope {
     ///
     /// # Examples
     /// ```rust
-    /// use ob_poc::sem_reg::reducer::EvalScope;
+    /// use ob_poc::state_reducer::EvalScope;
     ///
     /// let scope = EvalScope::default();
     /// let json = scope.as_scope_data();
@@ -360,7 +360,7 @@ pub struct SlotReduceResult {
     pub slot_path: String,
     pub computed_state: String,
     pub effective_state: String,
-    pub override_entry: Option<crate::sem_reg::reducer::overrides::StateOverride>,
+    pub override_entry: Option<crate::state_reducer::overrides::StateOverride>,
     pub available_verbs: Vec<String>,
     pub blocked_verbs: Vec<BlockedVerb>,
     pub consistency_warnings: Vec<String>,

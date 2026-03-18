@@ -213,6 +213,9 @@ pub struct ToolHandlers {
     pub(super) scenario_index: Option<Arc<crate::mcp::scenario_index::ScenarioIndex>>,
     /// Semantic OS client — routes sem_reg_* tool calls through the DI boundary
     pub(super) sem_os_client: Option<Arc<dyn SemOsClient>>,
+    /// Pre-built CoreService from startup — shared across all MCP tool calls.
+    /// Avoids per-request reconstruction of CoreServiceImpl + 8 PgStores.
+    pub(super) sem_os_service: Option<Arc<dyn sem_os_core::service::CoreService>>,
     /// Authoring pipeline mode (Research vs Governed) — controls db_introspect surface.
     pub(super) agent_mode: sem_os_core::authoring::agent_mode::AgentMode,
 }
@@ -239,6 +242,7 @@ impl ToolHandlers {
             macro_index: None,
             scenario_index: None,
             sem_os_client: None,
+            sem_os_service: None,
             agent_mode: sem_os_core::authoring::agent_mode::AgentMode::default(),
         }
     }
@@ -282,6 +286,15 @@ impl ToolHandlers {
     /// Set the Semantic OS client for sem_reg_* tool dispatch
     pub fn with_sem_os_client(mut self, client: Arc<dyn SemOsClient>) -> Self {
         self.sem_os_client = Some(client);
+        self
+    }
+
+    /// Set the pre-built CoreService shared across all MCP tool calls.
+    pub fn with_sem_os_service(
+        mut self,
+        service: Arc<dyn sem_os_core::service::CoreService>,
+    ) -> Self {
+        self.sem_os_service = Some(service);
         self
     }
 
@@ -548,6 +561,7 @@ impl ToolHandlers {
             let ctx = SemRegToolContext {
                 pool: &self.pool,
                 actor: &actor,
+                sem_os_service: self.sem_os_service.as_ref(),
             };
             let result = dispatch_tool(&ctx, name, &args).await;
             if result.success {

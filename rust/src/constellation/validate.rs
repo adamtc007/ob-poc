@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use super::error::{ConstellationError, ConstellationResult};
 use super::map_def::{Cardinality, ConstellationMapDef, SlotDef, SlotType};
-use crate::sem_reg::reducer::{load_builtin_state_machine, ValidatedStateMachine};
+use crate::state_reducer::{load_builtin_state_machine, ValidatedStateMachine};
 
 /// Validated constellation map with flattened slot index.
 #[derive(Debug, Clone)]
@@ -32,7 +32,7 @@ pub struct ResolvedSlot {
 ///
 /// # Examples
 /// ```rust
-/// use ob_poc::sem_reg::constellation::{validate_constellation_map, ConstellationMapDef};
+/// use ob_poc::constellation::{validate_constellation_map, ConstellationMapDef};
 ///
 /// let yaml = r#"
 /// constellation: demo

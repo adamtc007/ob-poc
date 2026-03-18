@@ -182,6 +182,7 @@ impl CustomOperation for ChangesetListOp {
         let tool_ctx = crate::sem_reg::agent::mcp_tools::SemRegToolContext {
             pool,
             actor: &actor,
+            sem_os_service: None,
         };
         if let Some(result) = crate::sem_reg::stewardship::dispatch_phase0_tool(
             &tool_ctx,

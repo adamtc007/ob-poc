@@ -3,7 +3,7 @@ mod tests {
     use std::fs;
     use std::path::PathBuf;
 
-    use ob_poc::sem_reg::constellation::{
+    use ob_poc::constellation::{
         compile_query_plan, compute_map_revision, load_builtin_constellation_map,
         load_constellation_map, QueryType,
     };

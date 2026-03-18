@@ -6,7 +6,7 @@ use ob_poc_macros::register_custom_op;
 
 use super::helpers::{extract_string, extract_uuid, extract_uuid_opt};
 use super::{CustomOperation, ExecutionContext, ExecutionResult, VerbCall};
-use crate::sem_reg::constellation::{handle_constellation_hydrate, handle_constellation_summary};
+use crate::constellation::{handle_constellation_hydrate, handle_constellation_summary};
 
 #[cfg(feature = "database")]
 use sqlx::PgPool;

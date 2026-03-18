@@ -38,7 +38,7 @@ pub enum QueryType {
 ///
 /// # Examples
 /// ```rust
-/// use ob_poc::sem_reg::constellation::{compile_query_plan, load_builtin_constellation_map};
+/// use ob_poc::constellation::{compile_query_plan, load_builtin_constellation_map};
 ///
 /// let map = load_builtin_constellation_map("struct.lux.ucits.sicav").unwrap();
 /// let plan = compile_query_plan(&map);

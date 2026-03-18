@@ -6,7 +6,7 @@ use super::validate::ValidatedConstellationMap;
 ///
 /// # Examples
 /// ```rust
-/// use ob_poc::sem_reg::constellation::load_builtin_constellation_map;
+/// use ob_poc::constellation::load_builtin_constellation_map;
 ///
 /// let map = load_builtin_constellation_map("struct.lux.ucits.sicav").unwrap();
 /// assert_eq!(map.constellation, "struct.lux.ucits.sicav");

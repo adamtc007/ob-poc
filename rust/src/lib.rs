@@ -167,6 +167,14 @@ pub mod policy;
 #[cfg(feature = "database")]
 pub mod sem_reg;
 
+// Constellation — CBU case/structure ownership graph with resolver
+#[cfg(feature = "database")]
+pub mod constellation;
+
+// State Reducer — canonical reducer definitions for constellation/case state
+#[cfg(feature = "database")]
+pub mod state_reducer;
+
 // SemTaxonomy — replacement discovery/composition contract for utterance handling
 #[cfg(feature = "database")]
 pub mod semtaxonomy;

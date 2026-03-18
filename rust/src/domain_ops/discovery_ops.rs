@@ -2049,6 +2049,7 @@ async fn sem_reg_tool(
     let tool_ctx = SemRegToolContext {
         pool,
         actor: &actor,
+        sem_os_service: None,
     };
     let result = dispatch_tool(&tool_ctx, tool_name, &args).await;
     tool_error(result)

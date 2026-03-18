@@ -12,7 +12,7 @@ use super::normalize::normalize_slots;
 use super::query_plan::compile_query_plan;
 use super::summary::{compute_summary, ConstellationSummary};
 use super::validate::ValidatedConstellationMap;
-use crate::sem_reg::reducer::{
+use crate::state_reducer::{
     build_eval_scope_tx, fetch_slot_overlays_tx, get_active_override_tx, reduce_slot,
     SlotReduceResult,
 };
@@ -80,7 +80,7 @@ pub struct ConstellationSlotContext {
 /// ```rust,no_run
 /// # async fn demo(pool: &sqlx::PgPool) -> anyhow::Result<()> {
 /// use uuid::Uuid;
-/// use ob_poc::sem_reg::constellation::{hydrate_constellation, load_builtin_constellation_map};
+/// use ob_poc::constellation::{hydrate_constellation, load_builtin_constellation_map};
 ///
 /// let map = load_builtin_constellation_map("struct.lux.ucits.sicav").unwrap();
 /// let _ = hydrate_constellation(pool, Uuid::new_v4(), None, &map).await?;
@@ -164,7 +164,7 @@ pub async fn hydrate_constellation(
 /// ```rust,no_run
 /// # async fn demo(pool: &sqlx::PgPool) -> anyhow::Result<()> {
 /// use uuid::Uuid;
-/// use ob_poc::sem_reg::constellation::{hydrate_constellation_summary, load_builtin_constellation_map};
+/// use ob_poc::constellation::{hydrate_constellation_summary, load_builtin_constellation_map};
 ///
 /// let map = load_builtin_constellation_map("struct.lux.ucits.sicav").unwrap();
 /// let _ = hydrate_constellation_summary(pool, Uuid::new_v4(), None, &map).await?;
@@ -187,7 +187,7 @@ pub async fn hydrate_constellation_summary(
 /// ```rust,no_run
 /// # async fn demo(pool: &sqlx::PgPool) -> anyhow::Result<()> {
 /// use uuid::Uuid;
-/// use ob_poc::sem_reg::constellation::{discover_state_machine_slot_contexts, load_builtin_constellation_map};
+/// use ob_poc::constellation::{discover_state_machine_slot_contexts, load_builtin_constellation_map};
 ///
 /// let map = load_builtin_constellation_map("struct.lux.ucits.sicav").unwrap();
 /// let _ = discover_state_machine_slot_contexts(
@@ -1092,7 +1092,7 @@ async fn populate_entity_details_tx(
 
 fn raw_overlay_rows_from_slot_data(
     entity_id: Uuid,
-    overlays: crate::sem_reg::reducer::SlotOverlayData,
+    overlays: crate::state_reducer::SlotOverlayData,
 ) -> Vec<RawOverlayRow> {
     overlays
         .sources

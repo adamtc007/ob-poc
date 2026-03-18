@@ -8,7 +8,7 @@ use serde_json::json;
 
 use super::helpers::{extract_string, extract_string_opt, extract_uuid, extract_uuid_opt};
 use super::{CustomOperation, ExecutionContext, ExecutionResult, VerbCall};
-use crate::sem_reg::reducer::{
+use crate::state_reducer::{
     handle_state_blocked_why, handle_state_check_consistency, handle_state_derive,
     handle_state_derive_all, handle_state_diagnose, handle_state_list_overrides,
     handle_state_override, handle_state_revoke_override, load_builtin_state_machine,

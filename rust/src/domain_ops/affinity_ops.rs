@@ -16,7 +16,6 @@ use async_trait::async_trait;
 use ob_poc_macros::register_custom_op;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
-use std::sync::Arc;
 use uuid::Uuid;
 
 use super::sem_os_helpers::{get_bool_arg, get_int_arg, get_string_arg};
@@ -31,9 +30,7 @@ use {
     sem_os_core::context_resolution::{
         ContextResolutionRequest, DiscoveryContext, EvidenceMode, SubjectRef,
     },
-    sem_os_core::service::{CoreService, CoreServiceImpl},
     sem_os_core::verb_contract::VerbContractBody,
-    sem_os_postgres::PgStores,
     sqlx::PgPool,
 };
 
@@ -131,26 +128,6 @@ async fn load_active_verb_contracts(pool: &PgPool) -> Result<Vec<VerbContractBod
 }
 
 #[cfg(feature = "database")]
-fn build_sem_os_service(pool: &PgPool) -> Arc<dyn CoreService> {
-    let stores = PgStores::new(pool.clone());
-    Arc::new(
-        CoreServiceImpl::new(
-            Arc::new(stores.snapshots),
-            Arc::new(stores.objects),
-            Arc::new(stores.changesets),
-            Arc::new(stores.audit),
-            Arc::new(stores.outbox),
-            Arc::new(stores.evidence),
-            Arc::new(stores.projections),
-        )
-        .with_bootstrap_audit(Arc::new(stores.bootstrap_audit))
-        .with_authoring(Arc::new(stores.authoring))
-        .with_scratch_runner(Arc::new(stores.scratch_runner))
-        .with_cleanup(Arc::new(stores.cleanup)),
-    )
-}
-
-#[cfg(feature = "database")]
 fn to_sem_os_actor(actor: &ActorContext) -> sem_os_core::abac::ActorContext {
     let json = serde_json::to_value(actor).expect("ActorContext serializes");
     serde_json::from_value(json).expect("ActorContext round-trips")
@@ -164,7 +141,7 @@ async fn resolve_context_via_sem_os(
 ) -> sem_os_core::service::Result<sem_os_core::context_resolution::ContextResolutionResponse> {
     let principal =
         sem_os_core::principal::Principal::in_process(&actor.actor_id, actor.roles.clone());
-    let service = build_sem_os_service(pool);
+    let service = crate::sem_reg::agent::mcp_tools::build_sem_os_service(pool);
     service.resolve_context(&principal, request).await
 }
 

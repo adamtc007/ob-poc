@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::sem_reg::reducer::BlockedVerb;
+use crate::state_reducer::BlockedVerb;
 
 use super::hydration::RawOverlayRow;
 use super::map_def::{Cardinality, SlotType};

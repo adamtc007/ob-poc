@@ -50,7 +50,7 @@ pub struct CreateOverrideRequest {
 /// ```rust,no_run
 /// # async fn demo(pool: &sqlx::PgPool) -> anyhow::Result<()> {
 /// use uuid::Uuid;
-/// use ob_poc::sem_reg::reducer::get_active_override;
+/// use ob_poc::state_reducer::get_active_override;
 ///
 /// let cbu_id = Uuid::new_v4();
 /// let _ = get_active_override(pool, cbu_id, None, "entity.primary").await?;
@@ -135,7 +135,7 @@ pub(crate) async fn get_active_override_tx(
 /// ```rust,no_run
 /// # async fn demo(pool: &sqlx::PgPool) -> anyhow::Result<()> {
 /// use uuid::Uuid;
-/// use ob_poc::sem_reg::reducer::{create_override, CreateOverrideRequest};
+/// use ob_poc::state_reducer::{create_override, CreateOverrideRequest};
 ///
 /// let req = CreateOverrideRequest {
 ///     cbu_id: Uuid::new_v4(),
@@ -227,7 +227,7 @@ pub async fn create_override(pool: &PgPool, req: CreateOverrideRequest) -> Resul
 /// ```rust,no_run
 /// # async fn demo(pool: &sqlx::PgPool) -> anyhow::Result<()> {
 /// use uuid::Uuid;
-/// use ob_poc::sem_reg::reducer::revoke_override;
+/// use ob_poc::state_reducer::revoke_override;
 ///
 /// revoke_override(pool, Uuid::new_v4(), "operator", "superseded").await?;
 /// # Ok(())
@@ -317,7 +317,7 @@ fn is_missing_relation_error(error: &sqlx::Error, relation_name: &str) -> bool {
 /// ```rust,no_run
 /// # async fn demo(pool: &sqlx::PgPool) -> anyhow::Result<()> {
 /// use uuid::Uuid;
-/// use ob_poc::sem_reg::reducer::list_active_overrides;
+/// use ob_poc::state_reducer::list_active_overrides;
 ///
 /// let _ = list_active_overrides(pool, Uuid::new_v4()).await?;
 /// # Ok(())

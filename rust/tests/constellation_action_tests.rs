@@ -2,7 +2,7 @@
 mod tests {
     use uuid::Uuid;
 
-    use ob_poc::sem_reg::constellation::{
+    use ob_poc::constellation::{
         compute_action_surface, load_builtin_constellation_map, normalize_slots, RawHydrationData,
         RawSlotRow,
     };

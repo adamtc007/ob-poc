@@ -75,6 +75,9 @@ impl GroundingContext {
 pub struct SemRegToolContext<'a> {
     pub pool: &'a PgPool,
     pub actor: &'a ActorContext,
+    /// Pre-built CoreService from startup. When `Some`, avoids per-request
+    /// reconstruction of `CoreServiceImpl` + 8 `PgStores`.
+    pub sem_os_service: Option<&'a Arc<dyn CoreService>>,
 }
 
 // ── Tool Result ───────────────────────────────────────────────
@@ -109,7 +112,12 @@ impl SemRegToolResult {
     }
 }
 
-fn build_sem_os_service(pool: &PgPool) -> Arc<dyn CoreService> {
+/// Build a fresh `CoreServiceImpl` wrapping 8 Postgres stores.
+///
+/// Prefer using the pre-built service from `SemRegToolContext.sem_os_service`
+/// when available — this function exists as a fallback for call sites that
+/// lack access to the startup-constructed instance (e.g. integration tests).
+pub fn build_sem_os_service(pool: &PgPool) -> Arc<dyn CoreService> {
     let stores = PgStores::new(pool.clone());
     Arc::new(
         CoreServiceImpl::new(
@@ -134,13 +142,19 @@ fn to_sem_os_actor(actor: &ActorContext) -> sem_os_core::abac::ActorContext {
 }
 
 async fn resolve_context_via_sem_os(
-    pool: &PgPool,
-    actor: &ActorContext,
+    ctx: &SemRegToolContext<'_>,
     request: ContextResolutionRequest,
 ) -> sem_os_core::service::Result<sem_os_core::context_resolution::ContextResolutionResponse> {
     let principal =
-        sem_os_core::principal::Principal::in_process(&actor.actor_id, actor.roles.clone());
-    let service = build_sem_os_service(pool);
+        sem_os_core::principal::Principal::in_process(&ctx.actor.actor_id, ctx.actor.roles.clone());
+    let owned;
+    let service: &dyn CoreService = match ctx.sem_os_service {
+        Some(s) => s.as_ref(),
+        None => {
+            owned = build_sem_os_service(ctx.pool);
+            owned.as_ref()
+        }
+    };
     service.resolve_context(&principal, request).await
 }
 
@@ -1347,7 +1361,7 @@ async fn handle_resolve_context(
         EvidenceMode::Governance => "governance",
     };
 
-    match resolve_context_via_sem_os(ctx.pool, ctx.actor, request).await {
+    match resolve_context_via_sem_os(ctx, request).await {
         Ok(response) => {
             // Build grounding context from the resolution response
             let mut grounding = GroundingContext::empty();
@@ -1458,7 +1472,7 @@ async fn handle_apply_view(
         discovery: DiscoveryContext::default(),
     };
 
-    match resolve_context_via_sem_os(ctx.pool, ctx.actor, request).await {
+    match resolve_context_via_sem_os(ctx, request).await {
         Ok(response) => SemRegToolResult::ok(serde_json::json!({
             "view_fqn": view_fqn,
             "view_snapshot_id": view_row.snapshot_id,
@@ -2281,7 +2295,7 @@ async fn handle_identify_gaps(
         discovery: DiscoveryContext::default(),
     };
 
-    match resolve_context_via_sem_os(ctx.pool, ctx.actor, request).await {
+    match resolve_context_via_sem_os(ctx, request).await {
         Ok(response) => {
             let mut gaps = Vec::new();
 

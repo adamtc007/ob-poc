@@ -17,10 +17,10 @@ use super::error::{ReducerError, ReducerResult};
 ///
 /// # Examples
 /// ```rust
-/// use ob_poc::sem_reg::reducer::parse_condition_body;
+/// use ob_poc::state_reducer::parse_condition_body;
 ///
 /// let body = parse_condition_body("screening.status = 'CLEAR'").unwrap();
-/// assert!(matches!(body, ob_poc::sem_reg::reducer::ConditionBody::Leaf { .. }));
+/// assert!(matches!(body, ob_poc::state_reducer::ConditionBody::Leaf { .. }));
 /// ```
 pub fn parse_condition_body(input: &str) -> ReducerResult<ConditionBody> {
     let trimmed = input.trim();
@@ -36,7 +36,7 @@ pub fn parse_condition_body(input: &str) -> ReducerResult<ConditionBody> {
 ///
 /// # Examples
 /// ```rust
-/// use ob_poc::sem_reg::reducer::{parse_value, Value};
+/// use ob_poc::state_reducer::{parse_value, Value};
 ///
 /// assert_eq!(parse_value("$2").unwrap(), Value::Param(2));
 /// ```
@@ -50,7 +50,7 @@ pub fn parse_value(input: &str) -> ReducerResult<Value> {
 ///
 /// # Examples
 /// ```rust
-/// use ob_poc::sem_reg::reducer::{parse_literal, Literal};
+/// use ob_poc::state_reducer::{parse_literal, Literal};
 ///
 /// assert_eq!(parse_literal("'ok'").unwrap(), Literal::Str("ok".into()));
 /// ```

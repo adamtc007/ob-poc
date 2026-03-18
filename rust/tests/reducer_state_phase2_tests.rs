@@ -5,7 +5,7 @@ mod tests {
     use chrono::Utc;
     use uuid::Uuid;
 
-    use ob_poc::sem_reg::reducer::{
+    use ob_poc::state_reducer::{
         diagnose_slot, load_builtin_state_machine, reduce_slot, EvalScope, FieldValue, OverlayRow,
         SlotOverlayData, StateOverride,
     };

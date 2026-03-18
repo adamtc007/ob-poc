@@ -365,27 +365,41 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     //   "http"                — HttpClient targeting standalone sem_os_server
     //   unset / other         — None (direct sem_reg calls, legacy path)
     // =========================================================================
+    // Shared CoreService — built once at startup, reused by MCP tool handlers.
+    // Only available in inprocess mode.
+    let sem_os_core_service: Option<Arc<dyn sem_os_core::service::CoreService>> = {
+        let mode = std::env::var("SEM_OS_MODE").unwrap_or_default();
+        if mode == "inprocess" {
+            use sem_os_core::service::CoreServiceImpl;
+            use sem_os_postgres::PgStores;
+
+            let stores = PgStores::new(pool.clone());
+            let core_service = CoreServiceImpl::new(
+                Arc::new(stores.snapshots),
+                Arc::new(stores.objects),
+                Arc::new(stores.changesets),
+                Arc::new(stores.audit),
+                Arc::new(stores.outbox),
+                Arc::new(stores.evidence),
+                Arc::new(stores.projections),
+            )
+            .with_authoring(Arc::new(stores.authoring))
+            .with_scratch_runner(Arc::new(stores.scratch_runner))
+            .with_cleanup(Arc::new(stores.cleanup));
+            Some(Arc::new(core_service) as Arc<dyn sem_os_core::service::CoreService>)
+        } else {
+            None
+        }
+    };
+
     let sem_os_client: Option<Arc<dyn sem_os_client::SemOsClient>> = {
         let mode = std::env::var("SEM_OS_MODE").unwrap_or_default();
         match mode.as_str() {
             "inprocess" => {
-                use sem_os_core::service::CoreServiceImpl;
-                use sem_os_postgres::PgStores;
-
-                let stores = PgStores::new(pool.clone());
-                let core_service = CoreServiceImpl::new(
-                    Arc::new(stores.snapshots),
-                    Arc::new(stores.objects),
-                    Arc::new(stores.changesets),
-                    Arc::new(stores.audit),
-                    Arc::new(stores.outbox),
-                    Arc::new(stores.evidence),
-                    Arc::new(stores.projections),
-                )
-                .with_authoring(Arc::new(stores.authoring))
-                .with_scratch_runner(Arc::new(stores.scratch_runner))
-                .with_cleanup(Arc::new(stores.cleanup));
-                let client = sem_os_client::inprocess::InProcessClient::new(Arc::new(core_service));
+                let service = sem_os_core_service
+                    .clone()
+                    .expect("sem_os_core_service must be Some when SEM_OS_MODE=inprocess");
+                let client = sem_os_client::inprocess::InProcessClient::new(service);
                 tracing::info!("SemOsClient: InProcess mode (direct CoreService)");
                 Some(Arc::new(client) as Arc<dyn sem_os_client::SemOsClient>)
             }
