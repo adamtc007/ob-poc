@@ -434,7 +434,7 @@ mod tests {
     #[test]
     fn test_single_input_passthrough() {
         let input = confidential_pii_label();
-        let result = compute_inherited_label(&[input.clone()]);
+        let result = compute_inherited_label(std::slice::from_ref(&input));
         assert_eq!(result.classification, Classification::Confidential);
         assert!(result.pii);
         assert_eq!(result.jurisdictions, vec!["DE"]);

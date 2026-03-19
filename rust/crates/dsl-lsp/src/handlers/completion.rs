@@ -549,16 +549,6 @@ fn infer_type_from_keyword_pattern(keyword: &str) -> Option<String> {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    // Note: All completion tests require DSL_CONFIG_DIR to be set
-    // pointing to the config directory. These are tested in integration tests.
-    //
-    // The get_lookup_entity_type function now dynamically looks up entity_type
-    // from the verb registry based on verbs.yaml configuration, so tests
-    // need the full config loaded.
-}
-
 /// Get verb completions for playbook files (macro verbs + primitive verbs)
 pub fn playbook_verb_completions() -> Vec<CompletionItem> {
     let mut items = Vec::new();
@@ -592,4 +582,14 @@ pub fn playbook_verb_completions() -> Vec<CompletionItem> {
     }
 
     items
+}
+
+#[cfg(test)]
+mod tests {
+    // Note: All completion tests require DSL_CONFIG_DIR to be set
+    // pointing to the config directory. These are tested in integration tests.
+    //
+    // The get_lookup_entity_type function now dynamically looks up entity_type
+    // from the verb registry based on verbs.yaml configuration, so tests
+    // need the full config loaded.
 }

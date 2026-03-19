@@ -582,7 +582,7 @@ mod tests {
         assert!(projection.root.contains_key("deal"));
 
         // Check deal node exists
-        let deal_node_id = NodeId::new(&format!("deal:{}", deal.deal_id)).unwrap();
+        let deal_node_id = NodeId::new(format!("deal:{}", deal.deal_id)).unwrap();
         let deal_node = projection.get_node(&deal_node_id).unwrap();
         assert_eq!(deal_node.kind, NodeKind::Deal);
         assert_eq!(deal_node.label_short, "Test Deal");
@@ -597,7 +597,7 @@ mod tests {
         let projection = generator.generate(&deal);
 
         // Check product list exists
-        let product_list_id = NodeId::new(&format!("deal:{}:products", deal.deal_id)).unwrap();
+        let product_list_id = NodeId::new(format!("deal:{}:products", deal.deal_id)).unwrap();
         let product_list = projection.get_node(&product_list_id).unwrap();
         assert_eq!(product_list.kind, NodeKind::DealProductList);
     }

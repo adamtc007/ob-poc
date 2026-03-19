@@ -1921,8 +1921,6 @@ mod tests {
 
 #[cfg(test)]
 mod policy_gate_tests {
-    use super::*;
-
     /// Static guard: IntentPipeline must ONLY be constructed in orchestrator.rs.
     #[test]
     fn test_no_duplicate_pipeline_outside_orchestrator() {
@@ -1937,7 +1935,7 @@ mod policy_gate_tests {
                 let path = entry.path();
                 if path.is_dir() {
                     scan_dir(&path, violations);
-                } else if path.extension().map_or(false, |e| e == "rs") {
+                } else if path.extension().is_some_and(|e| e == "rs") {
                     let rel = path.file_name().unwrap().to_string_lossy().to_string();
                     if rel == "orchestrator.rs" || rel == "intent_pipeline.rs" {
                         continue;

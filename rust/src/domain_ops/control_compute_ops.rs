@@ -338,6 +338,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::assertions_on_constants)]
     fn test_priority_ordering() {
         // BOARD_APPOINTMENT (1) > MANAGEMENT_CONTRACT (2) > SPECIAL_RIGHTS (3) > OFFICER (4)
         assert!(
@@ -438,7 +439,7 @@ mod tests {
         let id_a = Uuid::parse_str("00000000-0000-0000-0000-000000000001").unwrap();
         let id_b = Uuid::parse_str("00000000-0000-0000-0000-000000000002").unwrap();
 
-        let mut controllers = vec![
+        let mut controllers = [
             ControllerRecord {
                 controller_entity_id: id_b,
                 control_type: "OFFICER".to_string(),

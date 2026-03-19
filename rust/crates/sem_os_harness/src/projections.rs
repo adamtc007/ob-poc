@@ -167,6 +167,12 @@ async fn test_projection_watermark_advances(client: &dyn SemOsClient, pool: &PgP
     let bundle = SeedBundle {
         bundle_hash: String::new(),
         verb_contracts,
+        macro_defs: vec![],
+        universes: vec![],
+        constellation_families: vec![],
+        constellation_maps: vec![],
+        state_machines: vec![],
+        state_graphs: vec![],
         attributes: vec![],
         entity_types,
         taxonomies,

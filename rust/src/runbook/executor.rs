@@ -1600,10 +1600,10 @@ mod tests {
                 continue;
             }
             // Look for raw execute_dsl calls.
-            if trimmed.contains("execute_dsl(") || trimmed.contains(".execute_dsl(") {
-                if !in_not_gate {
-                    ungated_execute_dsl.push((i + 1, line.to_string()));
-                }
+            if (trimmed.contains("execute_dsl(") || trimmed.contains(".execute_dsl("))
+                && !in_not_gate
+            {
+                ungated_execute_dsl.push((i + 1, line.to_string()));
             }
         }
 

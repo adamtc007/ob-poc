@@ -791,7 +791,7 @@ fn test_content_addressed_id_determinism() {
     };
     let identical_step_b = identical_step_a.clone();
 
-    let id_a = content_addressed_id(&[identical_step_a.clone()], &env);
+    let id_a = content_addressed_id(std::slice::from_ref(&identical_step_a), &env);
     let id_b = content_addressed_id(&[identical_step_b], &env);
     assert_eq!(
         id_a, id_b,
@@ -854,7 +854,7 @@ fn test_content_addressed_id_determinism() {
     );
 
     // Verify full SHA-256 is 32 bytes and first 16 match truncated UUID
-    let hash = full_sha256(&[identical_step_a.clone()], &env);
+    let hash = full_sha256(std::slice::from_ref(&identical_step_a), &env);
     assert_eq!(hash.len(), 32);
     let expected_uuid = Uuid::from_bytes(hash[..16].try_into().unwrap());
     assert_eq!(id_a.0, expected_uuid);
@@ -998,7 +998,7 @@ async fn test_concurrent_lock_contention() {
     // Both produce write_sets containing the contested entity
     let ws1 =
         ob_poc::runbook::executor::compute_write_set(&[rb1_step1.clone(), rb1_step2.clone()], None);
-    let ws2 = ob_poc::runbook::executor::compute_write_set(&[rb2_step1.clone()], None);
+    let ws2 = ob_poc::runbook::executor::compute_write_set(std::slice::from_ref(&rb2_step1), None);
 
     assert!(ws1.contains(&contested_entity));
     assert!(ws2.contains(&contested_entity));

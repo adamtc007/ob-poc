@@ -160,13 +160,13 @@ artifacts:
         // Create two independent ChangeSets
         let b1 = unique_bundle("batch_1");
         let cs1 = svc.propose(&b1, &principal).await.unwrap();
-        svc.validate(cs1.change_set_id).await.unwrap();
-        svc.dry_run(cs1.change_set_id).await.unwrap();
+        let _ = svc.validate(cs1.change_set_id).await.unwrap();
+        let _ = svc.dry_run(cs1.change_set_id).await.unwrap();
 
         let b2 = unique_bundle("batch_2");
         let cs2 = svc.propose(&b2, &principal).await.unwrap();
-        svc.validate(cs2.change_set_id).await.unwrap();
-        svc.dry_run(cs2.change_set_id).await.unwrap();
+        let _ = svc.validate(cs2.change_set_id).await.unwrap();
+        let _ = svc.dry_run(cs2.change_set_id).await.unwrap();
 
         // Batch publish both
         let batch = svc
@@ -204,16 +204,16 @@ artifacts:
         // Publish original
         let b1 = unique_bundle("super_original");
         let cs1 = svc.propose(&b1, &principal).await.unwrap();
-        svc.validate(cs1.change_set_id).await.unwrap();
-        svc.dry_run(cs1.change_set_id).await.unwrap();
+        let _ = svc.validate(cs1.change_set_id).await.unwrap();
+        let _ = svc.dry_run(cs1.change_set_id).await.unwrap();
         svc.publish(cs1.change_set_id, "test").await.unwrap();
 
         // Publish successor that supersedes original
         let b2 = bundle_with_supersedes("super_successor", cs1.change_set_id);
         let cs2 = svc.propose(&b2, &principal).await.unwrap();
         assert_eq!(cs2.supersedes_change_set_id, Some(cs1.change_set_id));
-        svc.validate(cs2.change_set_id).await.unwrap();
-        svc.dry_run(cs2.change_set_id).await.unwrap();
+        let _ = svc.validate(cs2.change_set_id).await.unwrap();
+        let _ = svc.dry_run(cs2.change_set_id).await.unwrap();
         svc.publish(cs2.change_set_id, "test").await.unwrap();
 
         // Verify original is now Superseded
@@ -271,7 +271,7 @@ artifacts:
         let cs = svc.propose(&bundle, &principal).await.unwrap();
 
         // Validate first time (Draft → Validated)
-        svc.validate(cs.change_set_id).await.unwrap();
+        let _ = svc.validate(cs.change_set_id).await.unwrap();
 
         // Try to validate again (already Validated, not Draft)
         let err = svc.validate(cs.change_set_id).await;
@@ -373,8 +373,8 @@ artifacts:
         // First: fully ready
         let b1 = unique_bundle("batch_ready");
         let cs1 = svc.propose(&b1, &principal).await.unwrap();
-        svc.validate(cs1.change_set_id).await.unwrap();
-        svc.dry_run(cs1.change_set_id).await.unwrap();
+        let _ = svc.validate(cs1.change_set_id).await.unwrap();
+        let _ = svc.dry_run(cs1.change_set_id).await.unwrap();
 
         // Second: only Draft (not ready)
         let b2 = unique_bundle("batch_draft");
@@ -481,7 +481,7 @@ artifacts:
 
         let bundle = unique_bundle("val_report");
         let cs = svc.propose(&bundle, &principal).await.unwrap();
-        svc.validate(cs.change_set_id).await.unwrap();
+        let _ = svc.validate(cs.change_set_id).await.unwrap();
 
         // Check validation report was saved
         let reports = store
@@ -507,8 +507,8 @@ artifacts:
 
         let bundle = unique_bundle("dry_report");
         let cs = svc.propose(&bundle, &principal).await.unwrap();
-        svc.validate(cs.change_set_id).await.unwrap();
-        svc.dry_run(cs.change_set_id).await.unwrap();
+        let _ = svc.validate(cs.change_set_id).await.unwrap();
+        let _ = svc.dry_run(cs.change_set_id).await.unwrap();
 
         // Check both reports
         let reports = store
@@ -566,8 +566,8 @@ artifacts:
 
         let bundle = unique_bundle("audit_trail");
         let cs = svc.propose(&bundle, &principal).await.unwrap();
-        svc.validate(cs.change_set_id).await.unwrap();
-        svc.dry_run(cs.change_set_id).await.unwrap();
+        let _ = svc.validate(cs.change_set_id).await.unwrap();
+        let _ = svc.dry_run(cs.change_set_id).await.unwrap();
         svc.publish(cs.change_set_id, "audit-test").await.unwrap();
 
         // Verify audit entry exists
@@ -700,8 +700,8 @@ artifacts:
 
         let bundle = unique_bundle("obs_batch");
         let cs = svc.propose(&bundle, &principal).await.unwrap();
-        svc.validate(cs.change_set_id).await.unwrap();
-        svc.dry_run(cs.change_set_id).await.unwrap();
+        let _ = svc.validate(cs.change_set_id).await.unwrap();
+        let _ = svc.dry_run(cs.change_set_id).await.unwrap();
         let batch = svc.publish(cs.change_set_id, "obs-test").await.unwrap();
 
         // Check publish_batches table

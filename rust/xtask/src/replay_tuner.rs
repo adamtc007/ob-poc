@@ -156,16 +156,11 @@ pub fn evaluate_test_case_offline(
     };
 
     let failure_reason = if !passed {
-        let reason = if verb_rank.is_none() {
-            format!(
-                "Expected verb '{}' not in candidates. Top: {:?}",
-                test.expected_verb, top_verb
-            )
-        } else {
+        let reason = if let Some(rank) = verb_rank {
             format!(
                 "Expected verb '{}' at rank {} (need {}). Top: {:?} @ {:.3}",
                 test.expected_verb,
-                verb_rank.unwrap() + 1,
+                rank + 1,
                 match test.match_mode {
                     GoldenMatchMode::Exact => "rank 1",
                     GoldenMatchMode::TopThree => "rank 1-3",
@@ -173,6 +168,11 @@ pub fn evaluate_test_case_offline(
                 },
                 top_verb,
                 top_score
+            )
+        } else {
+            format!(
+                "Expected verb '{}' not in candidates. Top: {:?}",
+                test.expected_verb, top_verb
             )
         };
         Some(reason)

@@ -122,7 +122,6 @@ pub fn full_sha256(steps: &[CompiledStep], envelope: &ReplayEnvelope) -> [u8; 32
 mod tests {
     use super::*;
     use crate::dsl_v2::macros::ExpansionLimits;
-    use chrono::Utc;
     use std::collections::BTreeMap;
 
     fn sample_step(verb: &str, args: &[(&str, &str)]) -> CompiledStep {
@@ -155,7 +154,7 @@ mod tests {
             },
             external_lookups: vec![],
             macro_audits: vec![],
-            sealed_at: chrono::DateTime::UNIX_EPOCH.into(),
+            sealed_at: chrono::DateTime::UNIX_EPOCH,
         }
     }
 
@@ -167,7 +166,7 @@ mod tests {
             resolved_autofill: BTreeMap::new(),
             expansion_digest: "abc123".to_string(),
             expansion_limits: ExpansionLimits::default(),
-            expanded_at: chrono::DateTime::UNIX_EPOCH.into(),
+            expanded_at: chrono::DateTime::UNIX_EPOCH,
         }
     }
 
@@ -239,7 +238,7 @@ mod tests {
         let mut env_a = ReplayEnvelope::empty();
         let mut env_b = ReplayEnvelope::empty();
         // Different sealed_at timestamps
-        env_a.sealed_at = chrono::DateTime::UNIX_EPOCH.into();
+        env_a.sealed_at = chrono::DateTime::UNIX_EPOCH;
         env_b.sealed_at = chrono::Utc::now();
         let id_a = content_addressed_id(&steps, &env_a);
         let id_b = content_addressed_id(&steps, &env_b);
@@ -444,7 +443,7 @@ mod proptests {
         (1577836800i64..1893456000i64).prop_map(|secs| {
             Utc.timestamp_opt(secs, 0)
                 .single()
-                .unwrap_or_else(|| DateTime::UNIX_EPOCH.into())
+                .unwrap_or(DateTime::UNIX_EPOCH)
         })
     }
 

@@ -32,6 +32,7 @@ struct TestFixture {
 }
 
 #[derive(Debug, Deserialize, Clone)]
+#[allow(dead_code)]
 struct TestCase {
     utterance: String,
     expected_verb: String,
@@ -122,6 +123,7 @@ impl Outcome {
 
 #[cfg(test)]
 #[cfg(feature = "database")]
+#[allow(clippy::items_after_test_module)]
 mod tests {
     use super::*;
 
@@ -140,7 +142,7 @@ mod tests {
             toml::from_str(&fixture_content).expect("Failed to parse test fixtures");
 
         // Filter by command-line arg if provided
-        let filter = std::env::args().last().unwrap_or_default();
+        let filter = std::env::args().next_back().unwrap_or_default();
         let tests: Vec<TestCase> = fixture
             .tests
             .into_iter()
@@ -193,6 +195,7 @@ mod tests {
                     &case.utterance,
                     None,                        // user_id
                     case.domain_hint.as_deref(), // domain_filter
+                    None,                        // entity_kind
                     5,                           // limit
                     None,                        // allowed_verbs (no SemReg in test)
                 )
@@ -396,7 +399,7 @@ mod tests {
                 .filter(|r| {
                     r.top_source
                         .as_ref()
-                        .map_or(false, |s| s.contains("ScenarioIndex") || s == "MacroIndex")
+                        .is_some_and(|s| s.contains("ScenarioIndex") || s == "MacroIndex")
                 })
                 .count();
             let fp_rate = blocker_intercepted as f64 / blocker_total as f64 * 100.0;
@@ -608,7 +611,7 @@ fn print_ecir_report(results: &[TestResult]) {
         .filter(|r| {
             r.top_source
                 .as_ref()
-                .map_or(false, |s| s.contains("NounTaxonomy"))
+                .is_some_and(|s| s.contains("NounTaxonomy"))
         })
         .collect();
 
@@ -646,7 +649,7 @@ fn print_ecir_report(results: &[TestResult]) {
             let is_ecir = r
                 .top_source
                 .as_ref()
-                .map_or(false, |s| s.contains("NounTaxonomy"));
+                .is_some_and(|s| s.contains("NounTaxonomy"));
             let expected_ecir = matches!(
                 r.case.ecir_path.as_deref(),
                 Some("deterministic") | Some("narrow")
@@ -664,7 +667,7 @@ fn print_ecir_report(results: &[TestResult]) {
             let is_ecir = r
                 .top_source
                 .as_ref()
-                .map_or(false, |s| s.contains("NounTaxonomy"));
+                .is_some_and(|s| s.contains("NounTaxonomy"));
             let expected_fallthrough = r.case.ecir_path.as_deref() == Some("fallthrough");
             is_ecir && expected_fallthrough
         })
@@ -734,24 +737,24 @@ fn print_tier2_report(results: &[TestResult]) {
         .filter(|r| {
             r.top_source
                 .as_ref()
-                .map_or(false, |s| s.contains("ScenarioIndex"))
+                .is_some_and(|s| s.contains("ScenarioIndex"))
         })
         .count();
     let tier2b_count = results
         .iter()
-        .filter(|r| r.top_source.as_ref().map_or(false, |s| s == "MacroIndex"))
+        .filter(|r| r.top_source.as_ref().is_some_and(|s| s == "MacroIndex"))
         .count();
     let ecir_count = results
         .iter()
         .filter(|r| {
             r.top_source
                 .as_ref()
-                .map_or(false, |s| s.contains("NounTaxonomy"))
+                .is_some_and(|s| s.contains("NounTaxonomy"))
         })
         .count();
     let macro_count = results
         .iter()
-        .filter(|r| r.top_source.as_ref().map_or(false, |s| s == "Macro"))
+        .filter(|r| r.top_source.as_ref().is_some_and(|s| s == "Macro"))
         .count();
     let other_count = results.len() - tier2a_count - tier2b_count - ecir_count - macro_count;
 
@@ -800,7 +803,7 @@ fn print_tier2_report(results: &[TestResult]) {
             .filter(|r| {
                 r.top_source
                     .as_ref()
-                    .map_or(false, |s| s.contains("ScenarioIndex"))
+                    .is_some_and(|s| s.contains("ScenarioIndex"))
                     && r.outcome.is_first_attempt_hit()
             })
             .count();
@@ -872,7 +875,7 @@ fn print_tier2_report(results: &[TestResult]) {
         let macro_tier_correct = macro_match_cases
             .iter()
             .filter(|r| {
-                r.top_source.as_ref().map_or(false, |s| s == "MacroIndex")
+                r.top_source.as_ref().is_some_and(|s| s == "MacroIndex")
                     && r.outcome.is_first_attempt_hit()
             })
             .count();
@@ -926,7 +929,7 @@ fn print_tier2_report(results: &[TestResult]) {
             .filter(|r| {
                 r.top_source
                     .as_ref()
-                    .map_or(false, |s| s.contains("ScenarioIndex") || s == "MacroIndex")
+                    .is_some_and(|s| s.contains("ScenarioIndex") || s == "MacroIndex")
             })
             .count();
         let blocker_correct = blocker_cases
@@ -956,7 +959,7 @@ fn print_tier2_report(results: &[TestResult]) {
                 let is_tier2 = r
                     .top_source
                     .as_ref()
-                    .map_or(false, |s| s.contains("ScenarioIndex") || s == "MacroIndex");
+                    .is_some_and(|s| s.contains("ScenarioIndex") || s == "MacroIndex");
                 if is_tier2 {
                     println!(
                         "      ! \"{}\" → {} ({:.2}) [{}]",

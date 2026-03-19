@@ -294,8 +294,7 @@ mod field_tests {
         // Check booking rules have match criteria
         for rule in &profile.booking_rules {
             // Some rules have mic filter, some don't
-            if rule.match_criteria.mic.is_some() {
-                let mic_val = rule.match_criteria.mic.as_ref().unwrap();
+            if let Some(mic_val) = &rule.match_criteria.mic {
                 assert!(
                     mic_val.len() == 4,
                     "MIC should be 4-char code, got: {}",

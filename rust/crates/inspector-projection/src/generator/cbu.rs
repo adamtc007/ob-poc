@@ -611,8 +611,10 @@ mod tests {
             })
             .collect();
 
-        let mut policy = RenderPolicy::default();
-        policy.max_items_per_list = 20;
+        let policy = RenderPolicy {
+            max_items_per_list: 20,
+            ..RenderPolicy::default()
+        };
 
         let projection =
             CbuGenerator::new().generate("cbu-001", "Large Fund", None, None, &nodes, &[], &policy);

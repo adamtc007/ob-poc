@@ -1399,7 +1399,7 @@ async fn e2e_11_payload_integrity_corrupt_hash_rejected() {
     let task_types = rig.config.all_task_types();
     let jobs = rig
         .client
-        .activate_jobs(&task_types, 1, 5_000, "test-integrity")
+        .activate_jobs(task_types, 1, 5_000, "test-integrity")
         .await
         .expect("ActivateJobs failed");
     assert!(!jobs.is_empty(), "Expected at least 1 job");

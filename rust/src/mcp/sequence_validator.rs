@@ -452,6 +452,7 @@ mod tests {
     }
 
     /// Build a test MacroRegistry from a list of (fqn, prereqs, sets_state).
+    #[allow(clippy::type_complexity)]
     fn test_registry(entries: Vec<(&str, Vec<MacroPrereq>, Vec<(&str, bool)>)>) -> MacroRegistry {
         let mut registry = MacroRegistry::new();
         for (fqn, prereqs, sets_state) in entries {

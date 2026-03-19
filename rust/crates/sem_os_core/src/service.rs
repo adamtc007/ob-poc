@@ -1838,7 +1838,9 @@ fn parse_uuid(s: &str, field_name: &str) -> Result<Uuid> {
 mod tests {
     use super::*;
     use crate::abac::ActorContext;
-    use crate::context_resolution::{EvidenceMode, ResolutionConstraints, SubjectRef};
+    use crate::context_resolution::{
+        DiscoveryContext, EvidenceMode, ResolutionConstraints, SubjectRef,
+    };
     use chrono::Utc;
     use serde_json::json;
 

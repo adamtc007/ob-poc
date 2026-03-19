@@ -207,10 +207,12 @@ mod tests {
 
     #[test]
     fn test_field_visibility() {
-        let mut policy = RenderPolicy::default();
+        let mut policy = RenderPolicy {
+            lod: 0,
+            ..RenderPolicy::default()
+        };
 
         // LOD 0 - minimal
-        policy.lod = 0;
         assert!(policy.field_visible("id"));
         assert!(policy.field_visible("glyph"));
         assert!(!policy.field_visible("label_short"));

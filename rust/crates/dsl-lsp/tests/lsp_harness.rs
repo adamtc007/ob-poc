@@ -22,6 +22,7 @@ struct TestCase {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+#[allow(dead_code)]
 enum Expected {
     /// Should parse and validate without errors
     Valid,
@@ -1030,7 +1031,7 @@ const GOLDEN_EXAMPLES: &[TestCase] = &[
 // =============================================================================
 
 fn run_test_case(case: &TestCase) {
-    let (state, diagnostics) = analyze_document(case.input);
+    let (_state, diagnostics) = analyze_document(case.input);
 
     let errors: Vec<_> = diagnostics
         .iter()

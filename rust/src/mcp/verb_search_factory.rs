@@ -105,6 +105,7 @@ mod tests {
     fn test_factory_type_signatures() {
         // Verify the factory methods have expected signatures
         // (actual execution requires database)
+        #[allow(clippy::too_many_arguments)]
         fn _check_build_signature(
             _pool: &PgPool,
             _embedder: SharedEmbedder,

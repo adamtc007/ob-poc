@@ -175,7 +175,7 @@ mod tests {
         for entry in fs::read_dir(&runbook_dir).expect("read runbook dir") {
             let entry = entry.expect("dir entry");
             let path = entry.path();
-            if path.extension().map_or(true, |e| e != "rs") {
+            if path.extension().is_none_or(|e| e != "rs") {
                 continue;
             }
 

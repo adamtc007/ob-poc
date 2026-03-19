@@ -631,6 +631,7 @@ pub async fn ctx_resolve(
         evidence_mode,
         point_in_time,
         entity_kind: None,
+        entity_confidence: None,
         discovery: DiscoveryContext::default(),
     };
 

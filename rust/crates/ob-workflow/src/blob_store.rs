@@ -141,6 +141,13 @@ impl InMemoryBlobStore {
 }
 
 #[cfg(test)]
+impl Default for InMemoryBlobStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(test)]
 #[async_trait]
 impl BlobStore for InMemoryBlobStore {
     async fn store(

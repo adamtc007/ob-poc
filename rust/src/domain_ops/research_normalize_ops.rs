@@ -281,7 +281,7 @@ mod tests {
         assert_eq!(canonical["flag"], serde_json::Value::Bool(true));
         assert_eq!(canonical["count"], serde_json::json!(42));
         assert_eq!(canonical["empty"], serde_json::Value::Null);
-        assert_eq!(canonical["ratio"], serde_json::json!(3.14));
+        assert_eq!(canonical["ratio"], serde_json::json!(314.0_f64 / 100.0));
     }
 
     #[test]

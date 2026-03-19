@@ -199,11 +199,9 @@ async fn test_verb_profiles_have_sexpr_signatures() {
         .expect("available_verbs must be present");
 
     // Find a well-known verb (cbu.create should always be in the universe)
-    let cbu_create = verbs.iter().find(|v| {
-        v.get("fqn")
-            .and_then(|f| f.as_str())
-            .map_or(false, |f| f == "cbu.create")
-    });
+    let cbu_create = verbs
+        .iter()
+        .find(|v| v.get("fqn").and_then(|f| f.as_str()) == Some("cbu.create"));
 
     if let Some(verb) = cbu_create {
         let sexpr = verb["sexpr"].as_str().unwrap_or("");
@@ -226,11 +224,9 @@ async fn test_verb_profiles_have_sexpr_signatures() {
         assert!(!args.is_empty(), "cbu.create must have args");
 
         // Check name arg exists and is required
-        let name_arg = args.iter().find(|a| {
-            a.get("name")
-                .and_then(|n| n.as_str())
-                .map_or(false, |n| n == "name")
-        });
+        let name_arg = args
+            .iter()
+            .find(|a| a.get("name").and_then(|n| n.as_str()) == Some("name"));
         assert!(name_arg.is_some(), "cbu.create must have a 'name' argument");
         if let Some(arg) = name_arg {
             assert_eq!(

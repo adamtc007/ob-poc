@@ -414,8 +414,10 @@ mod tests {
 
     #[test]
     fn test_promotion_report_summary() {
-        let mut report = PromotionReport::default();
-        report.expired_outcomes = 5;
+        let mut report = PromotionReport {
+            expired_outcomes: 5,
+            ..PromotionReport::default()
+        };
         report.promoted.push("test phrase".to_string());
         report.skipped = 2;
         report.collisions = 1;

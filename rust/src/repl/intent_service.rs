@@ -507,6 +507,7 @@ mod tests {
             client_group_name: None,
             scope: None,
             dominant_entity_id: None,
+            entity_kind: None,
             user_id: None,
             domain_hint: None,
             bindings: vec![],

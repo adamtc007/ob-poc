@@ -2151,8 +2151,8 @@ mod tests {
             entry.labels.get(provenance::ORIGIN_MACRO_FQN).unwrap(),
             "struct.lux.ucits.sicav"
         );
-        assert!(entry.labels.get(provenance::ORIGIN_SCENARIO_ID).is_none());
-        assert!(entry.labels.get(provenance::ORIGIN_TITLE).is_none());
+        assert!(!entry.labels.contains_key(provenance::ORIGIN_SCENARIO_ID));
+        assert!(!entry.labels.contains_key(provenance::ORIGIN_TITLE));
     }
 
     #[test]

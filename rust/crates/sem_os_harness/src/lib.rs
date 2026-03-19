@@ -159,6 +159,12 @@ fn build_test_seed_bundle() -> SeedBundle {
     let mut bundle = SeedBundle {
         bundle_hash: String::new(),
         verb_contracts,
+        macro_defs: vec![],
+        universes: vec![],
+        constellation_families: vec![],
+        constellation_maps: vec![],
+        state_machines: vec![],
+        state_graphs: vec![],
         attributes,
         entity_types,
         taxonomies,
@@ -307,7 +313,8 @@ async fn test_context_resolution_determinism(client: &dyn SemOsClient) {
     let subject_id = Uuid::new_v4();
     let request = || sem_os_core::proto::ResolveContextRequest {
         subject: SubjectRef::EntityId(subject_id),
-        intent: Some("discover UBO structure".into()),
+        intent_summary: Some("discover UBO structure".into()),
+        raw_utterance: Some("discover UBO structure".into()),
         actor: sem_os_core::abac::ActorContext {
             actor_id: "harness-agent".into(),
             roles: vec!["analyst".into()],
@@ -320,6 +327,8 @@ async fn test_context_resolution_determinism(client: &dyn SemOsClient) {
         evidence_mode: EvidenceMode::Normal,
         point_in_time: None,
         entity_kind: None,
+        entity_confidence: None,
+        discovery: sem_os_core::context_resolution::DiscoveryContext::default(),
     };
 
     // Run resolution twice with identical input.
@@ -383,6 +392,12 @@ async fn test_manifest_stability(client: &dyn SemOsClient) {
     let bundle = SeedBundle {
         bundle_hash: String::new(),
         verb_contracts,
+        macro_defs: vec![],
+        universes: vec![],
+        constellation_families: vec![],
+        constellation_maps: vec![],
+        state_machines: vec![],
+        state_graphs: vec![],
         attributes: vec![],
         entity_types: vec![],
         taxonomies: vec![],
@@ -419,6 +434,12 @@ async fn test_manifest_stability(client: &dyn SemOsClient) {
     let bundle2 = SeedBundle {
         bundle_hash: resp.bundle_hash.clone(),
         verb_contracts: vec![make_verb_contract_seed(&fqn, "test", "Manifest test verb")],
+        macro_defs: vec![],
+        universes: vec![],
+        constellation_families: vec![],
+        constellation_maps: vec![],
+        state_machines: vec![],
+        state_graphs: vec![],
         attributes: vec![],
         entity_types: vec![],
         taxonomies: vec![],

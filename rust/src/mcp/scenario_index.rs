@@ -737,22 +737,10 @@ scenarios:
         - value: IE
           macro_fqn: struct.ie.ucits.icav
         - value: UK
-          macro_fqn: struct.uk.ucits.oeic
+          macro_fqn: struct.uk.authorised.oeic
         - value: US
-          macro_fqn: struct.us.fund.lp
+          macro_fqn: struct.us.private-fund.delaware-lp
       then: []
-
-  - id: simple-fund-create
-    title: Simple Fund Creation
-    modes: [onboarding]
-    requires:
-      any_of: []
-    signals:
-      actions: []
-      nouns_any: [fund]
-    routes:
-      kind: macro
-      macro_fqn: structure.setup
 "#
     }
 
@@ -765,7 +753,7 @@ scenarios:
     #[test]
     fn test_load_yaml() {
         let idx = load_test_index();
-        assert_eq!(idx.len(), 5);
+        assert_eq!(idx.len(), 4);
         assert!(!idx.is_empty());
     }
 
@@ -797,18 +785,8 @@ scenarios:
     fn test_gate_g1_no_compound_signal() {
         let idx = load_test_index();
         // "create umbrella fund" has no compound action, no jurisdiction, no pair
-        // The simple-fund-create scenario has empty any_of, so G1 passes for it
-        // but score should still be low because no compound signals
         let result = idx.resolve("create umbrella fund", None, None);
-        // Should either NoMatch (low score) or match the simple scenario weakly
-        match result {
-            ScenarioResolveOutcome::NoMatch => {} // Expected if score < MIN_SCORE
-            ScenarioResolveOutcome::Matched(m) => {
-                // If matched, verify it's the simple scenario and score is reasonable
-                assert_eq!(m.scenario_id, "simple-fund-create");
-            }
-            _ => {}
-        }
+        assert!(matches!(result, ScenarioResolveOutcome::NoMatch));
     }
 
     // --- Gate G2: mode compatibility ---
@@ -972,11 +950,8 @@ scenarios:
         let result = idx.resolve("Set up a fund in Ireland", None, None);
         match result {
             ScenarioResolveOutcome::Matched(m) => {
-                match m.route {
-                    ResolvedRoute::Macro { ref macro_fqn } => {
-                        assert_eq!(macro_fqn, "struct.ie.ucits.icav");
-                    }
-                    _ => {} // Could be ie-icav-setup direct match too
+                if let ResolvedRoute::Macro { ref macro_fqn } = m.route {
+                    assert_eq!(macro_fqn, "struct.ie.ucits.icav");
                 }
             }
             _ => {
@@ -1042,7 +1017,6 @@ scenarios:
         let idx = load_test_index();
         // "list my CBUs" has no compound signals → should not match most scenarios
         let result = idx.resolve("list my CBUs", None, None);
-        // simple-fund-create has empty requires but "CBU" won't match its nouns_any
         assert!(
             matches!(result, ScenarioResolveOutcome::NoMatch),
             "Expected NoMatch for simple verb"

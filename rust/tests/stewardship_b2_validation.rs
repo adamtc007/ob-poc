@@ -20,10 +20,8 @@ mod b2_validation {
     use ob_poc::sem_reg::agent::mcp_tools::{SemRegToolContext, SemRegToolResult};
     use ob_poc::sem_reg::onboarding::seed::BOOTSTRAP_SET_ID;
     use ob_poc::sem_reg::stewardship::focus::FocusStore;
-    use ob_poc::sem_reg::stewardship::show_loop::ShowLoop;
     use ob_poc::sem_reg::stewardship::tools_phase0::dispatch_phase0_tool;
     use ob_poc::sem_reg::stewardship::tools_phase1::dispatch_phase1_tool;
-    use ob_poc::sem_reg::stewardship::types::*;
 
     // ── Test Infrastructure ──────────────────────────────────────────
 
@@ -143,6 +141,7 @@ mod b2_validation {
         let ctx = SemRegToolContext {
             pool: &pool,
             actor: &actor,
+            sem_os_service: None,
         };
 
         // 1a. Discover real FQNs from bootstrap
@@ -260,6 +259,7 @@ mod b2_validation {
         let ctx = SemRegToolContext {
             pool: &pool,
             actor: &actor,
+            sem_os_service: None,
         };
 
         // 2a. Create changeset
@@ -343,6 +343,7 @@ mod b2_validation {
         let ctx = SemRegToolContext {
             pool: &pool,
             actor: &actor,
+            sem_os_service: None,
         };
 
         // 3a. Find a real AttributeDef FQN
@@ -442,6 +443,7 @@ mod b2_validation {
         let ctx = SemRegToolContext {
             pool: &pool,
             actor: &actor,
+            sem_os_service: None,
         };
 
         // 4a. Find a VerbContract with args (for cross-reference potential)
@@ -532,6 +534,7 @@ mod b2_validation {
         let ctx = SemRegToolContext {
             pool: &pool,
             actor: &actor,
+            sem_os_service: None,
         };
 
         // 5a. Find a real AttributeDef
@@ -692,6 +695,7 @@ mod b2_validation {
         let ctx = SemRegToolContext {
             pool: &pool,
             actor: &actor,
+            sem_os_service: None,
         };
 
         // 6a. Create changeset
