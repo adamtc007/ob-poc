@@ -1,0 +1,74 @@
+fqn: family.billing_operations
+family_id: billing_operations
+label: Billing Operations
+description: Family for billing, invoicing, and fee-schedule discovery anchored to a supported structure.
+domain_id: billing
+selection_rules:
+  - condition: jurisdiction == 'UK' && entity_kind == 'company'
+    target_constellation: struct.uk.manager.llp
+    priority: 30
+  - condition: jurisdiction == 'LU'
+    target_constellation: struct.lux.ucits.sicav
+    priority: 29
+  - condition: jurisdiction == 'IE'
+    target_constellation: struct.ie.ucits.icav
+    priority: 28
+  - condition: jurisdiction == 'US'
+    target_constellation: struct.us.40act.open-end
+    priority: 27
+constellation_refs:
+  - constellation_id: struct.uk.manager.llp
+    label: UK Manager LLP Billing Anchor
+    jurisdiction: UK
+    entity_kind: company
+    triggers:
+      - billing
+      - invoice
+      - fee
+      - rate card
+      - manager
+  - constellation_id: struct.lux.ucits.sicav
+    label: Luxembourg Billing Anchor
+    jurisdiction: LU
+    entity_kind: fund
+    triggers:
+      - billing
+      - invoice
+      - fee
+      - luxembourg
+  - constellation_id: struct.ie.ucits.icav
+    label: Irish Billing Anchor
+    jurisdiction: IE
+    entity_kind: fund
+    triggers:
+      - billing
+      - invoice
+      - fee
+      - ireland
+  - constellation_id: struct.us.40act.open-end
+    label: US Billing Anchor
+    jurisdiction: US
+    entity_kind: fund
+    triggers:
+      - billing
+      - invoice
+      - payment
+      - us
+candidate_jurisdictions:
+  - LU
+  - IE
+  - UK
+  - US
+candidate_entity_kinds:
+  - deal
+  - contract
+  - document
+  - company
+  - fund
+  - cbu
+grounding_threshold:
+  required_input_keys:
+    - objective
+    - jurisdiction
+  requires_entity_instance: false
+  allows_draft_instance: true

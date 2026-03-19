@@ -1,0 +1,156 @@
+fqn: universe.deal_execution
+universe_id: deal_execution
+name: Deal Execution
+description: Discovery universe for commercial deal setup, contracting, pricing, and onboarding handoff.
+version: "1.0"
+default_entry_domain: deal
+domains:
+  - domain_id: deal
+    label: Deal
+    description: Deal creation, pricing, SLA, contracting, and onboarding-request workflows.
+    objective_tags:
+      - deal
+      - commercial
+      - contracting
+    utterance_signals:
+      - signal_type: keyword
+        pattern: deal
+        weight: 1.0
+      - signal_type: keyword
+        pattern: rate card
+        weight: 0.8
+      - signal_type: keyword
+        pattern: pricing
+        weight: 0.8
+      - signal_type: keyword
+        pattern: contract
+        weight: 0.8
+      - signal_type: keyword
+        pattern: sla
+        weight: 0.8
+      - signal_type: keyword
+        pattern: commercial
+        weight: 0.7
+    candidate_entity_kinds:
+      - deal
+      - client-group
+      - fund
+      - contract
+      - company
+      - cbu
+    candidate_family_ids:
+      - deal_lifecycle
+    required_grounding_inputs:
+      - key: objective
+        label: Objective
+        required: true
+        input_type: string
+    entry_questions:
+      - question_id: deal_goal
+        prompt: What deal workflow do you want to run?
+        maps_to: objective
+        priority: 1
+    allowed_discovery_actions:
+      - research.search
+      - entity.resolve
+      - session.clarify
+  - domain_id: contract
+    label: Contract
+    description: Contract drafting, negotiation, agreement setup, and legal handoff workflows.
+    objective_tags:
+      - contract
+      - agreement
+      - legal
+    utterance_signals:
+      - signal_type: keyword
+        pattern: contract
+        weight: 1.0
+      - signal_type: keyword
+        pattern: agreement
+        weight: 0.9
+      - signal_type: keyword
+        pattern: msa
+        weight: 0.8
+      - signal_type: keyword
+        pattern: negotiate
+        weight: 0.8
+      - signal_type: keyword
+        pattern: legal
+        weight: 0.7
+    candidate_entity_kinds:
+      - contract
+      - deal
+      - document
+      - company
+      - fund
+      - cbu
+    candidate_family_ids:
+      - contract_lifecycle
+    required_grounding_inputs:
+      - key: objective
+        label: Objective
+        required: true
+        input_type: string
+    entry_questions:
+      - question_id: contract_goal
+        prompt: What contract or agreement workflow do you need?
+        maps_to: objective
+        priority: 1
+      - question_id: contract_jurisdiction
+        prompt: Which jurisdiction governs the agreement?
+        maps_to: jurisdiction
+        priority: 2
+    allowed_discovery_actions:
+      - research.search
+      - entity.resolve
+      - session.clarify
+  - domain_id: billing
+    label: Billing
+    description: Billing setup, invoicing readiness, fee schedules, and payment workflow discovery.
+    objective_tags:
+      - billing
+      - invoicing
+      - fees
+    utterance_signals:
+      - signal_type: keyword
+        pattern: billing
+        weight: 1.0
+      - signal_type: keyword
+        pattern: invoice
+        weight: 0.9
+      - signal_type: keyword
+        pattern: fee
+        weight: 0.8
+      - signal_type: keyword
+        pattern: rate card
+        weight: 0.8
+      - signal_type: keyword
+        pattern: payment
+        weight: 0.7
+    candidate_entity_kinds:
+      - deal
+      - contract
+      - fund
+      - company
+      - cbu
+      - document
+    candidate_family_ids:
+      - billing_operations
+    required_grounding_inputs:
+      - key: objective
+        label: Objective
+        required: true
+        input_type: string
+    entry_questions:
+      - question_id: billing_goal
+        prompt: What billing or fee setup do you need?
+        maps_to: objective
+        priority: 1
+      - question_id: billing_jurisdiction
+        prompt: Which jurisdiction or client base does the billing model cover?
+        maps_to: jurisdiction
+        priority: 2
+    allowed_discovery_actions:
+      - research.search
+      - entity.resolve
+      - session.clarify

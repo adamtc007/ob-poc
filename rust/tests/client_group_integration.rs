@@ -461,7 +461,9 @@ mod e2e_tests {
             .with_embedder(dyn_embedder);
 
         // Test: "allianz" should match session.load-cluster
-        let results = searcher.search("allianz", None, None, 5, None).await?;
+        let results = searcher
+            .search("allianz", None, None, None, 5, None)
+            .await?;
 
         assert!(!results.is_empty(), "Should find at least one verb match");
         let top = &results[0];
@@ -502,7 +504,7 @@ mod e2e_tests {
 
         // Test: "load the allianz book" should match session.load-cluster
         let results = searcher
-            .search("load the allianz book", None, None, 5, None)
+            .search("load the allianz book", None, None, None, 5, None)
             .await?;
 
         assert!(!results.is_empty(), "Should find at least one verb match");
@@ -592,7 +594,9 @@ mod e2e_tests {
         let searcher = HybridVerbSearcher::new(verb_service.clone(), Some(learned_data.clone()))
             .with_embedder(dyn_embedder);
 
-        let results = searcher.search("allianz", None, None, 3, None).await?;
+        let results = searcher
+            .search("allianz", None, None, None, 3, None)
+            .await?;
         assert!(!results.is_empty());
         let verb = &results[0].verb;
         println!("  Input: 'allianz'");

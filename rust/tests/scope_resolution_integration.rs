@@ -141,7 +141,9 @@ mod tests {
         println!("\n=== Hard Gate Test: 'allianz' ===\n");
 
         // Process "allianz" - should be caught by Stage 0
-        let result = pipeline.process_with_scope("allianz", None, None).await?;
+        let result = pipeline
+            .process_with_scope("allianz", None, None, None)
+            .await?;
 
         println!("Outcome: {:?}", result.outcome);
         println!("Scope resolution: {:?}", result.scope_resolution);
@@ -246,7 +248,7 @@ mod tests {
         println!("\n=== Scope Phrase Test: 'work on allianz' ===\n");
 
         let result = pipeline
-            .process_with_scope("work on allianz", None, None)
+            .process_with_scope("work on allianz", None, None, None)
             .await?;
 
         println!("Outcome: {:?}", result.outcome);
@@ -289,7 +291,9 @@ mod tests {
         println!("\n=== Scope Context Propagation Test ===\n");
 
         // Step 1: Set scope with "allianz"
-        let scope_result = pipeline.process_with_scope("allianz", None, None).await?;
+        let scope_result = pipeline
+            .process_with_scope("allianz", None, None, None)
+            .await?;
 
         let scope_ctx = match &scope_result.outcome {
             PipelineOutcome::ScopeResolved {
@@ -308,7 +312,12 @@ mod tests {
 
         // Step 2: Run a command with the scope context
         let command_result = pipeline
-            .process_with_scope("show me the irish funds", None, Some(scope_ctx.clone()))
+            .process_with_scope(
+                "show me the irish funds",
+                None,
+                None,
+                Some(scope_ctx.clone()),
+            )
             .await?;
 
         println!("\nStep 2: Processing 'show me the irish funds' with scope");
@@ -490,7 +499,9 @@ mod tests {
         // - But it's also a client group alias
         // - Stage 0 should intercept and resolve as scope, NOT trigger modal
 
-        let result = pipeline.process_with_scope("allianz", None, None).await?;
+        let result = pipeline
+            .process_with_scope("allianz", None, None, None)
+            .await?;
 
         // Check that we did NOT get entity references that need resolution
         println!("Unresolved refs: {:?}", result.unresolved_refs);

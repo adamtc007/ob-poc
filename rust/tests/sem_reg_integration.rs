@@ -260,6 +260,7 @@ mod integration {
             evidence_mode: EvidenceMode::Normal,
             point_in_time: None,
             entity_kind: None,
+            entity_confidence: None,
             discovery: DiscoveryContext::default(),
         };
         let response = resolve_context_via_sem_os(&db.pool, &actor, request).await?;
@@ -1374,6 +1375,7 @@ mod integration {
             evidence_mode: EvidenceMode::Exploratory,
             point_in_time: None,
             entity_kind: None,
+            entity_confidence: None,
             discovery: DiscoveryContext::default(),
         };
 

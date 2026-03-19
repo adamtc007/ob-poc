@@ -61,13 +61,6 @@ use axum::{
 };
 use uuid::Uuid;
 
-fn semtaxonomy_enabled_for_routes() -> bool {
-    !matches!(
-        std::env::var("SEMTAXONOMY_ENABLED").ok().as_deref(),
-        Some("0" | "false" | "FALSE" | "no" | "NO")
-    )
-}
-
 // Re-export all request/response types from agent_types
 pub(crate) use crate::api::agent_types::ExecutionOutcome;
 pub use crate::api::agent_types::{
@@ -853,7 +846,7 @@ async fn create_session(
     });
 
     // Build decision packet for client group selection if no client is set
-    let decision = if final_state == SessionState::New && !semtaxonomy_enabled_for_routes() {
+    let decision = if final_state == SessionState::New {
         build_client_group_decision(&state.pool, session_id).await
     } else {
         None
@@ -2848,6 +2841,7 @@ async fn chat_session(
                 sage_explain: None,
                 coder_proposal: None,
                 discovery_bootstrap: None,
+                parked_entries: None,
             }));
         }
         #[cfg(not(feature = "database"))]
@@ -2873,6 +2867,7 @@ async fn chat_session(
                 sage_explain: None,
                 coder_proposal: None,
                 discovery_bootstrap: None,
+                parked_entries: None,
             }));
         }
     }
@@ -2910,6 +2905,7 @@ async fn chat_session(
                 sage_explain: None,
                 coder_proposal: None,
                 discovery_bootstrap: None,
+                parked_entries: None,
             }));
         }
     };
@@ -3020,6 +3016,7 @@ async fn chat_session(
         sage_explain: response.sage_explain,
         coder_proposal: response.coder_proposal,
         discovery_bootstrap: response.discovery_bootstrap,
+        parked_entries: response.parked_entries,
     }))
 }
 
@@ -4744,6 +4741,37 @@ mod tests {
         assert!(
             !source.contains("/execute"),
             "chat UI must not call /execute directly"
+        );
+    }
+
+    #[test]
+    fn test_routes_do_not_gate_session_behavior_on_semtaxonomy_flag() {
+        let source = std::fs::read_to_string(file!()).expect("agent_routes source should read");
+        assert!(
+            !source.contains("semtaxonomy_enabled_for_routes"),
+            "route-level SemTaxonomy feature gating should remain deleted"
+        );
+        assert!(
+            !source.contains("SEMTAXONOMY_ENABLED"),
+            "routes should not branch on SEMTAXONOMY_ENABLED"
+        );
+    }
+
+    #[test]
+    fn test_unified_utterance_ingress_still_routes_through_chat_session() {
+        let source = std::fs::read_to_string(file!()).expect("agent_routes source should read");
+        assert!(
+            source.contains("SessionInputRequest::Utterance { message }"),
+            "unified utterance ingress arm should exist"
+        );
+        assert!(
+            source
+                .contains("chat_session(State(state), Path(session_id), headers, Json(chat_req))"),
+            "utterance ingress should route through chat_session"
+        );
+        assert!(
+            source.contains(".process_chat(&mut session, &req, actor)"),
+            "chat_session should delegate into AgentService::process_chat"
         );
     }
 }

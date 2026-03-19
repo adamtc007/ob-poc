@@ -18,6 +18,7 @@ export interface ChatMessage {
   sage_explain?: SageExplain;
   coder_proposal?: CoderProposal;
   discovery_bootstrap?: DiscoveryBootstrap;
+  parked_entries?: ParkedEntry[];
 }
 
 export interface SageExplain {
@@ -83,6 +84,16 @@ export interface DiscoveryQuestionPrompt {
   prompt: string;
   maps_to: string;
   priority: number;
+}
+
+export interface ParkedEntry {
+  step_id: string;
+  verb: string;
+  park_reason: string;
+  correlation_key?: string;
+  resource?: string;
+  gate_entry_id?: string;
+  message?: string;
 }
 
 export type DiscoverySelectionKind =

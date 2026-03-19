@@ -676,6 +676,16 @@ fn build_discovery_surface(
     let top_domain = matched_domains
         .first()
         .map(|domain| domain.domain_id.as_str());
+    let preferred_family_ids: std::collections::HashSet<String> = matched_domains
+        .first()
+        .and_then(|top_domain| {
+            universes
+                .iter()
+                .flat_map(|universe| universe.domains.iter())
+                .find(|domain| domain.domain_id == top_domain.domain_id)
+        })
+        .map(|domain| domain.candidate_family_ids.iter().cloned().collect())
+        .unwrap_or_default();
     let lowered_request = request_text.to_lowercase();
     let mut matched_families = Vec::new();
     let mut matched_constellations = Vec::new();
@@ -684,6 +694,11 @@ fn build_discovery_surface(
         let mut score = 0.0;
         if top_domain == Some(family.domain_id.as_str()) {
             score += 0.5;
+            if preferred_family_ids.contains(&family.family_id) {
+                score += 0.6;
+            } else if !preferred_family_ids.is_empty() {
+                score -= 0.15;
+            }
         }
         if let Some(selected_family_id) = req.discovery.selected_family_id.as_deref() {
             if selected_family_id == family.family_id {
@@ -856,14 +871,17 @@ impl CoreService for CoreServiceImpl {
         });
 
         let top_view = applicable_views.first().map(|view| &view.body);
-        let mut candidate_verbs = filter_and_rank_verbs(
+        let (mut candidate_verbs, entity_kind_pruned_verbs) = filter_and_rank_verbs(
             &verb_rows,
-            &req.actor,
-            req.evidence_mode,
-            top_view,
-            req.entity_kind.as_deref(),
-            &memberships,
-            &relationships,
+            crate::context_resolution::VerbFilterContext {
+                actor: &req.actor,
+                mode: req.evidence_mode,
+                top_view,
+                entity_kind: req.entity_kind.as_deref(),
+                entity_confidence: req.entity_confidence,
+                memberships: &memberships,
+                relationships: &relationships,
+            },
         );
         candidate_verbs.sort_by(|a, b| {
             b.rank_score
@@ -964,6 +982,7 @@ impl CoreService for CoreServiceImpl {
             policy_verdicts,
             security_handling,
             governance_signals,
+            entity_kind_pruned_verbs,
             confidence,
             grounded_action_surface,
             resolution_stage,
@@ -1894,6 +1913,7 @@ mod tests {
             evidence_mode: EvidenceMode::default(),
             point_in_time: None,
             entity_kind: Some("fund".into()),
+            entity_confidence: Some(0.9),
             discovery: DiscoveryContext::default(),
         };
 
@@ -1970,6 +1990,120 @@ mod tests {
         assert_eq!(
             surface.grounding_readiness,
             GroundingReadiness::ConstellationReady
+        );
+    }
+
+    #[test]
+    fn discovery_surface_prefers_domain_candidate_family_ids() {
+        let req = ContextResolutionRequest {
+            subject: SubjectRef::TaskId(Uuid::new_v4()),
+            intent_summary: Some("set up billing for a US client".into()),
+            raw_utterance: Some("Please set up billing for a US client".into()),
+            actor: ActorContext {
+                actor_id: "test-user".into(),
+                roles: vec!["analyst".into()],
+                department: None,
+                clearance: Some(Classification::Internal),
+                jurisdictions: vec!["US".into()],
+            },
+            goals: vec![],
+            constraints: ResolutionConstraints {
+                jurisdiction: Some("US".into()),
+                risk_posture: None,
+                thresholds: HashMap::new(),
+            },
+            evidence_mode: EvidenceMode::default(),
+            point_in_time: None,
+            entity_kind: Some("contract".into()),
+            entity_confidence: Some(0.9),
+            discovery: DiscoveryContext::default(),
+        };
+
+        let universe = snapshot_row(
+            ObjectType::UniverseDef,
+            json!({
+                "fqn": "universe.deal_execution",
+                "universe_id": "deal_execution",
+                "name": "Deal Execution",
+                "description": "Commercial discovery universe",
+                "version": "1.0",
+                "domains": [{
+                    "domain_id": "billing",
+                    "label": "Billing",
+                    "description": "Billing setup",
+                    "objective_tags": ["billing"],
+                    "utterance_signals": [{"signal_type": "keyword", "pattern": "billing", "weight": 1.0}],
+                    "candidate_entity_kinds": ["contract"],
+                    "candidate_family_ids": ["billing_operations"],
+                    "required_grounding_inputs": [],
+                    "entry_questions": [],
+                    "allowed_discovery_actions": ["research.search"]
+                }]
+            }),
+            "universe.deal_execution",
+        );
+        let billing_family = snapshot_row(
+            ObjectType::ConstellationFamilyDef,
+            json!({
+                "fqn": "family.billing_operations",
+                "family_id": "billing_operations",
+                "label": "Billing Operations",
+                "description": "Billing family",
+                "domain_id": "billing",
+                "selection_rules": [],
+                "constellation_refs": [{
+                    "constellation_id": "struct.us.40act.open-end",
+                    "label": "US Billing Anchor",
+                    "jurisdiction": "US",
+                    "entity_kind": "fund",
+                    "triggers": ["billing", "invoice"]
+                }],
+                "candidate_jurisdictions": ["US"],
+                "candidate_entity_kinds": ["contract"],
+                "grounding_threshold": {
+                    "required_input_keys": ["objective", "jurisdiction"],
+                    "requires_entity_instance": false,
+                    "allows_draft_instance": true
+                }
+            }),
+            "family.billing_operations",
+        );
+        let distractor_family = snapshot_row(
+            ObjectType::ConstellationFamilyDef,
+            json!({
+                "fqn": "family.generic_billing",
+                "family_id": "generic_billing",
+                "label": "Generic Billing",
+                "description": "Generic billing family",
+                "domain_id": "billing",
+                "selection_rules": [],
+                "constellation_refs": [{
+                    "constellation_id": "struct.us.40act.closed-end",
+                    "label": "US Generic Billing Anchor",
+                    "jurisdiction": "US",
+                    "entity_kind": "fund",
+                    "triggers": ["billing"]
+                }],
+                "candidate_jurisdictions": ["US"],
+                "candidate_entity_kinds": ["contract"],
+                "grounding_threshold": {
+                    "required_input_keys": ["objective", "jurisdiction"],
+                    "requires_entity_instance": false,
+                    "allows_draft_instance": true
+                }
+            }),
+            "family.generic_billing",
+        );
+
+        let surface =
+            build_discovery_surface(&req, &[universe], &[billing_family, distractor_family])
+                .expect("surface");
+        assert_eq!(
+            surface
+                .matched_families
+                .first()
+                .map(|family| family.family_id.as_str()),
+            Some("billing_operations")
         );
     }
 }

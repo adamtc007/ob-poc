@@ -646,6 +646,48 @@ impl CustomOperation for ViewClearOp {
     }
 }
 
+/// view.clear handler - Legacy alias for clearing refinements
+#[register_custom_op]
+pub struct ViewClearAliasOp;
+
+#[async_trait]
+impl CustomOperation for ViewClearAliasOp {
+    fn domain(&self) -> &'static str {
+        "view"
+    }
+
+    fn verb(&self) -> &'static str {
+        "clear"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Provides backward-compatible access to clearing view refinements"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        _pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        ctx.clear_selection();
+
+        Ok(ExecutionResult::Record(json!({
+            "message": "View cleared. Use view.universe, view.book, or view.cbu to set a new view."
+        })))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow::anyhow!("view.clear requires database feature"))
+    }
+}
+
 // =============================================================================
 // VIEW.SELECT - Explicitly set selection
 // =============================================================================

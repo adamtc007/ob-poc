@@ -24,6 +24,7 @@ domains:
           source_of_truth: external
           scope: cbu
           noun: screening
+          subject_kinds: [entity, company, person, fund]
           phase_tags: [kyc]
           side_effects: state_write
         behavior: plugin
@@ -66,6 +67,7 @@ domains:
           source_of_truth: external
           scope: cbu
           noun: screening
+          subject_kinds: [entity, company, person, fund]
           phase_tags: [kyc]
           side_effects: state_write
         behavior: plugin
@@ -108,6 +110,7 @@ domains:
           source_of_truth: external
           scope: cbu
           noun: screening
+          subject_kinds: [entity, company, person, fund]
           phase_tags: [kyc]
           side_effects: state_write
         behavior: plugin
@@ -137,6 +140,7 @@ domains:
           scope: cbu
           noun: screening
           tags: [kyc]
+          subject_kinds: [entity-workstream]
           phase_tags: [kyc]
           side_effects: state_write
         invocation_phrases:
@@ -206,6 +210,7 @@ domains:
           scope: cbu
           noun: screening
           tags: [kyc]
+          subject_kinds: [screening]
           phase_tags: [kyc]
           side_effects: state_write
         invocation_phrases:
@@ -262,6 +267,7 @@ domains:
           scope: cbu
           noun: screening
           tags: [kyc]
+          subject_kinds: [screening]
           phase_tags: [kyc]
           side_effects: state_write
         invocation_phrases:
@@ -323,6 +329,7 @@ domains:
           scope: cbu
           noun: screening
           tags: [kyc]
+          subject_kinds: [kyc-case]
           phase_tags: [kyc]
           side_effects: state_write
         invocation_phrases:
@@ -362,6 +369,7 @@ domains:
           scope: cbu
           noun: screening
           tags: [kyc]
+          subject_kinds: [entity-workstream]
           phase_tags: [kyc]
           side_effects: facts_only
         invocation_phrases:

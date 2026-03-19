@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-> **Last reviewed:** 2026-03-17
+> **Last reviewed:** 2026-03-19
 > **Frontend:** React/TypeScript (`ob-poc-ui-react/`) - Chat UI with scope panel, Inspector, Semantic OS Tab
 > **Backend:** Rust/Axum (`rust/crates/ob-poc-web/`) - Serves React + REST API
 > **Crates:** 22 active Rust crates (16 ob-poc + 6 sem_os_*; esper_* deprecated; ob-poc-graph + viewport removed)
@@ -93,6 +93,7 @@
 > **Sem OS Discovery Cutover (2026-03-17):** ✅ Live on the Sage path — Sem OS is now fail-closed for utterance discovery, discovery-stage `resolve_context()` returns a structured bootstrap surface (`matched_domains`, `matched_families`, `matched_constellations`, `missing_inputs`, `entry_questions`, `grounding_readiness`), the chat API/UI renders that bootstrap surface directly, and bootstrap selections flow back into session state and into Sem OS as structured discovery hints instead of widening to legacy global verb search
 > **Sem OS Non-Lossy Utterance Contract (2026-03-17):** ✅ Live on the Sem OS path — `ContextResolutionRequest` now carries `raw_utterance` separately from `intent_summary`, so Sage summaries no longer replace the original user wording when Sem OS scores discovery/domain/family/constellation matches
 > **Sem OS Discovery Harness (2026-03-17):** ✅ New baseline harness — `rust/tests/semos_discovery_hit_rate.rs` measures utterance → domain/family/constellation/readiness against the Sem OS discovery resolver using real authored universe/family seeds, including a regression case where the raw utterance carries trigger terms absent from `intent_summary`; current seeded corpus baseline is 100% across domain/family/constellation/readiness on the small authored discovery set
+> **Sem OS Reconciliation Remediation (2026-03-19):** ✅ Complete — reconciliation findings from `docs/todo/semos-reconciliation-findings-2026-03-19.md` are now remediated in the live stack: direct `HybridVerbSearcher` paths accept `entity_kind`, canonical kinds include `fund`/`document`/`contract`/`trading-profile`/`deal`/`cbu`, runtime + SemOS `subject_kinds` filtering/prune visibility are wired, low-confidence entity signals widen instead of over-pruning, discovery bootstrap questions are actionable in chat, authored discovery families for trading/billing/deal/contract now influence SemOS family selection and are startup-validated against the runtime verb registry, macro post-expansion DSL is re-validated before runbook assembly, fail-closed safe-harbor verbs are audited against `harm_class` at startup, and parked runbook reasons surface through the chat API/UI
 
 This is the root project guide for Claude Code. Domain-specific details are in annexes.
 

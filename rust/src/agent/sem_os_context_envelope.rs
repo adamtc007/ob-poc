@@ -195,6 +195,16 @@ impl SemOsContextEnvelope {
             }
         }
 
+        for entity_kind_pruned in &response.entity_kind_pruned_verbs {
+            pruned.push(PrunedVerb {
+                fqn: entity_kind_pruned.fqn.clone(),
+                reason: PruneReason::EntityKindMismatch {
+                    verb_kinds: entity_kind_pruned.verb_kinds.clone(),
+                    subject_kind: entity_kind_pruned.subject_kind.clone(),
+                },
+            });
+        }
+
         let fingerprint = AllowedVerbSetFingerprint::compute(&allowed);
 
         let evidence_gaps: Vec<String> = response
@@ -524,6 +534,45 @@ mod tests {
         assert!(json.contains("allowed_verbs"));
         assert!(json.contains("fingerprint"));
         assert!(json.contains("computed_at"));
+    }
+
+    #[test]
+    fn test_from_resolution_preserves_entity_kind_pruned_verbs() {
+        let response = sem_os_core::context_resolution::ContextResolutionResponse {
+            as_of_time: Utc::now(),
+            resolved_at: Utc::now(),
+            applicable_views: vec![],
+            candidate_verbs: vec![],
+            candidate_attributes: vec![],
+            required_preconditions: vec![],
+            disambiguation_questions: vec![],
+            evidence: Default::default(),
+            policy_verdicts: vec![],
+            security_handling: AccessDecision::Allow,
+            governance_signals: vec![],
+            entity_kind_pruned_verbs: vec![sem_os_core::context_resolution::EntityKindPrunedVerb {
+                fqn: "deal.create".into(),
+                verb_kinds: vec!["deal".into()],
+                subject_kind: "company".into(),
+            }],
+            confidence: 0.9,
+            grounded_action_surface: None,
+            resolution_stage: ResolutionStage::Grounded,
+            discovery_surface: None,
+        };
+
+        let env = SemOsContextEnvelope::from_resolution(&response);
+        assert_eq!(env.pruned_verbs.len(), 1);
+        match &env.pruned_verbs[0].reason {
+            PruneReason::EntityKindMismatch {
+                verb_kinds,
+                subject_kind,
+            } => {
+                assert_eq!(verb_kinds, &vec!["deal".to_string()]);
+                assert_eq!(subject_kind, "company");
+            }
+            other => panic!("expected entity kind mismatch, got {other:?}"),
+        }
     }
 
     // ── TOCTOU tests ───────────────────────────────────────────

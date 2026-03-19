@@ -16,7 +16,11 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: state
+          subject_kinds:
+            [cbu, client-group, entity, fund, document, deal, kyc-case]
+          phase_tags: [monitoring]
           side_effects: facts_only
+          harm_class: read_only
         args:
           - name: cbu-id
             type: uuid
@@ -46,7 +50,11 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: state_trace
+          subject_kinds:
+            [cbu, client-group, entity, fund, document, deal, kyc-case]
+          phase_tags: [monitoring]
           side_effects: facts_only
+          harm_class: read_only
         args:
           - name: cbu-id
             type: uuid
@@ -76,7 +84,11 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: state
+          subject_kinds:
+            [cbu, client-group, entity, fund, document, deal, kyc-case]
+          phase_tags: [monitoring]
           side_effects: facts_only
+          harm_class: read_only
         args:
           - name: cbu-id
             type: uuid
@@ -100,7 +112,11 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: blocked_reason
+          subject_kinds:
+            [cbu, client-group, entity, fund, document, deal, kyc-case]
+          phase_tags: [monitoring]
           side_effects: facts_only
+          harm_class: read_only
         args:
           - name: cbu-id
             type: uuid
@@ -133,7 +149,11 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: state_consistency
+          subject_kinds:
+            [cbu, client-group, entity, fund, document, deal, kyc-case]
+          phase_tags: [monitoring]
           side_effects: facts_only
+          harm_class: read_only
         args:
           - name: cbu-id
             type: uuid
@@ -157,7 +177,11 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: state_override
+          subject_kinds:
+            [cbu, client-group, entity, fund, document, deal, kyc-case]
+          phase_tags: [monitoring]
           side_effects: state_write
+          harm_class: reversible
         args:
           - name: cbu-id
             type: uuid
@@ -205,7 +229,11 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: state_override
+          subject_kinds:
+            [cbu, client-group, entity, fund, document, deal, kyc-case]
+          phase_tags: [monitoring]
           side_effects: state_write
+          harm_class: reversible
         args:
           - name: override-id
             type: uuid
@@ -229,7 +257,11 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: state_override
+          subject_kinds:
+            [cbu, client-group, entity, fund, document, deal, kyc-case]
+          phase_tags: [monitoring]
           side_effects: facts_only
+          harm_class: read_only
         args:
           - name: cbu-id
             type: uuid

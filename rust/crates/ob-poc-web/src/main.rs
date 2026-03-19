@@ -182,6 +182,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     tracing::warn!("Verb discovery will use fallback behavior");
                 }
             }
+
+            ob_poc::agent::verb_surface::validate_fail_closed_safe_harbor_harm_class()?;
         }
         Err(e) => {
             tracing::warn!("Failed to load verb config (non-fatal): {}", e);

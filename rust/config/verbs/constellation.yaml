@@ -14,7 +14,10 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: constellation
+          subject_kinds: [cbu]
+          phase_tags: [discovery, monitoring]
           side_effects: facts_only
+          harm_class: read_only
         args:
           - name: cbu-id
             type: uuid
@@ -37,7 +40,10 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: constellation_summary
+          subject_kinds: [cbu]
+          phase_tags: [discovery, monitoring]
           side_effects: facts_only
+          harm_class: read_only
         args:
           - name: cbu-id
             type: uuid

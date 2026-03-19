@@ -1,0 +1,73 @@
+fqn: family.contract_lifecycle
+family_id: contract_lifecycle
+label: Contract Lifecycle
+description: Family for routing agreement and legal workflow discovery into a supported structure anchor.
+domain_id: contract
+selection_rules:
+  - condition: jurisdiction == 'UK' && entity_kind == 'company'
+    target_constellation: struct.uk.manager.llp
+    priority: 30
+  - condition: jurisdiction == 'LU'
+    target_constellation: struct.lux.ucits.sicav
+    priority: 29
+  - condition: jurisdiction == 'IE'
+    target_constellation: struct.ie.ucits.icav
+    priority: 28
+  - condition: jurisdiction == 'US'
+    target_constellation: struct.us.40act.open-end
+    priority: 27
+constellation_refs:
+  - constellation_id: struct.uk.manager.llp
+    label: UK Manager LLP Contract Anchor
+    jurisdiction: UK
+    entity_kind: company
+    triggers:
+      - contract
+      - agreement
+      - msa
+      - legal
+      - manager
+  - constellation_id: struct.lux.ucits.sicav
+    label: Luxembourg Contract Anchor
+    jurisdiction: LU
+    entity_kind: fund
+    triggers:
+      - contract
+      - agreement
+      - legal
+      - luxembourg
+  - constellation_id: struct.ie.ucits.icav
+    label: Irish Contract Anchor
+    jurisdiction: IE
+    entity_kind: fund
+    triggers:
+      - contract
+      - agreement
+      - legal
+      - ireland
+  - constellation_id: struct.us.40act.open-end
+    label: US Contract Anchor
+    jurisdiction: US
+    entity_kind: fund
+    triggers:
+      - contract
+      - agreement
+      - msa
+      - us
+candidate_jurisdictions:
+  - LU
+  - IE
+  - UK
+  - US
+candidate_entity_kinds:
+  - contract
+  - document
+  - company
+  - fund
+  - cbu
+grounding_threshold:
+  required_input_keys:
+    - objective
+    - jurisdiction
+  requires_entity_instance: false
+  allows_draft_instance: true

@@ -42,6 +42,10 @@ pub struct ChatMessage {
     /// Coder proposal payload for this message, when present.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub coder_proposal: Option<CoderProposalPayload>,
+
+    /// Runbook parked-state payload for this message, when present.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parked_entries: Option<Vec<ParkedEntryPayload>>,
 }
 
 /// Chat message role
@@ -343,6 +347,9 @@ pub struct ChatResponse {
     /// Typed Sem OS discovery/bootstrap payload for onboarding-stage sessions.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub discovery_bootstrap: Option<DiscoveryBootstrapPayload>,
+    /// Typed parked-runbook payload for long-running or gated execution.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parked_entries: Option<Vec<ParkedEntryPayload>>,
 }
 
 /// User-facing Sage explanation payload.
@@ -431,6 +438,21 @@ pub struct DiscoveryQuestionPrompt {
     pub prompt: String,
     pub maps_to: String,
     pub priority: u8,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ParkedEntryPayload {
+    pub step_id: String,
+    pub verb: String,
+    pub park_reason: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub correlation_key: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resource: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub gate_entry_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
 }
 
 /// Verb surface response for the REST endpoint.

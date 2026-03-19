@@ -1,8 +1,8 @@
 use std::collections::{HashMap, HashSet};
-use std::path::PathBuf;
 
 use super::error::{ConstellationError, ConstellationResult};
 use super::map_def::{Cardinality, ConstellationMapDef, SlotDef, SlotType};
+use crate::dsl_v2::runtime_registry::runtime_registry;
 use crate::state_reducer::{load_builtin_state_machine, ValidatedStateMachine};
 
 /// Validated constellation map with flattened slot index.
@@ -53,6 +53,7 @@ pub fn validate_constellation_map(
 ) -> ConstellationResult<ValidatedConstellationMap> {
     let mut flattened = Vec::new();
     flatten_slots(&definition.slots, &mut flattened, None, Vec::new(), 0);
+    let known_verbs = load_known_verbs()?;
 
     let root_count = flattened
         .iter()
@@ -77,7 +78,7 @@ pub fn validate_constellation_map(
     let names: HashSet<_> = flattened.iter().map(|slot| slot.name.clone()).collect();
     let mut state_machines = HashMap::new();
     for slot in &flattened {
-        validate_slot(slot, &names)?;
+        validate_slot(slot, &names, &known_verbs)?;
         if let Some(machine_name) = &slot.def.state_machine {
             state_machines.entry(machine_name.clone()).or_insert(
                 load_builtin_state_machine(machine_name)
@@ -132,7 +133,11 @@ fn flatten_slots(
     }
 }
 
-fn validate_slot(slot: &ResolvedSlot, names: &HashSet<String>) -> ConstellationResult<()> {
+fn validate_slot(
+    slot: &ResolvedSlot,
+    names: &HashSet<String>,
+    known_verbs: &HashSet<String>,
+) -> ConstellationResult<()> {
     if slot.def.cardinality != Cardinality::Root
         && slot.def.slot_type != SlotType::Cbu
         && slot.def.join.is_none()
@@ -164,7 +169,6 @@ fn validate_slot(slot: &ResolvedSlot, names: &HashSet<String>) -> ConstellationR
             )));
         }
     }
-    let known_verbs = load_known_verbs()?;
     for entry in slot.def.verbs.values() {
         let verb = entry.verb_fqn();
         if !known_verbs.contains(verb) {
@@ -190,56 +194,21 @@ fn validate_slot(slot: &ResolvedSlot, names: &HashSet<String>) -> ConstellationR
 }
 
 fn load_known_verbs() -> ConstellationResult<HashSet<String>> {
-    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("config/verbs");
     let mut known = HashSet::new();
-    load_known_verbs_from_dir(&root, &mut known)?;
-    let macros_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("config/verb_schemas/macros");
-    load_known_macro_verbs_from_dir(&macros_root, &mut known)?;
+    load_runtime_registry_verbs(&mut known);
+    load_known_macro_verbs(&mut known)?;
     Ok(known)
 }
 
-fn load_known_verbs_from_dir(
-    path: &PathBuf,
-    known: &mut HashSet<String>,
-) -> ConstellationResult<()> {
-    for entry in std::fs::read_dir(path).map_err(|err| ConstellationError::Other(err.into()))? {
-        let entry = entry.map_err(|err| ConstellationError::Other(err.into()))?;
-        let path = entry.path();
-        if path.is_dir() {
-            load_known_verbs_from_dir(&path, known)?;
-            continue;
-        }
-        if path.extension().and_then(|ext| ext.to_str()) != Some("yaml") {
-            continue;
-        }
-        let contents =
-            std::fs::read_to_string(&path).map_err(|err| ConstellationError::Other(err.into()))?;
-        let value: serde_yaml::Value =
-            serde_yaml::from_str(&contents).map_err(|err| ConstellationError::Other(err.into()))?;
-        collect_verb_fqns(&value, known);
-    }
-    Ok(())
-}
-
-fn collect_verb_fqns(value: &serde_yaml::Value, known: &mut HashSet<String>) {
-    let Some(mapping) = value.as_mapping() else {
-        return;
-    };
-    if let Some(domains) = mapping.get(serde_yaml::Value::String(String::from("domains"))) {
-        collect_domain_verbs(domains, known);
-        return;
-    }
-    if let Some(verbs) = mapping.get(serde_yaml::Value::String(String::from("verbs"))) {
-        collect_domain_verbs(verbs, known);
-    } else {
-        collect_domain_verbs(value, known);
+fn load_runtime_registry_verbs(known: &mut HashSet<String>) {
+    for verb in runtime_registry().all_verbs() {
+        known.insert(verb.full_name.clone());
     }
 }
 
-fn load_known_macro_verbs_from_dir(
-    path: &PathBuf,
-    known: &mut HashSet<String>,
-) -> ConstellationResult<()> {
+fn load_known_macro_verbs(known: &mut HashSet<String>) -> ConstellationResult<()> {
+    let path =
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("config/verb_schemas/macros");
     for entry in std::fs::read_dir(path).map_err(|err| ConstellationError::Other(err.into()))? {
         let entry = entry.map_err(|err| ConstellationError::Other(err.into()))?;
         let path = entry.path();
@@ -266,27 +235,34 @@ fn load_known_macro_verbs_from_dir(
     Ok(())
 }
 
-fn collect_domain_verbs(value: &serde_yaml::Value, known: &mut HashSet<String>) {
-    let Some(mapping) = value.as_mapping() else {
-        return;
-    };
-    for (domain_key, domain_value) in mapping {
-        let Some(domain) = domain_key.as_str() else {
+fn load_known_macro_verbs_from_dir(
+    path: &std::path::Path,
+    known: &mut HashSet<String>,
+) -> ConstellationResult<()> {
+    for entry in std::fs::read_dir(path).map_err(|err| ConstellationError::Other(err.into()))? {
+        let entry = entry.map_err(|err| ConstellationError::Other(err.into()))?;
+        let path = entry.path();
+        if path.is_dir() {
+            load_known_macro_verbs_from_dir(&path, known)?;
+            continue;
+        }
+        if path.extension().and_then(|ext| ext.to_str()) != Some("yaml") {
+            continue;
+        }
+        let contents =
+            std::fs::read_to_string(&path).map_err(|err| ConstellationError::Other(err.into()))?;
+        let value: serde_yaml::Value =
+            serde_yaml::from_str(&contents).map_err(|err| ConstellationError::Other(err.into()))?;
+        let Some(mapping) = value.as_mapping() else {
             continue;
         };
-        let Some(domain_map) = domain_value.as_mapping() else {
-            continue;
-        };
-        let source = domain_map
-            .get(serde_yaml::Value::String(String::from("verbs")))
-            .and_then(serde_yaml::Value::as_mapping)
-            .unwrap_or(domain_map);
-        for (verb_key, _) in source {
-            if let Some(verb) = verb_key.as_str() {
-                known.insert(format!("{domain}.{verb}"));
+        for (key, _) in mapping {
+            if let Some(verb_fqn) = key.as_str() {
+                known.insert(verb_fqn.to_string());
             }
         }
     }
+    Ok(())
 }
 
 fn topo_sort(slots: &[ResolvedSlot]) -> ConstellationResult<Vec<String>> {
@@ -340,4 +316,49 @@ fn visit(
     visited.insert(name.to_string());
     ordered.push(name.to_string());
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::validate_constellation_map;
+    use crate::constellation::map_def::ConstellationMapDef;
+
+    #[test]
+    fn validates_runtime_registry_verbs() {
+        let yaml = r#"
+constellation: demo
+jurisdiction: LU
+slots:
+  cbu:
+    type: cbu
+    table: cbus
+    pk: cbu_id
+    cardinality: root
+    verbs:
+      create: cbu.create
+"#;
+        let definition: ConstellationMapDef = serde_yaml::from_str(yaml).unwrap();
+        let validated = validate_constellation_map(&definition).unwrap();
+        assert_eq!(validated.constellation, "demo");
+    }
+
+    #[test]
+    fn rejects_unknown_slot_verbs() {
+        let yaml = r#"
+constellation: demo
+jurisdiction: LU
+slots:
+  cbu:
+    type: cbu
+    table: cbus
+    pk: cbu_id
+    cardinality: root
+    verbs:
+      create: cbu.not-real
+"#;
+        let definition: ConstellationMapDef = serde_yaml::from_str(yaml).unwrap();
+        let error = validate_constellation_map(&definition).unwrap_err();
+        let message = error.to_string();
+        assert!(message.contains("unknown verb 'cbu.not-real'"));
+    }
 }

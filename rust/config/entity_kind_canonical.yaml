@@ -1,0 +1,25 @@
+version: "1.0"
+
+canonical_kinds:
+  kyc-case:
+    aliases: [kyc_case, case]
+  client-group:
+    aliases: [client_group, client-book, client_book]
+  company:
+    aliases: [organization, org, legal_entity, legal-entity]
+  person:
+    aliases: [individual, natural_person]
+  investor:
+    aliases: [investor-register, investor_register]
+  fund:
+    aliases: [investment-fund, umbrella, sub-fund, compartment]
+  cbu:
+    aliases: [client-business-unit, structure, trading-unit]
+  document:
+    aliases: [doc, evidence-document]
+  contract:
+    aliases: [legal-contract, agreement, msa]
+  trading-profile:
+    aliases: [mandate, trading-mandate]
+  deal:
+    aliases: [deal-record, sales-deal]

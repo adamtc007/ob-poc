@@ -23,8 +23,10 @@ domains:
           source_of_truth: operational
           scope: global
           noun: deal
+          subject_kinds: [deal]
           phase_tags: [deal]
           side_effects: state_write
+          harm_class: reversible
         invocation_phrases:
           - "create deal"
           - "new deal"
@@ -95,8 +97,10 @@ domains:
           source_of_truth: operational
           scope: global
           noun: deal
+          subject_kinds: [deal]
           phase_tags: [deal]
           side_effects: facts_only
+          harm_class: read_only
         invocation_phrases:
           - "get deal"
           - "show deal by id"
@@ -127,8 +131,10 @@ domains:
           source_of_truth: operational
           scope: global
           noun: deal
+          subject_kinds: [deal]
           phase_tags: [deal]
           side_effects: facts_only
+          harm_class: read_only
         invocation_phrases:
           - "list deals"
           - "show deals"
@@ -175,8 +181,10 @@ domains:
           source_of_truth: operational
           scope: global
           noun: deal
+          subject_kinds: [deal]
           phase_tags: [deal]
           side_effects: facts_only
+          harm_class: read_only
         invocation_phrases:
           - "search deals"
           - "find deal"
@@ -197,8 +205,10 @@ domains:
           source_of_truth: operational
           scope: global
           noun: deal
+          subject_kinds: [deal]
           phase_tags: [deal]
           side_effects: state_write
+          harm_class: reversible
         invocation_phrases:
           - "update deal"
           - "modify deal"
@@ -235,8 +245,10 @@ domains:
           source_of_truth: operational
           scope: global
           noun: deal
+          subject_kinds: [deal]
           phase_tags: [deal]
           side_effects: state_write
+          harm_class: reversible
         invocation_phrases:
           - "update deal status"
           - "change deal status"
@@ -280,8 +292,10 @@ domains:
           source_of_truth: operational
           scope: global
           noun: deal
+          subject_kinds: [deal]
           phase_tags: [deal]
           side_effects: state_write
+          harm_class: irreversible
         invocation_phrases:
           - "cancel deal"
           - "abort deal"
@@ -310,8 +324,10 @@ domains:
           source_of_truth: operational
           scope: global
           noun: deal_participant
+          subject_kinds: [deal]
           phase_tags: [deal]
           side_effects: state_write
+          harm_class: reversible
         invocation_phrases:
           - "add participant to deal"
           - "add entity to deal"
@@ -366,8 +382,10 @@ domains:
           source_of_truth: operational
           scope: global
           noun: deal_participant
+          subject_kinds: [deal]
           phase_tags: [deal]
           side_effects: state_write
+          harm_class: destructive
         invocation_phrases:
           - "remove participant from deal"
           - "remove deal participant"
@@ -400,8 +418,10 @@ domains:
           source_of_truth: operational
           scope: global
           noun: deal_participant
+          subject_kinds: [deal]
           phase_tags: [deal]
           side_effects: facts_only
+          harm_class: read_only
         invocation_phrases:
           - "list deal participants"
           - "show deal participants"
@@ -428,8 +448,10 @@ domains:
           source_of_truth: operational
           scope: global
           noun: deal_product
+          subject_kinds: [deal]
           phase_tags: [deal]
           side_effects: state_write
+          harm_class: reversible
         invocation_phrases:
           - "add product to deal"
           - "include product in deal"
@@ -483,8 +505,10 @@ domains:
           source_of_truth: operational
           scope: global
           noun: deal_product
+          subject_kinds: [deal]
           phase_tags: [deal]
           side_effects: state_write
+          harm_class: reversible
         invocation_phrases:
           - "update deal product status"
           - "agree product"
@@ -514,8 +538,10 @@ domains:
           source_of_truth: operational
           scope: global
           noun: deal_product
+          subject_kinds: [deal]
           phase_tags: [deal]
           side_effects: state_write
+          harm_class: destructive
         invocation_phrases:
           - "remove product from deal"
           - "drop product from deal"
@@ -544,8 +570,10 @@ domains:
           source_of_truth: operational
           scope: global
           noun: deal_product
+          subject_kinds: [deal]
           phase_tags: [deal]
           side_effects: facts_only
+          harm_class: read_only
         invocation_phrases:
           - "list deal products"
           - "show deal products"
@@ -576,8 +604,10 @@ domains:
           source_of_truth: operational
           scope: global
           noun: deal_contract
+          subject_kinds: [deal]
           phase_tags: [deal]
           side_effects: state_write
+          harm_class: reversible
         invocation_phrases:
           - "add contract to deal"
           - "link contract to deal"
@@ -612,8 +642,10 @@ domains:
           source_of_truth: operational
           scope: global
           noun: deal_contract
+          subject_kinds: [deal]
           phase_tags: [deal]
           side_effects: state_write
+          harm_class: destructive
         invocation_phrases:
           - "remove contract from deal"
           - "unlink contract"
@@ -642,8 +674,10 @@ domains:
           source_of_truth: operational
           scope: global
           noun: deal_contract
+          subject_kinds: [deal]
           phase_tags: [deal]
           side_effects: facts_only
+          harm_class: read_only
         invocation_phrases:
           - "list deal contracts"
           - "show contracts for deal"
@@ -672,8 +706,10 @@ domains:
           source_of_truth: operational
           scope: global
           noun: deal_rate_card
+          subject_kinds: [deal]
           phase_tags: [deal]
           side_effects: state_write
+          harm_class: reversible
         invocation_phrases:
           - "create deal rate card"
           - "new rate card for deal"
@@ -726,8 +762,10 @@ domains:
           source_of_truth: operational
           scope: global
           noun: rate_card_line
+          subject_kinds: [deal]
           phase_tags: [deal]
           side_effects: state_write
+          harm_class: reversible
         invocation_phrases:
           - "add rate card line"
           - "add fee line"
@@ -802,8 +840,10 @@ domains:
           source_of_truth: operational
           scope: global
           noun: rate_card_line
+          subject_kinds: [deal]
           phase_tags: [deal]
           side_effects: state_write
+          harm_class: reversible
         invocation_phrases:
           - "update rate card line"
           - "modify fee line"
@@ -840,8 +880,10 @@ domains:
           source_of_truth: operational
           scope: global
           noun: rate_card_line
+          subject_kinds: [deal]
           phase_tags: [deal]
           side_effects: state_write
+          harm_class: destructive
         invocation_phrases:
           - "remove rate card line"
           - "delete fee line"
@@ -865,8 +907,10 @@ domains:
           source_of_truth: operational
           scope: global
           noun: rate_card_line
+          subject_kinds: [deal]
           phase_tags: [deal]
           side_effects: facts_only
+          harm_class: read_only
         invocation_phrases:
           - "list rate card lines"
           - "show fee lines"
@@ -895,8 +939,10 @@ domains:
           source_of_truth: operational
           scope: global
           noun: deal_rate_card
+          subject_kinds: [deal]
           phase_tags: [deal]
           side_effects: state_write
+          harm_class: reversible
         invocation_phrases:
           - "propose rate card"
           - "submit rate card"
@@ -923,8 +969,10 @@ domains:
           source_of_truth: operational
           scope: global
           noun: deal_rate_card
+          subject_kinds: [deal]
           phase_tags: [deal]
           side_effects: state_write
+          harm_class: reversible
         invocation_phrases:
           - "counter rate card"
           - "client counter offer"
@@ -957,8 +1005,10 @@ domains:
           source_of_truth: operational
           scope: global
           noun: deal_rate_card
+          subject_kinds: [deal]
           phase_tags: [deal]
           side_effects: state_write
+          harm_class: irreversible
         invocation_phrases:
           - "agree rate card"
           - "accept rate card"
@@ -984,8 +1034,10 @@ domains:
           source_of_truth: operational
           scope: global
           noun: deal_rate_card
+          subject_kinds: [deal]
           phase_tags: [deal]
           side_effects: facts_only
+          harm_class: read_only
         invocation_phrases:
           - "list deal rate cards"
           - "show rate cards"
@@ -1020,8 +1072,10 @@ domains:
           source_of_truth: operational
           scope: global
           noun: deal_rate_card
+          subject_kinds: [deal]
           phase_tags: [deal]
           side_effects: facts_only
+          harm_class: read_only
         invocation_phrases:
           - "active rate cards"
           - "current pricing"
@@ -1046,8 +1100,10 @@ domains:
           source_of_truth: operational
           scope: global
           noun: deal_rate_card
+          subject_kinds: [deal]
           phase_tags: [deal]
           side_effects: facts_only
+          harm_class: read_only
         invocation_phrases:
           - "rate card history"
           - "pricing history"
@@ -1076,8 +1132,10 @@ domains:
           source_of_truth: operational
           scope: global
           noun: deal_sla
+          subject_kinds: [deal]
           phase_tags: [deal]
           side_effects: state_write
+          harm_class: reversible
         invocation_phrases:
           - "add sla to deal"
           - "create deal sla"
@@ -1151,8 +1209,10 @@ domains:
           source_of_truth: operational
           scope: global
           noun: deal_sla
+          subject_kinds: [deal]
           phase_tags: [deal]
           side_effects: state_write
+          harm_class: destructive
         invocation_phrases:
           - "remove deal sla"
           - "delete sla"
@@ -1176,8 +1236,10 @@ domains:
           source_of_truth: operational
           scope: global
           noun: deal_sla
+          subject_kinds: [deal]
           phase_tags: [deal]
           side_effects: facts_only
+          harm_class: read_only
         invocation_phrases:
           - "list deal slas"
           - "show slas for deal"
@@ -1202,8 +1264,10 @@ domains:
           source_of_truth: operational
           scope: global
           noun: deal_document
+          subject_kinds: [deal]
           phase_tags: [deal]
           side_effects: state_write
+          harm_class: reversible
         invocation_phrases:
           - "add document to deal"
           - "attach document"
@@ -1252,8 +1316,10 @@ domains:
           source_of_truth: operational
           scope: global
           noun: deal_document
+          subject_kinds: [deal]
           phase_tags: [deal]
           side_effects: state_write
+          harm_class: reversible
         invocation_phrases:
           - "update deal document status"
           - "mark document signed"
@@ -1288,8 +1354,10 @@ domains:
           source_of_truth: operational
           scope: global
           noun: deal_document
+          subject_kinds: [deal]
           phase_tags: [deal]
           side_effects: facts_only
+          harm_class: read_only
         invocation_phrases:
           - "list deal documents"
           - "show deal documents"
@@ -1314,8 +1382,10 @@ domains:
           source_of_truth: operational
           scope: global
           noun: deal_ubo_assessment
+          subject_kinds: [deal]
           phase_tags: [deal]
           side_effects: state_write
+          harm_class: reversible
         invocation_phrases:
           - "add ubo assessment to deal"
           - "link kyc assessment"
@@ -1346,8 +1416,10 @@ domains:
           source_of_truth: operational
           scope: global
           noun: deal_ubo_assessment
+          subject_kinds: [deal]
           phase_tags: [deal]
           side_effects: state_write
+          harm_class: reversible
         invocation_phrases:
           - "update ubo assessment"
           - "set assessment status"
@@ -1388,8 +1460,10 @@ domains:
           source_of_truth: operational
           scope: global
           noun: deal_onboarding_request
+          subject_kinds: [deal]
           phase_tags: [deal]
           side_effects: state_write
+          harm_class: reversible
         invocation_phrases:
           - "request onboarding"
           - "create onboarding request"
@@ -1454,8 +1528,10 @@ domains:
           source_of_truth: operational
           scope: global
           noun: deal_onboarding_request
+          subject_kinds: [deal]
           phase_tags: [deal]
           side_effects: state_write
+          harm_class: reversible
         invocation_phrases:
           - "batch onboarding request"
           - "bulk onboard"
@@ -1493,8 +1569,10 @@ domains:
           source_of_truth: operational
           scope: global
           noun: deal_onboarding_request
+          subject_kinds: [deal]
           phase_tags: [deal]
           side_effects: state_write
+          harm_class: reversible
         invocation_phrases:
           - "update onboarding status"
           - "progress onboarding"
@@ -1537,8 +1615,10 @@ domains:
           source_of_truth: operational
           scope: global
           noun: deal_onboarding_request
+          subject_kinds: [deal]
           phase_tags: [deal]
           side_effects: facts_only
+          harm_class: read_only
         invocation_phrases:
           - "list onboarding requests"
           - "show onboarding requests"
@@ -1567,8 +1647,10 @@ domains:
           source_of_truth: operational
           scope: global
           noun: deal
+          subject_kinds: [deal]
           phase_tags: [deal]
           side_effects: facts_only
+          harm_class: read_only
         invocation_phrases:
           - "deal summary"
           - "full deal details"
@@ -1593,8 +1675,10 @@ domains:
           source_of_truth: operational
           scope: global
           noun: deal_event
+          subject_kinds: [deal]
           phase_tags: [deal]
           side_effects: facts_only
+          harm_class: read_only
         invocation_phrases:
           - "deal timeline"
           - "deal history"

@@ -424,6 +424,7 @@ fn build_request(case: &DiscoveryCase) -> ContextResolutionRequest {
         evidence_mode: EvidenceMode::Normal,
         point_in_time: None,
         entity_kind: None,
+        entity_confidence: None,
         discovery: DiscoveryContext {
             selected_domain_id: case.selected_domain.clone(),
             selected_family_id: case.selected_family.clone(),

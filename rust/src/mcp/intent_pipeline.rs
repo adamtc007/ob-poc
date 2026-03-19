@@ -385,6 +385,7 @@ impl IntentPipeline {
         &self,
         instruction: &str,
         domain_hint: Option<&str>,
+        entity_kind: Option<&str>,
         existing_scope: Option<ScopeContext>,
     ) -> Result<PipelineResult> {
         let trimmed = instruction.trim();
@@ -484,8 +485,13 @@ impl IntentPipeline {
 
         // Natural language path (with scope context for entity resolution)
         // Pass inferred domain to filter verb search results
-        self.process_as_natural_language(instruction, inferred_domain.as_deref(), scope_ctx)
-            .await
+        self.process_as_natural_language(
+            instruction,
+            inferred_domain.as_deref(),
+            entity_kind,
+            scope_ctx,
+        )
+        .await
     }
 
     /// Process input as natural language (semantic search → LLM extraction → DSL)
@@ -495,15 +501,9 @@ impl IntentPipeline {
         &self,
         instruction: &str,
         domain_filter: Option<&str>,
+        entity_kind: Option<&str>,
         scope_ctx: ScopeContext,
     ) -> Result<PipelineResult> {
-        if let Err(error) = self.extract_nlci_plan(instruction).await {
-            tracing::warn!(
-                error = %error,
-                "NLCI structured-intent extraction failed during shadow execution"
-            );
-        }
-
         // Step 1: Find verb candidates via semantic search
         // Domain filter narrows results to relevant verbs (e.g., "session" domain for "set session...")
         // When allowed_verbs is set (Phase 3 CCIR), search is pre-constrained to SemReg-approved verbs.
@@ -513,6 +513,7 @@ impl IntentPipeline {
                 instruction,
                 None,
                 domain_filter,
+                entity_kind,
                 5,
                 self.allowed_verbs.as_ref(),
             )
@@ -558,6 +559,13 @@ impl IntentPipeline {
                     None
                 },
             });
+        }
+
+        if let Err(error) = self.extract_nlci_plan(instruction).await {
+            tracing::warn!(
+                error = %error,
+                "NLCI structured-intent extraction failed during shadow execution"
+            );
         }
 
         // Step 1b: Check for ambiguity (Issue D/J)
@@ -1989,7 +1997,7 @@ mod correctness_tests {
             .unwrap();
 
         let result = rt
-            .block_on(pipeline.process_with_scope("dsl:(cbu.list)", None, None))
+            .block_on(pipeline.process_with_scope("dsl:(cbu.list)", None, None, None))
             .unwrap();
 
         // Should NOT be Ready via bypass — goes through NL pipeline

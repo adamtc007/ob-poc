@@ -130,6 +130,10 @@ pub struct ContextResolutionRequest {
     /// kind are filtered out.
     #[serde(default)]
     pub entity_kind: Option<String>,
+    /// Confidence in the dominant entity-kind signal.
+    /// Low-confidence signals widen the candidate verb set instead of filtering.
+    #[serde(default)]
+    pub entity_confidence: Option<f64>,
     /// Explicit discovery navigation hints captured during Sage bootstrap.
     #[serde(default)]
     pub discovery: DiscoveryContext,
@@ -179,6 +183,9 @@ pub struct ContextResolutionResponse {
     pub security_handling: AccessDecision,
     /// Governance signals (gaps, staleness, unowned objects).
     pub governance_signals: Vec<GovernanceSignal>,
+    /// Verbs pruned specifically because the requested entity kind did not match.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub entity_kind_pruned_verbs: Vec<EntityKindPrunedVerb>,
     /// Overall confidence in the resolution (0.0–1.0).
     pub confidence: f64,
     /// Grounded Sem OS action surface for the resolved subject/slot/node.
@@ -539,6 +546,14 @@ pub struct GovernanceSignal {
     pub related_snapshot_id: Option<Uuid>,
 }
 
+/// A verb pruned because its `subject_kinds` did not include the requested entity kind.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EntityKindPrunedVerb {
+    pub fqn: String,
+    pub verb_kinds: Vec<String>,
+    pub subject_kind: String,
+}
+
 /// Categories of governance signals.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -666,6 +681,24 @@ impl SubjectRelationships {
     }
 }
 
+/// Inputs used to filter and rank candidate verbs during context resolution.
+pub struct VerbFilterContext<'a> {
+    /// Actor context used for ABAC evaluation.
+    pub actor: &'a ActorContext,
+    /// Evidence mode for the current resolution.
+    pub mode: EvidenceMode,
+    /// Highest-ranked view candidate, if available.
+    pub top_view: Option<&'a ViewDefBody>,
+    /// Canonical dominant entity kind inferred for the subject.
+    pub entity_kind: Option<&'a str>,
+    /// Confidence for the dominant entity-kind signal.
+    pub entity_confidence: Option<f64>,
+    /// Taxonomy memberships attached to the subject.
+    pub memberships: &'a SubjectMemberships,
+    /// Relationship metadata attached to the subject.
+    pub relationships: &'a SubjectRelationships,
+}
+
 // ── Pure Scoring / Filtering Functions ────────────────────────
 
 /// Step 3: Rank views by taxonomy overlap with the subject.
@@ -741,14 +774,11 @@ pub fn compute_view_overlap(
 /// Step 5: Filter and rank verbs by taxonomy + ABAC + tier + relationship edge_class.
 pub fn filter_and_rank_verbs(
     verb_rows: &[SnapshotRow],
-    actor: &ActorContext,
-    mode: EvidenceMode,
-    top_view: Option<&ViewDefBody>,
-    entity_kind: Option<&str>,
-    memberships: &SubjectMemberships,
-    relationships: &SubjectRelationships,
-) -> Vec<VerbCandidate> {
+    ctx: VerbFilterContext<'_>,
+) -> (Vec<VerbCandidate>, Vec<EntityKindPrunedVerb>) {
     let mut candidates = Vec::new();
+    let mut entity_kind_pruned = Vec::new();
+    let enforce_entity_kind = ctx.entity_confidence.unwrap_or(1.0) >= 0.5;
 
     for row in verb_rows {
         let body: serde_json::Value = row.definition.clone();
@@ -764,47 +794,71 @@ pub fn filter_and_rank_verbs(
             .to_string();
 
         // Entity-kind applicability filter
-        if let Some(kind) = entity_kind {
-            let subject_kinds: Vec<String> = body
-                .get("subject_kinds")
-                .and_then(|v| serde_json::from_value(v.clone()).ok())
-                .unwrap_or_default();
-            if !subject_kinds.is_empty() && !subject_kinds.iter().any(|sk| sk == kind) {
-                continue;
+        if enforce_entity_kind {
+            if let Some(kind) = ctx.entity_kind {
+                let subject_kinds: Vec<String> = body
+                    .get("subject_kinds")
+                    .and_then(|v| serde_json::from_value(v.clone()).ok())
+                    .unwrap_or_default();
+                let canonical_kind = canonicalize_entity_kind(kind);
+                let canonical_subject_kinds: Vec<String> = subject_kinds
+                    .iter()
+                    .map(|sk| canonicalize_entity_kind(sk))
+                    .collect();
+                if !canonical_subject_kinds.is_empty()
+                    && !canonical_subject_kinds
+                        .iter()
+                        .any(|sk| sk == &canonical_kind)
+                {
+                    entity_kind_pruned.push(EntityKindPrunedVerb {
+                        fqn,
+                        verb_kinds: canonical_subject_kinds,
+                        subject_kind: canonical_kind,
+                    });
+                    continue;
+                }
             }
         }
 
         // Tier/trust filtering based on evidence mode
-        if !tier_allowed(row.governance_tier, row.trust_class, mode, top_view) {
+        if !tier_allowed(row.governance_tier, row.trust_class, ctx.mode, ctx.top_view) {
             continue;
         }
 
         // ABAC check
         let label = row.parse_security_label().unwrap_or_default();
-        let access = evaluate_abac(actor, &label, AccessPurpose::Operations);
-        if !access.is_allowed() && mode != EvidenceMode::Exploratory {
+        let access = evaluate_abac(ctx.actor, &label, AccessPurpose::Operations);
+        if !access.is_allowed() && ctx.mode != EvidenceMode::Exploratory {
             continue;
         }
 
         // Compute rank score from view prominence
-        let mut rank_score = compute_verb_prominence(&fqn, top_view);
+        let mut rank_score = compute_verb_prominence(&fqn, ctx.top_view);
 
         // Boost verbs that explicitly match the entity kind
-        if let Some(kind) = entity_kind {
-            let subject_kinds: Vec<String> = body
-                .get("subject_kinds")
-                .and_then(|v| serde_json::from_value(v.clone()).ok())
-                .unwrap_or_default();
-            if subject_kinds.iter().any(|sk| sk == kind) {
-                rank_score += 0.15;
+        if enforce_entity_kind {
+            if let Some(kind) = ctx.entity_kind {
+                let subject_kinds: Vec<String> = body
+                    .get("subject_kinds")
+                    .and_then(|v| serde_json::from_value(v.clone()).ok())
+                    .unwrap_or_default();
+                let canonical_kind = canonicalize_entity_kind(kind);
+                if subject_kinds
+                    .iter()
+                    .map(|sk| canonicalize_entity_kind(sk))
+                    .any(|sk| sk == canonical_kind)
+                {
+                    rank_score += 0.15;
+                }
             }
         }
 
         // Taxonomy membership filtering
-        if memberships.has_memberships() {
-            let verb_taxonomies = memberships.taxonomy_fqns_for_target(&fqn);
+        if ctx.memberships.has_memberships() {
+            let verb_taxonomies = ctx.memberships.taxonomy_fqns_for_target(&fqn);
             if !verb_taxonomies.is_empty() {
-                let overlap = memberships
+                let overlap = ctx
+                    .memberships
                     .subject_taxonomy_fqns
                     .intersection(&verb_taxonomies)
                     .count();
@@ -816,13 +870,13 @@ pub fn filter_and_rank_verbs(
         }
 
         // D5: Relationship-aware ranking
-        if relationships.has_relationships() {
+        if ctx.relationships.has_relationships() {
             let verb_domain = fqn.split('.').next().unwrap_or("");
-            let rel_domains = relationships.relationship_domains();
+            let rel_domains = ctx.relationships.relationship_domains();
             if rel_domains.contains(verb_domain) {
                 rank_score += 0.08;
             }
-            let edge_classes = relationships.edge_classes();
+            let edge_classes = ctx.relationships.edge_classes();
             if edge_classes.contains(verb_domain) {
                 rank_score += 0.07;
             }
@@ -848,7 +902,26 @@ pub fn filter_and_rank_verbs(
         });
     }
 
-    candidates
+    (candidates, entity_kind_pruned)
+}
+
+fn canonicalize_entity_kind(kind: &str) -> String {
+    let normalized = kind.trim().to_ascii_lowercase();
+    match normalized.as_str() {
+        "kyc_case" | "case" => "kyc-case".to_string(),
+        "client_group" => "client-group".to_string(),
+        "legal-entity" | "legal_entity" | "organization" | "org" => "company".to_string(),
+        "individual" | "natural_person" => "person".to_string(),
+        "client-book" | "client_book" => "client-group".to_string(),
+        "investor-register" | "investor_register" => "investor".to_string(),
+        "investment-fund" | "umbrella" | "sub-fund" | "compartment" => "fund".to_string(),
+        "doc" | "evidence-document" => "document".to_string(),
+        "legal-contract" | "agreement" | "msa" => "contract".to_string(),
+        "mandate" | "trading-mandate" => "trading-profile".to_string(),
+        "deal-record" | "sales-deal" => "deal".to_string(),
+        "client-business-unit" | "structure" | "trading-unit" => "cbu".to_string(),
+        other => other.to_string(),
+    }
 }
 
 /// Compute verb prominence based on the top view.
@@ -1394,6 +1467,7 @@ mod tests {
             evidence_mode: EvidenceMode::Normal,
             point_in_time: None,
             entity_kind: None,
+            entity_confidence: None,
             discovery: DiscoveryContext::default(),
         }
     }

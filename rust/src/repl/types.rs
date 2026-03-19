@@ -51,6 +51,10 @@ pub struct MatchContext {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub domain_hint: Option<String>,
 
+    /// Dominant entity kind when known from prior context or focus.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub entity_kind: Option<String>,
+
     /// Current bindings (symbol -> entity)
     #[serde(default)]
     pub bindings: Vec<(String, Uuid)>,

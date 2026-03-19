@@ -2,6 +2,7 @@
  * ChatMessage - Single message display component
  */
 
+import { useState } from "react";
 import { User, Bot, AlertCircle, CheckCircle, Loader2 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -130,6 +131,54 @@ function CoderProposalCard({ message }: { message: ChatMessageType }) {
   );
 }
 
+function ParkedEntriesCard({ message }: { message: ChatMessageType }) {
+  if (!message.parked_entries || message.parked_entries.length === 0)
+    return null;
+
+  return (
+    <div className="mt-2 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-secondary)] p-3 text-sm">
+      <div className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+        Execution Parked
+      </div>
+      <div className="mt-2 space-y-2">
+        {message.parked_entries.map((entry) => (
+          <div
+            key={entry.step_id}
+            className="rounded border border-[var(--border-primary)] bg-[var(--bg-tertiary)] p-3"
+          >
+            <div className="font-mono text-xs text-[var(--text-primary)]">
+              {entry.verb}
+            </div>
+            <div className="mt-1 text-xs text-[var(--text-secondary)]">
+              reason: {entry.park_reason.replaceAll("_", " ")}
+            </div>
+            {entry.message && (
+              <div className="mt-1 text-xs text-[var(--text-secondary)]">
+                {entry.message}
+              </div>
+            )}
+            {entry.correlation_key && (
+              <div className="mt-1 text-xs text-[var(--text-secondary)]">
+                callback key: {entry.correlation_key}
+              </div>
+            )}
+            {entry.resource && (
+              <div className="mt-1 text-xs text-[var(--text-secondary)]">
+                resource: {entry.resource}
+              </div>
+            )}
+            {entry.gate_entry_id && (
+              <div className="mt-1 text-xs text-[var(--text-secondary)]">
+                gate entry: {entry.gate_entry_id}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function DiscoveryBootstrapCard({
   message,
   onDiscoverySelection,
@@ -138,6 +187,9 @@ function DiscoveryBootstrapCard({
   onDiscoverySelection?: (selection: DiscoverySelection) => void;
 }) {
   const bootstrap = message.discovery_bootstrap;
+  const [questionAnswers, setQuestionAnswers] = useState<
+    Record<string, string>
+  >({});
   if (!bootstrap) return null;
 
   return (
@@ -156,11 +208,51 @@ function DiscoveryBootstrapCard({
           <div className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
             Next Questions
           </div>
-          <ul className="mt-2 list-disc pl-5 text-xs text-[var(--text-secondary)]">
-            {bootstrap.entry_questions.map((item) => (
-              <li key={item.question_id}>{item.prompt}</li>
-            ))}
-          </ul>
+          <div className="mt-2 space-y-3">
+            {bootstrap.entry_questions.map((item) => {
+              const answer = questionAnswers[item.question_id] ?? "";
+              return (
+                <div
+                  key={item.question_id}
+                  className="rounded border border-[var(--border-primary)] bg-[var(--bg-secondary)] p-3"
+                >
+                  <div className="text-xs text-[var(--text-secondary)]">
+                    {item.prompt}
+                  </div>
+                  <div className="mt-2 flex gap-2">
+                    <input
+                      type="text"
+                      value={answer}
+                      placeholder="Type your answer"
+                      className="flex-1 rounded border border-[var(--border-primary)] bg-[var(--bg-primary)] px-2 py-1 text-xs text-[var(--text-primary)] outline-none placeholder:text-[var(--text-muted)]"
+                      onChange={(event) =>
+                        setQuestionAnswers((current) => ({
+                          ...current,
+                          [item.question_id]: event.target.value,
+                        }))
+                      }
+                    />
+                    <button
+                      type="button"
+                      disabled={!answer.trim()}
+                      className="rounded bg-[var(--accent-blue)] px-2 py-1 text-xs text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                      onClick={() =>
+                        onDiscoverySelection?.({
+                          selection_kind: "question_answer",
+                          selection_id: item.question_id,
+                          label: item.prompt,
+                          maps_to: item.maps_to,
+                          value: answer.trim(),
+                        })
+                      }
+                    >
+                      Use Answer
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
@@ -330,6 +422,7 @@ export function ChatMessage({
               message={message}
               onDiscoverySelection={onDiscoverySelection}
             />
+            <ParkedEntriesCard message={message} />
             <CoderProposalCard message={message} />
           </>
         )}

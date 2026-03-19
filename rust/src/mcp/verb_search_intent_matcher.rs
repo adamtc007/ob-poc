@@ -53,6 +53,7 @@ impl IntentMatcher for VerbSearchIntentMatcher {
         // Map MatchContext fields to HybridVerbSearcher params
         let user_id: Option<Uuid> = context.user_id;
         let domain_filter: Option<String> = context.domain_hint.clone();
+        let entity_kind = context.entity_kind.as_deref();
 
         // Run the 10-tier verb search, constrained by SemReg allowed verbs if present
         let results = self
@@ -61,6 +62,7 @@ impl IntentMatcher for VerbSearchIntentMatcher {
                 utterance,
                 user_id,
                 domain_filter.as_deref(),
+                entity_kind,
                 10, // top-k candidates
                 context.allowed_verbs.as_ref(),
             )

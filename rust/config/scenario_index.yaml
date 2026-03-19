@@ -74,6 +74,39 @@ scenarios:
     explain:
       summary: "Irish Collective Asset-management Vehicle (ICAV) UCITS setup"
 
+  # ── Ireland AIF ICAV ───────────────────────────────────────────────────
+  - id: ie-aif-icav-setup
+    title: "Ireland AIF ICAV Setup"
+    modes: [onboarding, structure]
+    requires:
+      all_of: [compound_action, jurisdiction]
+    signals:
+      actions: [onboard, "set up", establish, launch, configure]
+      jurisdictions: [IE]
+      nouns_any: [icav, aif, qiaif, riaif]
+    routes:
+      kind: macro
+      macro_fqn: struct.ie.aif.icav
+    explain:
+      summary: "Irish AIF ICAV setup"
+
+  # ── Ireland Hedge ICAV ─────────────────────────────────────────────────
+  - id: ie-hedge-icav-setup
+    title: "Ireland Hedge ICAV Setup"
+    modes: [onboarding, structure]
+    requires:
+      all_of: [compound_action, jurisdiction]
+    signals:
+      actions: [onboard, "set up", establish, launch, configure]
+      jurisdictions: [IE]
+      nouns_any: [icav, hedge, qiaif]
+      phrases_any: ["hedge icav", "irish hedge fund"]
+    routes:
+      kind: macro
+      macro_fqn: struct.ie.hedge.icav
+    explain:
+      summary: "Irish hedge fund ICAV setup"
+
   # ── UK Authorised OEIC ─────────────────────────────────────────────────
   - id: uk-oeic-setup
     title: "UK Authorised OEIC Setup"
@@ -89,6 +122,88 @@ scenarios:
       macro_fqn: struct.uk.authorised.oeic
     explain:
       summary: "UK Open-Ended Investment Company (OEIC) setup"
+
+  # ── UK Authorised Unit Trust ───────────────────────────────────────────
+  - id: uk-aut-setup
+    title: "UK Authorised Unit Trust Setup"
+    modes: [onboarding, structure]
+    requires:
+      all_of: [compound_action, jurisdiction]
+    signals:
+      actions: [onboard, "set up", establish, launch, configure]
+      jurisdictions: [UK]
+      nouns_any: [aut, "unit trust", authorised]
+    routes:
+      kind: macro
+      macro_fqn: struct.uk.authorised.aut
+    explain:
+      summary: "UK Authorised Unit Trust setup"
+
+  # ── UK Authorised Contractual Scheme ───────────────────────────────────
+  - id: uk-acs-setup
+    title: "UK Authorised Contractual Scheme Setup"
+    modes: [onboarding, structure]
+    requires:
+      all_of: [compound_action, jurisdiction]
+    signals:
+      actions: [onboard, "set up", establish, launch, configure]
+      jurisdictions: [UK]
+      nouns_any: [acs, "contractual scheme", co-ownership]
+    routes:
+      kind: macro
+      macro_fqn: struct.uk.authorised.acs
+    explain:
+      summary: "UK Authorised Contractual Scheme setup"
+
+  # ── UK Long-Term Asset Fund ────────────────────────────────────────────
+  - id: uk-ltaf-setup
+    title: "UK Long-Term Asset Fund Setup"
+    modes: [onboarding, structure]
+    requires:
+      all_of: [compound_action, jurisdiction]
+    signals:
+      actions: [onboard, "set up", establish, launch, configure]
+      jurisdictions: [UK]
+      nouns_any: [ltaf, "long-term asset fund", "long term asset fund"]
+    routes:
+      kind: macro
+      macro_fqn: struct.uk.authorised.ltaf
+    explain:
+      summary: "UK Long-Term Asset Fund setup"
+
+  # ── UK Manager LLP ─────────────────────────────────────────────────────
+  - id: uk-manager-llp-setup
+    title: "UK Manager LLP Setup"
+    modes: [onboarding, structure]
+    requires:
+      all_of: [compound_action, jurisdiction]
+    signals:
+      actions: [onboard, "set up", establish, launch, configure]
+      jurisdictions: [UK]
+      nouns_any: [manager, llp, management]
+      phrases_any: ["manager llp", "management llp"]
+    routes:
+      kind: macro
+      macro_fqn: struct.uk.manager.llp
+    explain:
+      summary: "UK manager LLP setup"
+
+  # ── UK Private Equity LP ───────────────────────────────────────────────
+  - id: uk-private-equity-lp-setup
+    title: "UK Private Equity LP Setup"
+    modes: [onboarding, structure]
+    requires:
+      all_of: [compound_action, jurisdiction]
+    signals:
+      actions: [onboard, "set up", establish, launch, configure]
+      jurisdictions: [UK]
+      nouns_any: ["private equity", pe, lp]
+      phrases_any: ["uk pe fund", "private equity lp"]
+    routes:
+      kind: macro
+      macro_fqn: struct.uk.private-equity.lp
+    explain:
+      summary: "UK private equity LP setup"
 
   # ── US 40-Act Open-End Fund ────────────────────────────────────────────
   - id: us-40act-setup
@@ -106,6 +221,55 @@ scenarios:
     explain:
       summary: "US Investment Company Act of 1940 open-end fund setup"
 
+  # ── US 40-Act Closed-End Fund ──────────────────────────────────────────
+  - id: us-40act-closed-end-setup
+    title: "US 40-Act Closed-End Fund Setup"
+    modes: [onboarding, structure]
+    requires:
+      all_of: [compound_action, jurisdiction]
+    signals:
+      actions: [onboard, "set up", establish, launch, configure]
+      jurisdictions: [US]
+      nouns_any: [fund, "closed-end", "closed end", "40-act", "40 act"]
+    routes:
+      kind: macro
+      macro_fqn: struct.us.40act.closed-end
+    explain:
+      summary: "US Investment Company Act of 1940 closed-end fund setup"
+
+  # ── US 40-Act ETF ──────────────────────────────────────────────────────
+  - id: us-etf-setup
+    title: "US 40-Act ETF Setup"
+    modes: [onboarding, structure]
+    requires:
+      all_of: [compound_action, jurisdiction]
+    signals:
+      actions: [onboard, "set up", establish, launch, configure]
+      jurisdictions: [US]
+      nouns_any: [etf, "exchange traded", "40-act", "40 act"]
+    routes:
+      kind: macro
+      macro_fqn: struct.us.etf.40act
+    explain:
+      summary: "US 40-Act ETF setup"
+
+  # ── US Private Fund Delaware LP ────────────────────────────────────────
+  - id: us-private-fund-delaware-lp-setup
+    title: "US Private Fund Delaware LP Setup"
+    modes: [onboarding, structure]
+    requires:
+      all_of: [compound_action, jurisdiction]
+    signals:
+      actions: [onboard, "set up", establish, launch, configure]
+      jurisdictions: [US]
+      nouns_any: ["private fund", delaware, lp]
+      phrases_any: ["delaware lp", "delaware private fund"]
+    routes:
+      kind: macro
+      macro_fqn: struct.us.private-fund.delaware-lp
+    explain:
+      summary: "US private fund Delaware LP setup"
+
   # ── Jurisdiction Selector (generic onboarding) ─────────────────────────
   - id: generic-fund-onboarding
     title: "Fund Structure Onboarding (by jurisdiction)"
@@ -113,7 +277,8 @@ scenarios:
     requires:
       any_of: [compound_action]
     signals:
-      actions: [onboard, "set up", establish, launch, configure, prepare, initiate]
+      actions:
+        [onboard, "set up", establish, launch, configure, prepare, initiate]
       nouns_any: [fund, structure, vehicle, ucits, sicav, icav, oeic]
     routes:
       kind: macro_selector
@@ -138,8 +303,16 @@ scenarios:
       any_of: [compound_action, multi_noun_workflow]
     signals:
       actions: ["run the", "complete the", "do the", "perform", screen]
-      nouns_any: [screening, "due diligence", aml, pep, sanctions, "adverse media"]
-      phrases_any: ["full screening", "complete screening", "run all checks", "screen this party", "kyc screening"]
+      nouns_any:
+        [screening, "due diligence", aml, pep, sanctions, "adverse media"]
+      phrases_any:
+        [
+          "full screening",
+          "complete screening",
+          "run all checks",
+          "screen this party",
+          "kyc screening",
+        ]
     routes:
       kind: macro
       macro_fqn: screening.full
@@ -155,7 +328,8 @@ scenarios:
     signals:
       actions: [onboard, "run the", "complete the", "do the", configure, review]
       nouns_any: [kyc, "due diligence", compliance, review]
-      phrases_any: ["full kyc", "complete kyc", "kyc review", "run kyc", "do kyc"]
+      phrases_any:
+        ["full kyc", "complete kyc", "kyc review", "run kyc", "do kyc"]
     routes:
       kind: macro
       macro_fqn: kyc.full-review
@@ -170,8 +344,23 @@ scenarios:
       any_of: [compound_action, multi_noun_workflow]
     signals:
       actions: [collect, request, solicit, gather, "get the"]
-      nouns_any: [document, documents, passport, proof, identity, "proof of address", kyc]
-      phrases_any: ["collect documents", "request documents", "gather kyc documents", "get identity documents"]
+      nouns_any:
+        [
+          document,
+          documents,
+          passport,
+          proof,
+          identity,
+          "proof of address",
+          kyc,
+        ]
+      phrases_any:
+        [
+          "collect documents",
+          "request documents",
+          "gather kyc documents",
+          "get identity documents",
+        ]
     routes:
       kind: macro
       macro_fqn: kyc.collect-documents
@@ -187,7 +376,14 @@ scenarios:
     signals:
       actions: [onboard, "run the", "complete the", "do the", "set up"]
       nouns_any: [kyc, onboarding, case, screening, documents, compliance]
-      phrases_any: ["full kyc onboarding", "complete kyc process", "onboard with kyc", "run full kyc process", "kyc case and screening"]
+      phrases_any:
+        [
+          "full kyc onboarding",
+          "complete kyc process",
+          "onboard with kyc",
+          "run full kyc process",
+          "kyc case and screening",
+        ]
     routes:
       kind: macro_sequence
       macros:
@@ -206,7 +402,13 @@ scenarios:
     signals:
       actions: ["open and screen", "create and screen", "set up", "run the"]
       nouns_any: [case, screening, kyc, compliance]
-      phrases_any: ["open case and screen", "case with screening", "kyc case and screening", "new case with full screening"]
+      phrases_any:
+        [
+          "open case and screen",
+          "case with screening",
+          "kyc case and screening",
+          "new case with full screening",
+        ]
     routes:
       kind: macro_sequence
       macros:
@@ -224,7 +426,12 @@ scenarios:
     signals:
       actions: ["open and collect", "create and request", "set up"]
       nouns_any: [case, documents, kyc, identity]
-      phrases_any: ["open case and collect documents", "case with document collection", "new case and request documents"]
+      phrases_any:
+        [
+          "open case and collect documents",
+          "case with document collection",
+          "new case and request documents",
+        ]
     routes:
       kind: macro_sequence
       macros:

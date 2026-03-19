@@ -1,0 +1,116 @@
+fqn: family.trading_mandate
+family_id: trading_mandate
+label: Trading Mandate
+description: Family for selecting the right trading-profile and custody-ready constellation anchor.
+domain_id: trading
+selection_rules:
+  - condition: jurisdiction == 'LU' && structure_type == 'ucits'
+    target_constellation: struct.lux.ucits.sicav
+    priority: 30
+  - condition: jurisdiction == 'LU' && (structure_type == 'raif' || structure_type == 'private-equity')
+    target_constellation: struct.lux.aif.raif
+    priority: 29
+  - condition: jurisdiction == 'IE' && (structure_type == 'ucits' || strategy == 'hedge')
+    target_constellation: struct.ie.ucits.icav
+    priority: 28
+  - condition: jurisdiction == 'UK'
+    target_constellation: struct.uk.authorised.oeic
+    priority: 27
+  - condition: jurisdiction == 'US' && structure_type == 'etf'
+    target_constellation: struct.us.etf.40act
+    priority: 26
+  - condition: jurisdiction == 'US'
+    target_constellation: struct.us.40act.open-end
+    priority: 25
+  - condition: jurisdiction == 'XB'
+    target_constellation: struct.hedge.cross-border
+    priority: 24
+constellation_refs:
+  - constellation_id: struct.lux.ucits.sicav
+    label: Luxembourg UCITS SICAV Mandate
+    jurisdiction: LU
+    entity_kind: fund
+    triggers:
+      - trading
+      - mandate
+      - custody
+      - ssi
+      - luxembourg
+      - ucits
+  - constellation_id: struct.lux.aif.raif
+    label: Luxembourg RAIF Mandate
+    jurisdiction: LU
+    entity_kind: fund
+    triggers:
+      - trading
+      - mandate
+      - raif
+      - aif
+      - settlement
+  - constellation_id: struct.ie.ucits.icav
+    label: Irish ICAV Mandate
+    jurisdiction: IE
+    entity_kind: fund
+    triggers:
+      - trading
+      - mandate
+      - ireland
+      - icav
+      - custody
+  - constellation_id: struct.uk.authorised.oeic
+    label: UK OEIC Mandate
+    jurisdiction: UK
+    entity_kind: fund
+    triggers:
+      - trading
+      - mandate
+      - uk
+      - oeic
+      - settlement
+  - constellation_id: struct.us.40act.open-end
+    label: US 40-Act Open-End Mandate
+    jurisdiction: US
+    entity_kind: fund
+    triggers:
+      - trading
+      - mandate
+      - us
+      - 40-act
+      - custody
+  - constellation_id: struct.us.etf.40act
+    label: US ETF Mandate
+    jurisdiction: US
+    entity_kind: fund
+    triggers:
+      - trading
+      - mandate
+      - etf
+      - booking
+      - ssi
+  - constellation_id: struct.hedge.cross-border
+    label: Cross-Border Hedge Mandate
+    jurisdiction: XB
+    entity_kind: fund
+    triggers:
+      - cross-border
+      - hedge
+      - mandate
+      - isda
+      - settlement
+candidate_jurisdictions:
+  - LU
+  - IE
+  - UK
+  - US
+  - XB
+candidate_entity_kinds:
+  - trading-profile
+  - fund
+  - cbu
+grounding_threshold:
+  required_input_keys:
+    - objective
+    - jurisdiction
+    - entity_kind
+  requires_entity_instance: false
+  allows_draft_instance: true

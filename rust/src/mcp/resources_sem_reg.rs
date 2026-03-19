@@ -253,6 +253,7 @@ async fn read_context(
         evidence_mode: EvidenceMode::Normal,
         point_in_time: None,
         entity_kind: None,
+        entity_confidence: None,
         discovery: DiscoveryContext::default(),
     };
 

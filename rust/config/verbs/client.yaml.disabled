@@ -3,6 +3,10 @@
 # These verbs are available to clients via the client portal.
 # They follow the "read + respond" principle - clients can query their status
 # and submit responses, but cannot directly modify internal state.
+#
+# Disabled in the main runtime surface because this file uses a legacy list-based
+# schema and there are no matching runtime/plugin implementations for its
+# declared handlers.
 
 domain: client
 description: "Client-facing operations for responding to onboarding requests"

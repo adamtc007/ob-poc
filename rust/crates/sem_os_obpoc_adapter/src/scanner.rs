@@ -112,30 +112,7 @@ pub fn verb_config_to_contract(
         phase_tags: m.phase_tags.clone(),
     });
 
-    let subject_kinds = config
-        .metadata
-        .as_ref()
-        .map(|m| m.subject_kinds.clone())
-        .filter(|sk| !sk.is_empty())
-        .unwrap_or_else(|| {
-            // Fallback 1: derive from produces.entity_type
-            if let Some(p) = config.produces.as_ref() {
-                return vec![p.produced_type.clone()];
-            }
-            // Fallback 2: derive from verb domain + required UUID args with entity_type lookups
-            let mut kinds: Vec<String> = config
-                .args
-                .iter()
-                .filter(|a| a.required)
-                .filter_map(|a| a.lookup.as_ref().and_then(|l| l.entity_type.clone()))
-                .collect();
-            kinds.dedup();
-            if !kinds.is_empty() {
-                return kinds;
-            }
-            // Fallback 3: derive from domain name (domain-level heuristic)
-            vec![domain_to_subject_kind(domain)]
-        });
+    let subject_kinds = derive_subject_kinds(domain, config);
 
     let phase_tags = {
         let explicit = config
@@ -654,6 +631,113 @@ fn domain_to_subject_kind(domain: &str) -> String {
     }
 }
 
+fn derive_subject_kinds(domain: &str, config: &VerbConfig) -> Vec<String> {
+    if let Some(ref meta) = config.metadata {
+        if !meta.subject_kinds.is_empty() {
+            return meta
+                .subject_kinds
+                .iter()
+                .map(|kind| canonicalize_entity_kind(kind))
+                .collect();
+        }
+    }
+
+    if let Some(ref produces) = config.produces {
+        return vec![canonicalize_entity_kind(&produces.produced_type)];
+    }
+
+    let mut crud_kinds = derive_subject_kinds_from_crud(config);
+    if !crud_kinds.is_empty() {
+        crud_kinds.sort();
+        crud_kinds.dedup();
+        return crud_kinds;
+    }
+
+    let mut lookup_kinds: Vec<String> = config
+        .args
+        .iter()
+        .filter(|arg| arg.required)
+        .filter_map(|arg| arg.lookup.as_ref())
+        .filter_map(|lookup| {
+            lookup
+                .entity_type
+                .as_deref()
+                .filter(|kind| !is_generic_lookup_kind(kind))
+                .map(canonicalize_entity_kind)
+                .or_else(|| derive_subject_kind_from_table_name(&lookup.table))
+        })
+        .collect();
+    if !lookup_kinds.is_empty() {
+        lookup_kinds.sort();
+        lookup_kinds.dedup();
+        return lookup_kinds;
+    }
+
+    vec![canonicalize_entity_kind(&domain_to_subject_kind(domain))]
+}
+
+fn derive_subject_kinds_from_crud(config: &VerbConfig) -> Vec<String> {
+    let Some(ref crud) = config.crud else {
+        return Vec::new();
+    };
+
+    [
+        crud.table.as_deref(),
+        crud.base_table.as_deref(),
+        crud.extension_table.as_deref(),
+        crud.junction.as_deref(),
+        crud.primary_table.as_deref(),
+        crud.join_table.as_deref(),
+    ]
+    .into_iter()
+    .flatten()
+    .filter_map(derive_subject_kind_from_table_name)
+    .collect()
+}
+
+fn derive_subject_kind_from_table_name(table: &str) -> Option<String> {
+    let normalized = table.trim().to_ascii_lowercase().replace('_', "-");
+    let kind = match normalized.as_str() {
+        "cbu" | "cbus" => "cbu",
+        "entity" | "entities" => "entity",
+        "deal" | "deals" => "deal",
+        "contract" | "contracts" | "contract-pack" | "contract-packs" => "contract",
+        "document" | "documents" | "requirement" | "requirements" => "document",
+        "trading-profile" | "trading-profiles" | "mandate" | "mandates" => "trading-profile",
+        "billing" | "billings" | "billing-profile" | "billing-profiles" => "billing-profile",
+        "fund" | "funds" => "fund",
+        "investor" | "investors" | "holding" | "holdings" => "investor",
+        _ => return None,
+    };
+    Some(canonicalize_entity_kind(kind))
+}
+
+fn is_generic_lookup_kind(kind: &str) -> bool {
+    matches!(
+        canonicalize_entity_kind(kind).as_str(),
+        "jurisdiction" | "country" | "currency" | "role" | "status" | "market" | "user" | "team"
+    )
+}
+
+fn canonicalize_entity_kind(kind: &str) -> String {
+    let normalized = kind.trim().to_ascii_lowercase();
+    match normalized.as_str() {
+        "kyc_case" | "case" => "kyc-case".to_string(),
+        "client_group" => "client-group".to_string(),
+        "legal-entity" | "legal_entity" | "organization" | "org" => "company".to_string(),
+        "individual" | "natural_person" => "person".to_string(),
+        "client-book" | "client_book" => "client-group".to_string(),
+        "investor-register" | "investor_register" => "investor".to_string(),
+        "investment-fund" | "umbrella" | "sub-fund" | "compartment" => "fund".to_string(),
+        "doc" | "evidence-document" => "document".to_string(),
+        "legal-contract" | "agreement" | "msa" => "contract".to_string(),
+        "mandate" | "trading-mandate" => "trading-profile".to_string(),
+        "deal-record" | "sales-deal" => "deal".to_string(),
+        "client-business-unit" | "structure" | "trading-unit" => "cbu".to_string(),
+        other => other.to_string(),
+    }
+}
+
 pub fn arg_type_to_attribute_type(arg: &ArgConfig) -> AttributeDataType {
     match to_wire_str(&arg.arg_type).as_str() {
         "string" => AttributeDataType::String,
@@ -896,10 +980,45 @@ mod tests {
         let mut config = sample_verb_config();
         config.produces = None;
         config.metadata = None;
-        // arg[1] has lookup.entity_type = Some("jurisdiction")
+        // arg[1] has lookup.entity_type = Some("jurisdiction"), which is treated
+        // as generic reference data, so this should fall back to the domain kind.
         let contract = verb_config_to_contract("cbu", "lookup-verb", &config);
-        // Falls through produces (None) → required args with entity_type lookups
-        assert!(contract.subject_kinds.contains(&"jurisdiction".to_string()));
+        assert_eq!(contract.subject_kinds, vec!["cbu".to_string()]);
+    }
+
+    #[test]
+    fn test_subject_kinds_from_crud_table() {
+        let mut config = sample_verb_config();
+        config.produces = None;
+        config.metadata = None;
+        config.crud = Some(CrudConfig {
+            operation: CrudOperation::Insert,
+            table: Some("documents".into()),
+            schema: Some("ob-poc".into()),
+            key: None,
+            returning: None,
+            conflict_keys: None,
+            conflict_constraint: None,
+            junction: None,
+            from_col: None,
+            to_col: None,
+            role_table: None,
+            role_col: None,
+            fk_col: None,
+            filter_col: None,
+            primary_table: None,
+            join_table: None,
+            join_col: None,
+            base_table: None,
+            extension_table: None,
+            order_by: None,
+            set_values: None,
+            extension_table_column: None,
+            type_id_column: None,
+            type_code: None,
+        });
+        let contract = verb_config_to_contract("research", "store-document", &config);
+        assert_eq!(contract.subject_kinds, vec!["document".to_string()]);
     }
 
     #[test]

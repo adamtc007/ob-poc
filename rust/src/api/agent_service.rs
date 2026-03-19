@@ -105,7 +105,6 @@ use crate::agent::learning::embedder::CandleEmbedder;
 use crate::api::client_group_adapter::ClientGroupEmbedderAdapter;
 
 use crate::api::session::DisambiguationRequest;
-use crate::domain_ops::CustomOperationRegistry;
 use crate::dsl_v2::ast::AstNode;
 use crate::dsl_v2::gateway_resolver::{gateway_addr, GatewayRefResolver};
 use crate::dsl_v2::macros::{load_macro_registry_from_dir, MacroRegistry};
@@ -119,14 +118,6 @@ use crate::mcp::noun_index::NounIndex;
 use crate::mcp::scenario_index::ScenarioIndex;
 use crate::mcp::verb_search_factory::VerbSearcherFactory;
 use crate::sage::SageEngine;
-use crate::semtaxonomy::{
-    extract_entity_candidates, hydrate_sage_session, DomainStateSummary, EntityCandidate,
-    EntityRef as SemtaxEntityRef, IntentHint, SageSession as SemtaxSession, VerbSurfaceEntry,
-};
-use crate::semtaxonomy_v2::{
-    build_generic_state, introduces_entity_reference, step1_entity_scope, step2_entity_state,
-    step3_select_verb, EntityScope, EntityScopeOutcome, EntitySource,
-};
 #[cfg(not(feature = "runbook-gate-vnext"))]
 use crate::session::SessionScope;
 use crate::session::{SessionEvent, SessionState, UnifiedSession, UnresolvedRefInfo};
@@ -152,10 +143,6 @@ pub struct EntityLookup {
 #[cfg(test)]
 mod tests {
     use super::AgentService;
-    use crate::semtaxonomy::EntityCandidate;
-    use crate::semtaxonomy_v2::{step1_entity_scope, EntityScopeOutcome};
-    use crate::session::UnifiedSession;
-    use uuid::Uuid;
 
     #[test]
     fn read_only_pivot_detection_catches_show_queries() {
@@ -197,126 +184,35 @@ mod tests {
     }
 
     #[test]
-    fn relationship_relevant_detects_ownership_queries() {
-        assert!(AgentService::relationship_relevant("who owns this?"));
-        assert!(AgentService::relationship_relevant(
-            "show me the relationship between Allianz and Deutsche Bank"
-        ));
-        assert!(!AgentService::relationship_relevant("show me the cbus"));
-    }
-
-    #[test]
-    fn signal_driven_domains_from_active_deal() {
-        let state = serde_json::json!({
-            "signals": {
-                "has_active_deal": true,
-                "has_active_onboarding": false,
-                "has_active_kyc": false,
-                "has_incomplete_ubo": false,
-                "has_pending_documentation": false
-            }
-        });
-        let domains = AgentService::signal_driven_domains(Some(&state));
-        assert!(domains.contains(&"deal".to_string()));
-    }
-
-    #[test]
-    fn signal_driven_domains_from_incomplete_ubo() {
-        let state = serde_json::json!({
-            "signals": {
-                "has_active_deal": false,
-                "has_active_onboarding": false,
-                "has_active_kyc": false,
-                "has_incomplete_ubo": true,
-                "has_pending_documentation": false
-            }
-        });
-        let domains = AgentService::signal_driven_domains(Some(&state));
-        assert!(domains.contains(&"ubo".to_string()));
-        assert!(domains.contains(&"ownership".to_string()));
-    }
-
-    #[test]
-    fn signal_driven_domains_empty_for_stale_entity() {
-        let state = serde_json::json!({
-            "signals": {
-                "has_active_deal": false,
-                "has_active_onboarding": false,
-                "has_active_kyc": false,
-                "has_incomplete_ubo": false,
-                "has_pending_documentation": false,
-                "stale": true
-            }
-        });
-        let domains = AgentService::signal_driven_domains(Some(&state));
-        assert!(domains.is_empty());
-    }
-
-    #[test]
-    fn lifecycle_populated_entity_preferred_over_hollow() {
-        let hollow = EntityCandidate {
-            entity_id: Uuid::now_v7(),
-            entity_type: "entity".to_string(),
-            name: "Allianz Holdings".to_string(),
-            match_score: 0.91,
-            match_field: Some("name".to_string()),
-            summary: None,
-            source_kind: Some("db_search".to_string()),
-            linked_cbu_ids: Vec::new(),
-            is_onboarding_member: false,
-            candidate_for_cbu: true,
-            lifecycle_populated: false,
-            linked_entity_count: 0,
-            has_active_workflow: false,
-        };
-        let rich = EntityCandidate {
-            entity_id: Uuid::now_v7(),
-            entity_type: "cbu".to_string(),
-            name: "Allianz Holdings".to_string(),
-            match_score: 0.89,
-            match_field: Some("name".to_string()),
-            summary: None,
-            source_kind: Some("db_search".to_string()),
-            linked_cbu_ids: vec![Uuid::now_v7()],
-            is_onboarding_member: true,
-            candidate_for_cbu: false,
-            lifecycle_populated: true,
-            linked_entity_count: 3,
-            has_active_workflow: true,
-        };
-
-        let outcome = step1_entity_scope("show me Allianz", None, &[hollow, rich.clone()]);
-        match outcome {
-            EntityScopeOutcome::Resolved(selected) => {
-                assert_eq!(selected.entity_id, rich.entity_id)
-            }
-            other => panic!("expected resolved outcome, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn infer_discovery_domains_includes_entity_for_company() {
-        let session = UnifiedSession::new();
-        let domains = AgentService::infer_discovery_domains(&session, "add a new company");
-        assert!(domains.contains(&"entity".to_string()));
-    }
-
-    #[test]
-    fn infer_discovery_domains_includes_entity_for_person() {
-        let session = UnifiedSession::new();
-        let domains =
-            AgentService::infer_discovery_domains(&session, "register John Smith as a person");
-        assert!(domains.contains(&"entity".to_string()));
-    }
-
-    #[test]
-    fn infer_discovery_domains_includes_entity_for_trust() {
-        let session = UnifiedSession::new();
-        let domains = AgentService::infer_discovery_domains(
-            &session,
-            "add a trust -- Cayman Islands discretionary trust",
+    fn static_guard_no_alternate_semtaxonomy_path_symbols() {
+        let source = std::fs::read_to_string(file!()).expect("agent_service source should read");
+        assert!(
+            !source.contains("fn semtaxonomy_enabled("),
+            "semtaxonomy_enabled should remain deleted"
         );
-        assert!(domains.contains(&"entity".to_string()));
+        assert!(
+            !source.contains("fn try_semtaxonomy_path("),
+            "try_semtaxonomy_path should remain deleted"
+        );
+        assert!(
+            !source.contains("build_semtaxonomy_pending_mutation("),
+            "build_semtaxonomy_pending_mutation should remain deleted"
+        );
+        assert!(
+            !source.contains("SEMTAXONOMY_ENABLED"),
+            "SEMTAXONOMY_ENABLED should not gate agent_service behavior"
+        );
+    }
+
+    #[test]
+    fn static_guard_process_chat_routes_freeform_utterances_to_orchestrator() {
+        let source = std::fs::read_to_string(file!()).expect("agent_service source should read");
+        assert!(
+            source.contains(
+                "crate::agent::orchestrator::handle_utterance(&orch_ctx, &request.message)"
+            ),
+            "process_chat should route free-form utterances through orchestrator::handle_utterance"
+        );
     }
 }
 
@@ -383,6 +279,9 @@ pub struct AgentChatResponse {
     /// Typed Sem OS discovery/bootstrap payload for onboarding-stage sessions.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub discovery_bootstrap: Option<ob_poc_types::chat::DiscoveryBootstrapPayload>,
+    /// Typed parked-runbook payload for long-running or gated execution.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parked_entries: Option<Vec<ob_poc_types::chat::ParkedEntryPayload>>,
 }
 
 // Re-export AgentCommand from ob_poc_types as the single source of truth
@@ -495,1371 +394,6 @@ pub struct AgentService {
 }
 
 impl AgentService {
-    fn push_discovery_domain(domains: &mut Vec<String>, domain: &str) {
-        if !domains.iter().any(|existing| existing == domain) {
-            domains.push(domain.to_string());
-        }
-    }
-
-    fn semtaxonomy_enabled() -> bool {
-        !matches!(
-            std::env::var("SEMTAXONOMY_ENABLED").ok().as_deref(),
-            Some("0" | "false" | "FALSE" | "no" | "NO")
-        )
-    }
-
-    fn classify_action(input: &str) -> Option<&'static str> {
-        let lower = input.to_ascii_lowercase();
-
-        if ["delete", "remove", "drop", "destroy", "kill", "purge"]
-            .iter()
-            .any(|needle| lower.contains(needle))
-        {
-            return Some("delete");
-        }
-        if [
-            "create", "add", "new", "register", "set up", "spin up", "open", "onboard",
-        ]
-        .iter()
-        .any(|needle| lower.contains(needle))
-        {
-            return Some("create");
-        }
-        if [
-            "update", "change", "modify", "edit", "rename", "set ", "amend", "correct",
-        ]
-        .iter()
-        .any(|needle| lower.contains(needle))
-        {
-            return Some("update");
-        }
-        if ["reject", "deny", "decline", "refuse"]
-            .iter()
-            .any(|needle| lower.contains(needle))
-        {
-            return Some("reject");
-        }
-        if ["verify", "approve", "confirm", "accept", "validate"]
-            .iter()
-            .any(|needle| lower.contains(needle))
-        {
-            return Some("verify");
-        }
-        let read_only = [
-            "show", "list", "what", "which", "read", "view", "inspect", "describe", "display",
-            "tell", "who", "where",
-        ]
-        .iter()
-        .any(|needle| lower.contains(needle));
-        let write_intent = [
-            "create", "add", "update", "change", "delete", "remove", "assign", "set", "open",
-            "run", "check", "verify", "approve", "reject", "complete", "close", "rename", "amend",
-            "register", "onboard", "spin up",
-        ]
-        .iter()
-        .any(|needle| lower.contains(needle));
-        if read_only && !write_intent {
-            return Some("read");
-        }
-
-        None
-    }
-
-    fn infer_discovery_domains(session: &UnifiedSession, message: &str) -> Vec<String> {
-        let normalized = message.to_ascii_lowercase();
-        let mut domains = Vec::new();
-
-        if normalized.contains("deal")
-            || normalized.contains("mandate")
-            || normalized.contains("rate card")
-        {
-            Self::push_discovery_domain(&mut domains, "deal");
-        }
-        if normalized.contains("cbu")
-            || normalized.contains("client onboarding")
-            || normalized.contains("onboard")
-            || normalized.contains("client ")
-        {
-            Self::push_discovery_domain(&mut domains, "cbu");
-        }
-        if normalized.contains("document")
-            || normalized.contains("doc pack")
-            || normalized.contains("evidence")
-        {
-            Self::push_discovery_domain(&mut domains, "document");
-        }
-        if normalized.contains("ubo")
-            || normalized.contains("ownership")
-            || normalized.contains("beneficial owner")
-            || normalized.contains("who owns")
-            || normalized.contains("who controls")
-        {
-            Self::push_discovery_domain(&mut domains, "ubo");
-            Self::push_discovery_domain(&mut domains, "ownership");
-        }
-        if normalized.contains("relationship") || normalized.contains("graph") {
-            Self::push_discovery_domain(&mut domains, "entity");
-        }
-        if normalized.contains("entity")
-            || normalized.contains("legal entity")
-            || normalized.contains("company")
-            || normalized.contains("person")
-            || normalized.contains("individual")
-            || normalized.contains("trust")
-            || normalized.contains("partnership")
-            || normalized.contains("register")
-            || normalized.contains("placeholder")
-            || (normalized.contains("add")
-                && (normalized.contains("company")
-                    || normalized.contains("person")
-                    || normalized.contains("trust")
-                    || normalized.contains("limited")))
-        {
-            Self::push_discovery_domain(&mut domains, "entity");
-        }
-        if normalized.contains("screening")
-            || normalized.contains("sanctions")
-            || normalized.contains("pep")
-            || normalized.contains("adverse media")
-        {
-            Self::push_discovery_domain(&mut domains, "screening");
-        }
-        if normalized.contains("fund")
-            || normalized.contains("subfund")
-            || normalized.contains("share class")
-            || normalized.contains("umbrella")
-        {
-            Self::push_discovery_domain(&mut domains, "fund");
-            if normalized.contains("structure")
-                || normalized.contains("subfund")
-                || normalized.contains("share class")
-            {
-                Self::push_discovery_domain(&mut domains, "struct");
-            }
-        }
-        if normalized.contains("case") {
-            Self::push_discovery_domain(&mut domains, "case");
-        }
-        if normalized.contains("kyc") {
-            Self::push_discovery_domain(&mut domains, "kyc");
-        }
-        if normalized.contains("group") || normalized.contains("party") {
-            Self::push_discovery_domain(&mut domains, "client-group");
-        }
-        if normalized == "undo" || normalized.contains("session") || normalized.contains("resume") {
-            Self::push_discovery_domain(&mut domains, "session");
-        }
-
-        if domains.is_empty() {
-            if let Some(stage_focus) = session.context.stage_focus.as_deref() {
-                match stage_focus {
-                    "semos-data-management" | "semos-data" => {
-                        Self::push_discovery_domain(&mut domains, "deal")
-                    }
-                    "semos-kyc" => Self::push_discovery_domain(&mut domains, "kyc"),
-                    "semos-onboarding" => Self::push_discovery_domain(&mut domains, "cbu"),
-                    "semos-stewardship" => Self::push_discovery_domain(&mut domains, "registry"),
-                    _ => {}
-                }
-            }
-        }
-
-        if let Some(state) = session.semtaxonomy_session.as_ref() {
-            if let Some(domain_scope) = state.domain_scope.as_ref() {
-                Self::push_discovery_domain(&mut domains, domain_scope);
-            }
-        }
-
-        domains
-    }
-
-    fn parse_entity_candidates(payload: &serde_json::Value) -> Vec<EntityCandidate> {
-        payload["results"]
-            .as_array()
-            .cloned()
-            .unwrap_or_default()
-            .into_iter()
-            .filter_map(|item| {
-                let entity_id = item["entity_id"]
-                    .as_str()
-                    .and_then(|raw| Uuid::parse_str(raw).ok())?;
-                Some(EntityCandidate {
-                    entity_id,
-                    entity_type: item["entity_type"].as_str().unwrap_or("entity").to_string(),
-                    name: item["name"].as_str().unwrap_or("unknown").to_string(),
-                    match_score: item["match_score"].as_f64().unwrap_or_default(),
-                    match_field: item["match_field"].as_str().map(str::to_string),
-                    summary: item.get("summary").cloned(),
-                    source_kind: item["source_kind"].as_str().map(str::to_string),
-                    linked_cbu_ids: item["linked_cbu_ids"]
-                        .as_array()
-                        .cloned()
-                        .unwrap_or_default()
-                        .into_iter()
-                        .filter_map(|value| {
-                            value.as_str().and_then(|raw| Uuid::parse_str(raw).ok())
-                        })
-                        .collect(),
-                    is_onboarding_member: item["is_onboarding_member"].as_bool().unwrap_or(false),
-                    candidate_for_cbu: item["candidate_for_cbu"].as_bool().unwrap_or(false),
-                    lifecycle_populated: item["lifecycle_populated"].as_bool().unwrap_or(false),
-                    linked_entity_count: item["linked_entity_count"]
-                        .as_u64()
-                        .map(|value| value as usize)
-                        .unwrap_or(0),
-                    has_active_workflow: item["has_active_workflow"].as_bool().unwrap_or(false),
-                })
-            })
-            .collect()
-    }
-
-    fn is_vague_status_utterance(request: &str) -> bool {
-        let normalized = request.trim().to_ascii_lowercase();
-        [
-            "what is the status",
-            "what's the status",
-            "status",
-            "where are we",
-            "where do we stand",
-            "what now",
-            "what next",
-            "next step",
-            "next steps",
-            "move forward",
-        ]
-        .iter()
-        .any(|needle| normalized == *needle || normalized.contains(needle))
-    }
-
-    fn signal_driven_domains(entity_state: Option<&serde_json::Value>) -> Vec<String> {
-        let mut domains = Vec::new();
-        let Some(signals) = entity_state
-            .and_then(|state| state.get("signals"))
-            .and_then(serde_json::Value::as_object)
-        else {
-            return domains;
-        };
-
-        if signals
-            .get("has_active_deal")
-            .and_then(serde_json::Value::as_bool)
-            .unwrap_or(false)
-        {
-            Self::push_discovery_domain(&mut domains, "deal");
-        }
-        if signals
-            .get("has_active_onboarding")
-            .and_then(serde_json::Value::as_bool)
-            .unwrap_or(false)
-        {
-            Self::push_discovery_domain(&mut domains, "cbu");
-        }
-        if signals
-            .get("has_active_kyc")
-            .and_then(serde_json::Value::as_bool)
-            .unwrap_or(false)
-        {
-            Self::push_discovery_domain(&mut domains, "kyc");
-            Self::push_discovery_domain(&mut domains, "case");
-        }
-        if signals
-            .get("has_pending_documentation")
-            .and_then(serde_json::Value::as_bool)
-            .unwrap_or(false)
-        {
-            Self::push_discovery_domain(&mut domains, "document");
-        }
-        if signals
-            .get("has_incomplete_ubo")
-            .and_then(serde_json::Value::as_bool)
-            .unwrap_or(false)
-        {
-            Self::push_discovery_domain(&mut domains, "ubo");
-            Self::push_discovery_domain(&mut domains, "ownership");
-        }
-        domains
-    }
-
-    fn build_domain_state_summaries(
-        entity_state: Option<&serde_json::Value>,
-        domains: &[String],
-    ) -> Vec<DomainStateSummary> {
-        let activities = entity_state
-            .and_then(|state| state.get("activities"))
-            .and_then(serde_json::Value::as_array)
-            .cloned()
-            .unwrap_or_default();
-        let signals = entity_state
-            .and_then(|state| state.get("signals"))
-            .cloned()
-            .unwrap_or_else(|| serde_json::json!({}));
-
-        domains
-            .iter()
-            .map(|domain| {
-                let mut active_count = 0usize;
-                let mut blocked_count = 0usize;
-                let mut notable_gaps = Vec::new();
-                for activity in &activities {
-                    let activity_domain = activity["domain"].as_str().unwrap_or_default();
-                    if activity_domain.eq_ignore_ascii_case(domain) {
-                        active_count += 1;
-                        if activity["status"].as_str() == Some("blocked") {
-                            blocked_count += 1;
-                        }
-                    }
-                }
-                match domain.as_str() {
-                    "deal" if signals["has_active_deal"].as_bool().unwrap_or(false) => {
-                        active_count += 1
-                    }
-                    "kyc" if signals["has_active_kyc"].as_bool().unwrap_or(false) => {
-                        active_count += 1
-                    }
-                    "document"
-                        if signals["has_pending_documentation"]
-                            .as_bool()
-                            .unwrap_or(false) =>
-                    {
-                        notable_gaps.push("pending_documentation".to_string())
-                    }
-                    "ubo" | "ownership"
-                        if signals["has_incomplete_ubo"].as_bool().unwrap_or(false) =>
-                    {
-                        notable_gaps.push("incomplete_ubo".to_string())
-                    }
-                    _ => {}
-                }
-                let next_action_candidates = match domain.as_str() {
-                    "document" if blocked_count > 0 || active_count > 0 => {
-                        vec!["document.list-requests-by-workstream".to_string()]
-                    }
-                    "screening" if active_count > 0 || blocked_count > 0 => {
-                        vec!["screening.sanctions".to_string()]
-                    }
-                    "kyc" if active_count > 0 => vec!["case.list".to_string()],
-                    "ubo" | "ownership" if !notable_gaps.is_empty() => {
-                        vec![
-                            "ubo.list-owners".to_string(),
-                            "ubo.trace-chains".to_string(),
-                        ]
-                    }
-                    "deal" if active_count > 0 => {
-                        vec!["deal.list".to_string(), "deal.read-timeline".to_string()]
-                    }
-                    "cbu" if active_count > 0 || domain == "cbu" => {
-                        vec![
-                            "cbu.list".to_string(),
-                            "cbu.create".to_string(),
-                            "cbu.parties".to_string(),
-                        ]
-                    }
-                    _ => Vec::new(),
-                };
-                DomainStateSummary {
-                    domain: domain.clone(),
-                    active_count,
-                    blocked_count,
-                    notable_gaps,
-                    next_action_candidates,
-                }
-            })
-            .collect()
-    }
-
-    fn merge_entity_candidates(mut candidates: Vec<EntityCandidate>) -> Vec<EntityCandidate> {
-        candidates.sort_by(|left, right| {
-            right
-                .has_active_workflow
-                .cmp(&left.has_active_workflow)
-                .then(right.lifecycle_populated.cmp(&left.lifecycle_populated))
-                .then(right.linked_entity_count.cmp(&left.linked_entity_count))
-                .then(
-                    right
-                        .match_score
-                        .partial_cmp(&left.match_score)
-                        .unwrap_or(std::cmp::Ordering::Equal),
-                )
-                .then(left.name.cmp(&right.name))
-        });
-        candidates.dedup_by(|left, right| left.entity_id == right.entity_id);
-        candidates
-    }
-
-    fn make_synthetic_arg(
-        key: &str,
-        value: serde_json::Value,
-    ) -> Result<crate::dsl_v2::Argument, String> {
-        use crate::dsl_v2::{AstNode, Literal, Span};
-
-        fn node_from_json(value: serde_json::Value) -> Result<AstNode, String> {
-            Ok(match value {
-                serde_json::Value::String(s) => {
-                    if let Ok(uuid) = uuid::Uuid::parse_str(&s) {
-                        AstNode::Literal(Literal::Uuid(uuid), Span::synthetic())
-                    } else {
-                        AstNode::Literal(Literal::String(s), Span::synthetic())
-                    }
-                }
-                serde_json::Value::Bool(b) => {
-                    AstNode::Literal(Literal::Boolean(b), Span::synthetic())
-                }
-                serde_json::Value::Number(n) => {
-                    if let Some(i) = n.as_i64() {
-                        AstNode::Literal(Literal::Integer(i), Span::synthetic())
-                    } else if let Some(f) = n.as_f64() {
-                        let dec = rust_decimal::Decimal::from_f64_retain(f)
-                            .ok_or_else(|| "Invalid decimal literal".to_string())?;
-                        AstNode::Literal(Literal::Decimal(dec), Span::synthetic())
-                    } else {
-                        return Err("Unsupported numeric argument".to_string());
-                    }
-                }
-                serde_json::Value::Array(items) => AstNode::List {
-                    items: items
-                        .into_iter()
-                        .map(node_from_json)
-                        .collect::<Result<Vec<_>, _>>()?,
-                    span: Span::synthetic(),
-                },
-                serde_json::Value::Null => {
-                    AstNode::Literal(Literal::String(String::new()), Span::synthetic())
-                }
-                serde_json::Value::Object(_) => {
-                    return Err(
-                        "Object args are not yet supported in SemTaxonomy synthetic calls"
-                            .to_string(),
-                    );
-                }
-            })
-        }
-
-        Ok(crate::dsl_v2::Argument {
-            key: key.to_string(),
-            value: node_from_json(value)?,
-            span: crate::dsl_v2::Span::synthetic(),
-        })
-    }
-
-    async fn run_discovery_op(
-        &self,
-        domain: &str,
-        verb: &str,
-        args: Vec<(&str, serde_json::Value)>,
-    ) -> Result<serde_json::Value, String> {
-        let registry = CustomOperationRegistry::new();
-        let op = registry
-            .get(domain, verb)
-            .ok_or_else(|| format!("SemTaxonomy op not registered: {}.{}", domain, verb))?;
-        let arguments = args
-            .into_iter()
-            .map(|(k, v)| Self::make_synthetic_arg(k, v))
-            .collect::<Result<Vec<_>, _>>()?;
-        let call = crate::dsl_v2::VerbCall {
-            domain: domain.to_string(),
-            verb: verb.to_string(),
-            arguments,
-            binding: None,
-            span: crate::dsl_v2::Span::synthetic(),
-        };
-        let mut exec_ctx = crate::dsl_v2::ExecutionContext::new();
-        let result = op
-            .execute(&call, &mut exec_ctx, &self.pool)
-            .await
-            .map_err(|e| e.to_string())?;
-
-        match result {
-            crate::dsl_v2::ExecutionResult::Record(record) => Ok(record),
-            crate::dsl_v2::ExecutionResult::RecordSet(records) => {
-                Ok(serde_json::json!({ "results": records }))
-            }
-            other => Ok(serde_json::json!({ "result_kind": format!("{:?}", other) })),
-        }
-    }
-
-    async fn try_semtaxonomy_path(
-        &self,
-        session: &mut UnifiedSession,
-        request: &ChatRequest,
-        dominant_entity_id: Option<Uuid>,
-        resolved_kinds: &[String],
-    ) -> Result<Option<AgentChatResponse>, String> {
-        tracing::info!(
-            semtaxonomy_enabled = Self::semtaxonomy_enabled(),
-            session_id = %session.id,
-            message = %request.message,
-            "try_semtaxonomy_path invoked"
-        );
-        if !Self::semtaxonomy_enabled() {
-            return Ok(None);
-        }
-
-        let extracted_names = extract_entity_candidates(&request.message);
-        let mut state = session
-            .semtaxonomy_session
-            .clone()
-            .unwrap_or_else(|| SemtaxSession {
-                session_id: session.id,
-                started_at: chrono::Utc::now(),
-                ..Default::default()
-            });
-        state.utterance_history.push(request.message.clone());
-        if state.utterance_history.len() > 20 {
-            let keep_from = state.utterance_history.len() - 20;
-            state.utterance_history.drain(0..keep_from);
-        }
-
-        let inferred_domains = Self::infer_discovery_domains(session, &request.message);
-        let domain_scope = inferred_domains.first().cloned();
-        let active_entity_id = if extracted_names.is_empty() {
-            dominant_entity_id
-                .or(session.context.dominant_entity_id)
-                .or_else(|| state.active_entity.as_ref().map(|entity| entity.entity_id))
-        } else {
-            None
-        };
-
-        let previous_active = state.active_entity.clone();
-        let (
-            cascade_result,
-            entity_candidates,
-            active_entity,
-            entity_state,
-            intent_hints,
-            grounding_strategy,
-            grounding_confidence,
-        ) = if let Some(entity_id) = active_entity_id {
-            let context = self
-                .run_discovery_op(
-                    "discovery",
-                    "entity-context",
-                    vec![("entity-id", serde_json::json!(entity_id))],
-                )
-                .await?;
-            let active_entity = Some(SemtaxEntityRef {
-                entity_id,
-                entity_type: context["entity_type"]
-                    .as_str()
-                    .unwrap_or("entity")
-                    .to_string(),
-                name: context["name"].as_str().unwrap_or("unknown").to_string(),
-            });
-            let hints = vec![IntentHint {
-                intent: "grounded-entity-context".to_string(),
-                confidence: "high".to_string(),
-                reason: "Existing entity context was available for this turn".to_string(),
-            }];
-            let entity_candidates = active_entity
-                .as_ref()
-                .map(|entity| {
-                    vec![EntityCandidate {
-                        entity_id: entity.entity_id,
-                        entity_type: entity.entity_type.clone(),
-                        name: entity.name.clone(),
-                        match_score: 1.0,
-                        match_field: Some("session_scope".to_string()),
-                        summary: None,
-                        source_kind: Some("session_scope".to_string()),
-                        linked_cbu_ids: Vec::new(),
-                        is_onboarding_member: entity.entity_type.eq_ignore_ascii_case("cbu"),
-                        candidate_for_cbu: !entity.entity_type.eq_ignore_ascii_case("cbu"),
-                        lifecycle_populated: true,
-                        linked_entity_count: 0,
-                        has_active_workflow: true,
-                    }]
-                })
-                .unwrap_or_default();
-            (
-                None,
-                entity_candidates,
-                active_entity,
-                Some(context),
-                hints,
-                Some("existing_scope".to_string()),
-                Some("high".to_string()),
-            )
-        } else {
-            let search_queries = if extracted_names.is_empty() {
-                vec![request.message.clone()]
-            } else {
-                extracted_names.clone()
-            };
-            let mut merged_candidates = Vec::new();
-            let mut first_search_payload = None;
-            for query in &search_queries {
-                let search = self
-                    .run_discovery_op(
-                        "discovery",
-                        "search-entities",
-                        vec![
-                            ("query", serde_json::json!(query)),
-                            ("entity-types", serde_json::json!(resolved_kinds)),
-                        ],
-                    )
-                    .await?;
-                if first_search_payload.is_none() {
-                    first_search_payload = Some(search.clone());
-                }
-                merged_candidates.extend(Self::parse_entity_candidates(&search));
-            }
-            if merged_candidates.is_empty() && !extracted_names.is_empty() {
-                let fallback = self
-                    .run_discovery_op(
-                        "discovery",
-                        "search-entities",
-                        vec![
-                            ("query", serde_json::json!(request.message.clone())),
-                            ("entity-types", serde_json::json!(resolved_kinds)),
-                        ],
-                    )
-                    .await?;
-                if first_search_payload.is_none() {
-                    first_search_payload = Some(fallback.clone());
-                }
-                merged_candidates.extend(Self::parse_entity_candidates(&fallback));
-            }
-            let search =
-                first_search_payload.unwrap_or_else(|| serde_json::json!({ "results": [] }));
-            let mut entity_candidates = Self::merge_entity_candidates(merged_candidates);
-            let mut cascade_result = None;
-            if entity_candidates.len() > 1 || domain_scope.is_none() {
-                let include_relationships = Self::relationship_relevant(&request.message);
-                let cascade_query = extracted_names
-                    .first()
-                    .cloned()
-                    .unwrap_or_else(|| request.message.clone());
-                if let Ok(cascade) = self
-                    .run_discovery_op(
-                        "discovery",
-                        "cascade-research",
-                        vec![
-                            ("query", serde_json::json!(cascade_query)),
-                            ("top-n", serde_json::json!(3)),
-                            (
-                                "include-relationships",
-                                serde_json::json!(include_relationships),
-                            ),
-                        ],
-                    )
-                    .await
-                {
-                    if let Some(entities) = cascade["entities"].as_array() {
-                        entity_candidates = entities
-                            .iter()
-                            .filter_map(|item| {
-                                let entity_id = item["entity_id"]
-                                    .as_str()
-                                    .and_then(|raw| Uuid::parse_str(raw).ok())?;
-                                Some(EntityCandidate {
-                                    entity_id,
-                                    entity_type: item["entity_type"]
-                                        .as_str()
-                                        .unwrap_or("entity")
-                                        .to_string(),
-                                    name: item["name"].as_str().unwrap_or("unknown").to_string(),
-                                    match_score: item["match_score"].as_f64().unwrap_or_default(),
-                                    match_field: item["match_field"].as_str().map(str::to_string),
-                                    summary: item.get("signals").cloned(),
-                                    source_kind: Some("cascade_research".to_string()),
-                                    linked_cbu_ids: item["linked_cbu_ids"]
-                                        .as_array()
-                                        .cloned()
-                                        .unwrap_or_default()
-                                        .into_iter()
-                                        .filter_map(|value| {
-                                            value.as_str().and_then(|raw| Uuid::parse_str(raw).ok())
-                                        })
-                                        .collect(),
-                                    is_onboarding_member: item["is_onboarding_member"]
-                                        .as_bool()
-                                        .unwrap_or(false),
-                                    candidate_for_cbu: item["candidate_for_cbu"]
-                                        .as_bool()
-                                        .unwrap_or(false),
-                                    lifecycle_populated: item["lifecycle_populated"]
-                                        .as_bool()
-                                        .unwrap_or(false),
-                                    linked_entity_count: item["linked_entity_count"]
-                                        .as_u64()
-                                        .map(|value| value as usize)
-                                        .unwrap_or(0),
-                                    has_active_workflow: item["has_active_workflow"]
-                                        .as_bool()
-                                        .unwrap_or(false),
-                                })
-                            })
-                            .collect();
-                    }
-                    cascade_result = Some(cascade);
-                }
-            }
-            entity_candidates = Self::merge_entity_candidates(entity_candidates);
-            let previous_scope = previous_active.as_ref().map(|entity| EntityScope {
-                entity_id: entity.entity_id,
-                entity_type: entity.entity_type.clone(),
-                name: entity.name.clone(),
-                confidence: 1.0,
-                source: EntitySource::SessionCarry,
-            });
-            let fresh_entity_reference = introduces_entity_reference(&request.message);
-            let scope_outcome = step1_entity_scope(
-                &request.message,
-                previous_scope.as_ref(),
-                &entity_candidates,
-            );
-            let active_entity = match &scope_outcome {
-                EntityScopeOutcome::Resolved(scope) => Some(SemtaxEntityRef {
-                    entity_id: scope.entity_id,
-                    entity_type: scope.entity_type.clone(),
-                    name: scope.name.clone(),
-                }),
-                EntityScopeOutcome::Ambiguous(_) | EntityScopeOutcome::Unresolved => None,
-            };
-            match &scope_outcome {
-                EntityScopeOutcome::Ambiguous(scopes) => {
-                    hydrate_sage_session(
-                        &mut state,
-                        crate::semtaxonomy::SageSessionHydration {
-                            cascade_result: cascade_result.clone().or(Some(search.clone())),
-                            active_entity: None,
-                            entity_candidates: entity_candidates.clone(),
-                            domain_scope: domain_scope.clone(),
-                            aspect: session.context.stage_focus.clone(),
-                            verb_surface: Vec::new(),
-                            entity_state: None,
-                            domain_state_summaries: Vec::new(),
-                            intent_hints: vec![IntentHint {
-                                intent: "entity-scope-ambiguous".to_string(),
-                                confidence: "low".to_string(),
-                                reason: "Multiple entity candidates remained after search"
-                                    .to_string(),
-                            }],
-                            grounding_strategy: Some("scope_ambiguity".to_string()),
-                            grounding_confidence: Some("low".to_string()),
-                        },
-                    );
-                    session.semtaxonomy_session = Some(state);
-                    let options = scopes
-                        .iter()
-                        .take(5)
-                        .map(|scope| format!("{} ({})", scope.name, scope.entity_type))
-                        .collect::<Vec<_>>();
-                    let message = format!(
-                        "I found multiple possible matches for this entity reference.\n\n{}",
-                        options
-                            .iter()
-                            .enumerate()
-                            .map(|(idx, item)| format!("{}. {}", idx + 1, item))
-                            .collect::<Vec<_>>()
-                            .join("\n")
-                    );
-                    let sage_explain = ob_poc_types::chat::SageExplainPayload {
-                            understanding: "I found multiple plausible entity matches and need you to confirm which one you mean before I continue.".to_string(),
-                            mode: "scope_clarification".to_string(),
-                            scope_summary: None,
-                            confidence: "low".to_string(),
-                            clarifications: options,
-                        };
-                    return Ok(Some(Self::scope_feedback_response(
-                        session,
-                        message,
-                        sage_explain,
-                    )));
-                }
-                EntityScopeOutcome::Unresolved if fresh_entity_reference => {
-                    hydrate_sage_session(
-                        &mut state,
-                        crate::semtaxonomy::SageSessionHydration {
-                            cascade_result: Some(search.clone()),
-                            active_entity: None,
-                            entity_candidates: entity_candidates.clone(),
-                            domain_scope: domain_scope.clone(),
-                            aspect: session.context.stage_focus.clone(),
-                            verb_surface: Vec::new(),
-                            entity_state: None,
-                            domain_state_summaries: Vec::new(),
-                            intent_hints: vec![IntentHint {
-                                intent: "entity-scope-unresolved".to_string(),
-                                confidence: "low".to_string(),
-                                reason: "Entity search did not resolve a usable scope".to_string(),
-                            }],
-                            grounding_strategy: Some("scope_unresolved".to_string()),
-                            grounding_confidence: Some("low".to_string()),
-                        },
-                    );
-                    session.semtaxonomy_session = Some(state);
-                    let message = "I could not identify the entity from that utterance. Give me the full name or a more specific reference.".to_string();
-                    let sage_explain = ob_poc_types::chat::SageExplainPayload {
-                            understanding: "I could not resolve a single entity scope from that utterance, so I am stopping before state and transition selection.".to_string(),
-                            mode: "scope_clarification".to_string(),
-                            scope_summary: None,
-                            confidence: "low".to_string(),
-                            clarifications: vec![
-                                "Try the full legal or onboarding name".to_string(),
-                                "If you mean a different entity, name it explicitly".to_string(),
-                            ],
-                        };
-                    return Ok(Some(Self::scope_feedback_response(
-                        session,
-                        message,
-                        sage_explain,
-                    )));
-                }
-                _ => {}
-            }
-            let entity_state_from_cascade = cascade_result
-                .as_ref()
-                .and_then(|cascade| cascade["entities"].as_array())
-                .and_then(|entities| {
-                    active_entity.as_ref().and_then(|entity| {
-                        entities.iter().find(|item| {
-                            item["entity_id"].as_str()
-                                == Some(entity.entity_id.to_string().as_str())
-                        })
-                    })
-                })
-                .and_then(|entity| entity.get("context").cloned());
-            let entity_state = match (active_entity.as_ref(), entity_state_from_cascade) {
-                (_, Some(context)) => Some(context),
-                (Some(entity), None) => Some(
-                    self.run_discovery_op(
-                        "discovery",
-                        "entity-context",
-                        vec![("entity-id", serde_json::json!(entity.entity_id))],
-                    )
-                    .await?,
-                ),
-                (None, None) => None,
-            };
-            let hints = vec![IntentHint {
-                intent: "entity-discovery".to_string(),
-                confidence: if active_entity.is_some() {
-                    "medium".to_string()
-                } else {
-                    "low".to_string()
-                },
-                reason: "Turn grounded through entity search before composition".to_string(),
-            }];
-            let used_cascade = cascade_result.is_some();
-            let grounding_confidence = if entity_candidates.len() <= 1 {
-                "high".to_string()
-            } else if active_entity.is_some() {
-                "medium".to_string()
-            } else {
-                "low".to_string()
-            };
-            (
-                cascade_result.or(Some(search)),
-                entity_candidates,
-                active_entity,
-                entity_state,
-                hints,
-                Some(if used_cascade {
-                    "cascade_research".to_string()
-                } else {
-                    "search_entities".to_string()
-                }),
-                Some(grounding_confidence),
-            )
-        };
-
-        if let Some(entity) = active_entity.as_ref() {
-            if entity.entity_type.eq_ignore_ascii_case("client-group") {
-                let scope = crate::mcp::scope_resolution::ScopeContext::new()
-                    .with_client_group(entity.entity_id, entity.name.clone());
-                session.context.set_client_scope(scope);
-                session.context.deal_id = None;
-                session.context.deal_gate_skipped = false;
-            }
-        }
-
-        let mut inferred_domains = inferred_domains;
-        let action_class = Self::classify_action(&request.message);
-        let signal_domains = Self::signal_driven_domains(entity_state.as_ref());
-        for domain in &signal_domains {
-            Self::push_discovery_domain(&mut inferred_domains, domain);
-        }
-        if matches!(action_class, Some("create")) {
-            let lower = request.message.to_ascii_lowercase();
-            let entity_creation_nouns = [
-                "entity",
-                "company",
-                "person",
-                "individual",
-                "trust",
-                "partnership",
-                "limited",
-                "plc",
-                "ltd",
-                "ag",
-                "sa",
-                "legal entity",
-                "holding",
-                "holdco",
-            ];
-            if entity_creation_nouns
-                .iter()
-                .any(|noun| lower.contains(noun))
-            {
-                Self::push_discovery_domain(&mut inferred_domains, "entity");
-            }
-        }
-        if Self::is_vague_status_utterance(&request.message) && !signal_domains.is_empty() {
-            let mut reordered = signal_domains;
-            for domain in inferred_domains {
-                if !reordered.iter().any(|existing| existing == &domain) {
-                    reordered.push(domain);
-                }
-            }
-            inferred_domains = reordered;
-        }
-
-        let domain_scope = inferred_domains.first().cloned();
-
-        let entity_type_for_actions = active_entity
-            .as_ref()
-            .map(|entity| entity.entity_type.clone())
-            .or_else(|| resolved_kinds.first().cloned())
-            .unwrap_or_else(|| "entity".to_string());
-
-        let mut action_surface = if let Some(active_entity) = active_entity.as_ref() {
-            let transitions = self
-                .run_discovery_op(
-                    "discovery",
-                    "graph-walk",
-                    vec![
-                        ("entity-id", serde_json::json!(active_entity.entity_id)),
-                        ("include-blocked", serde_json::json!(true)),
-                    ],
-                )
-                .await
-                .unwrap_or_else(|_| serde_json::json!({}));
-            state
-                .research_cache
-                .insert("graph-walk".to_string(), transitions.clone());
-
-            transitions["valid_verbs"]
-                .as_array()
-                .cloned()
-                .unwrap_or_default()
-                .into_iter()
-                .map(|verb| {
-                    let verb_id = verb["verb_id"].as_str().unwrap_or_default().to_string();
-                    let domain = verb_id
-                        .split_once('.')
-                        .map(|(domain, _)| domain.to_string())
-                        .unwrap_or_else(|| "unknown".to_string());
-                    let invocation_phrases = verb["invocation_phrases"]
-                        .as_array()
-                        .cloned()
-                        .unwrap_or_default()
-                        .into_iter()
-                        .filter_map(|value| value.as_str().map(str::to_string))
-                        .collect::<Vec<_>>();
-                    let description = if invocation_phrases.is_empty() {
-                        verb["description"].as_str().unwrap_or_default().to_string()
-                    } else {
-                        format!(
-                            "{} {}",
-                            verb["description"].as_str().unwrap_or_default(),
-                            invocation_phrases.join(" ")
-                        )
-                    };
-                    VerbSurfaceEntry {
-                        verb_id: verb_id.clone(),
-                        domain,
-                        name: verb_id
-                            .split_once('.')
-                            .map(|(_, name)| name.to_string())
-                            .unwrap_or_else(|| verb_id.clone()),
-                        description,
-                        polarity: verb["polarity"].as_str().unwrap_or("read").to_string(),
-                        phase_tags: vec![verb["lane"].as_str().unwrap_or("general").to_string()],
-                        subject_kinds: vec![entity_type_for_actions.clone()],
-                        parameters: verb["parameters"]
-                            .as_array()
-                            .cloned()
-                            .unwrap_or_default()
-                            .into_iter()
-                            .map(|parameter| crate::semtaxonomy::VerbParameter {
-                                name: parameter["name"].as_str().unwrap_or_default().to_string(),
-                                required: parameter["required"].as_bool().unwrap_or(false),
-                                description: parameter["description"].as_str().map(str::to_string),
-                            })
-                            .collect(),
-                    }
-                })
-                .collect::<Vec<_>>()
-        } else {
-            Vec::new()
-        };
-
-        if action_surface.is_empty() {
-            let mut action_domains_and_types: Vec<(String, String)> = inferred_domains
-                .iter()
-                .cloned()
-                .map(|domain| (domain, entity_type_for_actions.clone()))
-                .collect();
-            if inferred_domains.iter().any(|domain| domain == "entity")
-                && !action_domains_and_types
-                    .iter()
-                    .any(|(domain, entity_type)| domain == "entity" && entity_type == "entity")
-            {
-                action_domains_and_types.push(("entity".to_string(), "entity".to_string()));
-            }
-
-            for (domain, entity_type) in &action_domains_and_types {
-                let surface = self
-                    .run_discovery_op(
-                        "discovery",
-                        "available-actions",
-                        vec![
-                            ("domain", serde_json::json!(domain.clone())),
-                            ("entity-type", serde_json::json!(entity_type.clone())),
-                            ("polarity", serde_json::json!("all")),
-                        ],
-                    )
-                    .await?;
-                let mut entries = surface["groups"]
-                    .as_array()
-                    .cloned()
-                    .unwrap_or_default()
-                    .into_iter()
-                    .flat_map(|group| {
-                        let phase = group["aspect"].as_str().unwrap_or("general").to_string();
-                        let domain_name = domain.clone();
-                        let subject_kind = entity_type.clone();
-                        group["verbs"]
-                            .as_array()
-                            .cloned()
-                            .unwrap_or_default()
-                            .into_iter()
-                            .map(move |verb| VerbSurfaceEntry {
-                                verb_id: verb["verb_id"].as_str().unwrap_or_default().to_string(),
-                                domain: domain_name.clone(),
-                                name: verb["name"].as_str().unwrap_or_default().to_string(),
-                                description: verb["description"]
-                                    .as_str()
-                                    .unwrap_or_default()
-                                    .to_string(),
-                                polarity: verb["polarity"].as_str().unwrap_or("read").to_string(),
-                                phase_tags: vec![phase.clone()],
-                                subject_kinds: vec![subject_kind.clone()],
-                                parameters: verb["parameters"]
-                                    .as_array()
-                                    .cloned()
-                                    .unwrap_or_default()
-                                    .into_iter()
-                                    .map(|parameter| crate::semtaxonomy::VerbParameter {
-                                        name: parameter["name"]
-                                            .as_str()
-                                            .unwrap_or_default()
-                                            .to_string(),
-                                        required: parameter["required"].as_bool().unwrap_or(false),
-                                        description: parameter["description"]
-                                            .as_str()
-                                            .map(str::to_string),
-                                    })
-                                    .collect(),
-                            })
-                    })
-                    .collect::<Vec<_>>();
-                action_surface.append(&mut entries);
-            }
-        }
-        action_surface.sort_by(|left, right| left.verb_id.cmp(&right.verb_id));
-        action_surface.dedup_by(|left, right| left.verb_id == right.verb_id);
-        let action_surface = (!action_surface.is_empty()).then_some(action_surface);
-        let valid_transitions = state
-            .research_cache
-            .get("graph-walk")
-            .cloned()
-            .or_else(|| state.research_cache.get("valid-transitions").cloned());
-
-        if let Some(entries) = action_surface.as_ref() {
-            for entry in entries.iter().take(12) {
-                if let Ok(detail) = self
-                    .run_discovery_op(
-                        "discovery",
-                        "verb-detail",
-                        vec![("verb-id", serde_json::json!(entry.verb_id.clone()))],
-                    )
-                    .await
-                {
-                    state
-                        .research_cache
-                        .insert(format!("verb-detail:{}", entry.verb_id), detail);
-                }
-            }
-        }
-
-        let domain_state_summaries =
-            Self::build_domain_state_summaries(entity_state.as_ref(), &inferred_domains);
-
-        hydrate_sage_session(
-            &mut state,
-            crate::semtaxonomy::SageSessionHydration {
-                cascade_result: cascade_result.clone(),
-                active_entity: active_entity.clone(),
-                entity_candidates,
-                domain_scope: domain_scope.clone(),
-                aspect: session.context.stage_focus.clone(),
-                verb_surface: action_surface.clone().unwrap_or_default(),
-                entity_state: entity_state.clone(),
-                domain_state_summaries,
-                intent_hints,
-                grounding_strategy,
-                grounding_confidence,
-            },
-        );
-        session.semtaxonomy_session = Some(state);
-
-        let history_depth = session.messages.len();
-        let visible_action_count = action_surface
-            .as_ref()
-            .map(|verbs| verbs.len())
-            .unwrap_or(0);
-        let selected_verb = if let Some(entity) = active_entity.as_ref() {
-            let scope = EntityScope {
-                entity_id: entity.entity_id,
-                entity_type: entity.entity_type.clone(),
-                name: entity.name.clone(),
-                confidence: 1.0,
-                source: EntitySource::SearchHit,
-            };
-            let state_model =
-                step2_entity_state(scope, entity_state.as_ref(), valid_transitions.as_ref());
-            step3_select_verb(&request.message, &state_model)
-        } else {
-            action_surface.as_ref().and_then(|surface| {
-                let state_model = build_generic_state(&entity_type_for_actions, surface);
-                step3_select_verb(&request.message, &state_model)
-            })
-        };
-        let dsl = selected_verb
-            .as_ref()
-            .and_then(Self::render_selected_verb_dsl);
-        let ready_to_execute = selected_verb
-            .as_ref()
-            .map(|selected| !selected.partial && !selected.verb_id.is_empty())
-            .unwrap_or(false);
-        let action_preview = action_surface
-            .as_ref()
-            .map(|verbs| {
-                verbs
-                    .iter()
-                    .take(3)
-                    .map(|verb| verb.verb_id.clone())
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            })
-            .filter(|preview| !preview.is_empty());
-        let entity_summary = active_entity
-            .as_ref()
-            .map(|entity| format!("{} ({})", entity.name, entity.entity_type))
-            .unwrap_or_else(|| "no entity grounded yet".to_string());
-        let message = format!(
-            "SemTaxonomy grounded this turn.\n\nEntity: {}\nDomain scope: {}\nHistory depth: {}{}\n{}",
-            entity_summary,
-            domain_scope.clone().unwrap_or_else(|| "unspecified".to_string()),
-            history_depth,
-            action_preview
-                .map(|preview| format!("\nAvailable actions: {}", preview))
-                .unwrap_or_default(),
-            selected_verb
-                .as_ref()
-                .map(|selected| {
-                    let missing = if selected.missing_args.is_empty() {
-                        String::new()
-                    } else {
-                        format!(
-                            "\nMissing required inputs: {}",
-                            selected
-                                .missing_args
-                                .iter()
-                                .map(|arg| arg.name.clone())
-                                .collect::<Vec<_>>()
-                                .join(", ")
-                        )
-                    };
-                    format!("\n{}{}", selected.explanation, missing)
-                })
-                .unwrap_or_else(|| "\nNo deterministic runbook could be composed yet.".to_string())
-        );
-
-        let sage_explain = Some(ob_poc_types::chat::SageExplainPayload {
-            understanding: selected_verb
-                .as_ref()
-                .map(|selected| selected.explanation.clone())
-                .unwrap_or_else(|| {
-                    format!(
-                        "So you want to work from a grounded discovery context for: {}",
-                        request.message
-                    )
-                }),
-            mode: "semtaxonomy_discovery".to_string(),
-            scope_summary: Some(format!(
-                "entity={}, domain={}",
-                entity_summary,
-                domain_scope.unwrap_or_else(|| "unspecified".to_string())
-            )),
-            confidence: if active_entity.is_some() {
-                "medium".to_string()
-            } else {
-                "low".to_string()
-            },
-            clarifications: Vec::new(),
-        });
-        let coder_proposal = Some(ob_poc_types::chat::CoderProposalPayload {
-            verb_fqn: selected_verb
-                .as_ref()
-                .map(|selected| selected.verb_id.clone())
-                .filter(|verb_id| !verb_id.is_empty()),
-            dsl: dsl.clone(),
-            change_summary: selected_verb
-                .as_ref()
-                .map(|selected| {
-                    let mut summary = vec![selected.explanation.clone()];
-                    if !selected.missing_args.is_empty() {
-                        summary.push(format!(
-                            "Missing required inputs: {}",
-                            selected
-                                .missing_args
-                                .iter()
-                                .map(|arg| arg.name.clone())
-                                .collect::<Vec<_>>()
-                                .join(", ")
-                        ));
-                    }
-                    summary
-                })
-                .unwrap_or_else(|| {
-                    vec![format!(
-                        "CompositionRequest prepared with {} prior messages and {} visible actions",
-                        history_depth, visible_action_count
-                    )]
-                }),
-            requires_confirmation: selected_verb
-                .as_ref()
-                .map(|selected| selected.requires_confirmation && !selected.partial)
-                .unwrap_or(false),
-            ready_to_execute,
-        });
-
-        if let (Some(selected), Some(dsl_source), Some(verb_fqn)) = (
-            selected_verb.as_ref(),
-            dsl.as_deref(),
-            selected_verb
-                .as_ref()
-                .map(|candidate| candidate.verb_id.as_str()),
-        ) {
-            if selected.requires_confirmation && !selected.partial {
-                let pending = Self::build_semtaxonomy_pending_mutation(
-                    request,
-                    session,
-                    verb_fqn,
-                    dsl_source,
-                    &selected.explanation,
-                );
-                session.pending_decision = None;
-                session.pending_intent_tier = None;
-                session.pending_verb_disambiguation = None;
-                if session.has_pending() {
-                    session.cancel_pending();
-                }
-                session.pending_mutation = Some(pending.clone());
-                session.transition(SessionEvent::DslPendingValidation);
-
-                let bullets = if pending.change_summary.is_empty() {
-                    String::new()
-                } else {
-                    format!(
-                        "\n\nThis will:\n{}",
-                        pending
-                            .change_summary
-                            .iter()
-                            .map(|item| format!("• {}", item))
-                            .collect::<Vec<_>>()
-                            .join("\n")
-                    )
-                };
-                let message = format!(
-                    "This would change state.\n\nPending change: {}{}\n\nReply 'yes' to confirm or ask a read-only question to cancel.",
-                    pending.confirmation_text, bullets
-                );
-                let sage_explain = Some(Self::to_sage_explain_payload(&pending.intent.explain));
-                let coder_proposal = Self::to_coder_proposal_payload(
-                    Some(&pending),
-                    Some(&pending.coder_result.dsl),
-                    Some(&pending.coder_result.verb_fqn),
-                    false,
-                );
-
-                Self::add_agent_message_with_payloads(
-                    session,
-                    message.clone(),
-                    None,
-                    sage_explain.clone(),
-                    coder_proposal.clone(),
-                    None,
-                );
-
-                return Ok(Some(AgentChatResponse {
-                    message,
-                    session_state: SessionState::PendingValidation,
-                    can_execute: false,
-                    dsl_source: None,
-                    ast: None,
-                    disambiguation: None,
-                    commands: None,
-                    unresolved_refs: None,
-                    current_ref_index: None,
-                    dsl_hash: None,
-                    verb_disambiguation: None,
-                    intent_tier: None,
-                    decision: None,
-                    sage_explain,
-                    coder_proposal,
-                    discovery_bootstrap: None,
-                }));
-            }
-        }
-
-        Self::add_agent_message_with_payloads(
-            session,
-            message.clone(),
-            dsl,
-            sage_explain.clone(),
-            coder_proposal.clone(),
-            None,
-        );
-
-        Ok(Some(AgentChatResponse {
-            message,
-            session_state: SessionState::New,
-            can_execute: ready_to_execute,
-            dsl_source: if ready_to_execute {
-                coder_proposal
-                    .as_ref()
-                    .and_then(|proposal| proposal.dsl.clone())
-            } else {
-                None
-            },
-            ast: None,
-            disambiguation: None,
-            commands: None,
-            unresolved_refs: None,
-            current_ref_index: None,
-            dsl_hash: None,
-            verb_disambiguation: None,
-            intent_tier: None,
-            decision: None,
-            sage_explain,
-            coder_proposal,
-            discovery_bootstrap: None,
-        }))
-    }
-
     /// Return true when session context checks should not enforce client/deal gating.
     ///
     /// Semantic OS workflows are registry-scoped and should not force
@@ -1971,6 +505,7 @@ impl AgentService {
             sage_explain: None,
             coder_proposal: None,
             discovery_bootstrap: None,
+            parked_entries: None,
         }
     }
 
@@ -2278,6 +813,7 @@ impl AgentService {
             sage_engine: self.sage_engine.clone(),
             pre_sage_entity_kind: Self::current_sage_entity_kind(session),
             pre_sage_entity_name: Self::current_sage_entity_name(session),
+            pre_sage_entity_confidence: None,
             recent_sage_intents: session.recent_sage_intents.clone(),
             nlci_compiler: Some(crate::semtaxonomy_v2::build_minimal_cbu_compiler()),
             discovery_selected_domain: session.context.discovery_selected_domain.clone(),
@@ -2312,7 +848,7 @@ impl AgentService {
                 session
                     .current_mandate
                     .as_ref()
-                    .map(|_| "mandate".to_string())
+                    .map(|_| "trading-profile".to_string())
             })
             .or_else(|| session.domain_hint.clone())
             .or_else(|| (!session.entity_type.is_empty()).then(|| session.entity_type.clone()))
@@ -2402,83 +938,6 @@ impl AgentService {
         })
     }
 
-    fn build_semtaxonomy_pending_mutation(
-        request: &ChatRequest,
-        session: &UnifiedSession,
-        verb_fqn: &str,
-        dsl: &str,
-        explanation: &str,
-    ) -> crate::sage::PendingMutation {
-        let mut intent = crate::sage::OutcomeIntent::stub(
-            &request.message,
-            crate::sage::ObservationPlane::Instance,
-            crate::sage::IntentPolarity::Write,
-        );
-        intent.summary = explanation.to_string();
-        intent.domain_concept = verb_fqn.split('.').next().unwrap_or_default().to_string();
-        intent.action = crate::sage::OutcomeAction::from_first_word(&request.message);
-        intent.subject = session
-            .semtaxonomy_session
-            .as_ref()
-            .and_then(|state| state.active_entity.as_ref())
-            .map(|entity| crate::sage::EntityRef {
-                mention: entity.name.clone(),
-                kind_hint: Some(entity.entity_type.clone()),
-                uuid: Some(entity.entity_id),
-            });
-        intent.explain = crate::sage::SageExplain {
-            understanding: explanation.to_string(),
-            mode: "confirmation_required".to_string(),
-            scope_summary: session
-                .semtaxonomy_session
-                .as_ref()
-                .and_then(|state| state.active_entity.as_ref())
-                .map(|entity| format!("entity={} ({})", entity.name, entity.entity_type)),
-            confidence: "medium".to_string(),
-            clarifications: Vec::new(),
-        };
-        intent.coder_handoff.goal = "compose_runbook".to_string();
-        intent.coder_handoff.intent_summary = explanation.to_string();
-        intent.coder_handoff.required_outcome = format!("execute {verb_fqn}");
-        intent.coder_handoff.constraints = vec!["no_mutation_without_confirmation".to_string()];
-        intent.coder_handoff.serve_safe = false;
-        intent.coder_handoff.requires_confirmation = true;
-
-        let coder_result = crate::sage::CoderResult {
-            verb_fqn: verb_fqn.to_string(),
-            dsl: dsl.to_string(),
-            resolution: crate::sage::coder::CoderResolution::Proposed,
-            missing_args: Vec::new(),
-            unresolved_refs: Vec::new(),
-            diagnostics: None,
-        };
-
-        let subject_name = intent
-            .subject
-            .as_ref()
-            .map(|subject| subject.mention.as_str())
-            .unwrap_or("this");
-        let action_word = match intent.action {
-            crate::sage::OutcomeAction::Create => "create",
-            crate::sage::OutcomeAction::Update => "update",
-            crate::sage::OutcomeAction::Delete => "delete",
-            crate::sage::OutcomeAction::Assign => "assign",
-            crate::sage::OutcomeAction::Import => "import",
-            crate::sage::OutcomeAction::Publish => "publish",
-            _ => "change",
-        };
-
-        crate::sage::PendingMutation {
-            confirmation_text: format!("So you want to {action_word} {subject_name}?"),
-            change_summary: vec![
-                format!("Resolved action: {verb_fqn}"),
-                explanation.to_string(),
-            ],
-            coder_result,
-            intent,
-        }
-    }
-
     fn add_agent_message_with_payloads(
         session: &mut UnifiedSession,
         content: String,
@@ -2486,12 +945,14 @@ impl AgentService {
         sage_explain: Option<ob_poc_types::chat::SageExplainPayload>,
         coder_proposal: Option<ob_poc_types::chat::CoderProposalPayload>,
         discovery_bootstrap: Option<ob_poc_types::chat::DiscoveryBootstrapPayload>,
+        parked_entries: Option<Vec<ob_poc_types::chat::ParkedEntryPayload>>,
     ) {
         session.add_agent_message(content, None, dsl);
         if let Some(last) = session.messages.last_mut() {
             last.sage_explain = sage_explain;
             last.coder_proposal = coder_proposal;
             last.discovery_bootstrap = discovery_bootstrap;
+            last.parked_entries = parked_entries;
         }
     }
 
@@ -2576,39 +1037,6 @@ impl AgentService {
         _envelope: Option<&crate::agent::sem_os_context_envelope::SemOsContextEnvelope>,
     ) -> Option<ob_poc_types::chat::DiscoveryBootstrapPayload> {
         None
-    }
-
-    fn scope_feedback_response(
-        session: &mut UnifiedSession,
-        message: String,
-        sage_explain: ob_poc_types::chat::SageExplainPayload,
-    ) -> AgentChatResponse {
-        Self::add_agent_message_with_payloads(
-            session,
-            message.clone(),
-            None,
-            Some(sage_explain.clone()),
-            None,
-            None,
-        );
-        AgentChatResponse {
-            message,
-            session_state: SessionState::New,
-            can_execute: false,
-            dsl_source: None,
-            ast: None,
-            disambiguation: None,
-            commands: None,
-            unresolved_refs: None,
-            current_ref_index: None,
-            dsl_hash: None,
-            verb_disambiguation: None,
-            intent_tier: None,
-            decision: None,
-            sage_explain: Some(sage_explain),
-            coder_proposal: None,
-            discovery_bootstrap: None,
-        }
     }
 
     /// Get or build the LookupService for unified verb + entity discovery
@@ -2737,46 +1165,6 @@ impl AgentService {
             return self.execute_runbook(session).await;
         }
 
-        if Self::semtaxonomy_enabled() {
-            if session.pending_verb_disambiguation.take().is_some() {
-                pivot_feedback = Some(
-                    "Discarded the legacy pending verb choice and re-routed through SemTaxonomy."
-                        .to_string(),
-                );
-            }
-            if session.pending_intent_tier.take().is_some() {
-                pivot_feedback = Some(
-                    "Discarded the legacy pending intent choice and re-routed through SemTaxonomy."
-                        .to_string(),
-                );
-            }
-            if session.pending_decision.take().is_some() {
-                pivot_feedback = Some(
-                    "Discarded the legacy pending choice and re-routed through SemTaxonomy."
-                        .to_string(),
-                );
-            }
-
-            if let Some(mut response) = self
-                .try_semtaxonomy_path(session, request, session.context.dominant_entity_id, &[])
-                .await?
-            {
-                response.message = Self::with_pivot_feedback(&pivot_feedback, response.message);
-                if let Some(last) = session.messages.last_mut() {
-                    last.content = response.message.clone();
-                    last.sage_explain = response.sage_explain.clone();
-                    last.coder_proposal = response.coder_proposal.clone();
-                }
-                return Ok(response);
-            }
-
-            let msg = Self::with_pivot_feedback(
-                &pivot_feedback,
-                "SemTaxonomy could not ground this utterance yet.",
-            );
-            return Ok(self.fail(&msg, session));
-        }
-
         // 3. Check for pending verb disambiguation - numeric input selects an option
         if session.pending_verb_disambiguation.is_some()
             && Self::should_reclassify_before_pending(&request.message)
@@ -2848,6 +1236,7 @@ impl AgentService {
                         sage_explain: None,
                         coder_proposal: None,
                         discovery_bootstrap: None,
+                        parked_entries: None,
                     });
                 }
             }
@@ -2857,12 +1246,7 @@ impl AgentService {
 
         // 4. Check for pending decision (client group or deal selection)
         if let Some(pending) = session.pending_decision.take() {
-            if Self::semtaxonomy_enabled() {
-                pivot_feedback = Some(
-                    "Discarded the legacy pending choice and re-routed through SemTaxonomy."
-                        .to_string(),
-                );
-            } else if Self::should_reclassify_before_pending(&request.message) {
+            if Self::should_reclassify_before_pending(&request.message) {
                 pivot_feedback = Some(
                     "Discarded the pending choice and re-routed from your new instruction."
                         .to_string(),
@@ -3085,19 +1469,6 @@ impl AgentService {
         // If client group is set but no deal, check for existing deals and prompt.
         // This makes "deal" a first-class concept the agent understands.
         // =====================================================================
-        tracing::info!(
-            semtaxonomy_enabled = Self::semtaxonomy_enabled(),
-            session_id = %session.id,
-            message = %request.message,
-            "process_chat about to evaluate SemTaxonomy branch"
-        );
-        if let Some(response) = self
-            .try_semtaxonomy_path(session, request, session.context.dominant_entity_id, &[])
-            .await?
-        {
-            return Ok(response);
-        }
-
         if let Some(decision) = self
             .check_session_context(session, Some(&request.message))
             .await
@@ -3301,6 +1672,7 @@ impl AgentService {
                         sage_explain_payload.clone(),
                         coder_proposal.clone(),
                         None,
+                        None,
                     );
                     return Ok(AgentChatResponse {
                         message: msg,
@@ -3319,6 +1691,7 @@ impl AgentService {
                         sage_explain: sage_explain_payload.clone(),
                         coder_proposal,
                         discovery_bootstrap: None,
+                        parked_entries: None,
                     });
                 }
 
@@ -3329,71 +1702,57 @@ impl AgentService {
                     entity_count,
                 } = r.outcome
                 {
-                    if Self::semtaxonomy_enabled()
-                        && session
-                            .semtaxonomy_session
-                            .as_ref()
-                            .and_then(|state| state.active_entity.as_ref())
-                            .map(|entity| entity.entity_type.eq_ignore_ascii_case("client-group"))
-                            .unwrap_or(false)
-                    {
-                        tracing::info!(
-                            group_id = %group_id,
-                            group_name = %group_name,
-                            entity_count = entity_count,
-                            "Suppressing legacy scope response because SemTaxonomy already grounded client scope"
-                        );
-                    } else {
-                        tracing::info!(
-                            group_id = %group_id,
-                            group_name = %group_name,
-                            entity_count = entity_count,
-                            "Scope resolved via pipeline, updating session context"
-                        );
+                    tracing::info!(
+                        group_id = %group_id,
+                        group_name = %group_name,
+                        entity_count = entity_count,
+                        "Scope resolved via pipeline, updating session context"
+                    );
 
-                        // Update session context with resolved scope
-                        if let Ok(uuid) = group_id.parse::<uuid::Uuid>() {
-                            let scope = crate::mcp::scope_resolution::ScopeContext::new()
-                                .with_client_group(uuid, group_name.clone());
-                            session.context.set_client_scope(scope);
-                            // Reset deal context when switching clients
-                            session.context.deal_id = None;
-                            session.context.deal_gate_skipped = false;
-                        }
-
-                        let msg = format!(
-                            "Now working with client: {} ({} entities in scope).",
-                            group_name, entity_count
-                        );
-                        let msg = Self::with_pivot_feedback(&pivot_feedback, msg);
-                        Self::add_agent_message_with_payloads(
-                            session,
-                            msg.clone(),
-                            None,
-                            sage_explain_payload.clone(),
-                            None,
-                            None,
-                        );
-                        return Ok(AgentChatResponse {
-                            message: msg,
-
-                            session_state: SessionState::New,
-                            can_execute: false,
-                            dsl_source: None,
-                            ast: None,
-                            disambiguation: None,
-                            commands: None,
-                            unresolved_refs: None,
-                            current_ref_index: None,
-                            dsl_hash: None,
-                            verb_disambiguation: None,
-                            intent_tier: None,
-                            decision: None,
-                            sage_explain: sage_explain_payload.clone(),
-                            coder_proposal: None,
-                            discovery_bootstrap: None,
-                        });
+                    // Update session context with resolved scope
+                    if let Ok(uuid) = group_id.parse::<uuid::Uuid>() {
+                        let scope = crate::mcp::scope_resolution::ScopeContext::new()
+                            .with_client_group(uuid, group_name.clone());
+                        session.context.set_client_scope(scope);
+                        // Reset deal context when switching clients
+                        session.context.deal_id = None;
+                        session.context.deal_gate_skipped = false;
                     }
+
+                    let msg = format!(
+                        "Now working with client: {} ({} entities in scope).",
+                        group_name, entity_count
+                    );
+                    let msg = Self::with_pivot_feedback(&pivot_feedback, msg);
+                    Self::add_agent_message_with_payloads(
+                        session,
+                        msg.clone(),
+                        None,
+                        sage_explain_payload.clone(),
+                        None,
+                        None,
+                        None,
+                    );
+                    return Ok(AgentChatResponse {
+                        message: msg,
+
+                        session_state: SessionState::New,
+                        can_execute: false,
+                        dsl_source: None,
+                        ast: None,
+                        disambiguation: None,
+                        commands: None,
+                        unresolved_refs: None,
+                        current_ref_index: None,
+                        dsl_hash: None,
+                        verb_disambiguation: None,
+                        intent_tier: None,
+                        decision: None,
+                        sage_explain: sage_explain_payload.clone(),
+                        coder_proposal: None,
+                        discovery_bootstrap: None,
+                        parked_entries: None,
+                    });
                 }
 
                 // Handle scope candidates - multiple client matches
@@ -3420,6 +1779,7 @@ impl AgentService {
                             sage_explain_payload.clone(),
                             None,
                             Some(bootstrap.clone()),
+                            None,
                         );
                         return Ok(AgentChatResponse {
                             message,
@@ -3438,6 +1798,7 @@ impl AgentService {
                             sage_explain: sage_explain_payload.clone(),
                             coder_proposal: None,
                             discovery_bootstrap: Some(bootstrap),
+                            parked_entries: None,
                         });
                     }
                 }
@@ -3525,6 +1886,7 @@ impl AgentService {
                         sage_explain_payload.clone(),
                         coder_proposal.clone(),
                         None,
+                        None,
                     );
                     let mut response = self.staged_response(r.dsl, msg);
                     response.sage_explain = sage_explain_payload.clone();
@@ -3545,6 +1907,7 @@ impl AgentService {
                             sage_explain_payload.clone(),
                             None,
                             None,
+                            None,
                         );
                         return Ok(AgentChatResponse {
                             message: msg,
@@ -3563,6 +1926,7 @@ impl AgentService {
                             sage_explain: sage_explain_payload.clone(),
                             coder_proposal: None,
                             discovery_bootstrap: None,
+                            parked_entries: None,
                         });
                     }
                 }
@@ -3677,68 +2041,6 @@ impl AgentService {
             || normalized.starts_with("run ")
             || normalized.starts_with("execute ")
             || normalized.starts_with("publish ")
-    }
-
-    fn relationship_relevant(input: &str) -> bool {
-        let normalized = input.trim().to_ascii_lowercase();
-        [
-            "relationship",
-            "relationships",
-            "ownership",
-            "owner",
-            "owners",
-            "who owns",
-            "who controls",
-            "graph",
-            "party",
-            "parties",
-        ]
-        .iter()
-        .any(|needle| normalized.contains(needle))
-    }
-
-    fn render_selected_verb_dsl(selected: &crate::semtaxonomy_v2::SelectedVerb) -> Option<String> {
-        if selected.verb_id.is_empty() {
-            return None;
-        }
-        let mut parts = vec![format!("({}", selected.verb_id)];
-        if let serde_json::Value::Object(args) = &selected.args {
-            let mut keys = args.keys().cloned().collect::<Vec<_>>();
-            keys.sort();
-            for key in keys {
-                if let Some(value) = args.get(&key) {
-                    parts.push(format!(
-                        " :{} {}",
-                        key,
-                        Self::render_selected_arg_value(value)
-                    ));
-                }
-            }
-        }
-        parts.push(")".to_string());
-        Some(parts.join(""))
-    }
-
-    fn render_selected_arg_value(value: &serde_json::Value) -> String {
-        match value {
-            serde_json::Value::String(value) => Self::quote_dsl_string(value),
-            serde_json::Value::Bool(value) => value.to_string(),
-            serde_json::Value::Number(value) => value.to_string(),
-            serde_json::Value::Array(items) => {
-                let rendered = items
-                    .iter()
-                    .map(Self::render_selected_arg_value)
-                    .collect::<Vec<_>>()
-                    .join(" ");
-                format!("(list {})", rendered)
-            }
-            serde_json::Value::Null => "nil".to_string(),
-            other => Self::quote_dsl_string(&other.to_string()),
-        }
-    }
-
-    fn quote_dsl_string(value: &str) -> String {
-        format!("\"{}\"", value.replace('\\', "\\\\").replace('"', "\\\""))
     }
 
     fn should_reclassify_before_pending(input: &str) -> bool {
@@ -4019,6 +2321,7 @@ impl AgentService {
             sage_explain: None,
             coder_proposal: None,
             discovery_bootstrap: None,
+            parked_entries: None,
         })
     }
 
@@ -4133,6 +2436,7 @@ impl AgentService {
             sage_explain: None,
             coder_proposal: None,
             discovery_bootstrap: None,
+            parked_entries: None,
         })
     }
 
@@ -4254,6 +2558,7 @@ impl AgentService {
             sage_explain: None,
             coder_proposal: None,
             discovery_bootstrap: None,
+            parked_entries: None,
         })
     }
 
@@ -4506,6 +2811,7 @@ impl AgentService {
                                     sage_explain: None,
                                     coder_proposal: None,
                                     discovery_bootstrap: None,
+                                    parked_entries: None,
                                 });
                             }
                         }
@@ -4540,6 +2846,7 @@ impl AgentService {
                     sage_explain: None,
                     coder_proposal: None,
                     discovery_bootstrap: None,
+                    parked_entries: None,
                 })
             }
             Err(e) => {
@@ -4640,7 +2947,120 @@ impl AgentService {
                 let real_executor = RealDslExecutor::new(self.pool.clone());
                 let step_executor = DslStepExecutor::new(std::sync::Arc::new(real_executor));
                 match execute_runbook(store, runbook_id, None, &step_executor).await {
-                    Ok(_result) => {
+                    Ok(result) => {
+                        let parked_entries = match &result.final_status {
+                            crate::runbook::CompiledRunbookStatus::Parked { reason, cursor } => {
+                                result
+                                    .step_results
+                                    .iter()
+                                    .find(|step| step.step_id == cursor.step_id)
+                                    .map(|step| match reason {
+                                        crate::runbook::ParkReason::AwaitingCallback {
+                                            correlation_key,
+                                        } => {
+                                            vec![ob_poc_types::chat::ParkedEntryPayload {
+                                                step_id: step.step_id.to_string(),
+                                                verb: step.verb.clone(),
+                                                park_reason: "awaiting_callback".to_string(),
+                                                correlation_key: Some(correlation_key.clone()),
+                                                resource: None,
+                                                gate_entry_id: None,
+                                                message: match &step.outcome {
+                                                    crate::runbook::StepOutcome::Parked {
+                                                        message,
+                                                        ..
+                                                    } => Some(message.clone()),
+                                                    _ => None,
+                                                },
+                                            }]
+                                        }
+                                        crate::runbook::ParkReason::UserPaused => {
+                                            vec![ob_poc_types::chat::ParkedEntryPayload {
+                                                step_id: step.step_id.to_string(),
+                                                verb: step.verb.clone(),
+                                                park_reason: "user_paused".to_string(),
+                                                correlation_key: None,
+                                                resource: None,
+                                                gate_entry_id: None,
+                                                message: None,
+                                            }]
+                                        }
+                                        crate::runbook::ParkReason::ResourceUnavailable {
+                                            resource,
+                                        } => {
+                                            vec![ob_poc_types::chat::ParkedEntryPayload {
+                                                step_id: step.step_id.to_string(),
+                                                verb: step.verb.clone(),
+                                                park_reason: "resource_unavailable".to_string(),
+                                                correlation_key: None,
+                                                resource: Some(resource.clone()),
+                                                gate_entry_id: None,
+                                                message: None,
+                                            }]
+                                        }
+                                        crate::runbook::ParkReason::HumanGate { entry_id } => {
+                                            vec![ob_poc_types::chat::ParkedEntryPayload {
+                                                step_id: step.step_id.to_string(),
+                                                verb: step.verb.clone(),
+                                                park_reason: "human_gate".to_string(),
+                                                correlation_key: None,
+                                                resource: None,
+                                                gate_entry_id: Some(entry_id.to_string()),
+                                                message: None,
+                                            }]
+                                        }
+                                    })
+                            }
+                            _ => None,
+                        };
+                        if let Some(parked_entries) = parked_entries {
+                            let msg = if let Some(first) = parked_entries.first() {
+                                match first.park_reason.as_str() {
+                                    "awaiting_callback" => format!(
+                                        "Execution parked while waiting for an external callback for `{}`.",
+                                        first.verb
+                                    ),
+                                    "human_gate" => format!(
+                                        "Execution parked and is waiting for human approval for `{}`.",
+                                        first.verb
+                                    ),
+                                    "resource_unavailable" => format!(
+                                        "Execution parked because a required resource is unavailable for `{}`.",
+                                        first.verb
+                                    ),
+                                    "user_paused" => format!(
+                                        "Execution is paused for `{}`.",
+                                        first.verb
+                                    ),
+                                    _ => format!("Execution parked for `{}`.", first.verb),
+                                }
+                            } else {
+                                "Execution parked.".to_string()
+                            };
+                            session.add_agent_message(msg.clone(), None, None);
+                            if let Some(last) = session.messages.last_mut() {
+                                last.parked_entries = Some(parked_entries.clone());
+                            }
+                            return Ok(AgentChatResponse {
+                                message: msg,
+                                dsl_source: Some(resolved_dsl),
+                                can_execute: false,
+                                session_state: SessionState::Executing,
+                                ast: None,
+                                disambiguation: None,
+                                commands: None,
+                                unresolved_refs: None,
+                                current_ref_index: None,
+                                dsl_hash: None,
+                                verb_disambiguation: None,
+                                intent_tier: None,
+                                decision: None,
+                                sage_explain: None,
+                                coder_proposal: None,
+                                discovery_bootstrap: None,
+                                parked_entries: Some(parked_entries),
+                            });
+                        }
                         executed_count += 1;
                     }
                     Err(e) => {
@@ -4678,6 +3098,7 @@ impl AgentService {
             sage_explain: None,
             coder_proposal: None,
             discovery_bootstrap: None,
+            parked_entries: None,
         })
     }
 
@@ -4867,6 +3288,7 @@ impl AgentService {
             sage_explain: None,
             coder_proposal: None,
             discovery_bootstrap: None,
+            parked_entries: None,
         }
     }
 
@@ -4891,6 +3313,7 @@ impl AgentService {
             sage_explain: None,
             coder_proposal: None,
             discovery_bootstrap: None,
+            parked_entries: None,
         }
     }
 
@@ -4915,6 +3338,7 @@ impl AgentService {
             sage_explain: None,
             coder_proposal: None,
             discovery_bootstrap: None,
+            parked_entries: None,
         }
     }
 
@@ -5043,6 +3467,7 @@ impl AgentService {
             sage_explain: None,
             coder_proposal: None,
             discovery_bootstrap: None,
+            parked_entries: None,
         }
     }
 
@@ -5122,6 +3547,7 @@ impl AgentService {
             sage_explain: None,
             coder_proposal: None,
             discovery_bootstrap: None,
+            parked_entries: None,
         }
     }
 

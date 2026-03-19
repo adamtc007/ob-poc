@@ -89,6 +89,8 @@ pub struct OrchestratorContext {
     pub pre_sage_entity_kind: Option<String>,
     /// Pre-Sage dominant entity name carried from session state or prior scope.
     pub pre_sage_entity_name: Option<String>,
+    /// Confidence for the dominant entity-kind signal when available.
+    pub pre_sage_entity_confidence: Option<f64>,
     /// Minimal recent Sage ledger from prior turns.
     pub recent_sage_intents: Vec<crate::sage::RecentIntent>,
     /// Optional NLCI compiler hook for the deterministic replacement pipeline.
@@ -1493,6 +1495,7 @@ pub async fn legacy_handle_utterance(
         .process_with_scope(
             discovery_utterance,
             discovery_domain_hint,
+            dominant_entity_kind.as_deref(),
             ctx.scope.clone(),
         )
         .await?;
@@ -2877,6 +2880,7 @@ async fn resolve_via_client(
         evidence_mode,
         point_in_time: None,
         entity_kind: entity_kind.map(|s| s.to_string()),
+        entity_confidence: ctx.pre_sage_entity_confidence,
         discovery: sem_os_core::context_resolution::DiscoveryContext {
             selected_domain_id: ctx.discovery_selected_domain.clone(),
             selected_family_id: ctx.discovery_selected_family.clone(),
@@ -2935,6 +2939,7 @@ pub async fn resolve_allowed_verbs(
         evidence_mode: EvidenceMode::default(),
         point_in_time: None,
         entity_kind: None,
+        entity_confidence: None,
         discovery: Default::default(),
     };
     let principal =
@@ -2965,6 +2970,23 @@ mod tests {
     use super::*;
     use crate::dsl_v2::parse_program;
     use crate::mcp::verb_search::HybridVerbSearcher;
+    use async_trait::async_trait;
+    use chrono::Utc;
+    use sem_os_client::SemOsClient;
+    use sem_os_core::abac::AccessDecision;
+    use sem_os_core::context_resolution::{
+        ContextResolutionResponse, DiscoverySurface, GroundingReadiness, ResolutionStage,
+    };
+    use sem_os_core::error::SemOsError;
+    use sem_os_core::principal::Principal;
+    use sem_os_core::proto::{
+        BootstrapSeedBundleResponse, ChangesetDiffResponse, ChangesetImpactResponse,
+        ChangesetPublishResponse, ExportSnapshotSetResponse, GatePreviewResponse,
+        GetManifestResponse, ListChangesetsQuery, ListChangesetsResponse, ListToolSpecsResponse,
+        ResolveContextRequest, ResolveContextResponse, ToolCallRequest, ToolCallResponse,
+    };
+    use sem_os_core::types::Changeset;
+    use sem_os_core::universe_def::{EntryQuestion, GroundingInput};
     use uuid::Uuid;
 
     /// Helper to build a default IntentTrace for tests.
@@ -3330,6 +3352,18 @@ mod tests {
     }
 
     fn make_test_context() -> OrchestratorContext {
+        fn test_runtime() -> &'static tokio::runtime::Runtime {
+            static TEST_RUNTIME: std::sync::OnceLock<tokio::runtime::Runtime> =
+                std::sync::OnceLock::new();
+            TEST_RUNTIME.get_or_init(|| {
+                tokio::runtime::Builder::new_current_thread()
+                    .enable_all()
+                    .build()
+                    .expect("test runtime")
+            })
+        }
+
+        let _guard = test_runtime().enter();
         OrchestratorContext {
             actor: crate::sem_reg::abac::ActorContext {
                 actor_id: "test.user".to_string(),
@@ -3356,6 +3390,7 @@ mod tests {
             sage_engine: None,
             pre_sage_entity_kind: Some("cbu".to_string()),
             pre_sage_entity_name: Some("Current CBU".to_string()),
+            pre_sage_entity_confidence: Some(0.9),
             recent_sage_intents: vec![],
             nlci_compiler: Some(crate::semtaxonomy_v2::build_minimal_cbu_compiler()),
             discovery_selected_domain: None,
@@ -3370,7 +3405,160 @@ mod tests {
             dominant_entity_id: None,
             pre_sage_entity_kind: None,
             pre_sage_entity_name: None,
+            pre_sage_entity_confidence: None,
             ..make_test_context()
+        }
+    }
+
+    #[derive(Clone)]
+    struct StaticSemOsClient {
+        response: ResolveContextResponse,
+    }
+
+    impl StaticSemOsClient {
+        fn unsupported() -> SemOsError {
+            SemOsError::InvalidInput("unsupported test client operation".to_string())
+        }
+    }
+
+    #[async_trait]
+    impl SemOsClient for StaticSemOsClient {
+        async fn resolve_context(
+            &self,
+            _principal: &Principal,
+            _req: ResolveContextRequest,
+        ) -> sem_os_client::Result<ResolveContextResponse> {
+            Ok(self.response.clone())
+        }
+
+        async fn get_manifest(
+            &self,
+            _snapshot_set_id: &str,
+        ) -> sem_os_client::Result<GetManifestResponse> {
+            Err(Self::unsupported())
+        }
+
+        async fn export_snapshot_set(
+            &self,
+            _snapshot_set_id: &str,
+        ) -> sem_os_client::Result<ExportSnapshotSetResponse> {
+            Err(Self::unsupported())
+        }
+
+        async fn bootstrap_seed_bundle(
+            &self,
+            _principal: &Principal,
+            _bundle: sem_os_core::seeds::SeedBundle,
+        ) -> sem_os_client::Result<BootstrapSeedBundleResponse> {
+            Err(Self::unsupported())
+        }
+
+        async fn dispatch_tool(
+            &self,
+            _principal: &Principal,
+            _req: ToolCallRequest,
+        ) -> sem_os_client::Result<ToolCallResponse> {
+            Err(Self::unsupported())
+        }
+
+        async fn list_tool_specs(&self) -> sem_os_client::Result<ListToolSpecsResponse> {
+            Err(Self::unsupported())
+        }
+
+        async fn list_changesets(
+            &self,
+            _query: ListChangesetsQuery,
+        ) -> sem_os_client::Result<ListChangesetsResponse> {
+            Ok(ListChangesetsResponse {
+                changesets: Vec::<Changeset>::new(),
+            })
+        }
+
+        async fn changeset_diff(
+            &self,
+            _changeset_id: &str,
+        ) -> sem_os_client::Result<ChangesetDiffResponse> {
+            Err(Self::unsupported())
+        }
+
+        async fn changeset_impact(
+            &self,
+            _changeset_id: &str,
+        ) -> sem_os_client::Result<ChangesetImpactResponse> {
+            Err(Self::unsupported())
+        }
+
+        async fn changeset_gate_preview(
+            &self,
+            _changeset_id: &str,
+        ) -> sem_os_client::Result<GatePreviewResponse> {
+            Err(Self::unsupported())
+        }
+
+        async fn publish_changeset(
+            &self,
+            _principal: &Principal,
+            _changeset_id: &str,
+        ) -> sem_os_client::Result<ChangesetPublishResponse> {
+            Err(Self::unsupported())
+        }
+
+        async fn get_affinity_graph(
+            &self,
+        ) -> sem_os_client::Result<Arc<sem_os_core::affinity::AffinityGraph>> {
+            Err(Self::unsupported())
+        }
+
+        async fn drain_outbox_for_test(&self) -> sem_os_client::Result<()> {
+            Ok(())
+        }
+    }
+
+    fn discovery_stage_response() -> ContextResolutionResponse {
+        ContextResolutionResponse {
+            as_of_time: Utc::now(),
+            resolved_at: Utc::now(),
+            applicable_views: vec![],
+            candidate_verbs: vec![],
+            candidate_attributes: vec![],
+            required_preconditions: vec![],
+            disambiguation_questions: vec![],
+            evidence: Default::default(),
+            policy_verdicts: vec![],
+            security_handling: AccessDecision::Allow,
+            governance_signals: vec![],
+            entity_kind_pruned_verbs: vec![],
+            confidence: 0.42,
+            grounded_action_surface: None,
+            resolution_stage: ResolutionStage::Discovery,
+            discovery_surface: Some(DiscoverySurface {
+                matched_universes: vec![],
+                matched_domains: vec![],
+                matched_families: vec![],
+                matched_constellations: vec![],
+                missing_inputs: vec![GroundingInput {
+                    key: "client_name".to_string(),
+                    label: "client name".to_string(),
+                    required: true,
+                    input_type: "string".to_string(),
+                }],
+                entry_questions: vec![EntryQuestion {
+                    question_id: "client-name".to_string(),
+                    prompt: "Which client are you working on?".to_string(),
+                    maps_to: "client_name".to_string(),
+                    priority: 1,
+                }],
+                grounding_readiness: GroundingReadiness::NotReady,
+            }),
+        }
+    }
+
+    fn make_discovery_test_context() -> OrchestratorContext {
+        OrchestratorContext {
+            sem_os_client: Some(Arc::new(StaticSemOsClient {
+                response: discovery_stage_response(),
+            })),
+            ..make_unscoped_test_context()
         }
     }
 
@@ -3783,6 +3971,96 @@ mod tests {
         assert_eq!(
             coder_result.dsl,
             "(schema.entity.describe :entity-type \"document\")"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_freeform_utterance_without_semos_does_not_produce_dsl_hit() {
+        let ctx = make_unscoped_test_context();
+
+        let outcome = handle_utterance(&ctx, "show me Allianz").await.unwrap();
+
+        assert!(!outcome.pipeline_result.valid);
+        assert!(outcome.pipeline_result.dsl.is_empty());
+        assert_eq!(
+            outcome.pipeline_result.outcome,
+            PipelineOutcome::NoAllowedVerbs
+        );
+        assert_eq!(outcome.trace.final_verb, None);
+        assert!(outcome.trace.dsl_generated.is_none());
+        assert!(outcome.trace.semreg_unavailable);
+        assert!(outcome
+            .trace
+            .blocked_reason
+            .as_deref()
+            .is_some_and(|reason| reason.contains("Sem OS unavailable")));
+    }
+
+    #[tokio::test]
+    async fn test_forced_verb_is_denied_when_semos_is_unavailable_in_strict_mode() {
+        let ctx = make_unscoped_test_context();
+
+        let outcome = handle_utterance_with_forced_verb(&ctx, "show me Allianz", "deal.create")
+            .await
+            .unwrap();
+
+        assert!(!outcome.pipeline_result.valid);
+        assert!(outcome.pipeline_result.dsl.is_empty());
+        assert_eq!(
+            outcome.pipeline_result.outcome,
+            PipelineOutcome::NeedsClarification
+        );
+        assert_eq!(outcome.trace.forced_verb.as_deref(), Some("deal.create"));
+        assert_eq!(outcome.trace.final_verb, None);
+        assert_eq!(outcome.trace.selection_source, "user_choice");
+        assert_eq!(outcome.trace.toctou_result.as_deref(), Some("denied"));
+        assert!(outcome.trace.semreg_unavailable);
+        assert!(outcome
+            .trace
+            .blocked_reason
+            .as_deref()
+            .is_some_and(|reason| reason.contains("not in safe-harbor set")));
+    }
+
+    #[tokio::test]
+    async fn test_discovery_stage_semos_response_requires_clarification_not_dsl() {
+        let ctx = make_discovery_test_context();
+
+        let outcome = handle_utterance(&ctx, "show me Allianz").await.unwrap();
+
+        assert!(!outcome.pipeline_result.valid);
+        assert!(outcome.pipeline_result.dsl.is_empty());
+        assert_eq!(
+            outcome.pipeline_result.outcome,
+            PipelineOutcome::NeedsUserInput
+        );
+        assert_eq!(
+            outcome.pipeline_result.missing_required,
+            vec!["client_name".to_string()]
+        );
+        assert!(outcome
+            .pipeline_result
+            .validation_error
+            .as_deref()
+            .is_some_and(|message| message.contains("Which client are you working on?")));
+        assert_eq!(outcome.trace.final_verb, None);
+        assert!(outcome.trace.dsl_generated.is_none());
+        assert!(!outcome.trace.semreg_unavailable);
+        assert!(outcome
+            .trace
+            .blocked_reason
+            .as_deref()
+            .is_some_and(|reason| reason.contains("discovery stage requires clarification")));
+        assert!(outcome
+            .context_envelope
+            .as_ref()
+            .is_some_and(SemOsContextEnvelope::is_discovery_stage));
+        assert_eq!(
+            outcome
+                .context_envelope
+                .as_ref()
+                .and_then(SemOsContextEnvelope::first_discovery_question),
+            Some("Which client are you working on?")
         );
     }
 

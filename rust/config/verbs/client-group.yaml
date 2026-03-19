@@ -44,6 +44,7 @@ domains:
           source_of_truth: operational
           internal: false
           noun: client_group_entity
+          subject_kinds: [client-group]
           tags: [membership, crud]
           phase_tags: [onboarding]
           side_effects: state_write
@@ -98,6 +99,7 @@ domains:
           source_of_truth: operational
           internal: false
           noun: client_group_entity
+          subject_kinds: [client-group]
           tags: [membership, crud]
           phase_tags: [onboarding]
           side_effects: state_write
@@ -141,6 +143,7 @@ domains:
           source_of_truth: operational
           internal: false
           noun: client_group_entity
+          subject_kinds: [client-group]
           tags: [membership, read]
           phase_tags: [onboarding]
           side_effects: facts_only
@@ -193,6 +196,7 @@ domains:
           source_of_truth: operational
           internal: false
           noun: entity_tag
+          subject_kinds: [client-group]
           tags: [tag, crud, learning]
           phase_tags: [onboarding]
           side_effects: state_write
@@ -247,6 +251,7 @@ domains:
           source_of_truth: operational
           internal: false
           noun: entity_tag
+          subject_kinds: [client-group]
           tags: [tag, crud]
           phase_tags: [onboarding]
           side_effects: state_write
@@ -271,6 +276,7 @@ domains:
           source_of_truth: operational
           internal: false
           noun: entity_tag
+          subject_kinds: [client-group]
           tags: [tag, read]
           phase_tags: [onboarding]
           side_effects: facts_only
@@ -321,6 +327,7 @@ domains:
           source_of_truth: operational
           internal: false
           noun: entity_search
+          subject_kinds: [client-group]
           tags: [search, semantic, candle]
           phase_tags: [onboarding]
           side_effects: facts_only
@@ -372,6 +379,7 @@ domains:
           source_of_truth: operational
           internal: false
           noun: discovery
+          subject_kinds: [client-group]
           tags: [onboarding, discovery, bulk]
           phase_tags: [onboarding]
           side_effects: facts_only
@@ -419,6 +427,7 @@ domains:
           source_of_truth: operational
           internal: false
           noun: membership
+          subject_kinds: [client-group]
           tags: [onboarding, confirmation]
           phase_tags: [onboarding]
           side_effects: state_write
@@ -467,6 +476,7 @@ domains:
           source_of_truth: operational
           internal: false
           noun: membership
+          subject_kinds: [client-group]
           tags: [onboarding, rejection]
           phase_tags: [onboarding]
           side_effects: state_write
@@ -515,6 +525,7 @@ domains:
           source_of_truth: operational
           internal: false
           noun: client_group_entity_role
+          subject_kinds: [client-group]
           tags: [role, crud]
           phase_tags: [onboarding]
           side_effects: state_write
@@ -598,6 +609,7 @@ domains:
           source_of_truth: operational
           internal: false
           noun: client_group_entity_role
+          subject_kinds: [client-group]
           tags: [role, crud]
           phase_tags: [onboarding]
           side_effects: state_write
@@ -624,6 +636,7 @@ domains:
           source_of_truth: operational
           internal: false
           noun: client_group_entity_role
+          subject_kinds: [client-group]
           tags: [role, read]
           phase_tags: [onboarding]
           side_effects: facts_only
@@ -685,6 +698,7 @@ domains:
           source_of_truth: operational
           internal: false
           noun: client_group_parties
+          subject_kinds: [client-group]
           tags: [role, read, overview]
           phase_tags: [onboarding]
           side_effects: facts_only
@@ -730,6 +744,7 @@ domains:
           source_of_truth: operational
           internal: false
           noun: client_group_relationship
+          subject_kinds: [client-group]
           tags: [ownership, crud]
           phase_tags: [onboarding]
           side_effects: state_write
@@ -788,6 +803,7 @@ domains:
           source_of_truth: operational
           internal: false
           noun: client_group_relationship
+          subject_kinds: [client-group]
           tags: [ownership, read]
           phase_tags: [onboarding]
           side_effects: facts_only
@@ -847,6 +863,7 @@ domains:
           source_of_truth: operational
           internal: false
           noun: client_group_relationship_source
+          subject_kinds: [client-group]
           tags: [ownership, source, crud]
           phase_tags: [onboarding]
           side_effects: state_write
@@ -914,6 +931,7 @@ domains:
           source_of_truth: operational
           internal: false
           noun: client_group_relationship_source
+          subject_kinds: [client-group]
           tags: [ownership, verification]
           phase_tags: [onboarding]
           side_effects: state_write
@@ -945,6 +963,7 @@ domains:
           source_of_truth: operational
           internal: false
           noun: client_group_relationship_source
+          subject_kinds: [client-group]
           tags: [ownership, canonical]
           phase_tags: [onboarding]
           side_effects: state_write
@@ -978,6 +997,7 @@ domains:
           source_of_truth: operational
           internal: false
           noun: ownership_review
+          subject_kinds: [client-group]
           tags: [ownership, review, kyc]
           phase_tags: [onboarding]
           side_effects: facts_only
@@ -1021,6 +1041,7 @@ domains:
           source_of_truth: operational
           internal: false
           noun: ownership_review
+          subject_kinds: [client-group]
           tags: [ownership, review, reconciliation]
           phase_tags: [onboarding]
           side_effects: facts_only
@@ -1070,6 +1091,7 @@ domains:
           source_of_truth: operational
           internal: false
           noun: client_group
+          subject_kinds: [client-group]
           tags: [discovery, workflow]
           phase_tags: [onboarding]
           side_effects: state_write
@@ -1110,6 +1132,7 @@ domains:
           source_of_truth: operational
           internal: false
           noun: client_group
+          subject_kinds: [client-group]
           tags: [discovery, workflow]
           phase_tags: [onboarding]
           side_effects: state_write

@@ -1004,6 +1004,8 @@ mod tests {
             verb: "create".to_string(),
             full_name: "cbu.create".to_string(),
             description: "Create a CBU".to_string(),
+            harm_class: None,
+            subject_kinds: vec!["cbu".to_string()],
             behavior: RuntimeBehavior::Plugin("create_cbu".to_string()),
             args: vec![RuntimeArg {
                 name: "name".to_string(),

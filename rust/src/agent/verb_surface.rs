@@ -18,6 +18,7 @@ use sem_os_core::authoring::agent_mode::AgentMode;
 use crate::agent::sem_os_context_envelope::{
     AllowedVerbSetFingerprint, PruneReason, SemOsContextEnvelope,
 };
+use crate::dsl_v2::config::types::HarmClass;
 use crate::dsl_v2::runtime_registry::{runtime_registry, RuntimeVerb};
 
 // ── Core types ──────────────────────────────────────────────────
@@ -129,6 +130,46 @@ pub fn is_safe_harbor_verb(fqn: &str) -> bool {
     SAFE_HARBOR_DOMAINS
         .iter()
         .any(|domain| fqn.starts_with(&format!("{domain}.")))
+}
+
+/// Validate that every fail-closed safe-harbor verb is read-only.
+///
+/// # Examples
+/// ```rust
+/// let _ = ob_poc::agent::verb_surface::validate_fail_closed_safe_harbor_harm_class();
+/// ```
+pub fn validate_fail_closed_safe_harbor_harm_class() -> anyhow::Result<()> {
+    let mut violations = Vec::new();
+    let mut missing = Vec::new();
+
+    for verb in runtime_registry().all_verbs() {
+        if !is_safe_harbor_verb(&verb.full_name) {
+            continue;
+        }
+
+        match verb.harm_class {
+            Some(HarmClass::ReadOnly) => {}
+            Some(other) => violations.push(format!("{} ({other:?})", verb.full_name)),
+            None => missing.push(verb.full_name.clone()),
+        }
+    }
+
+    if !missing.is_empty() {
+        tracing::warn!(
+            count = missing.len(),
+            verbs = ?missing,
+            "Safe-harbor harm-class audit found verbs without harm_class metadata"
+        );
+    }
+
+    if violations.is_empty() {
+        return Ok(());
+    }
+
+    anyhow::bail!(
+        "FailClosed safe-harbor contains non-read-only verbs: {}",
+        violations.join(", ")
+    );
 }
 
 // ── Workflow phase → domain allowlists ──────────────────────────

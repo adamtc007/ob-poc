@@ -18,6 +18,7 @@ use tracing::{info, warn};
 use sqlx::PgPool;
 
 use super::config::types::*;
+use crate::entity_kind::canonicalize as canonicalize_entity_kind;
 use crate::templates::{TemplateDefinition, TemplateRegistry};
 
 // =============================================================================
@@ -31,6 +32,10 @@ pub struct RuntimeVerb {
     pub verb: String,
     pub full_name: String,
     pub description: String,
+    /// Safety tier for routing and fail-closed audits.
+    pub harm_class: Option<HarmClass>,
+    /// Entity kinds this verb applies to. Empty means globally applicable.
+    pub subject_kinds: Vec<String>,
     pub behavior: RuntimeBehavior,
     pub args: Vec<RuntimeArg>,
     pub returns: RuntimeReturn,
@@ -337,6 +342,8 @@ impl RuntimeVerbRegistry {
                 verb: verb_name.clone(),
                 full_name: full_name.clone(),
                 description: format!("Create {} entity", type_code),
+                harm_class: Some(HarmClass::Reversible),
+                subject_kinds: vec!["entity".to_string()],
                 behavior: RuntimeBehavior::Crud(Box::new(RuntimeCrudConfig {
                     operation: dynamic
                         .crud
@@ -537,6 +544,8 @@ impl RuntimeVerbRegistry {
             verb: verb.to_string(),
             full_name: format!("{}.{}", domain, verb),
             description: config.description.clone(),
+            harm_class: config.metadata.as_ref().and_then(|meta| meta.harm_class),
+            subject_kinds: derive_subject_kinds(domain, config),
             behavior,
             args: config.args.iter().map(Self::convert_arg).collect(),
             returns: config
@@ -783,6 +792,112 @@ impl RuntimeVerbRegistry {
     }
 }
 
+fn derive_subject_kinds(domain: &str, config: &VerbConfig) -> Vec<String> {
+    if let Some(ref meta) = config.metadata {
+        if !meta.subject_kinds.is_empty() {
+            return meta
+                .subject_kinds
+                .iter()
+                .map(|kind| canonicalize_entity_kind(kind))
+                .collect();
+        }
+    }
+
+    if let Some(ref produces) = config.produces {
+        return vec![canonicalize_entity_kind(&produces.produced_type)];
+    }
+
+    let mut crud_kinds = derive_subject_kinds_from_crud(config);
+    if !crud_kinds.is_empty() {
+        crud_kinds.sort();
+        crud_kinds.dedup();
+        return crud_kinds;
+    }
+
+    let mut lookup_kinds: Vec<String> = config
+        .args
+        .iter()
+        .filter(|arg| arg.required)
+        .filter_map(|arg| arg.lookup.as_ref())
+        .filter_map(|lookup| {
+            lookup
+                .entity_type
+                .as_deref()
+                .filter(|kind| !is_generic_lookup_kind(kind))
+                .map(canonicalize_entity_kind)
+                .or_else(|| derive_subject_kind_from_table_name(&lookup.table))
+        })
+        .collect();
+    if !lookup_kinds.is_empty() {
+        lookup_kinds.sort();
+        lookup_kinds.dedup();
+        return lookup_kinds;
+    }
+
+    vec![canonicalize_entity_kind(&domain_to_subject_kind(domain))]
+}
+
+fn derive_subject_kinds_from_crud(config: &VerbConfig) -> Vec<String> {
+    let Some(ref crud) = config.crud else {
+        return Vec::new();
+    };
+
+    [
+        crud.table.as_deref(),
+        crud.base_table.as_deref(),
+        crud.extension_table.as_deref(),
+        crud.junction.as_deref(),
+        crud.primary_table.as_deref(),
+        crud.join_table.as_deref(),
+    ]
+    .into_iter()
+    .flatten()
+    .filter_map(derive_subject_kind_from_table_name)
+    .collect()
+}
+
+fn derive_subject_kind_from_table_name(table: &str) -> Option<String> {
+    let normalized = table.trim().to_ascii_lowercase().replace('_', "-");
+    let kind = match normalized.as_str() {
+        "cbu" | "cbus" => "cbu",
+        "entity" | "entities" => "entity",
+        "deal" | "deals" => "deal",
+        "contract" | "contracts" | "contract-pack" | "contract-packs" => "contract",
+        "document" | "documents" | "requirement" | "requirements" => "document",
+        "trading-profile" | "trading-profiles" | "mandate" | "mandates" => "trading-profile",
+        "billing" | "billings" | "billing-profile" | "billing-profiles" => "billing-profile",
+        "fund" | "funds" => "fund",
+        "investor" | "investors" | "holding" | "holdings" => "investor",
+        _ => return None,
+    };
+    Some(canonicalize_entity_kind(kind))
+}
+
+fn is_generic_lookup_kind(kind: &str) -> bool {
+    matches!(
+        canonicalize_entity_kind(kind).as_str(),
+        "jurisdiction" | "country" | "currency" | "role" | "status" | "market" | "user" | "team"
+    )
+}
+
+fn domain_to_subject_kind(domain: &str) -> String {
+    match domain {
+        "cbu" | "cbu-role" | "role" => "cbu".into(),
+        "entity" | "entity-role" => "entity".into(),
+        "kyc" | "kyc-case" | "screening" => "kyc-case".into(),
+        "deal" => "deal".into(),
+        "contract" | "contract-pack" => "contract".into(),
+        "billing" => "billing-profile".into(),
+        "trading-profile" | "custody" | "ssi" => "trading-profile".into(),
+        "investor" | "holding" => "investor".into(),
+        "document" | "requirement" => "document".into(),
+        "session" | "view" => "session".into(),
+        "gleif" | "research" => "entity".into(),
+        "workflow" | "bpmn" => "workflow".into(),
+        _ => domain.into(),
+    }
+}
+
 // =============================================================================
 // GLOBAL REGISTRY ACCESSOR
 // =============================================================================
@@ -997,6 +1112,13 @@ mod tests {
 
         assert_eq!(registry.len(), 1);
         assert!(registry.contains("cbu", "create"));
+        assert_eq!(
+            registry
+                .get("cbu", "create")
+                .expect("runtime verb")
+                .subject_kinds,
+            vec!["cbu".to_string()]
+        );
     }
 
     #[test]

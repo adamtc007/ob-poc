@@ -48,6 +48,8 @@ use crate::agent::learning::embedder::SharedEmbedder;
 use crate::agent::learning::warmup::SharedLearnedData;
 use crate::database::VerbService;
 use crate::dsl_v2::macros::MacroRegistry;
+use crate::dsl_v2::runtime_registry::runtime_registry;
+use crate::entity_kind::canonicalize as canonicalize_entity_kind;
 use crate::lexicon::LexiconService;
 use crate::mcp::compound_intent::extract_compound_signals;
 use crate::mcp::macro_index::{MacroIndex, MacroResolveOutcome};
@@ -482,6 +484,7 @@ impl HybridVerbSearcher {
         query: &str,
         user_id: Option<Uuid>,
         domain_filter: Option<&str>,
+        entity_kind: Option<&str>,
         limit: usize,
         allowed_verbs: Option<&HashSet<String>>,
     ) -> Result<Vec<VerbSearchResult>> {
@@ -573,6 +576,7 @@ impl HybridVerbSearcher {
                                 ecir_boost_set.insert(fqn.clone());
                             }
                         } else if self.matches_domain(fqn, domain_filter)
+                            && self.matches_entity_kind(fqn, entity_kind)
                             && allowed_verbs.is_none_or(|av| av.contains(fqn))
                             && !seen_verbs.contains(fqn)
                         {
@@ -641,6 +645,7 @@ impl HybridVerbSearcher {
                         };
                         if let Some(fqn) = route_fqn {
                             if self.matches_domain(&fqn, domain_filter)
+                                && self.matches_entity_kind(&fqn, entity_kind)
                                 && allowed_verbs.is_none_or(|av| av.contains(&fqn))
                                 && !seen_verbs.contains(&fqn)
                             {
@@ -770,6 +775,7 @@ impl HybridVerbSearcher {
                     );
                     for m in candidates {
                         if self.matches_domain(&m.fqn, domain_filter)
+                            && self.matches_entity_kind(&m.fqn, entity_kind)
                             && allowed_verbs.is_none_or(|av| av.contains(&m.fqn))
                             && !seen_verbs.contains(&m.fqn)
                         {
@@ -805,6 +811,7 @@ impl HybridVerbSearcher {
             let macro_results = self.search_macros(query, limit);
             for result in macro_results {
                 if self.matches_domain(&result.verb, domain_filter)
+                    && self.matches_entity_kind(&result.verb, entity_kind)
                     && allowed_verbs.is_none_or(|av| av.contains(&result.verb))
                     && !seen_verbs.contains(&result.verb)
                 {
@@ -837,6 +844,7 @@ impl HybridVerbSearcher {
             let lexicon_results = lexicon.search_verbs(&normalized, None, limit);
             for candidate in lexicon_results {
                 if self.matches_domain(&candidate.dsl_verb, domain_filter)
+                    && self.matches_entity_kind(&candidate.dsl_verb, entity_kind)
                     && allowed_verbs.is_none_or(|av| av.contains(&candidate.dsl_verb))
                     && !seen_verbs.contains(&candidate.dsl_verb)
                 {
@@ -873,6 +881,7 @@ impl HybridVerbSearcher {
         if let Some(uid) = user_id {
             if let Some(result) = self.search_user_learned_exact(uid, &normalized).await? {
                 if self.matches_domain(&result.verb, domain_filter)
+                    && self.matches_entity_kind(&result.verb, entity_kind)
                     && allowed_verbs.is_none_or(|av| av.contains(&result.verb))
                 {
                     seen_verbs.insert(result.verb.clone());
@@ -887,6 +896,7 @@ impl HybridVerbSearcher {
                 let guard = learned.read().await;
                 if let Some(verb) = guard.resolve_phrase(&normalized) {
                     if self.matches_domain(verb, domain_filter)
+                        && self.matches_entity_kind(verb, entity_kind)
                         && allowed_verbs.is_none_or(|av| av.contains(verb))
                     {
                         let description = self.get_verb_description(verb).await;
@@ -923,6 +933,7 @@ impl HybridVerbSearcher {
                         );
                         for matched in exact_matches {
                             if !self.matches_domain(&matched.verb, domain_filter)
+                                || !self.matches_entity_kind(&matched.verb, entity_kind)
                                 || seen_verbs.contains(&matched.verb)
                             {
                                 continue;
@@ -954,6 +965,7 @@ impl HybridVerbSearcher {
                     .await?;
                 for result in user_results {
                     if self.matches_domain(&result.verb, domain_filter)
+                        && self.matches_entity_kind(&result.verb, entity_kind)
                         && !seen_verbs.contains(&result.verb)
                     {
                         seen_verbs.insert(result.verb.clone());
@@ -1011,7 +1023,9 @@ impl HybridVerbSearcher {
                             if seen_verbs.contains(&result.verb) {
                                 continue;
                             }
-                            if !self.matches_domain(&result.verb, domain_filter) {
+                            if !self.matches_domain(&result.verb, domain_filter)
+                                || !self.matches_entity_kind(&result.verb, entity_kind)
+                            {
                                 continue;
                             }
                             if self
@@ -1061,7 +1075,9 @@ impl HybridVerbSearcher {
                             if seen_verbs.contains(&pm.verb) {
                                 continue;
                             }
-                            if !self.matches_domain(&pm.verb, domain_filter) {
+                            if !self.matches_domain(&pm.verb, domain_filter)
+                                || !self.matches_entity_kind(&pm.verb, entity_kind)
+                            {
                                 continue;
                             }
                             // Score phonetic matches slightly below semantic threshold
@@ -1355,6 +1371,26 @@ impl HybridVerbSearcher {
         }
     }
 
+    fn matches_entity_kind(&self, verb: &str, entity_kind: Option<&str>) -> bool {
+        let Some(kind) = entity_kind.map(canonicalize_entity_kind) else {
+            return true;
+        };
+
+        let Some(runtime_verb) = runtime_registry().get_by_name(verb) else {
+            return true;
+        };
+
+        if runtime_verb.subject_kinds.is_empty() {
+            return true;
+        }
+
+        runtime_verb
+            .subject_kinds
+            .iter()
+            .map(|sk| canonicalize_entity_kind(sk))
+            .any(|sk| sk == kind)
+    }
+
     /// Search operator macros by label/FQN match
     ///
     /// Macros are the PRIMARY UI mechanism (verb picker). This search:
@@ -1503,7 +1539,7 @@ mod tests {
     async fn test_minimal_searcher() {
         let searcher = HybridVerbSearcher::minimal();
         let results = searcher
-            .search("create cbu", None, None, 5, None)
+            .search("create cbu", None, None, None, 5, None)
             .await
             .unwrap();
 
@@ -1525,6 +1561,24 @@ mod tests {
             let json = serde_json::to_string(&source).unwrap();
             println!("{:?} -> {}", source, json);
         }
+    }
+
+    #[test]
+    fn test_matches_entity_kind_allows_empty_subject_kinds() {
+        let searcher = HybridVerbSearcher::minimal();
+        assert!(searcher.matches_entity_kind("session.help", Some("company")));
+    }
+
+    #[test]
+    fn test_matches_entity_kind_filters_mismatched_subject_kind() {
+        let searcher = HybridVerbSearcher::minimal();
+        assert!(!searcher.matches_entity_kind("deal.create", Some("company")));
+    }
+
+    #[test]
+    fn test_matches_entity_kind_canonicalizes_aliases() {
+        let searcher = HybridVerbSearcher::minimal();
+        assert!(searcher.matches_entity_kind("deal.create", Some("deal-record")));
     }
 
     // =========================================================================

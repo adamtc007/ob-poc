@@ -11,7 +11,8 @@ domains:
           source_of_truth: operational
           scope: global
           noun: discovery
-          subject_kinds: []
+          subject_kinds:
+            [entity, cbu, fund, person, company, client-group, deal, kyc-case]
           phase_tags: [discovery]
           side_effects: facts_only
           harm_class: read_only
@@ -131,7 +132,8 @@ domains:
           source_of_truth: operational
           scope: global
           noun: discovery
-          subject_kinds: []
+          subject_kinds:
+            [entity, cbu, fund, person, company, client-group, deal, kyc-case]
           phase_tags: [discovery]
           side_effects: facts_only
           harm_class: read_only
@@ -168,7 +170,8 @@ domains:
           source_of_truth: operational
           scope: global
           noun: discovery
-          subject_kinds: []
+          subject_kinds:
+            [entity, cbu, fund, person, company, client-group, deal, kyc-case]
           phase_tags: [discovery]
           side_effects: facts_only
           harm_class: read_only
@@ -209,7 +212,8 @@ domains:
           source_of_truth: operational
           scope: global
           noun: discovery
-          subject_kinds: []
+          subject_kinds:
+            [entity, cbu, fund, person, company, client-group, deal, kyc-case]
           phase_tags: [discovery]
           side_effects: facts_only
           harm_class: read_only
@@ -236,7 +240,7 @@ domains:
           scope: global
           noun: discovery
           subject_kinds:
-            [entity, cbu, fund, person, company, client-group, deal, case]
+            [entity, cbu, fund, person, company, client-group, deal, kyc-case]
           phase_tags: [discovery]
           side_effects: facts_only
           harm_class: read_only
@@ -273,7 +277,7 @@ domains:
           scope: global
           noun: discovery
           subject_kinds:
-            [entity, cbu, fund, person, company, client-group, deal, case]
+            [entity, cbu, fund, person, company, client-group, deal, kyc-case]
           phase_tags: [discovery]
           side_effects: facts_only
           harm_class: read_only

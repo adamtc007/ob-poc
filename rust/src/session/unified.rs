@@ -847,6 +847,9 @@ pub struct ChatMessage {
     /// Sem OS discovery bootstrap payload for this message.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub discovery_bootstrap: Option<ob_poc_types::chat::DiscoveryBootstrapPayload>,
+    /// Parked runbook payload for this message.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parked_entries: Option<Vec<ob_poc_types::chat::ParkedEntryPayload>>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -2115,6 +2118,7 @@ impl UnifiedSession {
             sage_explain: None,
             coder_proposal: None,
             discovery_bootstrap: None,
+            parked_entries: None,
         });
         self.updated_at = Utc::now();
         id
@@ -2139,6 +2143,7 @@ impl UnifiedSession {
             sage_explain: None,
             coder_proposal: None,
             discovery_bootstrap: None,
+            parked_entries: None,
         });
         self.updated_at = Utc::now();
         id
@@ -2157,6 +2162,7 @@ impl UnifiedSession {
             sage_explain: None,
             coder_proposal: None,
             discovery_bootstrap: None,
+            parked_entries: None,
         });
         self.updated_at = Utc::now();
         id
@@ -3523,6 +3529,7 @@ impl From<ChatMessage> for crate::api::session::ChatMessage {
             sage_explain: msg.sage_explain,
             coder_proposal: msg.coder_proposal,
             discovery_bootstrap: msg.discovery_bootstrap,
+            parked_entries: msg.parked_entries,
         }
     }
 }

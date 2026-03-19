@@ -19,6 +19,8 @@ use serde::Deserialize;
 
 use dsl_core::config::types::VerbsConfig;
 
+use crate::entity_kind::canonicalize as canonical_entity_kind;
+
 // ---------------------------------------------------------------------------
 // YAML deserialization types
 // ---------------------------------------------------------------------------
@@ -222,29 +224,92 @@ fn derive_subject_kinds(domain: &str, config: &dsl_core::config::types::VerbConf
     // Priority 1: explicit metadata.subject_kinds
     if let Some(ref meta) = config.metadata {
         if !meta.subject_kinds.is_empty() {
-            return meta.subject_kinds.clone();
+            return meta
+                .subject_kinds
+                .iter()
+                .map(|kind| canonical_entity_kind(kind))
+                .collect();
         }
     }
 
     // Priority 2: produces.entity_type
     if let Some(ref p) = config.produces {
-        return vec![p.produced_type.clone()];
+        return vec![canonical_entity_kind(&p.produced_type)];
     }
 
-    // Priority 3: required args with lookup.entity_type
+    // Priority 3: CRUD/table heuristic
+    let mut crud_kinds = derive_subject_kinds_from_crud(config);
+    if !crud_kinds.is_empty() {
+        crud_kinds.sort();
+        crud_kinds.dedup();
+        return crud_kinds;
+    }
+
+    // Priority 4: required args with lookup.entity_type
     let mut kinds: Vec<String> = config
         .args
         .iter()
         .filter(|a| a.required)
-        .filter_map(|a| a.lookup.as_ref().and_then(|l| l.entity_type.clone()))
+        .filter_map(|a| a.lookup.as_ref())
+        .filter_map(|lookup| {
+            lookup
+                .entity_type
+                .as_deref()
+                .filter(|kind| !is_generic_lookup_kind(kind))
+                .map(canonical_entity_kind)
+                .or_else(|| derive_subject_kind_from_table_name(&lookup.table))
+        })
         .collect();
     kinds.dedup();
     if !kinds.is_empty() {
         return kinds;
     }
 
-    // Priority 4: domain heuristic
-    vec![domain_to_subject_kind(domain)]
+    // Priority 5: domain heuristic
+    vec![canonical_entity_kind(&domain_to_subject_kind(domain))]
+}
+
+fn derive_subject_kinds_from_crud(config: &dsl_core::config::types::VerbConfig) -> Vec<String> {
+    let Some(ref crud) = config.crud else {
+        return Vec::new();
+    };
+
+    [
+        crud.table.as_deref(),
+        crud.base_table.as_deref(),
+        crud.extension_table.as_deref(),
+        crud.junction.as_deref(),
+        crud.primary_table.as_deref(),
+        crud.join_table.as_deref(),
+    ]
+    .into_iter()
+    .flatten()
+    .filter_map(derive_subject_kind_from_table_name)
+    .collect()
+}
+
+fn derive_subject_kind_from_table_name(table: &str) -> Option<String> {
+    let normalized = table.trim().to_ascii_lowercase().replace('_', "-");
+    let kind = match normalized.as_str() {
+        "cbu" | "cbus" => "cbu",
+        "entity" | "entities" => "entity",
+        "deal" | "deals" => "deal",
+        "contract" | "contracts" | "contract-pack" | "contract-packs" => "contract",
+        "document" | "documents" | "requirement" | "requirements" => "document",
+        "trading-profile" | "trading-profiles" | "mandate" | "mandates" => "trading-profile",
+        "billing" | "billings" | "billing-profile" | "billing-profiles" => "billing-profile",
+        "fund" | "funds" => "fund",
+        "investor" | "investors" | "holding" | "holdings" => "investor",
+        _ => return None,
+    };
+    Some(canonical_entity_kind(kind))
+}
+
+fn is_generic_lookup_kind(kind: &str) -> bool {
+    matches!(
+        canonical_entity_kind(kind).as_str(),
+        "jurisdiction" | "country" | "currency" | "role" | "status" | "market" | "user" | "team"
+    )
 }
 
 /// Map a verb domain name to its primary subject kind (lowest-priority heuristic).
@@ -315,7 +380,9 @@ impl NounIndex {
         for (key, entry_yaml) in parsed.nouns {
             let entry = Arc::new(NounEntry {
                 key: key.clone(),
-                entity_type_fqn: entry_yaml.entity_type_fqn,
+                entity_type_fqn: entry_yaml
+                    .entity_type_fqn
+                    .map(|kind| canonical_entity_kind(&kind)),
                 noun_keys: entry_yaml.noun_keys,
                 action_verbs: entry_yaml.action_verbs,
             });
@@ -528,7 +595,8 @@ impl NounIndex {
 
         // Path 3: entity_type_fqn → subject_kinds match
         if let Some(ref etf) = primary.noun.entity_type_fqn {
-            if let Some(verbs) = self.verb_index.by_subject_kind.get(etf) {
+            let canonical_kind = canonical_entity_kind(etf);
+            if let Some(verbs) = self.verb_index.by_subject_kind.get(&canonical_kind) {
                 let mut candidates = verbs.clone();
                 candidates.sort();
                 candidates.dedup();
@@ -973,5 +1041,31 @@ nouns:
                 idx.canonical.len()
             );
         }
+    }
+
+    #[test]
+    fn test_subject_kind_match_normalizes_kebab_and_snake_case() {
+        let mut verb_index = test_verb_index();
+        verb_index
+            .by_subject_kind
+            .insert("kyc-case".to_string(), vec!["kyc-case.create".to_string()]);
+
+        let idx = NounIndex::from_yaml(
+            r#"
+version: "1.0"
+nouns:
+  kyc-case:
+    aliases: ["kyc case"]
+    entity_type_fqn: kyc_case
+    noun_keys: [kyc_case]
+"#,
+            verb_index,
+        )
+        .unwrap();
+
+        let matches = idx.extract("open a kyc case");
+        let resolution = idx.resolve(&matches, Some(ActionCategory::Create));
+        assert_eq!(resolution.resolution_path, ResolutionPath::SubjectKindMatch);
+        assert_eq!(resolution.candidates, vec!["kyc-case.create".to_string()]);
     }
 }

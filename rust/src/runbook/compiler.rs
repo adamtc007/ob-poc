@@ -28,6 +28,7 @@ use uuid::Uuid;
 use crate::dsl_v2::macros::{
     expand_macro_fixpoint, MacroExpansionError, MacroRegistry, MacroSchema, EXPANSION_LIMITS,
 };
+use crate::dsl_v2::{quick_validate, runtime_registry_arc, Severity};
 use crate::journey::pack_manager::EffectiveConstraints;
 use crate::session::unified::UnifiedSession;
 
@@ -203,6 +204,21 @@ fn compile_macro(
             ));
         }
     };
+
+    let expanded_source = fixpoint.statements.join("\n");
+    let validation_errors: Vec<String> = quick_validate(&expanded_source, runtime_registry_arc())
+        .into_iter()
+        .filter(|diagnostic| diagnostic.severity == Severity::Error)
+        .map(|diagnostic| diagnostic.message)
+        .collect();
+    if !validation_errors.is_empty() {
+        return OrchestratorResponse::CompilationError(CompilationError::new(
+            CompilationErrorKind::ExpansionFailed {
+                reason: validation_errors.join("; "),
+            },
+            "expand",
+        ));
+    }
 
     // Extract expanded verb names for downstream gates.
     let expanded_verbs: Vec<String> = fixpoint

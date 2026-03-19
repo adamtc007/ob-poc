@@ -1351,6 +1351,7 @@ async fn handle_resolve_context(
         evidence_mode: mode,
         point_in_time: None,
         entity_kind: None,
+        entity_confidence: None,
         discovery: DiscoveryContext::default(),
     };
 
@@ -1469,6 +1470,7 @@ async fn handle_apply_view(
         evidence_mode: EvidenceMode::Normal,
         point_in_time: None,
         entity_kind: None,
+        entity_confidence: None,
         discovery: DiscoveryContext::default(),
     };
 
@@ -2292,6 +2294,7 @@ async fn handle_identify_gaps(
         evidence_mode: mode,
         point_in_time: None,
         entity_kind: None,
+        entity_confidence: None,
         discovery: DiscoveryContext::default(),
     };
 

@@ -29,7 +29,7 @@ domains:
           source_of_truth: external
           scope: global
           noun: lei
-          subject_kinds: [company, legal_entity]
+          subject_kinds: [company]
           tags: [gleif, external-api, enrichment, onboarding]
           phase_tags: [onboarding, kyc]
           side_effects: state_write
@@ -70,7 +70,7 @@ domains:
           source_of_truth: external
           scope: global
           noun: lei
-          subject_kinds: [company, legal_entity]
+          subject_kinds: [company]
           tags: [gleif, external-api, search, onboarding]
           phase_tags: [onboarding, kyc]
           side_effects: facts_only
@@ -121,7 +121,7 @@ domains:
           source_of_truth: external
           scope: global
           noun: lei
-          subject_kinds: [company, legal_entity]
+          subject_kinds: [company]
           tags: [gleif, external-api, import, hierarchy, onboarding]
           phase_tags: [onboarding, kyc]
           side_effects: state_write
@@ -169,7 +169,7 @@ domains:
           source_of_truth: external
           scope: global
           noun: lei
-          subject_kinds: [company, legal_entity]
+          subject_kinds: [company]
           tags: [gleif, external-api, import, funds, onboarding]
           phase_tags: [onboarding, kyc]
           side_effects: state_write
@@ -210,7 +210,7 @@ domains:
           source_of_truth: external
           scope: global
           noun: lei
-          subject_kinds: [company, legal_entity]
+          subject_kinds: [company]
           tags: [gleif, external-api, refresh, onboarding]
           phase_tags: [onboarding, kyc]
           side_effects: state_write
@@ -255,7 +255,7 @@ domains:
           source_of_truth: external
           scope: global
           noun: lei
-          subject_kinds: [company, legal_entity]
+          subject_kinds: [company]
           tags: [gleif, external-api, lookup, onboarding]
           phase_tags: [onboarding, kyc]
           side_effects: facts_only
@@ -284,7 +284,7 @@ domains:
           source_of_truth: external
           scope: global
           noun: lei
-          subject_kinds: [company, legal_entity]
+          subject_kinds: [company]
           tags: [gleif, external-api, lookup, relationship, onboarding]
           phase_tags: [onboarding, kyc]
           side_effects: facts_only
@@ -313,7 +313,7 @@ domains:
           source_of_truth: external
           scope: global
           noun: lei
-          subject_kinds: [company, legal_entity]
+          subject_kinds: [company]
           tags: [gleif, external-api, lookup, relationship, onboarding]
           phase_tags: [onboarding, kyc]
           side_effects: facts_only
@@ -353,7 +353,7 @@ domains:
           source_of_truth: external
           scope: global
           noun: lei
-          subject_kinds: [company, legal_entity]
+          subject_kinds: [company]
           tags: [gleif, external-api, trace, ownership, onboarding]
           phase_tags: [onboarding, kyc]
           side_effects: facts_only
@@ -384,7 +384,7 @@ domains:
           source_of_truth: external
           scope: global
           noun: lei
-          subject_kinds: [company, legal_entity]
+          subject_kinds: [company]
           tags: [gleif, external-api, lookup, funds, onboarding]
           phase_tags: [onboarding, kyc]
           side_effects: facts_only
@@ -424,7 +424,7 @@ domains:
           source_of_truth: external
           scope: global
           noun: lei
-          subject_kinds: [company, legal_entity]
+          subject_kinds: [company]
           tags: [gleif, external-api, lookup, successor, onboarding]
           phase_tags: [onboarding, kyc]
           side_effects: state_write
@@ -460,7 +460,7 @@ domains:
           source_of_truth: external
           scope: global
           noun: lei
-          subject_kinds: [company, legal_entity]
+          subject_kinds: [company]
           tags: [gleif, external-api, lookup, relationship, funds, onboarding]
           phase_tags: [onboarding, kyc]
           side_effects: facts_only
@@ -501,7 +501,7 @@ domains:
           source_of_truth: external
           scope: global
           noun: lei
-          subject_kinds: [company, legal_entity]
+          subject_kinds: [company]
           tags: [gleif, external-api, lookup, relationship, funds, onboarding]
           phase_tags: [onboarding, kyc]
           side_effects: facts_only
@@ -542,7 +542,7 @@ domains:
           source_of_truth: external
           scope: global
           noun: lei
-          subject_kinds: [company, legal_entity]
+          subject_kinds: [company]
           tags: [gleif, external-api, lookup, relationship, funds, onboarding]
           phase_tags: [onboarding, kyc]
           side_effects: facts_only
@@ -583,7 +583,7 @@ domains:
           source_of_truth: external
           scope: global
           noun: lei
-          subject_kinds: [company, legal_entity]
+          subject_kinds: [company]
           tags: [gleif, external-api, lookup, isin, onboarding]
           phase_tags: [onboarding, kyc]
           side_effects: facts_only

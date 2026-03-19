@@ -1832,6 +1832,7 @@ impl ReplOrchestratorV2 {
             client_group_id: ctx.derived_scope.client_group_id,
             client_group_name: ctx.derived_scope.client_group_name.clone(),
             domain_hint: ctx.active_pack().and_then(|p| p.dominant_domain.clone()),
+            entity_kind: ctx.focus.cbu.as_ref().map(|_| "cbu".to_string()),
             ..Default::default()
         }
     }

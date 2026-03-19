@@ -1,0 +1,88 @@
+fqn: family.deal_lifecycle
+family_id: deal_lifecycle
+label: Deal Lifecycle
+description: Family for routing commercial deal setup into the closest supported structure anchor.
+domain_id: deal
+selection_rules:
+  - condition: jurisdiction == 'UK' && entity_kind == 'company'
+    target_constellation: struct.uk.manager.llp
+    priority: 30
+  - condition: jurisdiction == 'LU'
+    target_constellation: struct.lux.ucits.sicav
+    priority: 29
+  - condition: jurisdiction == 'IE'
+    target_constellation: struct.ie.ucits.icav
+    priority: 28
+  - condition: jurisdiction == 'US'
+    target_constellation: struct.us.40act.open-end
+    priority: 27
+  - condition: jurisdiction == 'XB'
+    target_constellation: struct.hedge.cross-border
+    priority: 26
+constellation_refs:
+  - constellation_id: struct.uk.manager.llp
+    label: UK Manager LLP Commercial Anchor
+    jurisdiction: UK
+    entity_kind: company
+    triggers:
+      - deal
+      - commercial
+      - pricing
+      - sla
+      - manager
+  - constellation_id: struct.lux.ucits.sicav
+    label: Luxembourg Commercial Fund Anchor
+    jurisdiction: LU
+    entity_kind: fund
+    triggers:
+      - deal
+      - commercial
+      - contract
+      - pricing
+      - luxembourg
+  - constellation_id: struct.ie.ucits.icav
+    label: Irish Commercial Fund Anchor
+    jurisdiction: IE
+    entity_kind: fund
+    triggers:
+      - deal
+      - commercial
+      - agreement
+      - pricing
+      - ireland
+  - constellation_id: struct.us.40act.open-end
+    label: US Commercial Fund Anchor
+    jurisdiction: US
+    entity_kind: fund
+    triggers:
+      - deal
+      - commercial
+      - contract
+      - rate card
+      - us
+  - constellation_id: struct.hedge.cross-border
+    label: Cross-Border Commercial Anchor
+    jurisdiction: XB
+    entity_kind: fund
+    triggers:
+      - deal
+      - cross-border
+      - commercial
+      - contract
+candidate_jurisdictions:
+  - LU
+  - IE
+  - UK
+  - US
+  - XB
+candidate_entity_kinds:
+  - deal
+  - fund
+  - company
+  - cbu
+grounding_threshold:
+  required_input_keys:
+    - objective
+    - jurisdiction
+  requires_entity_instance: false
+  allows_draft_instance: true

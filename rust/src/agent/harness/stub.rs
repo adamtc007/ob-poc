@@ -59,6 +59,7 @@ pub fn build_stub_context(
         sage_engine: None,
         pre_sage_entity_kind: None,
         pre_sage_entity_name: None,
+        pre_sage_entity_confidence: None,
         recent_sage_intents: vec![],
         nlci_compiler: Some(crate::semtaxonomy_v2::build_minimal_cbu_compiler()),
         discovery_selected_domain: None,

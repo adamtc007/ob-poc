@@ -1,0 +1,56 @@
+fqn: universe.trading_operations
+universe_id: trading_operations
+name: Trading Operations
+description: Discovery universe for mandate, instruction profile, ISDA, and settlement-chain workflows.
+version: "1.0"
+default_entry_domain: trading
+domains:
+  - domain_id: trading
+    label: Trading
+    description: Trading setup, booking readiness, SSI, and custody workflow discovery.
+    objective_tags:
+      - trading
+      - custody
+      - settlement
+    utterance_signals:
+      - signal_type: keyword
+        pattern: trading
+        weight: 1.0
+      - signal_type: keyword
+        pattern: settlement
+        weight: 0.9
+      - signal_type: keyword
+        pattern: mandate
+        weight: 0.8
+      - signal_type: keyword
+        pattern: isda
+        weight: 0.8
+      - signal_type: keyword
+        pattern: ssi
+        weight: 0.8
+    candidate_entity_kinds:
+      - trading-profile
+      - settlement-chain
+      - isda
+      - cbu
+      - fund
+    candidate_family_ids:
+      - trading_mandate
+    required_grounding_inputs:
+      - key: objective
+        label: Objective
+        required: true
+        input_type: string
+    entry_questions:
+      - question_id: trading_goal
+        prompt: What trading or custody setup do you need?
+        maps_to: objective
+        priority: 1
+      - question_id: trading_jurisdiction
+        prompt: Which jurisdiction or market is this trading setup for?
+        maps_to: jurisdiction
+        priority: 2
+    allowed_discovery_actions:
+      - research.search
+      - entity.resolve
+      - session.clarify
