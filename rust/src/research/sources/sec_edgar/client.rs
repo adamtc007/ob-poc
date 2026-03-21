@@ -34,6 +34,7 @@ impl SecEdgarClient {
         let http = Client::builder()
             .timeout(Duration::from_secs(30))
             .user_agent(user_agent)
+            .no_proxy()
             .build()
             .context("Failed to create HTTP client")?;
 

@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
+use sem_os_core::constellation_map_def::{ConstellationMapDefBody, SlotDef, SlotType};
 use sqlx::{PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
@@ -16,7 +17,6 @@ use super::overrides::{
     CreateOverrideRequest, StateOverride,
 };
 use super::{fetch_slot_overlays, ValidatedStateMachine};
-use crate::constellation::{discover_state_machine_slot_contexts, load_builtin_constellation_map};
 
 /// Compute reducer state for a single slot.
 ///
@@ -118,28 +118,13 @@ pub async fn handle_state_derive_all(
     case_id: Option<Uuid>,
     state_machine: &ValidatedStateMachine,
 ) -> Result<Vec<SlotReduceResult>> {
-    if let Ok(map) = load_builtin_constellation_map("struct.lux.ucits.sicav") {
+    if let Ok(map) = load_sem_os_builtin_constellation_map("struct.lux.ucits.sicav") {
         let contexts =
-            discover_state_machine_slot_contexts(pool, cbu_id, case_id, &map, &state_machine.name)
+            discover_sem_os_slot_contexts(pool, cbu_id, case_id, &map, &state_machine.name)
                 .await
                 .unwrap_or_default();
         if !contexts.is_empty() {
-            return evaluate_slot_contexts(
-                pool,
-                cbu_id,
-                case_id,
-                state_machine,
-                contexts
-                    .into_iter()
-                    .map(|context| SlotContext {
-                        entity_id: context.entity_id,
-                        slot_path: context.slot_path,
-                        slot_type: context.slot_type,
-                        cardinality: context.cardinality,
-                    })
-                    .collect(),
-            )
-            .await;
+            return evaluate_slot_contexts(pool, cbu_id, case_id, state_machine, contexts).await;
         }
     }
     let contexts = load_slot_contexts(pool, cbu_id, case_id).await?;
@@ -220,23 +205,16 @@ pub async fn handle_state_check_consistency(
     case_id: Option<Uuid>,
     state_machine: &ValidatedStateMachine,
 ) -> Result<Vec<ConsistencyWarning>> {
-    let contexts = if let Ok(map) = load_builtin_constellation_map("struct.lux.ucits.sicav") {
+    let contexts = if let Ok(map) = load_sem_os_builtin_constellation_map("struct.lux.ucits.sicav")
+    {
         let discovered =
-            discover_state_machine_slot_contexts(pool, cbu_id, case_id, &map, &state_machine.name)
+            discover_sem_os_slot_contexts(pool, cbu_id, case_id, &map, &state_machine.name)
                 .await
                 .unwrap_or_default();
         if discovered.is_empty() {
             load_slot_contexts(pool, cbu_id, case_id).await?
         } else {
             discovered
-                .into_iter()
-                .map(|context| SlotContext {
-                    entity_id: context.entity_id,
-                    slot_path: context.slot_path,
-                    slot_type: context.slot_type,
-                    cardinality: context.cardinality,
-                })
-                .collect()
         }
     } else {
         load_slot_contexts(pool, cbu_id, case_id).await?
@@ -626,6 +604,146 @@ struct SlotContext {
     cardinality: String,
 }
 
+fn load_sem_os_builtin_constellation_map(name: &str) -> Result<ConstellationMapDefBody> {
+    if !name
+        .chars()
+        .all(|ch| ch.is_ascii_alphanumeric() || ch == '.' || ch == '_' || ch == '-')
+    {
+        return Err(anyhow!("invalid built-in constellation map '{name}'"));
+    }
+
+    let filename = format!("{}.yaml", name.replace(['.', '-'], "_"));
+    let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("config/sem_os_seeds/constellation_maps")
+        .join(filename);
+    let yaml = std::fs::read_to_string(&path)?;
+    Ok(serde_yaml::from_str(&yaml)?)
+}
+
+async fn discover_sem_os_slot_contexts(
+    pool: &PgPool,
+    cbu_id: Uuid,
+    case_id: Option<Uuid>,
+    map: &ConstellationMapDefBody,
+    state_machine_name: &str,
+) -> Result<Vec<SlotContext>> {
+    let mut discovered_slots = Vec::new();
+    collect_sem_os_slots(&mut discovered_slots, &[], &map.slots, state_machine_name);
+    let mut contexts = Vec::new();
+    for (qualified_slot, slot) in discovered_slots {
+        contexts.extend(
+            sem_os_slot_contexts_for_slot(pool, cbu_id, case_id, &qualified_slot, &slot).await?,
+        );
+    }
+    Ok(contexts)
+}
+
+fn collect_sem_os_slots(
+    out: &mut Vec<(String, SlotDef)>,
+    prefix: &[String],
+    slots: &std::collections::BTreeMap<String, SlotDef>,
+    state_machine_name: &str,
+) {
+    for (slot_name, slot) in slots {
+        let mut path = prefix.to_vec();
+        path.push(slot_name.clone());
+        let qualified_slot = path.join(".");
+
+        if slot.state_machine.as_deref() == Some(state_machine_name) {
+            out.push((qualified_slot.clone(), slot.clone()));
+        }
+
+        if !slot.children.is_empty() {
+            collect_sem_os_slots(out, &path, &slot.children, state_machine_name);
+        }
+    }
+}
+
+async fn sem_os_slot_contexts_for_slot(
+    pool: &PgPool,
+    cbu_id: Uuid,
+    case_id: Option<Uuid>,
+    qualified_slot: &str,
+    slot: &SlotDef,
+) -> Result<Vec<SlotContext>> {
+    match slot.slot_type {
+        SlotType::Entity => sem_os_entity_slot_contexts(pool, cbu_id, qualified_slot, slot).await,
+        SlotType::Case => {
+            if let Some(case_id) = case_id {
+                Ok(vec![SlotContext {
+                    entity_id: case_id,
+                    slot_path: qualified_slot.to_string(),
+                    slot_type: "case".to_string(),
+                    cardinality: format!("{:?}", slot.cardinality).to_ascii_lowercase(),
+                }])
+            } else {
+                Ok(Vec::new())
+            }
+        }
+        _ => Ok(Vec::new()),
+    }
+}
+
+async fn sem_os_entity_slot_contexts(
+    pool: &PgPool,
+    cbu_id: Uuid,
+    qualified_slot: &str,
+    slot: &SlotDef,
+) -> Result<Vec<SlotContext>> {
+    let Some(join) = slot.join.as_ref() else {
+        return Ok(Vec::new());
+    };
+
+    let via = checked_ident(&join.via)?;
+    let parent_fk = checked_ident(&join.parent_fk)?;
+    let child_fk = checked_ident(&join.child_fk)?;
+    let mut query = format!(
+        r#"SELECT DISTINCT "{child_fk}" AS entity_id FROM "ob-poc"."{via}" WHERE "{parent_fk}" = $1"#
+    );
+    let rows = if let (Some(filter_column), Some(filter_value)) =
+        (join.filter_column.as_ref(), join.filter_value.as_ref())
+    {
+        let filter_column = checked_ident(filter_column)?;
+        query.push_str(&format!(
+            r#" AND "{filter_column}" = $2 ORDER BY "{child_fk}""#
+        ));
+        sqlx::query_scalar::<_, Uuid>(&query)
+            .bind(cbu_id)
+            .bind(filter_value)
+            .fetch_all(pool)
+            .await?
+    } else {
+        query.push_str(&format!(r#" ORDER BY "{child_fk}""#));
+        sqlx::query_scalar::<_, Uuid>(&query)
+            .bind(cbu_id)
+            .fetch_all(pool)
+            .await?
+    };
+
+    Ok(rows
+        .into_iter()
+        .map(|entity_id| SlotContext {
+            entity_id,
+            slot_path: qualified_slot.to_string(),
+            slot_type: "entity".to_string(),
+            cardinality: format!("{:?}", slot.cardinality).to_ascii_lowercase(),
+        })
+        .collect())
+}
+
+fn checked_ident(value: &str) -> Result<&str> {
+    if value
+        .chars()
+        .all(|ch| ch.is_ascii_alphanumeric() || ch == '_')
+    {
+        Ok(value)
+    } else {
+        Err(anyhow!(
+            "unsupported identifier '{value}' in Sem OS slot discovery"
+        ))
+    }
+}
+
 async fn load_slot_contexts(
     pool: &PgPool,
     cbu_id: Uuid,
@@ -753,5 +871,55 @@ fn infer_entity_type(state_machine: &ValidatedStateMachine, slot_path: &str) -> 
         "ubo".to_string()
     } else {
         slot_path.split('.').next().unwrap_or("entity").to_string()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{checked_ident, collect_sem_os_slots};
+    use sem_os_core::constellation_map_def::ConstellationMapDefBody;
+
+    #[test]
+    fn sem_os_slot_collection_finds_nested_state_machine_slots() {
+        let map: ConstellationMapDefBody = serde_yaml::from_str(
+            r#"
+fqn: demo
+constellation: demo
+jurisdiction: LU
+slots:
+  case:
+    type: case
+    table: cases
+    pk: case_id
+    cardinality: optional
+    state_machine: kyc_case_lifecycle
+    children:
+      tollgate:
+        type: tollgate
+        table: tollgate_evaluations
+        pk: evaluation_id
+        cardinality: optional
+        state_machine: tollgate_machine
+  manager:
+    type: entity
+    table: entities
+    pk: entity_id
+    cardinality: mandatory
+    state_machine: entity_kyc_lifecycle
+"#,
+        )
+        .unwrap();
+
+        let mut discovered = Vec::new();
+        collect_sem_os_slots(&mut discovered, &[], &map.slots, "tollgate_machine");
+        assert_eq!(discovered.len(), 1);
+        assert_eq!(discovered[0].0, "case.tollgate");
+    }
+
+    #[test]
+    fn checked_ident_rejects_unsafe_identifiers() {
+        assert!(checked_ident("cbu_entity_roles").is_ok());
+        assert!(checked_ident("cbu-entity-roles").is_err());
+        assert!(checked_ident("entity roles").is_err());
     }
 }

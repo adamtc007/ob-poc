@@ -17,6 +17,7 @@
 //! ```
 
 // Core error handling
+pub mod entity_kind;
 pub mod error;
 
 // Data dictionary
@@ -79,6 +80,13 @@ pub mod trading_profile;
 
 // Template system for DSL generation
 pub mod templates;
+
+// Traceability - first-class utterance trace persistence
+pub mod traceability;
+
+// Transitional Sem OS runtime surfaces
+#[cfg(feature = "database")]
+pub mod sem_os_runtime;
 
 // Verification module - adversarial agent model for KYC
 pub mod verification;
@@ -169,8 +177,6 @@ pub mod sem_reg;
 
 // Constellation — CBU case/structure ownership graph with resolver
 #[cfg(feature = "database")]
-pub mod constellation;
-
 // State Reducer — canonical reducer definitions for constellation/case state
 #[cfg(feature = "database")]
 pub mod state_reducer;

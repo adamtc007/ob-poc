@@ -1,0 +1,47 @@
+graph_id: contract
+name: Contract Graph
+version: "1"
+description: Contract and pricing management graph
+entity_types:
+  - contract
+nodes:
+  - node_id: contract.entry
+    name: Contract Entry
+    node_type: entry
+    lane: contract
+  - node_id: contract.lookup
+    name: Contract Lookup
+    node_type: gate
+    lane: contract
+  - node_id: contract.manage
+    name: Contract Management
+    node_type: gate
+    lane: contract
+edges:
+  - edge_id: contract.lookup
+    from_node: contract.entry
+    to_node: contract.lookup
+    verb_ids:
+      [
+        "contract.get",
+        "contract.list",
+        "contract.list-products",
+        "contract.for-client",
+        "contract.list-rate-cards",
+        "contract.list-subscriptions",
+      ]
+    edge_type: conditional
+  - edge_id: contract.manage
+    from_node: contract.entry
+    to_node: contract.manage
+    verb_ids:
+      [
+        "contract.update",
+        "contract.terminate",
+        "contract.add-product",
+        "contract.remove-product",
+        "contract.subscribe",
+        "contract.unsubscribe",
+      ]
+    edge_type: advance
+gates: []

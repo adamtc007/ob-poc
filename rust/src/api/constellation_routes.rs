@@ -14,8 +14,9 @@ use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::constellation::{
-    handle_constellation_hydrate, handle_constellation_summary, HydratedConstellation,
+use crate::sem_os_runtime::constellation_runtime::{
+    handle_constellation_hydrate, handle_constellation_summary, ConstellationSummary,
+    HydratedConstellation,
 };
 
 /// Application state for constellation routes.
@@ -114,7 +115,7 @@ async fn get_constellation_summary(
     State(state): State<ConstellationAppState>,
     Path(cbu_id): Path<Uuid>,
     Query(query): Query<ConstellationQuery>,
-) -> Result<Json<crate::constellation::ConstellationSummary>, (StatusCode, String)> {
+) -> Result<Json<ConstellationSummary>, (StatusCode, String)> {
     let map_name = query
         .map_name
         .unwrap_or_else(|| String::from("struct.lux.ucits.sicav"));

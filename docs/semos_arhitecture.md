@@ -1,8 +1,8 @@
 # Semantic OS — Vision & Scope v3.0
 
 > **Version:** 3.0
-> **Date:** 2026-03-17
-> **Status:** Living document — consolidation of 9 prior specs, updated for the 2026-03-08 runtime schema consolidation, the 2026-03-12 document-governance bootstrap, the 2026-03-13 NLCI/CBU surface reconciliation, the 2026-03-15 reducer/constellation runtime cutover, the 2026-03-16 DB harness/runtime verification pass, the 2026-03-16 CODEX data-integrity/parser/serialization remediation, and the 2026-03-17 discovery-universe + single-pipeline cutover
+> **Date:** 2026-03-21
+> **Status:** Living document — consolidation of 9 prior specs, updated for the 2026-03-08 runtime schema consolidation, the 2026-03-12 document-governance bootstrap, the 2026-03-13 NLCI/CBU surface reconciliation, the 2026-03-15 reducer/constellation runtime cutover, the 2026-03-16 DB harness/runtime verification pass, the 2026-03-16 CODEX data-integrity/parser/serialization remediation, the 2026-03-17 discovery-universe + single-pipeline cutover, and the 2026-03-21 SemOS reconciliation remediation verification pass
 > **Audience:** Engineering, governance, architecture review
 
 ---
@@ -52,6 +52,36 @@ The discovery surface currently includes:
 - `grounding_readiness`
 
 This is the active bridge between ambiguous onboarding/opening turns and grounded constellation execution.
+
+### Reconciliation Remediation State (2026-03-21)
+
+The SemOS reconciliation findings recorded on 2026-03-19 are now closed at the code level.
+
+The executed remediation includes:
+
+- direct `entity_kind` filtering on the non-SemOS verb-search path
+- expanded canonical entity-kind vocabulary and broader `subject_kinds` derivation coverage
+- preserved SemOS prune visibility for `EntityKindMismatch`
+- actionable discovery bootstrap questions in the chat/session flow
+- authored discovery families for trading, billing, deal, and contract
+- runtime validation that constellation map slot verbs and supported bulk macros resolve against the active registry
+- post-expansion DSL revalidation before runbook planning
+- startup audit of fail-closed safe-harbor verbs against `harm_class`
+- end-to-end entity-confidence threading as a widening signal
+- park-reason exposure through chat payloads and UI
+
+Verification status for the remediation execution:
+
+- `cargo check` passes
+- `cargo fmt --check` passes
+- `cargo clippy -- -D warnings` passes
+- the dedicated `vnext-repl` regression for post-expansion validation passes
+
+Residual full-suite failures are environment-dependent integration issues rather than unresolved remediation code.
+
+Peer-review bundle for the execution set:
+
+- `artifacts/semos-recon-remediation-review-2026-03-21.tar.gz`
 
 ### Non-Lossy Utterance Contract (2026-03-17)
 

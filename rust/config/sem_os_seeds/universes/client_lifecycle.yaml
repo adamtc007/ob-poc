@@ -25,6 +25,8 @@ domains:
       - entity
     candidate_family_ids:
       - fund_onboarding
+      - cross_border_onboarding
+      - manager_onboarding
     required_grounding_inputs:
       - key: objective
         label: Objective

@@ -14,7 +14,7 @@ use uuid::Uuid;
 
 use sem_os_core::abac::AccessDecision;
 use sem_os_core::context_resolution::{
-    ContextResolutionResponse, DiscoverySurface, ResolutionStage,
+    ContextResolutionResponse, DiscoverySurface, GroundedActionSurface, ResolutionStage,
 };
 
 /// Structured result of Sem OS context resolution.
@@ -46,6 +46,9 @@ pub struct SemOsContextEnvelope {
     /// Discovery-stage surface returned by Sem OS, when the session is not grounded yet.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub discovery_surface: Option<DiscoverySurface>,
+    /// Grounded action surface with Sem OS-selected constellation/slot/node provenance.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub grounded_action_surface: Option<GroundedActionSurface>,
     /// Whether this is a "deny all" result (resolution succeeded, zero verbs).
     deny_all: bool,
     /// Whether Sem OS was unavailable (resolution failed or not configured).
@@ -244,6 +247,7 @@ impl SemOsContextEnvelope {
             computed_at: Utc::now(),
             resolution_stage: response.resolution_stage,
             discovery_surface: response.discovery_surface.clone(),
+            grounded_action_surface: response.grounded_action_surface.clone(),
             deny_all,
             unavailable: false,
         }
@@ -262,6 +266,7 @@ impl SemOsContextEnvelope {
             computed_at: Utc::now(),
             resolution_stage: ResolutionStage::Grounded,
             discovery_surface: None,
+            grounded_action_surface: None,
             deny_all: false,
             unavailable: true,
         }
@@ -280,6 +285,7 @@ impl SemOsContextEnvelope {
             computed_at: Utc::now(),
             resolution_stage: ResolutionStage::Grounded,
             discovery_surface: None,
+            grounded_action_surface: None,
             deny_all: true,
             unavailable: false,
         }
@@ -350,6 +356,7 @@ impl SemOsContextEnvelope {
             computed_at: Utc::now(),
             resolution_stage: ResolutionStage::Grounded,
             discovery_surface: None,
+            grounded_action_surface: None,
             deny_all: false,
             unavailable: false,
         }
@@ -573,6 +580,48 @@ mod tests {
             }
             other => panic!("expected entity kind mismatch, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn test_from_resolution_preserves_grounded_action_surface() {
+        let response = sem_os_core::context_resolution::ContextResolutionResponse {
+            as_of_time: Utc::now(),
+            resolved_at: Utc::now(),
+            applicable_views: vec![],
+            candidate_verbs: vec![],
+            candidate_attributes: vec![],
+            required_preconditions: vec![],
+            disambiguation_questions: vec![],
+            evidence: Default::default(),
+            policy_verdicts: vec![],
+            security_handling: AccessDecision::Allow,
+            governance_signals: vec![],
+            entity_kind_pruned_verbs: vec![],
+            confidence: 0.9,
+            grounded_action_surface: Some(sem_os_core::context_resolution::GroundedActionSurface {
+                resolved_subject: sem_os_core::context_resolution::SubjectRef::TaskId(Uuid::nil()),
+                resolved_constellation: Some("constellation.kyc".into()),
+                resolved_slot_path: Some("case".into()),
+                resolved_node_id: Some("node-1".into()),
+                resolved_state_machine: Some("case_machine".into()),
+                current_state: Some("intake".into()),
+                traversed_edges: vec![],
+                constraint_signals: vec![],
+                valid_actions: vec![],
+                blocked_actions: vec![],
+                dsl_candidates: vec![],
+            }),
+            resolution_stage: ResolutionStage::Grounded,
+            discovery_surface: None,
+        };
+
+        let env = SemOsContextEnvelope::from_resolution(&response);
+        assert_eq!(
+            env.grounded_action_surface
+                .as_ref()
+                .and_then(|surface| surface.resolved_constellation.as_deref()),
+            Some("constellation.kyc")
+        );
     }
 
     // ── TOCTOU tests ───────────────────────────────────────────

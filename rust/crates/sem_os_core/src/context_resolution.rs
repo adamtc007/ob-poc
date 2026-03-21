@@ -343,6 +343,12 @@ pub struct GroundedActionSurface {
     /// Current effective state of the resolved slot/node.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub current_state: Option<String>,
+    /// Traversed DAG-like edges Sem OS followed to ground this slot/node.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub traversed_edges: Vec<GroundedTraversalEdge>,
+    /// Structured constraint signals that shaped legality for this slot/node.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub constraint_signals: Vec<GroundedConstraintSignal>,
     /// Valid primitive or macro actions for the resolved slot/node.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub valid_actions: Vec<GroundedActionOption>,
@@ -352,6 +358,45 @@ pub struct GroundedActionSurface {
     /// DSL candidates Sem OS can render deterministically for execution.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub dsl_candidates: Vec<DslCandidate>,
+}
+
+/// A traversed edge in Sem OS grounding provenance.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GroundedTraversalEdge {
+    /// Source node/type in the grounding walk.
+    pub from_type: String,
+    /// Target node/type in the grounding walk.
+    pub to_type: String,
+    /// Relationship or derivation name.
+    pub relationship: String,
+    /// Direction of the traversal.
+    pub direction: String,
+    /// Source instance identifier when available.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub from_instance: Option<String>,
+    /// Target instance identifier when available.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub to_instance: Option<String>,
+}
+
+/// A structured Sem OS legality constraint observed during grounding.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GroundedConstraintSignal {
+    /// Signal classification, e.g. `dependency_block` or `state_gate`.
+    pub kind: String,
+    /// Slot/node the signal applies to.
+    pub slot_path: String,
+    /// The related slot or dependency, when applicable.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub related_slot: Option<String>,
+    /// Required state or threshold.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub required_state: Option<String>,
+    /// Actual observed state, if any.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub actual_state: Option<String>,
+    /// Human-readable explanation.
+    pub message: String,
 }
 
 /// A grounded action Sem OS considers valid from the current slot/node state.

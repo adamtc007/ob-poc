@@ -1,0 +1,41 @@
+fqn: family.cross_border_onboarding
+family_id: cross_border_onboarding
+label: Cross-Border Onboarding
+description: Family for cross-border hedge and private-equity structures.
+domain_id: onboarding
+selection_rules:
+  - condition: structure_type == 'hedge' || strategy == 'hedge'
+    target_constellation: struct.hedge.cross-border
+    priority: 20
+  - condition: structure_type == 'private-equity' || strategy == 'private-equity'
+    target_constellation: struct.pe.cross-border
+    priority: 19
+constellation_refs:
+  - constellation_id: struct.hedge.cross-border
+    label: Cross-Border Hedge Master-Feeder
+    jurisdiction: XB
+    entity_kind: fund
+    triggers:
+      - cross-border
+      - hedge
+      - master-feeder
+      - feeder
+  - constellation_id: struct.pe.cross-border
+    label: Cross-Border Private Equity Parallel Fund
+    jurisdiction: XB
+    entity_kind: fund
+    triggers:
+      - cross-border
+      - private equity
+      - pe
+      - parallel fund
+candidate_jurisdictions:
+  - XB
+candidate_entity_kinds:
+  - fund
+grounding_threshold:
+  required_input_keys:
+    - objective
+    - entity_kind
+  requires_entity_instance: false
+  allows_draft_instance: true

@@ -10,7 +10,7 @@ slots:
     verbs: { create: cbu.create, read: cbu.read, show: cbu.show }
   investment_adviser:
     type: entity
-    entity_kinds: [organization]
+    entity_kinds: [company]
     join: { via: cbu_entity_roles, parent_fk: cbu_id, child_fk: entity_id, filter_column: role, filter_value: investment-adviser }
     cardinality: mandatory
     depends_on: [cbu]
@@ -20,7 +20,7 @@ slots:
     verbs: { ensure: { verb: entity.ensure-or-placeholder, when: empty }, assign: { verb: cbu.assign-role, when: placeholder }, search: { verb: party.search, when: [placeholder, filled] }, add: { verb: party.add, when: empty }, show: { verb: entity.read, when: filled } }
   custodian:
     type: entity
-    entity_kinds: [organization]
+    entity_kinds: [company]
     join: { via: cbu_entity_roles, parent_fk: cbu_id, child_fk: entity_id, filter_column: role, filter_value: custodian }
     cardinality: mandatory
     depends_on: [cbu]
@@ -30,7 +30,7 @@ slots:
     verbs: { ensure: { verb: entity.ensure-or-placeholder, when: empty }, assign: { verb: cbu.assign-role, when: placeholder }, search: { verb: party.search, when: [placeholder, filled] }, add: { verb: party.add, when: empty }, show: { verb: entity.read, when: filled } }
   sub_adviser:
     type: entity
-    entity_kinds: [organization]
+    entity_kinds: [company]
     join: { via: cbu_entity_roles, parent_fk: cbu_id, child_fk: entity_id, filter_column: role, filter_value: sub-adviser }
     cardinality: optional
     depends_on: [cbu]
@@ -40,7 +40,7 @@ slots:
     verbs: { ensure: { verb: entity.ensure-or-placeholder, when: empty }, assign: { verb: cbu.assign-role, when: placeholder }, search: { verb: party.search, when: [placeholder, filled] }, add: { verb: party.add, when: empty }, show: { verb: entity.read, when: filled } }
   administrator:
     type: entity
-    entity_kinds: [organization]
+    entity_kinds: [company]
     join: { via: cbu_entity_roles, parent_fk: cbu_id, child_fk: entity_id, filter_column: role, filter_value: administrator }
     cardinality: optional
     depends_on: [cbu]
@@ -50,7 +50,7 @@ slots:
     verbs: { ensure: { verb: entity.ensure-or-placeholder, when: empty }, assign: { verb: cbu.assign-role, when: placeholder }, search: { verb: party.search, when: [placeholder, filled] }, add: { verb: party.add, when: empty }, show: { verb: entity.read, when: filled } }
   transfer_agent:
     type: entity
-    entity_kinds: [organization]
+    entity_kinds: [company]
     join: { via: cbu_entity_roles, parent_fk: cbu_id, child_fk: entity_id, filter_column: role, filter_value: transfer-agent }
     cardinality: optional
     depends_on: [cbu]
@@ -60,7 +60,7 @@ slots:
     verbs: { ensure: { verb: entity.ensure-or-placeholder, when: empty }, assign: { verb: cbu.assign-role, when: placeholder }, search: { verb: party.search, when: [placeholder, filled] }, add: { verb: party.add, when: empty }, show: { verb: entity.read, when: filled } }
   distributor:
     type: entity
-    entity_kinds: [organization]
+    entity_kinds: [company]
     join: { via: cbu_entity_roles, parent_fk: cbu_id, child_fk: entity_id, filter_column: role, filter_value: distributor }
     cardinality: optional
     depends_on: [cbu]
@@ -70,7 +70,7 @@ slots:
     verbs: { ensure: { verb: entity.ensure-or-placeholder, when: empty }, assign: { verb: cbu.assign-role, when: placeholder }, search: { verb: party.search, when: [placeholder, filled] }, add: { verb: party.add, when: empty }, show: { verb: entity.read, when: filled } }
   auditor:
     type: entity
-    entity_kinds: [organization]
+    entity_kinds: [company]
     join: { via: cbu_entity_roles, parent_fk: cbu_id, child_fk: entity_id, filter_column: role, filter_value: auditor }
     cardinality: optional
     depends_on: [cbu]
@@ -80,7 +80,7 @@ slots:
     verbs: { ensure: { verb: entity.ensure-or-placeholder, when: empty }, assign: { verb: cbu.assign-role, when: placeholder }, search: { verb: party.search, when: [placeholder, filled] }, add: { verb: party.add, when: empty }, show: { verb: entity.read, when: filled } }
   legal_counsel:
     type: entity
-    entity_kinds: [organization]
+    entity_kinds: [company]
     join: { via: cbu_entity_roles, parent_fk: cbu_id, child_fk: entity_id, filter_column: role, filter_value: legal-counsel }
     cardinality: optional
     depends_on: [cbu]
@@ -90,7 +90,7 @@ slots:
     verbs: { ensure: { verb: entity.ensure-or-placeholder, when: empty }, assign: { verb: cbu.assign-role, when: placeholder }, search: { verb: party.search, when: [placeholder, filled] }, add: { verb: party.add, when: empty }, show: { verb: entity.read, when: filled } }
   ownership_chain:
     type: entity_graph
-    entity_kinds: [person, organization]
+    entity_kinds: [person, company]
     join: { via: entity_relationships, parent_fk: from_entity_id, child_fk: to_entity_id }
     cardinality: recursive
     max_depth: 5

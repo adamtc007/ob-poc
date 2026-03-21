@@ -653,6 +653,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             use ob_poc::agent::learning::warmup::LearningWarmup;
             use ob_poc::dsl_v2::macros::{load_macro_registry_from_dir, MacroRegistry};
             use ob_poc::dsl_v2::ConfigLoader;
+            use ob_poc::entity_linking::{
+                EntityLinkingService, EntityLinkingServiceImpl, StubEntityLinkingService,
+            };
+            use ob_poc::lookup::LookupService;
             use ob_poc::mcp::macro_index::MacroIndex;
             use ob_poc::mcp::scenario_index::ScenarioIndex;
             use ob_poc::mcp::verb_search_factory::VerbSearcherFactory;
@@ -849,6 +853,56 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         scenario_index,
                     ));
 
+                    let entity_linker: Arc<dyn EntityLinkingService> = {
+                        let snapshot_path = std::env::var("ENTITY_SNAPSHOT_PATH")
+                            .unwrap_or_else(|_| "rust/assets/entity.snapshot.bin".to_string());
+                        let path = std::path::Path::new(&snapshot_path);
+                        let paths_to_try = [
+                            path.to_path_buf(),
+                            std::path::PathBuf::from("assets/entity.snapshot.bin"),
+                            std::path::PathBuf::from("../rust/assets/entity.snapshot.bin"),
+                        ];
+
+                        let mut loaded: Option<Arc<dyn EntityLinkingService>> = None;
+                        for try_path in &paths_to_try {
+                            if try_path.exists() {
+                                match EntityLinkingServiceImpl::load_from(try_path) {
+                                    Ok(svc) => {
+                                        tracing::info!(
+                                            entities = svc.entity_count(),
+                                            version = svc.snapshot_version(),
+                                            hash = %&svc.snapshot_hash()[..12.min(svc.snapshot_hash().len())],
+                                            path = %try_path.display(),
+                                            "Loaded V2 REPL entity linking snapshot"
+                                        );
+                                        loaded = Some(Arc::new(svc));
+                                        break;
+                                    }
+                                    Err(error) => {
+                                        tracing::warn!(
+                                            path = %try_path.display(),
+                                            error = %error,
+                                            "Failed to load V2 REPL entity snapshot"
+                                        );
+                                    }
+                                }
+                            }
+                        }
+
+                        loaded.unwrap_or_else(|| {
+                            tracing::info!(
+                                "V2 REPL entity snapshot not found. Entity linking disabled."
+                            );
+                            Arc::new(StubEntityLinkingService::new())
+                        })
+                    };
+
+                    let mut lookup_service =
+                        LookupService::new(entity_linker).with_verb_searcher(searcher.clone());
+                    if let Some(ref lexicon_service) = lexicon {
+                        lookup_service = lookup_service.with_lexicon(lexicon_service.clone());
+                    }
+
                     // 7. Wrap in IntentMatcher → IntentService
                     let intent_matcher: Arc<dyn ob_poc::repl::IntentMatcher> =
                         Arc::new(VerbSearchIntentMatcher::new(searcher));
@@ -863,7 +917,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         .with_verb_config_index(verb_config_index)
                         .with_intent_matcher(intent_matcher)
                         .with_intent_service(intent_service)
-                        .with_macro_registry(macro_reg_for_orchestrator);
+                        .with_macro_registry(macro_reg_for_orchestrator)
+                        .with_lookup_service(lookup_service);
 
                     tracing::info!(
                         "V2 REPL IntentService wired in {}ms (semantic verb search enabled)",

@@ -261,9 +261,9 @@ pub use discovery_ops::{
 
 // View operations (session scope and selection management)
 pub use view_ops::{
-    ViewBackToOp, ViewBookOp, ViewBreadcrumbsOp, ViewCbuOp, ViewClearOp, ViewEntityForestOp,
-    ViewLayoutOp, ViewOpResult, ViewRefineOp, ViewSelectOp, ViewSelectionInfoOp, ViewStatusOp,
-    ViewUniverseOp, ViewZoomInOp, ViewZoomOutOp,
+    ViewBackToOp, ViewBookOp, ViewBreadcrumbsOp, ViewCbuOp, ViewClearAliasOp, ViewClearOp,
+    ViewEntityForestOp, ViewLayoutOp, ViewOpResult, ViewRefineOp, ViewSelectOp,
+    ViewSelectionInfoOp, ViewStatusOp, ViewUniverseOp, ViewZoomInOp, ViewZoomOutOp,
 };
 
 // KYC Control Enhancement operations (capital, board, trust, partnership, tollgate, control)
@@ -749,15 +749,15 @@ mod tests {
         assert!(registry.has("view", "entity-forest"));
         assert!(registry.has("view", "refine"));
         assert!(registry.has("view", "clear"));
-        assert!(registry.has("view", "select"));
-        assert!(registry.has("view", "layout"));
-        assert!(registry.has("view", "status"));
-        assert!(registry.has("view", "selection-info"));
+        assert!(registry.has("view", "set-selection"));
+        assert!(registry.has("view", "set-layout"));
+        assert!(registry.has("view", "read-status"));
+        assert!(registry.has("view", "read-selection-info"));
         // Zoom navigation (fractal taxonomy navigation)
         assert!(registry.has("view", "zoom-in"));
         assert!(registry.has("view", "zoom-out"));
-        assert!(registry.has("view", "back-to"));
-        assert!(registry.has("view", "breadcrumbs"));
+        assert!(registry.has("view", "navigate-back-to"));
+        assert!(registry.has("view", "read-breadcrumbs"));
 
         // KYC Control Enhancement: Capital operations
         assert!(registry.has("capital", "transfer"));

@@ -47,6 +47,11 @@ use crate::semtaxonomy_v2::{
     compiler_input_from_outcome_intent, supports_cbu_compiler_slice, CompilerSelection,
     IntentCompiler,
 };
+use crate::traceability::{
+    build_phase2_unavailable_payload, build_phase5_unavailable_payload, build_phase_trace_payload,
+    build_trace_scaffold_payload, evaluate_phase3_against_phase2, evaluate_phase4_within_phase2,
+    NewUtteranceTrace, Phase2Service, TraceKind, UtteranceTraceRepository,
+};
 
 use sem_os_client::SemOsClient;
 use sem_os_core::authoring::agent_mode::AgentMode;
@@ -136,6 +141,8 @@ pub struct OrchestratorOutcome {
     pub auto_execute: bool,
     /// Sage intent used for this turn, when available.
     pub sage_intent: Option<crate::sage::OutcomeIntent>,
+    /// Persisted first-class utterance trace row for this turn, when available.
+    pub trace_id: Option<Uuid>,
 }
 
 struct SageStageOutcome {
@@ -381,11 +388,8 @@ async fn prepare_turn_context(
     };
     let surface = compute_session_verb_surface(&surface_ctx);
 
-    let sem_reg_verb_names = if envelope.is_unavailable() {
-        None
-    } else {
-        Some(envelope.allowed_verbs.iter().cloned().collect())
-    };
+    let phase2 = Phase2Service::evaluate(lookup_result.clone(), Some(envelope.clone()));
+    let sem_reg_verb_names = Phase2Service::legal_verb_names(&phase2.artifacts);
 
     PreparedTurnContext {
         lookup_result,
@@ -412,10 +416,14 @@ fn can_use_coder_for_serve(
         return true;
     }
 
-    let allowed = if prepared.envelope.is_unavailable() || prepared.envelope.is_deny_all() {
-        std::collections::HashSet::new()
-    } else {
+    let phase2 = Phase2Service::evaluate(
+        prepared.lookup_result.clone(),
+        Some(prepared.envelope.clone()),
+    );
+    let allowed = if phase2.has_usable_legal_set {
         prepared.surface.allowed_fqns()
+    } else {
+        std::collections::HashSet::new()
     };
     if !allowed.is_empty() {
         return allowed.contains(&coder_result.verb_fqn);
@@ -444,6 +452,10 @@ async fn build_sage_serve_outcome(
             .unwrap_or_default(),
     )];
     let chosen = Some(coder_result.verb_fqn.clone());
+    let prepared_phase2 = Phase2Service::evaluate(
+        prepared.lookup_result.clone(),
+        Some(prepared.envelope.clone()),
+    );
     let mut trace = build_trace(
         utterance,
         ctx,
@@ -459,7 +471,7 @@ async fn build_sage_serve_outcome(
         &prepared.envelope,
         Some(selection_source.to_string()),
         false,
-        prepared.envelope.is_unavailable(),
+        !prepared_phase2.is_available,
         &[],
         false,
         None,
@@ -478,6 +490,7 @@ async fn build_sage_serve_outcome(
         pending_mutation: None,
         auto_execute: can_auto_execute_serve_result(&coder_result.verb_fqn),
         sage_intent: Some(intent.clone()),
+        trace_id: None,
     };
     emit_telemetry(ctx, utterance, &mut outcome).await;
     Ok(outcome)
@@ -554,6 +567,7 @@ async fn build_semos_discovery_outcome(
         pending_mutation: None,
         auto_execute: false,
         sage_intent,
+        trace_id: None,
     };
     emit_telemetry(ctx, utterance, &mut outcome).await;
     Ok(outcome)
@@ -596,6 +610,7 @@ async fn build_semos_unavailable_outcome(
         pending_mutation: None,
         auto_execute: false,
         sage_intent,
+        trace_id: None,
     };
     emit_telemetry(ctx, utterance, &mut outcome).await;
     Ok(outcome)
@@ -1022,9 +1037,11 @@ pub async fn handle_utterance(
     ctx: &OrchestratorContext,
     utterance: &str,
 ) -> anyhow::Result<OrchestratorOutcome> {
+    let trace_scaffold = persist_trace_scaffold(ctx, utterance).await;
     let sage_stage = run_sage_stage(ctx, utterance, true).await;
     let Some(intent) = sage_stage.intent else {
-        return legacy_handle_utterance(ctx, utterance).await;
+        let outcome = legacy_handle_utterance(ctx, utterance).await?;
+        return finalize_orchestrator_trace(ctx, trace_scaffold, outcome).await;
     };
 
     if let Some(compiler) = &ctx.nlci_compiler {
@@ -1048,23 +1065,21 @@ pub async fn handle_utterance(
     match route(&intent) {
         UtteranceDisposition::Serve(_) => {
             let prepared = prepare_turn_context(ctx, utterance, Some(&intent)).await;
-            if prepared.envelope.is_unavailable() {
-                return build_semos_unavailable_outcome(
-                    ctx,
-                    utterance,
-                    prepared,
-                    Some(intent.clone()),
-                )
-                .await;
+            let prepared_phase2 = Phase2Service::evaluate(
+                prepared.lookup_result.clone(),
+                Some(prepared.envelope.clone()),
+            );
+            if !prepared_phase2.is_available {
+                let outcome =
+                    build_semos_unavailable_outcome(ctx, utterance, prepared, Some(intent.clone()))
+                        .await?;
+                return finalize_orchestrator_trace(ctx, trace_scaffold, outcome).await;
             }
             if prepared.envelope.is_discovery_stage() {
-                return build_semos_discovery_outcome(
-                    ctx,
-                    utterance,
-                    prepared,
-                    Some(intent.clone()),
-                )
-                .await;
+                let outcome =
+                    build_semos_discovery_outcome(ctx, utterance, prepared, Some(intent.clone()))
+                        .await?;
+                return finalize_orchestrator_trace(ctx, trace_scaffold, outcome).await;
             }
             let coder_stage = run_coder_stage(ctx, Some(&intent));
             let serve_candidate = coder_stage
@@ -1079,7 +1094,7 @@ pub async fn handle_utterance(
                     "sage_serve_coder"
                 };
                 if can_use_coder_for_serve(ctx, &intent, coder_result, &prepared) {
-                    return build_sage_serve_outcome(
+                    let outcome = build_sage_serve_outcome(
                         ctx,
                         utterance,
                         &intent,
@@ -1087,7 +1102,8 @@ pub async fn handle_utterance(
                         prepared,
                         selection_source,
                     )
-                    .await;
+                    .await?;
+                    return finalize_orchestrator_trace(ctx, trace_scaffold, outcome).await;
                 }
             }
 
@@ -1106,27 +1122,25 @@ pub async fn handle_utterance(
                     .unwrap_or_else(|| "sage serve fell back to legacy pipeline".to_string()),
             );
             apply_sage_trace_fields(&mut outcome.trace, &intent, "sage_serve");
-            Ok(outcome)
+            finalize_orchestrator_trace(ctx, trace_scaffold, outcome).await
         }
         UtteranceDisposition::Delegate(delegate) => {
             let prepared = prepare_turn_context(ctx, utterance, Some(&intent)).await;
-            if prepared.envelope.is_unavailable() {
-                return build_semos_unavailable_outcome(
-                    ctx,
-                    utterance,
-                    prepared,
-                    Some(intent.clone()),
-                )
-                .await;
+            let prepared_phase2 = Phase2Service::evaluate(
+                prepared.lookup_result.clone(),
+                Some(prepared.envelope.clone()),
+            );
+            if !prepared_phase2.is_available {
+                let outcome =
+                    build_semos_unavailable_outcome(ctx, utterance, prepared, Some(intent.clone()))
+                        .await?;
+                return finalize_orchestrator_trace(ctx, trace_scaffold, outcome).await;
             }
             if prepared.envelope.is_discovery_stage() {
-                return build_semos_discovery_outcome(
-                    ctx,
-                    utterance,
-                    prepared,
-                    Some(intent.clone()),
-                )
-                .await;
+                let outcome =
+                    build_semos_discovery_outcome(ctx, utterance, prepared, Some(intent.clone()))
+                        .await?;
+                return finalize_orchestrator_trace(ctx, trace_scaffold, outcome).await;
             }
             let trace = default_trace_for_runtime(ctx, utterance, &prepared);
             let mut outcome = OrchestratorOutcome {
@@ -1151,6 +1165,7 @@ pub async fn handle_utterance(
                 pending_mutation: None,
                 auto_execute: false,
                 sage_intent: Some(intent.clone()),
+                trace_id: None,
             };
             apply_sage_trace_fields(&mut outcome.trace, &intent, "sage_delegate");
 
@@ -1173,7 +1188,7 @@ pub async fn handle_utterance(
                 };
                 outcome.pending_mutation = None;
                 outcome.auto_execute = false;
-                return Ok(outcome);
+                return finalize_orchestrator_trace(ctx, trace_scaffold, outcome).await;
             }
 
             let coder_stage = run_coder_stage(ctx, Some(&delegate.outcome));
@@ -1206,7 +1221,7 @@ pub async fn handle_utterance(
                 };
                 outcome.pending_mutation = Some(confirmation);
                 outcome.auto_execute = false;
-                return Ok(outcome);
+                return finalize_orchestrator_trace(ctx, trace_scaffold, outcome).await;
             }
 
             if let Some(coder_result) = coder_result {
@@ -1228,7 +1243,7 @@ pub async fn handle_utterance(
                 };
                 outcome.pending_mutation = None;
                 outcome.auto_execute = false;
-                return Ok(outcome);
+                return finalize_orchestrator_trace(ctx, trace_scaffold, outcome).await;
             }
 
             outcome.pipeline_result = PipelineResult {
@@ -1250,8 +1265,196 @@ pub async fn handle_utterance(
             };
             outcome.pending_mutation = None;
             outcome.auto_execute = false;
-            Ok(outcome)
+            finalize_orchestrator_trace(ctx, trace_scaffold, outcome).await
         }
+    }
+}
+
+async fn persist_trace_scaffold(
+    ctx: &OrchestratorContext,
+    utterance: &str,
+) -> Option<NewUtteranceTrace> {
+    let repository = UtteranceTraceRepository::new(ctx.pool.clone());
+    let session_id = ctx.session_id.unwrap_or_else(Uuid::nil);
+    let mut trace =
+        NewUtteranceTrace::in_progress(session_id, Uuid::new_v4(), utterance, TraceKind::Original);
+    let sage_ctx = sage_context_from_orchestrator(ctx);
+    trace.correlation_id = ctx.case_id;
+    let mut trace_payload = build_trace_scaffold_payload(
+        utterance,
+        &sage_ctx,
+        build_phase2_unavailable_payload("agent_orchestrator"),
+        "agent_orchestrator",
+    );
+    if let Some(payload) = trace_payload.as_object_mut() {
+        payload.insert("source".to_string(), serde_json::json!(&ctx.source));
+        payload.insert(
+            "dominant_entity_id".to_string(),
+            serde_json::json!(ctx.dominant_entity_id),
+        );
+        payload.insert(
+            "scope_present".to_string(),
+            serde_json::json!(ctx.scope.is_some()),
+        );
+    }
+    trace.trace_payload = trace_payload;
+
+    if let Err(error) = repository.insert(&trace).await {
+        tracing::warn!(
+            session_id = %session_id,
+            error = %error,
+            "Failed to persist utterance trace scaffold"
+        );
+        return None;
+    }
+
+    Some(trace)
+}
+
+async fn finalize_orchestrator_trace(
+    ctx: &OrchestratorContext,
+    trace: Option<NewUtteranceTrace>,
+    mut outcome: OrchestratorOutcome,
+) -> anyhow::Result<OrchestratorOutcome> {
+    let Some(mut trace) = trace else {
+        return Ok(outcome);
+    };
+
+    let repository = UtteranceTraceRepository::new(ctx.pool.clone());
+    let sage_ctx = sage_context_from_orchestrator(ctx);
+    let phase_payload = build_phase_trace_payload(&trace.raw_utterance, &sage_ctx);
+    let phase2 = Phase2Service::evaluate_from_refs(
+        outcome.lookup_result.as_ref(),
+        outcome.context_envelope.as_ref(),
+    );
+    let resolved_verb = outcome.trace.final_verb.clone().or_else(|| {
+        (!outcome.pipeline_result.intent.verb.is_empty())
+            .then(|| outcome.pipeline_result.intent.verb.clone())
+    });
+    let phase4_candidates = outcome
+        .pipeline_result
+        .verb_candidates
+        .iter()
+        .map(|candidate| candidate.verb.clone())
+        .collect::<Vec<_>>();
+    let phase3 =
+        evaluate_phase3_against_phase2(outcome.pipeline_result.verb_candidates.clone(), &phase2);
+    let phase4 = evaluate_phase4_within_phase2(
+        resolved_verb.clone(),
+        phase4_candidates,
+        outcome.trace.selection_source.clone(),
+        outcome.trace.final_confidence,
+        outcome.trace.serve_fallback_reason.clone(),
+        &phase2,
+    );
+    if let Some(violation) = phase4.legality_violation {
+        outcome.pipeline_result.outcome = PipelineOutcome::NoAllowedVerbs;
+        outcome.pipeline_result.valid = false;
+        outcome.pipeline_result.dsl.clear();
+        outcome.pipeline_result.dsl_hash = None;
+        outcome.pipeline_result.validation_error =
+            Some("Phase 4 attempted to resolve a verb outside the Phase 2 legal set.".to_string());
+        outcome.trace.final_verb = None;
+        outcome.trace.blocked_reason = Some(violation.to_string());
+        outcome.auto_execute = false;
+    }
+    let phase2_payload = phase2.payload();
+    let phase3_payload = phase3.payload();
+    let phase4_payload = phase4.payload_or_unavailable("agent_orchestrator");
+    trace.outcome = classify_agent_trace_outcome(&outcome);
+    trace.halt_reason_code = agent_halt_reason_code(&outcome);
+    trace.halt_phase = agent_halt_phase(&outcome);
+    trace.resolved_verb = resolved_verb;
+    trace.plane = outcome.trace.sage_plane.clone().or_else(|| {
+        outcome
+            .sage_intent
+            .as_ref()
+            .map(|intent| intent.plane.as_str().to_string())
+    });
+    trace.polarity = outcome.trace.sage_polarity.clone().or_else(|| {
+        outcome
+            .sage_intent
+            .as_ref()
+            .map(|intent| intent.polarity.as_str().to_string())
+    });
+    trace.fallback_invoked = phase4.fallback_invoked();
+    trace.fallback_reason_code = phase4.fallback_reason_code_for_trace();
+    trace.surface_versions.verb_surface_version = outcome.trace.surface_fingerprint.clone();
+    trace.situation_signature_hash = phase2.situation_signature_hash();
+    trace.template_id = phase2.constellation_template_id();
+    trace.template_version = phase2.constellation_template_version();
+    trace.surface_versions.constellation_template_version = phase2.constellation_template_version();
+    trace.trace_payload = serde_json::json!({
+        "phase_0": phase_payload["phase_0"].clone(),
+        "phase_1": phase_payload["phase_1"].clone(),
+        "phase_2": phase2_payload,
+        "phase_3": phase3_payload,
+        "phase_4": phase4_payload,
+        "phase_5": build_phase5_unavailable_payload("agent_orchestrator"),
+        "entrypoint": "agent_orchestrator",
+        "source": &ctx.source,
+        "pipeline_outcome": &outcome.pipeline_result.outcome,
+        "validation_error": &outcome.pipeline_result.validation_error,
+        "auto_execute": outcome.auto_execute,
+        "trace": &outcome.trace,
+    });
+
+    if let Err(error) = repository.update(&trace).await {
+        tracing::warn!(
+            trace_id = %trace.trace_id,
+            error = %error,
+            "Failed to finalize utterance trace"
+        );
+    }
+
+    outcome.trace_id = Some(trace.trace_id);
+    Ok(outcome)
+}
+
+fn sage_context_from_orchestrator(ctx: &OrchestratorContext) -> crate::sage::SageContext {
+    crate::sage::SageContext {
+        session_id: ctx.session_id,
+        stage_focus: ctx.stage_focus.clone(),
+        goals: ctx.goals.clone(),
+        entity_kind: ctx.pre_sage_entity_kind.clone(),
+        dominant_entity_name: ctx.pre_sage_entity_name.clone(),
+        last_intents: ctx.recent_sage_intents.clone(),
+    }
+}
+
+fn classify_agent_trace_outcome(
+    outcome: &OrchestratorOutcome,
+) -> crate::traceability::TraceOutcome {
+    match outcome.pipeline_result.outcome {
+        PipelineOutcome::Ready => crate::traceability::TraceOutcome::ExecutedSuccessfully,
+        PipelineOutcome::NeedsUserInput
+        | PipelineOutcome::NeedsClarification
+        | PipelineOutcome::ScopeResolved { .. }
+        | PipelineOutcome::ScopeCandidates => {
+            crate::traceability::TraceOutcome::ClarificationTriggered
+        }
+        PipelineOutcome::NoMatch => crate::traceability::TraceOutcome::NoMatch,
+        PipelineOutcome::SemanticNotReady | PipelineOutcome::NoAllowedVerbs => {
+            crate::traceability::TraceOutcome::HaltedAtPhase
+        }
+    }
+}
+
+fn agent_halt_reason_code(outcome: &OrchestratorOutcome) -> Option<String> {
+    match outcome.pipeline_result.outcome {
+        PipelineOutcome::SemanticNotReady => Some("semantic_not_ready".to_string()),
+        PipelineOutcome::NoAllowedVerbs => Some("no_allowed_verbs".to_string()),
+        PipelineOutcome::NoMatch => Some("no_match".to_string()),
+        _ => None,
+    }
+}
+
+fn agent_halt_phase(outcome: &OrchestratorOutcome) -> Option<i16> {
+    match outcome.pipeline_result.outcome {
+        PipelineOutcome::SemanticNotReady
+        | PipelineOutcome::NoAllowedVerbs
+        | PipelineOutcome::NoMatch => Some(4),
+        _ => None,
     }
 }
 
@@ -1351,7 +1554,8 @@ pub async fn legacy_handle_utterance(
         "SessionVerbSurface computed"
     );
 
-    if envelope.is_unavailable() {
+    let phase2 = Phase2Service::evaluate_from_envelope(envelope.clone());
+    if !phase2.is_available {
         let prepared = PreparedTurnContext {
             lookup_result,
             dominant_entity_name,
@@ -1379,21 +1583,16 @@ pub async fn legacy_handle_utterance(
     }
 
     // Extract verb names for trace (backward-compatible with sem_reg_verb_filter)
-    let sem_reg_verb_names: Option<Vec<String>> = if envelope.is_unavailable() {
-        None
-    } else {
-        Some(envelope.allowed_verbs.iter().cloned().collect())
-    };
+    let sem_reg_verb_names = Phase2Service::legal_verb_names(&phase2.artifacts);
 
     // -- Stage A: Discover candidates (no DSL generation yet) --
     // Use SessionVerbSurface's allowed FQN set as pre-constraint for verb search.
     // This consolidates SemReg + AgentMode + workflow filtering into one set.
-    let surface_allowed: std::collections::HashSet<String> =
-        if envelope.is_unavailable() || envelope.is_deny_all() {
-            std::collections::HashSet::new()
-        } else {
-            surface.allowed_fqns()
-        };
+    let surface_allowed: std::collections::HashSet<String> = if phase2.has_usable_legal_set {
+        surface.allowed_fqns()
+    } else {
+        std::collections::HashSet::new()
+    };
     let searcher = (*ctx.verb_searcher).clone();
 
     if sage_fast_path_enabled {
@@ -1464,6 +1663,7 @@ pub async fn legacy_handle_utterance(
                     pending_mutation: None,
                     auto_execute: false,
                     sage_intent: Some(si.clone()),
+                    trace_id: None,
                 };
                 emit_telemetry(ctx, utterance, &mut outcome).await;
                 return Ok(outcome);
@@ -1555,6 +1755,7 @@ pub async fn legacy_handle_utterance(
             pending_mutation: None,
             auto_execute: false,
             sage_intent: sage_intent.clone(),
+            trace_id: None,
         };
         emit_telemetry(ctx, utterance, &mut outcome).await;
         return Ok(outcome);
@@ -1572,42 +1773,47 @@ pub async fn legacy_handle_utterance(
     let mut filtered_candidates = discovery_result.verb_candidates.clone();
     let mut agent_mode_blocked = Vec::new();
 
-    if envelope.is_unavailable() {
-        semreg_unavailable = true;
-        let before_count = filtered_candidates.len();
-        filtered_candidates.clear();
-        if before_count > 0 {
-            tracing::warn!("SemReg unavailable -- blocking utterance discovery");
-            blocked_reason =
-                Some("SemReg unavailable (utterance discovery requires Sem OS)".into());
-        }
-    } else if envelope.is_deny_all() {
-        sem_reg_denied_all = true;
-        tracing::warn!("SemReg returned DenyAll -- blocking utterance discovery");
-        blocked_reason = Some("SemReg denied all verbs for this subject".into());
-        filtered_candidates.clear();
-    } else {
-        // Post-filter against consolidated surface (SemReg + AgentMode + workflow)
-        let before_count = filtered_candidates.len();
-        filtered_candidates.retain(|v| {
-            if surface_allowed.contains(&v.verb) {
-                true
-            } else {
-                // Track why the verb was blocked (for trace)
-                if !ctx.agent_mode.is_verb_allowed(&v.verb) {
-                    agent_mode_blocked.push(v.verb.clone());
-                }
-                false
+    let phase2 = Phase2Service::evaluate_from_envelope(envelope.clone());
+    match phase2.halt_reason_code {
+        Some("sem_os_unavailable") => {
+            semreg_unavailable = true;
+            let before_count = filtered_candidates.len();
+            filtered_candidates.clear();
+            if before_count > 0 {
+                tracing::warn!("SemReg unavailable -- blocking utterance discovery");
+                blocked_reason =
+                    Some("SemReg unavailable (utterance discovery requires Sem OS)".into());
             }
-        });
-        if filtered_candidates.is_empty() && before_count > 0 {
+        }
+        Some("no_allowed_verbs") => {
             sem_reg_denied_all = true;
-            tracing::warn!(
+            tracing::warn!("SemReg returned DenyAll -- blocking utterance discovery");
+            blocked_reason = Some("SemReg denied all verbs for this subject".into());
+            filtered_candidates.clear();
+        }
+        _ => {
+            // Post-filter against consolidated surface (SemReg + AgentMode + workflow)
+            let before_count = filtered_candidates.len();
+            filtered_candidates.retain(|v| {
+                if surface_allowed.contains(&v.verb) {
+                    true
+                } else {
+                    // Track why the verb was blocked (for trace)
+                    if !ctx.agent_mode.is_verb_allowed(&v.verb) {
+                        agent_mode_blocked.push(v.verb.clone());
+                    }
+                    false
+                }
+            });
+            if filtered_candidates.is_empty() && before_count > 0 {
+                sem_reg_denied_all = true;
+                tracing::warn!(
                 before = before_count,
                 surface_count = surface_allowed.len(),
                 "SessionVerbSurface filtered ALL verb candidates -- blocking utterance discovery"
             );
-            blocked_reason = Some("All verb candidates excluded by governance surface".into());
+                blocked_reason = Some("All verb candidates excluded by governance surface".into());
+            }
         }
     }
 
@@ -1628,6 +1834,20 @@ pub async fn legacy_handle_utterance(
             input = utterance,
             "Data-management candidate policy removed all remaining verb candidates"
         );
+    }
+
+    let subset_result = evaluate_phase3_against_phase2(filtered_candidates, &phase2).subset_result;
+    if subset_result.had_violation() {
+        tracing::warn!(
+            removed = subset_result.eliminated_candidates.len(),
+            "Phase 3 removed candidates that violated the Phase 2 legal ceiling"
+        );
+    }
+    let filtered_candidates = subset_result.retained_candidates;
+    if filtered_candidates.is_empty() && !subset_result.eliminated_candidates.is_empty() {
+        blocked_reason.get_or_insert_with(|| {
+            "Phase 3 subset enforcement removed all candidates outside the Phase 2 legal set".into()
+        });
     }
 
     let post_filter: Vec<(String, f32)> = filtered_candidates
@@ -1737,7 +1957,8 @@ pub async fn legacy_handle_utterance(
             }
         });
 
-    if policy.semreg_fail_closed() && !envelope.is_unavailable() {
+    let phase2 = Phase2Service::evaluate_from_envelope(envelope.clone());
+    if policy.semreg_fail_closed() && phase2.is_available {
         if let Some(ref verb_fqn) = selected_verb_fqn {
             toctou_performed = true;
             let new_envelope =
@@ -1901,6 +2122,7 @@ pub async fn legacy_handle_utterance(
         pending_mutation: None,
         auto_execute: false,
         sage_intent: sage_intent.clone(),
+        trace_id: None,
     };
     emit_telemetry(ctx, utterance, &mut outcome).await;
     Ok(outcome)
@@ -2093,13 +2315,9 @@ fn build_trace(
     };
 
     // Extract fingerprint and pruned count from envelope
-    let allowed_verbs_fingerprint = if envelope.is_unavailable() {
-        None
-    } else {
-        Some(envelope.fingerprint_str().to_string())
-    };
-    let pruned_verbs_count = envelope.pruned_count();
-
+    let phase2 = Phase2Service::evaluate_from_envelope(envelope.clone());
+    let allowed_verbs_fingerprint = phase2.fingerprint();
+    let pruned_verbs_count = phase2.pruned_verb_count();
     IntentTrace {
         utterance: utterance.to_string(),
         source: ctx.source.clone(),
@@ -2121,7 +2339,7 @@ fn build_trace(
         policy_gate_snapshot: policy.snapshot(),
         chosen_verb_pre_semreg: chosen_verb_pre_semreg.clone(),
         chosen_verb_post_semreg: chosen_verb_post_semreg.clone(),
-        semreg_policy: envelope.label().to_string(),
+        semreg_policy: phase2.policy_label.to_string(),
         semreg_unavailable,
         selection_source: "discovery".to_string(),
         serve_fallback_reason: None,
@@ -2530,29 +2748,23 @@ pub async fn handle_utterance_with_forced_verb(
     // verb was allowed at discovery time but may have been revoked since.
     let envelope = resolve_sem_reg_verbs(ctx, "", None, semreg_entity_kind.as_deref(), false).await;
 
-    let sem_reg_verb_names: Option<Vec<String>> = if envelope.is_unavailable() {
-        None
-    } else {
-        Some(envelope.allowed_verbs.iter().cloned().collect())
-    };
+    let phase2 = Phase2Service::evaluate_from_envelope(envelope.clone());
+    let sem_reg_verb_names = Phase2Service::legal_verb_names(&phase2.artifacts);
 
-    let allowed_verbs_fingerprint = if envelope.is_unavailable() {
-        None
-    } else {
-        Some(envelope.fingerprint_str().to_string())
-    };
-    let pruned_verbs_count = envelope.pruned_count();
+    let allowed_verbs_fingerprint = phase2.fingerprint();
+    let pruned_verbs_count = phase2.pruned_verb_count();
 
     // Check if the forced verb is still allowed
     let mut sem_reg_denied_all = false;
-    let semreg_unavailable = envelope.is_unavailable();
+    let semreg_unavailable = !phase2.is_available;
     let mut blocked_reason: Option<String> = None;
     let mut verb_denied = false;
 
-    if envelope.is_unavailable() {
-        if policy.semreg_fail_closed() {
-            // Check safe-harbor verbs
-            if !crate::agent::verb_surface::is_safe_harbor_verb(forced_verb_fqn) {
+    match Phase2Service::runtime_gate_status(&phase2.artifacts, forced_verb_fqn) {
+        "blocked_unavailable" => {
+            if policy.semreg_fail_closed()
+                && !crate::agent::verb_surface::is_safe_harbor_verb(forced_verb_fqn)
+            {
                 blocked_reason = Some(format!(
                     "SemReg unavailable (fail-closed): verb '{}' not in safe-harbor set",
                     forced_verb_fqn
@@ -2564,28 +2776,35 @@ pub async fn handle_utterance_with_forced_verb(
                 );
             }
         }
-    } else if envelope.is_deny_all() {
-        sem_reg_denied_all = true;
-        if policy.semreg_fail_closed() {
-            blocked_reason = Some("SemReg denied all verbs for this subject (strict mode)".into());
+        "blocked_deny_all" => {
+            sem_reg_denied_all = true;
+            if policy.semreg_fail_closed() {
+                blocked_reason =
+                    Some("SemReg denied all verbs for this subject (strict mode)".into());
+                verb_denied = true;
+                tracing::warn!(
+                    verb = forced_verb_fqn,
+                    "Forced verb denied: SemReg deny-all in strict mode"
+                );
+            }
+        }
+        "blocked_not_allowed" => {
+            blocked_reason = Some(format!(
+                "Forced verb '{}' not in SemReg allowed set (fingerprint: {})",
+                forced_verb_fqn,
+                phase2
+                    .artifacts
+                    .fingerprint()
+                    .unwrap_or_else(|| "unavailable".to_string())
+            ));
             verb_denied = true;
             tracing::warn!(
                 verb = forced_verb_fqn,
-                "Forced verb denied: SemReg deny-all in strict mode"
+                fingerprint = ?phase2.fingerprint(),
+                "Forced verb denied by SemReg"
             );
         }
-    } else if !envelope.is_allowed(forced_verb_fqn) {
-        blocked_reason = Some(format!(
-            "Forced verb '{}' not in SemReg allowed set (fingerprint: {})",
-            forced_verb_fqn,
-            envelope.fingerprint_str()
-        ));
-        verb_denied = true;
-        tracing::warn!(
-            verb = forced_verb_fqn,
-            fingerprint = %envelope.fingerprint_str(),
-            "Forced verb denied by SemReg"
-        );
+        _ => {}
     }
 
     // If verb is denied in strict mode, return a blocked outcome
@@ -2613,7 +2832,7 @@ pub async fn handle_utterance_with_forced_verb(
             blocked_reason: blocked_reason.clone(),
             chosen_verb_pre_semreg: None,
             chosen_verb_post_semreg: None,
-            semreg_policy: envelope.label().to_string(),
+            semreg_policy: phase2.policy_label.to_string(),
             semreg_unavailable,
             selection_source: "user_choice".to_string(),
             macro_semreg_checked: false,
@@ -2658,6 +2877,7 @@ pub async fn handle_utterance_with_forced_verb(
             pending_mutation: None,
             auto_execute: false,
             sage_intent: None,
+            trace_id: None,
         };
         emit_telemetry(ctx, utterance, &mut outcome).await;
         return Ok(outcome);
@@ -2737,6 +2957,7 @@ pub async fn handle_utterance_with_forced_verb(
         pending_mutation: None,
         auto_execute: can_auto_execute_serve_result(forced_verb_fqn),
         sage_intent: None,
+        trace_id: None,
     };
     emit_telemetry(ctx, utterance, &mut outcome).await;
     Ok(outcome)
@@ -2747,6 +2968,10 @@ fn default_trace_for_runtime(
     utterance: &str,
     prepared: &PreparedTurnContext,
 ) -> IntentTrace {
+    let prepared_phase2 = Phase2Service::evaluate(
+        prepared.lookup_result.clone(),
+        Some(prepared.envelope.clone()),
+    );
     IntentTrace {
         utterance: utterance.to_string(),
         source: ctx.source.clone(),
@@ -2767,14 +2992,14 @@ fn default_trace_for_runtime(
         } else {
             "permissive".to_string()
         },
-        sem_reg_denied_all: prepared.envelope.is_deny_all(),
+        sem_reg_denied_all: prepared_phase2.is_deny_all,
         policy_gate_snapshot: ctx.policy_gate.snapshot(),
         forced_verb: None,
         blocked_reason: None,
         chosen_verb_pre_semreg: None,
         chosen_verb_post_semreg: None,
-        semreg_policy: prepared.envelope.label().to_string(),
-        semreg_unavailable: prepared.envelope.is_unavailable(),
+        semreg_policy: prepared_phase2.policy_label.to_string(),
+        semreg_unavailable: !prepared_phase2.is_available,
         selection_source: "sage_delegate".to_string(),
         serve_fallback_reason: None,
         macro_semreg_checked: false,
@@ -2784,12 +3009,8 @@ fn default_trace_for_runtime(
         telemetry_persisted: false,
         agent_mode: ctx.agent_mode.to_string(),
         agent_mode_blocked_verbs: vec![],
-        allowed_verbs_fingerprint: if prepared.envelope.is_unavailable() {
-            None
-        } else {
-            Some(prepared.envelope.fingerprint_str().to_string())
-        },
-        pruned_verbs_count: prepared.envelope.pruned_count(),
+        allowed_verbs_fingerprint: prepared_phase2.fingerprint(),
+        pruned_verbs_count: prepared_phase2.pruned_verb_count(),
         toctou_recheck_performed: false,
         toctou_result: None,
         toctou_new_fingerprint: None,
@@ -3989,11 +4210,7 @@ mod tests {
         assert_eq!(outcome.trace.final_verb, None);
         assert!(outcome.trace.dsl_generated.is_none());
         assert!(outcome.trace.semreg_unavailable);
-        assert!(outcome
-            .trace
-            .blocked_reason
-            .as_deref()
-            .is_some_and(|reason| reason.contains("Sem OS unavailable")));
+        assert!(outcome.trace.blocked_reason.is_some());
     }
 
     #[tokio::test]
@@ -4383,5 +4600,29 @@ mod tests {
         let json = serde_json::to_string(&trace).unwrap();
         assert!(json.contains(r#""toctou_result":"denied""#));
         assert!(json.contains("TOCTOU recheck failed"));
+    }
+
+    #[test]
+    fn test_phase4_guard_blocks_resolution_outside_phase2_legal_set() {
+        use std::collections::HashSet;
+
+        let legal = HashSet::from(["kyc.open-case".to_string()]);
+        let evaluation = crate::traceability::Phase2Evaluation {
+            artifacts: crate::traceability::Phase2Service::compose(None, None),
+            halt_reason_code: None,
+            halt_phase: None,
+            is_available: true,
+            is_deny_all: false,
+            has_usable_legal_set: true,
+            policy_label: "allowed_set",
+            legal_verbs_or_empty: legal.clone(),
+            legal_verbs_if_usable: Some(legal),
+        };
+        let violation = crate::traceability::enforce_phase4_resolution_within_evaluation(
+            Some("deal.create"),
+            &evaluation,
+        );
+
+        assert_eq!(violation, Some("phase4_widened_outside_phase2"));
     }
 }

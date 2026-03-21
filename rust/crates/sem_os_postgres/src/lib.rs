@@ -10,6 +10,7 @@
 
 pub mod authoring;
 pub mod cleanup;
+pub mod constellation_hydration;
 pub mod sqlx_types;
 pub mod store;
 

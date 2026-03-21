@@ -13,7 +13,9 @@ use serde::{Deserialize, Serialize};
 use crate::constellation_map_def::{
     ConstellationMapDefBody, DependencyEntry, SlotDef, VerbPaletteEntry,
 };
-use crate::context_resolution::{BlockedActionOption, GroundedActionOption};
+use crate::context_resolution::{
+    BlockedActionOption, GroundedActionOption, GroundedConstraintSignal,
+};
 use crate::state_machine_def::StateMachineDefBody;
 
 /// Fully flattened constellation model used for grounding.
@@ -38,6 +40,8 @@ pub struct SlotActionSurface {
     pub valid_actions: Vec<GroundedActionOption>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub blocked_actions: Vec<BlockedActionOption>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub constraint_signals: Vec<GroundedConstraintSignal>,
 }
 
 impl ConstellationModel {
@@ -166,6 +170,7 @@ pub fn compute_slot_action_surface(
 
     let mut valid_actions = Vec::new();
     let mut blocked_actions = Vec::new();
+    let mut constraint_signals = Vec::new();
     let mut seen = HashSet::new();
 
     for entry in resolved.def.verbs.values() {
@@ -177,12 +182,17 @@ pub fn compute_slot_action_surface(
                 .into_iter()
                 .any(|required| state_at_least(model, slot_name, &current_state, &required)),
         };
-        let dependency_reasons = resolved
+        let dependency_blocks = resolved
             .def
             .depends_on
             .iter()
-            .filter_map(|dep| dependency_block_reason(model, slot_states, dep))
+            .filter_map(|dep| dependency_block_detail(model, slot_states, &resolved.name, dep))
             .collect::<Vec<_>>();
+        let dependency_reasons = dependency_blocks
+            .iter()
+            .map(|signal| signal.message.clone())
+            .collect::<Vec<_>>();
+        constraint_signals.extend(dependency_blocks);
 
         if state_allowed && dependency_reasons.is_empty() {
             if seen.insert(action_id.clone()) {
@@ -217,6 +227,7 @@ pub fn compute_slot_action_surface(
     Ok(SlotActionSurface {
         valid_actions,
         blocked_actions,
+        constraint_signals,
     })
 }
 
@@ -242,24 +253,39 @@ fn flatten_slots(
     }
 }
 
-fn dependency_block_reason(
+fn dependency_block_detail(
     model: &ConstellationModel,
     slot_states: &HashMap<String, String>,
+    slot_name: &str,
     dep: &DependencyEntry,
-) -> Option<String> {
+) -> Option<GroundedConstraintSignal> {
     match slot_states.get(dep.slot_name()) {
         Some(state) if state_at_least(model, dep.slot_name(), state, dep.min_state()) => None,
-        Some(state) => Some(format!(
-            "dependency '{}' is in state '{}' but requires '{}'",
-            dep.slot_name(),
-            state,
-            dep.min_state()
-        )),
-        None => Some(format!(
-            "dependency '{}' is missing; requires '{}'",
-            dep.slot_name(),
-            dep.min_state()
-        )),
+        Some(state) => Some(GroundedConstraintSignal {
+            kind: "dependency_block".to_string(),
+            slot_path: slot_name.to_string(),
+            related_slot: Some(dep.slot_name().to_string()),
+            required_state: Some(dep.min_state().to_string()),
+            actual_state: Some(state.clone()),
+            message: format!(
+                "dependency '{}' is in state '{}' but requires '{}'",
+                dep.slot_name(),
+                state,
+                dep.min_state()
+            ),
+        }),
+        None => Some(GroundedConstraintSignal {
+            kind: "dependency_block".to_string(),
+            slot_path: slot_name.to_string(),
+            related_slot: Some(dep.slot_name().to_string()),
+            required_state: Some(dep.min_state().to_string()),
+            actual_state: None,
+            message: format!(
+                "dependency '{}' is missing; requires '{}'",
+                dep.slot_name(),
+                dep.min_state()
+            ),
+        }),
     }
 }
 
@@ -403,5 +429,11 @@ slots:
         assert!(surface.valid_actions.is_empty());
         assert_eq!(surface.blocked_actions.len(), 1);
         assert!(surface.blocked_actions[0].reasons[0].contains("dependency 'case'"));
+        assert_eq!(surface.constraint_signals.len(), 1);
+        assert_eq!(surface.constraint_signals[0].kind, "dependency_block");
+        assert_eq!(
+            surface.constraint_signals[0].related_slot.as_deref(),
+            Some("case")
+        );
     }
 }

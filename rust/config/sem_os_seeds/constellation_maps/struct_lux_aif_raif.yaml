@@ -13,7 +13,7 @@ slots:
       show: cbu.show
   aifm:
     type: entity
-    entity_kinds: [organization]
+    entity_kinds: [company]
     join:
       via: cbu_entity_roles
       parent_fk: cbu_id
@@ -43,7 +43,7 @@ slots:
         when: filled
   depositary:
     type: entity
-    entity_kinds: [organization]
+    entity_kinds: [company]
     join:
       via: cbu_entity_roles
       parent_fk: cbu_id
@@ -73,7 +73,7 @@ slots:
         when: filled
   investment_manager:
     type: entity
-    entity_kinds: [organization]
+    entity_kinds: [company]
     join:
       via: cbu_entity_roles
       parent_fk: cbu_id
@@ -103,7 +103,7 @@ slots:
         when: filled
   administrator:
     type: entity
-    entity_kinds: [organization]
+    entity_kinds: [company]
     join:
       via: cbu_entity_roles
       parent_fk: cbu_id
@@ -133,7 +133,7 @@ slots:
         when: filled
   auditor:
     type: entity
-    entity_kinds: [organization]
+    entity_kinds: [company]
     join:
       via: cbu_entity_roles
       parent_fk: cbu_id
@@ -163,7 +163,7 @@ slots:
         when: filled
   prime_broker:
     type: entity
-    entity_kinds: [organization]
+    entity_kinds: [company]
     join:
       via: cbu_entity_roles
       parent_fk: cbu_id
@@ -193,7 +193,7 @@ slots:
         when: filled
   ownership_chain:
     type: entity_graph
-    entity_kinds: [person, organization]
+    entity_kinds: [person, company]
     join:
       via: entity_relationships
       parent_fk: from_entity_id

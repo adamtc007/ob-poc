@@ -8,6 +8,8 @@ use std::collections::HashSet;
 
 use dsl_core::config::types::ActionClass;
 
+use crate::entity_kind::matches as entity_kind_matches;
+
 use super::outcome::OutcomeIntent;
 use super::polarity::IntentPolarity;
 use super::verb_index::{VerbMeta, VerbMetadataIndex};
@@ -152,10 +154,16 @@ impl StructuredVerbScorer {
     ) -> (Vec<&'a VerbMeta>, FilterDiagnostics) {
         let domain_hint =
             (!intent.domain_concept.trim().is_empty()).then_some(intent.domain_concept.as_str());
-        let filtered = self.query_by_harm_class(intent, domain_hint);
+        let strict_filtered = self.query_by_harm_class(intent, domain_hint, true);
+        if !strict_filtered.is_empty() {
+            let diagnostics = self.diagnose_filter_chain(intent, domain_hint);
+            return (strict_filtered, diagnostics);
+        }
+
+        let filtered = self.query_by_harm_class(intent, domain_hint, false);
         if filtered.is_empty() && domain_hint.is_some() {
             let diagnostics = self.diagnose_filter_chain(intent, None);
-            (self.query_by_harm_class(intent, None), diagnostics)
+            (self.query_by_harm_class(intent, None, false), diagnostics)
         } else {
             let diagnostics = self.diagnose_filter_chain(intent, domain_hint);
             (filtered, diagnostics)
@@ -166,15 +174,10 @@ impl StructuredVerbScorer {
         &'a self,
         intent: &OutcomeIntent,
         domain_hint: Option<&str>,
+        strict_domain: bool,
     ) -> Vec<&'a VerbMeta> {
-        let filter_domain = |meta: &&VerbMeta| match domain_hint {
-            Some(hint) => self
-                .index
-                .query(intent.plane, intent.polarity, Some(hint))
-                .iter()
-                .any(|candidate| candidate.fqn == meta.fqn),
-            None => true,
-        };
+        let filter_domain =
+            |meta: &&VerbMeta| self.matches_domain_filter(intent, meta, domain_hint, strict_domain);
 
         match intent.polarity {
             IntentPolarity::Read | IntentPolarity::Ambiguous => self
@@ -203,7 +206,7 @@ impl StructuredVerbScorer {
         let domain = base
             .iter()
             .copied()
-            .filter(|meta| self.matches_domain_filter(intent, meta, domain_hint))
+            .filter(|meta| self.matches_domain_filter(intent, meta, domain_hint, true))
             .collect::<Vec<_>>();
         let phase = domain
             .iter()
@@ -244,8 +247,10 @@ impl StructuredVerbScorer {
         intent: &OutcomeIntent,
         meta: &VerbMeta,
         domain_hint: Option<&str>,
+        strict_domain: bool,
     ) -> bool {
         match domain_hint {
+            Some(hint) if strict_domain => matches_strict_domain_hint(meta, hint),
             Some(hint) => self
                 .index
                 .query(intent.plane, intent.polarity, Some(hint))
@@ -254,6 +259,16 @@ impl StructuredVerbScorer {
             None => true,
         }
     }
+}
+
+fn matches_strict_domain_hint(meta: &VerbMeta, hint: &str) -> bool {
+    let hint = hint.trim().to_ascii_lowercase();
+    if hint.is_empty() || hint == "unknown" {
+        return true;
+    }
+
+    let domain = meta.domain.to_ascii_lowercase();
+    domain == hint || domain.starts_with(&hint) || hint.starts_with(&domain)
 }
 
 fn candidate_matches_context(meta: &VerbMeta, intent: &OutcomeIntent) -> bool {
@@ -335,14 +350,13 @@ fn subject_kinds_match(meta: &VerbMeta, intent: &OutcomeIntent) -> bool {
         .as_ref()
         .and_then(|subject| subject.kind_hint.as_deref())
         .or(intent.hints.entity_kind.as_deref());
-    let Some(subject_kind) = subject_kind.map(|value| value.to_ascii_lowercase()) else {
+    let Some(subject_kind) = subject_kind else {
         return true;
     };
 
     meta.subject_kinds
         .iter()
-        .map(|kind| kind.to_ascii_lowercase())
-        .any(|kind| kind == subject_kind)
+        .any(|kind| entity_kind_matches(kind, subject_kind))
 }
 
 fn normalized_action_tags(intent: &OutcomeIntent) -> HashSet<String> {
@@ -903,6 +917,28 @@ mod tests {
         )]));
 
         let candidates = scorer.score(&intent, 3);
-        assert_eq!(candidates[0].action_score, 0.3);
+        assert_eq!(candidates[0].action_score, 0.95);
+    }
+
+    #[test]
+    fn subject_kind_filter_accepts_canonical_aliases() {
+        let mut meta = sample_meta(
+            "kyc-case.create",
+            IntentPolarity::Write,
+            vec![ObservationPlane::Instance],
+            &["create", "kyc-case"],
+            &["cbu-id"],
+            "Create a case",
+        );
+        meta.subject_kinds = vec!["kyc-case".to_string()];
+
+        let mut intent = sample_intent();
+        intent.subject = Some(EntityRef {
+            mention: "this case".to_string(),
+            kind_hint: Some("kyc_case".to_string()),
+            uuid: None,
+        });
+
+        assert!(subject_kinds_match(&meta, &intent));
     }
 }

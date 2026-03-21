@@ -13,7 +13,7 @@ slots:
       show: cbu.show
   aifm:
     type: entity
-    entity_kinds: [organization]
+    entity_kinds: [company]
     join: { via: cbu_entity_roles, parent_fk: cbu_id, child_fk: entity_id, filter_column: role, filter_value: aifm }
     cardinality: mandatory
     depends_on: [cbu]
@@ -28,7 +28,7 @@ slots:
       show: { verb: entity.read, when: filled }
   depositary:
     type: entity
-    entity_kinds: [organization]
+    entity_kinds: [company]
     join: { via: cbu_entity_roles, parent_fk: cbu_id, child_fk: entity_id, filter_column: role, filter_value: depositary }
     cardinality: mandatory
     depends_on: [cbu]
@@ -43,7 +43,7 @@ slots:
       show: { verb: entity.read, when: filled }
   investment_manager:
     type: entity
-    entity_kinds: [organization]
+    entity_kinds: [company]
     join: { via: cbu_entity_roles, parent_fk: cbu_id, child_fk: entity_id, filter_column: role, filter_value: investment-manager }
     cardinality: optional
     depends_on: [cbu]
@@ -58,7 +58,7 @@ slots:
       show: { verb: entity.read, when: filled }
   administrator:
     type: entity
-    entity_kinds: [organization]
+    entity_kinds: [company]
     join: { via: cbu_entity_roles, parent_fk: cbu_id, child_fk: entity_id, filter_column: role, filter_value: administrator }
     cardinality: optional
     depends_on: [cbu]
@@ -73,7 +73,7 @@ slots:
       show: { verb: entity.read, when: filled }
   auditor:
     type: entity
-    entity_kinds: [organization]
+    entity_kinds: [company]
     join: { via: cbu_entity_roles, parent_fk: cbu_id, child_fk: entity_id, filter_column: role, filter_value: auditor }
     cardinality: optional
     depends_on: [cbu]
@@ -88,7 +88,7 @@ slots:
       show: { verb: entity.read, when: filled }
   prime_broker:
     type: entity
-    entity_kinds: [organization]
+    entity_kinds: [company]
     join: { via: cbu_entity_roles, parent_fk: cbu_id, child_fk: entity_id, filter_column: role, filter_value: prime-broker }
     occurrence: 1
     cardinality: optional
@@ -104,7 +104,7 @@ slots:
       show: { verb: entity.read, when: filled }
   secondary_prime_broker:
     type: entity
-    entity_kinds: [organization]
+    entity_kinds: [company]
     join: { via: cbu_entity_roles, parent_fk: cbu_id, child_fk: entity_id, filter_column: role, filter_value: prime-broker }
     occurrence: 2
     cardinality: optional
@@ -120,7 +120,7 @@ slots:
       show: { verb: entity.read, when: filled }
   executing_broker:
     type: entity
-    entity_kinds: [organization]
+    entity_kinds: [company]
     join: { via: cbu_entity_roles, parent_fk: cbu_id, child_fk: entity_id, filter_column: role, filter_value: executing-broker }
     cardinality: optional
     depends_on: [cbu]
@@ -135,7 +135,7 @@ slots:
       show: { verb: entity.read, when: filled }
   company_secretary:
     type: entity
-    entity_kinds: [organization]
+    entity_kinds: [company]
     join: { via: cbu_entity_roles, parent_fk: cbu_id, child_fk: entity_id, filter_column: role, filter_value: company-secretary }
     cardinality: optional
     depends_on: [cbu]
@@ -150,7 +150,7 @@ slots:
       show: { verb: entity.read, when: filled }
   ownership_chain:
     type: entity_graph
-    entity_kinds: [person, organization]
+    entity_kinds: [person, company]
     join: { via: entity_relationships, parent_fk: from_entity_id, child_fk: to_entity_id }
     cardinality: recursive
     max_depth: 5

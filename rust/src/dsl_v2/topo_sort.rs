@@ -926,8 +926,7 @@ mod tests {
             .collect();
 
         assert!(
-            first_two_verbs.contains(&"ensure")
-                && first_two_verbs.contains(&"create-proper-person"),
+            first_two_verbs.contains(&"ensure") && first_two_verbs.contains(&"create"),
             "First two should be cbu.ensure and entity.create (any order)"
         );
     }
@@ -960,10 +959,7 @@ mod tests {
         assert!(result.reordered);
 
         if let Statement::VerbCall(vc) = &result.program.statements[0] {
-            assert_eq!(
-                vc.verb, "create-proper-person",
-                "First should create entity"
-            );
+            assert_eq!(vc.verb, "create", "First should create entity");
         }
     }
 
@@ -1146,10 +1142,7 @@ mod tests {
         assert!(result.reordered);
 
         if let Statement::VerbCall(vc) = &result.program.statements[0] {
-            assert_eq!(
-                vc.verb, "create-proper-person",
-                "First should create entity"
-            );
+            assert_eq!(vc.verb, "create", "First should create entity");
         }
     }
 

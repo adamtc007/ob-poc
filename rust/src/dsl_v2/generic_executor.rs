@@ -182,6 +182,16 @@ pub struct GenericCrudExecutor {
 
 #[cfg(feature = "database")]
 impl GenericCrudExecutor {
+    fn canonical_entity_type_arg(entity_type: &str) -> &str {
+        match entity_type {
+            "proper_person" => "proper-person",
+            "limited_company" => "limited-company",
+            "partnership" => "partnership",
+            "trust" => "trust",
+            other => other,
+        }
+    }
+
     fn soft_delete_supported(&self, schema: &str, table: &str) -> bool {
         schema == "ob-poc" && matches!(table, "cbus" | "entities")
     }
@@ -476,11 +486,7 @@ impl GenericCrudExecutor {
                 // Map entity_type to verb
                 let (domain, verb_name) = match entity_type.as_str() {
                     "cbu" => ("cbu", "ensure"),
-                    "proper_person" => ("entity", "create-proper-person"),
-                    "limited_company" => ("entity", "create-limited-company"),
-                    "partnership" => ("entity", "create-partnership-limited"),
-                    "trust" => ("entity", "create-trust-discretionary"),
-                    _ => ("entity", "create-limited-company"), // fallback
+                    _ => ("entity", "create"),
                 };
 
                 // Convert attrs to args format
@@ -489,6 +495,12 @@ impl GenericCrudExecutor {
                     // Convert snake_case to kebab-case for arg names
                     let arg_name = k.replace('_', "-");
                     args.insert(arg_name, v.clone());
+                }
+                if domain == "entity" {
+                    args.insert(
+                        "entity-type".to_string(),
+                        json!(Self::canonical_entity_type_arg(entity_type)),
+                    );
                 }
 
                 // Look up verb and execute

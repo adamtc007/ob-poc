@@ -31,9 +31,10 @@ use crate::{
         evaluate_verb_preconditions, filter_and_rank_attributes, filter_and_rank_verbs,
         generate_disambiguation, generate_governance_signals, rank_views_by_overlap,
         ContextResolutionRequest, ContextResolutionResponse, DiscoverySurface, DslCandidate,
-        EvidenceSummary, GovernanceSignal, GroundedActionSurface, GroundingReadiness,
-        RankedConstellation, RankedConstellationFamily, RankedUniverse, RankedUniverseDomain,
-        RankedView, ResolutionStage, ResolvedSubject, SubjectMemberships, SubjectRelationships,
+        EvidenceSummary, GovernanceSignal, GroundedActionSurface, GroundedTraversalEdge,
+        GroundingReadiness, RankedConstellation, RankedConstellationFamily, RankedUniverse,
+        RankedUniverseDomain, RankedView, ResolutionStage, ResolvedSubject, SubjectMemberships,
+        SubjectRelationships,
     },
     error::SemOsError,
     grounding::{compute_slot_action_surface, ConstellationModel},
@@ -419,6 +420,8 @@ fn build_grounded_action_surface(
                 resolved_node_id: Some(format!("{}:{}", model.constellation, slot_name)),
                 resolved_state_machine: slot.def.state_machine.clone(),
                 current_state: slot_states.get(slot_name).cloned(),
+                traversed_edges: build_grounded_traversal_edges(&model, slot_name, subject),
+                constraint_signals: surface.constraint_signals,
                 valid_actions: surface.valid_actions,
                 blocked_actions: surface.blocked_actions,
                 dsl_candidates,
@@ -432,6 +435,57 @@ fn build_grounded_action_surface(
     }
 
     best.map(|(_, grounded)| grounded)
+}
+
+fn build_grounded_traversal_edges(
+    model: &ConstellationModel,
+    slot_name: &str,
+    subject: &crate::context_resolution::SubjectRef,
+) -> Vec<GroundedTraversalEdge> {
+    let mut edges = Vec::new();
+    let node_id = format!("{}:{}", model.constellation, slot_name);
+
+    edges.push(GroundedTraversalEdge {
+        from_type: model.constellation.clone(),
+        to_type: slot_name.to_string(),
+        relationship: "resolved_slot_path".to_string(),
+        direction: "parent_to_child".to_string(),
+        from_instance: Some(subject.id().to_string()),
+        to_instance: Some(node_id.clone()),
+    });
+
+    let slot_segments = slot_name.split('.').collect::<Vec<_>>();
+    if slot_segments.len() > 1 {
+        let mut parent = slot_segments[0].to_string();
+        for segment in slot_segments.iter().skip(1) {
+            let child = format!("{parent}.{segment}");
+            edges.push(GroundedTraversalEdge {
+                from_type: parent.clone(),
+                to_type: child.clone(),
+                relationship: "contains_slot".to_string(),
+                direction: "parent_to_child".to_string(),
+                from_instance: Some(format!("{}:{}", model.constellation, parent)),
+                to_instance: Some(format!("{}:{}", model.constellation, child)),
+            });
+            parent = child;
+        }
+    }
+
+    if let Some(slot) = model.slots.get(slot_name) {
+        for dependency in &slot.def.depends_on {
+            let dependency_slot = dependency.slot_name().to_string();
+            edges.push(GroundedTraversalEdge {
+                from_type: dependency_slot.clone(),
+                to_type: slot_name.to_string(),
+                relationship: format!("depends_on[min_state={}]", dependency.min_state()),
+                direction: "prerequisite_to_dependent".to_string(),
+                from_instance: Some(format!("{}:{}", model.constellation, dependency_slot)),
+                to_instance: Some(node_id.clone()),
+            });
+        }
+    }
+
+    edges
 }
 
 fn is_discovery_stage(req: &ContextResolutionRequest) -> bool {
@@ -1838,11 +1892,14 @@ fn parse_uuid(s: &str, field_name: &str) -> Result<Uuid> {
 mod tests {
     use super::*;
     use crate::abac::ActorContext;
+    use crate::constellation_map_def::ConstellationMapDefBody;
     use crate::context_resolution::{
         DiscoveryContext, EvidenceMode, ResolutionConstraints, SubjectRef,
     };
+    use crate::grounding::ConstellationModel;
     use chrono::Utc;
     use serde_json::json;
+    use std::collections::HashMap;
 
     #[test]
     fn test_parse_uuid_valid() {
@@ -1863,6 +1920,44 @@ mod tests {
             }
             other => panic!("Expected InvalidInput, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn grounded_traversal_edges_include_parent_and_dependency_edges() {
+        let map: ConstellationMapDefBody = serde_yaml::from_str(
+            r#"
+fqn: demo
+constellation: demo
+jurisdiction: LU
+slots:
+  cbu:
+    type: cbu
+    table: cbus
+    pk: cbu_id
+    cardinality: root
+  cbu.case:
+    type: case
+    table: cases
+    pk: case_id
+    cardinality: optional
+    depends_on:
+      - slot: cbu
+        min_state: filled
+    verbs:
+      open: case.open
+"#,
+        )
+        .unwrap();
+        let model = ConstellationModel::from_parts(map, HashMap::new());
+        let edges =
+            build_grounded_traversal_edges(&model, "cbu.case", &SubjectRef::TaskId(Uuid::nil()));
+
+        assert!(edges
+            .iter()
+            .any(|edge| edge.relationship == "contains_slot"));
+        assert!(edges
+            .iter()
+            .any(|edge| edge.relationship == "depends_on[min_state=filled]"));
     }
 
     fn snapshot_row(

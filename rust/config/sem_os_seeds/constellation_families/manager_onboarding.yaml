@@ -1,0 +1,30 @@
+fqn: family.manager_onboarding
+family_id: manager_onboarding
+label: Manager Onboarding
+description: Family for manager-led legal-entity structures that anchor fund launches.
+domain_id: onboarding
+selection_rules:
+  - condition: jurisdiction == 'UK' && entity_kind == 'company'
+    target_constellation: struct.uk.manager.llp
+    priority: 15
+constellation_refs:
+  - constellation_id: struct.uk.manager.llp
+    label: UK Manager LLP
+    jurisdiction: UK
+    entity_kind: company
+    triggers:
+      - manager
+      - manager llp
+      - management llp
+      - llp
+candidate_jurisdictions:
+  - UK
+candidate_entity_kinds:
+  - company
+grounding_threshold:
+  required_input_keys:
+    - objective
+    - jurisdiction
+    - entity_kind
+  requires_entity_instance: false
+  allows_draft_instance: true

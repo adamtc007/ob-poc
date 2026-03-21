@@ -1,0 +1,53 @@
+fqn: universe.kyc_operations
+universe_id: kyc_operations
+name: KYC Operations
+description: Discovery universe for KYC cases, screening, document collection, and ownership review workflows.
+version: "1.0"
+default_entry_domain: kyc
+domains:
+  - domain_id: kyc
+    label: KYC
+    description: KYC case creation, screening, document collection, and escalation work.
+    objective_tags:
+      - kyc
+      - due_diligence
+      - compliance
+    utterance_signals:
+      - signal_type: keyword
+        pattern: kyc
+        weight: 1.0
+      - signal_type: keyword
+        pattern: screening
+        weight: 0.9
+      - signal_type: keyword
+        pattern: sanctions
+        weight: 0.8
+      - signal_type: keyword
+        pattern: pep
+        weight: 0.8
+      - signal_type: keyword
+        pattern: documents
+        weight: 0.8
+      - signal_type: keyword
+        pattern: ownership
+        weight: 0.7
+    candidate_entity_kinds:
+      - kyc-case
+      - entity
+      - company
+      - person
+      - fund
+    required_grounding_inputs:
+      - key: objective
+        label: Objective
+        required: true
+        input_type: string
+    entry_questions:
+      - question_id: kyc_goal
+        prompt: What KYC outcome are you trying to achieve?
+        maps_to: objective
+        priority: 1
+    allowed_discovery_actions:
+      - research.search
+      - entity.resolve
+      - session.clarify

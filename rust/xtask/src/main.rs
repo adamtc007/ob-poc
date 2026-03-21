@@ -27,6 +27,7 @@ mod replay_tuner;
 mod seed_allianz;
 mod sem_reg;
 mod ubo_test;
+mod utterance_roundtrip;
 mod verbs;
 
 #[derive(Parser)]
@@ -559,6 +560,28 @@ enum Command {
     /// (GC001-GC003) and soft warnings (GC010-GC011).
     GovernedCheck {
         /// Fail with non-zero exit code on hard errors (for CI)
+        #[arg(long)]
+        strict: bool,
+    },
+
+    /// Live utterance -> Sem OS -> DSL round-trip harness
+    UtteranceRoundtrip {
+        /// API base URL hosting the ob-poc server
+        #[arg(long, default_value = "http://127.0.0.1:3000")]
+        base_url: String,
+        /// Fixture YAML file
+        #[arg(long, default_value = "fixtures/utterance_roundtrip_bank_domain.yaml")]
+        fixture: std::path::PathBuf,
+        /// Output directory for JSON/Markdown reports
+        #[arg(long, default_value = "target/utterance_roundtrip")]
+        out_dir: std::path::PathBuf,
+        /// Optional substring filter over case names/domains/utterances
+        #[arg(long)]
+        filter: Option<String>,
+        /// Only run the first N matching cases
+        #[arg(long)]
+        limit: Option<usize>,
+        /// Exit non-zero if any case fails
         #[arg(long)]
         strict: bool,
     },
@@ -1591,6 +1614,29 @@ fn main() -> Result<()> {
         Command::GovernedCheck { strict } => {
             let rt = tokio::runtime::Runtime::new()?;
             rt.block_on(governed_check::run_check(strict))
+        }
+        Command::UtteranceRoundtrip {
+            base_url,
+            fixture,
+            out_dir,
+            filter,
+            limit,
+            strict,
+        } => {
+            let rt = tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .build()?;
+            let report = rt.block_on(utterance_roundtrip::run(
+                &base_url,
+                &fixture,
+                &out_dir,
+                filter.as_deref(),
+                limit,
+            ))?;
+            if strict && report.summary.failed > 0 {
+                std::process::exit(1);
+            }
+            Ok(())
         }
     }
 }

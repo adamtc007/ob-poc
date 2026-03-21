@@ -116,11 +116,18 @@ use crate::graph::GraphScope;
 use crate::mcp::macro_index::MacroIndex;
 use crate::mcp::noun_index::NounIndex;
 use crate::mcp::scenario_index::ScenarioIndex;
+use crate::mcp::verb_search::{VerbSearchResult, VerbSearchSource};
 use crate::mcp::verb_search_factory::VerbSearcherFactory;
 use crate::sage::SageEngine;
 #[cfg(not(feature = "runbook-gate-vnext"))]
 use crate::session::SessionScope;
 use crate::session::{SessionEvent, SessionState, UnifiedSession, UnresolvedRefInfo};
+use crate::traceability::{
+    build_phase2_unavailable_payload, build_phase3_unavailable_payload,
+    build_phase4_unavailable_payload, build_phase_trace_payload, build_trace_scaffold_payload,
+    evaluate_phase3_against_phase2, evaluate_phase4_within_phase2, evaluate_phase5_agent,
+    NewUtteranceTrace, Phase2Service, TraceKind, TraceOutcome, UtteranceTraceRepository,
+};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use std::sync::Arc;
@@ -142,7 +149,16 @@ pub struct EntityLookup {
 
 #[cfg(test)]
 mod tests {
-    use super::AgentService;
+    use super::{
+        agent_phase5_recheck_failure, build_direct_phase4_evaluation,
+        direct_response_resolved_verb, AgentChatResponse, AgentService,
+    };
+    use crate::session::SessionState;
+    use crate::traceability::{Phase2Service, TraceOutcome};
+    use sem_os_core::context_resolution::{
+        BlockedActionOption, GroundedActionSurface, GroundedConstraintSignal, SubjectRef,
+    };
+    use uuid::Uuid;
 
     #[test]
     fn read_only_pivot_detection_catches_show_queries() {
@@ -186,6 +202,10 @@ mod tests {
     #[test]
     fn static_guard_no_alternate_semtaxonomy_path_symbols() {
         let source = std::fs::read_to_string(file!()).expect("agent_service source should read");
+        let source = source
+            .split("#[cfg(test)]")
+            .next()
+            .expect("agent_service source should include pre-test content");
         assert!(
             !source.contains("fn semtaxonomy_enabled("),
             "semtaxonomy_enabled should remain deleted"
@@ -212,6 +232,132 @@ mod tests {
                 "crate::agent::orchestrator::handle_utterance(&orch_ctx, &request.message)"
             ),
             "process_chat should route free-form utterances through orchestrator::handle_utterance"
+        );
+    }
+
+    #[cfg(feature = "runbook-gate-vnext")]
+    #[test]
+    fn phase5_recheck_failure_blocks_removed_verb() {
+        let envelope =
+            crate::agent::sem_os_context_envelope::SemOsContextEnvelope::test_with_verbs(&[
+                "cbu.create",
+            ]);
+
+        let outcome = agent_phase5_recheck_failure("case.open", &envelope);
+        assert!(outcome.is_some());
+    }
+
+    #[test]
+    fn phase5_recheck_failure_surfaces_constellation_block() {
+        let mut envelope = crate::agent::sem_os_context_envelope::SemOsContextEnvelope::deny_all();
+        envelope.grounded_action_surface = Some(GroundedActionSurface {
+            resolved_subject: SubjectRef::TaskId(Uuid::nil()),
+            resolved_constellation: Some("constellation.kyc".to_string()),
+            resolved_slot_path: Some("case".to_string()),
+            resolved_node_id: Some("node-1".to_string()),
+            resolved_state_machine: Some("case_machine".to_string()),
+            current_state: Some("intake".to_string()),
+            traversed_edges: vec![],
+            constraint_signals: vec![GroundedConstraintSignal {
+                kind: "dependency_block".to_string(),
+                slot_path: "case".to_string(),
+                related_slot: Some("cbu".to_string()),
+                required_state: Some("filled".to_string()),
+                actual_state: Some("empty".to_string()),
+                message: "dependency 'cbu' is in state 'empty' but requires 'filled'".to_string(),
+            }],
+            valid_actions: vec![],
+            blocked_actions: vec![BlockedActionOption {
+                action_id: "case.open".to_string(),
+                action_kind: "primitive".to_string(),
+                description: "Blocked action for slot 'case'".to_string(),
+                reasons: vec![
+                    "dependency 'cbu' is in state 'empty' but requires 'filled'".to_string()
+                ],
+            }],
+            dsl_candidates: vec![],
+        });
+
+        let outcome = agent_phase5_recheck_failure("case.open", &envelope).expect("blocked");
+        assert!(outcome.contains("dependency 'cbu' is in state 'empty' but requires 'filled'"));
+        assert!(outcome.contains("move 'cbu' from 'empty' to at least 'filled'"));
+    }
+
+    #[test]
+    fn direct_trace_halt_prefers_phase2_reason_when_session_closes() {
+        let response = AgentChatResponse {
+            message: "Blocked".to_string(),
+            session_state: SessionState::Closed,
+            can_execute: false,
+            dsl_source: None,
+            ast: None,
+            disambiguation: None,
+            commands: None,
+            unresolved_refs: None,
+            current_ref_index: None,
+            dsl_hash: None,
+            verb_disambiguation: None,
+            intent_tier: None,
+            decision: None,
+            sage_explain: None,
+            coder_proposal: None,
+            discovery_bootstrap: None,
+            parked_entries: None,
+        };
+        let phase2 = Phase2Service::evaluate(
+            None,
+            Some(crate::agent::sem_os_context_envelope::SemOsContextEnvelope::deny_all()),
+        );
+
+        assert_eq!(
+            AgentService::direct_trace_outcome(&response),
+            TraceOutcome::HaltedAtPhase
+        );
+        assert_eq!(
+            AgentService::direct_trace_halt_reason(&response, &phase2).as_deref(),
+            Some("no_allowed_verbs")
+        );
+        assert_eq!(
+            AgentService::direct_trace_halt_phase(&response, &phase2),
+            Some(2)
+        );
+    }
+
+    #[test]
+    fn direct_phase4_payload_extracts_resolved_verb_from_dsl() {
+        let response = AgentChatResponse {
+            message: "Ready".to_string(),
+            session_state: SessionState::ReadyToExecute,
+            can_execute: true,
+            dsl_source: Some("(case.open :id @case)".to_string()),
+            ast: None,
+            disambiguation: None,
+            commands: None,
+            unresolved_refs: None,
+            current_ref_index: None,
+            dsl_hash: None,
+            verb_disambiguation: None,
+            intent_tier: None,
+            decision: None,
+            sage_explain: None,
+            coder_proposal: None,
+            discovery_bootstrap: None,
+            parked_entries: None,
+        };
+
+        let resolved = direct_response_resolved_verb(&response);
+        let payload = build_direct_phase4_evaluation(
+            &response,
+            resolved.as_deref(),
+            &crate::traceability::Phase2Service::evaluate(None, None),
+        )
+        .expect("phase4 evaluation should exist")
+        .payload();
+        assert_eq!(resolved.as_deref(), Some("case.open"));
+        assert_eq!(payload["resolved_verb"], "case.open");
+        assert_eq!(
+            payload["resolution_strategy_detail"],
+            "agent_direct_execute"
         );
     }
 }
@@ -311,6 +457,64 @@ impl Default for AgentServiceConfig {
     }
 }
 
+#[cfg(feature = "runbook-gate-vnext")]
+fn agent_phase5_recheck_record(
+    verb_fqn: &str,
+    dsl_source: &str,
+    envelope: &crate::agent::sem_os_context_envelope::SemOsContextEnvelope,
+) -> serde_json::Value {
+    let phase2 = Phase2Service::evaluate_from_envelope(envelope.clone());
+    let status = Phase2Service::runtime_gate_status(&phase2.artifacts, verb_fqn);
+    let primary_block = phase2.primary_constellation_block();
+
+    serde_json::json!({
+        "verb": verb_fqn,
+        "dsl_command": dsl_source,
+        "status": status,
+        "sem_os_label": phase2.policy_label,
+        "allowed_verb_count": phase2.legal_verb_count(),
+        "pruned_verb_count": phase2.pruned_verb_count(),
+        "fingerprint": phase2.fingerprint(),
+        "snapshot_set_id": envelope.snapshot_set_id,
+        "blocking_entity": primary_block.as_ref().and_then(|block| block.blocking_entity.clone()),
+        "blocking_state": primary_block.as_ref().and_then(|block| block.blocking_state.clone()),
+        "blocking_predicate": primary_block.as_ref().map(|block| block.predicate.clone()),
+        "resolution_hint": primary_block.as_ref().map(|block| block.resolution_hint.clone()),
+    })
+}
+
+#[cfg(any(test, feature = "runbook-gate-vnext"))]
+fn agent_phase5_recheck_failure(
+    verb_fqn: &str,
+    envelope: &crate::agent::sem_os_context_envelope::SemOsContextEnvelope,
+) -> Option<String> {
+    let phase2 = Phase2Service::evaluate_from_envelope(envelope.clone());
+    Phase2Service::runtime_gate_failure(&phase2.artifacts, verb_fqn)
+}
+
+#[cfg(feature = "runbook-gate-vnext")]
+fn agent_execution_artifact(
+    runbook_id: crate::runbook::types::CompiledRunbookId,
+    step: &crate::runbook::executor::StepExecutionResult,
+    final_status: &crate::runbook::types::CompiledRunbookStatus,
+) -> serde_json::Value {
+    let (status, result) = match &step.outcome {
+        crate::runbook::executor::StepOutcome::Completed { result } => ("completed", Some(result)),
+        crate::runbook::executor::StepOutcome::Parked { .. } => ("parked", None),
+        crate::runbook::executor::StepOutcome::Failed { .. } => ("failed", None),
+        crate::runbook::executor::StepOutcome::Skipped { .. } => ("skipped", None),
+    };
+
+    serde_json::json!({
+        "runbook_id": runbook_id.to_string(),
+        "step_id": step.step_id,
+        "verb": step.verb,
+        "status": status,
+        "final_status": final_status,
+        "result": result,
+    })
+}
+
 // ============================================================================
 // Client Scope (for client portal)
 // ============================================================================
@@ -394,6 +598,317 @@ pub struct AgentService {
 }
 
 impl AgentService {
+    async fn start_direct_trace(
+        &self,
+        session: &UnifiedSession,
+        message: &str,
+    ) -> Option<NewUtteranceTrace> {
+        let repository = UtteranceTraceRepository::new(self.pool.clone());
+        let sage_ctx = Self::trace_sage_context(session);
+        let phase2_payload = self
+            .direct_phase2_evaluation(session, message)
+            .await
+            .payload_or_unavailable("agent_service_direct");
+        let mut trace = NewUtteranceTrace::in_progress(
+            session.id,
+            Uuid::new_v4(),
+            message,
+            if session.pending_trace_id.is_some() {
+                TraceKind::ClarificationResponse
+            } else {
+                TraceKind::Original
+            },
+        );
+        trace.parent_trace_id = session.pending_trace_id;
+        let mut trace_payload = build_trace_scaffold_payload(
+            message,
+            &sage_ctx,
+            phase2_payload,
+            "agent_service_direct",
+        );
+        if let Some(payload) = trace_payload.as_object_mut() {
+            payload.insert(
+                "session_state".to_string(),
+                serde_json::json!(format!("{:?}", session.state)),
+            );
+            payload.insert(
+                "has_pending_mutation".to_string(),
+                serde_json::json!(session.pending_mutation.is_some()),
+            );
+            payload.insert(
+                "has_pending_decision".to_string(),
+                serde_json::json!(session.pending_decision.is_some()),
+            );
+            payload.insert(
+                "has_pending_intent_tier".to_string(),
+                serde_json::json!(session.pending_intent_tier.is_some()),
+            );
+            payload.insert(
+                "has_pending_verb_disambiguation".to_string(),
+                serde_json::json!(session.pending_verb_disambiguation.is_some()),
+            );
+        }
+        trace.trace_payload = trace_payload;
+
+        if let Err(error) = repository.insert(&trace).await {
+            tracing::warn!(
+                session_id = %session.id,
+                error = %error,
+                "Failed to persist direct agent trace scaffold"
+            );
+            return None;
+        }
+
+        Some(trace)
+    }
+
+    async fn finalize_direct_trace(
+        &self,
+        session: &mut UnifiedSession,
+        trace: Option<NewUtteranceTrace>,
+        response: &AgentChatResponse,
+    ) {
+        let Some(mut trace) = trace else {
+            return;
+        };
+
+        let repository = UtteranceTraceRepository::new(self.pool.clone());
+        let sage_ctx = Self::trace_sage_context(session);
+        let phase_payload = build_phase_trace_payload(&trace.raw_utterance, &sage_ctx);
+        let phase2 = self
+            .direct_phase2_evaluation(session, &trace.raw_utterance)
+            .await;
+        let resolved_verb = direct_response_resolved_verb(response);
+        let phase3 = build_direct_phase3_evaluation(response, resolved_verb.as_deref(), &phase2);
+        let phase4 = build_direct_phase4_evaluation(response, resolved_verb.as_deref(), &phase2);
+        let phase5 = evaluate_phase5_agent(session, response);
+        let phase2_template_version = phase2.constellation_template_version();
+        trace.template_id = phase2.constellation_template_id();
+        trace.situation_signature_hash = phase2.situation_signature_hash();
+        trace.template_version = phase2_template_version.clone();
+        trace.surface_versions.constellation_template_version = phase2_template_version;
+        trace.outcome = Self::direct_trace_outcome(response);
+        trace.halt_reason_code = Self::direct_trace_halt_reason(response, &phase2);
+        trace.halt_phase = Self::direct_trace_halt_phase(response, &phase2);
+        trace.resolved_verb = resolved_verb.clone();
+        trace.fallback_invoked = phase4
+            .as_ref()
+            .map(|evaluation| evaluation.fallback_invoked())
+            .unwrap_or(false);
+        trace.fallback_reason_code = phase4
+            .as_ref()
+            .and_then(|evaluation| evaluation.fallback_reason_code_for_trace());
+        trace.execution_shape_kind = phase5.execution_shape_kind().map(ToString::to_string);
+        trace.trace_payload = serde_json::json!({
+            "phase_0": phase_payload["phase_0"].clone(),
+            "phase_1": phase_payload["phase_1"].clone(),
+            "phase_2": phase2.payload(),
+            "phase_3": phase3
+                .as_ref()
+                .map(|evaluation| evaluation.payload_or_unavailable("agent_service_direct"))
+                .unwrap_or_else(|| build_phase3_unavailable_payload("agent_service_direct")),
+            "phase_4": phase4
+                .as_ref()
+                .map(|evaluation| evaluation.payload_or_unavailable("agent_service_direct"))
+                .unwrap_or_else(|| build_phase4_unavailable_payload("agent_service_direct")),
+            "phase_5": phase5.payload(),
+            "entrypoint": "agent_service_direct",
+            "session_state": format!("{:?}", response.session_state),
+            "can_execute": response.can_execute,
+            "has_decision": response.decision.is_some(),
+            "has_verb_disambiguation": response.verb_disambiguation.is_some(),
+            "has_intent_tier": response.intent_tier.is_some(),
+            "has_coder_proposal": response.coder_proposal.is_some(),
+            "has_discovery_bootstrap": response.discovery_bootstrap.is_some(),
+            "has_parked_entries": response.parked_entries.is_some(),
+        });
+
+        if let Err(error) = repository.update(&trace).await {
+            tracing::warn!(
+                trace_id = %trace.trace_id,
+                error = %error,
+                "Failed to finalize direct agent trace"
+            );
+            return;
+        }
+
+        session.last_trace_id = Some(trace.trace_id);
+        if Self::response_needs_follow_up(response) {
+            session.pending_trace_id = self
+                .emit_agent_prompt_trace(session, Some(trace.trace_id), response)
+                .await
+                .or(Some(trace.trace_id));
+        } else {
+            session.pending_trace_id = None;
+        }
+    }
+
+    async fn direct_phase2_evaluation(
+        &self,
+        session: &UnifiedSession,
+        message: &str,
+    ) -> crate::traceability::Phase2Evaluation {
+        let lookup = if let Some(lookup_service) = self.get_lookup_service() {
+            Some(lookup_service.analyze(message, 5).await)
+        } else {
+            None
+        };
+
+        let envelope = if self.sem_os_client.is_some() {
+            let actor = crate::policy::ActorResolver::from_env();
+            self.resolve_options(session, actor).await.ok()
+        } else {
+            None
+        };
+
+        Phase2Service::evaluate(lookup, envelope)
+    }
+
+    async fn emit_agent_prompt_trace(
+        &self,
+        session: &mut UnifiedSession,
+        parent_trace_id: Option<Uuid>,
+        response: &AgentChatResponse,
+    ) -> Option<Uuid> {
+        let parent_trace_id = parent_trace_id?;
+        let repository = UtteranceTraceRepository::new(self.pool.clone());
+        let mut trace = NewUtteranceTrace::in_progress(
+            session.id,
+            Uuid::new_v4(),
+            response.message.clone(),
+            TraceKind::ClarificationPrompt,
+        );
+        trace.parent_trace_id = Some(parent_trace_id);
+        trace.outcome = TraceOutcome::ClarificationTriggered;
+        let sage_ctx = Self::trace_sage_context(session);
+        let mut trace_payload = build_trace_scaffold_payload(
+            &response.message,
+            &sage_ctx,
+            build_phase2_unavailable_payload("agent_service_prompt"),
+            "agent_service_prompt",
+        );
+        if let Some(payload) = trace_payload.as_object_mut() {
+            payload.insert(
+                "session_state".to_string(),
+                serde_json::json!(format!("{:?}", response.session_state)),
+            );
+            payload.insert(
+                "has_decision".to_string(),
+                serde_json::json!(response.decision.is_some()),
+            );
+            payload.insert(
+                "has_verb_disambiguation".to_string(),
+                serde_json::json!(response.verb_disambiguation.is_some()),
+            );
+            payload.insert(
+                "has_intent_tier".to_string(),
+                serde_json::json!(response.intent_tier.is_some()),
+            );
+            payload.insert(
+                "has_coder_proposal".to_string(),
+                serde_json::json!(response.coder_proposal.is_some()),
+            );
+            payload.insert(
+                "has_discovery_bootstrap".to_string(),
+                serde_json::json!(response.discovery_bootstrap.is_some()),
+            );
+        }
+        trace.trace_payload = trace_payload;
+
+        if let Err(error) = repository.insert(&trace).await {
+            tracing::warn!(
+                session_id = %session.id,
+                error = %error,
+                "Failed to persist direct agent prompt trace"
+            );
+            return None;
+        }
+
+        session.last_trace_id = Some(trace.trace_id);
+        Some(trace.trace_id)
+    }
+
+    fn direct_trace_outcome(response: &AgentChatResponse) -> TraceOutcome {
+        if Self::response_needs_follow_up(response) {
+            TraceOutcome::ClarificationTriggered
+        } else if response.parked_entries.is_some() {
+            TraceOutcome::ExecutedSuccessfully
+        } else if response.session_state == SessionState::Closed {
+            TraceOutcome::HaltedAtPhase
+        } else if response.can_execute || response.dsl_source.is_some() {
+            TraceOutcome::ClarificationTriggered
+        } else {
+            TraceOutcome::HaltedAtPhase
+        }
+    }
+
+    fn direct_trace_halt_reason(
+        response: &AgentChatResponse,
+        phase2: &crate::traceability::Phase2Evaluation,
+    ) -> Option<String> {
+        if matches!(response.session_state, SessionState::Closed)
+            && phase2.halt_reason_code.is_some()
+        {
+            return phase2.halt_reason_code.map(ToString::to_string);
+        }
+
+        if response.session_state == SessionState::Closed {
+            Some("session_closed".to_string())
+        } else if !Self::response_needs_follow_up(response)
+            && !response.can_execute
+            && response.parked_entries.is_none()
+        {
+            Some("direct_agent_response".to_string())
+        } else {
+            None
+        }
+    }
+
+    fn direct_trace_halt_phase(
+        response: &AgentChatResponse,
+        phase2: &crate::traceability::Phase2Evaluation,
+    ) -> Option<i16> {
+        if matches!(response.session_state, SessionState::Closed) && phase2.halt_phase.is_some() {
+            return phase2.halt_phase;
+        }
+
+        if matches!(
+            Self::direct_trace_outcome(response),
+            TraceOutcome::HaltedAtPhase | TraceOutcome::NoMatch
+        ) {
+            Some(4)
+        } else {
+            None
+        }
+    }
+
+    fn response_needs_follow_up(response: &AgentChatResponse) -> bool {
+        response.decision.is_some()
+            || response.verb_disambiguation.is_some()
+            || response.intent_tier.is_some()
+            || response
+                .coder_proposal
+                .as_ref()
+                .is_some_and(|proposal| proposal.requires_confirmation)
+            || response.discovery_bootstrap.is_some()
+            || response.can_execute
+    }
+
+    fn trace_sage_context(session: &UnifiedSession) -> crate::sage::SageContext {
+        crate::sage::SageContext {
+            session_id: Some(session.id),
+            stage_focus: session.context.stage_focus.clone(),
+            goals: Vec::new(),
+            entity_kind: (!session.entity_type.is_empty()).then(|| session.entity_type.clone()),
+            dominant_entity_name: session
+                .context
+                .active_cbu
+                .as_ref()
+                .map(|cbu| cbu.display_name.clone()),
+            last_intents: session.recent_sage_intents.clone(),
+        }
+    }
+
     /// Return true when session context checks should not enforce client/deal gating.
     ///
     /// Semantic OS workflows are registry-scoped and should not force
@@ -1107,6 +1622,7 @@ impl AgentService {
         // 1. Check for pending mutation confirmation before anything else.
         if let Some(pending) = session.pending_mutation.clone() {
             if crate::agent::orchestrator::is_confirmation(&request.message) {
+                let direct_trace = self.start_direct_trace(session, &request.message).await;
                 session.pending_mutation = None;
                 session.pending_decision = None;
                 session.pending_intent_tier = None;
@@ -1130,6 +1646,8 @@ impl AgentService {
                         false,
                     );
                 }
+                self.finalize_direct_trace(session, direct_trace, &response)
+                    .await;
                 return Ok(response);
             }
             session.pending_mutation = None;
@@ -1147,6 +1665,7 @@ impl AgentService {
         }
 
         if crate::agent::orchestrator::is_confirmation(&request.message) {
+            let direct_trace = self.start_direct_trace(session, &request.message).await;
             session.pending_decision = None;
             session.pending_intent_tier = None;
             session.pending_verb_disambiguation = None;
@@ -1154,7 +1673,10 @@ impl AgentService {
                 &pivot_feedback,
                 "There is no pending change to confirm. I am still in read-only mode.",
             );
-            return Ok(self.fail(&msg, session));
+            let response = self.fail(&msg, session);
+            self.finalize_direct_trace(session, direct_trace, &response)
+                .await;
+            return Ok(response);
         }
 
         // 2. Check for RUN command - execute staged runbook
@@ -1162,7 +1684,11 @@ impl AgentService {
             input.as_str(),
             "run" | "execute" | "do it" | "go" | "run it" | "execute it"
         ) {
-            return self.execute_runbook(session).await;
+            let direct_trace = self.start_direct_trace(session, &request.message).await;
+            let response = self.execute_runbook(session).await?;
+            self.finalize_direct_trace(session, direct_trace, &response)
+                .await;
+            return Ok(response);
         }
 
         // 3. Check for pending verb disambiguation - numeric input selects an option
@@ -1202,7 +1728,8 @@ impl AgentService {
                     );
 
                     // Record learning signal and continue with selected verb
-                    return self
+                    let direct_trace = self.start_direct_trace(session, &request.message).await;
+                    let response = self
                         .handle_verb_selection(
                             session,
                             &original_input,
@@ -1210,15 +1737,19 @@ impl AgentService {
                             &all_candidates,
                             actor.clone(),
                         )
+                        .await?;
+                    self.finalize_direct_trace(session, direct_trace, &response)
                         .await;
+                    return Ok(response);
                 } else {
                     // Invalid selection number
+                    let direct_trace = self.start_direct_trace(session, &request.message).await;
                     let msg = format!(
                         "Please select a number between 1 and {}.",
                         pending.options.len()
                     );
                     session.add_agent_message(msg.clone(), None, None);
-                    return Ok(AgentChatResponse {
+                    let response = AgentChatResponse {
                         message: msg,
 
                         session_state: SessionState::PendingValidation,
@@ -1237,7 +1768,10 @@ impl AgentService {
                         coder_proposal: None,
                         discovery_bootstrap: None,
                         parked_entries: None,
-                    });
+                    };
+                    self.finalize_direct_trace(session, direct_trace, &response)
+                        .await;
+                    return Ok(response);
                 }
             }
             // Not a number - clear pending and process as new input
@@ -1271,16 +1805,25 @@ impl AgentService {
                     // Find the matching choice
                     if let Some(choice) = pending.choices.iter().find(|c| c.id == choice_id) {
                         let choice = choice.clone();
-                        return self
+                        let direct_trace = self.start_direct_trace(session, &request.message).await;
+                        let response = self
                             .handle_decision_selection(session, &pending, &choice)
+                            .await?;
+                        self.finalize_direct_trace(session, direct_trace, &response)
                             .await;
+                        return Ok(response);
                     } else if let Ok(idx) = input.trim().parse::<usize>() {
                         // Try index-based selection
                         if idx >= 1 && idx <= pending.choices.len() {
                             let choice = pending.choices[idx - 1].clone();
-                            return self
+                            let direct_trace =
+                                self.start_direct_trace(session, &request.message).await;
+                            let response = self
                                 .handle_decision_selection(session, &pending, &choice)
+                                .await?;
+                            self.finalize_direct_trace(session, direct_trace, &response)
                                 .await;
+                            return Ok(response);
                         }
                     }
 
@@ -1300,7 +1843,11 @@ impl AgentService {
                             pending.choices.len()
                         )
                     };
-                    return Ok(Self::reprompt_pending_decision(session, pending, msg));
+                    let direct_trace = self.start_direct_trace(session, &request.message).await;
+                    let response = Self::reprompt_pending_decision(session, pending, msg);
+                    self.finalize_direct_trace(session, direct_trace, &response)
+                        .await;
+                    return Ok(response);
                 }
                 // Not a number/keyword - try fuzzy match against choice labels
                 // This handles cases like typing "aviva" when the choices list
@@ -1311,9 +1858,13 @@ impl AgentService {
                     .position(|c| c.label.to_lowercase().contains(&input_lower))
                 {
                     let choice = pending.choices[matched_idx].clone();
-                    return self
+                    let direct_trace = self.start_direct_trace(session, &request.message).await;
+                    let response = self
                         .handle_decision_selection(session, &pending, &choice)
+                        .await?;
+                    self.finalize_direct_trace(session, direct_trace, &response)
                         .await;
+                    return Ok(response);
                 }
 
                 // Semantic OS workflow selection accepts natural language intents,
@@ -1321,9 +1872,14 @@ impl AgentService {
                 if pending.trace.decision_reason == "semos_workflow_selection" {
                     if let Some(choice_id) = Self::infer_semos_workflow_choice(&input_lower) {
                         if let Some(choice) = pending.choices.iter().find(|c| c.id == choice_id) {
-                            return self
+                            let direct_trace =
+                                self.start_direct_trace(session, &request.message).await;
+                            let response = self
                                 .handle_decision_selection(session, &pending, choice)
+                                .await?;
+                            self.finalize_direct_trace(session, direct_trace, &response)
                                 .await;
+                            return Ok(response);
                         }
                     }
                 }
@@ -1354,7 +1910,11 @@ impl AgentService {
                 // Mandatory decisions must remain active until user picks an option.
                 if Self::is_mandatory_pending_decision(&pending) {
                     let msg = pending.prompt.clone();
-                    return Ok(Self::reprompt_pending_decision(session, pending, msg));
+                    let direct_trace = self.start_direct_trace(session, &request.message).await;
+                    let response = Self::reprompt_pending_decision(session, pending, msg);
+                    self.finalize_direct_trace(session, direct_trace, &response)
+                        .await;
+                    return Ok(response);
                 }
                 // Optional decisions can fall through to the normal intent pipeline.
             }
@@ -1416,7 +1976,8 @@ impl AgentService {
                         let selected_verb = filtered[0].verb.clone();
                         let original_input = pending_tier.original_input.clone();
                         let all_candidates = pending_tier.candidates.clone();
-                        return self
+                        let direct_trace = self.start_direct_trace(session, &request.message).await;
+                        let response = self
                             .handle_verb_selection(
                                 session,
                                 &original_input,
@@ -1430,7 +1991,10 @@ impl AgentService {
                                     .collect::<Vec<_>>(),
                                 actor.clone(),
                             )
+                            .await?;
+                        self.finalize_direct_trace(session, direct_trace, &response)
                             .await;
+                        return Ok(response);
                     } else if !filtered.is_empty() {
                         // Multiple verbs in this tier — show verb disambiguation
                         let search_results: Vec<crate::mcp::verb_search::VerbSearchResult> =
@@ -1446,11 +2010,15 @@ impl AgentService {
                                     journey: None,
                                 })
                                 .collect();
-                        return Ok(self.build_verb_disambiguation_response(
+                        let direct_trace = self.start_direct_trace(session, &request.message).await;
+                        let response = self.build_verb_disambiguation_response(
                             &pending_tier.original_input,
                             &search_results,
                             session,
-                        ));
+                        );
+                        self.finalize_direct_trace(session, direct_trace, &response)
+                            .await;
+                        return Ok(response);
                     }
                     // No verbs matched tier — fall through to pipeline
                 }
@@ -1473,6 +2041,9 @@ impl AgentService {
             .check_session_context(session, Some(&request.message))
             .await
         {
+            let direct_trace = self.start_direct_trace(session, &request.message).await;
+            self.finalize_direct_trace(session, direct_trace, &decision)
+                .await;
             return Ok(decision);
         }
 
@@ -1598,6 +2169,7 @@ impl AgentService {
             crate::agent::orchestrator::handle_utterance(&orch_ctx, &request.message).await;
         let (
             result,
+            trace_id,
             journey_match,
             journey_decision,
             pending_mutation,
@@ -1614,6 +2186,7 @@ impl AgentService {
 
                 (
                     Ok(o.pipeline_result),
+                    o.trace_id,
                     o.trace.journey_match,
                     o.journey_decision,
                     o.pending_mutation,
@@ -1622,8 +2195,9 @@ impl AgentService {
                     discovery_bootstrap,
                 )
             }
-            Err(e) => (Err(e), None, None, None, false, None, None),
+            Err(e) => (Err(e), None, None, None, None, false, None, None),
         };
+        session.last_trace_id = trace_id;
         if let Some(intent) = sage_intent.as_ref() {
             Self::push_recent_sage_intent(session, intent);
         }
@@ -1634,6 +2208,7 @@ impl AgentService {
         match result {
             Ok(r) => {
                 if let Some(pending) = pending_mutation {
+                    session.pending_trace_id = trace_id;
                     session.pending_decision = None;
                     session.pending_intent_tier = None;
                     session.pending_verb_disambiguation = None;
@@ -1674,7 +2249,7 @@ impl AgentService {
                         None,
                         None,
                     );
-                    return Ok(AgentChatResponse {
+                    let response = AgentChatResponse {
                         message: msg,
                         session_state: SessionState::PendingValidation,
                         can_execute: false,
@@ -1692,7 +2267,12 @@ impl AgentService {
                         coder_proposal,
                         discovery_bootstrap: None,
                         parked_entries: None,
-                    });
+                    };
+                    session.pending_trace_id = self
+                        .emit_agent_prompt_trace(session, trace_id, &response)
+                        .await
+                        .or(trace_id);
+                    return Ok(response);
                 }
 
                 // Handle scope resolution - "work on allianz", "switch to blackrock"
@@ -1754,6 +2334,7 @@ impl AgentService {
                         parked_entries: None,
                     });
                 }
+                session.pending_trace_id = None;
 
                 // Handle scope candidates - multiple client matches
                 if matches!(r.outcome, PipelineOutcome::ScopeCandidates) {
@@ -1767,6 +2348,7 @@ impl AgentService {
                 }
 
                 if matches!(r.outcome, PipelineOutcome::NeedsUserInput) {
+                    session.pending_trace_id = trace_id;
                     if let Some(bootstrap) = discovery_bootstrap.clone() {
                         let message = r.validation_error.clone().unwrap_or_else(|| {
                             "Sem OS is still grounding this session.".to_string()
@@ -1781,7 +2363,7 @@ impl AgentService {
                             Some(bootstrap.clone()),
                             None,
                         );
-                        return Ok(AgentChatResponse {
+                        let response = AgentChatResponse {
                             message,
                             session_state: SessionState::New,
                             can_execute: false,
@@ -1799,7 +2381,12 @@ impl AgentService {
                             coder_proposal: None,
                             discovery_bootstrap: Some(bootstrap),
                             parked_entries: None,
-                        });
+                        };
+                        session.pending_trace_id = self
+                            .emit_agent_prompt_trace(session, trace_id, &response)
+                            .await
+                            .or(trace_id);
+                        return Ok(response);
                     }
                 }
 
@@ -1891,6 +2478,10 @@ impl AgentService {
                     let mut response = self.staged_response(r.dsl, msg);
                     response.sage_explain = sage_explain_payload.clone();
                     response.coder_proposal = coder_proposal;
+                    session.pending_trace_id = self
+                        .emit_agent_prompt_trace(session, trace_id, &response)
+                        .await
+                        .or(trace_id);
                     return Ok(response);
                 }
 
@@ -1899,6 +2490,7 @@ impl AgentService {
                 // matched — we just need a parameter to resolve the specific macro.
                 if matches!(r.outcome, PipelineOutcome::NeedsClarification) {
                     if let Some(jd) = journey_decision {
+                        session.pending_trace_id = trace_id;
                         let msg = Self::with_pivot_feedback(&pivot_feedback, jd.prompt.clone());
                         Self::add_agent_message_with_payloads(
                             session,
@@ -1909,7 +2501,7 @@ impl AgentService {
                             None,
                             None,
                         );
-                        return Ok(AgentChatResponse {
+                        let response = AgentChatResponse {
                             message: msg,
                             session_state: SessionState::New,
                             can_execute: false,
@@ -1927,7 +2519,12 @@ impl AgentService {
                             coder_proposal: None,
                             discovery_bootstrap: None,
                             parked_entries: None,
-                        });
+                        };
+                        session.pending_trace_id = self
+                            .emit_agent_prompt_trace(session, trace_id, &response)
+                            .await
+                            .or(trace_id);
+                        return Ok(response);
                     }
                 }
 
@@ -1936,6 +2533,7 @@ impl AgentService {
                 if matches!(r.outcome, PipelineOutcome::NeedsClarification)
                     && r.verb_candidates.len() >= 2
                 {
+                    session.pending_trace_id = trace_id;
                     // Analyze which intent tiers are represented
                     let intent_taxonomy = crate::dsl_v2::intent_tiers::intent_tier_taxonomy();
                     let verbs: Vec<&str> =
@@ -1955,6 +2553,10 @@ impl AgentService {
                         );
                         response.message =
                             Self::with_pivot_feedback(&pivot_feedback, response.message);
+                        session.pending_trace_id = self
+                            .emit_agent_prompt_trace(session, trace_id, &response)
+                            .await
+                            .or(trace_id);
                         return Ok(response);
                     }
 
@@ -1965,6 +2567,10 @@ impl AgentService {
                         session,
                     );
                     response.message = Self::with_pivot_feedback(&pivot_feedback, response.message);
+                    session.pending_trace_id = self
+                        .emit_agent_prompt_trace(session, trace_id, &response)
+                        .await
+                        .or(trace_id);
                     return Ok(response);
                 }
 
@@ -2893,6 +3499,8 @@ impl AgentService {
         let store: &dyn RunbookStoreBackend = &mem_store;
         let session_id = session.id;
         let mut executed_count = 0usize;
+        session.pending_execution_rechecks.clear();
+        session.pending_execution_artifacts.clear();
 
         for stmt in &program.statements {
             if let crate::dsl_v2::ast::Statement::VerbCall(vc) = stmt {
@@ -2903,6 +3511,13 @@ impl AgentService {
                     .map(|a| (a.key.clone(), a.value.to_dsl_string()))
                     .collect();
                 let dsl_source = vc.to_dsl_string();
+
+                if let Some(error) = self
+                    .phase5_runtime_recheck_agent(session, &verb_fqn, &dsl_source)
+                    .await
+                {
+                    return Ok(self.fail(&error, session));
+                }
 
                 // Derive write_set from args (heuristic UUID extraction)
                 let write_set: Vec<uuid::Uuid> =
@@ -2948,6 +3563,11 @@ impl AgentService {
                 let step_executor = DslStepExecutor::new(std::sync::Arc::new(real_executor));
                 match execute_runbook(store, runbook_id, None, &step_executor).await {
                     Ok(result) => {
+                        session
+                            .pending_execution_artifacts
+                            .extend(result.step_results.iter().map(|step| {
+                                agent_execution_artifact(runbook_id, step, &result.final_status)
+                            }));
                         let parked_entries = match &result.final_status {
                             crate::runbook::CompiledRunbookStatus::Parked { reason, cursor } => {
                                 result
@@ -3100,6 +3720,35 @@ impl AgentService {
             discovery_bootstrap: None,
             parked_entries: None,
         })
+    }
+
+    #[cfg(feature = "runbook-gate-vnext")]
+    async fn phase5_runtime_recheck_agent(
+        &self,
+        session: &mut UnifiedSession,
+        verb_fqn: &str,
+        dsl_source: &str,
+    ) -> Option<String> {
+        let Some(_) = self.sem_os_client else {
+            session.pending_execution_rechecks.push(serde_json::json!({
+                "verb": verb_fqn,
+                "dsl_command": dsl_source,
+                "status": "skipped",
+                "reason": "sem_os_client_unconfigured",
+            }));
+            return None;
+        };
+
+        let actor = crate::policy::ActorResolver::from_env();
+        let envelope = match self.resolve_options(session, actor).await {
+            Ok(envelope) => envelope,
+            Err(_) => crate::agent::sem_os_context_envelope::SemOsContextEnvelope::unavailable(),
+        };
+        session
+            .pending_execution_rechecks
+            .push(agent_phase5_recheck_record(verb_fqn, dsl_source, &envelope));
+
+        agent_phase5_recheck_failure(verb_fqn, &envelope)
     }
 
     /// Sync scope from execution context into session (legacy path only).
@@ -3648,4 +4297,60 @@ impl AgentService {
             Err(e) => Err(format!("Client group resolution failed: {}", e)),
         }
     }
+}
+
+fn build_direct_phase4_evaluation(
+    response: &AgentChatResponse,
+    resolved_verb: Option<&str>,
+    phase2: &crate::traceability::Phase2Evaluation,
+) -> Option<crate::traceability::Phase4Evaluation> {
+    let resolved_verb = resolved_verb?;
+
+    let strategy = if response.can_execute {
+        "agent_direct_execute"
+    } else {
+        "agent_direct_selection"
+    };
+
+    Some(evaluate_phase4_within_phase2(
+        Some(resolved_verb.to_string()),
+        vec![resolved_verb.to_string()],
+        strategy,
+        1.0,
+        None,
+        phase2,
+    ))
+}
+
+fn build_direct_phase3_evaluation(
+    response: &AgentChatResponse,
+    resolved_verb: Option<&str>,
+    phase2: &crate::traceability::Phase2Evaluation,
+) -> Option<crate::traceability::Phase3Evaluation> {
+    let resolved_verb = resolved_verb?;
+    let source = if response.can_execute {
+        VerbSearchSource::LearnedExact
+    } else {
+        VerbSearchSource::LexiconExact
+    };
+    Some(evaluate_phase3_against_phase2(
+        vec![VerbSearchResult {
+            verb: resolved_verb.to_string(),
+            score: 1.0,
+            source,
+            matched_phrase: resolved_verb.to_string(),
+            description: None,
+            journey: None,
+        }],
+        phase2,
+    ))
+}
+
+fn direct_response_resolved_verb(response: &AgentChatResponse) -> Option<String> {
+    let source = response.dsl_source.as_deref()?.trim();
+    let remainder = source.strip_prefix('(')?;
+    let head = remainder
+        .split(|ch: char| ch.is_whitespace() || ch == ')' || ch == '(')
+        .find(|token| !token.is_empty())?;
+    Some(head.to_string())
 }

@@ -148,6 +148,11 @@ impl SessionRepositoryV2 {
                     pending_slot_provenance: None,
                     last_proposal_set: None,
                     decision_log: super::decision_log::SessionDecisionLog::new(r.session_id),
+                    last_trace_id: None,
+                    pending_trace_id: None,
+                    pending_sem_os_envelope: None,
+                    pending_lookup_result: None,
+                    pending_execution_rechecks: Vec::new(),
                     created_at: r.created_at,
                     last_active_at: r.last_active_at,
                     // Transient field — the authoritative counter is on `runbook.next_version_counter`

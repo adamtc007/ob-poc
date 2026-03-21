@@ -48,6 +48,8 @@ use crate::journey::handoff::PackHandoff;
 use crate::journey::playback::PackPlayback;
 use crate::journey::router::{PackRouteOutcome, PackRouter};
 use crate::journey::template::instantiate_template;
+use crate::lookup::LookupService;
+use crate::mcp::verb_search::{VerbSearchResult, VerbSearchSource};
 use crate::repl::intent_matcher::IntentMatcher;
 use crate::repl::types::{MatchContext, MatchOutcome};
 use crate::runbook::envelope::ReplayEnvelope;
@@ -59,6 +61,12 @@ use crate::runbook::types::{
     CompiledRunbook, CompiledStep, ExecutionMode as CompiledExecutionMode,
 };
 use crate::runbook::RunbookStore;
+use crate::traceability::{
+    build_phase2_unavailable_payload, build_phase3_unavailable_payload,
+    build_phase4_unavailable_payload, build_phase_trace_payload, build_trace_scaffold_payload,
+    evaluate_phase3_against_phase2, evaluate_phase4_within_phase2, evaluate_phase5_repl,
+    NewUtteranceTrace, Phase2Service, TraceKind, UtteranceTraceRepository,
+};
 use sem_os_client::SemOsClient;
 
 // ---------------------------------------------------------------------------
@@ -178,6 +186,8 @@ pub struct ReplOrchestratorV2 {
     /// When set, `match_verb_for_input()` resolves a SemOsContextEnvelope and
     /// pre-constrains verb search to Sem OS-allowed verbs.
     sem_os_client: Option<Arc<dyn SemOsClient>>,
+    /// Optional lookup service for trace-time entity recovery.
+    lookup_service: Option<LookupService>,
 }
 
 impl ReplOrchestratorV2 {
@@ -202,6 +212,7 @@ impl ReplOrchestratorV2 {
             #[cfg(feature = "database")]
             unified_orch_pool: None,
             sem_os_client: None,
+            lookup_service: None,
         }
     }
 
@@ -290,6 +301,18 @@ impl ReplOrchestratorV2 {
     /// pre-constrains verb search via `MatchContext.allowed_verbs`.
     pub fn with_sem_os_client(mut self, client: Arc<dyn SemOsClient>) -> Self {
         self.sem_os_client = Some(client);
+        self
+    }
+
+    /// Attach a lookup service for trace-time entity recovery.
+    ///
+    /// # Examples
+    /// ```rust,ignore
+    /// let orch = ReplOrchestratorV2::new(router, executor)
+    ///     .with_lookup_service(lookup_service);
+    /// ```
+    pub fn with_lookup_service(mut self, lookup_service: LookupService) -> Self {
+        self.lookup_service = Some(lookup_service);
         self
     }
 
@@ -442,6 +465,11 @@ impl ReplOrchestratorV2 {
             .get_mut(&session_id)
             .ok_or(OrchestratorError::SessionNotFound(session_id))?;
 
+        session.pending_sem_os_envelope = None;
+        session.pending_lookup_result = None;
+
+        let trace_scaffold = self.persist_trace_scaffold(session, &input).await;
+
         // Record user input as a message.
         if let UserInputV2::Message { ref content } = input {
             session.push_message(MessageRole::User, content.clone());
@@ -466,8 +494,218 @@ impl ReplOrchestratorV2 {
 
         // Record assistant response message.
         session.push_message(MessageRole::Assistant, response.message.clone());
+        let finalized_trace_id = self
+            .finalize_trace_scaffold(trace_scaffold, session, &response)
+            .await;
+        let lineage_trace_id = if repl_response_needs_follow_up(&response) {
+            self.emit_repl_prompt_trace(session, finalized_trace_id, &response)
+                .await
+                .or(finalized_trace_id)
+        } else {
+            finalized_trace_id
+        };
+        update_repl_trace_lineage(session, lineage_trace_id, &response);
 
         Ok(response)
+    }
+
+    async fn persist_trace_scaffold(
+        &self,
+        session: &ReplSessionV2,
+        input: &UserInputV2,
+    ) -> Option<NewUtteranceTrace> {
+        let Some(raw_utterance) = input_trace_text(input) else {
+            return None;
+        };
+
+        let Some(pool) = self.pool.clone() else {
+            return None;
+        };
+
+        let repository = UtteranceTraceRepository::new(pool);
+        let sage_ctx = repl_trace_sage_context(session);
+        let mut trace = NewUtteranceTrace::in_progress(
+            session.id,
+            Uuid::new_v4(),
+            raw_utterance.clone(),
+            repl_trace_kind(session, input),
+        );
+        trace.parent_trace_id = repl_parent_trace_id(session, input);
+        let mut trace_payload = build_trace_scaffold_payload(
+            &raw_utterance,
+            &sage_ctx,
+            build_phase2_unavailable_payload("repl_v2"),
+            "repl_v2",
+        );
+        if let Some(payload) = trace_payload.as_object_mut() {
+            payload.insert(
+                "state".to_string(),
+                serde_json::json!(format!("{:?}", session.state)),
+            );
+            payload.insert(
+                "has_active_pack".to_string(),
+                serde_json::json!(session.has_active_pack()),
+            );
+            payload.insert(
+                "runbook_step_count".to_string(),
+                serde_json::json!(session.runbook.entries.len()),
+            );
+        }
+        trace.trace_payload = trace_payload;
+
+        if let Err(error) = repository.insert(&trace).await {
+            tracing::warn!(
+                session_id = %session.id,
+                error = %error,
+                "Failed to persist REPL utterance trace scaffold"
+            );
+            return None;
+        }
+
+        Some(trace)
+    }
+
+    async fn finalize_trace_scaffold(
+        &self,
+        trace: Option<NewUtteranceTrace>,
+        session: &ReplSessionV2,
+        response: &ReplResponseV2,
+    ) -> Option<Uuid> {
+        let Some(mut trace) = trace else {
+            return None;
+        };
+
+        let Some(pool) = self.pool.clone() else {
+            return None;
+        };
+
+        let repository = UtteranceTraceRepository::new(pool);
+        let sage_ctx = repl_trace_sage_context(session);
+        let phase_payload = build_phase_trace_payload(&trace.raw_utterance, &sage_ctx);
+        let phase2 = Phase2Service::evaluate_from_refs(
+            session.pending_lookup_result.as_ref(),
+            session.pending_sem_os_envelope.as_ref(),
+        );
+        let phase_2 = phase2.payload_or_unavailable("repl_v2");
+        let resolved_verb = response_resolved_verb(response, session);
+        let phase_3 =
+            build_repl_phase3_evaluation(response, session, resolved_verb.as_deref(), &phase2);
+        let phase_4 =
+            build_repl_phase4_evaluation(response, session, resolved_verb.as_deref(), &phase2);
+        let phase_5 = evaluate_phase5_repl(session, response);
+        trace.outcome = classify_repl_trace_outcome(response);
+        trace.halt_reason_code = repl_halt_reason_code(session, response);
+        trace.halt_phase = repl_halt_phase(session, response);
+        trace.resolved_verb = resolved_verb;
+        trace.fallback_invoked = phase_4
+            .as_ref()
+            .map(|evaluation| evaluation.fallback_invoked())
+            .unwrap_or(false);
+        trace.fallback_reason_code = phase_4
+            .as_ref()
+            .and_then(|evaluation| evaluation.fallback_reason_code_for_trace());
+        trace.execution_shape_kind = phase_5.execution_shape_kind().map(ToString::to_string);
+        trace.situation_signature_hash = phase2.situation_signature_hash();
+        trace.template_id = session
+            .runbook
+            .template_id
+            .clone()
+            .or_else(|| phase2.constellation_template_id());
+        trace.template_version = session
+            .runbook
+            .template_hash
+            .clone()
+            .or_else(|| phase2.constellation_template_version());
+        trace.surface_versions.constellation_template_version = trace.template_version.clone();
+        trace.trace_payload = serde_json::json!({
+            "phase_0": phase_payload["phase_0"].clone(),
+            "phase_1": phase_payload["phase_1"].clone(),
+            "phase_2": phase_2,
+            "phase_3": phase_3
+                .as_ref()
+                .map(|evaluation| evaluation.payload_or_unavailable("repl_v2"))
+                .unwrap_or_else(|| build_phase3_unavailable_payload("repl_v2")),
+            "phase_4": phase_4
+                .as_ref()
+                .map(|evaluation| evaluation.payload_or_unavailable("repl_v2"))
+                .unwrap_or_else(|| build_phase4_unavailable_payload("repl_v2")),
+            "phase_5": phase_5.payload(),
+            "entrypoint": "repl_v2",
+            "state": &response.state,
+            "response_kind": &response.kind,
+            "step_count": response.step_count,
+            "has_active_pack": session.has_active_pack(),
+        });
+
+        if let Err(error) = repository.update(&trace).await {
+            tracing::warn!(
+                trace_id = %trace.trace_id,
+                error = %error,
+                "Failed to finalize REPL utterance trace"
+            );
+            return None;
+        }
+
+        Some(trace.trace_id)
+    }
+
+    async fn emit_repl_prompt_trace(
+        &self,
+        session: &mut ReplSessionV2,
+        parent_trace_id: Option<Uuid>,
+        response: &ReplResponseV2,
+    ) -> Option<Uuid> {
+        let Some(parent_trace_id) = parent_trace_id else {
+            return None;
+        };
+        let Some(pool) = self.pool.clone() else {
+            return None;
+        };
+
+        let repository = UtteranceTraceRepository::new(pool);
+        let mut trace = NewUtteranceTrace::in_progress(
+            session.id,
+            Uuid::new_v4(),
+            response.message.clone(),
+            TraceKind::ClarificationPrompt,
+        );
+        trace.parent_trace_id = Some(parent_trace_id);
+        trace.outcome = crate::traceability::TraceOutcome::ClarificationTriggered;
+        let sage_ctx = repl_trace_sage_context(session);
+        let mut trace_payload = build_trace_scaffold_payload(
+            &response.message,
+            &sage_ctx,
+            build_phase2_unavailable_payload("repl_v2_prompt"),
+            "repl_v2_prompt",
+        );
+        if let Some(payload) = trace_payload.as_object_mut() {
+            payload.insert("state".to_string(), serde_json::json!(&response.state));
+            payload.insert(
+                "response_kind".to_string(),
+                serde_json::json!(&response.kind),
+            );
+            payload.insert(
+                "step_count".to_string(),
+                serde_json::json!(response.step_count),
+            );
+            payload.insert(
+                "has_active_pack".to_string(),
+                serde_json::json!(session.has_active_pack()),
+            );
+        }
+        trace.trace_payload = trace_payload;
+
+        if let Err(error) = repository.insert(&trace).await {
+            tracing::warn!(
+                session_id = %session.id,
+                error = %error,
+                "Failed to persist REPL prompt trace"
+            );
+            return None;
+        }
+
+        session.last_trace_id = Some(trace.trace_id);
+        Some(trace.trace_id)
     }
 
     // -----------------------------------------------------------------------
@@ -2070,6 +2308,10 @@ impl ReplOrchestratorV2 {
         let mut match_ctx = self.build_match_context(session);
         let context_stack = self.build_context_stack(session);
 
+        if let Some(lookup_service) = &self.lookup_service {
+            session.pending_lookup_result = Some(lookup_service.analyze(content, 5).await);
+        }
+
         // Phase 4 CCIR: Resolve SemOsContextEnvelope and pre-constrain verb search.
         // This injects `allowed_verbs` into MatchContext, which flows through to
         // VerbSearchIntentMatcher → HybridVerbSearcher::search() via the Phase 3
@@ -2085,29 +2327,33 @@ impl ReplOrchestratorV2 {
                 Some(session.id),
             )
             .await;
+            session.pending_sem_os_envelope = Some(envelope.clone());
+            let phase2 =
+                Phase2Service::evaluate(session.pending_lookup_result.clone(), Some(envelope));
+            let phase2_legal_verbs = phase2.legal_verbs_or_empty.clone();
 
-            if envelope.is_deny_all() {
+            if phase2.is_deny_all {
                 tracing::warn!(
                     session_id = %session.id,
                     "REPL: Sem OS deny-all — verb search will return empty"
                 );
-                match_ctx.allowed_verbs = Some(envelope.allowed_verbs.clone());
+                match_ctx.allowed_verbs = Some(phase2_legal_verbs.clone());
             }
 
-            if envelope.is_unavailable() {
+            if !phase2.is_available {
                 tracing::warn!(
                     session_id = %session.id,
                     "REPL: Sem OS unavailable — blocking unconstrained verb matching"
                 );
                 match_ctx.allowed_verbs = Some(std::collections::HashSet::new());
             } else {
-                sem_os_fingerprint = Some(envelope.fingerprint_str().to_string());
-                sem_os_pruned_count = envelope.pruned_count();
-                match_ctx.allowed_verbs = Some(envelope.allowed_verbs.clone());
+                sem_os_fingerprint = phase2.fingerprint();
+                sem_os_pruned_count = phase2.pruned_verb_count();
+                match_ctx.allowed_verbs = Some(phase2_legal_verbs);
                 tracing::debug!(
                     session_id = %session.id,
-                    allowed_count = envelope.allowed_verbs.len(),
-                    fingerprint = %envelope.fingerprint_str(),
+                    allowed_count = phase2.legal_verb_count(),
+                    fingerprint = ?phase2.fingerprint(),
                     pruned_count = sem_os_pruned_count,
                     "REPL: Sem OS pre-constraint applied to MatchContext"
                 );
@@ -2118,6 +2364,11 @@ impl ReplOrchestratorV2 {
                 "REPL: SemOsClient unavailable — blocking unconstrained verb matching"
             );
             match_ctx.allowed_verbs = Some(std::collections::HashSet::new());
+            session.pending_sem_os_envelope = None;
+        }
+
+        if let Some(response) = self.phase2_gate_response(session) {
+            return response;
         }
 
         // Phase 2: Try IntentService with context-aware matching first.
@@ -3289,6 +3540,9 @@ impl ReplOrchestratorV2 {
         session.runbook.set_status(RunbookStatus::Executing);
         let runbook_id = session.runbook.id;
         let total = session.runbook.entries.len();
+        if start_index == 0 {
+            session.pending_execution_rechecks.clear();
+        }
 
         session.set_state(ReplStateV2::Executing {
             runbook_id,
@@ -3324,6 +3578,23 @@ impl ReplOrchestratorV2 {
 
             // Skip already-completed entries (for continuation after resume).
             if entry_status == EntryStatus::Completed {
+                continue;
+            }
+
+            if let Some(outcome) = self
+                .phase5_runtime_recheck(session, idx, entry_id, &entry_sentence, &entry_dsl)
+                .await
+            {
+                let entry = &mut session.runbook.entries[idx];
+                entry.status = EntryStatus::Failed;
+                results.push(StepResult {
+                    entry_id,
+                    sequence: entry_sequence,
+                    sentence: entry_sentence,
+                    success: false,
+                    message: Some(recheck_failure_message(&outcome)),
+                    result: None,
+                });
                 continue;
             }
 
@@ -3606,6 +3877,56 @@ impl ReplOrchestratorV2 {
         }
     }
 
+    /// Re-hydrate Sem OS legality before executing a runbook node.
+    ///
+    /// Returns `Some(StepOutcome::Failed)` when the step must be blocked at
+    /// execution time because the selected verb is no longer legal.
+    async fn phase5_runtime_recheck(
+        &self,
+        session: &mut ReplSessionV2,
+        entry_index: usize,
+        entry_id: Uuid,
+        entry_sentence: &str,
+        entry_dsl: &str,
+    ) -> Option<StepOutcome> {
+        let Some(entry) = session.runbook.entries.get(entry_index) else {
+            return Some(StepOutcome::Failed {
+                error: "Runbook entry missing during Phase 5 re-check".to_string(),
+            });
+        };
+
+        let Some(ref client) = self.sem_os_client else {
+            session.pending_execution_rechecks.push(serde_json::json!({
+                "entry_id": entry_id,
+                "sequence": entry.sequence,
+                "verb": entry.verb,
+                "status": "skipped",
+                "reason": "sem_os_client_unconfigured",
+            }));
+            return None;
+        };
+
+        let actor = crate::policy::ActorResolver::from_env();
+        let envelope = crate::agent::orchestrator::resolve_allowed_verbs(
+            client.as_ref(),
+            &actor,
+            Some(session.id),
+        )
+        .await;
+        session
+            .pending_execution_rechecks
+            .push(phase5_recheck_record(
+                entry_id,
+                entry.sequence,
+                &entry.verb,
+                entry_sentence,
+                entry_dsl,
+                &envelope,
+            ));
+
+        phase5_recheck_failure(&entry.verb, &envelope)
+    }
+
     /// Compile a runbook entry on-the-fly for entries that lack a `compiled_runbook_id`.
     ///
     /// This is the **fallback path** — entries created before the compile pipeline was
@@ -3638,7 +3959,7 @@ impl ReplOrchestratorV2 {
                 .iter()
                 .map(|(k, v)| (k.clone(), v.clone()))
                 .collect(),
-            depends_on: vec![],
+            depends_on: entry.depends_on.clone(),
             execution_mode: compiled_mode,
             write_set: derive_write_set(
                 &entry.verb,
@@ -4164,6 +4485,365 @@ impl ReplOrchestratorV2 {
             step_count: session.runbook.entries.len(),
         }
     }
+
+    fn phase2_gate_response(&self, session: &ReplSessionV2) -> Option<ReplResponseV2> {
+        let phase2 = Phase2Service::evaluate_from_refs(
+            session.pending_lookup_result.as_ref(),
+            session.pending_sem_os_envelope.as_ref(),
+        );
+        let reason = phase2.halt_reason_code?;
+        let message = match reason {
+            "no_allowed_verbs" => {
+                if let Some(block) = phase2.primary_constellation_block() {
+                    return Some(self.invalid_input(
+                        session,
+                        &format!(
+                            "Blocked by constellation state: {}. {}.",
+                            block.predicate, block.resolution_hint
+                        ),
+                    ));
+                }
+                "No legal actions are currently available for this session state."
+            }
+            "sem_os_unavailable" => {
+                "Semantic OS context is unavailable, so verb resolution is blocked."
+            }
+            "ambiguous_entity" => "I found multiple matching entities. Please be more specific.",
+            "no_entity_found" => {
+                "I could not resolve the referenced entity. Please provide more details."
+            }
+            _ => return None,
+        };
+
+        Some(self.invalid_input(session, message))
+    }
+}
+
+fn recheck_failure_message(outcome: &StepOutcome) -> String {
+    match outcome {
+        StepOutcome::Failed { error } => error.clone(),
+        StepOutcome::Completed { .. } => "Phase 5 re-check unexpectedly completed".to_string(),
+        StepOutcome::Parked { message, .. } => format!("Phase 5 re-check parked: {message}"),
+        StepOutcome::Skipped { reason } => format!("Phase 5 re-check skipped: {reason}"),
+    }
+}
+
+fn phase5_recheck_record(
+    entry_id: Uuid,
+    sequence: i32,
+    verb: &str,
+    sentence: &str,
+    dsl_command: &str,
+    envelope: &crate::agent::sem_os_context_envelope::SemOsContextEnvelope,
+) -> serde_json::Value {
+    let phase2 = Phase2Service::evaluate_from_envelope(envelope.clone());
+    let status = Phase2Service::runtime_gate_status(&phase2.artifacts, verb);
+    let primary_block = phase2.primary_constellation_block();
+
+    serde_json::json!({
+    "entry_id": entry_id,
+    "sequence": sequence,
+    "verb": verb,
+    "sentence": sentence,
+    "dsl_command": dsl_command,
+    "status": status,
+    "sem_os_label": phase2.policy_label,
+    "allowed_verb_count": phase2.legal_verb_count(),
+    "pruned_verb_count": phase2.pruned_verb_count(),
+    "fingerprint": phase2.fingerprint(),
+    "snapshot_set_id": envelope.snapshot_set_id,
+    "blocking_entity": primary_block.as_ref().and_then(|block| block.blocking_entity.clone()),
+    "blocking_state": primary_block.as_ref().and_then(|block| block.blocking_state.clone()),
+    "blocking_predicate": primary_block.as_ref().map(|block| block.predicate.clone()),
+    "resolution_hint": primary_block.as_ref().map(|block| block.resolution_hint.clone()),
+    })
+}
+
+fn phase5_recheck_failure(
+    verb: &str,
+    envelope: &crate::agent::sem_os_context_envelope::SemOsContextEnvelope,
+) -> Option<StepOutcome> {
+    let phase2 = Phase2Service::evaluate_from_envelope(envelope.clone());
+    Phase2Service::runtime_gate_failure(&phase2.artifacts, verb)
+        .map(|error| StepOutcome::Failed { error })
+}
+
+fn repl_trace_sage_context(session: &ReplSessionV2) -> crate::sage::SageContext {
+    crate::sage::SageContext {
+        session_id: Some(session.id),
+        stage_focus: session.active_pack_id(),
+        goals: Vec::new(),
+        entity_kind: None,
+        dominant_entity_name: None,
+        last_intents: Vec::new(),
+    }
+}
+
+fn input_trace_text(input: &UserInputV2) -> Option<String> {
+    match input {
+        UserInputV2::Message { content } => Some(content.clone()),
+        UserInputV2::Command { command } => Some(format!("/{}", repl_command_name(command))),
+        UserInputV2::SelectPack { pack_id } => Some(format!("select_pack:{pack_id}")),
+        UserInputV2::SelectVerb {
+            verb_fqn,
+            original_input,
+        } => Some(format!("select_verb:{verb_fqn}::{original_input}")),
+        UserInputV2::SelectProposal { proposal_id } => {
+            Some(format!("select_proposal:{proposal_id}"))
+        }
+        UserInputV2::SelectEntity {
+            ref_id,
+            entity_id,
+            entity_name,
+        } => Some(format!("select_entity:{ref_id}:{entity_id}:{entity_name}")),
+        UserInputV2::SelectScope {
+            group_id,
+            group_name,
+        } => Some(format!("select_scope:{group_id}:{group_name}")),
+        UserInputV2::Approve {
+            entry_id,
+            approved_by,
+        } => Some(format!(
+            "approve:{entry_id}:{}",
+            approved_by.as_deref().unwrap_or_default()
+        )),
+        UserInputV2::RejectGate { entry_id, reason } => Some(format!(
+            "reject_gate:{entry_id}:{}",
+            reason.as_deref().unwrap_or_default()
+        )),
+        UserInputV2::Confirm => Some("confirm".to_string()),
+        UserInputV2::Reject => Some("reject".to_string()),
+        UserInputV2::Edit {
+            step_id,
+            field,
+            value,
+        } => Some(format!("edit:{step_id}:{field}:{value}")),
+    }
+}
+
+fn repl_trace_kind(session: &ReplSessionV2, input: &UserInputV2) -> TraceKind {
+    match input {
+        UserInputV2::Command {
+            command: ReplCommandV2::Resume(_),
+        } => TraceKind::ResumedExecution,
+        _ if repl_parent_trace_id(session, input).is_some() => TraceKind::ClarificationResponse,
+        _ => TraceKind::Original,
+    }
+}
+
+fn repl_parent_trace_id(session: &ReplSessionV2, input: &UserInputV2) -> Option<Uuid> {
+    match input {
+        UserInputV2::Confirm
+        | UserInputV2::Reject
+        | UserInputV2::SelectPack { .. }
+        | UserInputV2::SelectVerb { .. }
+        | UserInputV2::SelectProposal { .. }
+        | UserInputV2::SelectEntity { .. }
+        | UserInputV2::SelectScope { .. }
+        | UserInputV2::Approve { .. }
+        | UserInputV2::RejectGate { .. }
+        | UserInputV2::Edit { .. }
+        | UserInputV2::Command { .. } => session.pending_trace_id,
+        UserInputV2::Message { .. } => match session.state {
+            ReplStateV2::Clarifying { .. } | ReplStateV2::SentencePlayback { .. } => {
+                session.pending_trace_id
+            }
+            _ => None,
+        },
+    }
+}
+
+fn update_repl_trace_lineage(
+    session: &mut ReplSessionV2,
+    trace_id: Option<Uuid>,
+    response: &ReplResponseV2,
+) {
+    session.last_trace_id = trace_id;
+    session.pending_trace_id = match response.kind {
+        ReplResponseKindV2::ScopeRequired { .. }
+        | ReplResponseKindV2::JourneyOptions { .. }
+        | ReplResponseKindV2::Question { .. }
+        | ReplResponseKindV2::SentencePlayback { .. }
+        | ReplResponseKindV2::Clarification { .. }
+        | ReplResponseKindV2::StepProposals { .. } => trace_id,
+        ReplResponseKindV2::Executed { .. }
+        | ReplResponseKindV2::Parked { .. }
+        | ReplResponseKindV2::RunbookSummary { .. }
+        | ReplResponseKindV2::Info { .. }
+        | ReplResponseKindV2::Prompt { .. }
+        | ReplResponseKindV2::Error { .. } => None,
+    };
+}
+
+fn repl_response_needs_follow_up(response: &ReplResponseV2) -> bool {
+    matches!(
+        response.kind,
+        ReplResponseKindV2::ScopeRequired { .. }
+            | ReplResponseKindV2::JourneyOptions { .. }
+            | ReplResponseKindV2::Question { .. }
+            | ReplResponseKindV2::SentencePlayback { .. }
+            | ReplResponseKindV2::Clarification { .. }
+            | ReplResponseKindV2::StepProposals { .. }
+    )
+}
+
+fn classify_repl_trace_outcome(response: &ReplResponseV2) -> crate::traceability::TraceOutcome {
+    match response.kind {
+        ReplResponseKindV2::Executed { .. } => {
+            crate::traceability::TraceOutcome::ExecutedSuccessfully
+        }
+        ReplResponseKindV2::Error { .. } => crate::traceability::TraceOutcome::HaltedAtPhase,
+        ReplResponseKindV2::JourneyOptions { .. } => crate::traceability::TraceOutcome::NoMatch,
+        ReplResponseKindV2::Parked { .. }
+        | ReplResponseKindV2::ScopeRequired { .. }
+        | ReplResponseKindV2::Question { .. }
+        | ReplResponseKindV2::SentencePlayback { .. }
+        | ReplResponseKindV2::Clarification { .. }
+        | ReplResponseKindV2::StepProposals { .. }
+        | ReplResponseKindV2::Info { .. }
+        | ReplResponseKindV2::Prompt { .. }
+        | ReplResponseKindV2::RunbookSummary { .. } => {
+            crate::traceability::TraceOutcome::ClarificationTriggered
+        }
+    }
+}
+
+fn repl_halt_reason_code(session: &ReplSessionV2, response: &ReplResponseV2) -> Option<String> {
+    if matches!(response.kind, ReplResponseKindV2::Error { .. }) {
+        if let Some(reason) = repl_phase2_halt_reason(session) {
+            return Some(reason);
+        }
+    }
+
+    match response.kind {
+        ReplResponseKindV2::Error { .. } => Some("repl_error".to_string()),
+        ReplResponseKindV2::JourneyOptions { .. } => Some("journey_selection_required".to_string()),
+        _ => None,
+    }
+}
+
+fn repl_halt_phase(session: &ReplSessionV2, response: &ReplResponseV2) -> Option<i16> {
+    if matches!(response.kind, ReplResponseKindV2::Error { .. }) {
+        if let Some(phase2) = repl_phase2_halt_artifacts(session) {
+            if phase2.halt_phase.is_some() {
+                return phase2.halt_phase;
+            }
+        }
+    }
+
+    match response.kind {
+        ReplResponseKindV2::Error { .. } | ReplResponseKindV2::JourneyOptions { .. } => Some(4),
+        _ => None,
+    }
+}
+
+fn repl_phase2_halt_artifacts(
+    session: &ReplSessionV2,
+) -> Option<crate::traceability::Phase2Evaluation> {
+    let phase2 = Phase2Service::evaluate_from_refs(
+        session.pending_lookup_result.as_ref(),
+        session.pending_sem_os_envelope.as_ref(),
+    );
+    phase2.is_available.then_some(phase2)
+}
+
+fn repl_phase2_halt_reason(session: &ReplSessionV2) -> Option<String> {
+    repl_phase2_halt_artifacts(session)
+        .as_ref()
+        .and_then(|phase2| phase2.halt_reason_code)
+        .map(ToString::to_string)
+}
+
+fn repl_command_name(command: &ReplCommandV2) -> &'static str {
+    match command {
+        ReplCommandV2::Run => "run",
+        ReplCommandV2::Undo => "undo",
+        ReplCommandV2::Redo => "redo",
+        ReplCommandV2::Clear => "clear",
+        ReplCommandV2::Cancel => "cancel",
+        ReplCommandV2::Info => "info",
+        ReplCommandV2::Help => "help",
+        ReplCommandV2::Remove(_) => "remove",
+        ReplCommandV2::Reorder(_) => "reorder",
+        ReplCommandV2::Disable(_) => "disable",
+        ReplCommandV2::Enable(_) => "enable",
+        ReplCommandV2::Toggle(_) => "toggle",
+        ReplCommandV2::Status => "status",
+        ReplCommandV2::Resume(_) => "resume",
+    }
+}
+
+fn response_resolved_verb(response: &ReplResponseV2, session: &ReplSessionV2) -> Option<String> {
+    match (&response.kind, &response.state) {
+        (ReplResponseKindV2::SentencePlayback { verb, .. }, _) => Some(verb.clone()),
+        (_, ReplStateV2::SentencePlayback { verb, .. }) => Some(verb.clone()),
+        _ => session
+            .runbook
+            .entries
+            .last()
+            .map(|entry| entry.verb.clone()),
+    }
+}
+
+fn build_repl_phase4_evaluation(
+    response: &ReplResponseV2,
+    session: &ReplSessionV2,
+    resolved_verb: Option<&str>,
+    phase2: &crate::traceability::Phase2Evaluation,
+) -> Option<crate::traceability::Phase4Evaluation> {
+    let resolved_verb = resolved_verb?;
+
+    let strategy = match response.kind {
+        ReplResponseKindV2::SentencePlayback { .. } => "repl_sentence_playback",
+        ReplResponseKindV2::Executed { .. } => "repl_runbook_execute",
+        ReplResponseKindV2::Parked { .. } => "repl_runbook_parked",
+        _ => "repl_selection",
+    };
+
+    Some(evaluate_phase4_within_phase2(
+        Some(resolved_verb.to_string()),
+        vec![resolved_verb.to_string()],
+        strategy,
+        if session.runbook.entries.is_empty() {
+            0.85
+        } else {
+            1.0
+        },
+        None,
+        phase2,
+    ))
+}
+
+fn build_repl_phase3_evaluation(
+    response: &ReplResponseV2,
+    session: &ReplSessionV2,
+    resolved_verb: Option<&str>,
+    phase2: &crate::traceability::Phase2Evaluation,
+) -> Option<crate::traceability::Phase3Evaluation> {
+    let resolved_verb = resolved_verb?;
+    let source = match response.kind {
+        ReplResponseKindV2::Executed { .. } | ReplResponseKindV2::Parked { .. } => {
+            VerbSearchSource::ScenarioIndex
+        }
+        ReplResponseKindV2::SentencePlayback { .. } => VerbSearchSource::MacroIndex,
+        _ if session.runbook.entries.is_empty() => VerbSearchSource::LearnedExact,
+        _ => VerbSearchSource::LexiconExact,
+    };
+    Some(evaluate_phase3_against_phase2(
+        vec![VerbSearchResult {
+            verb: resolved_verb.to_string(),
+            score: if session.runbook.entries.is_empty() {
+                0.85
+            } else {
+                1.0
+            },
+            source,
+            matched_phrase: resolved_verb.to_string(),
+            description: None,
+            journey: None,
+        }],
+        phase2,
+    ))
 }
 
 // ---------------------------------------------------------------------------
@@ -4458,6 +5138,95 @@ definition_of_done:
         // Should ask the first required question.
         assert!(matches!(resp.kind, ReplResponseKindV2::Question { .. }));
         assert!(resp.message.contains("products"));
+    }
+
+    #[test]
+    fn test_compile_entry_on_the_fly_preserves_dependency_edges() {
+        let orch = make_orchestrator();
+        let mut entry = RunbookEntry::new(
+            "case.open".to_string(),
+            "Open case".to_string(),
+            "(case.open)".to_string(),
+        );
+        entry.depends_on.push(Uuid::new_v4());
+        let compiled = orch.compile_entry_on_the_fly(&entry, Uuid::new_v4(), 1);
+
+        assert_eq!(compiled.steps.len(), 1);
+        assert_eq!(compiled.steps[0].depends_on, entry.depends_on);
+    }
+
+    #[test]
+    fn test_phase5_recheck_failure_blocks_verb_outside_allowed_set() {
+        let envelope =
+            crate::agent::sem_os_context_envelope::SemOsContextEnvelope::test_with_verbs(&[
+                "cbu.create",
+            ]);
+
+        let outcome = phase5_recheck_failure("case.open", &envelope);
+        assert!(matches!(outcome, Some(StepOutcome::Failed { .. })));
+    }
+
+    #[test]
+    fn test_phase5_recheck_failure_surfaces_constellation_block() {
+        let mut envelope = crate::agent::sem_os_context_envelope::SemOsContextEnvelope::deny_all();
+        envelope.grounded_action_surface =
+            Some(sem_os_core::context_resolution::GroundedActionSurface {
+                resolved_subject: sem_os_core::context_resolution::SubjectRef::TaskId(Uuid::nil()),
+                resolved_constellation: Some("constellation.kyc".to_string()),
+                resolved_slot_path: Some("case".to_string()),
+                resolved_node_id: Some("node-1".to_string()),
+                resolved_state_machine: Some("case_machine".to_string()),
+                current_state: Some("intake".to_string()),
+                traversed_edges: vec![],
+                constraint_signals: vec![
+                    sem_os_core::context_resolution::GroundedConstraintSignal {
+                        kind: "dependency_block".to_string(),
+                        slot_path: "case".to_string(),
+                        related_slot: Some("cbu".to_string()),
+                        required_state: Some("filled".to_string()),
+                        actual_state: Some("empty".to_string()),
+                        message: "dependency 'cbu' is in state 'empty' but requires 'filled'"
+                            .to_string(),
+                    },
+                ],
+                valid_actions: vec![],
+                blocked_actions: vec![sem_os_core::context_resolution::BlockedActionOption {
+                    action_id: "case.open".to_string(),
+                    action_kind: "primitive".to_string(),
+                    description: "Blocked action for slot 'case'".to_string(),
+                    reasons: vec![
+                        "dependency 'cbu' is in state 'empty' but requires 'filled'".to_string()
+                    ],
+                }],
+                dsl_candidates: vec![],
+            });
+
+        let outcome = phase5_recheck_failure("case.open", &envelope).expect("blocked");
+        let StepOutcome::Failed { error } = outcome else {
+            panic!("expected failed step outcome");
+        };
+        assert!(error.contains("dependency 'cbu' is in state 'empty' but requires 'filled'"));
+        assert!(error.contains("move 'cbu' from 'empty' to at least 'filled'"));
+    }
+
+    #[test]
+    fn test_phase5_recheck_record_marks_allowed_status() {
+        let envelope =
+            crate::agent::sem_os_context_envelope::SemOsContextEnvelope::test_with_verbs(&[
+                "case.open",
+            ]);
+
+        let record = phase5_recheck_record(
+            Uuid::nil(),
+            1,
+            "case.open",
+            "Open case",
+            "(case.open)",
+            &envelope,
+        );
+
+        assert_eq!(record["status"], "allowed");
+        assert_eq!(record["verb"], "case.open");
     }
 
     #[tokio::test]
@@ -5127,5 +5896,206 @@ definition_of_done:
             // Just verify roundtrip doesn't panic.
             let _ = format!("{:?}", deserialized);
         }
+    }
+
+    #[test]
+    fn test_repl_phase2_halt_reason_uses_sem_os_deny_all() {
+        let mut session = ReplSessionV2::new();
+        session.pending_sem_os_envelope =
+            Some(crate::agent::sem_os_context_envelope::SemOsContextEnvelope::deny_all());
+        let response = ReplResponseV2 {
+            state: ReplStateV2::RunbookEditing,
+            kind: ReplResponseKindV2::Error {
+                error: "No matching action found".to_string(),
+                recoverable: true,
+            },
+            message: "No matching action found".to_string(),
+            runbook_summary: None,
+            step_count: 0,
+        };
+
+        assert_eq!(
+            repl_halt_reason_code(&session, &response).as_deref(),
+            Some("no_allowed_verbs")
+        );
+        assert_eq!(repl_halt_phase(&session, &response), Some(2));
+    }
+
+    #[test]
+    fn test_repl_phase2_halt_reason_uses_ambiguous_lookup() {
+        let mut session = ReplSessionV2::new();
+        session.pending_lookup_result = Some(crate::lookup::LookupResult {
+            verbs: vec![],
+            entities: vec![crate::entity_linking::EntityResolution {
+                mention_span: (0, 7),
+                mention_text: "Allianz".to_string(),
+                candidates: vec![
+                    crate::entity_linking::EntityCandidate {
+                        entity_id: Uuid::new_v4(),
+                        entity_kind: "company".to_string(),
+                        canonical_name: "Allianz SE".to_string(),
+                        score: 0.81,
+                        evidence: vec![],
+                    },
+                    crate::entity_linking::EntityCandidate {
+                        entity_id: Uuid::new_v4(),
+                        entity_kind: "fund".to_string(),
+                        canonical_name: "Allianz Fund".to_string(),
+                        score: 0.79,
+                        evidence: vec![],
+                    },
+                ],
+                selected: None,
+                confidence: 0.0,
+                evidence: vec![],
+            }],
+            dominant_entity: None,
+            expected_kinds: vec!["company".to_string()],
+            concepts: vec![],
+            verb_matched: false,
+            entities_resolved: false,
+        });
+        let response = ReplResponseV2 {
+            state: ReplStateV2::RunbookEditing,
+            kind: ReplResponseKindV2::Error {
+                error: "Entity resolution needed".to_string(),
+                recoverable: true,
+            },
+            message: "Entity resolution needed".to_string(),
+            runbook_summary: None,
+            step_count: 0,
+        };
+
+        assert_eq!(
+            repl_halt_reason_code(&session, &response).as_deref(),
+            Some("ambiguous_entity")
+        );
+        assert_eq!(repl_halt_phase(&session, &response), Some(2));
+    }
+
+    #[test]
+    fn test_phase2_gate_response_uses_sem_os_deny_all_message() {
+        let orch = ReplOrchestratorV2::new(PackRouter::new(vec![]), Arc::new(StubExecutor));
+        let mut session = ReplSessionV2::new();
+        let mut envelope = crate::agent::sem_os_context_envelope::SemOsContextEnvelope::deny_all();
+        envelope.grounded_action_surface =
+            Some(sem_os_core::context_resolution::GroundedActionSurface {
+                resolved_subject: sem_os_core::context_resolution::SubjectRef::TaskId(Uuid::nil()),
+                resolved_constellation: Some("constellation.kyc".to_string()),
+                resolved_slot_path: Some("case".to_string()),
+                resolved_node_id: Some("node-1".to_string()),
+                resolved_state_machine: Some("case_machine".to_string()),
+                current_state: Some("intake".to_string()),
+                traversed_edges: vec![],
+                constraint_signals: vec![
+                    sem_os_core::context_resolution::GroundedConstraintSignal {
+                        kind: "dependency_block".to_string(),
+                        slot_path: "case".to_string(),
+                        related_slot: Some("cbu".to_string()),
+                        required_state: Some("filled".to_string()),
+                        actual_state: Some("empty".to_string()),
+                        message: "dependency 'cbu' is in state 'empty' but requires 'filled'"
+                            .to_string(),
+                    },
+                ],
+                valid_actions: vec![],
+                blocked_actions: vec![sem_os_core::context_resolution::BlockedActionOption {
+                    action_id: "case.open".to_string(),
+                    action_kind: "primitive".to_string(),
+                    description: "Blocked action for slot 'case'".to_string(),
+                    reasons: vec![
+                        "dependency 'cbu' is in state 'empty' but requires 'filled'".to_string()
+                    ],
+                }],
+                dsl_candidates: vec![],
+            });
+        session.pending_sem_os_envelope = Some(envelope);
+
+        let response = orch.phase2_gate_response(&session).expect("phase 2 gate");
+        assert!(matches!(response.kind, ReplResponseKindV2::Error { .. }));
+        assert_eq!(
+            response.message,
+            "Blocked by constellation state: dependency 'cbu' is in state 'empty' but requires 'filled'. move 'cbu' from 'empty' to at least 'filled'."
+        );
+    }
+
+    #[test]
+    fn test_phase2_gate_response_uses_lookup_ambiguity_message() {
+        let orch = ReplOrchestratorV2::new(PackRouter::new(vec![]), Arc::new(StubExecutor));
+        let mut session = ReplSessionV2::new();
+        session.pending_lookup_result = Some(crate::lookup::LookupResult {
+            verbs: vec![],
+            entities: vec![crate::entity_linking::EntityResolution {
+                mention_span: (0, 7),
+                mention_text: "Allianz".to_string(),
+                candidates: vec![
+                    crate::entity_linking::EntityCandidate {
+                        entity_id: Uuid::new_v4(),
+                        entity_kind: "company".to_string(),
+                        canonical_name: "Allianz SE".to_string(),
+                        score: 0.81,
+                        evidence: vec![],
+                    },
+                    crate::entity_linking::EntityCandidate {
+                        entity_id: Uuid::new_v4(),
+                        entity_kind: "fund".to_string(),
+                        canonical_name: "Allianz Fund".to_string(),
+                        score: 0.79,
+                        evidence: vec![],
+                    },
+                ],
+                selected: None,
+                confidence: 0.0,
+                evidence: vec![],
+            }],
+            dominant_entity: None,
+            expected_kinds: vec!["company".to_string()],
+            concepts: vec![],
+            verb_matched: false,
+            entities_resolved: false,
+        });
+
+        let response = orch.phase2_gate_response(&session).expect("phase 2 gate");
+        assert!(matches!(response.kind, ReplResponseKindV2::Error { .. }));
+        assert_eq!(
+            response.message,
+            "I found multiple matching entities. Please be more specific."
+        );
+    }
+
+    #[test]
+    fn test_build_repl_phase4_payload_uses_resolved_verb() {
+        let session = ReplSessionV2::new();
+        let response = ReplResponseV2 {
+            state: ReplStateV2::SentencePlayback {
+                sentence: "Open the case".to_string(),
+                dsl: "(case.open)".to_string(),
+                verb: "case.open".to_string(),
+                args: HashMap::new(),
+            },
+            kind: ReplResponseKindV2::SentencePlayback {
+                sentence: "Open the case".to_string(),
+                verb: "case.open".to_string(),
+                step_sequence: 1,
+            },
+            message: "Open the case".to_string(),
+            runbook_summary: None,
+            step_count: 0,
+        };
+
+        let payload = build_repl_phase4_evaluation(
+            &response,
+            &session,
+            Some("case.open"),
+            &crate::traceability::Phase2Service::evaluate(None, None),
+        )
+        .expect("phase4 evaluation should exist")
+        .payload();
+        assert_eq!(payload["resolved_verb"], "case.open");
+        assert_eq!(payload["resolution_strategy"], "exact_match");
+        assert_eq!(
+            payload["resolution_strategy_detail"],
+            "repl_sentence_playback"
+        );
     }
 }

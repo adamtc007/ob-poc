@@ -80,7 +80,17 @@ pub fn supports_cbu_compiler_slice(input: &CompilerInputEnvelope) -> bool {
     matches!(
         input.semantic_ir.steps.first(),
         Some(step)
-            if matches!(step.entity.as_str(), "cbu" | "entity" | "kyc-case" | "ubo" | "ubo.registry")
+            if matches!(
+                step.entity.as_str(),
+                "cbu"
+                    | "entity"
+                    | "kyc-case"
+                    | "ubo"
+                    | "ubo.registry"
+                    | "deal"
+                    | "contract"
+                    | "trading-profile"
+            )
                 && supports_entity_action(step.entity.as_str(), step.action.as_str())
     )
 }
@@ -210,16 +220,16 @@ impl super::compiler::BindingResolver for CbuBindingResolver {
                 bindings.push(("cbu-id".to_string(), cbu_id));
             }
             "cbu.list" => {
-                if let Ok(status) = optional_parameter_any(step, &["status"]) {
-                    bindings.push(("status".to_string(), status));
+                if let Ok(jurisdiction) = optional_parameter_any(step, &["jurisdiction"]) {
+                    bindings.push(("jurisdiction".to_string(), jurisdiction));
                 }
                 if let Ok(client_type) =
                     optional_parameter_any(step, &["client-type", "client_type"])
                 {
                     bindings.push(("client-type".to_string(), client_type));
                 }
-                if let Ok(jurisdiction) = optional_parameter_any(step, &["jurisdiction"]) {
-                    bindings.push(("jurisdiction".to_string(), jurisdiction));
+                if let Ok(status) = optional_parameter_any(step, &["status"]) {
+                    bindings.push(("status".to_string(), status));
                 }
             }
             "cbu.read" => {
@@ -229,6 +239,26 @@ impl super::compiler::BindingResolver for CbuBindingResolver {
             "entity.create"
             | "entity.list"
             | "entity.update"
+            | "deal.create"
+            | "deal.list"
+            | "deal.read-record"
+            | "deal.update-record"
+            | "deal.update-status"
+            | "contract.create"
+            | "contract.list"
+            | "contract.get"
+            | "contract.update"
+            | "contract.terminate"
+            | "trading-profile.import"
+            | "trading-profile.create-draft"
+            | "trading-profile.read"
+            | "trading-profile.get-active"
+            | "trading-profile.list-versions"
+            | "trading-profile.activate"
+            | "trading-profile.materialize"
+            | "trading-profile.add-component"
+            | "trading-profile.remove-component"
+            | "trading-profile.set-base-currency"
             | "kyc-case.create"
             | "kyc-case.assign"
             | "kyc-case.set-risk-rating"
@@ -363,10 +393,13 @@ fn resolve_minimal_slice_verb(step: &SemanticStep) -> Result<&'static str> {
     match step.entity.as_str() {
         "cbu" => resolve_cbu_verb(step),
         "entity" => resolve_entity_verb(step),
+        "deal" => resolve_deal_verb(step),
+        "contract" => resolve_contract_verb(step),
+        "trading-profile" => resolve_trading_profile_verb(step),
         "kyc-case" => resolve_kyc_case_verb(step),
         "ubo" | "ubo.registry" => resolve_ubo_registry_verb(step),
         other => Err(anyhow!(
-            "minimal compiler only supports cbu, entity, kyc-case, and ubo.registry, got {other}"
+            "minimal compiler only supports cbu, entity, deal, contract, trading-profile, kyc-case, and ubo.registry, got {other}"
         )),
     }
 }
@@ -476,6 +509,115 @@ fn resolve_entity_verb(step: &SemanticStep) -> Result<&'static str> {
         "update" => Ok("entity.update"),
         other => Err(anyhow!(
             "entity compiler slice only supports create/read/update actions, got {other}"
+        )),
+    }
+}
+
+fn resolve_deal_verb(step: &SemanticStep) -> Result<&'static str> {
+    match step.action.as_str() {
+        "create" => Ok("deal.create"),
+        "read" => {
+            if has_parameter(step, "client-group-id")
+                || has_parameter(step, "status")
+                || has_parameter(step, "sales-owner")
+                || (!has_bound_identifier(step)
+                    && qualifier_mentions_any(step, &["list", "show all", "pipeline", "deals"]))
+            {
+                Ok("deal.list")
+            } else {
+                Ok("deal.read-record")
+            }
+        }
+        "update" => {
+            if has_parameter(step, "status")
+                || qualifier_mentions_any(step, &["advance", "progress", "move", "stage"])
+            {
+                Ok("deal.update-status")
+            } else {
+                Ok("deal.update-record")
+            }
+        }
+        other => Err(anyhow!(
+            "deal compiler slice only supports create/read/update actions, got {other}"
+        )),
+    }
+}
+
+fn resolve_contract_verb(step: &SemanticStep) -> Result<&'static str> {
+    match step.action.as_str() {
+        "create" => Ok("contract.create"),
+        "read" => {
+            if has_parameter(step, "client")
+                || has_parameter(step, "status")
+                || (!has_bound_identifier(step)
+                    && qualifier_mentions_any(step, &["list", "show all", "contracts", "pricing"]))
+            {
+                Ok("contract.list")
+            } else {
+                Ok("contract.get")
+            }
+        }
+        "update" => {
+            if qualifier_mentions_any(step, &["terminate", "end contract", "cancel contract"])
+                || matches!(
+                    optional_parameter_any(step, &["status"]).ok().as_deref(),
+                    Some("TERMINATED")
+                )
+            {
+                Ok("contract.terminate")
+            } else {
+                Ok("contract.update")
+            }
+        }
+        other => Err(anyhow!(
+            "contract compiler slice only supports create/read/update actions, got {other}"
+        )),
+    }
+}
+
+fn resolve_trading_profile_verb(step: &SemanticStep) -> Result<&'static str> {
+    match step.action.as_str() {
+        "create" => {
+            if has_parameter(step, "file-path") || has_parameter(step, "document") {
+                Ok("trading-profile.import")
+            } else {
+                Ok("trading-profile.create-draft")
+            }
+        }
+        "read" => {
+            if has_parameter(step, "cbu-id")
+                && qualifier_mentions_any(step, &["active", "current", "live"])
+            {
+                Ok("trading-profile.get-active")
+            } else if has_parameter(step, "cbu-id")
+                || qualifier_mentions_any(step, &["versions", "history", "revisions"])
+            {
+                Ok("trading-profile.list-versions")
+            } else {
+                Ok("trading-profile.read")
+            }
+        }
+        "update" => {
+            if qualifier_mentions_any(step, &["activate", "go live", "live profile"]) {
+                Ok("trading-profile.activate")
+            } else if qualifier_mentions_any(step, &["materialize", "deploy", "sync profile"]) {
+                Ok("trading-profile.materialize")
+            } else if has_parameter(step, "currency") {
+                Ok("trading-profile.set-base-currency")
+            } else if has_parameter(step, "component-type")
+                && qualifier_mentions_any(step, &["remove", "delete"])
+            {
+                Ok("trading-profile.remove-component")
+            } else if has_parameter(step, "component-type") {
+                Ok("trading-profile.add-component")
+            } else {
+                Err(anyhow!(
+                    "trading-profile compiler slice only supports update intents for activation, materialization, base currency, or component edits"
+                ))
+            }
+        }
+        other => Err(anyhow!(
+            "trading-profile compiler slice only supports create/read/update actions, got {other}"
         )),
     }
 }
@@ -624,7 +766,9 @@ fn qualifier_mentions_any(step: &SemanticStep, needles: &[&str]) -> bool {
 
 fn supports_entity_action(entity: &str, action: &str) -> bool {
     match entity {
-        "cbu" | "entity" | "kyc-case" => matches!(action, "create" | "read" | "update"),
+        "cbu" | "entity" | "deal" | "contract" | "trading-profile" | "kyc-case" => {
+            matches!(action, "create" | "read" | "update")
+        }
         "ubo" | "ubo.registry" => matches!(action, "create" | "update"),
         _ => false,
     }
@@ -644,6 +788,19 @@ fn ensure_primary_binding(
 ) -> Result<()> {
     let required_binding = match verb {
         "entity.read" | "entity.update" => Some(("entity-id", "entity")),
+        "deal.read-record" | "deal.update-record" | "deal.update-status" => {
+            Some(("deal-id", "deal"))
+        }
+        "contract.get" | "contract.update" | "contract.terminate" => {
+            Some(("contract-id", "contract"))
+        }
+        "trading-profile.read"
+        | "trading-profile.activate"
+        | "trading-profile.materialize"
+        | "trading-profile.add-component"
+        | "trading-profile.remove-component"
+        | "trading-profile.set-base-currency" => Some(("profile-id", "trading profile")),
+        "trading-profile.get-active" | "trading-profile.list-versions" => Some(("cbu-id", "cbu")),
         "kyc-case.read"
         | "kyc-case.update-status"
         | "kyc-case.assign"
@@ -854,6 +1011,68 @@ mod tests {
             Some("kyc-case"),
         );
         assert!(supports_cbu_compiler_slice(&input));
+    }
+
+    #[test]
+    fn compiler_supports_deal_list_slice() {
+        let compiler = build_minimal_cbu_compiler();
+        let mut input = make_input_for_entity("deal", "read", vec![], None, Some("deal"));
+        input.structured_intent.steps[0].qualifiers = vec![super::super::IntentQualifier {
+            name: "legacy-notes".to_string(),
+            value: "show me the deal pipeline".to_string(),
+        }];
+        input.semantic_ir.steps[0].qualifiers = vec![(
+            "legacy-notes".to_string(),
+            "show me the deal pipeline".to_string(),
+        )];
+        let output = compiler.compile(input).expect("compile should succeed");
+        assert_eq!(
+            output.selection.expect("selection should exist").verb_id,
+            "deal.list"
+        );
+    }
+
+    #[test]
+    fn compiler_supports_contract_get_slice() {
+        let compiler = build_minimal_cbu_compiler();
+        let output = compiler
+            .compile(make_input_for_entity(
+                "contract",
+                "read",
+                vec![],
+                Some("123e4567-e89b-12d3-a456-426614174103"),
+                Some("contract"),
+            ))
+            .expect("compile should succeed");
+        assert_eq!(
+            output.selection.expect("selection should exist").verb_id,
+            "contract.get"
+        );
+    }
+
+    #[test]
+    fn compiler_supports_trading_profile_active_slice() {
+        let compiler = build_minimal_cbu_compiler();
+        let mut input = make_input_for_entity(
+            "trading-profile",
+            "read",
+            vec![("cbu-id", "123e4567-e89b-12d3-a456-426614174104")],
+            None,
+            Some("trading-profile"),
+        );
+        input.structured_intent.steps[0].qualifiers = vec![super::super::IntentQualifier {
+            name: "legacy-notes".to_string(),
+            value: "show the current live mandate".to_string(),
+        }];
+        input.semantic_ir.steps[0].qualifiers = vec![(
+            "legacy-notes".to_string(),
+            "show the current live mandate".to_string(),
+        )];
+        let output = compiler.compile(input).expect("compile should succeed");
+        assert_eq!(
+            output.selection.expect("selection should exist").verb_id,
+            "trading-profile.get-active"
+        );
     }
 
     #[test]

@@ -118,6 +118,7 @@ impl GleifClient {
     pub fn new() -> Result<Self> {
         let client = Client::builder()
             .timeout(Duration::from_secs(30))
+            .no_proxy()
             .build()
             .context("Failed to create HTTP client")?;
 

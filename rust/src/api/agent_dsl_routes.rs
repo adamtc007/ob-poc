@@ -2166,32 +2166,34 @@ async fn execute_onboarding_dsl(
         let actor = crate::policy::ActorResolver::from_env();
         let envelope =
             crate::agent::orchestrator::resolve_allowed_verbs(client.as_ref(), &actor, None).await;
-        if envelope.is_unavailable() {
-            let policy_gate = crate::policy::PolicyGate::from_env();
-            if policy_gate.semreg_fail_closed() {
-                return Err("SemReg unavailable — execution blocked in strict mode".to_string());
+        let phase2 = crate::traceability::Phase2Service::evaluate_from_envelope(envelope);
+        match phase2.halt_reason_code {
+            Some("sem_os_unavailable") => {
+                let policy_gate = crate::policy::PolicyGate::from_env();
+                if policy_gate.semreg_fail_closed() {
+                    return Err("SemReg unavailable — execution blocked in strict mode".to_string());
+                }
             }
-        } else if envelope.is_deny_all() {
-            return Err("SemReg denied execution: no verbs are allowed".to_string());
-        } else {
-            let denied_verbs: Vec<String> = program
-                .statements
-                .iter()
-                .filter_map(|stmt| {
-                    if let Statement::VerbCall(vc) = stmt {
-                        let fqn = format!("{}.{}", vc.domain, vc.verb);
-                        if !envelope.is_allowed(&fqn) {
-                            return Some(fqn);
+            Some("no_allowed_verbs") => {
+                return Err("SemReg denied execution: no verbs are allowed".to_string());
+            }
+            _ => {
+                let denied_verbs = crate::traceability::Phase2Service::collect_denied_verbs(
+                    &phase2.artifacts,
+                    program.statements.iter().filter_map(|stmt| {
+                        if let Statement::VerbCall(vc) = stmt {
+                            Some(format!("{}.{}", vc.domain, vc.verb))
+                        } else {
+                            None
                         }
-                    }
-                    None
-                })
-                .collect();
-            if !denied_verbs.is_empty() {
-                return Err(format!(
-                    "SemReg denied execution: verbs not in allowed set: {}",
-                    denied_verbs.join(", ")
-                ));
+                    }),
+                );
+                if !denied_verbs.is_empty() {
+                    return Err(format!(
+                        "SemReg denied execution: verbs not in allowed set: {}",
+                        denied_verbs.join(", ")
+                    ));
+                }
             }
         }
     }
@@ -2302,37 +2304,43 @@ pub(crate) async fn batch_add_products(
         let actor = crate::policy::ActorResolver::from_env();
         let envelope =
             crate::agent::orchestrator::resolve_allowed_verbs(client.as_ref(), &actor, None).await;
+        let phase2 = crate::traceability::Phase2Service::evaluate_from_envelope(envelope);
+        let blocked_response = || {
+            Json(BatchAddProductsResponse {
+                total_operations: 0,
+                success_count: 0,
+                failure_count: 0,
+                duration_ms: start.elapsed().as_millis() as u64,
+                results: vec![],
+            })
+        };
 
-        if envelope.is_unavailable() {
-            let policy_gate = crate::policy::PolicyGate::from_env();
-            if policy_gate.semreg_fail_closed() {
-                tracing::warn!("batch_add_products: SemReg unavailable — blocked in strict mode");
-                return Json(BatchAddProductsResponse {
-                    total_operations: 0,
-                    success_count: 0,
-                    failure_count: 0,
-                    duration_ms: start.elapsed().as_millis() as u64,
-                    results: vec![],
-                });
+        match crate::traceability::Phase2Service::runtime_gate_status(
+            &phase2.artifacts,
+            "cbu.add-product",
+        ) {
+            "blocked_unavailable" => {
+                let policy_gate = crate::policy::PolicyGate::from_env();
+                if policy_gate.semreg_fail_closed() {
+                    tracing::warn!(
+                        "batch_add_products: SemReg unavailable — blocked in strict mode"
+                    );
+                    return blocked_response();
+                }
             }
-        } else if envelope.is_deny_all() {
-            tracing::warn!("batch_add_products: SemReg deny-all — blocking execution");
-            return Json(BatchAddProductsResponse {
-                total_operations: 0,
-                success_count: 0,
-                failure_count: 0,
-                duration_ms: start.elapsed().as_millis() as u64,
-                results: vec![],
-            });
-        } else if !envelope.is_allowed("cbu.add-product") {
-            tracing::warn!("batch_add_products: cbu.add-product not in SemReg allowed set");
-            return Json(BatchAddProductsResponse {
-                total_operations: 0,
-                success_count: 0,
-                failure_count: 0,
-                duration_ms: start.elapsed().as_millis() as u64,
-                results: vec![],
-            });
+            "blocked_deny_all" => {
+                tracing::warn!("batch_add_products: SemReg deny-all — blocking execution");
+                return blocked_response();
+            }
+            "blocked_not_allowed" => {
+                tracing::warn!("batch_add_products: cbu.add-product not in SemReg allowed set");
+                return blocked_response();
+            }
+            "allowed" => {}
+            _ => {
+                tracing::warn!("batch_add_products: unexpected Phase 2 gate status");
+                return blocked_response();
+            }
         }
     }
 

@@ -2,7 +2,7 @@
 mod tests {
     use uuid::Uuid;
 
-    use ob_poc::constellation::{
+    use ob_poc::sem_os_runtime::constellation_runtime::{
         compute_action_surface, load_builtin_constellation_map, normalize_slots, RawHydrationData,
         RawSlotRow,
     };
@@ -162,5 +162,73 @@ mod tests {
             .blocked_verbs
             .iter()
             .any(|verb| verb.verb == "tollgate.evaluate"));
+    }
+
+    #[test]
+    fn gated_verb_block_reason_names_state_gate() {
+        let map = load_builtin_constellation_map("struct.lux.ucits.sicav").unwrap();
+        let mut raw = RawHydrationData::default();
+        raw.slot_rows.insert(
+            "cbu".into(),
+            vec![RawSlotRow {
+                entity_id: Some(Uuid::nil()),
+                record_id: Some(Uuid::nil()),
+                filter_value: None,
+                created_at: None,
+            }],
+        );
+        raw.slot_rows.insert(
+            "management_company".into(),
+            vec![RawSlotRow {
+                entity_id: Some(Uuid::new_v4()),
+                record_id: Some(Uuid::new_v4()),
+                filter_value: None,
+                created_at: None,
+            }],
+        );
+
+        let surfaced = compute_action_surface(&map, normalize_slots(&map, Uuid::nil(), None, raw));
+        let manco = surfaced.slots[0]
+            .children
+            .iter()
+            .find(|slot| slot.name == "management_company")
+            .unwrap();
+        let blocked = manco
+            .blocked_verbs
+            .iter()
+            .find(|verb| verb.verb == "cbu.assign-role")
+            .unwrap();
+        assert!(blocked
+            .reasons
+            .iter()
+            .any(|reason| reason.message.contains("does not satisfy action gating")));
+    }
+
+    #[test]
+    fn nested_slot_keeps_core_grounding_dependencies() {
+        let map = load_builtin_constellation_map("struct.lux.ucits.sicav").unwrap();
+        let surfaced = compute_action_surface(
+            &map,
+            normalize_slots(&map, Uuid::nil(), None, RawHydrationData::default()),
+        );
+        let case_slot = surfaced.slots[0]
+            .children
+            .iter()
+            .find(|slot| slot.name == "case")
+            .unwrap();
+        let tollgate = case_slot
+            .children
+            .iter()
+            .find(|slot| slot.name == "case.tollgate")
+            .unwrap();
+        let blocked = tollgate
+            .blocked_verbs
+            .iter()
+            .find(|verb| verb.verb == "tollgate.evaluate")
+            .unwrap();
+        assert!(blocked
+            .reasons
+            .iter()
+            .any(|reason| reason.message.contains("dependency 'case'")));
     }
 }

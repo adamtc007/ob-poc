@@ -295,6 +295,7 @@ mod b3_changesets {
         let ctx = SemRegToolContext {
             pool: &pool,
             actor: &actor,
+            sem_os_service: None,
         };
 
         // 1. Create changeset
@@ -520,6 +521,7 @@ mod b3_changesets {
         let ctx = SemRegToolContext {
             pool: &pool,
             actor: &actor,
+            sem_os_service: None,
         };
 
         // 1. Create changeset
@@ -792,6 +794,7 @@ mod b3_changesets {
         let ctx = SemRegToolContext {
             pool: &pool,
             actor: &actor,
+            sem_os_service: None,
         };
 
         // 1. Create changeset
@@ -1021,6 +1024,7 @@ mod b3_changesets {
         let ctx = SemRegToolContext {
             pool: &pool,
             actor: &actor,
+            sem_os_service: None,
         };
 
         // 1. Create changeset

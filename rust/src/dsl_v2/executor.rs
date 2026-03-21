@@ -121,6 +121,17 @@ fn validate_all_resolved(plan: &super::execution_plan::ExecutionPlan) -> Result<
     Ok(())
 }
 
+#[cfg(feature = "database")]
+fn canonical_entity_type_arg(entity_type: &str) -> &str {
+    match entity_type {
+        "proper_person" => "proper-person",
+        "limited_company" => "limited-company",
+        "partnership" => "partnership",
+        "trust" => "trust",
+        other => other,
+    }
+}
+
 /// Recursively collect unresolved EntityRefs from a VerbCall
 #[cfg(feature = "database")]
 fn collect_unresolved_from_verb_call(vc: &VerbCall, unresolved: &mut Vec<UnresolvedRef>) {
@@ -2353,14 +2364,18 @@ impl DslExecutor {
                 // Map entity_type to domain.verb
                 let (domain, verb) = match entity_type.as_str() {
                     "cbu" => ("cbu", "ensure"),
-                    "proper_person" => ("entity", "create-proper-person"),
-                    "limited_company" => ("entity", "create-limited-company"),
-                    "partnership" => ("entity", "create-partnership-limited"),
-                    "trust" => ("entity", "create-trust-discretionary"),
-                    _ => bail!("Unknown entity type for execution: {}", entity_type),
+                    _ => ("entity", "create"),
                 };
 
-                let vc = self.build_verb_call(domain, verb, attrs)?;
+                let mut op_attrs = attrs.clone();
+                if domain == "entity" {
+                    op_attrs.insert(
+                        "entity-type".to_string(),
+                        serde_json::json!(canonical_entity_type_arg(entity_type)),
+                    );
+                }
+
+                let vc = self.build_verb_call(domain, verb, &op_attrs)?;
                 let result = self.execute_verb(&vc, ctx).await?;
 
                 match result {

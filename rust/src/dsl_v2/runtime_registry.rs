@@ -795,46 +795,76 @@ impl RuntimeVerbRegistry {
 fn derive_subject_kinds(domain: &str, config: &VerbConfig) -> Vec<String> {
     if let Some(ref meta) = config.metadata {
         if !meta.subject_kinds.is_empty() {
-            return meta
-                .subject_kinds
-                .iter()
-                .map(|kind| canonicalize_entity_kind(kind))
-                .collect();
+            return dedupe_subject_kinds(
+                meta.subject_kinds
+                    .iter()
+                    .map(|kind| canonicalize_entity_kind(kind))
+                    .collect(),
+            );
         }
     }
 
+    let mut inferred = Vec::new();
+
     if let Some(ref produces) = config.produces {
-        return vec![canonicalize_entity_kind(&produces.produced_type)];
+        inferred.push(canonicalize_entity_kind(&produces.produced_type));
     }
 
-    let mut crud_kinds = derive_subject_kinds_from_crud(config);
-    if !crud_kinds.is_empty() {
-        crud_kinds.sort();
-        crud_kinds.dedup();
-        return crud_kinds;
+    inferred.extend(
+        config
+            .consumes
+            .iter()
+            .map(|consume| canonicalize_entity_kind(&consume.consumed_type)),
+    );
+
+    inferred.extend(derive_subject_kinds_from_crud(config));
+
+    inferred.extend(
+        config
+            .args
+            .iter()
+            .filter(|arg| arg.required || arg.lookup.is_some())
+            .filter_map(derive_subject_kind_from_arg),
+    );
+
+    if let Some(entity_arg) = config
+        .lifecycle
+        .as_ref()
+        .and_then(|lifecycle| lifecycle.entity_arg.as_deref())
+    {
+        if let Some(arg) = config.args.iter().find(|arg| arg.name == entity_arg) {
+            if let Some(kind) = derive_subject_kind_from_arg(arg) {
+                inferred.push(kind);
+            }
+        }
     }
 
-    let mut lookup_kinds: Vec<String> = config
-        .args
-        .iter()
-        .filter(|arg| arg.required)
-        .filter_map(|arg| arg.lookup.as_ref())
-        .filter_map(|lookup| {
-            lookup
-                .entity_type
-                .as_deref()
-                .filter(|kind| !is_generic_lookup_kind(kind))
-                .map(canonicalize_entity_kind)
-                .or_else(|| derive_subject_kind_from_table_name(&lookup.table))
-        })
-        .collect();
-    if !lookup_kinds.is_empty() {
-        lookup_kinds.sort();
-        lookup_kinds.dedup();
-        return lookup_kinds;
+    if let Some(meta) = &config.metadata {
+        inferred.extend(
+            meta.noun
+                .iter()
+                .filter_map(|noun| derive_subject_kind_from_hint(noun)),
+        );
+        inferred.extend(
+            meta.tags
+                .iter()
+                .filter_map(|tag| derive_subject_kind_from_hint(tag)),
+        );
+    }
+
+    let inferred = dedupe_subject_kinds(inferred);
+    if !inferred.is_empty() {
+        return inferred;
     }
 
     vec![canonicalize_entity_kind(&domain_to_subject_kind(domain))]
+}
+
+fn dedupe_subject_kinds(mut kinds: Vec<String>) -> Vec<String> {
+    kinds.retain(|kind| !kind.is_empty());
+    kinds.sort();
+    kinds.dedup();
+    kinds
 }
 
 fn derive_subject_kinds_from_crud(config: &VerbConfig) -> Vec<String> {
@@ -852,22 +882,81 @@ fn derive_subject_kinds_from_crud(config: &VerbConfig) -> Vec<String> {
     ]
     .into_iter()
     .flatten()
-    .filter_map(derive_subject_kind_from_table_name)
+    .filter_map(derive_subject_kind_from_hint)
     .collect()
 }
 
-fn derive_subject_kind_from_table_name(table: &str) -> Option<String> {
-    let normalized = table.trim().to_ascii_lowercase().replace('_', "-");
+fn derive_subject_kind_from_arg(arg: &ArgConfig) -> Option<String> {
+    arg.lookup
+        .as_ref()
+        .and_then(|lookup| {
+            lookup
+                .entity_type
+                .as_deref()
+                .filter(|kind| !is_generic_lookup_kind(kind))
+                .map(canonicalize_entity_kind)
+                .or_else(|| derive_subject_kind_from_hint(&lookup.table))
+        })
+        .or_else(|| derive_subject_kind_from_arg_name(&arg.name))
+}
+
+fn derive_subject_kind_from_arg_name(name: &str) -> Option<String> {
+    let normalized = name.trim().to_ascii_lowercase().replace('_', "-");
+    let trimmed = normalized
+        .trim_end_matches("-id")
+        .trim_end_matches("-ref")
+        .trim_end_matches("-uuid");
+    derive_subject_kind_from_hint(trimmed)
+}
+
+fn derive_subject_kind_from_hint(hint: &str) -> Option<String> {
+    let normalized = hint.trim().to_ascii_lowercase().replace('_', "-");
     let kind = match normalized.as_str() {
-        "cbu" | "cbus" => "cbu",
-        "entity" | "entities" => "entity",
+        "cbu" | "cbus" | "client-business-unit" | "client-business-units" | "structure" => "cbu",
+        "entity"
+        | "entities"
+        | "party"
+        | "parties"
+        | "company"
+        | "companies"
+        | "person"
+        | "people"
+        | "legal-entity"
+        | "legal-entities"
+        | "counterparty"
+        | "counterparties"
+        | "investment-manager"
+        | "investment-managers"
+        | "management-company"
+        | "management-companies"
+        | "depositary"
+        | "depositaries" => "entity",
         "deal" | "deals" => "deal",
-        "contract" | "contracts" | "contract-pack" | "contract-packs" => "contract",
-        "document" | "documents" | "requirement" | "requirements" => "document",
-        "trading-profile" | "trading-profiles" | "mandate" | "mandates" => "trading-profile",
-        "billing" | "billings" | "billing-profile" | "billing-profiles" => "billing-profile",
-        "fund" | "funds" => "fund",
-        "investor" | "investors" | "holding" | "holdings" => "investor",
+        "contract" | "contracts" | "contract-pack" | "contract-packs" | "agreement" => "contract",
+        "document" | "documents" | "requirement" | "requirements" | "evidence" | "attachments" => {
+            "document"
+        }
+        "trading-profile"
+        | "trading-profiles"
+        | "mandate"
+        | "mandates"
+        | "ssi"
+        | "custody"
+        | "cbu-trading-profiles" => "trading-profile",
+        "billing" | "billings" | "billing-profile" | "billing-profiles" | "invoice"
+        | "invoices" | "fee" | "fees" => "billing-profile",
+        "fund" | "funds" | "sub-fund" | "sub-funds" | "umbrella" | "umbrellas" => "fund",
+        "investor" | "investors" | "holding" | "holdings" | "investor-register" => "investor",
+        "kyc-case"
+        | "kyc"
+        | "case"
+        | "cases"
+        | "tollgate"
+        | "tollgate-evaluations"
+        | "screening"
+        | "screenings" => "kyc-case",
+        "session" | "view" => "session",
+        "workflow" => "workflow",
         _ => return None,
     };
     Some(canonicalize_entity_kind(kind))
@@ -876,19 +965,29 @@ fn derive_subject_kind_from_table_name(table: &str) -> Option<String> {
 fn is_generic_lookup_kind(kind: &str) -> bool {
     matches!(
         canonicalize_entity_kind(kind).as_str(),
-        "jurisdiction" | "country" | "currency" | "role" | "status" | "market" | "user" | "team"
+        "jurisdiction"
+            | "country"
+            | "currency"
+            | "role"
+            | "status"
+            | "market"
+            | "user"
+            | "team"
+            | "security"
     )
 }
 
 fn domain_to_subject_kind(domain: &str) -> String {
     match domain {
         "cbu" | "cbu-role" | "role" => "cbu".into(),
-        "entity" | "entity-role" => "entity".into(),
+        "entity" | "entity-role" | "party" | "ownership" | "legal-entity" => "entity".into(),
         "kyc" | "kyc-case" | "screening" => "kyc-case".into(),
+        "case" | "tollgate" => "kyc-case".into(),
         "deal" => "deal".into(),
         "contract" | "contract-pack" => "contract".into(),
         "billing" => "billing-profile".into(),
-        "trading-profile" | "custody" | "ssi" => "trading-profile".into(),
+        "trading-profile" | "custody" | "ssi" | "mandate" => "trading-profile".into(),
+        "fund" => "fund".into(),
         "investor" | "holding" => "investor".into(),
         "document" | "requirement" => "document".into(),
         "session" | "view" => "session".into(),
@@ -1139,6 +1238,20 @@ mod tests {
 
         let domains = registry.domains();
         assert!(domains.contains(&"cbu".to_string()));
+    }
+
+    #[test]
+    fn test_subject_kind_hint_maps_case_and_party_surfaces() {
+        assert_eq!(
+            derive_subject_kind_from_hint("party"),
+            Some("entity".to_string())
+        );
+        assert_eq!(
+            derive_subject_kind_from_hint("tollgate_evaluations"),
+            Some("kyc-case".to_string())
+        );
+        assert_eq!(domain_to_subject_kind("party"), "entity");
+        assert_eq!(domain_to_subject_kind("case"), "kyc-case");
     }
 
     #[test]

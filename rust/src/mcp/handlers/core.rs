@@ -761,40 +761,47 @@ impl ToolHandlers {
                 session_id,
             )
             .await;
-            if envelope.is_unavailable() {
-                // Graceful degradation: if strict mode, fail; otherwise warn and continue
-                let policy_gate = crate::policy::PolicyGate::from_env();
-                if policy_gate.semreg_fail_closed() {
-                    tracing::warn!("dsl_execute: SemReg unavailable in strict mode — blocking");
-                    return Err(anyhow!(
-                        "SemReg unavailable — execution blocked in strict mode"
-                    ));
-                }
-                tracing::warn!(
-                    "dsl_execute: SemReg unavailable — proceeding with governance warning"
-                );
-            } else if envelope.is_deny_all() {
-                tracing::warn!("dsl_execute: SemReg DenyAll — blocking execution");
-                return Err(anyhow!("SemReg denied execution: no verbs are allowed"));
-            } else {
-                let mut denied_verbs = Vec::new();
-                for stmt in &ast.statements {
-                    if let Statement::VerbCall(vc) = stmt {
-                        let fqn = format!("{}.{}", vc.domain, vc.verb);
-                        if !envelope.is_allowed(&fqn) {
-                            denied_verbs.push(fqn);
-                        }
+            let phase2 =
+                crate::traceability::Phase2Service::evaluate_from_envelope(envelope.clone());
+            match phase2.halt_reason_code {
+                Some("sem_os_unavailable") => {
+                    // Graceful degradation: if strict mode, fail; otherwise warn and continue
+                    let policy_gate = crate::policy::PolicyGate::from_env();
+                    if policy_gate.semreg_fail_closed() {
+                        tracing::warn!("dsl_execute: SemReg unavailable in strict mode — blocking");
+                        return Err(anyhow!(
+                            "SemReg unavailable — execution blocked in strict mode"
+                        ));
                     }
-                }
-                if !denied_verbs.is_empty() {
                     tracing::warn!(
-                        denied = ?denied_verbs,
-                        "dsl_execute: SemReg denied verbs in DSL"
+                        "dsl_execute: SemReg unavailable — proceeding with governance warning"
                     );
-                    return Err(anyhow!(
-                        "SemReg denied execution: verbs not in allowed set: {}",
-                        denied_verbs.join(", ")
-                    ));
+                }
+                Some("no_allowed_verbs") => {
+                    tracing::warn!("dsl_execute: SemReg DenyAll — blocking execution");
+                    return Err(anyhow!("SemReg denied execution: no verbs are allowed"));
+                }
+                _ => {
+                    let denied_verbs = crate::traceability::Phase2Service::collect_denied_verbs(
+                        &phase2.artifacts,
+                        ast.statements.iter().filter_map(|stmt| {
+                            if let Statement::VerbCall(vc) = stmt {
+                                Some(format!("{}.{}", vc.domain, vc.verb))
+                            } else {
+                                None
+                            }
+                        }),
+                    );
+                    if !denied_verbs.is_empty() {
+                        tracing::warn!(
+                            denied = ?denied_verbs,
+                            "dsl_execute: SemReg denied verbs in DSL"
+                        );
+                        return Err(anyhow!(
+                            "SemReg denied execution: verbs not in allowed set: {}",
+                            denied_verbs.join(", ")
+                        ));
+                    }
                 }
             }
         }
@@ -1278,41 +1285,48 @@ impl ToolHandlers {
                 None, // dsl_execute_submission has no session context
             )
             .await;
-            if envelope.is_unavailable() {
-                let policy_gate = crate::policy::PolicyGate::from_env();
-                if policy_gate.semreg_fail_closed() {
-                    tracing::warn!(
-                        "dsl_execute_submission: SemReg unavailable in strict mode — blocking"
-                    );
-                    return Err(anyhow!(
-                        "SemReg unavailable — execution blocked in strict mode"
-                    ));
-                }
-                tracing::warn!(
-                    "dsl_execute_submission: SemReg unavailable — proceeding with governance warning"
-                );
-            } else if envelope.is_deny_all() {
-                tracing::warn!("dsl_execute_submission: SemReg DenyAll — blocking execution");
-                return Err(anyhow!("SemReg denied execution: no verbs are allowed"));
-            } else {
-                let mut denied_verbs = Vec::new();
-                for stmt in &program.statements {
-                    if let Statement::VerbCall(vc) = stmt {
-                        let fqn = format!("{}.{}", vc.domain, vc.verb);
-                        if !envelope.is_allowed(&fqn) {
-                            denied_verbs.push(fqn);
-                        }
+            let phase2 =
+                crate::traceability::Phase2Service::evaluate_from_envelope(envelope.clone());
+            match phase2.halt_reason_code {
+                Some("sem_os_unavailable") => {
+                    let policy_gate = crate::policy::PolicyGate::from_env();
+                    if policy_gate.semreg_fail_closed() {
+                        tracing::warn!(
+                            "dsl_execute_submission: SemReg unavailable in strict mode — blocking"
+                        );
+                        return Err(anyhow!(
+                            "SemReg unavailable — execution blocked in strict mode"
+                        ));
                     }
-                }
-                if !denied_verbs.is_empty() {
                     tracing::warn!(
-                        denied = ?denied_verbs,
-                        "dsl_execute_submission: SemReg denied verbs in DSL"
+                        "dsl_execute_submission: SemReg unavailable — proceeding with governance warning"
                     );
-                    return Err(anyhow!(
-                        "SemReg denied execution: verbs not in allowed set: {}",
-                        denied_verbs.join(", ")
-                    ));
+                }
+                Some("no_allowed_verbs") => {
+                    tracing::warn!("dsl_execute_submission: SemReg DenyAll — blocking execution");
+                    return Err(anyhow!("SemReg denied execution: no verbs are allowed"));
+                }
+                _ => {
+                    let denied_verbs = crate::traceability::Phase2Service::collect_denied_verbs(
+                        &phase2.artifacts,
+                        program.statements.iter().filter_map(|stmt| {
+                            if let Statement::VerbCall(vc) = stmt {
+                                Some(format!("{}.{}", vc.domain, vc.verb))
+                            } else {
+                                None
+                            }
+                        }),
+                    );
+                    if !denied_verbs.is_empty() {
+                        tracing::warn!(
+                            denied = ?denied_verbs,
+                            "dsl_execute_submission: SemReg denied verbs in DSL"
+                        );
+                        return Err(anyhow!(
+                            "SemReg denied execution: verbs not in allowed set: {}",
+                            denied_verbs.join(", ")
+                        ));
+                    }
                 }
             }
         }
@@ -1597,33 +1611,47 @@ impl ToolHandlers {
 
         // Determine the allowed_verbs constraint for the search
         let empty_allowed_verbs = std::collections::HashSet::new();
-        let (allowed_verbs_ref, sem_reg_filtered, blocked_reason) = match &envelope {
-            Some(env) if env.is_deny_all() => {
-                tracing::warn!("verb_search: SemReg DenyAll — search will return empty");
-                (
-                    Some(&env.allowed_verbs),
-                    true,
-                    Some("Sem OS denied all verbs for this subject"),
-                )
-            }
-            Some(env) if env.is_unavailable() => {
-                tracing::warn!("verb_search: SemReg unavailable — search will return empty");
-                (
+        let phase2 = envelope
+            .as_ref()
+            .map(|env| crate::traceability::Phase2Service::evaluate_from_envelope(env.clone()));
+        let phase2_legal_verbs = phase2
+            .as_ref()
+            .map(|value| value.legal_verbs_or_empty.clone());
+        let (allowed_verbs_ref, sem_reg_filtered, blocked_reason) =
+            match (&phase2, &phase2_legal_verbs) {
+                (Some(value), Some(legal_verbs)) if value.is_deny_all => {
+                    tracing::warn!("verb_search: SemReg DenyAll — search will return empty");
+                    (
+                        Some(legal_verbs),
+                        true,
+                        Some("Sem OS denied all verbs for this subject"),
+                    )
+                }
+                (Some(value), Some(_)) if !value.is_available => {
+                    tracing::warn!("verb_search: SemReg unavailable — search will return empty");
+                    (
+                        Some(&empty_allowed_verbs),
+                        true,
+                        Some("Sem OS unavailable for utterance discovery"),
+                    )
+                }
+                (Some(_), Some(legal_verbs)) => (Some(legal_verbs), true, None),
+                (None, None) => {
+                    tracing::warn!(
+                        "verb_search: SemOsClient unavailable — search will return empty"
+                    );
+                    (
+                        Some(&empty_allowed_verbs),
+                        true,
+                        Some("Sem OS client unavailable for utterance discovery"),
+                    )
+                }
+                _ => (
                     Some(&empty_allowed_verbs),
                     true,
-                    Some("Sem OS unavailable for utterance discovery"),
-                )
-            }
-            Some(env) => (Some(&env.allowed_verbs), true, None),
-            None => {
-                tracing::warn!("verb_search: SemOsClient unavailable — search will return empty");
-                (
-                    Some(&empty_allowed_verbs),
-                    true,
-                    Some("Sem OS client unavailable for utterance discovery"),
-                )
-            }
-        };
+                    Some("Sem OS legality unavailable for utterance discovery"),
+                ),
+            };
 
         // Perform hybrid search with SemReg pre-constraint (Phase 3 CCIR)
         let results = searcher

@@ -4,19 +4,187 @@ label: Fund Onboarding
 description: Family for selecting the right fund onboarding constellation.
 domain_id: onboarding
 selection_rules:
+  - condition: jurisdiction == 'LU' && structure_type == 'ucits'
+    target_constellation: struct.lux.ucits.sicav
+    priority: 30
+  - condition: jurisdiction == 'LU' && structure_type == 'raif'
+    target_constellation: struct.lux.aif.raif
+    priority: 29
+  - condition: jurisdiction == 'LU' && structure_type == 'private-equity'
+    target_constellation: struct.lux.pe.scsp
+    priority: 28
   - condition: jurisdiction == 'IE'
     target_constellation: struct.ie.ucits.icav
-    priority: 10
+    priority: 27
+  - condition: jurisdiction == 'IE' && structure_type == 'aif'
+    target_constellation: struct.ie.aif.icav
+    priority: 26
+  - condition: jurisdiction == 'IE' && strategy == 'hedge'
+    target_constellation: struct.ie.hedge.icav
+    priority: 25
+  - condition: jurisdiction == 'UK' && structure_type == 'oeic'
+    target_constellation: struct.uk.authorised.oeic
+    priority: 24
+  - condition: jurisdiction == 'UK' && structure_type == 'aut'
+    target_constellation: struct.uk.authorised.aut
+    priority: 23
+  - condition: jurisdiction == 'UK' && structure_type == 'acs'
+    target_constellation: struct.uk.authorised.acs
+    priority: 22
+  - condition: jurisdiction == 'UK' && structure_type == 'ltaf'
+    target_constellation: struct.uk.authorised.ltaf
+    priority: 21
+  - condition: jurisdiction == 'UK' && structure_type == 'private-equity'
+    target_constellation: struct.uk.private-equity.lp
+    priority: 20
+  - condition: jurisdiction == 'US' && structure_type == 'open-end'
+    target_constellation: struct.us.40act.open-end
+    priority: 19
+  - condition: jurisdiction == 'US' && structure_type == 'closed-end'
+    target_constellation: struct.us.40act.closed-end
+    priority: 18
+  - condition: jurisdiction == 'US' && structure_type == 'etf'
+    target_constellation: struct.us.etf.40act
+    priority: 17
+  - condition: jurisdiction == 'US' && structure_type == 'private-fund'
+    target_constellation: struct.us.private-fund.delaware-lp
+    priority: 16
 constellation_refs:
+  - constellation_id: struct.lux.ucits.sicav
+    label: Luxembourg UCITS SICAV
+    jurisdiction: LU
+    entity_kind: fund
+    triggers:
+      - luxembourg
+      - sicav
+      - ucits
+      - umbrella
+  - constellation_id: struct.lux.aif.raif
+    label: Luxembourg AIF RAIF
+    jurisdiction: LU
+    entity_kind: fund
+    triggers:
+      - luxembourg
+      - raif
+      - aif
+  - constellation_id: struct.lux.pe.scsp
+    label: Luxembourg Private Equity SCSp
+    jurisdiction: LU
+    entity_kind: fund
+    triggers:
+      - luxembourg
+      - scsp
+      - slp
+      - private equity
+      - pe
   - constellation_id: struct.ie.ucits.icav
     label: Irish UCITS ICAV
     jurisdiction: IE
     entity_kind: fund
     triggers:
+      - ireland
+      - irish
       - icav
       - ucits
+  - constellation_id: struct.ie.aif.icav
+    label: Irish AIF ICAV
+    jurisdiction: IE
+    entity_kind: fund
+    triggers:
+      - ireland
+      - irish
+      - icav
+      - aif
+  - constellation_id: struct.ie.hedge.icav
+    label: Irish Hedge ICAV
+    jurisdiction: IE
+    entity_kind: fund
+    triggers:
+      - ireland
+      - irish
+      - hedge
+      - icav
+  - constellation_id: struct.uk.authorised.oeic
+    label: UK Authorised OEIC
+    jurisdiction: UK
+    entity_kind: fund
+    triggers:
+      - oeic
+      - uk
+      - open-ended
+  - constellation_id: struct.uk.authorised.aut
+    label: UK Authorised Unit Trust
+    jurisdiction: UK
+    entity_kind: fund
+    triggers:
+      - aut
+      - unit trust
+      - uk
+  - constellation_id: struct.uk.authorised.acs
+    label: UK Authorised Contractual Scheme
+    jurisdiction: UK
+    entity_kind: fund
+    triggers:
+      - acs
+      - contractual scheme
+      - uk
+  - constellation_id: struct.uk.authorised.ltaf
+    label: UK Long-Term Asset Fund
+    jurisdiction: UK
+    entity_kind: fund
+    triggers:
+      - ltaf
+      - long-term asset
+      - uk
+  - constellation_id: struct.uk.private-equity.lp
+    label: UK Private Equity LP
+    jurisdiction: UK
+    entity_kind: fund
+    triggers:
+      - uk
+      - private equity
+      - pe
+      - lp
+  - constellation_id: struct.us.40act.open-end
+    label: US 40-Act Open-End Fund
+    jurisdiction: US
+    entity_kind: fund
+    triggers:
+      - us
+      - 40-act
+      - open-end
+      - mutual fund
+  - constellation_id: struct.us.40act.closed-end
+    label: US 40-Act Closed-End Fund
+    jurisdiction: US
+    entity_kind: fund
+    triggers:
+      - us
+      - 40-act
+      - closed-end
+  - constellation_id: struct.us.etf.40act
+    label: US 40-Act ETF
+    jurisdiction: US
+    entity_kind: fund
+    triggers:
+      - us
+      - etf
+      - 40-act
+      - exchange traded
+  - constellation_id: struct.us.private-fund.delaware-lp
+    label: US Private Fund Delaware LP
+    jurisdiction: US
+    entity_kind: fund
+    triggers:
+      - us
+      - delaware
+      - private fund
+      - lp
 candidate_jurisdictions:
+  - LU
   - IE
+  - UK
+  - US
 candidate_entity_kinds:
   - fund
 grounding_threshold:

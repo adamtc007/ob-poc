@@ -301,7 +301,11 @@ fn select_domain_concept(utterance: &str, domain_hints: &[String]) -> String {
     if normalized.contains(" document") || normalized.starts_with("document ") {
         return "document".to_string();
     }
-    if normalized.contains(" deal") || normalized.starts_with("deal ") {
+    if normalized.contains(" deal")
+        || normalized.contains(" deals")
+        || normalized.starts_with("deal ")
+        || normalized.starts_with("deals ")
+    {
         return "deal".to_string();
     }
 

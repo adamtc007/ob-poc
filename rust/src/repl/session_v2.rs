@@ -15,8 +15,10 @@ use super::decision_log::SessionDecisionLog;
 use super::proposal_engine::ProposalSet;
 use super::runbook::{ArgExtractionAudit, Runbook, SlotSource};
 use super::types_v2::ReplStateV2;
+use crate::agent::sem_os_context_envelope::SemOsContextEnvelope;
 use crate::journey::handoff::PackHandoff;
 use crate::journey::pack::PackManifest;
+use crate::lookup::LookupResult;
 
 // ---------------------------------------------------------------------------
 // ReplSessionV2
@@ -65,6 +67,21 @@ pub struct ReplSessionV2 {
     /// Phase G: Accumulated decision logs for replay and tuning.
     #[serde(skip)]
     pub decision_log: SessionDecisionLog,
+    /// Most recent utterance trace written for this session.
+    #[serde(default)]
+    pub last_trace_id: Option<Uuid>,
+    /// Trace currently awaiting a user clarification/confirmation response.
+    #[serde(default)]
+    pub pending_trace_id: Option<Uuid>,
+    /// Current-turn Sem OS legality envelope used for trace persistence.
+    #[serde(skip)]
+    pub pending_sem_os_envelope: Option<SemOsContextEnvelope>,
+    /// Current-turn lookup result used for trace persistence.
+    #[serde(skip)]
+    pub pending_lookup_result: Option<LookupResult>,
+    /// Per-step Sem OS legality re-check evidence captured during execution.
+    #[serde(skip)]
+    pub pending_execution_rechecks: Vec<serde_json::Value>,
     pub created_at: DateTime<Utc>,
     pub last_active_at: DateTime<Utc>,
     /// Monotonic counter for runbook version allocation.
@@ -95,6 +112,11 @@ impl ReplSessionV2 {
             pending_slot_provenance: None,
             last_proposal_set: None,
             decision_log: SessionDecisionLog::new(id),
+            last_trace_id: None,
+            pending_trace_id: None,
+            pending_sem_os_envelope: None,
+            pending_lookup_result: None,
+            pending_execution_rechecks: Vec::new(),
             created_at: now,
             last_active_at: now,
             next_runbook_version: 0,

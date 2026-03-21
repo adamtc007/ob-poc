@@ -1,0 +1,59 @@
+graph_id: trading-profile
+name: Trading Profile Graph
+version: "1"
+description: Trading profile authoring and deployment graph
+entity_types:
+  - trading-profile
+nodes:
+  - node_id: trading-profile.entry
+    name: Trading Profile Entry
+    node_type: entry
+    lane: trading
+  - node_id: trading-profile.inspect
+    name: Trading Profile Inspection
+    node_type: gate
+    lane: trading
+  - node_id: trading-profile.author
+    name: Trading Profile Authoring
+    node_type: gate
+    lane: trading
+  - node_id: trading-profile.deploy
+    name: Trading Profile Deployment
+    node_type: gate
+    lane: trading
+edges:
+  - edge_id: trading-profile.inspect
+    from_node: trading-profile.entry
+    to_node: trading-profile.inspect
+    verb_ids:
+      [
+        "trading-profile.read",
+        "trading-profile.get-active",
+        "trading-profile.list-versions",
+        "trading-profile.diff",
+        "trading-profile.validate-go-live-ready",
+        "trading-profile.validate-universe-coverage",
+      ]
+    edge_type: conditional
+  - edge_id: trading-profile.author
+    from_node: trading-profile.entry
+    to_node: trading-profile.author
+    verb_ids:
+      [
+        "trading-profile.import",
+        "trading-profile.create-draft",
+        "trading-profile.create-new-version",
+        "trading-profile.add-component",
+        "trading-profile.remove-component",
+        "trading-profile.set-base-currency",
+        "trading-profile.link-csa-ssi",
+        "trading-profile.update-im-scope",
+        "trading-profile.clone-to",
+      ]
+    edge_type: advance
+  - edge_id: trading-profile.deploy
+    from_node: trading-profile.entry
+    to_node: trading-profile.deploy
+    verb_ids: ["trading-profile.activate", "trading-profile.materialize"]
+    edge_type: advance
+gates: []

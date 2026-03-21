@@ -37,7 +37,7 @@ slots:
         verbs: { show: cbu.read }
   general_partner:
     type: entity
-    entity_kinds: [organization]
+    entity_kinds: [company]
     join:
       {
         via: cbu_entity_roles,
@@ -62,7 +62,7 @@ slots:
       }
   aifm:
     type: entity
-    entity_kinds: [organization]
+    entity_kinds: [company]
     join:
       {
         via: cbu_entity_roles,
@@ -87,7 +87,7 @@ slots:
       }
   depositary:
     type: entity
-    entity_kinds: [organization]
+    entity_kinds: [company]
     join:
       {
         via: cbu_entity_roles,
@@ -112,7 +112,7 @@ slots:
       }
   administrator:
     type: entity
-    entity_kinds: [organization]
+    entity_kinds: [company]
     join:
       {
         via: cbu_entity_roles,
@@ -137,7 +137,7 @@ slots:
       }
   auditor:
     type: entity
-    entity_kinds: [organization]
+    entity_kinds: [company]
     join:
       {
         via: cbu_entity_roles,
@@ -162,7 +162,7 @@ slots:
       }
   legal_counsel:
     type: entity
-    entity_kinds: [organization]
+    entity_kinds: [company]
     join:
       {
         via: cbu_entity_roles,
@@ -187,7 +187,7 @@ slots:
       }
   ownership_chain:
     type: entity_graph
-    entity_kinds: [person, organization]
+    entity_kinds: [person, company]
     join:
       {
         via: entity_relationships,

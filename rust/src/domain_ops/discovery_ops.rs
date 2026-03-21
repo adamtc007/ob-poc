@@ -15,6 +15,7 @@ use uuid::Uuid;
 use super::sem_os_helpers::{build_actor_from_ctx, get_bool_arg, get_string_arg};
 use super::{CustomOperation, ExecutionContext, ExecutionResult, VerbCall};
 use crate::dsl_v2::gateway_resolver::gateway_addr;
+use crate::entity_kind::matches as entity_kind_matches;
 use crate::sem_reg::agent::mcp_tools::{dispatch_tool, SemRegToolContext, SemRegToolResult};
 use crate::stategraph::{load_state_graphs, validate_graphs, walk_graph};
 
@@ -110,7 +111,7 @@ fn matches_subject_kind(metadata: Option<&VerbMetadata>, entity_type: &str) -> b
         || metadata
             .subject_kinds
             .iter()
-            .any(|kind| kind.eq_ignore_ascii_case(entity_type))
+            .any(|kind| entity_kind_matches(kind, entity_type))
 }
 
 fn matches_aspect(metadata: Option<&VerbMetadata>, aspect: Option<&str>) -> bool {
@@ -2622,7 +2623,7 @@ impl CustomOperation for DiscoveryGraphWalkOp {
                     || graph
                         .entity_types
                         .iter()
-                        .any(|candidate| candidate.eq_ignore_ascii_case(entity_type))
+                        .any(|candidate| entity_kind_matches(candidate, entity_type))
             })
             .collect::<Vec<_>>();
 
@@ -2865,6 +2866,7 @@ impl CustomOperation for DiscoverySearchDataOp {
 mod tests {
     use super::*;
     use crate::domain_ops::CustomOperationRegistry;
+    use dsl_core::config::types::VerbStatus;
 
     #[test]
     fn discovery_domain_is_loaded_from_yaml() {
@@ -2895,5 +2897,35 @@ mod tests {
         assert!(registry.has("discovery", "graph-walk"));
         assert!(registry.has("discovery", "inspect-data"));
         assert!(registry.has("discovery", "search-data"));
+    }
+
+    #[test]
+    fn matches_subject_kind_uses_canonical_entity_kind_aliases() {
+        let metadata = VerbMetadata {
+            tier: None,
+            source_of_truth: None,
+            scope: None,
+            writes_operational: false,
+            side_effects: None,
+            harm_class: None,
+            action_class: None,
+            noun: None,
+            internal: false,
+            tags: Vec::new(),
+            replaces: None,
+            status: VerbStatus::Active,
+            replaced_by: None,
+            since_version: None,
+            removal_version: None,
+            dangerous: false,
+            subject_kinds: vec!["client-group".to_string(), "kyc-case".to_string()],
+            phase_tags: Vec::new(),
+            requires_subject: true,
+            produces_focus: false,
+        };
+
+        assert!(matches_subject_kind(Some(&metadata), "client_group"));
+        assert!(matches_subject_kind(Some(&metadata), "kyc_case"));
+        assert!(!matches_subject_kind(Some(&metadata), "deal"));
     }
 }

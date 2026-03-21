@@ -205,12 +205,8 @@ fn compile_macro(
         }
     };
 
-    let expanded_source = fixpoint.statements.join("\n");
-    let validation_errors: Vec<String> = quick_validate(&expanded_source, runtime_registry_arc())
-        .into_iter()
-        .filter(|diagnostic| diagnostic.severity == Severity::Error)
-        .map(|diagnostic| diagnostic.message)
-        .collect();
+    let registry = runtime_registry_arc();
+    let validation_errors = validate_expanded_macro_output(&fixpoint.statements, registry.as_ref());
     if !validation_errors.is_empty() {
         return OrchestratorResponse::CompilationError(CompilationError::new(
             CompilationErrorKind::ExpansionFailed {
@@ -504,6 +500,41 @@ fn extract_verb_from_dsl(dsl: &str) -> String {
     trimmed.to_string()
 }
 
+fn validate_expanded_macro_output(
+    statements: &[String],
+    registry: &crate::dsl_v2::RuntimeVerbRegistry,
+) -> Vec<String> {
+    let expanded_source = statements.join("\n");
+    let mut errors: Vec<String> = quick_validate(&expanded_source, runtime_registry_arc())
+        .into_iter()
+        .filter(|diagnostic| diagnostic.severity == Severity::Error)
+        .map(|diagnostic| diagnostic.message)
+        .collect();
+
+    for statement in statements {
+        let trimmed = statement.trim();
+        if trimmed.is_empty() || trimmed.starts_with(';') {
+            continue;
+        }
+
+        let verb = extract_verb_from_dsl(trimmed);
+        if verb.is_empty() || !verb.contains('.') {
+            errors.push(format!(
+                "Expanded DSL statement is not a verb call: {trimmed}"
+            ));
+            continue;
+        }
+
+        if registry.get_by_name(&verb).is_none() {
+            errors.push(format!(
+                "Expanded DSL references unknown runtime verb '{verb}'"
+            ));
+        }
+    }
+
+    errors
+}
+
 /// Build a DSL s-expression from verb FQN and args.
 ///
 /// BTreeMap iteration is deterministic (sorted by key), so no explicit
@@ -612,6 +643,51 @@ mod tests {
                         );
                         m
                     },
+                    bind_as: None,
+                })],
+                sets_state: vec![],
+                unlocks: vec![],
+            },
+        );
+        registry
+    }
+
+    fn test_macro_registry_with_unknown_expansion() -> MacroRegistry {
+        let mut registry = MacroRegistry::new();
+        registry.add(
+            "structure.broken".to_string(),
+            MacroSchema {
+                id: None,
+                kind: MacroKind::Macro,
+                tier: None,
+                aliases: vec![],
+                taxonomy: None,
+                ui: MacroUi {
+                    label: "Broken Structure".to_string(),
+                    description: "Expands to an unknown runtime verb".to_string(),
+                    target_label: "Structure".to_string(),
+                },
+                routing: MacroRouting {
+                    mode_tags: vec![],
+                    operator_domain: Some("structure".to_string()),
+                },
+                target: MacroTarget {
+                    operates_on: "client-ref".to_string(),
+                    produces: None,
+                    allowed_structure_types: vec![],
+                },
+                args: MacroArgs {
+                    style: ArgStyle::Keyworded,
+                    required: Default::default(),
+                    optional: Default::default(),
+                },
+                required_roles: vec![],
+                optional_roles: vec![],
+                docs_bundle: None,
+                prereqs: vec![],
+                expands_to: vec![MacroExpansionStep::VerbCall(VerbCallStep {
+                    verb: "unknown.verb".to_string(),
+                    args: HashMap::new(),
                     bind_as: None,
                 })],
                 sets_state: vec![],
@@ -1194,6 +1270,38 @@ mod tests {
             "Expected ConstraintViolation (pack gate fires before SemReg), got {:?}",
             resp
         );
+    }
+
+    #[test]
+    fn test_macro_expansion_revalidates_unknown_runtime_verbs() {
+        let registry = test_macro_registry_with_unknown_expansion();
+        let session = test_session();
+        let constraints = EffectiveConstraints::unconstrained();
+        let verb_index = VerbConfigIndex::empty();
+        let classification = classify_verb("structure.broken", &verb_index, &registry);
+
+        let resp = compile_verb(
+            Uuid::new_v4(),
+            &classification,
+            &BTreeMap::new(),
+            &session,
+            &registry,
+            1,
+            &constraints,
+            None,
+            None,
+        );
+
+        match resp {
+            OrchestratorResponse::CompilationError(error) => match error.kind {
+                CompilationErrorKind::ExpansionFailed { reason } => {
+                    assert!(reason.contains("unknown runtime verb"));
+                    assert!(reason.contains("unknown.verb"));
+                }
+                other => panic!("Expected ExpansionFailed, got {:?}", other),
+            },
+            other => panic!("Expected CompilationError, got {:?}", other),
+        }
     }
 
     /// INV-7: All 7 CompilationErrorKind variants are constructible.

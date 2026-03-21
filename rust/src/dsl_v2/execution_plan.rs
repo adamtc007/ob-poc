@@ -1577,7 +1577,7 @@ mod tests {
     #[test]
     fn test_planning_missing_entity_reports_missing_producer() {
         // Scenario: Reference @john without creating the entity
-        // Expected: MissingProducer diagnostic for @john
+        // Expected: synthetic entity.create diagnostic for @john
         let program = Program {
             statements: vec![
                 Statement::VerbCall(make_verb_call_with_binding(
@@ -1619,15 +1619,15 @@ mod tests {
         let ctx = PlanningContext::new();
         let result = compile_with_planning(&program, &ctx).unwrap();
 
-        // Should have a missing producer diagnostic for @john
-        let has_missing_john = result.diagnostics.iter().any(|d| {
-            matches!(d, PlannerDiagnostic::MissingProducer { binding, entity_type, .. }
+        // Should have a synthetic step injected for @john
+        let has_synthetic_john = result.diagnostics.iter().any(|d| {
+            matches!(d, PlannerDiagnostic::SyntheticStepInjected { binding, entity_type, .. }
                 if binding == "john" && entity_type == "entity")
         });
 
         assert!(
-            has_missing_john,
-            "Should report missing producer for @john. Diagnostics: {:?}",
+            has_synthetic_john,
+            "Should inject synthetic entity.create for @john. Diagnostics: {:?}",
             result.diagnostics
         );
     }
@@ -1649,8 +1649,15 @@ mod tests {
                 )),
                 Statement::VerbCall(make_verb_call_with_binding(
                     "entity",
-                    "create-proper-person",
+                    "create",
                     vec![
+                        (
+                            "entity-type",
+                            AstNode::Literal(
+                                Literal::String("proper-person".into()),
+                                Span::default(),
+                            ),
+                        ),
                         (
                             "first-name",
                             AstNode::Literal(Literal::String("John".into()), Span::default()),
@@ -1761,7 +1768,7 @@ mod tests {
     #[test]
     fn test_planning_multiple_missing_bindings() {
         // Scenario: Reference multiple undefined bindings
-        // Expected: CBU gets synthetic inject, entity gets MissingProducer
+        // Expected: both CBU and entity get synthetic injects
         let program = Program {
             statements: vec![Statement::VerbCall(make_verb_call(
                 "cbu",
@@ -1804,14 +1811,15 @@ mod tests {
             result.diagnostics
         );
 
-        // Entity should get a missing producer diagnostic (no implicit create)
-        let has_missing_entity = result.diagnostics.iter().any(|d| {
-            matches!(d, PlannerDiagnostic::MissingProducer { binding, .. } if binding == "my_entity")
+        // Entity should also get a synthetic inject
+        let has_synthetic_entity = result.diagnostics.iter().any(|d| {
+            matches!(d, PlannerDiagnostic::SyntheticStepInjected { binding, entity_type, .. }
+                if binding == "my_entity" && entity_type == "entity")
         });
 
         assert!(
-            has_missing_entity,
-            "Should report missing @my_entity. Diagnostics: {:?}",
+            has_synthetic_entity,
+            "Should inject synthetic entity.create for @my_entity. Diagnostics: {:?}",
             result.diagnostics
         );
     }

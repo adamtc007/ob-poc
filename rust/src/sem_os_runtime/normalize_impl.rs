@@ -2,16 +2,17 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 
 use uuid::Uuid;
 
-use super::hydrated::{HydratedConstellation, HydratedGraphEdge, HydratedGraphNode, HydratedSlot};
-use super::hydration::{RawGraphEdge, RawHydrationData, RawOverlayRow, RawSlotRow};
-use super::map_def::Cardinality;
-use super::validate::ValidatedConstellationMap;
+use crate::sem_os_runtime::constellation_runtime::{
+    Cardinality, HydratedCardinality, HydratedConstellation, HydratedGraphEdge, HydratedGraphNode,
+    HydratedSlot, HydratedSlotType, RawGraphEdge, RawHydrationData, RawOverlayRow, RawSlotRow,
+    ResolvedSlot, RuntimeSlotReduceResult, ValidatedConstellationMap,
+};
 
 /// Normalize raw hydration data into a tree of hydrated slots.
 ///
 /// # Examples
 /// ```rust
-/// use ob_poc::constellation::{load_builtin_constellation_map, normalize_slots, RawHydrationData};
+/// use ob_poc::sem_os_runtime::constellation_runtime::{load_builtin_constellation_map, normalize_slots, RawHydrationData};
 /// use uuid::Uuid;
 ///
 /// let map = load_builtin_constellation_map("struct.lux.ucits.sicav").unwrap();
@@ -112,11 +113,11 @@ fn build_tree(
 }
 
 fn normalize_singular(
-    slot: &super::validate::ResolvedSlot,
+    slot: &ResolvedSlot,
     rows: &[RawSlotRow],
     overlays: &[RawOverlayRow],
     mut warnings: Vec<String>,
-    reducer_result: Option<&crate::state_reducer::SlotReduceResult>,
+    reducer_result: Option<&RuntimeSlotReduceResult>,
 ) -> HydratedSlot {
     let chosen = pick_deterministic(rows);
     if rows.len() > 1 && slot.def.cardinality != Cardinality::Recursive {
@@ -173,8 +174,28 @@ fn normalize_singular(
     HydratedSlot {
         name: slot.name.clone(),
         path: slot.path.clone(),
-        slot_type: slot.def.slot_type,
-        cardinality: slot.def.cardinality,
+        slot_type: match slot.def.slot_type {
+            crate::sem_os_runtime::constellation_runtime::SlotType::Cbu => HydratedSlotType::Cbu,
+            crate::sem_os_runtime::constellation_runtime::SlotType::Entity => {
+                HydratedSlotType::Entity
+            }
+            crate::sem_os_runtime::constellation_runtime::SlotType::EntityGraph => {
+                HydratedSlotType::EntityGraph
+            }
+            crate::sem_os_runtime::constellation_runtime::SlotType::Case => HydratedSlotType::Case,
+            crate::sem_os_runtime::constellation_runtime::SlotType::Tollgate => {
+                HydratedSlotType::Tollgate
+            }
+            crate::sem_os_runtime::constellation_runtime::SlotType::Mandate => {
+                HydratedSlotType::Mandate
+            }
+        },
+        cardinality: match slot.def.cardinality {
+            Cardinality::Root => HydratedCardinality::Root,
+            Cardinality::Mandatory => HydratedCardinality::Mandatory,
+            Cardinality::Optional => HydratedCardinality::Optional,
+            Cardinality::Recursive => HydratedCardinality::Recursive,
+        },
         entity_id: chosen.and_then(|row| row.entity_id),
         record_id: chosen.and_then(|row| row.record_id),
         computed_state,
@@ -203,7 +224,7 @@ fn pick_deterministic(rows: &[RawSlotRow]) -> Option<&RawSlotRow> {
 }
 
 fn normalize_graph(
-    slot: &super::validate::ResolvedSlot,
+    slot: &ResolvedSlot,
     rows: &[RawSlotRow],
     edges: Vec<RawGraphEdge>,
     entity_details: &HashMap<Uuid, serde_json::Value>,
@@ -265,8 +286,8 @@ fn normalize_graph(
     HydratedSlot {
         name: slot.name.clone(),
         path: slot.path.clone(),
-        slot_type: slot.def.slot_type,
-        cardinality: slot.def.cardinality,
+        slot_type: HydratedSlotType::EntityGraph,
+        cardinality: HydratedCardinality::Recursive,
         entity_id: None,
         record_id: None,
         computed_state: if unique_nodes == 0 { "empty" } else { "filled" }.to_string(),

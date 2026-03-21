@@ -1,0 +1,225 @@
+cases:
+  - name: cbu_list_allianz
+    domain: cbu
+    utterance: "show me the CBUs for Allianz Global Investors"
+    expected_verb: "cbu.list"
+    notes: "Basic inventory read on a named client group"
+
+  - name: cbu_parties_deictic
+    domain: cbu
+    bootstrap:
+      - "Allianz Global Investors"
+      - "show me the cbus"
+    utterance: "who are the parties on this CBU?"
+    expected_verb: "cbu.parties"
+    notes: "Deictic scope should bind to the current CBU"
+
+  - name: cbu_assign_custodian
+    domain: cbu
+    bootstrap:
+      - "Allianz Global Investors"
+      - "show me the cbus"
+    utterance: "assign Goldman Sachs as custodian for this CBU"
+    expected_verb: "cbu.assign-role"
+    notes: "Role assignment phrasing should resolve to canonical role verb"
+
+  - name: cbu_add_product
+    domain: cbu
+    bootstrap:
+      - "Allianz Global Investors"
+      - "show me the cbus"
+    utterance: "add custody services to this client"
+    expected_verb: "cbu.add-product"
+
+  - name: cbu_create_growth_fund
+    domain: cbu
+    bootstrap:
+      - "Allianz Global Investors"
+    utterance: "create a new CBU for Allianz Growth Fund"
+    expected_verb: "cbu.create"
+
+  - name: cbu_submit_validation
+    domain: cbu
+    bootstrap:
+      - "Allianz Global Investors"
+      - "show me the cbus"
+    utterance: "submit this CBU for validation"
+    expected_verb: "cbu.submit-for-validation"
+
+  - name: entity_create_company
+    domain: entity
+    utterance: "create a legal entity for HSBC Holdings plc"
+    expected_verb: "entity.create"
+
+  - name: entity_update_address
+    domain: entity
+    bootstrap:
+      - "Allianz Global Investors"
+    utterance: "update the registered address for this entity"
+    expected_verb: "entity.update"
+
+  - name: screening_sanctions
+    domain: screening
+    bootstrap:
+      - "Allianz Global Investors"
+    utterance: "run sanctions screening on this entity"
+    expected_verb: "screening.sanctions"
+
+  - name: screening_pep
+    domain: screening
+    bootstrap:
+      - "Allianz Global Investors"
+    utterance: "is this person a PEP?"
+    expected_verb: "screening.pep"
+
+  - name: screening_adverse_media
+    domain: screening
+    bootstrap:
+      - "Allianz Global Investors"
+    utterance: "any negative news about this company?"
+    expected_verb: "screening.adverse-media"
+
+  - name: ubo_list_owners
+    domain: ubo
+    bootstrap:
+      - "Allianz Management Ltd"
+    utterance: "who owns this?"
+    expected_verb: "ubo.list-owners"
+
+  - name: ubo_show_controllers
+    domain: ubo
+    bootstrap:
+      - "Allianz Management Ltd"
+    utterance: "show me the controlling persons for this entity"
+    expected_verb: "ubo.list-controllers"
+    alt_verbs:
+      - "ubo.list-owners"
+
+  - name: document_list_missing
+    domain: document
+    bootstrap:
+      - "Allianz Global Investors"
+    utterance: "what documents are still missing for onboarding?"
+    expected_verb: "document.list-missing"
+    alt_verbs:
+      - "document.list"
+
+  - name: document_get_kyb
+    domain: document
+    bootstrap:
+      - "Allianz Global Investors"
+    utterance: "show me the KYB documents for this client"
+    expected_verb: "document.list"
+    notes: "Accept list/read style document retrieval"
+
+  - name: kyc_open_case
+    domain: kyc
+    bootstrap:
+      - "Allianz Global Investors"
+    utterance: "open a KYC case for this client"
+    expected_verb: "kyc.open-case"
+
+  - name: kyc_case_status
+    domain: kyc
+    bootstrap:
+      - "Allianz Global Investors"
+    utterance: "what is the KYC status for this client?"
+    expected_verb: "kyc.case-status"
+    alt_verbs:
+      - "kyc.read-case"
+
+  - name: kyc_missing_information
+    domain: kyc
+    bootstrap:
+      - "Allianz Global Investors"
+    utterance: "what information is still missing before KYC sign-off?"
+    expected_verb: "kyc.list-missing-items"
+    alt_verbs:
+      - "document.list-missing"
+
+  - name: onboarding_status
+    domain: onboarding
+    bootstrap:
+      - "Allianz Global Investors"
+    utterance: "where are we in the onboarding journey for this client?"
+    expected_verb: "onboarding.status"
+    alt_verbs:
+      - "semantic.derive-state"
+
+  - name: deal_list_client
+    domain: deal
+    bootstrap:
+      - "Allianz Global Investors"
+    utterance: "what deals does Allianz Global Investors have?"
+    expected_verb: "deal.list"
+
+  - name: deal_create_new
+    domain: deal
+    bootstrap:
+      - "Allianz Global Investors"
+    utterance: "open a new deal for this client"
+    expected_verb: "deal.create"
+
+  - name: deal_set_stage
+    domain: deal
+    bootstrap:
+      - "Allianz Global Investors"
+      - "what deals does Allianz Global Investors have?"
+    utterance: "move this deal to mandate negotiation"
+    expected_verb: "deal.set-stage"
+    alt_verbs:
+      - "deal.update"
+
+  - name: instrument_matrix_equities
+    domain: trading
+    bootstrap:
+      - "Allianz Global Investors"
+    utterance: "show me the permitted instrument matrix for this mandate"
+    expected_verb: "mandate.instrument-matrix"
+    alt_verbs:
+      - "trading-profile.instrument-matrix"
+
+  - name: instrument_matrix_futures
+    domain: trading
+    bootstrap:
+      - "Allianz Global Investors"
+    utterance: "can this mandate trade listed futures?"
+    expected_verb: "mandate.instrument-matrix"
+    alt_verbs:
+      - "trading-profile.instrument-matrix"
+
+  - name: onboarding_products
+    domain: onboarding
+    bootstrap:
+      - "Allianz Global Investors"
+      - "show me the cbus"
+    utterance: "which products are active on this client setup?"
+    expected_verb: "cbu.products"
+    alt_verbs:
+      - "cbu.list-products"
+
+  - name: cbu_remove_role
+    domain: cbu
+    bootstrap:
+      - "Allianz Global Investors"
+      - "show me the cbus"
+    utterance: "remove State Street as transfer agent"
+    expected_verb: "cbu.remove-role"
+
+  - name: cbu_delete_test
+    domain: cbu
+    bootstrap:
+      - "Allianz Global Investors"
+      - "show me the cbus"
+    utterance: "delete the test CBU I just created"
+    expected_verb: "cbu.delete"
+
+  - name: semantic_next_stage
+    domain: onboarding
+    bootstrap:
+      - "Allianz Global Investors"
+      - "show me the cbus"
+    utterance: "what is the next actionable onboarding stage for this CBU?"
+    expected_verb: "semantic.next-actionable"
+    alt_verbs:
+      - "semantic.get-next-actionable"

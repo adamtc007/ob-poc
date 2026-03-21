@@ -1,0 +1,73 @@
+fqn: universe.fund_structures
+universe_id: fund_structures
+name: Fund Structures
+description: Discovery universe for selecting and grounding fund and manager onboarding structures.
+version: "1.0"
+default_entry_domain: onboarding
+domains:
+  - domain_id: onboarding
+    label: Fund Onboarding
+    description: Fund launch and legal structure setup across jurisdictions.
+    objective_tags:
+      - onboarding
+      - fund_launch
+      - structure_setup
+    utterance_signals:
+      - signal_type: keyword
+        pattern: fund
+        weight: 1.0
+      - signal_type: keyword
+        pattern: structure
+        weight: 0.8
+      - signal_type: keyword
+        pattern: launch
+        weight: 0.8
+      - signal_type: keyword
+        pattern: sicav
+        weight: 0.9
+      - signal_type: keyword
+        pattern: icav
+        weight: 0.9
+      - signal_type: keyword
+        pattern: oeic
+        weight: 0.9
+      - signal_type: keyword
+        pattern: ltaf
+        weight: 0.9
+      - signal_type: keyword
+        pattern: etf
+        weight: 0.8
+    candidate_entity_kinds:
+      - fund
+      - cbu
+      - company
+    candidate_family_ids:
+      - fund_onboarding
+      - cross_border_onboarding
+      - manager_onboarding
+    required_grounding_inputs:
+      - key: objective
+        label: Objective
+        required: true
+        input_type: string
+      - key: jurisdiction
+        label: Jurisdiction
+        required: true
+        input_type: string
+      - key: entity_kind
+        label: Entity kind
+        required: true
+        input_type: string
+    entry_questions:
+      - question_id: structure_scope
+        prompt: What structure are you setting up?
+        maps_to: objective
+        priority: 1
+      - question_id: structure_jurisdiction
+        prompt: Which jurisdiction should the structure live in?
+        maps_to: jurisdiction
+        priority: 2
+    allowed_discovery_actions:
+      - research.search
+      - entity.resolve
+      - session.clarify

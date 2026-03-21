@@ -165,6 +165,111 @@ fn compile_verb_call(
         // =====================================================================
         // Entity verbs
         // =====================================================================
+        "entity.create" | "entity.ensure" => {
+            let entity_type = get_string_arg(vc, "entity-type")?;
+            let normalized = entity_type.trim().to_ascii_lowercase();
+
+            match normalized.as_str() {
+                "proper-person" | "proper_person" | "natural-person" | "natural_person" => {
+                    let first = get_string_arg(vc, "first-name")?;
+                    let last = get_string_arg(vc, "last-name")?;
+                    let name = format!("{} {}", first, last);
+                    let key = EntityKey::proper_person(&name);
+
+                    let mut attrs = HashMap::new();
+                    attrs.insert("first_name".to_string(), serde_json::json!(first));
+                    attrs.insert("last_name".to_string(), serde_json::json!(last));
+                    if let Ok(dob) = get_string_arg(vc, "date-of-birth") {
+                        attrs.insert("date_of_birth".to_string(), serde_json::json!(dob));
+                    }
+                    if let Ok(nat) = get_string_arg(vc, "nationality") {
+                        attrs.insert("nationality".to_string(), serde_json::json!(nat));
+                    }
+
+                    let op = Op::EnsureEntity {
+                        entity_type: "proper_person".to_string(),
+                        key: key.clone(),
+                        attrs,
+                        binding: vc.binding.clone(),
+                        source_stmt: stmt_idx,
+                    };
+
+                    let binding = vc.binding.as_ref().map(|b| (b.clone(), key));
+                    Ok((vec![op], binding))
+                }
+                "limited-company" | "limited_company" => {
+                    let name = get_string_arg(vc, "name")?;
+                    let key = EntityKey::limited_company(&name);
+
+                    let mut attrs = HashMap::new();
+                    attrs.insert("company_name".to_string(), serde_json::json!(name));
+                    if let Ok(j) = get_string_arg(vc, "jurisdiction") {
+                        attrs.insert("jurisdiction".to_string(), serde_json::json!(j));
+                    }
+                    if let Ok(reg) = get_string_arg(vc, "registration-number") {
+                        attrs.insert("registration_number".to_string(), serde_json::json!(reg));
+                    }
+
+                    let op = Op::EnsureEntity {
+                        entity_type: "limited_company".to_string(),
+                        key: key.clone(),
+                        attrs,
+                        binding: vc.binding.clone(),
+                        source_stmt: stmt_idx,
+                    };
+
+                    let binding = vc.binding.as_ref().map(|b| (b.clone(), key));
+                    Ok((vec![op], binding))
+                }
+                "partnership" => {
+                    let name = get_string_arg(vc, "name")?;
+                    let key = EntityKey::new("partnership", &name);
+
+                    let mut attrs = HashMap::new();
+                    attrs.insert("partnership_name".to_string(), serde_json::json!(name));
+                    if let Ok(j) = get_string_arg(vc, "jurisdiction") {
+                        attrs.insert("jurisdiction".to_string(), serde_json::json!(j));
+                    }
+
+                    let op = Op::EnsureEntity {
+                        entity_type: "partnership".to_string(),
+                        key: key.clone(),
+                        attrs,
+                        binding: vc.binding.clone(),
+                        source_stmt: stmt_idx,
+                    };
+
+                    let binding = vc.binding.as_ref().map(|b| (b.clone(), key));
+                    Ok((vec![op], binding))
+                }
+                "trust" => {
+                    let name = get_string_arg(vc, "name")?;
+                    let key = EntityKey::new("trust", &name);
+
+                    let mut attrs = HashMap::new();
+                    attrs.insert("trust_name".to_string(), serde_json::json!(name));
+                    if let Ok(j) = get_string_arg(vc, "jurisdiction") {
+                        attrs.insert("jurisdiction".to_string(), serde_json::json!(j));
+                    }
+
+                    let op = Op::EnsureEntity {
+                        entity_type: "trust".to_string(),
+                        key: key.clone(),
+                        attrs,
+                        binding: vc.binding.clone(),
+                        source_stmt: stmt_idx,
+                    };
+
+                    let binding = vc.binding.as_ref().map(|b| (b.clone(), key));
+                    Ok((vec![op], binding))
+                }
+                _ => Err(format!(
+                    "unsupported entity-type for compilation: {}",
+                    entity_type
+                )),
+            }
+        }
+
         "entity.create-proper-person" | "entity.ensure-proper-person" => {
             let first = get_string_arg(vc, "first-name")?;
             let last = get_string_arg(vc, "last-name")?;
@@ -781,8 +886,7 @@ mod tests {
 
     #[test]
     fn test_compile_entity_create() {
-        let source =
-            r#"(entity.create-proper-person :first-name "John" :last-name "Smith" :as @john)"#;
+        let source = r#"(entity.create :entity-type "proper-person" :first-name "John" :last-name "Smith" :as @john)"#;
         let program = parse_program(source).unwrap();
         let compiled = compile_to_ops(&program);
 
@@ -805,7 +909,7 @@ mod tests {
     fn test_compile_assign_role_with_symbols() {
         let source = r#"
             (cbu.ensure :name "Fund" :as @fund)
-            (entity.create-proper-person :first-name "John" :last-name "Smith" :as @john)
+            (entity.create :entity-type "proper-person" :first-name "John" :last-name "Smith" :as @john)
             (cbu.assign-role :cbu-id @fund :entity-id @john :role "DIRECTOR")
         "#;
         let program = parse_program(source).unwrap();

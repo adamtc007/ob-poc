@@ -3249,50 +3249,53 @@ async fn execute_session_dsl_raw(
                 Some(session_id),
             )
             .await;
-
-            if envelope.is_unavailable() {
-                let policy_gate = crate::policy::PolicyGate::from_env();
-                if policy_gate.semreg_fail_closed() {
+            let phase2 = crate::traceability::Phase2Service::evaluate_from_envelope(envelope);
+            match phase2.halt_reason_code {
+                Some("sem_os_unavailable") => {
+                    let policy_gate = crate::policy::PolicyGate::from_env();
+                    if policy_gate.semreg_fail_closed() {
+                        tracing::warn!(
+                            session = %session_id,
+                            "execute_session_dsl: Sem OS unavailable — blocked in strict mode"
+                        );
+                        return Ok(Json(ExecuteResponse {
+                            success: false,
+                            results: Vec::new(),
+                            errors: vec![
+                                "Sem OS unavailable — execution blocked in strict mode".to_string()
+                            ],
+                            new_state: current_state.into(),
+                            bindings: None,
+                        }));
+                    }
+                }
+                Some("no_allowed_verbs") => {
                     tracing::warn!(
                         session = %session_id,
-                        "execute_session_dsl: Sem OS unavailable — blocked in strict mode"
+                        "execute_session_dsl: Sem OS deny-all — blocking execution"
                     );
                     return Ok(Json(ExecuteResponse {
                         success: false,
                         results: Vec::new(),
-                        errors: vec![
-                            "Sem OS unavailable — execution blocked in strict mode".to_string()
-                        ],
+                        errors: vec!["Sem OS denied execution: no verbs are allowed".to_string()],
                         new_state: current_state.into(),
                         bindings: None,
                     }));
                 }
-            } else if envelope.is_deny_all() {
-                tracing::warn!(
-                    session = %session_id,
-                    "execute_session_dsl: Sem OS deny-all — blocking execution"
-                );
-                return Ok(Json(ExecuteResponse {
-                    success: false,
-                    results: Vec::new(),
-                    errors: vec!["Sem OS denied execution: no verbs are allowed".to_string()],
-                    new_state: current_state.into(),
-                    bindings: None,
-                }));
-            } else {
-                let denied_verbs: Vec<String> = program
-                    .statements
-                    .iter()
-                    .filter_map(|stmt| {
+                _ => {}
+            }
+
+            {
+                let denied_verbs = crate::traceability::Phase2Service::collect_denied_verbs(
+                    &phase2.artifacts,
+                    program.statements.iter().filter_map(|stmt| {
                         if let Statement::VerbCall(vc) = stmt {
-                            let fqn = format!("{}.{}", vc.domain, vc.verb);
-                            if !envelope.is_allowed(&fqn) {
-                                return Some(fqn);
-                            }
+                            Some(format!("{}.{}", vc.domain, vc.verb))
+                        } else {
+                            None
                         }
-                        None
-                    })
-                    .collect();
+                    }),
+                );
                 if !denied_verbs.is_empty() {
                     tracing::warn!(
                         session = %session_id,
@@ -4747,6 +4750,10 @@ mod tests {
     #[test]
     fn test_routes_do_not_gate_session_behavior_on_semtaxonomy_flag() {
         let source = std::fs::read_to_string(file!()).expect("agent_routes source should read");
+        let source = source
+            .split("#[cfg(test)]")
+            .next()
+            .expect("agent_routes source should include pre-test content");
         assert!(
             !source.contains("semtaxonomy_enabled_for_routes"),
             "route-level SemTaxonomy feature gating should remain deleted"

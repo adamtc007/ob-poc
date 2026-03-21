@@ -71,6 +71,18 @@ pub struct UnifiedSession {
     /// Pending mutation awaiting explicit user confirmation.
     #[serde(default)]
     pub pending_mutation: Option<PendingMutation>,
+    /// Most recent utterance trace written for this session.
+    #[serde(default)]
+    pub last_trace_id: Option<Uuid>,
+    /// Trace currently awaiting a user clarification/confirmation response.
+    #[serde(default)]
+    pub pending_trace_id: Option<Uuid>,
+    /// Per-step Sem OS legality re-check evidence captured during chat execution.
+    #[serde(skip)]
+    pub pending_execution_rechecks: Vec<serde_json::Value>,
+    /// Per-step execution artifacts captured from the runbook gate during chat execution.
+    #[serde(skip)]
+    pub pending_execution_artifacts: Vec<serde_json::Value>,
 
     /// Minimal rolling Sage intent ledger for carry-forward context.
     #[serde(default)]
@@ -1613,6 +1625,10 @@ impl UnifiedSession {
             pending_intent_tier: None,
             pending_decision: None,
             pending_mutation: None,
+            last_trace_id: None,
+            pending_trace_id: None,
+            pending_execution_rechecks: Vec::new(),
+            pending_execution_artifacts: Vec::new(),
             recent_sage_intents: Vec::new(),
             semtaxonomy_session: None,
             messages: Vec::new(),
