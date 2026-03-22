@@ -19,6 +19,8 @@ export interface ChatMessage {
   coder_proposal?: CoderProposal;
   discovery_bootstrap?: DiscoveryBootstrap;
   parked_entries?: ParkedEntry[];
+  onboarding_state?: OnboardingStateView;
+  verb_disambiguation_detail?: VerbDisambiguationRequest;
 }
 
 export interface SageExplain {
@@ -94,6 +96,116 @@ export interface ParkedEntry {
   resource?: string;
   gate_entry_id?: string;
   message?: string;
+}
+
+// ============================================================================
+// VERB DISAMBIGUATION — "did you mean?" with context
+// ============================================================================
+
+export interface VerbDisambiguationRequest {
+  request_id: string;
+  original_input: string;
+  options: VerbDisambiguationOption[];
+  prompt: string;
+}
+
+export interface VerbDisambiguationOption {
+  verb_fqn: string;
+  description: string;
+  example: string;
+  score: number;
+  matched_phrase?: string;
+  domain_label?: string;
+  category_label?: string;
+  suggested_utterance?: string;
+  // Differentiation — WHY this option differs
+  verb_kind?: string; // "primitive" | "macro" | "query" | "workflow"
+  differentiation?: string;
+  requires_state?: string;
+  produces_state?: string;
+  scope?: string;
+  step_count?: number;
+  // Entity/constellation context — WHERE this verb operates
+  target_entity_kind?: string;
+  constellation_slot?: string;
+  entity_context?: string;
+  target_entity_name?: string;
+}
+
+// ============================================================================
+// ONBOARDING STATE VIEW — "where am I + what can I do"
+// ============================================================================
+
+export type LayerState = "complete" | "in_progress" | "not_started" | "blocked";
+export type VerbDirection = "forward" | "revert" | "query";
+
+export interface OnboardingStateView {
+  group_name?: string;
+  overall_progress_pct: number;
+  active_layer_index: number;
+  layers: OnboardingLayer[];
+  cbu_cards: CbuStateCard[];
+  context_reset_hint?: ContextResetHint;
+}
+
+export interface ContextResetHint {
+  message: string;
+  reset_utterance: string;
+  reset_verb_fqn: string;
+}
+
+export interface OnboardingLayer {
+  index: number;
+  name: string;
+  description: string;
+  state: LayerState;
+  progress_pct: number;
+  summary?: string;
+  forward_verbs: SuggestedVerb[];
+  revert_verbs: SuggestedVerb[];
+  blocked_verbs: BlockedVerb[];
+  unreachable_verbs: UnreachableVerb[];
+}
+
+export interface SuggestedVerb {
+  verb_fqn: string;
+  label: string;
+  suggested_utterance: string;
+  reason: string;
+  boost: number;
+  direction: VerbDirection;
+  governance_tier?: string;
+}
+
+export interface BlockedVerb {
+  verb_fqn: string;
+  label: string;
+  reason: string;
+  prerequisite?: string;
+  unblock_utterance?: string;
+}
+
+export interface UnreachableVerb {
+  verb_fqn: string;
+  reason: string;
+}
+
+export interface CbuStateCard {
+  cbu_id: string;
+  cbu_name?: string;
+  lifecycle_state?: string;
+  progress_pct: number;
+  phases: CbuPhaseStatus;
+  next_action?: SuggestedVerb;
+  revert_action?: SuggestedVerb;
+}
+
+export interface CbuPhaseStatus {
+  has_case: boolean;
+  case_status?: string;
+  has_screening: boolean;
+  screening_complete: boolean;
+  document_coverage_pct?: number;
 }
 
 export type DiscoverySelectionKind =

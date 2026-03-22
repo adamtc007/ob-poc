@@ -328,6 +328,7 @@ export function ChatPage() {
                     message={message}
                     onDecisionReply={handleDecisionReply}
                     onDiscoverySelection={handleDiscoverySelection}
+                    onSendMessage={(msg) => sendMutation.mutate(msg)}
                   />
                 ))
               )}

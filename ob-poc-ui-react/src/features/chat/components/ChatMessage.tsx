@@ -13,11 +13,14 @@ import type {
 } from "../../../types/chat";
 import { cn, formatTime } from "../../../lib/utils";
 import { DecisionCard } from "./DecisionCard";
+import { VerbDisambiguationCard } from "./VerbDisambiguationCard";
+import { OnboardingStateCard } from "./OnboardingStateCard";
 
 interface ChatMessageProps {
   message: ChatMessageType;
   onDecisionReply?: (packetId: string, reply: unknown) => void;
   onDiscoverySelection?: (selection: DiscoverySelection) => void;
+  onSendMessage?: (message: string) => void;
 }
 
 function ToolCallDisplay({ toolCall }: { toolCall: ToolCall }) {
@@ -358,6 +361,7 @@ export function ChatMessage({
   message,
   onDecisionReply,
   onDiscoverySelection,
+  onSendMessage,
 }: ChatMessageProps) {
   const isUser = message.role === "user";
   const isSystem = message.role === "system";
@@ -424,11 +428,23 @@ export function ChatMessage({
             />
             <ParkedEntriesCard message={message} />
             <CoderProposalCard message={message} />
+            <OnboardingStateCard
+              message={message}
+              onVerbClick={onSendMessage}
+            />
           </>
         )}
 
-        {/* Decision packet */}
-        {message.decision_packet && (
+        {/* Verb disambiguation — rich "did you mean?" with context */}
+        {message.verb_disambiguation_detail && (
+          <VerbDisambiguationCard
+            message={message}
+            onSelect={onSendMessage}
+          />
+        )}
+
+        {/* Decision packet (fallback for non-verb disambiguation) */}
+        {message.decision_packet && !message.verb_disambiguation_detail && (
           <div className="mt-2">
             <DecisionCard
               packet={message.decision_packet}

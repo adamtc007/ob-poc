@@ -257,6 +257,7 @@ export function SemOsPage() {
                     key={message.id}
                     message={message}
                     onDecisionReply={handleDecisionReply}
+                    onSendMessage={(msg) => sendMutation.mutate(msg)}
                   />
                 ))
               )}

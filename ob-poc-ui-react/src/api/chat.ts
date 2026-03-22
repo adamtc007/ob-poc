@@ -23,6 +23,8 @@ import type {
   DiscoveryBootstrap,
   SageExplain,
   VerbProfile,
+  VerbDisambiguationRequest,
+  OnboardingStateView,
 } from "../types/chat";
 
 /**
@@ -492,9 +494,10 @@ interface ChatInputEnvelope {
     generated_dsl?: string;
     session_state?: string;
     unresolved_refs?: unknown[];
-    verb_disambiguation?: unknown;
+    verb_disambiguation?: VerbDisambiguationRequest;
     intent_tier?: unknown;
     clarification?: unknown;
+    onboarding_state?: OnboardingStateView;
     error?: string;
     sage_explain?: SageExplain;
     coder_proposal?: CoderProposal;
@@ -547,21 +550,23 @@ function buildAssistantMessage(
     sage_explain: response.sage_explain,
     coder_proposal: response.coder_proposal,
     discovery_bootstrap: response.discovery_bootstrap,
+    onboarding_state: response.onboarding_state,
   };
 
   if (response.verb_disambiguation) {
-    const disambiguation = response.verb_disambiguation as {
-      options?: Array<{ verb_fqn: string; description?: string }>;
-    };
+    const disambiguation = response.verb_disambiguation;
+    // Store full disambiguation detail for rich rendering
+    assistantMessage.verb_disambiguation_detail = disambiguation;
+    // Also map to DecisionPacket for backward-compat card rendering
     assistantMessage.decision_packet = {
-      id: `verb-${Date.now()}`,
+      id: disambiguation.request_id || `verb-${Date.now()}`,
       kind: "clarification",
       payload: {
-        question: "Which operation did you mean?",
+        question: disambiguation.prompt || "Which operation did you mean?",
         options: (disambiguation.options || []).map((opt, idx) => ({
           id: `opt-${idx}`,
-          label: opt.verb_fqn,
-          description: opt.description,
+          label: opt.suggested_utterance || opt.verb_fqn,
+          description: opt.differentiation || opt.description,
           value: opt.verb_fqn,
         })),
       },
