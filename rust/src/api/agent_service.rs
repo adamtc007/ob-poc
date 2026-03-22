@@ -4117,13 +4117,30 @@ impl AgentService {
                     let word_count = phrase.split_whitespace().count();
                     let is_specific = word_count >= 4
                         && !phrase.contains('.')
-                        && phrase.len() > 15; // Minimum 15 chars to avoid "go back to" etc.
-                    if is_specific {
-                        Some(phrase.clone())
+                        && phrase.len() > 15;
+                    let base = if is_specific {
+                        phrase.clone()
                     } else {
-                        // Use description as imperative utterance — always unique per verb
-                        Some(description.clone())
-                    }
+                        description.clone()
+                    };
+
+                    // Interpolate entity name if available — the utterance should
+                    // be plain English that resolves through entity linking.
+                    // "Open a KYC case" → "Open a KYC case for Allianz Dynamic Commodities"
+                    let entity_name: Option<&str> = session.context.client_group_name()
+                        .or(session.context.deal_name.as_deref());
+
+                    let enriched = if let Some(name) = entity_name {
+                        // Only append if the phrase doesn't already contain the name
+                        if !base.to_lowercase().contains(&name.to_lowercase()) {
+                            format!("{} for {}", base, name)
+                        } else {
+                            base
+                        }
+                    } else {
+                        base
+                    };
+                    Some(enriched)
                 };
 
                 // ── Differentiation context ───────────────────────────
