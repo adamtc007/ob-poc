@@ -1913,13 +1913,13 @@ fn project_root() -> Result<std::path::PathBuf> {
 fn check(sh: &Shell, db: bool) -> Result<()> {
     println!("Running checks...");
 
-    // Compile check
+    // Compile check (workspace)
     println!("  Checking compilation...");
-    cmd!(sh, "cargo check --features database").run()?;
+    cmd!(sh, "cargo check --workspace").run()?;
 
-    // Clippy
+    // Clippy (workspace, all targets)
     println!("  Running clippy...");
-    cmd!(sh, "cargo clippy --features database -- -D warnings").run()?;
+    cmd!(sh, "cargo clippy --workspace --all-targets -- -D warnings").run()?;
 
     // Tests
     println!("  Running tests...");
@@ -2093,14 +2093,31 @@ fn ci(sh: &Shell) -> Result<()> {
     println!("\n=== Format Check ===");
     fmt(sh, true)?;
 
-    println!("\n=== Clippy (all features) ===");
+    println!("\n=== Clippy (workspace) ===");
+    cmd!(sh, "cargo clippy --workspace --all-targets -- -D warnings").run()?;
+
+    println!("\n=== Clippy (per-feature) ===");
     clippy(sh, false)?;
 
     println!("\n=== Tests ===");
     test(sh, false, false, None)?;
 
+    println!("\n=== Adapter Tests ===");
+    cmd!(sh, "cargo test -p sem_os_obpoc_adapter").run()?;
+
     println!("\n=== Build ===");
     build(sh, false)?;
+
+    // Frontend type check (if node_modules exists)
+    let react_dir = std::path::Path::new("../ob-poc-ui-react");
+    if react_dir.join("node_modules").exists() {
+        println!("\n=== Frontend Type Check ===");
+        let prev_dir = std::env::current_dir()?;
+        std::env::set_current_dir(react_dir)?;
+        let tsc_result = cmd!(sh, "npx tsc --noEmit").run();
+        std::env::set_current_dir(prev_dir)?;
+        tsc_result?;
+    }
 
     // Governance drift check (requires DATABASE_URL)
     if std::env::var("DATABASE_URL").is_ok() {
@@ -2120,14 +2137,28 @@ fn pre_commit(sh: &Shell) -> Result<()> {
     println!("\n=== Format Check ===");
     fmt(sh, true)?;
 
-    println!("\n=== Clippy ===");
-    cmd!(sh, "cargo clippy --features database -- -D warnings").run()?;
+    println!("\n=== Clippy (workspace) ===");
+    cmd!(sh, "cargo clippy --workspace --all-targets -- -D warnings").run()?;
 
     println!("\n=== Unit Tests ===");
     cmd!(sh, "cargo test --lib --features database").run()?;
 
+    println!("\n=== Adapter Tests (constellation/state machine coverage) ===");
+    cmd!(sh, "cargo test -p sem_os_obpoc_adapter").run()?;
+
     println!("\n=== Verb Atlas Lint ===");
     verbs::verbs_atlas(None, true, false)?;
+
+    // Frontend type check (if node_modules exists)
+    let react_dir = std::path::Path::new("../ob-poc-ui-react");
+    if react_dir.join("node_modules").exists() {
+        println!("\n=== Frontend Type Check ===");
+        let prev_dir = std::env::current_dir()?;
+        std::env::set_current_dir(react_dir)?;
+        let tsc_result = cmd!(sh, "npx tsc --noEmit").run();
+        std::env::set_current_dir(prev_dir)?;
+        tsc_result?;
+    }
 
     println!("\nPre-commit checks passed!");
     Ok(())
