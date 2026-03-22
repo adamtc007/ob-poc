@@ -121,6 +121,7 @@ pub struct UtteranceTraceRecord {
     pub parent_trace_id: Option<Uuid>,
     pub timestamp: DateTime<Utc>,
     pub raw_utterance: String,
+    pub is_synthetic: bool,
     pub outcome: TraceOutcome,
     pub halt_reason_code: Option<String>,
     pub halt_phase: Option<i16>,
@@ -148,6 +149,7 @@ pub struct NewUtteranceTrace {
     pub parent_trace_id: Option<Uuid>,
     pub timestamp: DateTime<Utc>,
     pub raw_utterance: String,
+    pub is_synthetic: bool,
     pub outcome: TraceOutcome,
     pub halt_reason_code: Option<String>,
     pub halt_phase: Option<i16>,
@@ -177,6 +179,7 @@ impl NewUtteranceTrace {
     ///     Uuid::nil(),
     ///     "show me the case graph",
     ///     TraceKind::Original,
+    ///     false,
     /// );
     /// assert_eq!(trace.raw_utterance, "show me the case graph");
     /// ```
@@ -185,6 +188,7 @@ impl NewUtteranceTrace {
         utterance_id: Uuid,
         raw_utterance: impl Into<String>,
         trace_kind: TraceKind,
+        is_synthetic: bool,
     ) -> Self {
         Self {
             trace_id: Uuid::new_v4(),
@@ -195,6 +199,7 @@ impl NewUtteranceTrace {
             parent_trace_id: None,
             timestamp: Utc::now(),
             raw_utterance: raw_utterance.into(),
+            is_synthetic,
             outcome: TraceOutcome::InProgress,
             halt_reason_code: None,
             halt_phase: None,
@@ -210,5 +215,23 @@ impl NewUtteranceTrace {
             surface_versions: SurfaceVersions::current_defaults(),
             trace_payload: serde_json::json!({}),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn in_progress_trace_preserves_synthetic_flag() {
+        let trace = NewUtteranceTrace::in_progress(
+            Uuid::nil(),
+            Uuid::nil(),
+            "show me the case",
+            TraceKind::Original,
+            true,
+        );
+        assert!(trace.is_synthetic);
+        assert_eq!(trace.outcome, TraceOutcome::InProgress);
     }
 }

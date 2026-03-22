@@ -514,13 +514,9 @@ impl ReplOrchestratorV2 {
         session: &ReplSessionV2,
         input: &UserInputV2,
     ) -> Option<NewUtteranceTrace> {
-        let Some(raw_utterance) = input_trace_text(input) else {
-            return None;
-        };
+        let raw_utterance = input_trace_text(input)?;
 
-        let Some(pool) = self.pool.clone() else {
-            return None;
-        };
+        let pool = self.pool.clone()?;
 
         let repository = UtteranceTraceRepository::new(pool);
         let sage_ctx = repl_trace_sage_context(session);
@@ -529,6 +525,7 @@ impl ReplOrchestratorV2 {
             Uuid::new_v4(),
             raw_utterance.clone(),
             repl_trace_kind(session, input),
+            false,
         );
         trace.parent_trace_id = repl_parent_trace_id(session, input);
         let mut trace_payload = build_trace_scaffold_payload(
@@ -571,13 +568,9 @@ impl ReplOrchestratorV2 {
         session: &ReplSessionV2,
         response: &ReplResponseV2,
     ) -> Option<Uuid> {
-        let Some(mut trace) = trace else {
-            return None;
-        };
+        let mut trace = trace?;
 
-        let Some(pool) = self.pool.clone() else {
-            return None;
-        };
+        let pool = self.pool.clone()?;
 
         let repository = UtteranceTraceRepository::new(pool);
         let sage_ctx = repl_trace_sage_context(session);
@@ -655,12 +648,8 @@ impl ReplOrchestratorV2 {
         parent_trace_id: Option<Uuid>,
         response: &ReplResponseV2,
     ) -> Option<Uuid> {
-        let Some(parent_trace_id) = parent_trace_id else {
-            return None;
-        };
-        let Some(pool) = self.pool.clone() else {
-            return None;
-        };
+        let parent_trace_id = parent_trace_id?;
+        let pool = self.pool.clone()?;
 
         let repository = UtteranceTraceRepository::new(pool);
         let mut trace = NewUtteranceTrace::in_progress(
@@ -668,6 +657,7 @@ impl ReplOrchestratorV2 {
             Uuid::new_v4(),
             response.message.clone(),
             TraceKind::ClarificationPrompt,
+            false,
         );
         trace.parent_trace_id = Some(parent_trace_id);
         trace.outcome = crate::traceability::TraceOutcome::ClarificationTriggered;

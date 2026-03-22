@@ -41,6 +41,7 @@ impl UtteranceTraceRepository {
     ///     Uuid::new_v4(),
     ///     "show me the fund",
     ///     TraceKind::Original,
+    ///     false,
     /// );
     /// repo.insert(&trace).await?;
     /// # Ok(())
@@ -61,6 +62,7 @@ impl UtteranceTraceRepository {
                 parent_trace_id,
                 timestamp,
                 raw_utterance,
+                is_synthetic,
                 outcome,
                 halt_reason_code,
                 halt_phase,
@@ -76,8 +78,8 @@ impl UtteranceTraceRepository {
                 surface_versions,
                 trace_payload
             ) VALUES (
-                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
-                $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22
+                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
+                $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23
             )
             "#,
         )
@@ -89,6 +91,7 @@ impl UtteranceTraceRepository {
         .bind(trace.parent_trace_id)
         .bind(trace.timestamp)
         .bind(&trace.raw_utterance)
+        .bind(trace.is_synthetic)
         .bind(trace.outcome.as_str())
         .bind(&trace.halt_reason_code)
         .bind(trace.halt_phase)
@@ -123,6 +126,7 @@ impl UtteranceTraceRepository {
     ///     Uuid::new_v4(),
     ///     "show me the fund",
     ///     TraceKind::Original,
+    ///     false,
     /// );
     /// repo.insert(&trace).await?;
     /// trace.outcome = TraceOutcome::NoMatch;
@@ -145,20 +149,21 @@ impl UtteranceTraceRepository {
                 parent_trace_id = $6,
                 timestamp = $7,
                 raw_utterance = $8,
-                outcome = $9,
-                halt_reason_code = $10,
-                halt_phase = $11,
-                resolved_verb = $12,
-                plane = $13,
-                polarity = $14,
-                execution_shape_kind = $15,
-                fallback_invoked = $16,
-                fallback_reason_code = $17,
-                situation_signature_hash = $18,
-                template_id = $19,
-                template_version = $20,
-                surface_versions = $21,
-                trace_payload = $22
+                is_synthetic = $9,
+                outcome = $10,
+                halt_reason_code = $11,
+                halt_phase = $12,
+                resolved_verb = $13,
+                plane = $14,
+                polarity = $15,
+                execution_shape_kind = $16,
+                fallback_invoked = $17,
+                fallback_reason_code = $18,
+                situation_signature_hash = $19,
+                template_id = $20,
+                template_version = $21,
+                surface_versions = $22,
+                trace_payload = $23
             WHERE trace_id = $1
             "#,
         )
@@ -170,6 +175,7 @@ impl UtteranceTraceRepository {
         .bind(trace.parent_trace_id)
         .bind(trace.timestamp)
         .bind(&trace.raw_utterance)
+        .bind(trace.is_synthetic)
         .bind(trace.outcome.as_str())
         .bind(&trace.halt_reason_code)
         .bind(trace.halt_phase)
@@ -215,6 +221,7 @@ impl UtteranceTraceRepository {
                 parent_trace_id,
                 timestamp,
                 raw_utterance,
+                is_synthetic,
                 outcome,
                 halt_reason_code,
                 halt_phase,
@@ -269,6 +276,7 @@ impl UtteranceTraceRepository {
                 parent_trace_id,
                 timestamp,
                 raw_utterance,
+                is_synthetic,
                 outcome,
                 halt_reason_code,
                 halt_phase,
@@ -296,6 +304,35 @@ impl UtteranceTraceRepository {
         .context("list utterance traces for session")?;
 
         rows.into_iter().map(decode_trace_row).collect()
+    }
+
+    /// Mark an existing trace as synthetic or non-synthetic.
+    ///
+    /// # Examples
+    /// ```rust,no_run
+    /// use ob_poc::traceability::UtteranceTraceRepository;
+    /// use uuid::Uuid;
+    ///
+    /// # async fn demo(repo: UtteranceTraceRepository, trace_id: Uuid) -> anyhow::Result<()> {
+    /// repo.set_synthetic(trace_id, true).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn set_synthetic(&self, trace_id: Uuid, is_synthetic: bool) -> Result<()> {
+        sqlx::query(
+            r#"
+            UPDATE "ob-poc".utterance_traces
+            SET is_synthetic = $2
+            WHERE trace_id = $1
+            "#,
+        )
+        .bind(trace_id)
+        .bind(is_synthetic)
+        .execute(&self.pool)
+        .await
+        .context("mark utterance trace synthetic")?;
+
+        Ok(())
     }
 }
 
@@ -330,6 +367,7 @@ fn decode_trace_row(row: sqlx::postgres::PgRow) -> Result<UtteranceTraceRecord> 
         parent_trace_id: row.get("parent_trace_id"),
         timestamp: row.get("timestamp"),
         raw_utterance: row.get("raw_utterance"),
+        is_synthetic: row.get("is_synthetic"),
         outcome,
         halt_reason_code: row.get("halt_reason_code"),
         halt_phase: row.get("halt_phase"),
