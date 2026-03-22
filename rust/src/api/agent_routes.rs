@@ -623,6 +623,48 @@ async fn apply_discovery_selection(
     session_id: Uuid,
     selection: &DiscoverySelection,
 ) -> Result<String, StatusCode> {
+    // Validate the discovery selection against the session's last known SemOS
+    // discovery surface. All utterances flow through SemOS without exception —
+    // discovery selections are no different. The subsequent chat_session() call
+    // will re-validate through the full orchestrator pipeline with a fresh
+    // SemOS envelope, so this check prevents mutating session state with a
+    // selection that will be rejected downstream.
+    {
+        let sessions_read = state.sessions.read().await;
+        if let Some(session) = sessions_read.get(&session_id) {
+            // If the session has a discovery bootstrap surface, validate that
+            // the selected domain/family/constellation is actually offered.
+            if let Some(last_msg) = session.messages.last() {
+                if let Some(ref bootstrap) = last_msg.discovery_bootstrap {
+                    let valid = match selection.selection_kind {
+                        DiscoverySelectionKind::Domain => bootstrap
+                            .matched_domains
+                            .iter()
+                            .any(|d| d.domain_id == selection.selection_id),
+                        DiscoverySelectionKind::Family => bootstrap
+                            .matched_families
+                            .iter()
+                            .any(|f| f.family_id == selection.selection_id),
+                        DiscoverySelectionKind::Constellation => bootstrap
+                            .matched_constellations
+                            .iter()
+                            .any(|c| c.constellation_id == selection.selection_id),
+                        DiscoverySelectionKind::QuestionAnswer => true, // Free-text answers are always valid
+                    };
+                    if !valid {
+                        tracing::warn!(
+                            "Discovery selection '{}' ({:?}) not in SemOS discovery surface for session {}",
+                            selection.selection_id,
+                            selection.selection_kind,
+                            session_id
+                        );
+                        return Err(StatusCode::BAD_REQUEST);
+                    }
+                }
+            }
+        }
+    }
+
     let mut sessions = state.sessions.write().await;
     let session = sessions.entry(session_id).or_insert_with(|| {
         let mut new_session = UnifiedSession::new_for_entity(None, "cbu", None, None);
