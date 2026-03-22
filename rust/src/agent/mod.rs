@@ -7,6 +7,7 @@ pub mod composite_state;
 pub mod composite_state_loader;
 pub mod harness;
 pub mod learning;
+pub mod onboarding_state_view;
 pub mod orchestrator;
 pub mod sem_os_context_envelope;
 pub mod telemetry;

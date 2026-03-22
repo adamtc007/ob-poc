@@ -1,0 +1,38 @@
+fqn: family.kyc_lifecycle
+family_id: kyc_lifecycle
+label: KYC Lifecycle
+description: Family governing KYC case management, screening, evidence collection, and tollgate approval. Depends on a grounded group with identified CBUs.
+domain_id: kyc
+selection_rules:
+  - condition: "true"
+    target_constellation: kyc.onboarding
+    priority: 40
+constellation_refs:
+  - constellation_id: kyc.onboarding
+    label: KYC Onboarding Lifecycle
+    jurisdiction: ALL
+    entity_kind: cbu
+    triggers:
+      - kyc
+      - case
+      - screening
+      - sanctions
+      - pep
+      - adverse media
+      - compliance
+      - onboarding
+      - review
+      - approval
+      - tollgate
+candidate_jurisdictions:
+  - ALL
+candidate_entity_kinds:
+  - cbu
+  - entity
+  - person
+  - company
+grounding_threshold:
+  required_input_keys:
+    - cbu_id
+  requires_entity_instance: true
+  allows_draft_instance: false

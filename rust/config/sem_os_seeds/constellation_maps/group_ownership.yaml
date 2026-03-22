@@ -1,0 +1,73 @@
+constellation: group.ownership
+description: Client group ownership and control constellation — the root context for all onboarding. Maps group identity, GLEIF hierarchy, UBO discovery, control chain, and CBU identification.
+jurisdiction: ALL
+slots:
+  client_group:
+    type: cbu
+    table: client_group
+    pk: group_id
+    cardinality: root
+    state_machine: client_group_lifecycle
+    verbs:
+      create: { verb: client-group.create, when: empty }
+      read: { verb: client-group.read, when: filled }
+      research: { verb: client-group.research, when: [empty, filled] }
+      update: { verb: client-group.update, when: filled }
+  gleif_import:
+    type: entity
+    entity_kinds: [company]
+    join: { via: client_group_entity, parent_fk: group_id, child_fk: entity_id }
+    cardinality: optional
+    depends_on: [client_group]
+    verbs:
+      import: { verb: gleif.import-tree, when: empty }
+      search: { verb: gleif.search, when: [empty, filled] }
+      refresh: { verb: gleif.refresh, when: filled }
+  ubo_discovery:
+    type: entity_graph
+    entity_kinds: [person, company]
+    join: { via: ubo_registry, parent_fk: subject_entity_id, child_fk: ubo_entity_id }
+    cardinality: recursive
+    max_depth: 5
+    depends_on: [gleif_import]
+    state_machine: ubo_epistemic_lifecycle
+    overlays: [registry, evidence, screenings]
+    edge_overlays: [ownership]
+    verbs:
+      discover: { verb: ubo.discover, when: empty }
+      allege: { verb: ubo.allege, when: [empty, filled] }
+      verify: { verb: ubo.verify, when: filled }
+      promote: { verb: ubo.promote, when: filled }
+      approve: { verb: ubo.approve, when: filled }
+      reject: { verb: ubo.reject, when: filled }
+      list: { verb: ubo.list, when: filled }
+  control_chain:
+    type: entity_graph
+    entity_kinds: [company]
+    join: { via: ownership_snapshots, parent_fk: root_entity_id, child_fk: entity_id }
+    cardinality: recursive
+    max_depth: 10
+    depends_on: [ubo_discovery]
+    overlays: [ownership]
+    edge_overlays: [control]
+    verbs:
+      trace: { verb: ownership.trace-chain, when: empty }
+      build: { verb: control.build-graph, when: [empty, filled] }
+      refresh: { verb: ownership.refresh, when: filled }
+      read: { verb: control.read, when: filled }
+      list_links: { verb: control.list-links, when: filled }
+  cbu_identification:
+    type: cbu
+    table: cbus
+    pk: cbu_id
+    join: { via: cbu_entity_roles, parent_fk: entity_id, child_fk: cbu_id }
+    cardinality: optional
+    depends_on: [control_chain]
+    verbs:
+      create: { verb: cbu.create, when: empty }
+      create_from_group: { verb: cbu.create-from-client-group, when: empty }
+      list: { verb: cbu.list, when: filled }
+      read: { verb: cbu.read, when: filled }
+      # cbu.assign-role is owned by struct_* constellations (role assignment
+      # within a specific fund structure). Group ownership identifies CBUs,
+      # not their role composition.

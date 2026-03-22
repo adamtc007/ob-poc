@@ -1,0 +1,75 @@
+constellation: governance.compliance
+description: Governance and compliance constellation — SLA management, access reviews, regulatory compliance, rulesets, and delegation within a group context.
+jurisdiction: ALL
+slots:
+  group:
+    type: cbu
+    table: client_group
+    pk: group_id
+    cardinality: root
+    # group identity is owned by group.ownership constellation.
+    # governance navigates to it but does not own read/create verbs.
+    verbs: {}
+  sla:
+    type: entity
+    entity_kinds: [contract]
+    join: { via: deal_slas, parent_fk: deal_id, child_fk: sla_id }
+    cardinality: optional
+    depends_on: [group]
+    verbs:
+      create: { verb: sla.create, when: empty }
+      read: { verb: sla.read, when: filled }
+      list: { verb: sla.list, when: [empty, filled] }
+      update: { verb: sla.update, when: filled }
+      activate: { verb: sla.activate, when: filled }
+      suspend: { verb: sla.suspend, when: filled }
+      renew: { verb: sla.renew, when: filled }
+      breach: { verb: sla.record-breach, when: filled }
+      list_breaches: { verb: sla.list-breaches, when: filled }
+  access_review:
+    type: entity
+    entity_kinds: [entity]
+    join: { via: access_reviews, parent_fk: group_id, child_fk: review_id }
+    cardinality: optional
+    depends_on: [group]
+    verbs:
+      create: { verb: access-review.create, when: empty }
+      read: { verb: access-review.read, when: filled }
+      list: { verb: access-review.list, when: [empty, filled] }
+      start: { verb: access-review.start, when: filled }
+      complete: { verb: access-review.complete, when: filled }
+      approve: { verb: access-review.approve, when: filled }
+      reject: { verb: access-review.reject, when: filled }
+  regulatory:
+    type: entity
+    entity_kinds: [entity]
+    join: { via: regulatory_filings, parent_fk: group_id, child_fk: filing_id }
+    cardinality: optional
+    depends_on: [group]
+    verbs:
+      create: { verb: regulatory.create, when: empty }
+      read: { verb: regulatory.read, when: filled }
+      list: { verb: regulatory.list, when: [empty, filled] }
+      submit: { verb: regulatory.submit, when: filled }
+      update: { verb: regulatory.update, when: filled }
+  ruleset:
+    type: entity
+    entity_kinds: [entity]
+    join: { via: rulesets, parent_fk: group_id, child_fk: ruleset_id }
+    cardinality: optional
+    depends_on: [group]
+    verbs:
+      create: { verb: ruleset.create, when: empty }
+      read: { verb: ruleset.read, when: filled }
+      publish: { verb: ruleset.publish, when: filled }
+  delegation:
+    type: entity
+    entity_kinds: [entity]
+    join: { via: delegations, parent_fk: group_id, child_fk: delegation_id }
+    cardinality: optional
+    depends_on: [group]
+    verbs:
+      create: { verb: delegation.create, when: empty }
+      read: { verb: delegation.read, when: filled }
+      revoke: { verb: delegation.revoke, when: filled }
+      list: { verb: delegation.list, when: [empty, filled] }

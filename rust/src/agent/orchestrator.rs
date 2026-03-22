@@ -412,12 +412,20 @@ async fn prepare_turn_context(
     #[cfg(not(feature = "database"))]
     let composite_state: Option<crate::agent::composite_state::GroupCompositeState> = None;
 
+    // Extract entity state from SemOS grounded action surface.
+    // SemOS is the source of truth for current state — the state machine determines
+    // which verbs are reachable. Every utterance is a delta against current state.
+    let grounded_entity_state: Option<String> = envelope
+        .grounded_action_surface
+        .as_ref()
+        .and_then(|gas| gas.current_state.clone());
+
     let surface_ctx = VerbSurfaceContext {
         agent_mode: ctx.agent_mode,
         stage_focus: ctx.stage_focus.as_deref(),
         envelope: &envelope,
         fail_policy,
-        entity_state: None,
+        entity_state: grounded_entity_state.as_deref(),
         has_group_scope,
         composite_state: composite_state.as_ref(),
     };

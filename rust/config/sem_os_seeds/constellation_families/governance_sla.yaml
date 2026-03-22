@@ -1,0 +1,35 @@
+fqn: family.governance_sla
+family_id: governance_sla
+label: Governance & SLA
+description: Family governing service level agreements, access reviews, regulatory compliance, and rule management within a group context.
+domain_id: governance
+selection_rules:
+  - condition: "true"
+    target_constellation: governance.compliance
+    priority: 30
+constellation_refs:
+  - constellation_id: governance.compliance
+    label: Governance & Compliance
+    jurisdiction: ALL
+    entity_kind: client-group
+    triggers:
+      - governance
+      - compliance
+      - sla
+      - access review
+      - regulatory
+      - rule
+      - ruleset
+      - audit
+      - delegation
+candidate_jurisdictions:
+  - ALL
+candidate_entity_kinds:
+  - client-group
+  - cbu
+  - entity
+grounding_threshold:
+  required_input_keys:
+    - group_name
+  requires_entity_instance: false
+  allows_draft_instance: true

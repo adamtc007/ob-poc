@@ -25,6 +25,7 @@ pub mod disambiguation;
 pub mod galaxy;
 pub mod investor_register;
 pub mod manco_group;
+pub mod onboarding_state;
 pub mod resolution;
 pub mod semantic_stage;
 pub mod session_input;
@@ -41,6 +42,7 @@ pub use commands::*;
 pub use decision::*;
 pub use disambiguation::*;
 pub use resolution::*;
+pub use onboarding_state::*;
 pub use session_input::*;
 
 // ============================================================================

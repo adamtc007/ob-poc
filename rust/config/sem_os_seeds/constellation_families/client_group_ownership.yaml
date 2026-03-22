@@ -1,0 +1,35 @@
+fqn: family.client_group_ownership
+family_id: client_group_ownership
+label: Client Group & Ownership
+description: Family governing group-level identity, UBO discovery, ownership chain, and control mapping. This is the root of all onboarding — every other constellation depends on a grounded group.
+domain_id: client-group
+selection_rules:
+  - condition: "true"
+    target_constellation: group.ownership
+    priority: 50
+constellation_refs:
+  - constellation_id: group.ownership
+    label: Group Ownership & Control
+    jurisdiction: ALL
+    entity_kind: client-group
+    triggers:
+      - group
+      - client
+      - ownership
+      - ubo
+      - control
+      - gleif
+      - hierarchy
+      - corporate structure
+candidate_jurisdictions:
+  - ALL
+candidate_entity_kinds:
+  - client-group
+  - entity
+  - person
+  - company
+grounding_threshold:
+  required_input_keys:
+    - group_name
+  requires_entity_instance: false
+  allows_draft_instance: true

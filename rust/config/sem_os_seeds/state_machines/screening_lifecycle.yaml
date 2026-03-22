@@ -1,0 +1,101 @@
+state_machine: screening_lifecycle
+description: Compliance screening lifecycle — per-entity screening through clearance
+states:
+  [
+    not_started,
+    sanctions_pending,
+    sanctions_clear,
+    sanctions_hit,
+    pep_pending,
+    pep_clear,
+    pep_hit,
+    media_pending,
+    media_clear,
+    media_hit,
+    all_clear,
+    escalated,
+    resolved,
+  ]
+initial: not_started
+transitions:
+  - from: not_started
+    to: sanctions_pending
+    verbs: [screening.run, screening.sanctions]
+  - from: not_started
+    to: pep_pending
+    verbs: [screening.pep]
+  - from: not_started
+    to: media_pending
+    verbs: [screening.adverse-media]
+  - from: sanctions_pending
+    to: sanctions_clear
+    verbs: [screening.update-status]
+  - from: sanctions_pending
+    to: sanctions_hit
+    verbs: [screening.update-status]
+  - from: sanctions_clear
+    to: pep_pending
+    verbs: [screening.pep]
+  - from: pep_pending
+    to: pep_clear
+    verbs: [screening.update-status]
+  - from: pep_pending
+    to: pep_hit
+    verbs: [screening.update-status]
+  - from: pep_clear
+    to: media_pending
+    verbs: [screening.adverse-media]
+  - from: media_pending
+    to: media_clear
+    verbs: [screening.update-status]
+  - from: media_pending
+    to: media_hit
+    verbs: [screening.update-status]
+  - from: media_clear
+    to: all_clear
+    verbs: [screening.complete]
+  # Hit escalation
+  - from: sanctions_hit
+    to: escalated
+    verbs: [screening.escalate]
+  - from: pep_hit
+    to: escalated
+    verbs: [screening.escalate]
+  - from: media_hit
+    to: escalated
+    verbs: [screening.escalate]
+  - from: escalated
+    to: resolved
+    verbs: [screening.resolve]
+  # Rescreen
+  - from: all_clear
+    to: not_started
+    verbs: [screening.run]
+reducer:
+  overlay_sources: {}
+  conditions:
+    has_sanctions:
+      expr: "scope.sanctions_status IS NOT NULL"
+    sanctions_is_clear:
+      expr: "scope.sanctions_status = 'CLEAR'"
+    has_pep:
+      expr: "scope.pep_status IS NOT NULL"
+    pep_is_clear:
+      expr: "scope.pep_status = 'CLEAR'"
+    has_media:
+      expr: "scope.media_status IS NOT NULL"
+    media_is_clear:
+      expr: "scope.media_status = 'CLEAR'"
+    all_clear:
+      expr: "sanctions_is_clear AND pep_is_clear AND media_is_clear"
+  rules:
+    - state: all_clear
+      requires: [all_clear]
+    - state: media_clear
+      requires: [media_is_clear]
+    - state: pep_clear
+      requires: [pep_is_clear]
+    - state: sanctions_clear
+      requires: [sanctions_is_clear]
+    - state: not_started
+      requires: []

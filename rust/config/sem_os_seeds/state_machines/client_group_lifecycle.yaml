@@ -1,0 +1,84 @@
+state_machine: client_group_lifecycle
+description: Client group lifecycle — from prospect discovery through active management
+states:
+  [
+    prospect,
+    researching,
+    ubo_mapped,
+    control_mapped,
+    cbus_identified,
+    onboarding,
+    active,
+    dormant,
+    offboarded,
+  ]
+initial: prospect
+transitions:
+  - from: prospect
+    to: researching
+    verbs: [gleif.import-tree, client-group.research]
+  - from: researching
+    to: ubo_mapped
+    verbs: [ubo.discover, ubo.allege]
+  - from: ubo_mapped
+    to: control_mapped
+    verbs: [control.build-graph, ownership.trace-chain]
+  - from: control_mapped
+    to: cbus_identified
+    verbs: [cbu.create, cbu.create-from-client-group]
+  - from: cbus_identified
+    to: onboarding
+    verbs: [kyc-case.create, kyc.open-case]
+  - from: onboarding
+    to: active
+    verbs: [kyc-case.update-status]
+  - from: active
+    to: dormant
+    verbs: [client-group.suspend]
+  - from: dormant
+    to: active
+    verbs: [client-group.reactivate]
+  - from: active
+    to: offboarded
+    verbs: [client-group.offboard]
+  # Revert paths
+  - from: ubo_mapped
+    to: researching
+    verbs: [ubo.reset]
+  - from: control_mapped
+    to: ubo_mapped
+    verbs: [control.reset]
+reducer:
+  overlay_sources: {}
+  conditions:
+    has_gleif_import:
+      expr: "scope.gleif_import_count > 0"
+    has_ubo:
+      expr: "scope.has_ubo_determination = true"
+    has_control:
+      expr: "scope.has_control_chain = true"
+    has_cbus:
+      expr: "scope.cbu_count > 0"
+    has_active_case:
+      expr: "scope.active_case_count > 0"
+    all_approved:
+      expr: "scope.all_cases_approved = true"
+  rules:
+    - state: offboarded
+      requires: []
+    - state: dormant
+      requires: []
+    - state: active
+      requires: [all_approved]
+    - state: onboarding
+      requires: [has_active_case]
+    - state: cbus_identified
+      requires: [has_cbus]
+    - state: control_mapped
+      requires: [has_control]
+    - state: ubo_mapped
+      requires: [has_ubo]
+    - state: researching
+      requires: [has_gleif_import]
+    - state: prospect
+      requires: []

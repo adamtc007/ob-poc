@@ -315,6 +315,7 @@ mod tests {
             coder_proposal: None,
             discovery_bootstrap: None,
             parked_entries: None,
+            onboarding_state: None,
         };
         let phase2 = Phase2Service::evaluate(
             None,
@@ -355,6 +356,7 @@ mod tests {
             coder_proposal: None,
             discovery_bootstrap: None,
             parked_entries: None,
+            onboarding_state: None,
         };
 
         let resolved = direct_response_resolved_verb(&response);
@@ -440,6 +442,9 @@ pub struct AgentChatResponse {
     /// Typed parked-runbook payload for long-running or gated execution.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub parked_entries: Option<Vec<ob_poc_types::chat::ParkedEntryPayload>>,
+    /// Onboarding state view — "where am I + what can I do" contextual verb picker.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub onboarding_state: Option<ob_poc_types::onboarding_state::OnboardingStateView>,
 }
 
 // Re-export AgentCommand from ob_poc_types as the single source of truth
@@ -1036,6 +1041,7 @@ impl AgentService {
             coder_proposal: None,
             discovery_bootstrap: None,
             parked_entries: None,
+            onboarding_state: None,
         }
     }
 
@@ -1788,6 +1794,7 @@ impl AgentService {
                         coder_proposal: None,
                         discovery_bootstrap: None,
                         parked_entries: None,
+            onboarding_state: None,
                     };
                     self.finalize_direct_trace(session, direct_trace, &response)
                         .await;
@@ -2287,6 +2294,7 @@ impl AgentService {
                         coder_proposal,
                         discovery_bootstrap: None,
                         parked_entries: None,
+            onboarding_state: None,
                     };
                     session.pending_trace_id = self
                         .emit_agent_prompt_trace(session, trace_id, &response)
@@ -2352,6 +2360,7 @@ impl AgentService {
                         coder_proposal: None,
                         discovery_bootstrap: None,
                         parked_entries: None,
+            onboarding_state: None,
                     });
                 }
                 session.pending_trace_id = None;
@@ -2401,6 +2410,7 @@ impl AgentService {
                             coder_proposal: None,
                             discovery_bootstrap: Some(bootstrap),
                             parked_entries: None,
+            onboarding_state: None,
                         };
                         session.pending_trace_id = self
                             .emit_agent_prompt_trace(session, trace_id, &response)
@@ -2539,6 +2549,7 @@ impl AgentService {
                             coder_proposal: None,
                             discovery_bootstrap: None,
                             parked_entries: None,
+            onboarding_state: None,
                         };
                         session.pending_trace_id = self
                             .emit_agent_prompt_trace(session, trace_id, &response)
@@ -2948,6 +2959,7 @@ impl AgentService {
             coder_proposal: None,
             discovery_bootstrap: None,
             parked_entries: None,
+            onboarding_state: None,
         })
     }
 
@@ -3063,6 +3075,7 @@ impl AgentService {
             coder_proposal: None,
             discovery_bootstrap: None,
             parked_entries: None,
+            onboarding_state: None,
         })
     }
 
@@ -3185,6 +3198,7 @@ impl AgentService {
             coder_proposal: None,
             discovery_bootstrap: None,
             parked_entries: None,
+            onboarding_state: None,
         })
     }
 
@@ -3438,6 +3452,7 @@ impl AgentService {
                                     coder_proposal: None,
                                     discovery_bootstrap: None,
                                     parked_entries: None,
+            onboarding_state: None,
                                 });
                             }
                         }
@@ -3473,6 +3488,7 @@ impl AgentService {
                     coder_proposal: None,
                     discovery_bootstrap: None,
                     parked_entries: None,
+            onboarding_state: None,
                 })
             }
             Err(e) => {
@@ -3699,6 +3715,7 @@ impl AgentService {
                                 coder_proposal: None,
                                 discovery_bootstrap: None,
                                 parked_entries: Some(parked_entries),
+                                onboarding_state: None,
                             });
                         }
                         executed_count += 1;
@@ -3739,6 +3756,7 @@ impl AgentService {
             coder_proposal: None,
             discovery_bootstrap: None,
             parked_entries: None,
+            onboarding_state: None,
         })
     }
 
@@ -3958,6 +3976,7 @@ impl AgentService {
             coder_proposal: None,
             discovery_bootstrap: None,
             parked_entries: None,
+            onboarding_state: None,
         }
     }
 
@@ -3983,6 +4002,7 @@ impl AgentService {
             coder_proposal: None,
             discovery_bootstrap: None,
             parked_entries: None,
+            onboarding_state: None,
         }
     }
 
@@ -4008,6 +4028,7 @@ impl AgentService {
             coder_proposal: None,
             discovery_bootstrap: None,
             parked_entries: None,
+            onboarding_state: None,
         }
     }
 
@@ -4153,6 +4174,7 @@ impl AgentService {
             coder_proposal: None,
             discovery_bootstrap: None,
             parked_entries: None,
+            onboarding_state: None,
         }
     }
 
@@ -4233,6 +4255,7 @@ impl AgentService {
             coder_proposal: None,
             discovery_bootstrap: None,
             parked_entries: None,
+            onboarding_state: None,
         }
     }
 

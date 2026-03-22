@@ -1,0 +1,247 @@
+fqn: universe.group_onboarding
+universe_id: group_onboarding
+name: Group Onboarding
+description: Discovery universe for end-to-end client group onboarding — from prospect research through KYC approval. Encompasses group identity, UBO/control, CBU identification, KYC case management, screening, evidence collection, and governance.
+version: "1.0"
+default_entry_domain: client-group
+domains:
+  - domain_id: client-group
+    label: Client Group
+    description: Group identity, research, and prospect management.
+    objective_tags:
+      - group
+      - client
+      - prospect
+      - research
+    utterance_signals:
+      - signal_type: keyword
+        pattern: group
+        weight: 1.0
+      - signal_type: keyword
+        pattern: client
+        weight: 0.9
+      - signal_type: keyword
+        pattern: prospect
+        weight: 0.8
+      - signal_type: keyword
+        pattern: allianz
+        weight: 0.7
+      - signal_type: keyword
+        pattern: blackrock
+        weight: 0.7
+    candidate_entity_kinds:
+      - client-group
+      - entity
+      - company
+    candidate_family_ids:
+      - client_group_ownership
+    required_grounding_inputs:
+      - key: group_name
+        label: Client Group Name
+        required: true
+        input_type: string
+    entry_questions:
+      - question_id: which_client
+        prompt: Which client group are you working with?
+        maps_to: group_name
+        priority: 1
+    allowed_discovery_actions:
+      - gleif.search
+      - client-group.search
+      - session.load-galaxy
+
+  - domain_id: ownership
+    label: Ownership & Control
+    description: UBO discovery, ownership chain tracing, and control graph building.
+    objective_tags:
+      - ubo
+      - ownership
+      - control
+      - hierarchy
+      - gleif
+    utterance_signals:
+      - signal_type: keyword
+        pattern: ubo
+        weight: 1.0
+      - signal_type: keyword
+        pattern: ownership
+        weight: 0.9
+      - signal_type: keyword
+        pattern: control
+        weight: 0.9
+      - signal_type: keyword
+        pattern: hierarchy
+        weight: 0.8
+      - signal_type: keyword
+        pattern: beneficial owner
+        weight: 1.0
+    candidate_entity_kinds:
+      - entity
+      - person
+      - company
+    candidate_family_ids:
+      - client_group_ownership
+    required_grounding_inputs:
+      - key: group_name
+        label: Client Group
+        required: true
+        input_type: string
+    entry_questions:
+      - question_id: which_group_ubo
+        prompt: Which client group do you want to discover UBO for?
+        maps_to: group_name
+        priority: 1
+    allowed_discovery_actions:
+      - ubo.discover
+      - ownership.trace-chain
+      - control.build-graph
+
+  - domain_id: kyc
+    label: KYC & Screening
+    description: KYC case management, compliance screening, and tollgate approval.
+    objective_tags:
+      - kyc
+      - screening
+      - compliance
+      - case
+      - sanctions
+      - pep
+    utterance_signals:
+      - signal_type: keyword
+        pattern: kyc
+        weight: 1.0
+      - signal_type: keyword
+        pattern: screening
+        weight: 0.9
+      - signal_type: keyword
+        pattern: case
+        weight: 0.8
+      - signal_type: keyword
+        pattern: sanctions
+        weight: 0.9
+      - signal_type: keyword
+        pattern: pep
+        weight: 0.9
+      - signal_type: keyword
+        pattern: compliance
+        weight: 0.8
+      - signal_type: keyword
+        pattern: onboarding
+        weight: 0.7
+    candidate_entity_kinds:
+      - cbu
+      - entity
+      - person
+      - company
+    candidate_family_ids:
+      - kyc_lifecycle
+    required_grounding_inputs:
+      - key: cbu_id
+        label: CBU
+        required: true
+        input_type: uuid
+    entry_questions:
+      - question_id: which_cbu_kyc
+        prompt: Which CBU are you managing KYC for?
+        maps_to: cbu_id
+        priority: 1
+    allowed_discovery_actions:
+      - kyc-case.create
+      - screening.run
+      - cbu.list
+
+  - domain_id: document
+    label: Evidence & Documents
+    description: Document solicitation, collection, QA verification, and requirement tracking.
+    objective_tags:
+      - document
+      - evidence
+      - requirement
+      - verification
+      - upload
+    utterance_signals:
+      - signal_type: keyword
+        pattern: document
+        weight: 1.0
+      - signal_type: keyword
+        pattern: evidence
+        weight: 0.9
+      - signal_type: keyword
+        pattern: passport
+        weight: 0.8
+      - signal_type: keyword
+        pattern: certificate
+        weight: 0.8
+      - signal_type: keyword
+        pattern: upload
+        weight: 0.7
+      - signal_type: keyword
+        pattern: solicit
+        weight: 0.8
+    candidate_entity_kinds:
+      - entity
+      - person
+      - company
+      - document
+    candidate_family_ids:
+      - evidence_documents
+    required_grounding_inputs:
+      - key: entity_id
+        label: Entity
+        required: true
+        input_type: uuid
+    entry_questions:
+      - question_id: which_entity_docs
+        prompt: Which entity do you need documents from?
+        maps_to: entity_id
+        priority: 1
+    allowed_discovery_actions:
+      - document.solicit
+      - requirement.list
+      - document.list
+
+  - domain_id: governance
+    label: Governance & SLA
+    description: Service level agreements, access reviews, regulatory compliance, and rule management.
+    objective_tags:
+      - governance
+      - sla
+      - compliance
+      - regulatory
+      - access review
+    utterance_signals:
+      - signal_type: keyword
+        pattern: governance
+        weight: 1.0
+      - signal_type: keyword
+        pattern: sla
+        weight: 0.9
+      - signal_type: keyword
+        pattern: access review
+        weight: 0.9
+      - signal_type: keyword
+        pattern: regulatory
+        weight: 0.8
+      - signal_type: keyword
+        pattern: delegation
+        weight: 0.7
+    candidate_entity_kinds:
+      - client-group
+      - cbu
+      - entity
+    candidate_family_ids:
+      - governance_sla
+    required_grounding_inputs:
+      - key: group_name
+        label: Client Group
+        required: true
+        input_type: string
+    entry_questions:
+      - question_id: which_group_gov
+        prompt: Which client group is this governance action for?
+        maps_to: group_name
+        priority: 1
+    allowed_discovery_actions:
+      - sla.list
+      - access-review.list
+      - regulatory.list

@@ -233,8 +233,11 @@ mod tests {
     #[test]
     fn scans_state_machines_with_fqns() {
         let seeds = scan_state_machines().unwrap();
-        assert_eq!(seeds.len(), 3);
+        assert_eq!(seeds.len(), 6);
         assert!(seeds.iter().any(|seed| seed.fqn == "kyc_case_lifecycle"));
+        assert!(seeds.iter().any(|seed| seed.fqn == "client_group_lifecycle"));
+        assert!(seeds.iter().any(|seed| seed.fqn == "screening_lifecycle"));
+        assert!(seeds.iter().any(|seed| seed.fqn == "document_lifecycle"));
     }
 
     #[test]

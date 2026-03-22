@@ -1,0 +1,59 @@
+constellation: evidence.collection
+description: Evidence collection and verification constellation — per-entity document requirements, solicitation, upload, QA, and verification workflows.
+jurisdiction: ALL
+slots:
+  entity:
+    type: entity
+    entity_kinds: [person, company]
+    table: entities
+    pk: entity_id
+    cardinality: root
+    verbs:
+      read: { verb: entity.read, when: filled }
+      list: { verb: entity.list, when: filled }
+  requirement:
+    type: entity
+    entity_kinds: [document]
+    join: { via: document_requirements, parent_fk: entity_id, child_fk: requirement_id }
+    cardinality: optional
+    depends_on: [entity]
+    state_machine: document_lifecycle
+    verbs:
+      create: { verb: requirement.create, when: empty }
+      check: { verb: requirement.check, when: filled }
+      waive: { verb: requirement.waive, when: filled }
+      reinstate: { verb: requirement.reinstate, when: filled }
+      list: { verb: requirement.list, when: [empty, filled] }
+  document:
+    type: entity
+    entity_kinds: [document]
+    join: { via: documents, parent_fk: entity_id, child_fk: document_id }
+    cardinality: optional
+    depends_on: [requirement]
+    overlays: [document_version, qa_status]
+    verbs:
+      solicit: { verb: document.solicit, when: empty }
+      solicit_set: { verb: document.solicit-set, when: empty }
+      upload: { verb: document.upload, when: [empty, filled] }
+      read: { verb: document.read, when: filled }
+      list: { verb: document.list, when: [empty, filled] }
+  version:
+    type: entity
+    entity_kinds: [document]
+    join: { via: document_versions, parent_fk: document_id, child_fk: version_id }
+    cardinality: optional
+    depends_on: [document]
+    verbs:
+      verify: { verb: document.verify, when: filled }
+      reject: { verb: document.reject, when: filled }
+      read: { verb: document.read-version, when: filled }
+  docs_bundle:
+    type: entity
+    entity_kinds: [document]
+    join: { via: document_bundles, parent_fk: entity_id, child_fk: bundle_id }
+    cardinality: optional
+    depends_on: [entity]
+    verbs:
+      create: { verb: docs-bundle.create, when: empty }
+      read: { verb: docs-bundle.read, when: filled }
+      add_item: { verb: docs-bundle.add-item, when: filled }

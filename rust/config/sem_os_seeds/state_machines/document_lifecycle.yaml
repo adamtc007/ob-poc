@@ -1,0 +1,83 @@
+state_machine: document_lifecycle
+description: Document requirement lifecycle — from requirement through verification
+states:
+  [
+    missing,
+    requested,
+    received,
+    in_qa,
+    verified,
+    rejected,
+    waived,
+    expired,
+  ]
+initial: missing
+transitions:
+  - from: missing
+    to: requested
+    verbs: [document.solicit, document.solicit-set]
+  - from: missing
+    to: waived
+    verbs: [requirement.waive]
+  - from: requested
+    to: received
+    verbs: [document.upload]
+  - from: received
+    to: in_qa
+    verbs: [document.review]
+  - from: in_qa
+    to: verified
+    verbs: [document.verify]
+  - from: in_qa
+    to: rejected
+    verbs: [document.reject]
+  - from: rejected
+    to: requested
+    verbs: [document.solicit]
+  - from: verified
+    to: expired
+    verbs: [document.expire]
+  - from: expired
+    to: requested
+    verbs: [document.solicit]
+  # Revert
+  - from: waived
+    to: missing
+    verbs: [requirement.reinstate]
+  - from: requested
+    to: missing
+    verbs: [document.cancel-request]
+reducer:
+  overlay_sources: {}
+  conditions:
+    has_requirement:
+      expr: "scope.requirement_status IS NOT NULL"
+    is_requested:
+      expr: "scope.requirement_status = 'REQUESTED'"
+    is_received:
+      expr: "scope.requirement_status = 'RECEIVED'"
+    is_verified:
+      expr: "scope.requirement_status = 'VERIFIED'"
+    is_waived:
+      expr: "scope.requirement_status = 'WAIVED'"
+    is_expired:
+      expr: "scope.requirement_status = 'EXPIRED'"
+    is_rejected:
+      expr: "scope.requirement_status = 'REJECTED'"
+  rules:
+    - state: expired
+      requires: [is_expired]
+    - state: waived
+      requires: [is_waived]
+    - state: verified
+      requires: [is_verified]
+    - state: rejected
+      requires: [is_rejected]
+    - state: in_qa
+      requires: [is_received]
+    - state: received
+      requires: [is_received]
+    - state: requested
+      requires: [is_requested]
+    - state: missing
+      requires: []

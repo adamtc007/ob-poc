@@ -2844,6 +2844,7 @@ async fn chat_session(
                 coder_proposal: None,
                 discovery_bootstrap: None,
                 parked_entries: None,
+            onboarding_state: None,
             }));
         }
         #[cfg(not(feature = "database"))]
@@ -2870,6 +2871,7 @@ async fn chat_session(
                 coder_proposal: None,
                 discovery_bootstrap: None,
                 parked_entries: None,
+            onboarding_state: None,
             }));
         }
     }
@@ -2908,6 +2910,7 @@ async fn chat_session(
                 coder_proposal: None,
                 discovery_bootstrap: None,
                 parked_entries: None,
+            onboarding_state: None,
             }));
         }
     };
@@ -3021,6 +3024,7 @@ async fn chat_session(
         coder_proposal: response.coder_proposal,
         discovery_bootstrap: response.discovery_bootstrap,
         parked_entries: response.parked_entries,
+        onboarding_state: response.onboarding_state,
     }))
 }
 

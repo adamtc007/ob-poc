@@ -350,6 +350,15 @@ pub struct ChatResponse {
     /// Typed parked-runbook payload for long-running or gated execution.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub parked_entries: Option<Vec<ParkedEntryPayload>>,
+
+    /// Onboarding state view — "where am I + what can I do" contextual verb picker.
+    ///
+    /// Present when a group is in scope and composite state is loaded.
+    /// Shows the onboarding DAG layers with per-node verb suggestions
+    /// and per-CBU state cards. Enables the UI to render a timeline
+    /// showing current position and available next steps.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub onboarding_state: Option<crate::onboarding_state::OnboardingStateView>,
 }
 
 /// User-facing Sage explanation payload.

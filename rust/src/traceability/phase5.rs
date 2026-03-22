@@ -555,6 +555,7 @@ mod tests {
             coder_proposal: None,
             discovery_bootstrap: None,
             parked_entries: None,
+            onboarding_state: None,
         };
 
         let payload = build_phase5_agent_payload(&session, &response);
@@ -595,6 +596,7 @@ mod tests {
             coder_proposal: None,
             discovery_bootstrap: None,
             parked_entries: None,
+            onboarding_state: None,
         };
 
         let evaluation = evaluate_phase5_agent(&session, &response);

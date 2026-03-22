@@ -1,0 +1,37 @@
+fqn: family.evidence_documents
+family_id: evidence_documents
+label: Evidence & Documents
+description: Family governing document solicitation, collection, QA verification, and requirement tracking. Operates within a KYC case context per entity.
+domain_id: document
+selection_rules:
+  - condition: "true"
+    target_constellation: evidence.collection
+    priority: 35
+constellation_refs:
+  - constellation_id: evidence.collection
+    label: Evidence Collection & Verification
+    jurisdiction: ALL
+    entity_kind: entity
+    triggers:
+      - document
+      - evidence
+      - passport
+      - certificate
+      - proof
+      - upload
+      - solicit
+      - requirement
+      - verification
+      - QA
+candidate_jurisdictions:
+  - ALL
+candidate_entity_kinds:
+  - entity
+  - person
+  - company
+  - document
+grounding_threshold:
+  required_input_keys:
+    - entity_id
+  requires_entity_instance: true
+  allows_draft_instance: false

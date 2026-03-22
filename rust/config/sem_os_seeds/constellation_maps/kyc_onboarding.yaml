@@ -1,0 +1,85 @@
+constellation: kyc.onboarding
+description: KYC onboarding lifecycle constellation — per-CBU case management, entity workstreams, screening, and tollgate approval. Evidence/documents are a separate constellation (evidence.collection) referenced by dependency.
+jurisdiction: ALL
+slots:
+  cbu:
+    type: cbu
+    table: cbus
+    pk: cbu_id
+    cardinality: root
+    # cbu.read/show are navigation — owned by group.ownership constellation.
+    # KYC reads the CBU but does not create/modify it.
+    verbs:
+      show: { verb: cbu.show, when: filled }
+  kyc_case:
+    type: case
+    table: cases
+    pk: case_id
+    join: { via: cases, parent_fk: cbu_id, child_fk: case_id }
+    cardinality: mandatory
+    depends_on: [cbu]
+    state_machine: kyc_case_lifecycle
+    verbs:
+      create: { verb: kyc-case.create, when: empty }
+      open: { verb: kyc.open-case, when: empty }
+      read: { verb: kyc-case.read, when: filled }
+      update_status: { verb: kyc-case.update-status, when: filled }
+      set_risk: { verb: kyc-case.set-risk-rating, when: filled }
+      close: { verb: kyc-case.close, when: filled }
+      reopen: { verb: kyc-case.reopen, when: filled }
+      escalate: { verb: kyc-case.escalate, when: filled }
+    children:
+      tollgate:
+        type: tollgate
+        table: tollgate_evaluations
+        pk: evaluation_id
+        join: { via: tollgate_evaluations, parent_fk: case_id, child_fk: evaluation_id }
+        cardinality: optional
+        depends_on: [{ slot: kyc_case, min_state: review }]
+        verbs:
+          evaluate: { verb: tollgate.evaluate, when: empty }
+          read: { verb: tollgate.read, when: filled }
+  entity_workstream:
+    type: entity
+    entity_kinds: [person, company]
+    join: { via: entity_workstreams, parent_fk: case_id, child_fk: entity_id }
+    cardinality: optional
+    depends_on: [kyc_case]
+    verbs:
+      create: { verb: entity-workstream.create, when: empty }
+      read: { verb: entity-workstream.read, when: filled }
+      update: { verb: entity-workstream.update-status, when: filled }
+      block: { verb: entity-workstream.block, when: filled }
+  screening:
+    type: entity
+    entity_kinds: [person, company]
+    join: { via: screenings, parent_fk: workstream_id, child_fk: screening_id, filter_column: screening_type }
+    cardinality: optional
+    depends_on: [entity_workstream]
+    state_machine: screening_lifecycle
+    overlays: [screening_result]
+    verbs:
+      run: { verb: screening.run, when: empty }
+      sanctions: { verb: screening.sanctions, when: [empty, filled] }
+      pep: { verb: screening.pep, when: [empty, filled] }
+      adverse_media: { verb: screening.adverse-media, when: [empty, filled] }
+      read: { verb: screening.read, when: filled }
+      list: { verb: screening.list, when: filled }
+      update: { verb: screening.update-status, when: filled }
+      escalate: { verb: screening.escalate, when: filled }
+      resolve: { verb: screening.resolve, when: filled }
+      complete: { verb: screening.complete, when: filled }
+  # Evidence/documents are NOT embedded here — they are a separate concern
+  # owned by evidence.collection constellation. KYC depends on evidence
+  # being complete (tollgate checks coverage), but does not own the verbs.
+  kyc_agreement:
+    type: entity
+    entity_kinds: [company]
+    join: { via: kyc_agreements, parent_fk: case_id, child_fk: agreement_id }
+    cardinality: optional
+    depends_on: [kyc_case]
+    verbs:
+      create: { verb: kyc-agreement.create, when: empty }
+      read: { verb: kyc-agreement.read, when: filled }
+      update: { verb: kyc-agreement.update, when: filled }
+      sign: { verb: kyc-agreement.sign, when: filled }
