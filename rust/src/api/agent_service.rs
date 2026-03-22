@@ -4073,6 +4073,9 @@ impl AgentService {
         // Build verb options from candidates (top 5 max)
         // Include domain/category context from taxonomy for better UX
         let taxonomy = crate::dsl_v2::verb_taxonomy::verb_taxonomy();
+        // Load verb metadata for differentiation context
+        let registry = crate::dsl_v2::runtime_registry::runtime_registry();
+
         let options: Vec<VerbOption> = candidates
             .iter()
             .take(5)
@@ -4090,14 +4093,59 @@ impl AgentService {
                 // otherwise fall back to the verb description.
                 let suggested = {
                     let phrase = &c.matched_phrase;
-                    // Use matched phrase if it looks like natural language (3+ words, no dots)
                     if phrase.split_whitespace().count() >= 3 && !phrase.contains('.') {
                         Some(phrase.clone())
                     } else {
-                        // Fall back to description as imperative
                         Some(description.clone())
                     }
                 };
+
+                // ── Differentiation context ───────────────────────────
+                // Determine verb kind from search source + registry behavior
+                use crate::mcp::verb_search::VerbSearchSource;
+
+                let parts: Vec<&str> = c.verb.splitn(2, '.').collect();
+                let rv = if parts.len() == 2 {
+                    registry.get(parts[0], parts[1])
+                } else {
+                    None
+                };
+
+                let verb_kind = match c.source {
+                    VerbSearchSource::MacroIndex | VerbSearchSource::ScenarioIndex => "macro",
+                    _ => match rv {
+                        Some(v) => match &v.behavior {
+                            crate::dsl_v2::runtime_registry::RuntimeBehavior::Crud(crud) => {
+                                match crud.operation {
+                                    crate::dsl_v2::config::types::CrudOperation::Select => "query",
+                                    _ => "primitive",
+                                }
+                            }
+                            crate::dsl_v2::runtime_registry::RuntimeBehavior::Plugin(_) => {
+                                if v.produces.is_none() && v.harm_class.as_ref().map(|h| {
+                                    matches!(h, crate::dsl_v2::config::types::HarmClass::ReadOnly)
+                                }).unwrap_or(false) {
+                                    "query"
+                                } else {
+                                    "primitive"
+                                }
+                            }
+                            _ => "primitive",
+                        },
+                        None => "primitive",
+                    },
+                };
+
+                let step_count: Option<u32> = None; // Populated when macro metadata available
+
+                // Build differentiation text explaining WHY this option
+                // differs from the others
+                let differentiation = Some(match verb_kind {
+                    "macro" => "Multi-step workflow — executes a sequence of operations".into(),
+                    "query" => "Read-only — does not change any state".into(),
+                    "workflow" => "Template — expands to multiple DSL statements".into(),
+                    _ => description.clone(),
+                });
 
                 VerbOption {
                     verb_fqn: c.verb.clone(),
@@ -4108,13 +4156,19 @@ impl AgentService {
                     domain_label: location.as_ref().map(|l| l.domain_label.clone()),
                     category_label: location.as_ref().map(|l| l.category_label.clone()),
                     suggested_utterance: suggested,
+                    verb_kind: Some(verb_kind.to_string()),
+                    differentiation,
+                    requires_state: None, // Populated from GroundedActionSurface when available
+                    produces_state: None, // Populated from state machine transitions when available
+                    scope: None,
+                    step_count,
                 }
             })
             .collect();
 
         let request_id = Uuid::new_v4().to_string();
 
-        // Build message for display with suggested utterances (before options is moved)
+        // Build message for display with differentiation context
         let options_text: Vec<String> = options
             .iter()
             .enumerate()
@@ -4123,7 +4177,11 @@ impl AgentService {
                     .suggested_utterance
                     .as_deref()
                     .unwrap_or(&opt.description);
-                format!("{}. \"{}\" — {}", i + 1, utterance, opt.description)
+                let reason = opt
+                    .differentiation
+                    .as_deref()
+                    .unwrap_or(&opt.description);
+                format!("{}. \"{}\" — {}", i + 1, utterance, reason)
             })
             .collect();
 

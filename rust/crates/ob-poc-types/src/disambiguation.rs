@@ -180,6 +180,38 @@ pub struct VerbOption {
     /// Sourced from the verb's best invocation phrase.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub suggested_utterance: Option<String>,
+
+    // ── Differentiation context ───────────────────────────────────
+    // Explains WHY this option differs from the alternatives.
+    // Without this, the user sees two identical-looking options.
+
+    /// What kind of verb this is: "primitive" (single operation),
+    /// "macro" (multi-step workflow), "query" (read-only).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub verb_kind: Option<String>,
+
+    /// Human-readable reason this verb is an option.
+    /// E.g., "Single PEP check for one entity" vs "Full screening workflow (3 steps)".
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub differentiation: Option<String>,
+
+    /// What state the entity must be in for this verb to fire.
+    /// E.g., "Requires KYC case in REVIEW state".
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub requires_state: Option<String>,
+
+    /// What state the entity moves to after this verb executes.
+    /// E.g., "Moves case to APPROVED".
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub produces_state: Option<String>,
+
+    /// Scope of this verb: "single_entity", "batch", "group".
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scope: Option<String>,
+
+    /// Number of steps if this is a macro/workflow verb.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub step_count: Option<u32>,
 }
 
 // ============================================================================
