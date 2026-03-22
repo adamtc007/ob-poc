@@ -57,6 +57,7 @@ slots:
     join: { via: entity_workstreams, parent_fk: case_id, child_fk: entity_id }
     cardinality: optional
     depends_on: [kyc_case]
+    overlays: [red_flags, evidence]
     verbs:
       create: { verb: entity-workstream.create, when: empty }
       read: { verb: entity-workstream.read, when: filled }
@@ -67,6 +68,15 @@ slots:
       set_ubo: { verb: entity-workstream.set-ubo, when: filled }
       complete: { verb: entity-workstream.complete, when: filled }
       block: { verb: entity-workstream.block, when: filled }
+      # Red flag state verbs — flags are a state of the entity, not a separate entity
+      flag_raise: { verb: red-flag.raise, when: [empty, filled] }
+      flag_read: { verb: red-flag.read, when: filled }
+      flag_list: { verb: red-flag.list, when: filled }
+      flag_resolve: { verb: red-flag.resolve, when: filled }
+      flag_escalate: { verb: red-flag.escalate, when: filled }
+      flag_update: { verb: red-flag.update, when: filled }
+      flag_list_severity: { verb: red-flag.list-by-severity, when: filled }
+      flag_close: { verb: red-flag.close, when: filled }
   screening:
     type: entity
     entity_kinds: [person, company]
@@ -139,18 +149,7 @@ slots:
       assign: { verb: request.assign, when: filled }
       reopen: { verb: request.reopen, when: filled }
       escalate: { verb: request.escalate, when: filled }
-  red_flag:
-    type: entity
-    entity_kinds: [entity]
-    join: { via: red_flags, parent_fk: entity_id, child_fk: flag_id }
-    cardinality: optional
-    depends_on: [entity_workstream]
-    verbs:
-      raise: { verb: red-flag.raise, when: [empty, filled] }
-      read: { verb: red-flag.read, when: filled }
-      list: { verb: red-flag.list, when: filled }
-      resolve: { verb: red-flag.resolve, when: filled }
-      escalate: { verb: red-flag.escalate, when: filled }
-      update: { verb: red-flag.update, when: filled }
-      list_by_severity: { verb: red-flag.list-by-severity, when: filled }
-      close: { verb: red-flag.close, when: filled }
+  # red_flag is a STATE of an entity workstream (like "screened" or
+  # "document requested"), not a separate positioned entity.
+  # Red flag verbs are on the entity_workstream slot above.
+  # Evidence and case-event are similarly state/annotation, not entities.
