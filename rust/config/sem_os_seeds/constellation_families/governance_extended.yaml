@@ -1,0 +1,31 @@
+fqn: family.governance_extended
+family_id: governance_extended
+label: Extended Governance
+description: Family governing operational control frameworks — eligibility rulesets, rule management, reference data, team operations. Extends the core governance_sla family.
+domain_id: governance
+selection_rules:
+  - condition: "true"
+    target_constellation: governance.extended
+    priority: 25
+constellation_refs:
+  - constellation_id: governance.extended
+    label: Extended Governance Framework
+    jurisdiction: ALL
+    entity_kind: client-group
+    triggers:
+      - ruleset
+      - eligibility rule
+      - reference data
+      - team
+      - rule field
+      - governance framework
+candidate_jurisdictions:
+  - ALL
+candidate_entity_kinds:
+  - client-group
+  - entity
+grounding_threshold:
+  required_input_keys:
+    - group_name
+  requires_entity_instance: false
+  allows_draft_instance: true

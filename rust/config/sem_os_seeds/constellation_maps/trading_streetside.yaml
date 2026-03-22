@@ -1,0 +1,102 @@
+constellation: trading.streetside
+description: Street-side operations constellation — trading profiles, custody, settlement, booking principals, service delivery. Post-KYC approval operations.
+jurisdiction: ALL
+slots:
+  cbu:
+    type: cbu
+    table: cbus
+    pk: cbu_id
+    cardinality: root
+    verbs:
+      read: { verb: cbu.read, when: filled }
+  trading_profile:
+    type: mandate
+    table: cbu_trading_profiles
+    pk: profile_id
+    join: { via: cbu_trading_profiles, parent_fk: cbu_id, child_fk: profile_id }
+    cardinality: optional
+    depends_on: [cbu]
+    state_machine: trading_profile_lifecycle
+    verbs:
+      import: { verb: trading-profile.import, when: empty }
+      create_draft: { verb: trading-profile.create-draft, when: [empty, filled] }
+      read: { verb: trading-profile.read, when: filled }
+      get_active: { verb: trading-profile.get-active, when: filled }
+      list_versions: { verb: trading-profile.list-versions, when: filled }
+      activate: { verb: trading-profile.activate, when: filled }
+      diff: { verb: trading-profile.diff, when: filled }
+      clone: { verb: trading-profile.clone-to, when: filled }
+      new_version: { verb: trading-profile.create-new-version, when: filled }
+      add_component: { verb: trading-profile.add-component, when: filled }
+      remove_component: { verb: trading-profile.remove-component, when: filled }
+      set_base_currency: { verb: trading-profile.set-base-currency, when: filled }
+      link_csa_ssi: { verb: trading-profile.link-csa-ssi, when: filled }
+      update_im_scope: { verb: trading-profile.update-im-scope, when: filled }
+      validate_golive: { verb: trading-profile.validate-go-live-ready, when: filled }
+      validate_coverage: { verb: trading-profile.validate-universe-coverage, when: filled }
+      submit: { verb: trading-profile.submit, when: filled }
+      approve: { verb: trading-profile.approve, when: filled }
+      reject: { verb: trading-profile.reject, when: filled }
+      archive: { verb: trading-profile.archive, when: filled }
+  custody:
+    type: entity
+    entity_kinds: [cbu]
+    join: { via: cbu_custody_profiles, parent_fk: cbu_id, child_fk: custody_id }
+    cardinality: optional
+    depends_on: [trading_profile]
+    verbs:
+      list_universe: { verb: custody.list-universe, when: [empty, filled] }
+      list_ssis: { verb: custody.list-ssis, when: filled }
+      list_booking_rules: { verb: custody.list-booking-rules, when: filled }
+      list_overrides: { verb: custody.list-agent-overrides, when: filled }
+      derive_coverage: { verb: custody.derive-required-coverage, when: filled }
+      validate: { verb: custody.validate-booking-coverage, when: filled }
+      lookup_ssi: { verb: custody.lookup-ssi, when: filled }
+      setup_ssi: { verb: custody.setup-ssi, when: [empty, filled] }
+  booking_principal:
+    type: entity
+    entity_kinds: [company]
+    join: { via: booking_principals, parent_fk: cbu_id, child_fk: principal_id }
+    cardinality: optional
+    depends_on: [cbu]
+    verbs:
+      create: { verb: booking-principal.create, when: empty }
+      update: { verb: booking-principal.update, when: filled }
+      retire: { verb: booking-principal.retire, when: filled }
+      evaluate: { verb: booking-principal.evaluate, when: filled }
+      select: { verb: booking-principal.select, when: filled }
+      explain: { verb: booking-principal.explain, when: filled }
+      coverage: { verb: booking-principal.coverage-matrix, when: filled }
+      gaps: { verb: booking-principal.gap-report, when: filled }
+      impact: { verb: booking-principal.impact-analysis, when: filled }
+  cash_sweep:
+    type: entity
+    entity_kinds: [entity]
+    join: { via: cash_sweep_configs, parent_fk: cbu_id, child_fk: sweep_id }
+    cardinality: optional
+    depends_on: [custody]
+    verbs:
+      configure: { verb: cash-sweep.configure, when: empty }
+      link: { verb: cash-sweep.link-resource, when: filled }
+      list: { verb: cash-sweep.list, when: [empty, filled] }
+      update_threshold: { verb: cash-sweep.update-threshold, when: filled }
+      update_timing: { verb: cash-sweep.update-timing, when: filled }
+      change_vehicle: { verb: cash-sweep.change-vehicle, when: filled }
+      suspend: { verb: cash-sweep.suspend, when: filled }
+      reactivate: { verb: cash-sweep.reactivate, when: filled }
+      remove: { verb: cash-sweep.remove, when: filled }
+  service_resource:
+    type: entity
+    entity_kinds: [entity]
+    join: { via: service_resources, parent_fk: cbu_id, child_fk: resource_id }
+    cardinality: optional
+    depends_on: [cbu]
+    verbs:
+      read: { verb: service-resource.read, when: filled }
+      list: { verb: service-resource.list, when: [empty, filled] }
+      provision: { verb: service-resource.provision, when: [empty, filled] }
+      set_attr: { verb: service-resource.set-attr, when: filled }
+      activate: { verb: service-resource.activate, when: filled }
+      suspend: { verb: service-resource.suspend, when: filled }
+      decommission: { verb: service-resource.decommission, when: filled }
+      validate: { verb: service-resource.validate-attrs, when: filled }

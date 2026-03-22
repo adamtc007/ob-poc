@@ -1,0 +1,58 @@
+constellation: kyc.extended
+description: Extended KYC investigation constellation — board composition, BODS beneficial ownership data, red flags, specialist roles, research workflows. Deep compliance analysis beyond the core case/screening/docs lifecycle.
+jurisdiction: ALL
+slots:
+  entity:
+    type: entity
+    entity_kinds: [person, company]
+    table: entities
+    pk: entity_id
+    cardinality: root
+    verbs:
+      read: { verb: entity.read, when: filled }
+  board:
+    type: entity
+    entity_kinds: [person]
+    join: { via: board_appointments, parent_fk: entity_id, child_fk: person_id }
+    cardinality: optional
+    depends_on: [entity]
+    verbs:
+      appoint: { verb: board.appoint, when: [empty, filled] }
+      resign: { verb: board.resign, when: filled }
+      list_by_entity: { verb: board.list-by-entity, when: filled }
+      list_by_person: { verb: board.list-by-person, when: filled }
+      grant_right: { verb: board.grant-appointment-right, when: filled }
+      revoke_right: { verb: board.revoke-appointment-right, when: filled }
+      list_rights: { verb: board.list-appointment-rights, when: filled }
+      list_held: { verb: board.list-rights-held, when: filled }
+      analyze: { verb: board.analyze-control, when: filled }
+  bods:
+    type: entity
+    entity_kinds: [person, company]
+    join: { via: bods_statements, parent_fk: entity_id, child_fk: statement_id }
+    cardinality: optional
+    depends_on: [entity]
+    verbs:
+      discover: { verb: bods.discover-ubos, when: [empty, filled] }
+      import: { verb: bods.import, when: [empty, filled] }
+      link: { verb: bods.link-entity, when: filled }
+      get_statement: { verb: bods.get-statement, when: filled }
+      list_by_entity: { verb: bods.list-by-entity, when: filled }
+      find_by_lei: { verb: bods.find-by-lei, when: [empty, filled] }
+      list_persons: { verb: bods.list-persons, when: filled }
+      list_ownership: { verb: bods.list-ownership, when: filled }
+      sync: { verb: bods.sync-from-gleif, when: filled }
+  # UBO discovery/verification verbs owned by group.ownership constellation.
+  # KYC extended provides the BODS data that feeds UBO analysis,
+  # but the UBO verbs themselves live in the group context.
+  red_flag:
+    type: entity
+    entity_kinds: [entity]
+    join: { via: red_flags, parent_fk: entity_id, child_fk: flag_id }
+    cardinality: optional
+    depends_on: [entity]
+    verbs:
+      raise: { verb: red-flag.raise, when: [empty, filled] }
+      resolve: { verb: red-flag.resolve, when: filled }
+      list: { verb: red-flag.list, when: filled }
+      escalate: { verb: red-flag.escalate, when: filled }

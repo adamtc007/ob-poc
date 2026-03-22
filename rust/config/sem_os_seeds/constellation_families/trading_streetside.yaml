@@ -1,0 +1,34 @@
+fqn: family.trading_streetside
+family_id: trading_streetside
+label: Street-Side Operations
+description: Family governing post-KYC street-side operations — trading profiles, custody, settlement, booking principals, cash sweeps, service delivery.
+domain_id: trading
+selection_rules:
+  - condition: "true"
+    target_constellation: trading.streetside
+    priority: 35
+constellation_refs:
+  - constellation_id: trading.streetside
+    label: Street-Side Operations
+    jurisdiction: ALL
+    entity_kind: cbu
+    triggers:
+      - trading profile
+      - custody
+      - settlement
+      - booking
+      - cash sweep
+      - service resource
+      - SSI
+      - go live
+candidate_jurisdictions:
+  - ALL
+candidate_entity_kinds:
+  - cbu
+  - trading-profile
+  - entity
+grounding_threshold:
+  required_input_keys:
+    - cbu_id
+  requires_entity_instance: true
+  allows_draft_instance: false

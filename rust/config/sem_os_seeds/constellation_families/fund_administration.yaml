@@ -1,0 +1,35 @@
+fqn: family.fund_administration
+family_id: fund_administration
+label: Fund Administration
+description: Family governing fund vehicle lifecycle — umbrella/sub-fund/share-class structures, capital events, investment management, feeder/master relationships.
+domain_id: fund
+selection_rules:
+  - condition: "true"
+    target_constellation: fund.administration
+    priority: 35
+constellation_refs:
+  - constellation_id: fund.administration
+    label: Fund Vehicle Administration
+    jurisdiction: ALL
+    entity_kind: fund
+    triggers:
+      - fund
+      - umbrella
+      - subfund
+      - share class
+      - feeder
+      - master fund
+      - capital
+      - investment manager
+      - compartment
+candidate_jurisdictions:
+  - ALL
+candidate_entity_kinds:
+  - fund
+  - cbu
+  - entity
+grounding_threshold:
+  required_input_keys:
+    - fund_id
+  requires_entity_instance: false
+  allows_draft_instance: true

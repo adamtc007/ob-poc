@@ -1,0 +1,78 @@
+state_machine: deal_lifecycle
+description: Deal record lifecycle — from prospect qualification through active servicing
+states:
+  [
+    prospect,
+    qualifying,
+    negotiating,
+    contracted,
+    onboarding,
+    active,
+    winding_down,
+    offboarded,
+    cancelled,
+  ]
+initial: prospect
+transitions:
+  - from: prospect
+    to: qualifying
+    verbs: [deal.create, deal.update-status]
+  - from: qualifying
+    to: negotiating
+    verbs: [deal.update-status, deal.create-rate-card]
+  - from: negotiating
+    to: contracted
+    verbs: [deal.update-status, deal.agree-rate-card]
+  - from: contracted
+    to: onboarding
+    verbs: [deal.update-status, deal.request-onboarding]
+  - from: onboarding
+    to: active
+    verbs: [deal.update-status]
+  - from: active
+    to: winding_down
+    verbs: [deal.update-status]
+  - from: winding_down
+    to: offboarded
+    verbs: [deal.update-status]
+  # Cancel from any pre-active state
+  - from: prospect
+    to: cancelled
+    verbs: [deal.cancel]
+  - from: qualifying
+    to: cancelled
+    verbs: [deal.cancel]
+  - from: negotiating
+    to: cancelled
+    verbs: [deal.cancel]
+  - from: contracted
+    to: cancelled
+    verbs: [deal.cancel]
+  - from: onboarding
+    to: cancelled
+    verbs: [deal.cancel]
+reducer:
+  overlay_sources: {}
+  conditions:
+    status_is:
+      expr: "scope.deal_status = $1"
+      parameterized: true
+  rules:
+    - state: offboarded
+      requires: []
+    - state: cancelled
+      requires: []
+    - state: winding_down
+      requires: []
+    - state: active
+      requires: []
+    - state: onboarding
+      requires: []
+    - state: contracted
+      requires: []
+    - state: negotiating
+      requires: []
+    - state: qualifying
+      requires: []
+    - state: prospect
+      requires: []

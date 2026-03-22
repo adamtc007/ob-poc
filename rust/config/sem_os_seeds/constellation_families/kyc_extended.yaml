@@ -1,0 +1,34 @@
+fqn: family.kyc_extended
+family_id: kyc_extended
+label: Extended KYC Investigation
+description: Family governing deep KYC investigation — board composition, BODS beneficial ownership data, red flags, UBO registry, research workflows. Extends the core kyc_lifecycle family.
+domain_id: kyc
+selection_rules:
+  - condition: "true"
+    target_constellation: kyc.extended
+    priority: 35
+constellation_refs:
+  - constellation_id: kyc.extended
+    label: Extended KYC Investigation
+    jurisdiction: ALL
+    entity_kind: entity
+    triggers:
+      - board
+      - director
+      - BODS
+      - beneficial ownership
+      - red flag
+      - UBO registry
+      - control analysis
+      - research
+candidate_jurisdictions:
+  - ALL
+candidate_entity_kinds:
+  - entity
+  - person
+  - company
+grounding_threshold:
+  required_input_keys:
+    - entity_id
+  requires_entity_instance: true
+  allows_draft_instance: false

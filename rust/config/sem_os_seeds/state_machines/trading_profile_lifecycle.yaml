@@ -1,0 +1,63 @@
+state_machine: trading_profile_lifecycle
+description: Trading profile (mandate) lifecycle — from draft through go-live
+states:
+  [
+    draft,
+    submitted,
+    approved,
+    active,
+    suspended,
+    archived,
+    rejected,
+  ]
+initial: draft
+transitions:
+  - from: draft
+    to: submitted
+    verbs: [trading-profile.submit]
+  - from: submitted
+    to: approved
+    verbs: [trading-profile.approve]
+  - from: submitted
+    to: rejected
+    verbs: [trading-profile.reject]
+  - from: approved
+    to: active
+    verbs: [trading-profile.activate]
+  - from: active
+    to: suspended
+    verbs: [trading-profile.archive]
+  - from: suspended
+    to: active
+    verbs: [trading-profile.activate]
+  - from: active
+    to: archived
+    verbs: [trading-profile.archive]
+  # Revert paths
+  - from: rejected
+    to: draft
+    verbs: [trading-profile.create-draft]
+  - from: submitted
+    to: draft
+    verbs: [trading-profile.create-draft]
+reducer:
+  overlay_sources: {}
+  conditions:
+    status_is:
+      expr: "scope.profile_status = $1"
+      parameterized: true
+  rules:
+    - state: archived
+      requires: []
+    - state: rejected
+      requires: []
+    - state: suspended
+      requires: []
+    - state: active
+      requires: []
+    - state: approved
+      requires: []
+    - state: submitted
+      requires: []
+    - state: draft
+      requires: []

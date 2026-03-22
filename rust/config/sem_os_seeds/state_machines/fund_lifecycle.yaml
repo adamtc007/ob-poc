@@ -1,0 +1,62 @@
+state_machine: fund_lifecycle
+description: Fund vehicle lifecycle — from creation through termination
+states:
+  [
+    draft,
+    registered,
+    authorized,
+    active,
+    soft_closed,
+    hard_closed,
+    winding_down,
+    terminated,
+  ]
+initial: draft
+transitions:
+  - from: draft
+    to: registered
+    verbs: [fund.create, fund.ensure]
+  - from: registered
+    to: authorized
+    verbs: [fund.upsert-vehicle]
+  - from: authorized
+    to: active
+    verbs: [fund.upsert-vehicle]
+  - from: active
+    to: soft_closed
+    verbs: [fund.upsert-vehicle]
+  - from: soft_closed
+    to: active
+    verbs: [fund.upsert-vehicle]
+  - from: soft_closed
+    to: hard_closed
+    verbs: [fund.upsert-vehicle]
+  - from: hard_closed
+    to: winding_down
+    verbs: [fund.upsert-vehicle]
+  - from: winding_down
+    to: terminated
+    verbs: [fund.delete-vehicle]
+reducer:
+  overlay_sources: {}
+  conditions:
+    status_is:
+      expr: "scope.fund_status = $1"
+      parameterized: true
+  rules:
+    - state: terminated
+      requires: []
+    - state: winding_down
+      requires: []
+    - state: hard_closed
+      requires: []
+    - state: soft_closed
+      requires: []
+    - state: active
+      requires: []
+    - state: authorized
+      requires: []
+    - state: registered
+      requires: []
+    - state: draft
+      requires: []

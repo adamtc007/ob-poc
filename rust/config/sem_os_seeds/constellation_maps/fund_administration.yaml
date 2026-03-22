@@ -1,0 +1,87 @@
+constellation: fund.administration
+description: Fund vehicle administration constellation — umbrella/sub-fund/share-class structures, capital events, investment management, feeder/master relationships.
+jurisdiction: ALL
+slots:
+  fund:
+    type: cbu
+    table: entity_funds
+    pk: fund_id
+    cardinality: root
+    state_machine: fund_lifecycle
+    verbs:
+      create: { verb: fund.create, when: empty }
+      ensure: { verb: fund.ensure, when: [empty, filled] }
+      read: { verb: fund.read-vehicle, when: filled }
+      list: { verb: fund.list-by-manager, when: [empty, filled] }
+      list_by_type: { verb: fund.list-by-vehicle-type, when: [empty, filled] }
+      upsert: { verb: fund.upsert-vehicle, when: [empty, filled] }
+      delete: { verb: fund.delete-vehicle, when: filled }
+  umbrella:
+    type: entity
+    entity_kinds: [fund]
+    join: { via: entity_funds, parent_fk: umbrella_id, child_fk: fund_id }
+    cardinality: optional
+    depends_on: [fund]
+    verbs:
+      add_subfund: { verb: fund.add-to-umbrella, when: filled }
+      list_subfunds: { verb: fund.list-subfunds, when: filled }
+      upsert_compartment: { verb: fund.upsert-compartment, when: [empty, filled] }
+      read_compartment: { verb: fund.read-compartment, when: filled }
+      list_compartments: { verb: fund.list-compartments-by-umbrella, when: filled }
+      delete_compartment: { verb: fund.delete-compartment, when: filled }
+  share_class:
+    type: entity
+    entity_kinds: [fund]
+    join: { via: fund_share_classes, parent_fk: fund_id, child_fk: share_class_id }
+    cardinality: optional
+    depends_on: [fund]
+    verbs:
+      add: { verb: fund.add-share-class, when: [empty, filled] }
+      list: { verb: fund.list-share-classes, when: filled }
+  feeder:
+    type: entity
+    entity_kinds: [fund]
+    join: { via: fund_feeder_links, parent_fk: master_fund_id, child_fk: feeder_fund_id }
+    cardinality: optional
+    depends_on: [fund]
+    verbs:
+      link: { verb: fund.link-feeder, when: [empty, filled] }
+      list: { verb: fund.list-feeders, when: filled }
+  investment:
+    type: entity
+    entity_kinds: [entity]
+    join: { via: fund_investments, parent_fk: fund_id, child_fk: investment_id }
+    cardinality: optional
+    depends_on: [fund]
+    verbs:
+      add: { verb: fund.add-investment, when: [empty, filled] }
+      update: { verb: fund.update-investment, when: filled }
+      end: { verb: fund.end-investment, when: filled }
+      list: { verb: fund.list-investments, when: filled }
+      list_investors: { verb: fund.list-investors, when: filled }
+  capital:
+    type: entity
+    entity_kinds: [fund]
+    join: { via: capital_events, parent_fk: fund_id, child_fk: event_id }
+    cardinality: optional
+    depends_on: [fund]
+    verbs:
+      split: { verb: capital.split, when: filled }
+      buyback: { verb: capital.buyback, when: filled }
+      cancel: { verb: capital.cancel, when: filled }
+      cap_table: { verb: capital.cap-table, when: filled }
+      holders: { verb: capital.holders, when: filled }
+  investment_manager:
+    type: entity
+    entity_kinds: [company]
+    join: { via: cbu_entity_roles, parent_fk: cbu_id, child_fk: entity_id, filter_column: role, filter_value: investment-manager }
+    cardinality: optional
+    depends_on: [fund]
+    verbs:
+      assign: { verb: investment-manager.assign, when: [empty, filled] }
+      set_scope: { verb: investment-manager.set-scope, when: filled }
+      link_connectivity: { verb: investment-manager.link-connectivity, when: filled }
+      list: { verb: investment-manager.list, when: filled }
+      suspend: { verb: investment-manager.suspend, when: filled }
+      terminate: { verb: investment-manager.terminate, when: filled }
+      find: { verb: investment-manager.find-for-trade, when: filled }
