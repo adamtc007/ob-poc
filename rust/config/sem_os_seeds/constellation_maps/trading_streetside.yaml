@@ -47,6 +47,17 @@ slots:
       approve: { verb: trading-profile.approve, when: filled }
       reject: { verb: trading-profile.reject, when: filled }
       archive: { verb: trading-profile.archive, when: filled }
+      # Matrix overlay — configuration layer on the trading profile
+      overlay_create: { verb: matrix-overlay.create, when: [empty, filled] }
+      overlay_read: { verb: matrix-overlay.read, when: filled }
+      overlay_list: { verb: matrix-overlay.list, when: filled }
+      overlay_update: { verb: matrix-overlay.update, when: filled }
+      overlay_apply: { verb: matrix-overlay.apply, when: filled }
+      overlay_remove: { verb: matrix-overlay.remove, when: filled }
+      overlay_diff: { verb: matrix-overlay.diff, when: filled }
+      overlay_preview: { verb: matrix-overlay.preview, when: filled }
+      overlay_list_active: { verb: matrix-overlay.list-active, when: filled }
+    overlays: [matrix_overlay]
   custody:
     type: entity
     entity_kinds: [cbu]
@@ -128,22 +139,8 @@ slots:
       activate: { verb: service-intent.activate, when: filled }
       deactivate: { verb: service-intent.deactivate, when: filled }
       clone: { verb: service-intent.clone, when: filled }
-  matrix_overlay:
-    type: entity
-    entity_kinds: [entity]
-    join: { via: matrix_overlays, parent_fk: profile_id, child_fk: overlay_id }
-    cardinality: optional
-    depends_on: [trading_profile]
-    verbs:
-      create: { verb: matrix-overlay.create, when: empty }
-      read: { verb: matrix-overlay.read, when: filled }
-      list: { verb: matrix-overlay.list, when: [empty, filled] }
-      update: { verb: matrix-overlay.update, when: filled }
-      apply: { verb: matrix-overlay.apply, when: filled }
-      remove: { verb: matrix-overlay.remove, when: filled }
-      diff: { verb: matrix-overlay.diff, when: filled }
-      preview: { verb: matrix-overlay.preview, when: filled }
-      list_active: { verb: matrix-overlay.list-active, when: filled }
+  # matrix_overlay is a configuration layer ON the trading profile,
+  # not a separate positioned entity. Verbs moved to trading_profile slot.
   booking_location:
     type: entity
     entity_kinds: [company]
