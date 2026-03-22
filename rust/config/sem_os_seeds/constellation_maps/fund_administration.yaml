@@ -110,3 +110,55 @@ slots:
       suspend: { verb: investment-manager.suspend, when: filled }
       terminate: { verb: investment-manager.terminate, when: filled }
       find: { verb: investment-manager.find-for-trade, when: filled }
+  manco_group:
+    type: entity
+    entity_kinds: [company]
+    join: { via: manco_groups, parent_fk: fund_id, child_fk: manco_id }
+    cardinality: optional
+    depends_on: [fund]
+    verbs:
+      create: { verb: manco.create, when: empty }
+      read: { verb: manco.read, when: filled }
+      list: { verb: manco.list, when: [empty, filled] }
+      derive: { verb: manco.derive-groups, when: filled }
+      bridge: { verb: manco.bridge-roles, when: filled }
+      list_members: { verb: manco.list-members, when: filled }
+      list_roles: { verb: manco.list-roles, when: filled }
+      assign_role: { verb: manco.assign-role, when: filled }
+      remove_role: { verb: manco.remove-role, when: filled }
+      link: { verb: manco.link-entity, when: filled }
+      unlink: { verb: manco.unlink-entity, when: filled }
+      set_regulatory: { verb: manco.set-regulatory-status, when: filled }
+      list_funds: { verb: manco.list-managed-funds, when: filled }
+      verify: { verb: manco.verify, when: filled }
+      compute_control: { verb: manco.compute-control-chain, when: filled }
+      refresh: { verb: manco.refresh, when: filled }
+  trust:
+    type: entity
+    entity_kinds: [entity]
+    join: { via: trust_structures, parent_fk: fund_id, child_fk: trust_id }
+    cardinality: optional
+    depends_on: [fund]
+    verbs:
+      create: { verb: trust.create, when: empty }
+      read: { verb: trust.read, when: filled }
+      list: { verb: trust.list, when: [empty, filled] }
+      add_trustee: { verb: trust.add-trustee, when: filled }
+      remove_trustee: { verb: trust.remove-trustee, when: filled }
+      add_beneficiary: { verb: trust.add-beneficiary, when: filled }
+      add_settlor: { verb: trust.add-settlor, when: filled }
+      identify_ubos: { verb: trust.identify-ubos, when: filled }
+  partnership:
+    type: entity
+    entity_kinds: [entity]
+    join: { via: partnership_structures, parent_fk: fund_id, child_fk: partnership_id }
+    cardinality: optional
+    depends_on: [fund]
+    verbs:
+      create: { verb: partnership.create, when: empty }
+      read: { verb: partnership.read, when: filled }
+      list: { verb: partnership.list, when: [empty, filled] }
+      add_partner: { verb: partnership.add-partner, when: filled }
+      remove_partner: { verb: partnership.remove-partner, when: filled }
+      set_gp: { verb: partnership.set-general-partner, when: filled }
+      list_partners: { verb: partnership.list-partners, when: filled }

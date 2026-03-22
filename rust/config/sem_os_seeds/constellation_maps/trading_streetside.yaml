@@ -109,3 +109,77 @@ slots:
       suspend: { verb: service-resource.suspend, when: filled }
       decommission: { verb: service-resource.decommission, when: filled }
       validate: { verb: service-resource.validate-attrs, when: filled }
+  service_intent:
+    type: entity
+    entity_kinds: [entity]
+    join: { via: service_intents, parent_fk: cbu_id, child_fk: intent_id }
+    cardinality: optional
+    depends_on: [cbu]
+    verbs:
+      create: { verb: service-intent.create, when: empty }
+      read: { verb: service-intent.read, when: filled }
+      list: { verb: service-intent.list, when: [empty, filled] }
+      update: { verb: service-intent.update, when: filled }
+      approve: { verb: service-intent.approve, when: filled }
+      reject: { verb: service-intent.reject, when: filled }
+      cancel: { verb: service-intent.cancel, when: filled }
+      list_available: { verb: service-intent.list-available, when: [empty, filled] }
+      list_by_status: { verb: service-intent.list-by-status, when: filled }
+      activate: { verb: service-intent.activate, when: filled }
+      deactivate: { verb: service-intent.deactivate, when: filled }
+      clone: { verb: service-intent.clone, when: filled }
+  matrix_overlay:
+    type: entity
+    entity_kinds: [entity]
+    join: { via: matrix_overlays, parent_fk: profile_id, child_fk: overlay_id }
+    cardinality: optional
+    depends_on: [trading_profile]
+    verbs:
+      create: { verb: matrix-overlay.create, when: empty }
+      read: { verb: matrix-overlay.read, when: filled }
+      list: { verb: matrix-overlay.list, when: [empty, filled] }
+      update: { verb: matrix-overlay.update, when: filled }
+      apply: { verb: matrix-overlay.apply, when: filled }
+      remove: { verb: matrix-overlay.remove, when: filled }
+      diff: { verb: matrix-overlay.diff, when: filled }
+      preview: { verb: matrix-overlay.preview, when: filled }
+      list_active: { verb: matrix-overlay.list-active, when: filled }
+  booking_location:
+    type: entity
+    entity_kinds: [company]
+    join: { via: booking_locations, parent_fk: principal_id, child_fk: location_id }
+    cardinality: optional
+    depends_on: [booking_principal]
+    verbs:
+      create: { verb: booking-location.create, when: empty }
+      read: { verb: booking-location.read, when: filled }
+      list: { verb: booking-location.list, when: [empty, filled] }
+  legal_entity:
+    type: entity
+    entity_kinds: [company]
+    join: { via: legal_entities, parent_fk: principal_id, child_fk: legal_entity_id }
+    cardinality: optional
+    depends_on: [booking_principal]
+    verbs:
+      create: { verb: legal-entity.create, when: empty }
+      read: { verb: legal-entity.read, when: filled }
+      list: { verb: legal-entity.list, when: [empty, filled] }
+  product:
+    type: entity
+    entity_kinds: [entity]
+    join: { via: products, parent_fk: cbu_id, child_fk: product_id }
+    cardinality: optional
+    depends_on: [cbu]
+    verbs:
+      create: { verb: product.create, when: empty }
+      list: { verb: product.list, when: [empty, filled] }
+  delivery:
+    type: entity
+    entity_kinds: [entity]
+    join: { via: delivery_channels, parent_fk: cbu_id, child_fk: channel_id }
+    cardinality: optional
+    depends_on: [cbu]
+    verbs:
+      create: { verb: delivery.create, when: empty }
+      read: { verb: delivery.read, when: filled }
+      list: { verb: delivery.list, when: [empty, filled] }

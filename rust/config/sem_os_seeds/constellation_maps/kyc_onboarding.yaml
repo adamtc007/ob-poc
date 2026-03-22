@@ -105,3 +105,52 @@ slots:
       update: { verb: kyc-agreement.update, when: filled }
       update_status: { verb: kyc-agreement.update-status, when: filled }
       sign: { verb: kyc-agreement.sign, when: filled }
+  identifier:
+    type: entity
+    entity_kinds: [entity]
+    join: { via: entity_identifiers, parent_fk: entity_id, child_fk: identifier_id }
+    cardinality: optional
+    depends_on: [entity_workstream]
+    verbs:
+      add: { verb: identifier.add, when: [empty, filled] }
+      read: { verb: identifier.read, when: filled }
+      list: { verb: identifier.list, when: filled }
+      verify: { verb: identifier.verify, when: filled }
+      expire: { verb: identifier.expire, when: filled }
+      update: { verb: identifier.update, when: filled }
+      search: { verb: identifier.search, when: [empty, filled] }
+      resolve: { verb: identifier.resolve, when: filled }
+      list_by_type: { verb: identifier.list-by-type, when: filled }
+      set_primary: { verb: identifier.set-primary, when: filled }
+      remove: { verb: identifier.remove, when: filled }
+  request:
+    type: entity
+    entity_kinds: [entity]
+    join: { via: kyc_requests, parent_fk: case_id, child_fk: request_id }
+    cardinality: optional
+    depends_on: [kyc_case]
+    verbs:
+      create: { verb: request.create, when: empty }
+      read: { verb: request.read, when: filled }
+      list: { verb: request.list, when: [empty, filled] }
+      update: { verb: request.update, when: filled }
+      complete: { verb: request.complete, when: filled }
+      cancel: { verb: request.cancel, when: filled }
+      assign: { verb: request.assign, when: filled }
+      reopen: { verb: request.reopen, when: filled }
+      escalate: { verb: request.escalate, when: filled }
+  red_flag:
+    type: entity
+    entity_kinds: [entity]
+    join: { via: red_flags, parent_fk: entity_id, child_fk: flag_id }
+    cardinality: optional
+    depends_on: [entity_workstream]
+    verbs:
+      raise: { verb: red-flag.raise, when: [empty, filled] }
+      read: { verb: red-flag.read, when: filled }
+      list: { verb: red-flag.list, when: filled }
+      resolve: { verb: red-flag.resolve, when: filled }
+      escalate: { verb: red-flag.escalate, when: filled }
+      update: { verb: red-flag.update, when: filled }
+      list_by_severity: { verb: red-flag.list-by-severity, when: filled }
+      close: { verb: red-flag.close, when: filled }

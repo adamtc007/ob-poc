@@ -110,3 +110,49 @@ slots:
       list_received: { verb: delegation.list-delegations-received, when: filled }
       end: { verb: delegation.end, when: filled }
       revoke: { verb: delegation.revoke, when: filled }
+  team:
+    type: entity
+    entity_kinds: [person]
+    join: { via: team_members, parent_fk: group_id, child_fk: member_id }
+    cardinality: optional
+    depends_on: [group]
+    verbs:
+      add: { verb: team.add-member, when: [empty, filled] }
+      remove: { verb: team.remove-member, when: filled }
+      list: { verb: team.list-members, when: filled }
+      list_teams: { verb: team.list, when: [empty, filled] }
+      create: { verb: team.create, when: empty }
+      read: { verb: team.read, when: filled }
+      update: { verb: team.update, when: filled }
+      assign_role: { verb: team.assign-role, when: filled }
+      remove_role: { verb: team.remove-role, when: filled }
+      transfer: { verb: team.transfer-member, when: filled }
+      list_by_role: { verb: team.list-by-role, when: filled }
+      set_lead: { verb: team.set-lead, when: filled }
+      add_governance: { verb: team.add-governance-member, when: filled }
+      remove_governance: { verb: team.remove-governance-member, when: filled }
+      list_governance: { verb: team.list-governance-members, when: filled }
+      add_ops: { verb: team.add-ops-member, when: filled }
+      remove_ops: { verb: team.remove-ops-member, when: filled }
+      list_ops: { verb: team.list-ops-members, when: filled }
+      assign_capacity: { verb: team.assign-capacity, when: filled }
+      list_capacity: { verb: team.list-capacity, when: filled }
+  rule:
+    type: entity
+    entity_kinds: [entity]
+    join: { via: rules, parent_fk: ruleset_id, child_fk: rule_id }
+    cardinality: optional
+    depends_on: [ruleset]
+    verbs:
+      create: { verb: rule.create, when: empty }
+      read: { verb: rule.read, when: filled }
+      update: { verb: rule.update, when: filled }
+  rule_field:
+    type: entity
+    entity_kinds: [entity]
+    join: { via: rule_fields, parent_fk: field_id, child_fk: field_id }
+    cardinality: optional
+    depends_on: [ruleset]
+    verbs:
+      list: { verb: rule-field.list, when: [empty, filled] }
+      read: { verb: rule-field.read, when: filled }

@@ -110,8 +110,55 @@ slots:
       request_batch: { verb: deal.request-onboarding-batch, when: [empty, filled] }
       update: { verb: deal.update-onboarding-status, when: filled }
       list: { verb: deal.list-onboarding-requests, when: filled }
-  # billing verbs (billing.*, pricing-config.*) are workflow operations
-  # ON the deal, not entity positions IN the deal structure.
-  # They attach to the deal but don't create a structural topology.
-  # These verbs are available via the deal's verb surface but don't
-  # need their own constellation slots.
+  billing_profile:
+    type: entity
+    entity_kinds: [entity]
+    join: { via: fee_billing_profiles, parent_fk: deal_id, child_fk: profile_id }
+    cardinality: optional
+    depends_on: [rate_card]
+    verbs:
+      create: { verb: billing.create-profile, when: empty }
+      activate: { verb: billing.activate-profile, when: filled }
+      suspend: { verb: billing.suspend-profile, when: filled }
+      close: { verb: billing.close-profile, when: filled }
+      read: { verb: billing.get-profile, when: filled }
+      list: { verb: billing.list-profiles, when: [empty, filled] }
+      add_target: { verb: billing.add-account-target, when: filled }
+      remove_target: { verb: billing.remove-account-target, when: filled }
+      list_targets: { verb: billing.list-account-targets, when: filled }
+      create_period: { verb: billing.create-period, when: filled }
+      calculate: { verb: billing.calculate-period, when: filled }
+      review: { verb: billing.review-period, when: filled }
+      approve: { verb: billing.approve-period, when: filled }
+      invoice: { verb: billing.generate-invoice, when: filled }
+      dispute: { verb: billing.dispute-period, when: filled }
+      period_summary: { verb: billing.period-summary, when: filled }
+      revenue: { verb: billing.revenue-summary, when: filled }
+  pricing:
+    type: entity
+    entity_kinds: [entity]
+    join: { via: pricing_configs, parent_fk: deal_id, child_fk: config_id }
+    cardinality: optional
+    depends_on: [rate_card]
+    verbs:
+      set_valuation: { verb: pricing-config.set-valuation-schedule, when: [empty, filled] }
+      set_nav: { verb: pricing-config.set-nav-threshold, when: [empty, filled] }
+      set_settlement: { verb: pricing-config.set-settlement-calendar, when: [empty, filled] }
+      set_holiday: { verb: pricing-config.set-holiday-schedule, when: [empty, filled] }
+      set_reporting: { verb: pricing-config.set-reporting, when: [empty, filled] }
+      set_tax: { verb: pricing-config.set-tax-status, when: [empty, filled] }
+      set_reclaim: { verb: pricing-config.set-reclaim-config, when: [empty, filled] }
+      find: { verb: pricing-config.find-for-instrument, when: filled }
+      list_jurisdictions: { verb: pricing-config.list-jurisdictions, when: filled }
+      list_treaty_rates: { verb: pricing-config.list-treaty-rates, when: filled }
+      list_tax_status: { verb: pricing-config.list-tax-status, when: filled }
+      list_reclaims: { verb: pricing-config.list-reclaim-configs, when: filled }
+  contract_template:
+    type: entity
+    entity_kinds: [contract]
+    join: { via: contract_packs, parent_fk: contract_id, child_fk: pack_id }
+    cardinality: optional
+    depends_on: [contract]
+    verbs:
+      create: { verb: contract-pack.create, when: empty }
+      read: { verb: contract-pack.read, when: filled }
