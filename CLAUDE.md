@@ -67,6 +67,7 @@
 > **Onboarding State View (2026-03-22):** ✅ Complete — `OnboardingStateView` UI types (`ob-poc-types::onboarding_state`), 6-layer onboarding DAG (Group Ownership → CBU Identification → KYC Case → Screening → Documents → Approval), per-layer `forward_verbs` + `revert_verbs` (composite-level undo, not factual), per-CBU `CbuStateCard` with `next_action` + `revert_action`, `VerbDirection` enum (Forward/Revert/Query), `suggested_utterance` pipeline-aligned to `HybridVerbSearcher`, `context_reset_hint` for off-context utterances, `ChatResponse.onboarding_state` field, projection function `project_onboarding_state()`, 5 unit tests
 > **Constellation Orphan Remediation (2026-03-22):** ✅ P0 Complete — 4 new constellation families (`client_group_ownership`, `kyc_lifecycle`, `evidence_documents`, `governance_sla`), 4 new constellation maps (`group.ownership`, `kyc.onboarding`, `evidence.collection`, `governance.compliance`), 3 new state machines (`client_group_lifecycle` 9 states, `screening_lifecycle` 13 states, `document_lifecycle` 8 states), 1 new universe (`group_onboarding` with 5 domains), zero verb bleed across constellations (verified by cross-audit), ~97 verbs adopted from orphan domains (client-group, ubo, control, ownership, gleif, kyc-case, screening, document, requirement, sla, access-review, regulatory, delegation, ruleset, docs-bundle, kyc-agreement, entity-workstream, tollgate), coverage raised from ~13% to ~45% of verb domains
 > **SemOS Grounded Action Surface Wiring (2026-03-22):** ✅ Complete — `GroundedActionSurface.current_state` now extracted from `SemOsContextEnvelope` and fed to `VerbSurfaceContext.entity_state` (was hardcoded `None`), enabling the lifecycle filter in `compute_session_verb_surface()` Step 5 to fire. Every utterance is now a delta against current state — verb surface constrained by state machine transitions
+> **Pipeline Leak Remediation (2026-03-22):** ✅ Complete — All utterance paths now flow through SemOS without exception. Fixes: (1) Phase 5 runtime recheck fetches envelope ONCE before execution loop, not per-statement (eliminated TOCTOU window within batch), (2) pending mutation confirmation rechecks verb against current SemOS envelope before executing stale DSL from prior turn (was bypassing orchestrator entirely), (3) pending states cleared AFTER recheck passes not before (preserves context on failure), (4) discovery selections validated against SemOS discovery surface before session mutation (was mutating session state with unvalidated domain/family/constellation), (5) dead `phase5_runtime_recheck_agent` method removed (replaced by single-envelope inline pattern), (6) pre-existing `ob-poc-web` borrow-after-move and unused imports fixed (full workspace clippy clean)
 > **Semantic OS Tab:** ✅ Complete - Agent-driven workflow selection UI (`/semantic-os`), goals→phase_tags verb scoping in SemReg, DecisionPacket workflow prompt (Onboarding/KYC/Data Management/Stewardship), session sidebar + registry context panel, `GET /api/sem-os/context` endpoint
 > **SemOS Data Management Structure Contract:** ✅ Complete - noun-only exploration in `semos-data-management` / `semos-data` is structure-first, rewrites to `schema.entity.describe` / `schema.entity.*`, and instance-bound content verbs requiring `*-id` are blocked unless the user explicitly targets an instance
 > **Scenario-Based Intent Resolution (Phases 0.5-5):** ✅ Complete — MacroIndex (Tier -2B) + ScenarioIndex (Tier -2A) + CompoundSignals + SequenceValidator; deterministic scoring ledger, 16 YAML scenarios (incl. 3 macro_sequence KYC workflows), ECIR short-circuit gating, provenance labels on macro expansion, progress narration ("Step 4 of 13: Lux UCITS SICAV Setup"), 43 Tier-2 test cases with 5 hard threshold assertions (spec §11)
@@ -6270,6 +6271,7 @@ When you see these in a task, read the corresponding annex first:
 | "constellation orphan", "orphan verb", "orphan domain", "constellation coverage", "verb bleed", "separation of concerns", "constellation audit" | CLAUDE.md §Constellation Orphan Remediation |
 | "group.ownership", "kyc.onboarding", "evidence.collection", "governance.compliance", "client_group_lifecycle", "screening_lifecycle", "document_lifecycle" | `rust/config/sem_os_seeds/constellation_maps/`, `rust/config/sem_os_seeds/state_machines/` |
 | "GroundedActionSurface", "grounded_action_surface", "current_state", "valid_actions", "blocked_actions", "entity_state wiring" | CLAUDE.md §SemOS Grounded Action Surface Wiring, `rust/src/agent/orchestrator.rs` |
+| "pipeline leak", "TOCTOU recheck", "single envelope", "discovery validation", "pending confirmation recheck", "phase5 recheck", "apply_discovery_selection" | CLAUDE.md §Pipeline Leak Remediation, `rust/src/api/agent_service.rs`, `rust/src/api/agent_routes.rs` |
 
 ---
 
@@ -7677,7 +7679,13 @@ if envelope.is_unavailable() {
 }
 ```
 
-**Governance Bypass Prevention:** As of 2026-03-01, all DSL execution paths pass through SemReg validation. The direct DSL bypass (`dsl:` prefix) was removed. No entry point can execute a verb that is not in the session's `ContextEnvelope.allowed_verbs` set.
+**Governance Bypass Prevention:** As of 2026-03-22, all paths through the system — utterance, discovery selection, pending mutation confirmation, and DSL execution — validate against SemOS before mutating session state. Specific hardening:
+- **Utterance path:** Full orchestrator pipeline with SemOS envelope (existing)
+- **Discovery selection path:** Validated against SemOS discovery surface before session mutation (fixed 2026-03-22)
+- **Pending confirmation path:** TOCTOU recheck against current SemOS envelope before executing stale DSL from prior turn (fixed 2026-03-22)
+- **DSL execution loop:** Single SemOS envelope fetched once before loop, reused for all statements in batch (fixed 2026-03-22, was per-statement)
+- **Grounded action surface:** `current_state` extracted from `GroundedActionSurface` and fed to lifecycle filter (fixed 2026-03-22, was `None`)
+- **Direct DSL bypass:** Removed (2026-03-01)
 
 ### SessionVerbSurface — Governance Layer Composition
 
