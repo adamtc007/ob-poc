@@ -1,5 +1,5 @@
 constellation: kyc.extended
-description: Extended KYC investigation constellation — board composition, BODS beneficial ownership data, red flags, specialist roles, research workflows. Deep compliance analysis beyond the core case/screening/docs lifecycle.
+description: Extended KYC investigation topology — board composition and BODS beneficial ownership data for deep compliance analysis. Entities positioned in the corporate governance structure of a subject entity.
 jurisdiction: ALL
 slots:
   entity:
@@ -42,17 +42,6 @@ slots:
       list_persons: { verb: bods.list-persons, when: filled }
       list_ownership: { verb: bods.list-ownership, when: filled }
       sync: { verb: bods.sync-from-gleif, when: filled }
-  # UBO discovery/verification verbs owned by group.ownership constellation.
-  # KYC extended provides the BODS data that feeds UBO analysis,
-  # but the UBO verbs themselves live in the group context.
-  red_flag:
-    type: entity
-    entity_kinds: [entity]
-    join: { via: red_flags, parent_fk: entity_id, child_fk: flag_id }
-    cardinality: optional
-    depends_on: [entity]
-    verbs:
-      raise: { verb: red-flag.raise, when: [empty, filled] }
-      resolve: { verb: red-flag.resolve, when: filled }
-      list: { verb: red-flag.list, when: filled }
-      escalate: { verb: red-flag.escalate, when: filled }
+  # red_flag verbs are annotations/events ON entities, not entities
+  # positioned in a structural topology. They're available via the
+  # entity's verb surface but don't create constellation slots.

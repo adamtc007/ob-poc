@@ -1,5 +1,5 @@
 constellation: deal.lifecycle
-description: Commercial deal lifecycle constellation — deal origination, contract negotiation, rate card agreement, billing setup, and onboarding handoff.
+description: Commercial deal entity topology — the deal as a hub entity linking participants, contracts, products, and onboarding requests. Rate cards and billing attach to the deal but are workflow concerns, not structural positions.
 jurisdiction: ALL
 slots:
   deal:
@@ -28,17 +28,6 @@ slots:
       add: { verb: deal.add-participant, when: [empty, filled] }
       remove: { verb: deal.remove-participant, when: filled }
       list: { verb: deal.list-participants, when: filled }
-  deal_product:
-    type: entity
-    entity_kinds: [entity]
-    join: { via: deal_products, parent_fk: deal_id, child_fk: product_id }
-    cardinality: optional
-    depends_on: [deal]
-    verbs:
-      add: { verb: deal.add-product, when: [empty, filled] }
-      update: { verb: deal.update-product-status, when: filled }
-      remove: { verb: deal.remove-product, when: filled }
-      list: { verb: deal.list-products, when: filled }
   deal_contract:
     type: entity
     entity_kinds: [contract]
@@ -66,6 +55,17 @@ slots:
       subscribe: { verb: contract.subscribe, when: filled }
       list_subscriptions: { verb: contract.list-subscriptions, when: filled }
       for_client: { verb: contract.for-client, when: [empty, filled] }
+  deal_product:
+    type: entity
+    entity_kinds: [entity]
+    join: { via: deal_products, parent_fk: deal_id, child_fk: product_id }
+    cardinality: optional
+    depends_on: [deal]
+    verbs:
+      add: { verb: deal.add-product, when: [empty, filled] }
+      update: { verb: deal.update-product-status, when: filled }
+      remove: { verb: deal.remove-product, when: filled }
+      list: { verb: deal.list-products, when: filled }
   rate_card:
     type: entity
     entity_kinds: [entity]
@@ -75,56 +75,10 @@ slots:
     verbs:
       create: { verb: deal.create-rate-card, when: empty }
       add_line: { verb: deal.add-rate-card-line, when: filled }
-      update_line: { verb: deal.update-rate-card-line, when: filled }
-      remove_line: { verb: deal.remove-rate-card-line, when: filled }
-      list_lines: { verb: deal.list-rate-card-lines, when: filled }
       propose: { verb: deal.propose-rate-card, when: filled }
       counter: { verb: deal.counter-rate-card, when: filled }
       agree: { verb: deal.agree-rate-card, when: filled }
       list: { verb: deal.list-rate-cards, when: filled }
-      history: { verb: deal.list-rate-card-history, when: filled }
-  pricing:
-    type: entity
-    entity_kinds: [entity]
-    join: { via: pricing_configs, parent_fk: deal_id, child_fk: config_id }
-    cardinality: optional
-    depends_on: [rate_card]
-    verbs:
-      set_valuation: { verb: pricing-config.set-valuation-schedule, when: [empty, filled] }
-      set_nav: { verb: pricing-config.set-nav-threshold, when: [empty, filled] }
-      find: { verb: pricing-config.find-for-instrument, when: filled }
-  billing:
-    type: entity
-    entity_kinds: [entity]
-    join: { via: fee_billing_profiles, parent_fk: deal_id, child_fk: profile_id }
-    cardinality: optional
-    depends_on: [rate_card]
-    verbs:
-      create: { verb: billing.create-profile, when: empty }
-      activate: { verb: billing.activate-profile, when: filled }
-      suspend: { verb: billing.suspend-profile, when: filled }
-      close: { verb: billing.close-profile, when: filled }
-      read: { verb: billing.get-profile, when: filled }
-      list: { verb: billing.list-profiles, when: [empty, filled] }
-      add_target: { verb: billing.add-account-target, when: filled }
-      remove_target: { verb: billing.remove-account-target, when: filled }
-      list_targets: { verb: billing.list-account-targets, when: filled }
-      create_period: { verb: billing.create-period, when: filled }
-      calculate: { verb: billing.calculate-period, when: filled }
-      review: { verb: billing.review-period, when: filled }
-      approve: { verb: billing.approve-period, when: filled }
-      invoice: { verb: billing.generate-invoice, when: filled }
-      revenue: { verb: billing.revenue-summary, when: filled }
-  sla:
-    type: entity
-    entity_kinds: [entity]
-    join: { via: deal_slas, parent_fk: deal_id, child_fk: sla_id }
-    cardinality: optional
-    depends_on: [deal]
-    verbs:
-      add: { verb: deal.add-sla, when: [empty, filled] }
-      remove: { verb: deal.remove-sla, when: filled }
-      list: { verb: deal.list-slas, when: filled }
   onboarding_request:
     type: entity
     entity_kinds: [entity]
@@ -136,3 +90,8 @@ slots:
       request_batch: { verb: deal.request-onboarding-batch, when: [empty, filled] }
       update: { verb: deal.update-onboarding-status, when: filled }
       list: { verb: deal.list-onboarding-requests, when: filled }
+  # billing verbs (billing.*, pricing-config.*) are workflow operations
+  # ON the deal, not entity positions IN the deal structure.
+  # They attach to the deal but don't create a structural topology.
+  # These verbs are available via the deal's verb surface but don't
+  # need their own constellation slots.
