@@ -4076,7 +4076,20 @@ impl AgentService {
         // Load verb metadata for differentiation context
         let registry = crate::dsl_v2::runtime_registry::runtime_registry();
 
-        let options: Vec<VerbOption> = candidates
+        // Deduplicate candidates: if two verbs have the same description
+        // (same operation under different FQNs), keep only the first.
+        // This prevents offering "cbu.assign-role" and "cbu.role.assign"
+        // as two separate options when they're the same operation.
+        let mut seen_descriptions = std::collections::HashSet::new();
+        let deduped: Vec<&crate::mcp::verb_search::VerbSearchResult> = candidates
+            .iter()
+            .filter(|c| {
+                let desc = c.description.as_deref().unwrap_or(&c.verb);
+                seen_descriptions.insert(desc.to_string())
+            })
+            .collect();
+
+        let options: Vec<VerbOption> = deduped
             .iter()
             .take(5)
             .map(|c| {
@@ -4089,13 +4102,26 @@ impl AgentService {
                 let location = taxonomy.location_for_verb(&c.verb);
 
                 // Build a suggested utterance the user can say to unambiguously
-                // select this verb. Prefer the matched phrase if it's human-readable,
-                // otherwise fall back to the verb description.
+                // select this verb. The phrase must be specific enough to resolve
+                // back through the pipeline to THIS verb and no other.
+                //
+                // Requirements:
+                // - 4+ words (3-word phrases like "show all in" are too generic)
+                // - No dots (verb FQN is not an utterance)
+                // - Contains at least one domain-specific noun (not just stop words)
+                //
+                // If the matched phrase is too generic, fall back to the description
+                // which is unique per verb by definition.
                 let suggested = {
                     let phrase = &c.matched_phrase;
-                    if phrase.split_whitespace().count() >= 3 && !phrase.contains('.') {
+                    let word_count = phrase.split_whitespace().count();
+                    let is_specific = word_count >= 4
+                        && !phrase.contains('.')
+                        && phrase.len() > 15; // Minimum 15 chars to avoid "go back to" etc.
+                    if is_specific {
                         Some(phrase.clone())
                     } else {
+                        // Use description as imperative utterance — always unique per verb
                         Some(description.clone())
                     }
                 };
