@@ -1,0 +1,417 @@
+{
+  "clarifications": [
+    {
+      "suggested_prompt": "Did you want 'cbu.read' or 'unknown.neighbour'?",
+      "trigger_phrase": "show me the cbu",
+      "verb_a": "cbu.read",
+      "verb_b": "unknown.neighbour"
+    },
+    {
+      "suggested_prompt": "Did you want 'cbu.read' or 'unknown.neighbour'?",
+      "trigger_phrase": "open the cbu record",
+      "verb_a": "cbu.read",
+      "verb_b": "unknown.neighbour"
+    },
+    {
+      "suggested_prompt": "Did you want 'cbu.read' or 'unknown.neighbour'?",
+      "trigger_phrase": "view the fund shell details",
+      "verb_a": "cbu.read",
+      "verb_b": "unknown.neighbour"
+    },
+    {
+      "suggested_prompt": "Did you want 'cbu.read' or 'unknown.neighbour'?",
+      "trigger_phrase": "abracadabra banana telescope",
+      "verb_a": "cbu.read",
+      "verb_b": "unknown.neighbour"
+    },
+    {
+      "suggested_prompt": "Did you want 'cbu.read' or 'unknown.neighbour'?",
+      "trigger_phrase": "terminate this cbu",
+      "verb_a": "cbu.read",
+      "verb_b": "unknown.neighbour"
+    },
+    {
+      "suggested_prompt": "Did you want 'cbu.read' or 'unknown.neighbour'?",
+      "trigger_phrase": "show the cbu and maybe change it",
+      "verb_a": "cbu.read",
+      "verb_b": "unknown.neighbour"
+    }
+  ],
+  "fixture_transitions": [
+    {
+      "fixture_state": [
+        {
+          "binding_key": "target",
+          "current_state": "DISCOVERED",
+          "entity_id": "80e73d4c-1fec-42ad-9dda-13c55abb3bf5",
+          "entity_type": "cbu"
+        }
+      ],
+      "trace_id": "629b4620-afec-4e33-baa6-351e38fd50dd",
+      "utterance_id": "dee880c9-c098-4fef-9d1b-c12c68288e59"
+    },
+    {
+      "fixture_state": [
+        {
+          "binding_key": "target",
+          "current_state": "DISCOVERED",
+          "entity_id": "80e73d4c-1fec-42ad-9dda-13c55abb3bf5",
+          "entity_type": "cbu"
+        }
+      ],
+      "trace_id": "08018001-b640-4d42-82bb-36dcdce8978c",
+      "utterance_id": "11e3a297-c438-4cd6-a701-86a42e6b2e79"
+    },
+    {
+      "fixture_state": [
+        {
+          "binding_key": "target",
+          "current_state": "DISCOVERED",
+          "entity_id": "80e73d4c-1fec-42ad-9dda-13c55abb3bf5",
+          "entity_type": "cbu"
+        }
+      ],
+      "trace_id": "6be7f677-bbd9-4471-b0f0-dae3aee27914",
+      "utterance_id": "66ed3889-9a0f-4b63-97bf-b9b9e28032ee"
+    },
+    {
+      "fixture_state": [
+        {
+          "binding_key": "target",
+          "current_state": "DISCOVERED",
+          "entity_id": "80e73d4c-1fec-42ad-9dda-13c55abb3bf5",
+          "entity_type": "cbu"
+        }
+      ],
+      "trace_id": "4618cc5c-4790-40af-8b65-fdc5cc3bebe1",
+      "utterance_id": "5e49e2da-3529-44ff-9473-72bce0c9e931"
+    },
+    {
+      "fixture_state": [
+        {
+          "binding_key": "target",
+          "current_state": "DISCOVERED",
+          "entity_id": "80e73d4c-1fec-42ad-9dda-13c55abb3bf5",
+          "entity_type": "cbu"
+        }
+      ],
+      "trace_id": "9053f354-2e5b-45c6-b1aa-49a440fea952",
+      "utterance_id": "9134648b-9273-455d-b6be-21eb45d6cfa0"
+    },
+    {
+      "fixture_state": [
+        {
+          "binding_key": "target",
+          "current_state": "DISCOVERED",
+          "entity_id": "80e73d4c-1fec-42ad-9dda-13c55abb3bf5",
+          "entity_type": "cbu"
+        }
+      ],
+      "trace_id": "84c1bbf8-f2ac-49d9-8170-544aa0f11e1b",
+      "utterance_id": "2dce021c-c657-403b-903e-4ce3486537d4"
+    }
+  ],
+  "gaps": [],
+  "run": {
+    "boundary_count": 1,
+    "drift": {
+      "avg_margin_delta": 0.0,
+      "current_run_id": "b7019d7d-c58f-42ac-a8ee-8c7fd3cdd013",
+      "fallback_rate_delta": -0.3333333432674408,
+      "newly_failing_utterances": [],
+      "newly_passing_utterances": [
+        "2dce021c-c657-403b-903e-4ce3486537d4",
+        "5e49e2da-3529-44ff-9473-72bce0c9e931"
+      ],
+      "overall_accuracy_delta": 0.3333333432674408,
+      "prior_run_id": "ba618b88-eae3-49d7-82b7-83b80d31cc1a"
+    },
+    "metrics": {
+      "avg_total_latency_ms": null,
+      "boundary_correct_rate": 1.0,
+      "fragile_boundary_count": 0,
+      "negative_type_a_rejection_rate": 1.0,
+      "negative_type_b_rejection_rate": 1.0,
+      "overall_accuracy": 0.3333333432674408,
+      "phase4_avg_margin": 0.0,
+      "phase4_fallback_rate": 0.0,
+      "positive_hit_rate": 0.0
+    },
+    "negative_count": 2,
+    "outcomes": [
+      {
+        "actual_halt_reason": null,
+        "actual_resolved_verb": null,
+        "calibration_mode": "positive",
+        "expected_outcome": {
+          "type": "resolves_to",
+          "value": "cbu.read"
+        },
+        "failure_detail": null,
+        "failure_phase": null,
+        "latency_per_phase": null,
+        "latency_total_ms": null,
+        "margin": 0.0,
+        "margin_stable": false,
+        "negative_type": null,
+        "pre_screen": {
+          "margin": 0.0,
+          "nearest_neighbour_distance": 0.23319458961486816,
+          "nearest_neighbour_verb": "cbu.read",
+          "stratum": {
+            "kind": "boundary_case",
+            "margin": 0.0
+          },
+          "target_verb_distance": 0.23319458961486816,
+          "utterance": "show me the cbu"
+        },
+        "top1_score": null,
+        "top2_score": null,
+        "trace_id": "629b4620-afec-4e33-baa6-351e38fd50dd",
+        "utterance_id": "dee880c9-c098-4fef-9d1b-c12c68288e59",
+        "utterance_text": "show me the cbu",
+        "verdict": {
+          "actual_halt": "",
+          "expected": "cbu.read",
+          "kind": "false_negative"
+        }
+      },
+      {
+        "actual_halt_reason": null,
+        "actual_resolved_verb": null,
+        "calibration_mode": "positive",
+        "expected_outcome": {
+          "type": "resolves_to",
+          "value": "cbu.read"
+        },
+        "failure_detail": null,
+        "failure_phase": null,
+        "latency_per_phase": null,
+        "latency_total_ms": null,
+        "margin": 0.0,
+        "margin_stable": false,
+        "negative_type": null,
+        "pre_screen": {
+          "margin": 0.0,
+          "nearest_neighbour_distance": 0.23132288455963135,
+          "nearest_neighbour_verb": "cbu.read",
+          "stratum": {
+            "kind": "boundary_case",
+            "margin": 0.0
+          },
+          "target_verb_distance": 0.23132288455963135,
+          "utterance": "open the cbu record"
+        },
+        "top1_score": null,
+        "top2_score": null,
+        "trace_id": "08018001-b640-4d42-82bb-36dcdce8978c",
+        "utterance_id": "11e3a297-c438-4cd6-a701-86a42e6b2e79",
+        "utterance_text": "open the cbu record",
+        "verdict": {
+          "actual_halt": "",
+          "expected": "cbu.read",
+          "kind": "false_negative"
+        }
+      },
+      {
+        "actual_halt_reason": null,
+        "actual_resolved_verb": null,
+        "calibration_mode": "positive",
+        "expected_outcome": {
+          "type": "resolves_to",
+          "value": "cbu.read"
+        },
+        "failure_detail": null,
+        "failure_phase": null,
+        "latency_per_phase": null,
+        "latency_total_ms": null,
+        "margin": 0.0,
+        "margin_stable": false,
+        "negative_type": null,
+        "pre_screen": {
+          "margin": 0.0,
+          "nearest_neighbour_distance": 0.40603572130203247,
+          "nearest_neighbour_verb": "cbu.read",
+          "stratum": {
+            "kind": "boundary_case",
+            "margin": 0.0
+          },
+          "target_verb_distance": 0.40603572130203247,
+          "utterance": "view the fund shell details"
+        },
+        "top1_score": null,
+        "top2_score": null,
+        "trace_id": "6be7f677-bbd9-4471-b0f0-dae3aee27914",
+        "utterance_id": "66ed3889-9a0f-4b63-97bf-b9b9e28032ee",
+        "utterance_text": "view the fund shell details",
+        "verdict": {
+          "actual_halt": "",
+          "expected": "cbu.read",
+          "kind": "false_negative"
+        }
+      },
+      {
+        "actual_halt_reason": null,
+        "actual_resolved_verb": null,
+        "calibration_mode": "negative",
+        "expected_outcome": {
+          "type": "falls_to_sage"
+        },
+        "failure_detail": null,
+        "failure_phase": null,
+        "latency_per_phase": null,
+        "latency_total_ms": null,
+        "margin": 0.0,
+        "margin_stable": false,
+        "negative_type": "type_a",
+        "pre_screen": {
+          "margin": 0.0,
+          "nearest_neighbour_distance": 0.5140725374221802,
+          "nearest_neighbour_verb": "cbu.read",
+          "stratum": {
+            "kind": "boundary_case",
+            "margin": 0.0
+          },
+          "target_verb_distance": 0.5140725374221802,
+          "utterance": "abracadabra banana telescope"
+        },
+        "top1_score": null,
+        "top2_score": null,
+        "trace_id": "4618cc5c-4790-40af-8b65-fdc5cc3bebe1",
+        "utterance_id": "5e49e2da-3529-44ff-9473-72bce0c9e931",
+        "utterance_text": "abracadabra banana telescope",
+        "verdict": {
+          "kind": "pass"
+        }
+      },
+      {
+        "actual_halt_reason": null,
+        "actual_resolved_verb": null,
+        "calibration_mode": "negative",
+        "expected_outcome": {
+          "type": "halts_with_reason",
+          "value": "no_viable_verb"
+        },
+        "failure_detail": null,
+        "failure_phase": null,
+        "latency_per_phase": null,
+        "latency_total_ms": null,
+        "margin": 0.0,
+        "margin_stable": false,
+        "negative_type": "type_b",
+        "pre_screen": {
+          "margin": 0.0,
+          "nearest_neighbour_distance": 0.2938401699066162,
+          "nearest_neighbour_verb": "cbu.read",
+          "stratum": {
+            "kind": "boundary_case",
+            "margin": 0.0
+          },
+          "target_verb_distance": 0.2938401699066162,
+          "utterance": "terminate this cbu"
+        },
+        "top1_score": null,
+        "top2_score": null,
+        "trace_id": "9053f354-2e5b-45c6-b1aa-49a440fea952",
+        "utterance_id": "9134648b-9273-455d-b6be-21eb45d6cfa0",
+        "utterance_text": "terminate this cbu",
+        "verdict": {
+          "actual": "",
+          "expected": "no_viable_verb",
+          "kind": "correct_phase_wrong_reason"
+        }
+      },
+      {
+        "actual_halt_reason": null,
+        "actual_resolved_verb": null,
+        "calibration_mode": "boundary",
+        "expected_outcome": {
+          "type": "triggers_clarification"
+        },
+        "failure_detail": null,
+        "failure_phase": null,
+        "latency_per_phase": null,
+        "latency_total_ms": null,
+        "margin": 0.0,
+        "margin_stable": false,
+        "negative_type": null,
+        "pre_screen": {
+          "margin": 0.0,
+          "nearest_neighbour_distance": 0.27855777740478516,
+          "nearest_neighbour_verb": "cbu.read",
+          "stratum": {
+            "kind": "boundary_case",
+            "margin": 0.0
+          },
+          "target_verb_distance": 0.27855777740478516,
+          "utterance": "show the cbu and maybe change it"
+        },
+        "top1_score": null,
+        "top2_score": null,
+        "trace_id": "84c1bbf8-f2ac-49d9-8170-544aa0f11e1b",
+        "utterance_id": "2dce021c-c657-403b-903e-4ce3486537d4",
+        "utterance_text": "show the cbu and maybe change it",
+        "verdict": {
+          "kind": "pass"
+        }
+      }
+    ],
+    "positive_count": 3,
+    "prior_run_id": "ba618b88-eae3-49d7-82b7-83b80d31cc1a",
+    "run_end": "2026-03-22T11:38:16.245591Z",
+    "run_id": "b7019d7d-c58f-42ac-a8ee-8c7fd3cdd013",
+    "run_start": "2026-03-22T11:38:14.550369Z",
+    "scenario_id": "3836903a-c956-4e36-a279-bc4665d62ab6",
+    "surface_versions": {
+      "concept_registry_version": null,
+      "constellation_template_version": null,
+      "embedding_model_version": "bge-small-en-v1.5",
+      "entity_fsm_version": null,
+      "macro_compiler_version": "0.1.0",
+      "parser_version": "0.1.0",
+      "pattern_catalogue_version": null,
+      "threshold_policy_version": "policy_gate/v1",
+      "verb_surface_version": "session_verb_surface/v1"
+    },
+    "trace_ids": [
+      "629b4620-afec-4e33-baa6-351e38fd50dd",
+      "08018001-b640-4d42-82bb-36dcdce8978c",
+      "6be7f677-bbd9-4471-b0f0-dae3aee27914",
+      "4618cc5c-4790-40af-8b65-fdc5cc3bebe1",
+      "9053f354-2e5b-45c6-b1aa-49a440fea952",
+      "84c1bbf8-f2ac-49d9-8170-544aa0f11e1b"
+    ],
+    "triggered_by": "xtask.calibration",
+    "utterance_count": 6
+  },
+  "scenario": {
+    "admitted_synthetic_set_id": null,
+    "constellation_template_id": "struct.lux.ucits.sicav",
+    "constellation_template_version": "19be9af72debe5cb",
+    "created_by": "calibration.seed_builder",
+    "excluded_neighbours": [],
+    "execution_shape": {
+      "kind": "singleton"
+    },
+    "expected_margin_threshold": 0.07999999821186066,
+    "gold_utterances": [],
+    "governance_status": "draft",
+    "legal_verb_set_snapshot": [],
+    "linked_entity_states": [],
+    "near_neighbour_verbs": [],
+    "operational_phase": "EarlyOnboarding",
+    "scenario_id": "3836903a-c956-4e36-a279-bc4665d62ab6",
+    "scenario_name": "cbu-read-smoke",
+    "situation_signature": "cbu:DISCOVERED",
+    "situation_signature_hash": 1300918911258677596,
+    "target_entity_state": "DISCOVERED",
+    "target_entity_type": "cbu",
+    "target_verb": "cbu.read",
+    "verb_taxonomy_tag": "other"
+  },
+  "write_through": {
+    "loop1_candidates_upserted": 0,
+    "loop2_blocklist_upserts": 6,
+    "loop2_phrases_upserted": 9
+  }
+}

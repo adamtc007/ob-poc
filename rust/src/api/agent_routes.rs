@@ -2787,6 +2787,8 @@ async fn chat_session(
                                 envelope: &envelope,
                                 fail_policy: VerbSurfaceFailPolicy::default(),
                                 entity_state: None,
+                                has_group_scope: true,
+                                composite_state: None,
                             };
                             compute_session_verb_surface(&ctx)
                         };
@@ -2967,6 +2969,8 @@ async fn chat_session(
                         envelope: &envelope,
                         fail_policy: VerbSurfaceFailPolicy::default(),
                         entity_state: None,
+                        has_group_scope: true,
+                        composite_state: None,
                     };
                     compute_session_verb_surface(&ctx)
                 };
@@ -4557,6 +4561,8 @@ async fn get_session_verb_surface(
         envelope: &envelope,
         fail_policy,
         entity_state: None,
+        has_group_scope: true,
+        composite_state: None,
     };
     let surface = compute_session_verb_surface(&ctx);
 

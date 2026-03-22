@@ -1,0 +1,3 @@
+loop1_candidates_upserted: 3
+loop2_phrases_upserted: 9
+loop2_blocklist_upserts: 6

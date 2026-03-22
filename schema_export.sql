@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict CKSxEWaEFLYldANWbnoxa7vdMF1PPAnobnvKlMtJDeFbhBzzNTB3Qhif4FQzQt7
+\restrict lGIWzJ4wzhHCd8EaERupeXRZNHcV3RVtibEZcWukWmWiuKkpzQfwD1i9C9Ig4vP
 
 -- Dumped from database version 18.1 (Homebrew)
 -- Dumped by pg_dump version 18.1 (Homebrew)
@@ -7346,6 +7346,123 @@ CREATE TABLE "ob-poc".ca_event_types (
 --
 
 COMMENT ON TABLE "ob-poc".ca_event_types IS 'Reference catalog of corporate action event types';
+
+
+--
+-- Name: calibration_fixture_transitions; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".calibration_fixture_transitions (
+    transition_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    run_id uuid NOT NULL,
+    utterance_id uuid NOT NULL,
+    trace_id uuid NOT NULL,
+    fixture_state jsonb DEFAULT '[]'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: calibration_outcomes; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".calibration_outcomes (
+    outcome_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    run_id uuid NOT NULL,
+    utterance_id uuid NOT NULL,
+    trace_id uuid NOT NULL,
+    calibration_mode text NOT NULL,
+    negative_type text,
+    expected_outcome jsonb NOT NULL,
+    verdict text NOT NULL,
+    actual_resolved_verb text,
+    actual_halt_reason text,
+    failure_phase smallint,
+    failure_detail jsonb,
+    top1_score real,
+    top2_score real,
+    margin real,
+    margin_stable boolean,
+    latency_total_ms integer,
+    latency_per_phase jsonb,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: calibration_runs; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".calibration_runs (
+    run_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    scenario_id uuid NOT NULL,
+    triggered_by text NOT NULL,
+    surface_versions jsonb NOT NULL,
+    utterance_count integer NOT NULL,
+    positive_count integer DEFAULT 0 NOT NULL,
+    negative_count integer DEFAULT 0 NOT NULL,
+    boundary_count integer DEFAULT 0 NOT NULL,
+    metrics jsonb NOT NULL,
+    drift jsonb,
+    prior_run_id uuid,
+    trace_ids jsonb DEFAULT '[]'::jsonb NOT NULL,
+    run_start timestamp with time zone NOT NULL,
+    run_end timestamp with time zone
+);
+
+
+--
+-- Name: calibration_scenarios; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".calibration_scenarios (
+    scenario_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    scenario_name text NOT NULL,
+    created_by text NOT NULL,
+    governance_status text DEFAULT 'Draft'::text NOT NULL,
+    constellation_template_id text NOT NULL,
+    constellation_template_version text NOT NULL,
+    situation_signature text,
+    situation_signature_hash bigint,
+    operational_phase text,
+    target_entity_type text NOT NULL,
+    target_entity_state text NOT NULL,
+    linked_entity_states jsonb DEFAULT '[]'::jsonb NOT NULL,
+    target_verb text NOT NULL,
+    legal_verb_set_snapshot jsonb DEFAULT '[]'::jsonb NOT NULL,
+    verb_taxonomy_tag text,
+    excluded_neighbours jsonb DEFAULT '[]'::jsonb NOT NULL,
+    near_neighbour_verbs jsonb DEFAULT '[]'::jsonb NOT NULL,
+    expected_margin_threshold real DEFAULT 0.0 NOT NULL,
+    execution_shape text DEFAULT 'Singleton'::text NOT NULL,
+    gold_utterances jsonb DEFAULT '[]'::jsonb NOT NULL,
+    admitted_synthetic_set_id uuid,
+    seed_data jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: calibration_utterances; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".calibration_utterances (
+    utterance_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    scenario_id uuid NOT NULL,
+    text text NOT NULL,
+    calibration_mode text NOT NULL,
+    negative_type text,
+    lifecycle_status text DEFAULT 'Generated'::text NOT NULL,
+    expected_outcome jsonb NOT NULL,
+    generation_rationale text,
+    pre_screen jsonb,
+    pre_screen_stratum text,
+    reviewed_by text,
+    admitted_at timestamp with time zone,
+    deprecated_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
 
 
 --
@@ -16969,6 +17086,39 @@ ALTER SEQUENCE "ob-poc".user_learned_phrases_id_seq OWNED BY "ob-poc".user_learn
 
 
 --
+-- Name: utterance_traces; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".utterance_traces (
+    trace_id uuid NOT NULL,
+    utterance_id uuid NOT NULL,
+    session_id uuid NOT NULL,
+    correlation_id uuid,
+    trace_kind text NOT NULL,
+    parent_trace_id uuid,
+    "timestamp" timestamp with time zone DEFAULT now() NOT NULL,
+    raw_utterance text NOT NULL,
+    outcome text NOT NULL,
+    halt_reason_code text,
+    halt_phase smallint,
+    resolved_verb text,
+    plane text,
+    polarity text,
+    execution_shape_kind text,
+    fallback_invoked boolean DEFAULT false NOT NULL,
+    situation_signature_hash bigint,
+    template_id text,
+    template_version text,
+    surface_versions jsonb DEFAULT '{}'::jsonb NOT NULL,
+    trace_payload jsonb DEFAULT '{}'::jsonb NOT NULL,
+    fallback_reason_code text,
+    is_synthetic boolean DEFAULT false NOT NULL,
+    CONSTRAINT utterance_traces_outcome_check CHECK ((outcome = ANY (ARRAY['in_progress'::text, 'executed_successfully'::text, 'executed_with_correction'::text, 'halted_at_phase'::text, 'clarification_triggered'::text, 'no_match'::text]))),
+    CONSTRAINT utterance_traces_trace_kind_check CHECK ((trace_kind = ANY (ARRAY['original'::text, 'clarification_prompt'::text, 'clarification_response'::text, 'resumed_execution'::text])))
+);
+
+
+--
 -- Name: v_active_rate_cards; Type: VIEW; Schema: ob-poc; Owner: -
 --
 
@@ -21197,6 +21347,46 @@ ALTER TABLE ONLY "ob-poc".ca_event_types
 
 
 --
+-- Name: calibration_fixture_transitions calibration_fixture_transitions_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".calibration_fixture_transitions
+    ADD CONSTRAINT calibration_fixture_transitions_pkey PRIMARY KEY (transition_id);
+
+
+--
+-- Name: calibration_outcomes calibration_outcomes_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".calibration_outcomes
+    ADD CONSTRAINT calibration_outcomes_pkey PRIMARY KEY (outcome_id);
+
+
+--
+-- Name: calibration_runs calibration_runs_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".calibration_runs
+    ADD CONSTRAINT calibration_runs_pkey PRIMARY KEY (run_id);
+
+
+--
+-- Name: calibration_scenarios calibration_scenarios_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".calibration_scenarios
+    ADD CONSTRAINT calibration_scenarios_pkey PRIMARY KEY (scenario_id);
+
+
+--
+-- Name: calibration_utterances calibration_utterances_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".calibration_utterances
+    ADD CONSTRAINT calibration_utterances_pkey PRIMARY KEY (utterance_id);
+
+
+--
 -- Name: case_evaluation_snapshots case_evaluation_snapshots_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -24589,6 +24779,14 @@ ALTER TABLE ONLY "ob-poc".user_learned_phrases
 
 
 --
+-- Name: utterance_traces utterance_traces_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".utterance_traces
+    ADD CONSTRAINT utterance_traces_pkey PRIMARY KEY (trace_id);
+
+
+--
 -- Name: verb_centroids verb_centroids_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -25506,6 +25704,125 @@ CREATE INDEX idx_ca_ssi_cbu ON "ob-poc".cbu_ca_ssi_mappings USING btree (cbu_id)
 --
 
 CREATE INDEX idx_ca_windows_cbu ON "ob-poc".cbu_ca_instruction_windows USING btree (cbu_id);
+
+
+--
+-- Name: idx_cal_fixture_run; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cal_fixture_run ON "ob-poc".calibration_fixture_transitions USING btree (run_id, created_at);
+
+
+--
+-- Name: idx_cal_fixture_trace; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cal_fixture_trace ON "ob-poc".calibration_fixture_transitions USING btree (trace_id);
+
+
+--
+-- Name: idx_cal_out_failures; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cal_out_failures ON "ob-poc".calibration_outcomes USING btree (verdict, failure_phase) WHERE (verdict <> 'Pass'::text);
+
+
+--
+-- Name: idx_cal_out_fragile; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cal_out_fragile ON "ob-poc".calibration_outcomes USING btree (margin_stable) WHERE (margin_stable = false);
+
+
+--
+-- Name: idx_cal_out_run; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cal_out_run ON "ob-poc".calibration_outcomes USING btree (run_id, verdict);
+
+
+--
+-- Name: idx_cal_out_trace; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cal_out_trace ON "ob-poc".calibration_outcomes USING btree (trace_id);
+
+
+--
+-- Name: idx_cal_run_prior; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cal_run_prior ON "ob-poc".calibration_runs USING btree (prior_run_id) WHERE (prior_run_id IS NOT NULL);
+
+
+--
+-- Name: idx_cal_run_scenario; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cal_run_scenario ON "ob-poc".calibration_runs USING btree (scenario_id, run_start DESC);
+
+
+--
+-- Name: idx_cal_scenario_phase; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cal_scenario_phase ON "ob-poc".calibration_scenarios USING btree (operational_phase);
+
+
+--
+-- Name: idx_cal_scenario_signature_hash; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cal_scenario_signature_hash ON "ob-poc".calibration_scenarios USING btree (situation_signature_hash) WHERE (situation_signature_hash IS NOT NULL);
+
+
+--
+-- Name: idx_cal_scenario_status; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cal_scenario_status ON "ob-poc".calibration_scenarios USING btree (governance_status);
+
+
+--
+-- Name: idx_cal_scenario_template; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cal_scenario_template ON "ob-poc".calibration_scenarios USING btree (constellation_template_id);
+
+
+--
+-- Name: idx_cal_scenario_verb; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cal_scenario_verb ON "ob-poc".calibration_scenarios USING btree (target_verb);
+
+
+--
+-- Name: idx_cal_utt_admitted; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cal_utt_admitted ON "ob-poc".calibration_utterances USING btree (scenario_id) WHERE (lifecycle_status = 'Admitted'::text);
+
+
+--
+-- Name: idx_cal_utt_mode; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cal_utt_mode ON "ob-poc".calibration_utterances USING btree (calibration_mode);
+
+
+--
+-- Name: idx_cal_utt_scenario; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cal_utt_scenario ON "ob-poc".calibration_utterances USING btree (scenario_id, lifecycle_status);
+
+
+--
+-- Name: idx_cal_utt_stratum; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cal_utt_stratum ON "ob-poc".calibration_utterances USING btree (pre_screen_stratum) WHERE (pre_screen_stratum IS NOT NULL);
 
 
 --
@@ -29793,6 +30110,62 @@ CREATE INDEX idx_user_learned_phrases_user ON "ob-poc".user_learned_phrases USIN
 
 
 --
+-- Name: idx_utterance_traces_fallback; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_utterance_traces_fallback ON "ob-poc".utterance_traces USING btree ("timestamp") WHERE (fallback_invoked = true);
+
+
+--
+-- Name: idx_utterance_traces_fallback_reason_code; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_utterance_traces_fallback_reason_code ON "ob-poc".utterance_traces USING btree (fallback_reason_code) WHERE (fallback_reason_code IS NOT NULL);
+
+
+--
+-- Name: idx_utterance_traces_is_synthetic; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_utterance_traces_is_synthetic ON "ob-poc".utterance_traces USING btree (is_synthetic);
+
+
+--
+-- Name: idx_utterance_traces_outcome; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_utterance_traces_outcome ON "ob-poc".utterance_traces USING btree (outcome);
+
+
+--
+-- Name: idx_utterance_traces_parent; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_utterance_traces_parent ON "ob-poc".utterance_traces USING btree (parent_trace_id) WHERE (parent_trace_id IS NOT NULL);
+
+
+--
+-- Name: idx_utterance_traces_resolved_verb; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_utterance_traces_resolved_verb ON "ob-poc".utterance_traces USING btree (resolved_verb) WHERE (resolved_verb IS NOT NULL);
+
+
+--
+-- Name: idx_utterance_traces_session_ts; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_utterance_traces_session_ts ON "ob-poc".utterance_traces USING btree (session_id, "timestamp");
+
+
+--
+-- Name: idx_utterance_traces_signature; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_utterance_traces_signature ON "ob-poc".utterance_traces USING btree (situation_signature_hash) WHERE (situation_signature_hash IS NOT NULL);
+
+
+--
 -- Name: idx_values_attr_uuid; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -31212,6 +31585,78 @@ ALTER TABLE ONLY "ob-poc".booking_principal
 
 ALTER TABLE ONLY "ob-poc".booking_principal
     ADD CONSTRAINT booking_principal_legal_entity_id_fkey FOREIGN KEY (legal_entity_id) REFERENCES "ob-poc".legal_entity(legal_entity_id);
+
+
+--
+-- Name: calibration_fixture_transitions calibration_fixture_transitions_run_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".calibration_fixture_transitions
+    ADD CONSTRAINT calibration_fixture_transitions_run_id_fkey FOREIGN KEY (run_id) REFERENCES "ob-poc".calibration_runs(run_id);
+
+
+--
+-- Name: calibration_fixture_transitions calibration_fixture_transitions_trace_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".calibration_fixture_transitions
+    ADD CONSTRAINT calibration_fixture_transitions_trace_id_fkey FOREIGN KEY (trace_id) REFERENCES "ob-poc".utterance_traces(trace_id);
+
+
+--
+-- Name: calibration_fixture_transitions calibration_fixture_transitions_utterance_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".calibration_fixture_transitions
+    ADD CONSTRAINT calibration_fixture_transitions_utterance_id_fkey FOREIGN KEY (utterance_id) REFERENCES "ob-poc".calibration_utterances(utterance_id);
+
+
+--
+-- Name: calibration_outcomes calibration_outcomes_run_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".calibration_outcomes
+    ADD CONSTRAINT calibration_outcomes_run_id_fkey FOREIGN KEY (run_id) REFERENCES "ob-poc".calibration_runs(run_id);
+
+
+--
+-- Name: calibration_outcomes calibration_outcomes_trace_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".calibration_outcomes
+    ADD CONSTRAINT calibration_outcomes_trace_id_fkey FOREIGN KEY (trace_id) REFERENCES "ob-poc".utterance_traces(trace_id);
+
+
+--
+-- Name: calibration_outcomes calibration_outcomes_utterance_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".calibration_outcomes
+    ADD CONSTRAINT calibration_outcomes_utterance_id_fkey FOREIGN KEY (utterance_id) REFERENCES "ob-poc".calibration_utterances(utterance_id);
+
+
+--
+-- Name: calibration_runs calibration_runs_prior_run_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".calibration_runs
+    ADD CONSTRAINT calibration_runs_prior_run_id_fkey FOREIGN KEY (prior_run_id) REFERENCES "ob-poc".calibration_runs(run_id);
+
+
+--
+-- Name: calibration_runs calibration_runs_scenario_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".calibration_runs
+    ADD CONSTRAINT calibration_runs_scenario_id_fkey FOREIGN KEY (scenario_id) REFERENCES "ob-poc".calibration_scenarios(scenario_id);
+
+
+--
+-- Name: calibration_utterances calibration_utterances_scenario_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".calibration_utterances
+    ADD CONSTRAINT calibration_utterances_scenario_id_fkey FOREIGN KEY (scenario_id) REFERENCES "ob-poc".calibration_scenarios(scenario_id);
 
 
 --
@@ -35031,6 +35476,14 @@ ALTER TABLE ONLY "ob-poc".ubo_snapshots
 
 
 --
+-- Name: utterance_traces utterance_traces_parent_trace_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".utterance_traces
+    ADD CONSTRAINT utterance_traces_parent_trace_id_fkey FOREIGN KEY (parent_trace_id) REFERENCES "ob-poc".utterance_traces(trace_id);
+
+
+--
 -- Name: verification_challenges verification_challenges_allegation_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -35314,5 +35767,5 @@ ALTER TABLE ONLY sem_reg_authoring.validation_reports
 -- PostgreSQL database dump complete
 --
 
-\unrestrict CKSxEWaEFLYldANWbnoxa7vdMF1PPAnobnvKlMtJDeFbhBzzNTB3Qhif4FQzQt7
+\unrestrict lGIWzJ4wzhHCd8EaERupeXRZNHcV3RVtibEZcWukWmWiuKkpzQfwD1i9C9Ig4vP
 

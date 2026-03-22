@@ -1,0 +1,24 @@
+- suggested_prompt: Did you want 'cbu.read' or 'cbu.read'?
+  trigger_phrase: show me the cbu
+  verb_a: cbu.read
+  verb_b: cbu.read
+- suggested_prompt: Did you want 'cbu.read' or 'unknown.neighbour'?
+  trigger_phrase: open the cbu record
+  verb_a: cbu.read
+  verb_b: unknown.neighbour
+- suggested_prompt: Did you want 'cbu.read' or 'unknown.neighbour'?
+  trigger_phrase: view the fund shell details
+  verb_a: cbu.read
+  verb_b: unknown.neighbour
+- suggested_prompt: Did you want 'cbu.read' or 'session.list'?
+  trigger_phrase: abracadabra banana telescope
+  verb_a: cbu.read
+  verb_b: session.list
+- suggested_prompt: Did you want 'cbu.read' or 'cbu.delete'?
+  trigger_phrase: terminate this cbu
+  verb_a: cbu.read
+  verb_b: cbu.delete
+- suggested_prompt: Did you want 'cbu.read' or 'cbu.read'?
+  trigger_phrase: show the cbu and maybe change it
+  verb_a: cbu.read
+  verb_b: cbu.read

@@ -15,6 +15,7 @@ use std::collections::{HashMap, HashSet};
 
 use sem_os_core::authoring::agent_mode::AgentMode;
 
+use crate::agent::composite_state::GroupCompositeState;
 use crate::agent::sem_os_context_envelope::{
     AllowedVerbSetFingerprint, PruneReason, SemOsContextEnvelope,
 };
@@ -81,6 +82,7 @@ pub struct SurfacePrune {
 pub enum PruneLayer {
     AgentMode,
     WorkflowPhase,
+    GroupScope,
     SemRegCcir,
     LifecycleState,
     ActorGating,
@@ -116,6 +118,7 @@ pub struct FilterSummary {
     pub total_registry: usize,
     pub after_agent_mode: usize,
     pub after_workflow: usize,
+    pub after_group_scope: usize,
     pub after_semreg: usize,
     pub after_lifecycle: usize,
     pub after_actor: usize,
@@ -134,6 +137,24 @@ pub fn is_safe_harbor_verb(fqn: &str) -> bool {
         .iter()
         .any(|domain| fqn.starts_with(&format!("{domain}.")))
 }
+
+// ── Bootstrap domains (no group in scope) ────────────────────────
+//
+// When no client group is set, only these domains are available.
+// This forces the user to select a group before doing domain work.
+// Exception: new group onboarding (client-group.create, gleif.import-tree).
+const NO_GROUP_ALLOWED_DOMAINS: &[&str] = &[
+    "agent",
+    "audit",
+    "client-group",
+    "focus",
+    "gleif",
+    "onboarding",
+    "registry",
+    "schema",
+    "session",
+    "view",
+];
 
 /// Validate that every fail-closed safe-harbor verb is read-only.
 ///
@@ -270,21 +291,27 @@ pub struct VerbSurfaceContext<'a> {
     /// Current entity state (e.g., "open", "in_review") for lifecycle filtering.
     /// If None, lifecycle filtering is skipped.
     pub entity_state: Option<&'a str>,
+    /// Whether the session has a client group in scope.
+    /// When `false`, only bootstrap/onboarding verbs are available.
+    /// When `true`, full domain verbs cascade from the group.
+    pub has_group_scope: bool,
+    /// Group composite state for state-to-intent bias.
+    /// When present, verb candidates receive score boosts/penalties
+    /// based on the "as-is → to-be" gap analysis.
+    pub composite_state: Option<&'a GroupCompositeState>,
 }
 
 // ── 8-step compute pipeline ─────────────────────────────────────
 
 /// Compute the session verb surface by applying all governance layers.
 ///
-/// 8-step pipeline:
+/// 6-step pipeline:
 /// 1. Base set from RuntimeVerbRegistry
-/// 2. AgentMode filter
-/// 3. Workflow phase filter
-/// 4. Sem OS context resolution (SemOsContextEnvelope)
+/// 2. AgentMode filter (Research vs Governed)
+/// 3. Scope + workflow filter (group scope + workflow phase, merged)
+/// 4. SemReg CCIR (single enforcement point)
 /// 5. Lifecycle state filter
-/// 6. Actor gating (extension point)
-/// 7. FailPolicy check
-/// 8. Rank, group, fingerprint
+/// 6. Rank + composite state bias + fingerprint
 pub fn compute_session_verb_surface(ctx: &VerbSurfaceContext<'_>) -> SessionVerbSurface {
     let registry = runtime_registry();
 
@@ -318,10 +345,32 @@ pub fn compute_session_verb_surface(ctx: &VerbSurfaceContext<'_>) -> SessionVerb
         .collect();
     let after_agent_mode = after_mode.len();
 
-    // ── Step 3: Workflow phase filter ───────────────────────────
-    let allowed_domains = ctx.stage_focus.and_then(workflow_allowed_domains);
+    // ── Step 3: Scope + workflow filter (merged) ────────────────
+    // Three cases:
+    //   1. No group → only bootstrap domains (session, view, agent, gleif, etc.)
+    //   2. Group set + workflow focus → workflow-specific domains
+    //   3. Group set + no workflow → all domains pass through
+    let scope_domains: Option<HashSet<&str>> = if !ctx.has_group_scope {
+        // No group → bootstrap domains only
+        Some(NO_GROUP_ALLOWED_DOMAINS.iter().copied().collect())
+    } else {
+        // Group set → workflow domains (if any)
+        ctx.stage_focus.and_then(workflow_allowed_domains)
+    };
+    let allowed_domains = scope_domains.clone();
 
-    let after_wf: Vec<(&str, &RuntimeVerb)> = if let Some(ref domains) = allowed_domains {
+    let prune_layer = if !ctx.has_group_scope {
+        PruneLayer::GroupScope
+    } else {
+        PruneLayer::WorkflowPhase
+    };
+    let prune_reason_ctx = if !ctx.has_group_scope {
+        "no group in scope"
+    } else {
+        ctx.stage_focus.unwrap_or("unknown workflow")
+    };
+
+    let after_wf: Vec<(&str, &RuntimeVerb)> = if let Some(ref domains) = scope_domains {
         after_mode
             .into_iter()
             .filter(|(fqn, rv)| {
@@ -332,11 +381,10 @@ pub fn compute_session_verb_surface(ctx: &VerbSurfaceContext<'_>) -> SessionVerb
                         .entry(fqn.to_string())
                         .or_default()
                         .push(SurfacePrune {
-                            layer: PruneLayer::WorkflowPhase,
+                            layer: prune_layer.clone(),
                             reason: format!(
-                                "Domain '{}' not in workflow '{}'",
-                                rv.domain,
-                                ctx.stage_focus.unwrap_or("unknown")
+                                "Domain '{}' not allowed ({})",
+                                rv.domain, prune_reason_ctx,
                             ),
                         });
                     false
@@ -347,6 +395,7 @@ pub fn compute_session_verb_surface(ctx: &VerbSurfaceContext<'_>) -> SessionVerb
         after_mode
     };
     let after_workflow = after_wf.len();
+    let after_group_scope = after_wf.len(); // Same step now
 
     // ── Step 4: SemReg CCIR ────────────────────────────────────
     let phase2 = Phase2Service::evaluate_from_envelope(ctx.envelope.clone());
@@ -413,9 +462,8 @@ pub fn compute_session_verb_surface(ctx: &VerbSurfaceContext<'_>) -> SessionVerb
         .collect();
     let after_lifecycle = after_lc.len();
 
-    // ── Step 6: Actor gating (extension point) ──────────────────
-    // Currently a passthrough. Future: non-SemReg role checks.
-    let after_actor = after_lc.len();
+    // Actor gating removed (was no-op passthrough).
+    let after_actor = after_lifecycle;
 
     // ── Step 7: FailPolicy check ────────────────────────────────
     let after_fp: Vec<(&str, &RuntimeVerb)> = if !semreg_available {
@@ -475,7 +523,13 @@ pub fn compute_session_verb_surface(ctx: &VerbSurfaceContext<'_>) -> SessionVerb
                 })
                 .unwrap_or(true);
 
-            let rank_boost = compute_rank_boost(rv, ctx.stage_focus, &allowed_domains);
+            let mut rank_boost = compute_rank_boost(rv, ctx.stage_focus, &allowed_domains);
+
+            // State-to-intent bias: boost/penalize based on composite state
+            if let Some(composite) = ctx.composite_state {
+                let state_boost = composite.compute_state_boost(&rv.full_name);
+                rank_boost += state_boost as f64;
+            }
 
             SurfaceVerb {
                 fqn: rv.full_name.clone(),
@@ -504,6 +558,7 @@ pub fn compute_session_verb_surface(ctx: &VerbSurfaceContext<'_>) -> SessionVerb
         ctx.stage_focus,
         ctx.entity_state,
         ctx.fail_policy,
+        ctx.has_group_scope,
     );
 
     let semreg_fingerprint = if semreg_available {
@@ -523,6 +578,7 @@ pub fn compute_session_verb_surface(ctx: &VerbSurfaceContext<'_>) -> SessionVerb
             total_registry,
             after_agent_mode,
             after_workflow,
+            after_group_scope,
             after_semreg,
             after_lifecycle,
             after_actor,
@@ -565,6 +621,7 @@ fn compute_surface_fingerprint(
     stage_focus: Option<&str>,
     entity_state: Option<&str>,
     fail_policy: VerbSurfaceFailPolicy,
+    has_group_scope: bool,
 ) -> SurfaceFingerprint {
     let mut sorted_fqns: Vec<&str> = verbs.iter().map(|v| v.fqn.as_str()).collect();
     sorted_fqns.sort();
@@ -579,6 +636,7 @@ fn compute_surface_fingerprint(
     hasher.update(format!("focus:{}", stage_focus.unwrap_or("none")).as_bytes());
     hasher.update(format!("entity_state:{}", entity_state.unwrap_or("none")).as_bytes());
     hasher.update(format!("fail_policy:{fail_policy:?}").as_bytes());
+    hasher.update(format!("group_scope:{has_group_scope}").as_bytes());
 
     let hash = hasher.finalize();
     let hex = hex::encode(hash);
@@ -696,6 +754,7 @@ mod tests {
             None,
             None,
             VerbSurfaceFailPolicy::FailClosed,
+            true,
         );
         let fp2 = compute_surface_fingerprint(
             &verbs,
@@ -703,6 +762,7 @@ mod tests {
             None,
             None,
             VerbSurfaceFailPolicy::FailClosed,
+            true,
         );
         assert_eq!(fp1, fp2, "Same inputs must produce same fingerprint");
     }
@@ -715,6 +775,7 @@ mod tests {
             None,
             None,
             VerbSurfaceFailPolicy::FailClosed,
+            true,
         );
         assert!(
             fp.0.starts_with("vs1:"),
@@ -742,6 +803,7 @@ mod tests {
             None,
             None,
             VerbSurfaceFailPolicy::FailClosed,
+            true,
         );
         let fp_research = compute_surface_fingerprint(
             &verbs,
@@ -749,6 +811,7 @@ mod tests {
             None,
             None,
             VerbSurfaceFailPolicy::FailClosed,
+            true,
         );
         assert_ne!(
             fp_governed, fp_research,
@@ -766,6 +829,8 @@ mod tests {
             envelope: &envelope,
             fail_policy: VerbSurfaceFailPolicy::FailClosed,
             entity_state: None,
+            has_group_scope: true,
+            composite_state: None,
         };
 
         let surface = compute_session_verb_surface(&ctx);
@@ -791,6 +856,8 @@ mod tests {
             envelope: &envelope,
             fail_policy: VerbSurfaceFailPolicy::FailOpen,
             entity_state: None,
+            has_group_scope: true,
+            composite_state: None,
         };
 
         let surface = compute_session_verb_surface(&ctx);
@@ -817,6 +884,8 @@ mod tests {
             envelope: &envelope,
             fail_policy: VerbSurfaceFailPolicy::FailClosed,
             entity_state: None,
+            has_group_scope: true,
+            composite_state: None,
         };
 
         let surface = compute_session_verb_surface(&ctx);
@@ -851,6 +920,8 @@ mod tests {
             envelope: &envelope,
             fail_policy: VerbSurfaceFailPolicy::FailOpen, // Don't restrict further
             entity_state: None,
+            has_group_scope: true,
+            composite_state: None,
         };
 
         let surface = compute_session_verb_surface(&ctx);
@@ -878,6 +949,8 @@ mod tests {
             envelope: &envelope,
             fail_policy: VerbSurfaceFailPolicy::FailOpen,
             entity_state: None,
+            has_group_scope: true,
+            composite_state: None,
         };
 
         let governed_ctx = VerbSurfaceContext {
@@ -886,6 +959,8 @@ mod tests {
             envelope: &envelope,
             fail_policy: VerbSurfaceFailPolicy::FailOpen,
             entity_state: None,
+            has_group_scope: true,
+            composite_state: None,
         };
 
         let research_surface = compute_session_verb_surface(&research_ctx);
@@ -920,6 +995,8 @@ mod tests {
             envelope: &envelope,
             fail_policy: VerbSurfaceFailPolicy::FailOpen,
             entity_state: None,
+            has_group_scope: true,
+            composite_state: None,
         };
 
         let surface = compute_session_verb_surface(&kyc_ctx);
@@ -945,6 +1022,8 @@ mod tests {
             envelope: &envelope,
             fail_policy: VerbSurfaceFailPolicy::FailClosed,
             entity_state: None,
+            has_group_scope: true,
+            composite_state: None,
         };
 
         let surface = compute_session_verb_surface(&ctx);
@@ -969,6 +1048,8 @@ mod tests {
             envelope: &envelope,
             fail_policy: VerbSurfaceFailPolicy::FailOpen,
             entity_state: None,
+            has_group_scope: true,
+            composite_state: None,
         };
 
         let surface = compute_session_verb_surface(&ctx);
@@ -1000,6 +1081,8 @@ mod tests {
             envelope: &envelope,
             fail_policy: VerbSurfaceFailPolicy::FailOpen,
             entity_state: None,
+            has_group_scope: true,
+            composite_state: None,
         };
 
         let with_focus_ctx = VerbSurfaceContext {
@@ -1008,6 +1091,8 @@ mod tests {
             envelope: &envelope,
             fail_policy: VerbSurfaceFailPolicy::FailOpen,
             entity_state: None,
+            has_group_scope: true,
+            composite_state: None,
         };
 
         let no_focus = compute_session_verb_surface(&no_focus_ctx);
@@ -1031,6 +1116,8 @@ mod tests {
             envelope: &envelope,
             fail_policy: VerbSurfaceFailPolicy::FailClosed,
             entity_state: None,
+            has_group_scope: true,
+            composite_state: None,
         };
 
         let surface = compute_session_verb_surface(&ctx);

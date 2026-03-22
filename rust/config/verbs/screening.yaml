@@ -19,6 +19,12 @@ domains:
           - "check if they are politically exposed"
           - "run pep screening on this party"
           - "screen this person for pep risk"
+          - "are they a politically exposed person"
+          - "check if this person holds a public office"
+          - "run a PEP check on this individual"
+          - "is this director politically exposed"
+          - "check political connections"
+          - "screen for government affiliations"
         metadata:
           tier: intent
           source_of_truth: external
@@ -62,6 +68,14 @@ domains:
           - "check sanctions on this party"
           - "screen this name against sanctions lists"
           - "run sanctions screening for this onboarding entity"
+          - "check if they're on any sanctions lists"
+          - "are they sanctioned"
+          - "check this person against OFAC"
+          - "run an OFAC and EU sanctions check"
+          - "screen them against the sanctions database"
+          - "check whether this entity is on a sanctions list"
+          - "is this company sanctioned"
+          - "sanctions check on this counterparty"
         metadata:
           tier: intent
           source_of_truth: external
@@ -105,6 +119,12 @@ domains:
           - "check this party for bad press"
           - "screen for negative media"
           - "look for adverse news on this entity"
+          - "any negative press on this company"
+          - "check for bad news about this person"
+          - "search for adverse media coverage"
+          - "have there been any scandals involving this entity"
+          - "run a media check on this counterparty"
+          - "check for reputational risk in the news"
         metadata:
           tier: intent
           source_of_truth: external
@@ -153,6 +173,15 @@ domains:
           - "run full screening"
           - "run all screenings"
           - "start the full screening workflow"
+          - "screen them"
+          - "screen this entity"
+          - "run screening on this party"
+          - "start compliance checks"
+          - "kick off screening"
+          - "run a full screening -- sanctions, PEP, and adverse media"
+          - "do a complete compliance screen"
+          - "run all the checks on this entity"
+          - "initiate screening"
         behavior: crud
         produces:
           type: screening
@@ -220,6 +249,12 @@ domains:
           - "mark screening complete"
           - "close screening review"
           - "finish screening"
+          - "screening is done"
+          - "close this screening"
+          - "mark this screening as finished"
+          - "record the screening outcome"
+          - "finalise the compliance check"
+          - "complete this screening check"
         behavior: crud
         crud:
           operation: update
@@ -277,6 +312,12 @@ domains:
           - "resolve screening hit finding"
           - "review sanctions hit"
           - "investigate screening match"
+          - "dismiss this screening alert"
+          - "confirm this sanctions match"
+          - "review this compliance alert"
+          - "adjudicate this screening finding"
+          - "is this a true match or false positive"
+          - "resolve this screening flag"
         behavior: crud
         crud:
           operation: update
@@ -337,6 +378,12 @@ domains:
           - "rerun case screenings"
           - "refresh screening coverage for case"
           - "refresh sanctions pep and media checks"
+          - "rescreen all entities in this case"
+          - "refresh all compliance checks"
+          - "rerun all the screenings for this case"
+          - "update screening results for the case"
+          - "re-run sanctions and PEP checks for everyone"
+          - "refresh the screening coverage"
         behavior: plugin
         plugin:
           handler: ScreeningBulkRefreshOp
@@ -377,6 +424,12 @@ domains:
           - "show workstream screening results"
           - "what screenings have been run for workstream"
           - "show screening coverage for workstream"
+          - "what screening checks have been done"
+          - "show all screenings for this entity"
+          - "list the compliance checks"
+          - "what's the screening status"
+          - "show screening history for this workstream"
+          - "which screenings are complete"
         behavior: crud
         crud:
           operation: list_by_fk

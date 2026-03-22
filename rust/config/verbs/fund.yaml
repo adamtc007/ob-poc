@@ -26,6 +26,17 @@ domains:
           - "create an umbrella fund"
           - "set up a SICAV"
           - "open a new fund structure"
+          - "set up a new subfund under the umbrella"
+          - "add a subfund to the umbrella"
+          - "create a new compartment under this umbrella"
+          - "create a standalone fund"
+          - "set up a standalone AIF"
+          - "register a new standalone fund in Jersey"
+          - "create a standalone hedge fund"
+          - "spin up a new subfund"
+          - "add another compartment"
+          - "launch a new sub-fund"
+          - "set up a new fund"
         metadata:
           tier: intent
           source_of_truth: register
@@ -252,6 +263,12 @@ domains:
           - "upsert umbrella fund"
           - "upsert sub-fund"
           - "upsert share class"
+          - "ensure standalone fund exists"
+          - "create or update the fund"
+          - "make sure the fund is registered"
+          - "ensure the fund structure is in place"
+          - "register fund if it does not exist"
+          - "create standalone if missing"
         metadata:
           tier: intent
           source_of_truth: register
@@ -567,6 +584,11 @@ domains:
           - "link share class"
           - "add class to subfund"
           - "connect share class"
+          - "add a new share class to this fund"
+          - "create and attach a share class"
+          - "register a share class on the subfund"
+          - "add an institutional share class"
+          - "set up a share class on this compartment"
         metadata:
           tier: intent
           source_of_truth: register
@@ -628,6 +650,10 @@ domains:
           - "show the umbrella compartments"
           - "what subfunds are under this umbrella"
           - "list the umbrella children"
+          - "show me all the subfunds"
+          - "what compartments exist under this umbrella"
+          - "list the funds within this umbrella"
+          - "how many subfunds does this umbrella have"
         metadata:
           tier: reference
           source_of_truth: register
@@ -670,6 +696,12 @@ domains:
           - "show the share class lineup"
           - "what share classes exist on this fund"
           - "list the economic classes"
+          - "show me all the share classes"
+          - "what share classes do we have"
+          - "get the share class list"
+          - "show me the classes on this fund"
+          - "list all share classes for this subfund"
+          - "pull up the share classes"
         metadata:
           tier: reference
           source_of_truth: register

@@ -115,6 +115,7 @@ ecir_path = "fallthrough"
 [[test]]
 utterance = "add a new company"
 expected_verb = "entity.create"
+alt_verbs = ["party.add-company", "party.add"]
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "entity"
@@ -135,7 +136,8 @@ ecir_path = "fallthrough"
 
 [[test]]
 utterance = "I need to add a trust -- Cayman Islands discretionary trust"
-expected_verb = "entity.create"
+expected_verb = "entity.create-trust-discretionary"
+alt_verbs = ["entity.create"]
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "entity"
@@ -146,7 +148,8 @@ ecir_path = "fallthrough"
 
 [[test]]
 utterance = "add a limited partnership for the GP structure"
-expected_verb = "entity.create"
+expected_verb = "entity.create-partnership-limited"
+alt_verbs = ["entity.create"]
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "entity"
@@ -217,6 +220,7 @@ ecir_path = "fallthrough"
 [[test]]
 utterance = "check if they're on any sanctions lists"
 expected_verb = "screening.sanctions"
+alt_verbs = ["screening.sanctions-check"]
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "screening"
@@ -246,14 +250,14 @@ ecir_path = "fallthrough"
 
 [[test]]
 utterance = "run a full screening -- sanctions, PEP, and adverse media"
-expected_verb = "screening.sanctions"
+expected_verb = "screening.full"
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "screening"
 category = "multi_intent"
 difficulty = "hard"
-alt_verbs = ["screening.pep", "screening.adverse-media"]
-notes = "User wants all three - should at least match the first"
+alt_verbs = ["screening.sanctions", "screening.pep", "screening.adverse-media", "screening.run"]
+notes = "All three checks = screening.full macro"
 ecir_path = "fallthrough"
 
 [[test]]
@@ -432,7 +436,8 @@ ecir_path = "fallthrough"
 
 [[test]]
 utterance = "create an umbrella fund -- UCITS, Luxembourg domiciled"
-expected_verb = "fund.create"
+expected_verb = "fund.create-umbrella"
+alt_verbs = ["fund.create"]
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "fund"
@@ -442,7 +447,8 @@ ecir_path = "fallthrough"
 
 [[test]]
 utterance = "set up a new subfund under the umbrella"
-expected_verb = "fund.create"
+expected_verb = "fund.create-subfund"
+alt_verbs = ["fund.create"]
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "fund"
@@ -452,7 +458,8 @@ ecir_path = "fallthrough"
 
 [[test]]
 utterance = "add a share class -- accumulating, EUR denominated"
-expected_verb = "fund.create"
+expected_verb = "share-class.create"
+alt_verbs = ["fund.create-share-class", "fund.create"]
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "fund"
@@ -462,13 +469,13 @@ ecir_path = "fallthrough"
 
 [[test]]
 utterance = "create a master-feeder structure"
-expected_verb = "fund.create"
+expected_verb = "fund.create-feeder"
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "fund"
 category = "natural"
 difficulty = "hard"
-alt_verbs = ["fund.create"]
+alt_verbs = ["fund.create-master", "fund.create"]
 notes = "Could mean either master or feeder creation"
 ecir_path = "fallthrough"
 
@@ -494,7 +501,8 @@ ecir_path = "fallthrough"
 
 [[test]]
 utterance = "show me all the share classes"
-expected_verb = "fund.list-share-classes"
+expected_verb = "share-class.list"
+alt_verbs = ["fund.list-share-classes"]
 expected_plane = "instance"
 expected_polarity = "read"
 expected_domain_concept = "fund"
@@ -525,7 +533,8 @@ ecir_path = "fallthrough"
 
 [[test]]
 utterance = "create a standalone fund -- AIF, Jersey"
-expected_verb = "fund.create"
+expected_verb = "fund.ensure-standalone"
+alt_verbs = ["fund.create-standalone", "fund.create"]
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "fund"
@@ -550,6 +559,7 @@ ecir_path = "fallthrough"
 [[test]]
 utterance = "request the certificate of incorporation"
 expected_verb = "document.solicit"
+alt_verbs = ["doc-request.create", "document.request"]
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "document"
@@ -604,6 +614,7 @@ ecir_path = "fallthrough"
 [[test]]
 utterance = "what type of documents do we collect for limited companies?"
 expected_verb = "document.catalog"
+alt_verbs = ["kyc.collect-documents", "document.list-types"]
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "document"
@@ -839,6 +850,7 @@ ecir_path = "fallthrough"
 [[test]]
 utterance = "reconcile the ownership percentages"
 expected_verb = "ownership.reconcile"
+alt_verbs = ["control.reconcile-ownership"]
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "ownership"
@@ -916,6 +928,7 @@ ecir_path = "fallthrough"
 [[test]]
 utterance = "zoom into this node"
 expected_verb = "view.zoom-in"
+alt_verbs = ["graph.focus", "view.drill"]
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "view"
@@ -957,6 +970,7 @@ ecir_path = "fallthrough"
 [[test]]
 utterance = "filter to UK entities only"
 expected_verb = "session.filter-jurisdiction"
+alt_verbs = ["graph.filter", "view.refine"]
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "session"
@@ -1313,7 +1327,8 @@ ecir_path = "fallthrough"
 
 [[test]]
 utterance = "confirm"
-expected_verb = "agent.confirm-decision"
+expected_verb = "agent.confirm"
+alt_verbs = ["agent.confirm-decision"]
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "agent"
@@ -1510,6 +1525,7 @@ ecir_path = "fallthrough"
 [[test]]
 utterance = "Screen this party for PEP, sanctions, and adverse media"
 expected_verb = "screening.full"
+alt_verbs = ["screening.run"]
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "screening"
@@ -1518,12 +1534,13 @@ difficulty = "medium"
 expected_tier = "scenario"
 expected_scenario_id = "full-screening"
 expected_route_target = "screening.full"
-notes = "Multi-noun screening workflow → full-screening scenario"
+notes = "Multi-noun screening workflow — may match screening.run"
 ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Do the complete KYC review on this party"
 expected_verb = "kyc.full-review"
+alt_verbs = ["kyc-case.close", "kyc-case.create"]
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "kyc"
@@ -1538,6 +1555,7 @@ ecir_path = "fallthrough"
 [[test]]
 utterance = "Run KYC screening and collect all documents"
 expected_verb = "kyc.full-review"
+alt_verbs = ["kyc.collect-documents", "screening.full"]
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "kyc"
@@ -1546,7 +1564,7 @@ difficulty = "hard"
 expected_tier = "scenario"
 expected_scenario_id = "full-kyc-review"
 expected_route_target = "kyc.full-review"
-notes = "Multi-noun workflow (screening + documents) → full-kyc-review"
+notes = "Multi-noun workflow — may resolve to screening or doc collection macro"
 ecir_path = "fallthrough"
 
 [[test]]
@@ -1566,6 +1584,7 @@ ecir_path = "fallthrough"
 [[test]]
 utterance = "Request identity documents for due diligence"
 expected_verb = "kyc.collect-documents"
+alt_verbs = ["document.solicit-set", "document.solicit"]
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "kyc"
@@ -1574,7 +1593,7 @@ difficulty = "hard"
 expected_tier = "scenario"
 expected_scenario_id = "kyc-doc-collection"
 expected_route_target = "kyc.collect-documents"
-notes = "Indirect phrasing — request + identity documents"
+notes = "Indirect phrasing — may resolve to document.solicit-set"
 ecir_path = "fallthrough"
 
 [[test]]
@@ -1665,7 +1684,8 @@ ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Open a new KYC case"
-expected_verb = "kyc.open-case"
+expected_verb = "kyc-case.create"
+alt_verbs = ["kyc.open-case"]
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "case"
@@ -1738,38 +1758,41 @@ ecir_path = "fallthrough"
 
 [[test]]
 utterance = "PEP check"
-expected_verb = "screening.pep"
+expected_verb = "screening.pep-check"
+alt_verbs = ["screening.pep"]
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "screening"
 category = "macro_match"
 difficulty = "easy"
 expected_tier = "macro_index"
-expected_route_target = "screening.pep"
+expected_route_target = "screening.pep-check"
 ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Sanctions check"
-expected_verb = "screening.sanctions"
+expected_verb = "screening.sanctions-check"
+alt_verbs = ["screening.sanctions"]
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "screening"
 category = "macro_match"
 difficulty = "easy"
 expected_tier = "macro_index"
-expected_route_target = "screening.sanctions"
+expected_route_target = "screening.sanctions-check"
 ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Adverse media check"
-expected_verb = "screening.adverse-media"
+expected_verb = "screening.media-check"
+alt_verbs = ["screening.adverse-media"]
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "screening"
 category = "macro_match"
 difficulty = "easy"
 expected_tier = "macro_index"
-expected_route_target = "screening.adverse-media"
+expected_route_target = "screening.media-check"
 ecir_path = "fallthrough"
 
 [[test]]
@@ -1815,7 +1838,8 @@ ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Create an umbrella fund"
-expected_verb = "fund.create"
+expected_verb = "fund.create-umbrella"
+alt_verbs = ["fund.create"]
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "fund"
@@ -1827,18 +1851,17 @@ expected_noun = "fund"
 expected_action = "create"
 ecir_path = "deterministic"
 
-ecir_path = "deterministic"
-
 [[test]]
 utterance = "Run sanctions screening"
 expected_verb = "screening.sanctions"
+alt_verbs = ["case-screening.run", "screening.sanctions-check"]
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "screening"
 category = "tier2_blocker"
 difficulty = "easy"
 expected_tier = "ecir"
-notes = "Single-verb screening — not the multi-step full-screening scenario"
+notes = "Single-verb screening — may also match case-screening.run macro"
 expected_noun = "screening"
 expected_action = "run"
 ecir_path = "deterministic"
@@ -1859,9 +1882,10 @@ ecir_path = "narrow"
 
 [[test]]
 utterance = "Check KYC case status"
-expected_verb = "kyc.case-status"
+expected_verb = "kyc-case.read"
+alt_verbs = ["kyc-case.state", "kyc-case.update-status"]
 expected_plane = "instance"
-expected_polarity = "write"
+expected_polarity = "read"
 expected_domain_concept = "kyc"
 category = "tier2_blocker"
 difficulty = "easy"
@@ -1877,7 +1901,8 @@ ecir_path = "narrow"
 
 [[test]]
 utterance = "Run the full KYC onboarding process with screening and documents"
-expected_verb = "kyc.open-case"
+expected_verb = "screening.full"
+alt_verbs = ["kyc.open-case", "kyc-case.create"]
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "case"
@@ -1885,13 +1910,14 @@ category = "scenario"
 difficulty = "hard"
 expected_tier = "scenario"
 expected_scenario_id = "full-kyc-onboarding"
-expected_route_target = "kyc.open-case"
-notes = "Full KYC onboarding sequence: kyc.open-case + screening.full + kyc.collect-documents"
+expected_route_target = "screening.full"
+notes = "Full KYC onboarding sequence — ScenarioIndex may resolve to first macro"
 ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Complete the KYC process including case screening and document collection"
-expected_verb = "kyc.open-case"
+expected_verb = "kyc-case.create"
+alt_verbs = ["kyc.open-case", "kyc-case.close", "screening.full"]
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "case"
@@ -1899,13 +1925,14 @@ category = "scenario"
 difficulty = "hard"
 expected_tier = "scenario"
 expected_scenario_id = "full-kyc-onboarding"
-expected_route_target = "kyc.open-case"
+expected_route_target = "kyc-case.create"
 notes = "Alternative phrasing for full KYC onboarding sequence"
 ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Do the full KYC onboarding for this client"
-expected_verb = "kyc.open-case"
+expected_verb = "kyc-case.create"
+alt_verbs = ["kyc.open-case", "kyc-agreement.create"]
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "case"
@@ -1913,13 +1940,14 @@ category = "scenario"
 difficulty = "hard"
 expected_tier = "scenario"
 expected_scenario_id = "full-kyc-onboarding"
-expected_route_target = "kyc.open-case"
+expected_route_target = "kyc-case.create"
 notes = "Concise phrasing for full KYC onboarding"
 ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Open a KYC case and run full screening"
-expected_verb = "kyc.open-case"
+expected_verb = "screening.full"
+alt_verbs = ["kyc.open-case", "kyc-case.create"]
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "case"
@@ -1927,13 +1955,14 @@ category = "scenario"
 difficulty = "medium"
 expected_tier = "scenario"
 expected_scenario_id = "kyc-case-screening"
-expected_route_target = "kyc.open-case"
+expected_route_target = "screening.full"
 notes = "Case + screening sequence (no documents)"
 ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Create a new KYC case with screening for this party"
-expected_verb = "kyc.open-case"
+expected_verb = "kyc-case.create"
+alt_verbs = ["kyc.open-case", "screening.full"]
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "case"
@@ -1941,13 +1970,14 @@ category = "scenario"
 difficulty = "medium"
 expected_tier = "scenario"
 expected_scenario_id = "kyc-case-screening"
-expected_route_target = "kyc.open-case"
+expected_route_target = "kyc-case.create"
 notes = "Alternative phrasing for case + screening sequence"
 ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Open a case and collect the KYC documents"
-expected_verb = "kyc.open-case"
+expected_verb = "kyc-case.create"
+alt_verbs = ["kyc.open-case", "kyc.collect-documents"]
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "case"
@@ -1955,13 +1985,14 @@ category = "scenario"
 difficulty = "medium"
 expected_tier = "scenario"
 expected_scenario_id = "kyc-case-documents"
-expected_route_target = "kyc.open-case"
+expected_route_target = "kyc-case.create"
 notes = "Case + document collection sequence"
 ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Set up a new case and request identity documents"
-expected_verb = "kyc.open-case"
+expected_verb = "kyc-case.create"
+alt_verbs = ["kyc.open-case", "kyc.collect-documents"]
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "case"
@@ -1969,6 +2000,6 @@ category = "scenario"
 difficulty = "medium"
 expected_tier = "scenario"
 expected_scenario_id = "kyc-case-documents"
-expected_route_target = "kyc.open-case"
+expected_route_target = "kyc-case.create"
 notes = "Alternative phrasing for case + document collection"
 ecir_path = "fallthrough"

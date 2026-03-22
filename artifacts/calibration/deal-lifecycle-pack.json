@@ -1,0 +1,72 @@
+[
+  {
+    "text": "create a new deal for Allianz",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to", "value": "deal.create" },
+    "generation_rationale": "Direct deal creation."
+  },
+  {
+    "text": "what's the current status of this deal?",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["deal.read-record", "deal.read-summary", "deal.get"] },
+    "generation_rationale": "Deal status query."
+  },
+  {
+    "text": "move this deal to contracted",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to", "value": "deal.update-status" },
+    "generation_rationale": "Status transition."
+  },
+  {
+    "text": "show me the deal timeline",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["deal.read-timeline", "deal.timeline"] },
+    "generation_rationale": "Timeline view."
+  },
+  {
+    "text": "set up a rate card for this deal",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to", "value": "deal.create-rate-card" },
+    "generation_rationale": "Rate card creation."
+  },
+  {
+    "text": "what fees are on this rate card?",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["deal.list-rate-card-lines", "deal.list-rate-cards"] },
+    "generation_rationale": "Fee inquiry."
+  },
+  {
+    "text": "kick off onboarding for the deal products",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["deal.request-onboarding", "deal.request-onboarding-batch"] },
+    "generation_rationale": "Onboarding handoff."
+  },
+  {
+    "text": "cancel this deal",
+    "calibration_mode": "negative",
+    "negative_type": "type_b",
+    "expected_outcome": { "type": "resolves_to", "value": "deal.cancel" },
+    "generation_rationale": "Type-B: cancel, not create/update."
+  },
+  {
+    "text": "list all active deals",
+    "calibration_mode": "negative",
+    "negative_type": "type_b",
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["deal.list", "deal.search"] },
+    "generation_rationale": "Type-B: list, not single deal operations."
+  },
+  {
+    "text": "spectral deal flux capacitor",
+    "calibration_mode": "negative",
+    "negative_type": "type_a",
+    "expected_outcome": { "type": "falls_to_sage" },
+    "generation_rationale": "Nonsense with deal-adjacent words."
+  }
+]

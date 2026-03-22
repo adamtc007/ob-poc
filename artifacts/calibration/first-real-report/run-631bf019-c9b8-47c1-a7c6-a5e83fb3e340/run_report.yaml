@@ -1,0 +1,344 @@
+clarifications:
+- suggested_prompt: Did you want 'cbu.read' or 'unknown.neighbour'?
+  trigger_phrase: show me the cbu
+  verb_a: cbu.read
+  verb_b: unknown.neighbour
+- suggested_prompt: Did you want 'cbu.read' or 'unknown.neighbour'?
+  trigger_phrase: open the cbu record
+  verb_a: cbu.read
+  verb_b: unknown.neighbour
+- suggested_prompt: Did you want 'cbu.read' or 'unknown.neighbour'?
+  trigger_phrase: view the fund shell details
+  verb_a: cbu.read
+  verb_b: unknown.neighbour
+- suggested_prompt: Did you want 'cbu.read' or 'unknown.neighbour'?
+  trigger_phrase: abracadabra banana telescope
+  verb_a: cbu.read
+  verb_b: unknown.neighbour
+- suggested_prompt: Did you want 'cbu.read' or 'unknown.neighbour'?
+  trigger_phrase: terminate this cbu
+  verb_a: cbu.read
+  verb_b: unknown.neighbour
+- suggested_prompt: Did you want 'cbu.read' or 'unknown.neighbour'?
+  trigger_phrase: show the cbu and maybe change it
+  verb_a: cbu.read
+  verb_b: unknown.neighbour
+fixture_transitions:
+- fixture_state:
+  - binding_key: target
+    current_state: DISCOVERED
+    entity_id: 19eb2c6b-796b-5c79-9d96-f2f5af9108d3
+    entity_type: cbu
+  trace_id: 36c1dd3b-633f-48e3-889c-19c7dc30cd84
+  utterance_id: dee880c9-c098-4fef-9d1b-c12c68288e59
+- fixture_state:
+  - binding_key: target
+    current_state: DISCOVERED
+    entity_id: 19eb2c6b-796b-5c79-9d96-f2f5af9108d3
+    entity_type: cbu
+  trace_id: d5a01930-2880-4164-8ee3-54567c1fa844
+  utterance_id: 11e3a297-c438-4cd6-a701-86a42e6b2e79
+- fixture_state:
+  - binding_key: target
+    current_state: DISCOVERED
+    entity_id: 19eb2c6b-796b-5c79-9d96-f2f5af9108d3
+    entity_type: cbu
+  trace_id: e4bcf920-b195-429c-b20b-77ccab84a2b9
+  utterance_id: 66ed3889-9a0f-4b63-97bf-b9b9e28032ee
+- fixture_state:
+  - binding_key: target
+    current_state: DISCOVERED
+    entity_id: 19eb2c6b-796b-5c79-9d96-f2f5af9108d3
+    entity_type: cbu
+  trace_id: 4170ea9f-27d4-4506-a3df-1823c0c5c4f6
+  utterance_id: 5e49e2da-3529-44ff-9473-72bce0c9e931
+- fixture_state:
+  - binding_key: target
+    current_state: DISCOVERED
+    entity_id: 19eb2c6b-796b-5c79-9d96-f2f5af9108d3
+    entity_type: cbu
+  trace_id: d580d716-21b3-45b5-b2d5-0cd976dc297d
+  utterance_id: 9134648b-9273-455d-b6be-21eb45d6cfa0
+- fixture_state:
+  - binding_key: target
+    current_state: DISCOVERED
+    entity_id: 19eb2c6b-796b-5c79-9d96-f2f5af9108d3
+    entity_type: cbu
+  trace_id: 631aa87a-945e-4137-bd18-58555a35a053
+  utterance_id: 2dce021c-c657-403b-903e-4ce3486537d4
+gaps:
+- actual_halt_reason: no_match
+  code: GAP.CAL.CBU-READ
+  entity_state: DISCOVERED
+  entity_type: cbu
+  source: loopback_calibration
+  target_verb: cbu.read
+  utterance: show me the cbu
+- actual_halt_reason: no_match
+  code: GAP.CAL.CBU-READ
+  entity_state: DISCOVERED
+  entity_type: cbu
+  source: loopback_calibration
+  target_verb: cbu.read
+  utterance: open the cbu record
+- actual_halt_reason: no_match
+  code: GAP.CAL.CBU-READ
+  entity_state: DISCOVERED
+  entity_type: cbu
+  source: loopback_calibration
+  target_verb: cbu.read
+  utterance: view the fund shell details
+run:
+  boundary_count: 1
+  drift:
+    avg_margin_delta: 0.0
+    current_run_id: 631bf019-c9b8-47c1-a7c6-a5e83fb3e340
+    fallback_rate_delta: 0.0
+    newly_failing_utterances: []
+    newly_passing_utterances: []
+    overall_accuracy_delta: 0.0
+    prior_run_id: 817c3f8d-e6e5-4f75-b248-0a2cff13fe3d
+  metrics:
+    avg_total_latency_ms: null
+    boundary_correct_rate: 0.0
+    fragile_boundary_count: 0
+    negative_type_a_rejection_rate: 1.0
+    negative_type_b_rejection_rate: 1.0
+    overall_accuracy: 0.0
+    phase4_avg_margin: 0.0
+    phase4_fallback_rate: 0.3333333432674408
+    positive_hit_rate: 0.0
+  negative_count: 2
+  outcomes:
+  - actual_halt_reason: no_match
+    actual_resolved_verb: null
+    calibration_mode: positive
+    expected_outcome:
+      type: resolves_to
+      value: cbu.read
+    failure_detail: null
+    failure_phase: 4
+    latency_per_phase: null
+    latency_total_ms: null
+    margin: 0.0
+    margin_stable: false
+    negative_type: null
+    pre_screen:
+      margin: 0.0
+      nearest_neighbour_distance: 0.23319458961486816
+      nearest_neighbour_verb: cbu.read
+      stratum:
+        kind: boundary_case
+        margin: 0.0
+      target_verb_distance: 0.23319458961486816
+      utterance: show me the cbu
+    top1_score: null
+    top2_score: null
+    trace_id: 36c1dd3b-633f-48e3-889c-19c7dc30cd84
+    utterance_id: dee880c9-c098-4fef-9d1b-c12c68288e59
+    utterance_text: show me the cbu
+    verdict:
+      actual_halt: no_match
+      expected: cbu.read
+      kind: false_negative
+  - actual_halt_reason: no_match
+    actual_resolved_verb: null
+    calibration_mode: positive
+    expected_outcome:
+      type: resolves_to
+      value: cbu.read
+    failure_detail: null
+    failure_phase: 4
+    latency_per_phase: null
+    latency_total_ms: null
+    margin: 0.0
+    margin_stable: false
+    negative_type: null
+    pre_screen:
+      margin: 0.0
+      nearest_neighbour_distance: 0.23132288455963135
+      nearest_neighbour_verb: cbu.read
+      stratum:
+        kind: boundary_case
+        margin: 0.0
+      target_verb_distance: 0.23132288455963135
+      utterance: open the cbu record
+    top1_score: null
+    top2_score: null
+    trace_id: d5a01930-2880-4164-8ee3-54567c1fa844
+    utterance_id: 11e3a297-c438-4cd6-a701-86a42e6b2e79
+    utterance_text: open the cbu record
+    verdict:
+      actual_halt: no_match
+      expected: cbu.read
+      kind: false_negative
+  - actual_halt_reason: no_match
+    actual_resolved_verb: null
+    calibration_mode: positive
+    expected_outcome:
+      type: resolves_to
+      value: cbu.read
+    failure_detail: null
+    failure_phase: 4
+    latency_per_phase: null
+    latency_total_ms: null
+    margin: 0.0
+    margin_stable: false
+    negative_type: null
+    pre_screen:
+      margin: 0.0
+      nearest_neighbour_distance: 0.40603572130203247
+      nearest_neighbour_verb: cbu.read
+      stratum:
+        kind: boundary_case
+        margin: 0.0
+      target_verb_distance: 0.40603572130203247
+      utterance: view the fund shell details
+    top1_score: null
+    top2_score: null
+    trace_id: e4bcf920-b195-429c-b20b-77ccab84a2b9
+    utterance_id: 66ed3889-9a0f-4b63-97bf-b9b9e28032ee
+    utterance_text: view the fund shell details
+    verdict:
+      actual_halt: no_match
+      expected: cbu.read
+      kind: false_negative
+  - actual_halt_reason: no_match
+    actual_resolved_verb: null
+    calibration_mode: negative
+    expected_outcome:
+      type: falls_to_sage
+    failure_detail: null
+    failure_phase: 4
+    latency_per_phase: null
+    latency_total_ms: null
+    margin: 0.0
+    margin_stable: false
+    negative_type: type_a
+    pre_screen:
+      margin: 0.0
+      nearest_neighbour_distance: 0.5140725374221802
+      nearest_neighbour_verb: cbu.read
+      stratum:
+        kind: boundary_case
+        margin: 0.0
+      target_verb_distance: 0.5140725374221802
+      utterance: abracadabra banana telescope
+    top1_score: null
+    top2_score: null
+    trace_id: 4170ea9f-27d4-4506-a3df-1823c0c5c4f6
+    utterance_id: 5e49e2da-3529-44ff-9473-72bce0c9e931
+    utterance_text: abracadabra banana telescope
+    verdict:
+      kind: unnecessary_fallback
+  - actual_halt_reason: no_match
+    actual_resolved_verb: null
+    calibration_mode: negative
+    expected_outcome:
+      type: halts_with_reason
+      value: no_viable_verb
+    failure_detail: null
+    failure_phase: 4
+    latency_per_phase: null
+    latency_total_ms: null
+    margin: 0.0
+    margin_stable: false
+    negative_type: type_b
+    pre_screen:
+      margin: 0.0
+      nearest_neighbour_distance: 0.2938401699066162
+      nearest_neighbour_verb: cbu.read
+      stratum:
+        kind: boundary_case
+        margin: 0.0
+      target_verb_distance: 0.2938401699066162
+      utterance: terminate this cbu
+    top1_score: null
+    top2_score: null
+    trace_id: d580d716-21b3-45b5-b2d5-0cd976dc297d
+    utterance_id: 9134648b-9273-455d-b6be-21eb45d6cfa0
+    utterance_text: terminate this cbu
+    verdict:
+      kind: unnecessary_fallback
+  - actual_halt_reason: no_match
+    actual_resolved_verb: null
+    calibration_mode: boundary
+    expected_outcome:
+      type: triggers_clarification
+    failure_detail: null
+    failure_phase: 4
+    latency_per_phase: null
+    latency_total_ms: null
+    margin: 0.0
+    margin_stable: false
+    negative_type: null
+    pre_screen:
+      margin: 0.0
+      nearest_neighbour_distance: 0.27855777740478516
+      nearest_neighbour_verb: cbu.read
+      stratum:
+        kind: boundary_case
+        margin: 0.0
+      target_verb_distance: 0.27855777740478516
+      utterance: show the cbu and maybe change it
+    top1_score: null
+    top2_score: null
+    trace_id: 631aa87a-945e-4137-bd18-58555a35a053
+    utterance_id: 2dce021c-c657-403b-903e-4ce3486537d4
+    utterance_text: show the cbu and maybe change it
+    verdict:
+      actual: no_match
+      expected: ambiguous_resolution
+      kind: correct_phase_wrong_reason
+  positive_count: 3
+  prior_run_id: 817c3f8d-e6e5-4f75-b248-0a2cff13fe3d
+  run_end: 2026-03-22T11:25:55.103895Z
+  run_id: 631bf019-c9b8-47c1-a7c6-a5e83fb3e340
+  run_start: 2026-03-22T11:25:52.527177Z
+  scenario_id: 3836903a-c956-4e36-a279-bc4665d62ab6
+  surface_versions:
+    concept_registry_version: null
+    constellation_template_version: null
+    embedding_model_version: bge-small-en-v1.5
+    entity_fsm_version: null
+    macro_compiler_version: 0.1.0
+    parser_version: 0.1.0
+    pattern_catalogue_version: null
+    threshold_policy_version: policy_gate/v1
+    verb_surface_version: vs1:be666d043a6b244968ba5f271871fad4f1017a127ff388231322e60aa8ced549
+  trace_ids:
+  - 36c1dd3b-633f-48e3-889c-19c7dc30cd84
+  - d5a01930-2880-4164-8ee3-54567c1fa844
+  - e4bcf920-b195-429c-b20b-77ccab84a2b9
+  - 4170ea9f-27d4-4506-a3df-1823c0c5c4f6
+  - d580d716-21b3-45b5-b2d5-0cd976dc297d
+  - 631aa87a-945e-4137-bd18-58555a35a053
+  triggered_by: xtask.calibration
+  utterance_count: 6
+scenario:
+  admitted_synthetic_set_id: null
+  constellation_template_id: struct.lux.ucits.sicav
+  constellation_template_version: 19be9af72debe5cb
+  created_by: calibration.seed_builder
+  excluded_neighbours: []
+  execution_shape:
+    kind: singleton
+  expected_margin_threshold: 0.07999999821186066
+  gold_utterances: []
+  governance_status: draft
+  legal_verb_set_snapshot: []
+  linked_entity_states: []
+  near_neighbour_verbs: []
+  operational_phase: EarlyOnboarding
+  scenario_id: 3836903a-c956-4e36-a279-bc4665d62ab6
+  scenario_name: cbu-read-smoke
+  situation_signature: cbu:DISCOVERED
+  situation_signature_hash: 1300918911258677596
+  target_entity_state: DISCOVERED
+  target_entity_type: cbu
+  target_verb: cbu.read
+  verb_taxonomy_tag: other
+write_through:
+  loop1_candidates_upserted: 3
+  loop2_blocklist_upserts: 6
+  loop2_phrases_upserted: 9

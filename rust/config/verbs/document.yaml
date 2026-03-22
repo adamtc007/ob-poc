@@ -9,6 +9,15 @@ domains:
       - verify
       - evidence
       - KYC document
+      - CDD
+      - doc pack
+      - cert of inc
+      - articles of association
+      - missing documents
+      - outstanding documents
+      - solicit
+      - reject document
+      - document request
     verbs:
       # ========================================================================
       # Document Solicitation (outbound tasks)
@@ -34,6 +43,15 @@ domains:
           - ask the client for this document
           - request the missing document from this entity
           - solicit this missing document
+          - request the certificate of incorporation
+          - ask for the cert of inc
+          - send a document request to the client
+          - chase the missing passport
+          - request articles of association from entity
+          - ask the entity to provide their ID
+          - solicit proof of address from this person
+          - can you request the KYC document
+          - send out a request for this document
         metadata:
           tier: intent
           source_of_truth: operational
@@ -119,6 +137,16 @@ domains:
           - ask for passport and proof of address
           - get KYC documents
           - request identity documents
+          - send out the whole doc pack for this entity
+          - request the full CDD document pack
+          - solicit all required documents from entity
+          - send out the KYC document pack
+          - request the full set of KYC documents
+          - ask for all the missing documents
+          - chase the outstanding document pack
+          - send the complete document request to entity
+          - request all identity and address documents
+          - bulk request documents for this person
         metadata:
           tier: intent
           source_of_truth: operational
@@ -187,6 +215,12 @@ domains:
           - "request KYC document from client"
           - "add document to collection list"
           - "create CDD document request"
+          - "open a new document request"
+          - "add a doc request to the workstream"
+          - "set up a document request for this entity"
+          - "create a request for the missing document"
+          - "log a new KYC document request"
+          - "initiate document collection request"
         behavior: crud
         crud:
           operation: upsert
@@ -274,6 +308,12 @@ domains:
           - "confirm document request sent"
           - "set document status to requested"
           - "record outreach for document"
+          - "flag document as sent to client"
+          - "mark that we asked for this document"
+          - "update request status to requested"
+          - "record that the request was dispatched"
+          - "confirm we chased the client for this doc"
+          - "log outreach for this document request"
         behavior: crud
         crud:
           operation: update
@@ -313,6 +353,12 @@ domains:
           - "mark document as received"
           - "update document request to received"
           - "record KYC document intake"
+          - "confirm document arrived from client"
+          - "log receipt of this document"
+          - "the client sent the passport mark it received"
+          - "acknowledge document submission"
+          - "we got the document update the status"
+          - "record that the document came in"
         behavior: crud
         crud:
           operation: update
@@ -362,6 +408,12 @@ domains:
           - "approve requested document as valid"
           - "mark document request verified"
           - "accept document for CDD"
+          - "confirm document passes QA for this request"
+          - "sign off on the document request"
+          - "complete the document request verification"
+          - "mark CDD document request as satisfied"
+          - "this document satisfies the request"
+          - "approve the document for the workstream"
         behavior: crud
         crud:
           operation: update
@@ -409,6 +461,12 @@ domains:
           - "document failed quality check"
           - "mark document request as rejected"
           - "send document back for resubmission"
+          - "reject this document submission"
+          - "fail the document against the request"
+          - "send the doc request back as unsatisfied"
+          - "this document does not meet requirements"
+          - "kick back the document request"
+          - "the submitted document is invalid for the request"
         behavior: crud
         crud:
           operation: update
@@ -451,6 +509,12 @@ domains:
           - "skip this document request"
           - "override document requirement"
           - "approve document exemption"
+          - "grant a waiver for this document"
+          - "exempt entity from this document requirement"
+          - "we don't need this document anymore"
+          - "waive the passport requirement"
+          - "mark this doc request as not required"
+          - "override the missing document requirement"
         behavior: crud
         crud:
           operation: update
@@ -493,6 +557,12 @@ domains:
           - "show outstanding document requests"
           - "what documents are still needed"
           - "show document collection status"
+          - "what docs are outstanding for this workstream"
+          - "show me all pending document requests"
+          - "list the doc requests for this KYC case"
+          - "what CDD documents are we still waiting on"
+          - "show document collection progress"
+          - "how many document requests are still open"
         behavior: crud
         crud:
           operation: list_by_fk
@@ -526,6 +596,11 @@ domains:
           - catalog document
           - add document to catalog
           - register document type
+          - add document to the catalog registry
+          - classify this document
+          - file document under type
+          - catalog this uploaded document
+          - register a new document entry
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -573,6 +648,11 @@ domains:
           - extract document data
           - OCR document
           - parse document
+          - scan the document and extract fields
+          - run OCR on this document
+          - extract data from the uploaded document
+          - read the document contents automatically
+          - parse the passport and pull out the details
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -599,6 +679,11 @@ domains:
           - create document
           - add document record
           - register document
+          - create a new document entry
+          - add a document to the system
+          - register a new document for this entity
+          - create a document record for this CBU
+          - log a new document in the system
         metadata:
           tier: intent
           source_of_truth: operational
@@ -725,6 +810,12 @@ domains:
           - review this document for approval
           - check whether this document is valid
           - mark this document as approved
+          - sign off on this document
+          - confirm the document passes QA
+          - accept the passport as valid
+          - this document looks good approve it
+          - pass the document through QA
+          - the document is fine mark it verified
         metadata:
           tier: intent
           source_of_truth: operational
@@ -755,6 +846,14 @@ domains:
           - fail document verification
           - reject this document
           - mark this upload as invalid
+          - reject the articles of association
+          - fail the passport it is unreadable
+          - send the document back wrong entity
+          - this document is invalid reject it
+          - QA fail this document
+          - kick back this document version
+          - the document is expired reject it
+          - reject this upload wrong person
         metadata:
           tier: intent
           source_of_truth: operational
@@ -809,6 +908,11 @@ domains:
           - start QA
           - begin verification
           - queue for QA
+          - move document to QA queue
+          - send document for quality review
+          - start the document verification process
+          - put this document version into QA
+          - begin document quality check
         metadata:
           tier: intent
           source_of_truth: operational
@@ -917,6 +1021,14 @@ domains:
           - what documents do we have for this entity
           - list the documents on file
           - show the document pack for this entity
+          - where's the CDD pack for this client
+          - show the KYC document pack for this entity
+          - pull up the documents for this person
+          - what's in the doc pack for this entity
+          - do we have any documents on file for this client
+          - show me the CDD documents for this entity
+          - find all documents related to this entity
+          - what KYC docs do we have for this client
         metadata:
           tier: intent
           source_of_truth: operational
@@ -956,6 +1068,15 @@ domains:
           - what documents are missing for this entity
           - which documents are still outstanding
           - show the missing document checklist
+          - what documents do we still need from this entity
+          - what CDD documents are still missing
+          - show me the gaps in the document collection
+          - which KYC documents haven't been received yet
+          - are there any outstanding document requirements
+          - what's still missing from the doc pack
+          - show incomplete document requirements for this person
+          - what evidence is still needed from this entity
+          - list the unfulfilled document requirements
         metadata:
           tier: intent
           source_of_truth: operational
@@ -998,6 +1119,13 @@ domains:
           - show document requirement matrix
           - what evidence is required for this entity
           - compute missing document matrix
+          - calculate the document requirement matrix for this entity
+          - what documents does this entity type require
+          - show the governed evidence requirements
+          - generate the CDD requirement profile
+          - what are the mandatory documents for this entity
+          - compute the KYC document checklist
+          - derive the document requirements from the policy
         metadata:
           tier: intent
           source_of_truth: operational

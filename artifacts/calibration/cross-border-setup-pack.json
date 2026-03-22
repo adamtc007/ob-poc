@@ -1,0 +1,44 @@
+[
+  {
+    "text": "set up a cross-border hedge fund",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to", "value": "struct.hedge.cross-border" },
+    "generation_rationale": "Direct macro match."
+  },
+  {
+    "text": "launch a cross-border PE fund structure",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to", "value": "struct.pe.cross-border" },
+    "generation_rationale": "PE cross-border structure."
+  },
+  {
+    "text": "I need a master-feeder with the master in Ireland and feeder in Cayman",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["struct.hedge.cross-border", "struct.pe.cross-border", "fund.create-feeder"] },
+    "generation_rationale": "Cross-jurisdiction master-feeder."
+  },
+  {
+    "text": "set up a simple Luxembourg fund",
+    "calibration_mode": "negative",
+    "negative_type": "type_b",
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["struct.lux.ucits.sicav", "struct.lux.aif.raif", "fund.create"] },
+    "generation_rationale": "Type-B: single jurisdiction, not cross-border."
+  },
+  {
+    "text": "multi-jurisdiction fund with feeders",
+    "calibration_mode": "boundary",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["struct.hedge.cross-border", "struct.pe.cross-border"] },
+    "generation_rationale": "Boundary: hedge vs PE cross-border."
+  },
+  {
+    "text": "transdimensional fund structure arbitrage",
+    "calibration_mode": "negative",
+    "negative_type": "type_a",
+    "expected_outcome": { "type": "falls_to_sage" },
+    "generation_rationale": "Nonsense with fund-adjacent words."
+  }
+]

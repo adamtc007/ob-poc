@@ -1,0 +1,65 @@
+[
+  {
+    "text": "request a passport from this person",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["document.solicit", "document.request", "doc-request.create"] },
+    "generation_rationale": "Direct document request."
+  },
+  {
+    "text": "what documents do we still need?",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["document.missing-for-entity", "document.compute-requirements"] },
+    "generation_rationale": "Outstanding document query."
+  },
+  {
+    "text": "send out the full CDD doc pack",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["document.solicit-set", "kyc.collect-documents"] },
+    "generation_rationale": "Bulk document solicitation."
+  },
+  {
+    "text": "reject this passport — it's expired",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["document.reject", "document.reject-request"] },
+    "generation_rationale": "Document rejection with reason."
+  },
+  {
+    "text": "mark this document as verified",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["document.verify", "document.verify-request"] },
+    "generation_rationale": "Document QA approval."
+  },
+  {
+    "text": "show me what KYC docs we have for this client",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["document.for-entity", "document.list-versions"] },
+    "generation_rationale": "Document inventory query."
+  },
+  {
+    "text": "upload the articles of association",
+    "calibration_mode": "negative",
+    "negative_type": "type_b",
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["document.upload", "document.upload-version"] },
+    "generation_rationale": "Type-B: upload, not request."
+  },
+  {
+    "text": "request everything and then some",
+    "calibration_mode": "boundary",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["document.solicit-set", "document.solicit", "kyc.collect-documents"] },
+    "generation_rationale": "Boundary: single vs batch request."
+  },
+  {
+    "text": "marshmallow document escrow protocol",
+    "calibration_mode": "negative",
+    "negative_type": "type_a",
+    "expected_outcome": { "type": "falls_to_sage" },
+    "generation_rationale": "Nonsense with document-adjacent words."
+  }
+]

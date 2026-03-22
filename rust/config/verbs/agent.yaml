@@ -287,6 +287,12 @@ domains:
           - "what is the agent doing"
           - "research status"
           - "progress"
+          - "show agent progress"
+          - "what's the agent working on"
+          - "how far along is the research"
+          - "check agent status"
+          - "is the agent still running"
+          - "agent progress report"
         args: []
         returns:
           type: record
@@ -464,6 +470,14 @@ domains:
           - "learn this phrase"
           - "remember this mapping"
           - "when I say X do Y"
+          - "teach the system that spin up means create CBU"
+          - "train the system to recognise this phrase"
+          - "add a new phrase mapping"
+          - "teach it that this phrase means this verb"
+          - "map this phrase to a verb"
+          - "teach the agent a new command"
+          - "I want to teach you a shortcut"
+          - "associate this phrase with a verb"
         args:
           - name: phrase
             type: string
@@ -503,6 +517,12 @@ domains:
           - "forget this phrase"
           - "remove this mapping"
           - "unlearn"
+          - "unteach this phrase"
+          - "remove a taught phrase"
+          - "delete a phrase mapping"
+          - "forget this command"
+          - "undo a teaching"
+          - "remove a learned pattern"
         args:
           - name: phrase
             type: string
@@ -542,6 +562,12 @@ domains:
           - "what have I taught"
           - "show taught phrases"
           - "list learned patterns"
+          - "show what the system has learned"
+          - "list all taught mappings"
+          - "what phrases have been taught"
+          - "show learned commands"
+          - "teaching history"
+          - "review taught patterns"
         args:
           - name: limit
             type: integer
@@ -637,6 +663,14 @@ domains:
           - "show available tools"
           - "list MCP tools"
           - "tool inventory"
+          - "what tools do you have"
+          - "what can you do"
+          - "show me all available tools"
+          - "which tools are registered"
+          - "list all capabilities"
+          - "what operations are available"
+          - "show tool list"
+          - "what commands can I use"
         args:
           - name: category
             type: string

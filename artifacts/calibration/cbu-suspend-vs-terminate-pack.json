@@ -1,0 +1,72 @@
+[
+  {
+    "text": "suspend this CBU temporarily",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to", "value": "cbu.suspend" },
+    "generation_rationale": "Direct suspend intent — clear single verb."
+  },
+  {
+    "text": "put this client business unit on hold",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to", "value": "cbu.suspend" },
+    "generation_rationale": "Natural language synonym for suspend."
+  },
+  {
+    "text": "freeze trading on this structure",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to", "value": "cbu.suspend" },
+    "generation_rationale": "Domain language — freeze = suspend."
+  },
+  {
+    "text": "pause activity on this CBU pending review",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to", "value": "cbu.suspend" },
+    "generation_rationale": "Indirect phrasing using pause."
+  },
+  {
+    "text": "we need to temporarily block this CBU",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to", "value": "cbu.suspend" },
+    "generation_rationale": "Block as synonym for suspend."
+  },
+  {
+    "text": "permanently close down this CBU",
+    "calibration_mode": "negative",
+    "negative_type": "type_b",
+    "expected_outcome": { "type": "resolves_to", "value": "cbu.delete" },
+    "generation_rationale": "Type-B negative: should resolve to delete, not suspend."
+  },
+  {
+    "text": "terminate this client unit forever",
+    "calibration_mode": "negative",
+    "negative_type": "type_b",
+    "expected_outcome": { "type": "resolves_to", "value": "cbu.delete" },
+    "generation_rationale": "Type-B: terminate permanently = delete, not suspend."
+  },
+  {
+    "text": "hold off on this CBU for now",
+    "calibration_mode": "boundary",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["cbu.suspend", "cbu.delete"] },
+    "generation_rationale": "Ambiguous — hold off could mean suspend or cautious delete."
+  },
+  {
+    "text": "stop this CBU",
+    "calibration_mode": "boundary",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["cbu.suspend", "cbu.delete"] },
+    "generation_rationale": "Stop is maximally ambiguous between suspend and terminate."
+  },
+  {
+    "text": "quantum entanglement portfolio realignment",
+    "calibration_mode": "negative",
+    "negative_type": "type_a",
+    "expected_outcome": { "type": "falls_to_sage" },
+    "generation_rationale": "Nonsense — should not resolve to any CBU verb."
+  }
+]

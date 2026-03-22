@@ -1,0 +1,44 @@
+[
+  {
+    "text": "show me the cbu",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to", "value": "cbu.read" },
+    "generation_rationale": "Direct read intent using the canonical entity noun."
+  },
+  {
+    "text": "open the cbu record",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to", "value": "cbu.read" },
+    "generation_rationale": "Common operator phrasing for viewing an existing CBU."
+  },
+  {
+    "text": "view the fund shell details",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to", "value": "cbu.read" },
+    "generation_rationale": "Read-style synonym that still refers to the target CBU object."
+  },
+  {
+    "text": "abracadabra banana telescope",
+    "calibration_mode": "negative",
+    "negative_type": "type_a",
+    "expected_outcome": { "type": "falls_to_sage" },
+    "generation_rationale": "Nonsense utterance that should not resolve to a governed CBU verb."
+  },
+  {
+    "text": "terminate this cbu",
+    "calibration_mode": "negative",
+    "negative_type": "type_b",
+    "expected_outcome": { "type": "halts_with_reason", "value": "no_viable_verb" },
+    "generation_rationale": "Out-of-scope destructive request against a discovery-stage CBU."
+  },
+  {
+    "text": "show the cbu and maybe change it",
+    "calibration_mode": "boundary",
+    "negative_type": null,
+    "expected_outcome": { "type": "triggers_clarification" },
+    "generation_rationale": "Mixed read/update wording intended to probe ambiguity handling."
+  }
+]

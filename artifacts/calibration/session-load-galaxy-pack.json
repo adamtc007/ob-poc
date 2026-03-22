@@ -1,0 +1,65 @@
+[
+  {
+    "text": "load the Allianz book",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["session.load-cluster", "session.load-galaxy", "view.book"] },
+    "generation_rationale": "Canonical session loading phrase."
+  },
+  {
+    "text": "show me all CBUs for BlackRock",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["session.load-cluster", "session.load-galaxy"] },
+    "generation_rationale": "Client-scoped loading."
+  },
+  {
+    "text": "pull up the Vanguard universe",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["session.load-galaxy", "session.load-cluster", "view.universe"] },
+    "generation_rationale": "Universe loading for client."
+  },
+  {
+    "text": "load Luxembourg structures",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["session.load-jurisdiction", "session.filter-jurisdiction"] },
+    "generation_rationale": "Jurisdiction-scoped loading."
+  },
+  {
+    "text": "switch to the Ireland book",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["session.load-galaxy", "session.load-cluster", "session.load-jurisdiction"] },
+    "generation_rationale": "Book switching with jurisdiction."
+  },
+  {
+    "text": "clear the current scope",
+    "calibration_mode": "negative",
+    "negative_type": "type_b",
+    "expected_outcome": { "type": "resolves_to", "value": "session.clear" },
+    "generation_rationale": "Type-B: clear, not load."
+  },
+  {
+    "text": "undo the last action",
+    "calibration_mode": "negative",
+    "negative_type": "type_b",
+    "expected_outcome": { "type": "resolves_to", "value": "session.undo" },
+    "generation_rationale": "Type-B: undo, not load."
+  },
+  {
+    "text": "load everything",
+    "calibration_mode": "boundary",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["session.load-universe", "view.universe", "session.load-galaxy"] },
+    "generation_rationale": "Boundary: everything = universe or galaxy?"
+  },
+  {
+    "text": "invisible unicorn portfolio reset",
+    "calibration_mode": "negative",
+    "negative_type": "type_a",
+    "expected_outcome": { "type": "falls_to_sage" },
+    "generation_rationale": "Nonsense — should not match session verbs."
+  }
+]

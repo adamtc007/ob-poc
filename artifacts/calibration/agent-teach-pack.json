@@ -1,0 +1,58 @@
+[
+  {
+    "text": "teach the system that 'spin up' means cbu.create",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to", "value": "agent.teach" },
+    "generation_rationale": "Direct teaching command."
+  },
+  {
+    "text": "train the system to recognise 'stand up a fund' as cbu.create",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to", "value": "agent.teach" },
+    "generation_rationale": "Train as synonym for teach."
+  },
+  {
+    "text": "add 'register fund' as a phrase for fund.create",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to", "value": "agent.teach" },
+    "generation_rationale": "Phrase addition."
+  },
+  {
+    "text": "what tools are available?",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to", "value": "agent.list-tools" },
+    "generation_rationale": "Tool listing query."
+  },
+  {
+    "text": "what can you do?",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to", "value": "agent.list-tools" },
+    "generation_rationale": "Capability inquiry."
+  },
+  {
+    "text": "forget the phrase 'spin up'",
+    "calibration_mode": "negative",
+    "negative_type": "type_b",
+    "expected_outcome": { "type": "resolves_to", "value": "agent.unteach" },
+    "generation_rationale": "Type-B: unteach, not teach."
+  },
+  {
+    "text": "what's the current agent status?",
+    "calibration_mode": "negative",
+    "negative_type": "type_b",
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["agent.read-status", "agent.status"] },
+    "generation_rationale": "Type-B: status, not teach."
+  },
+  {
+    "text": "hyperdimensional teaching protocol override",
+    "calibration_mode": "negative",
+    "negative_type": "type_a",
+    "expected_outcome": { "type": "falls_to_sage" },
+    "generation_rationale": "Nonsense with teach-adjacent words."
+  }
+]

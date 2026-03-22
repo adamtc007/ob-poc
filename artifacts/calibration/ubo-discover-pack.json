@@ -1,0 +1,65 @@
+[
+  {
+    "text": "who are the ultimate beneficial owners?",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["ubo.discover", "ubo.list-ubos", "control.identify-ubos"] },
+    "generation_rationale": "Direct UBO discovery."
+  },
+  {
+    "text": "trace the ownership chain for this fund",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["ubo.trace-chains", "ownership.trace-chain"] },
+    "generation_rationale": "Ownership chain tracing."
+  },
+  {
+    "text": "calculate the UBO percentages",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["ubo.calculate", "ownership.compute"] },
+    "generation_rationale": "UBO percentage computation."
+  },
+  {
+    "text": "who controls this company?",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["ownership.who-controls", "control.identify-ubos", "ubo.list-ubos"] },
+    "generation_rationale": "Control question — maps to UBO domain."
+  },
+  {
+    "text": "discover beneficial owners above 25%",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["ubo.discover", "ubo.list-ubos"] },
+    "generation_rationale": "Threshold-based UBO discovery."
+  },
+  {
+    "text": "reconcile ownership percentages",
+    "calibration_mode": "negative",
+    "negative_type": "type_b",
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["ownership.reconcile", "control.reconcile-ownership"] },
+    "generation_rationale": "Type-B: reconcile, not discover."
+  },
+  {
+    "text": "import the GLEIF ownership data",
+    "calibration_mode": "negative",
+    "negative_type": "type_b",
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["gleif.trace-ownership", "ownership.snapshot.import-gleif"] },
+    "generation_rationale": "Type-B: import, not discover."
+  },
+  {
+    "text": "check the ownership",
+    "calibration_mode": "boundary",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["ubo.discover", "ownership.who-controls", "ownership.trace-chain", "ubo.trace-chains"] },
+    "generation_rationale": "Boundary: check could mean discover, trace, or compute."
+  },
+  {
+    "text": "recursive beneficial interest transponder",
+    "calibration_mode": "negative",
+    "negative_type": "type_a",
+    "expected_outcome": { "type": "falls_to_sage" },
+    "generation_rationale": "Nonsense with ownership-adjacent words."
+  }
+]

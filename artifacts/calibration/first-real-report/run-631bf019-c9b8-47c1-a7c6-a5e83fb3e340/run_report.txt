@@ -1,0 +1,7 @@
+scenario: cbu-read-smoke (3836903a-c956-4e36-a279-bc4665d62ab6)
+run_id: 631bf019-c9b8-47c1-a7c6-a5e83fb3e340
+utterances: 6
+accuracy: 0.00%
+loop1_candidates_upserted: 3
+loop2_phrases_upserted: 9
+loop2_blocklist_upserts: 6

@@ -1,0 +1,58 @@
+[
+  {
+    "text": "import the corporate hierarchy from GLEIF",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["gleif.import-tree", "gleif.import-entity"] },
+    "generation_rationale": "Direct GLEIF import."
+  },
+  {
+    "text": "look up Allianz SE in the LEI database",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["gleif.lookup", "gleif.search"] },
+    "generation_rationale": "LEI lookup by name."
+  },
+  {
+    "text": "pull the ownership tree from GLEIF for this entity",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["gleif.import-tree", "gleif.trace-ownership"] },
+    "generation_rationale": "Ownership tree import."
+  },
+  {
+    "text": "get the GLEIF data for this LEI",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["gleif.lookup", "gleif.get-by-lei", "gleif.search"] },
+    "generation_rationale": "LEI data retrieval."
+  },
+  {
+    "text": "research this company using GLEIF",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["gleif.import-tree", "gleif.lookup", "gleif.search"] },
+    "generation_rationale": "Research using GLEIF data source."
+  },
+  {
+    "text": "who manages this fund according to GLEIF?",
+    "calibration_mode": "negative",
+    "negative_type": "type_b",
+    "expected_outcome": { "type": "resolves_to", "value": "gleif.get-master-fund" },
+    "generation_rationale": "Type-B: manager query, not import."
+  },
+  {
+    "text": "import BODS ownership data",
+    "calibration_mode": "negative",
+    "negative_type": "type_b",
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["ownership.snapshot.import-bods", "bods.import"] },
+    "generation_rationale": "Type-B: BODS source, not GLEIF."
+  },
+  {
+    "text": "galactic lei transponder calibration",
+    "calibration_mode": "negative",
+    "negative_type": "type_a",
+    "expected_outcome": { "type": "falls_to_sage" },
+    "generation_rationale": "Nonsense with LEI-adjacent words."
+  }
+]

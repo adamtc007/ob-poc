@@ -1,0 +1,72 @@
+[
+  {
+    "text": "create a new legal entity",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to", "value": "entity.create" },
+    "generation_rationale": "Direct entity creation."
+  },
+  {
+    "text": "add a new company to the system",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["entity.create", "party.add-company"] },
+    "generation_rationale": "Natural language company creation."
+  },
+  {
+    "text": "register HSBC Holdings plc as an entity",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to", "value": "entity.create" },
+    "generation_rationale": "Register with specific company name."
+  },
+  {
+    "text": "onboard a new counterparty",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["entity.create", "party.add"] },
+    "generation_rationale": "Counterparty onboarding = entity creation."
+  },
+  {
+    "text": "add John Smith as a person",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to", "value": "entity.create" },
+    "generation_rationale": "Person entity creation."
+  },
+  {
+    "text": "show me all entities",
+    "calibration_mode": "negative",
+    "negative_type": "type_b",
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["entity.list", "view.universe"] },
+    "generation_rationale": "Type-B: list, not create."
+  },
+  {
+    "text": "delete this entity",
+    "calibration_mode": "negative",
+    "negative_type": "type_b",
+    "expected_outcome": { "type": "resolves_to", "value": "entity.delete" },
+    "generation_rationale": "Type-B: delete, not create."
+  },
+  {
+    "text": "add a new party",
+    "calibration_mode": "boundary",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["entity.create", "party.add"] },
+    "generation_rationale": "Boundary: party.add macro vs entity.create primitive."
+  },
+  {
+    "text": "set up a trust for the Cayman Islands",
+    "calibration_mode": "boundary",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["entity.create", "entity.create-trust-discretionary"] },
+    "generation_rationale": "Boundary: generic create vs specific trust sub-type."
+  },
+  {
+    "text": "purple elephant compliance framework",
+    "calibration_mode": "negative",
+    "negative_type": "type_a",
+    "expected_outcome": { "type": "falls_to_sage" },
+    "generation_rationale": "Nonsense — should not resolve to entity verbs."
+  }
+]

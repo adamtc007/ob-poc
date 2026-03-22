@@ -12,6 +12,7 @@ use xshell::{cmd, Shell};
 mod allianz_harness;
 mod aviva_deal_harness;
 mod bpmn_lite;
+mod calibration;
 mod deal_harness;
 mod entity;
 mod fund_programme;
@@ -325,6 +326,12 @@ enum Command {
     Lexicon {
         #[command(subcommand)]
         action: LexiconAction,
+    },
+
+    /// Loopback calibration commands.
+    Calibration {
+        #[command(subcommand)]
+        action: calibration::CalibrationAction,
     },
 
     /// Semantic Registry commands (stats, describe, list, history, scan)
@@ -1373,6 +1380,10 @@ fn main() -> Result<()> {
                 iterations,
             } => lexicon::bench(snapshot.as_deref(), iterations),
         },
+        Command::Calibration { action } => {
+            let rt = tokio::runtime::Runtime::new()?;
+            rt.block_on(calibration::run(action))
+        }
         Command::SemReg { action } => {
             let rt = tokio::runtime::Runtime::new()?;
             match action {

@@ -88,6 +88,10 @@ pub mod traceability;
 #[cfg(feature = "database")]
 pub mod sem_os_runtime;
 
+// Loopback calibration harness
+#[cfg(feature = "database")]
+pub mod calibration;
+
 // Verification module - adversarial agent model for KYC
 pub mod verification;
 

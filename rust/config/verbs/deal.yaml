@@ -34,6 +34,12 @@ domains:
           - "open new deal"
           - "start deal"
           - "create client deal"
+          - "set up a new deal"
+          - "register a sales opportunity"
+          - "open a deal for this client"
+          - "start a new commercial deal"
+          - "create a deal record"
+          - "kick off a new deal"
         args:
           - name: deal-name
             type: string
@@ -111,6 +117,21 @@ domains:
           - "view deal by id"
           - "read this deal"
           - "show the current deal record"
+          - "what's the status of the deal"
+          - "what is the deal status"
+          - "check deal status"
+          - "pull up the deal"
+          - "give me the deal details"
+          - "where does the deal stand"
+          - "show me this deal"
+          - "what's happening with the deal"
+          - "deal progress"
+          - "how is the deal going"
+          - "what stage is the deal at"
+          - "check on this deal"
+          - "deal status check"
+          - "what's the current state of this deal"
+          - "look up this deal"
         args:
           - name: deal-id
             type: uuid
@@ -145,6 +166,11 @@ domains:
           - "all deals"
           - "deals for client"
           - "my deals"
+          - "show me the deal pipeline"
+          - "what deals do we have"
+          - "list all active deals"
+          - "show the sales pipeline"
+          - "what's in the pipeline"
         args:
           - name: client-group-id
             type: uuid
@@ -260,6 +286,20 @@ domains:
           - "mark this deal as negotiated"
           - "move this deal into onboarding"
           - "advance the commercial status"
+          - "move the deal to approved"
+          - "transition the deal status"
+          - "promote the deal to the next stage"
+          - "set this deal to contracted"
+          - "mark deal as active"
+          - "push the deal to qualifying"
+          - "approve the deal"
+          - "push deal to next stage"
+          - "advance this deal to the next phase"
+          - "change the deal phase"
+          - "progress the deal forward"
+          - "escalate the deal to onboarding"
+          - "move deal status to contracted"
+          - "update the deal pipeline stage"
         args:
           - name: deal-id
             type: uuid
@@ -715,6 +755,21 @@ domains:
           - "new rate card for deal"
           - "create pricing for deal"
           - "add rate card to deal"
+          - "set up the rate card"
+          - "set up rate card for custody services"
+          - "create a fee schedule for this deal"
+          - "build the rate card"
+          - "start a new rate card for this product"
+          - "set up pricing for custody"
+          - "create a pricing schedule"
+          - "set up the fee card for this product"
+          - "build a fee schedule for custody"
+          - "create the pricing card"
+          - "set up custody pricing"
+          - "create rate card for this service"
+          - "new fee schedule"
+          - "start the rate card for fund accounting"
+          - "add pricing for this deal product"
         args:
           - name: deal-id
             type: uuid
@@ -915,6 +970,21 @@ domains:
           - "list rate card lines"
           - "show fee lines"
           - "rate card pricing"
+          - "what's the fee for custody"
+          - "show me the fees on this rate card"
+          - "what are the pricing lines"
+          - "show the fee breakdown"
+          - "what does custody cost on this product"
+          - "list the charges on the rate card"
+          - "show pricing details"
+          - "what's the fee for custody on this product"
+          - "how much does this service cost"
+          - "show the custody fees"
+          - "what are the charges for fund accounting"
+          - "fee line items"
+          - "what's the pricing on this rate card"
+          - "break down the fees"
+          - "show me what this product costs"
         args:
           - name: rate-card-id
             type: uuid
@@ -950,6 +1020,9 @@ domains:
           - "send this rate card for review"
           - "issue the commercial proposal"
           - "propose these fees to the client"
+          - "share the pricing with the client"
+          - "submit the fee proposal"
+          - "put this rate card out for approval"
         args:
           - name: rate-card-id
             type: uuid
@@ -1014,6 +1087,10 @@ domains:
           - "accept rate card"
           - "finalize rate card"
           - "approve pricing"
+          - "lock in the rate card"
+          - "confirm the agreed pricing"
+          - "sign off on the fees"
+          - "finalize the fee schedule"
         args:
           - name: rate-card-id
             type: uuid
@@ -1042,6 +1119,9 @@ domains:
           - "list deal rate cards"
           - "show rate cards"
           - "deal pricing history"
+          - "show me the rate cards for this deal"
+          - "what rate cards exist on this deal"
+          - "list all pricing versions"
         args:
           - name: deal-id
             type: uuid
@@ -1469,6 +1549,20 @@ domains:
           - "create onboarding request"
           - "handoff to ops"
           - "initiate onboarding"
+          - "kick off onboarding for this deal"
+          - "start onboarding for the deal products"
+          - "submit the onboarding request"
+          - "send this deal to operations"
+          - "trigger onboarding"
+          - "hand over to the onboarding team"
+          - "begin product setup for this deal"
+          - "trigger CBU creation from this deal"
+          - "start the onboarding process"
+          - "kick off product onboarding"
+          - "send deal products to onboarding"
+          - "initiate the ops handoff"
+          - "start setting up the deal products"
+          - "launch onboarding for this client"
         args:
           - name: deal-id
             type: uuid
@@ -1623,6 +1717,9 @@ domains:
           - "list onboarding requests"
           - "show onboarding requests"
           - "deal onboarding status"
+          - "what's the onboarding status"
+          - "show me the onboarding progress"
+          - "where are we on onboarding"
         args:
           - name: deal-id
             type: uuid
@@ -1655,6 +1752,20 @@ domains:
           - "deal summary"
           - "full deal details"
           - "deal overview"
+          - "show me the deal summary"
+          - "get the deal overview"
+          - "give me the full deal picture"
+          - "what's going on with this deal"
+          - "deal snapshot"
+          - "summarize the deal"
+          - "show me everything about this deal"
+          - "deal at a glance"
+          - "complete deal picture"
+          - "what's the full story on this deal"
+          - "deal dashboard"
+          - "pull up the deal summary"
+          - "give me the deal rundown"
+          - "show deal with all linked entities"
         args:
           - name: deal-id
             type: uuid
@@ -1684,6 +1795,20 @@ domains:
           - "deal history"
           - "deal events"
           - "deal audit trail"
+          - "show me the deal timeline"
+          - "what happened on this deal"
+          - "deal activity log"
+          - "show the deal event history"
+          - "when did this deal change status"
+          - "deal progression history"
+          - "show deal progress over time"
+          - "give me the deal chronology"
+          - "what's the history on this deal"
+          - "show the audit log for this deal"
+          - "deal milestones"
+          - "track deal changes"
+          - "walk me through what happened on this deal"
+          - "show deal activity"
         args:
           - name: deal-id
             type: uuid

@@ -28,6 +28,14 @@ domains:
         - "new booking principal"
         - "add booking principal"
         - "register booking principal"
+        - "set up a booking principal"
+        - "create booking entity"
+        - "register a booking principal"
+        - "create a new booking principal for this deal"
+        - "set up the booking entity"
+        - "add a principal for booking"
+        - "create a booking entity for custody"
+        - "establish a booking principal"
         args:
         - name: legal-entity-id
           type: uuid
@@ -221,6 +229,14 @@ domains:
         - "show evaluation details"
         - "why was this principal selected"
         - "evaluation audit trail"
+        - "explain the booking principal"
+        - "why this booking entity"
+        - "explain the principal selection"
+        - "show me why this principal was chosen"
+        - "booking principal rationale"
+        - "principal selection explanation"
+        - "why did we pick this booking entity"
+        - "explain the eligibility decision"
         args:
         - name: evaluation-id
           type: uuid
@@ -245,6 +261,14 @@ domains:
         - "show coverage"
         - "principal coverage"
         - "booking coverage matrix"
+        - "which entity handles custody for Ireland"
+        - "show booking coverage"
+        - "booking entity lookup"
+        - "which booking entity covers this jurisdiction"
+        - "who handles custody in Luxembourg"
+        - "show me the booking coverage by jurisdiction"
+        - "which principal services this region"
+        - "booking coverage by country"
         returns:
           type: record_set
           name: coverage_entries

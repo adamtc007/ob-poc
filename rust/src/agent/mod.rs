@@ -3,6 +3,8 @@
 //! Contains the agent learning infrastructure for continuous improvement.
 //! Navigation commands go through the unified intent pipeline (view.* and session.* verbs).
 
+pub mod composite_state;
+pub mod composite_state_loader;
 pub mod harness;
 pub mod learning;
 pub mod orchestrator;

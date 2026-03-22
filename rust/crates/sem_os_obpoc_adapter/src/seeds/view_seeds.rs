@@ -12,6 +12,10 @@ pub fn core_views() -> Vec<ViewDefBody> {
         kyc_case_view(),
         governance_review_view(),
         entity_detail_view(),
+        onboarding_view(),
+        deal_management_view(),
+        screening_view(),
+        document_collection_view(),
     ]
 }
 
@@ -59,7 +63,7 @@ pub fn trading_overview_view() -> ViewDefBody {
             attribute_fqn: "cbu.name".into(),
             direction: SortDirection::Ascending,
         }],
-        includes_operational: false,
+        includes_operational: true,
     }
 }
 
@@ -119,7 +123,7 @@ pub fn kyc_case_view() -> ViewDefBody {
             attribute_fqn: "kyc.risk_level".into(),
             direction: SortDirection::Descending,
         }],
-        includes_operational: false,
+        includes_operational: true,
     }
 }
 
@@ -206,6 +210,142 @@ pub fn entity_detail_view() -> ViewDefBody {
     }
 }
 
+pub fn onboarding_view() -> ViewDefBody {
+    ViewDefBody {
+        fqn: "view.onboarding".into(),
+        name: "Client Onboarding".into(),
+        description: "Onboarding workflow view showing CBU setup progress, role assignments, and KYC readiness".into(),
+        domain: "onboarding".into(),
+        base_entity_type: "entity.cbu".into(),
+        columns: vec![
+            col("cbu.name", Some("Structure"), Some(200), true, None),
+            col("cbu.status", Some("Status"), Some(80), true, Some("badge")),
+            col("cbu.jurisdiction_code", Some("Jurisdiction"), Some(80), true, Some("badge")),
+            col("cbu.client_type", Some("Type"), Some(100), true, None),
+            col("kyc-case.status", Some("KYC Status"), Some(100), true, Some("badge")),
+        ],
+        filters: vec![],
+        sort_order: vec![ViewSortField {
+            attribute_fqn: "cbu.name".into(),
+            direction: SortDirection::Ascending,
+        }],
+        includes_operational: true,
+    }
+}
+
+pub fn deal_management_view() -> ViewDefBody {
+    ViewDefBody {
+        fqn: "view.deal-management".into(),
+        name: "Deal Management".into(),
+        description:
+            "Commercial deal pipeline view showing deal status, rate cards, and onboarding progress"
+                .into(),
+        domain: "deal".into(),
+        base_entity_type: "entity.deal".into(),
+        columns: vec![
+            col("deal.deal_name", Some("Deal"), Some(200), true, None),
+            col(
+                "deal.status",
+                Some("Status"),
+                Some(100),
+                true,
+                Some("badge"),
+            ),
+            col(
+                "deal.sales_owner",
+                Some("Sales Owner"),
+                Some(120),
+                true,
+                None,
+            ),
+            col(
+                "deal.created_at",
+                Some("Created"),
+                Some(100),
+                true,
+                Some("date"),
+            ),
+        ],
+        filters: vec![],
+        sort_order: vec![ViewSortField {
+            attribute_fqn: "deal.created_at".into(),
+            direction: SortDirection::Descending,
+        }],
+        includes_operational: true,
+    }
+}
+
+pub fn screening_view() -> ViewDefBody {
+    ViewDefBody {
+        fqn: "view.screening".into(),
+        name: "Screening Dashboard".into(),
+        description:
+            "Compliance screening view showing PEP, sanctions, and adverse media check status"
+                .into(),
+        domain: "screening".into(),
+        base_entity_type: "entity.legal_entity".into(),
+        columns: vec![
+            col("entity.name", Some("Entity"), Some(200), true, None),
+            col(
+                "entity.entity_type",
+                Some("Type"),
+                Some(80),
+                true,
+                Some("badge"),
+            ),
+            col(
+                "screening.pep_status",
+                Some("PEP"),
+                Some(80),
+                true,
+                Some("badge"),
+            ),
+            col(
+                "screening.sanctions_status",
+                Some("Sanctions"),
+                Some(80),
+                true,
+                Some("badge"),
+            ),
+            col(
+                "screening.adverse_media_status",
+                Some("Media"),
+                Some(80),
+                true,
+                Some("badge"),
+            ),
+        ],
+        filters: vec![],
+        sort_order: vec![ViewSortField {
+            attribute_fqn: "entity.name".into(),
+            direction: SortDirection::Ascending,
+        }],
+        includes_operational: true,
+    }
+}
+
+pub fn document_collection_view() -> ViewDefBody {
+    ViewDefBody {
+        fqn: "view.document-collection".into(),
+        name: "Document Collection".into(),
+        description: "Document solicitation view showing outstanding requirements, submissions, and QA status".into(),
+        domain: "document".into(),
+        base_entity_type: "entity.legal_entity".into(),
+        columns: vec![
+            col("entity.name", Some("Entity"), Some(200), true, None),
+            col("document.doc_type", Some("Document Type"), Some(150), true, None),
+            col("document.status", Some("Status"), Some(80), true, Some("badge")),
+            col("document.requested_at", Some("Requested"), Some(100), true, Some("date")),
+        ],
+        filters: vec![],
+        sort_order: vec![ViewSortField {
+            attribute_fqn: "entity.name".into(),
+            direction: SortDirection::Ascending,
+        }],
+        includes_operational: true,
+    }
+}
+
 /// Helper to build a view column.
 fn col(
     attribute_fqn: &str,
@@ -230,7 +370,7 @@ mod tests {
     #[test]
     fn test_core_views_well_formed() {
         let views = core_views();
-        assert_eq!(views.len(), 4, "Expected 4 core views");
+        assert_eq!(views.len(), 8, "Expected 8 core views");
 
         for v in &views {
             assert!(v.fqn.starts_with("view."), "Bad FQN: {}", v.fqn);
@@ -242,23 +382,32 @@ mod tests {
     }
 
     #[test]
-    fn test_governance_view_includes_operational() {
+    fn test_cbu_instance_views_include_operational() {
         let views = core_views();
-        let gov_view = views
-            .iter()
-            .find(|v| v.fqn == "view.governance-review")
-            .unwrap();
-        assert!(gov_view.includes_operational);
-
-        for v in &views {
-            if v.fqn != "view.governance-review" {
-                assert!(
-                    !v.includes_operational,
-                    "View {} should not include operational",
-                    v.fqn
-                );
-            }
+        for fqn in [
+            "view.trading-overview",
+            "view.kyc-case",
+            "view.governance-review",
+        ] {
+            let view = views
+                .iter()
+                .find(|v| v.fqn == fqn)
+                .unwrap_or_else(|| panic!("missing {fqn}"));
+            assert!(
+                view.includes_operational,
+                "View {} should include operational tier",
+                fqn
+            );
         }
+
+        let entity_detail = views
+            .iter()
+            .find(|v| v.fqn == "view.entity-detail")
+            .unwrap();
+        assert!(
+            !entity_detail.includes_operational,
+            "Entity detail should remain governed-only"
+        );
     }
 
     #[test]

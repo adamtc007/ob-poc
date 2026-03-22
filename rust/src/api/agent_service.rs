@@ -235,6 +235,18 @@ mod tests {
         );
     }
 
+    #[test]
+    fn semos_calibration_focus_skips_client_scope_gate() {
+        assert!(AgentService::skips_client_scope_gate(Some(
+            "semos-calibration"
+        )));
+    }
+
+    #[test]
+    fn semos_calibration_focus_emits_no_goals() {
+        assert!(AgentService::stage_focus_goals(Some("semos-calibration")).is_empty());
+    }
+
     #[cfg(feature = "runbook-gate-vnext")]
     #[test]
     fn phase5_recheck_failure_blocks_removed_verb() {
@@ -618,6 +630,7 @@ impl AgentService {
             } else {
                 TraceKind::Original
             },
+            false,
         );
         trace.parent_trace_id = session.pending_trace_id;
         let mut trace_payload = build_trace_scaffold_payload(
@@ -777,6 +790,7 @@ impl AgentService {
             Uuid::new_v4(),
             response.message.clone(),
             TraceKind::ClarificationPrompt,
+            false,
         );
         trace.parent_trace_id = Some(parent_trace_id);
         trace.outcome = TraceOutcome::ClarificationTriggered;
@@ -972,6 +986,7 @@ impl AgentService {
     /// - `navigation` (session/view navigation verbs)
     fn stage_focus_goals(stage_focus: Option<&str>) -> Vec<String> {
         match stage_focus {
+            Some("semos-calibration") => vec![],
             Some("semos-data-management") | Some("semos-data") => vec![
                 "data-management".to_string(),
                 "data".to_string(),
@@ -1338,6 +1353,11 @@ impl AgentService {
                 .discovery_selected_constellation
                 .clone(),
             discovery_answers: session.context.discovery_answers.clone(),
+            session_cbu_ids: if session.context.cbu_ids.is_empty() {
+                None
+            } else {
+                Some(session.context.cbu_ids.clone())
+            },
         }
     }
 
@@ -4025,6 +4045,20 @@ impl AgentService {
                 // Get domain context from taxonomy
                 let location = taxonomy.location_for_verb(&c.verb);
 
+                // Build a suggested utterance the user can say to unambiguously
+                // select this verb. Prefer the matched phrase if it's human-readable,
+                // otherwise fall back to the verb description.
+                let suggested = {
+                    let phrase = &c.matched_phrase;
+                    // Use matched phrase if it looks like natural language (3+ words, no dots)
+                    if phrase.split_whitespace().count() >= 3 && !phrase.contains('.') {
+                        Some(phrase.clone())
+                    } else {
+                        // Fall back to description as imperative
+                        Some(description.clone())
+                    }
+                };
+
                 VerbOption {
                     verb_fqn: c.verb.clone(),
                     description,
@@ -4033,11 +4067,30 @@ impl AgentService {
                     matched_phrase: Some(c.matched_phrase.clone()),
                     domain_label: location.as_ref().map(|l| l.domain_label.clone()),
                     category_label: location.as_ref().map(|l| l.category_label.clone()),
+                    suggested_utterance: suggested,
                 }
             })
             .collect();
 
         let request_id = Uuid::new_v4().to_string();
+
+        // Build message for display with suggested utterances (before options is moved)
+        let options_text: Vec<String> = options
+            .iter()
+            .enumerate()
+            .map(|(i, opt)| {
+                let utterance = opt
+                    .suggested_utterance
+                    .as_deref()
+                    .unwrap_or(&opt.description);
+                format!("{}. \"{}\" — {}", i + 1, utterance, opt.description)
+            })
+            .collect();
+
+        let message = format!(
+            "I'm not sure which you meant:\n\n{}\n\nYou can type a number, or say one of the phrases above.",
+            options_text.join("\n")
+        );
 
         let disambiguation_request = VerbDisambiguationRequest {
             request_id: request_id.clone(),
@@ -4045,23 +4098,6 @@ impl AgentService {
             options,
             prompt: "Which action did you mean?".to_string(),
         };
-
-        // Build message for display (also shown in chat history)
-        let options_text: Vec<String> = candidates
-            .iter()
-            .take(5)
-            .enumerate()
-            .map(|(i, c)| {
-                let desc = c.description.as_deref().unwrap_or("No description");
-                format!("{}. **{}**: {}", i + 1, c.verb, desc)
-            })
-            .collect();
-
-        let message = format!(
-            "I found multiple matching actions for \"{}\":\n\n{}\n\nType a number to select, or enter a new command.",
-            original_input,
-            options_text.join("\n")
-        );
 
         session.add_agent_message(message.clone(), None, None);
 

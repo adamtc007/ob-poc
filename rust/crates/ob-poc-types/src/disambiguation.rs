@@ -175,6 +175,11 @@ pub struct VerbOption {
     /// Category within domain (e.g., "Load CBUs")
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub category_label: Option<String>,
+    /// Clear utterance the user can say to unambiguously select this verb.
+    /// E.g., "Open a new KYC case" or "Check the KYC case status".
+    /// Sourced from the verb's best invocation phrase.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub suggested_utterance: Option<String>,
 }
 
 // ============================================================================

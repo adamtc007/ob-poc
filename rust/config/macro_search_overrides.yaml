@@ -8,12 +8,150 @@
 #     aliases:
 #       - "phrase one"
 #       - "phrase two"
-#
-# Example:
-#   struct.lux.ucits.sicav:
-#     aliases:
-#       - "lux ucits"
-#       - "luxembourg sicav fund"
-#
-# Initially empty — MacroIndex derives all search terms from macro metadata.
-# Add curated overrides here when auto-derived terms are insufficient.
+
+# =========================================================================
+# SCREENING MACROS — bridge old verb names to macro FQNs
+# =========================================================================
+
+screening.pep-check:
+  aliases:
+    - "pep check"
+    - "pep screening"
+    - "check for pep"
+    - "is this person a pep"
+    - "politically exposed person check"
+    - "run pep"
+
+screening.sanctions-check:
+  aliases:
+    - "sanctions check"
+    - "sanctions screening"
+    - "run sanctions"
+    - "ofac check"
+    - "check sanctions"
+    - "sanctions list check"
+    - "are they sanctioned"
+
+screening.media-check:
+  aliases:
+    - "media check"
+    - "adverse media check"
+    - "adverse media screening"
+    - "negative news check"
+    - "run adverse media"
+    - "any bad press"
+
+screening.full:
+  aliases:
+    - "full screening"
+    - "run full screening"
+    - "complete screening"
+    - "all screening checks"
+    - "run all checks"
+    - "screen this entity completely"
+    - "comprehensive screening"
+
+# =========================================================================
+# KYC WORKFLOW MACROS
+# =========================================================================
+
+kyc.collect-documents:
+  aliases:
+    - "collect kyc documents"
+    - "gather kyc docs"
+    - "request all kyc documents"
+    - "send out the doc pack"
+    - "collect the cdd pack"
+    - "document collection"
+
+kyc.full-review:
+  aliases:
+    - "full kyc review"
+    - "complete kyc review"
+    - "do the full kyc"
+    - "comprehensive kyc"
+    - "run full kyc review"
+
+kyc.check-readiness:
+  aliases:
+    - "check case readiness"
+    - "is the case ready"
+    - "readiness check"
+    - "case readiness"
+    - "ready for decision"
+
+# =========================================================================
+# STRUCTURE MACROS — common operator phrases
+# =========================================================================
+
+struct.lux.ucits.sicav:
+  aliases:
+    - "lux ucits"
+    - "luxembourg sicav"
+    - "lux sicav"
+    - "ucits sicav luxembourg"
+    - "set up a lux ucits"
+
+struct.lux.aif.raif:
+  aliases:
+    - "lux raif"
+    - "luxembourg raif"
+    - "lux aif"
+    - "raif setup"
+
+struct.ie.ucits.icav:
+  aliases:
+    - "irish icav"
+    - "ireland icav"
+    - "ie ucits"
+    - "irish fund"
+
+struct.uk.authorised.oeic:
+  aliases:
+    - "uk oeic"
+    - "uk fund"
+    - "oeic structure"
+    - "uk authorised fund"
+
+struct.hedge.cross-border:
+  aliases:
+    - "cross border hedge"
+    - "cross-border hedge fund"
+    - "multi-jurisdiction hedge"
+
+struct.pe.cross-border:
+  aliases:
+    - "cross border pe"
+    - "cross-border pe fund"
+    - "multi-jurisdiction pe"
+
+# =========================================================================
+# PARTY / ROLE MACROS
+# =========================================================================
+
+party.add:
+  aliases:
+    - "add a party"
+    - "add new party"
+    - "add a new party"
+    - "register a party"
+
+party.add-company:
+  aliases:
+    - "add a company"
+    - "add new company"
+    - "register a company"
+
+mandate.create:
+  aliases:
+    - "create a mandate"
+    - "create trading mandate"
+    - "set up a mandate"
+    - "new mandate"
+
+structure.setup:
+  aliases:
+    - "set up a structure"
+    - "create a structure"
+    - "new structure"
+    - "add a structure"

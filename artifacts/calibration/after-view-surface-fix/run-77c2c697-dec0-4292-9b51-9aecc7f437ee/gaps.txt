@@ -1,0 +1,2 @@
+GAP.CAL.CBU-READ open the cbu record
+GAP.CAL.CBU-READ view the fund shell details

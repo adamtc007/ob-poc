@@ -1,0 +1,74 @@
+[
+  {
+    "fixture_state": [
+      {
+        "binding_key": "target",
+        "current_state": "DISCOVERED",
+        "entity_id": "19eb2c6b-796b-5c79-9d96-f2f5af9108d3",
+        "entity_type": "cbu"
+      }
+    ],
+    "trace_id": "36c1dd3b-633f-48e3-889c-19c7dc30cd84",
+    "utterance_id": "dee880c9-c098-4fef-9d1b-c12c68288e59"
+  },
+  {
+    "fixture_state": [
+      {
+        "binding_key": "target",
+        "current_state": "DISCOVERED",
+        "entity_id": "19eb2c6b-796b-5c79-9d96-f2f5af9108d3",
+        "entity_type": "cbu"
+      }
+    ],
+    "trace_id": "d5a01930-2880-4164-8ee3-54567c1fa844",
+    "utterance_id": "11e3a297-c438-4cd6-a701-86a42e6b2e79"
+  },
+  {
+    "fixture_state": [
+      {
+        "binding_key": "target",
+        "current_state": "DISCOVERED",
+        "entity_id": "19eb2c6b-796b-5c79-9d96-f2f5af9108d3",
+        "entity_type": "cbu"
+      }
+    ],
+    "trace_id": "e4bcf920-b195-429c-b20b-77ccab84a2b9",
+    "utterance_id": "66ed3889-9a0f-4b63-97bf-b9b9e28032ee"
+  },
+  {
+    "fixture_state": [
+      {
+        "binding_key": "target",
+        "current_state": "DISCOVERED",
+        "entity_id": "19eb2c6b-796b-5c79-9d96-f2f5af9108d3",
+        "entity_type": "cbu"
+      }
+    ],
+    "trace_id": "4170ea9f-27d4-4506-a3df-1823c0c5c4f6",
+    "utterance_id": "5e49e2da-3529-44ff-9473-72bce0c9e931"
+  },
+  {
+    "fixture_state": [
+      {
+        "binding_key": "target",
+        "current_state": "DISCOVERED",
+        "entity_id": "19eb2c6b-796b-5c79-9d96-f2f5af9108d3",
+        "entity_type": "cbu"
+      }
+    ],
+    "trace_id": "d580d716-21b3-45b5-b2d5-0cd976dc297d",
+    "utterance_id": "9134648b-9273-455d-b6be-21eb45d6cfa0"
+  },
+  {
+    "fixture_state": [
+      {
+        "binding_key": "target",
+        "current_state": "DISCOVERED",
+        "entity_id": "19eb2c6b-796b-5c79-9d96-f2f5af9108d3",
+        "entity_type": "cbu"
+      }
+    ],
+    "trace_id": "631aa87a-945e-4137-bd18-58555a35a053",
+    "utterance_id": "2dce021c-c657-403b-903e-4ce3486537d4"
+  }
+]

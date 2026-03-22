@@ -908,6 +908,8 @@ pub(crate) async fn handle_decision_reply(
                 envelope: &envelope,
                 fail_policy,
                 entity_state: None,
+                has_group_scope: true,
+                composite_state: None,
             };
             let surface = compute_session_verb_surface(&ctx);
 

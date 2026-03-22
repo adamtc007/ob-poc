@@ -286,8 +286,8 @@ mod tests {
         let config = minimal_verbs_config();
         let bundle = build_seed_bundle(&config);
 
-        // Should have 4 views from core_views()
-        assert_eq!(bundle.views.len(), 4);
+        // Should have 8 views from core_views()
+        assert_eq!(bundle.views.len(), 8);
     }
 
     #[test]

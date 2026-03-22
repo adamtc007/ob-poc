@@ -108,6 +108,9 @@ pub struct OrchestratorContext {
     pub discovery_selected_constellation: Option<String>,
     /// Structured answers collected during the discovery bootstrap.
     pub discovery_answers: HashMap<String, String>,
+    /// CBU IDs currently in the session scope.
+    /// Used by composite state loader to query group-level entity states.
+    pub session_cbu_ids: Option<Vec<Uuid>>,
 }
 
 /// Where the utterance originated.
@@ -163,6 +166,8 @@ struct PreparedTurnContext {
     sem_reg_verb_names: Option<Vec<String>>,
     envelope: SemOsContextEnvelope,
     surface: SessionVerbSurface,
+    #[allow(dead_code)]
+    composite_state: Option<crate::agent::composite_state::GroupCompositeState>,
 }
 
 fn route(intent: &crate::sage::OutcomeIntent) -> UtteranceDisposition {
@@ -379,12 +384,42 @@ async fn prepare_turn_context(
     } else {
         VerbSurfaceFailPolicy::FailOpen
     };
+    let has_group_scope = ctx.scope.as_ref().and_then(|s| s.client_group_id).is_some();
+
+    // Load group composite state for state-to-intent bias
+    #[cfg(feature = "database")]
+    let composite_state = if has_group_scope {
+        // Use session CBU IDs to load composite state
+        let cbu_ids: Vec<uuid::Uuid> = ctx.session_cbu_ids.as_deref().unwrap_or(&[]).to_vec();
+        if !cbu_ids.is_empty() {
+            match crate::agent::composite_state_loader::load_group_composite_state(
+                &ctx.pool, &cbu_ids,
+            )
+            .await
+            {
+                Ok(state) => state,
+                Err(e) => {
+                    tracing::warn!("Failed to load composite state: {e}");
+                    None
+                }
+            }
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+    #[cfg(not(feature = "database"))]
+    let composite_state: Option<crate::agent::composite_state::GroupCompositeState> = None;
+
     let surface_ctx = VerbSurfaceContext {
         agent_mode: ctx.agent_mode,
         stage_focus: ctx.stage_focus.as_deref(),
         envelope: &envelope,
         fail_policy,
         entity_state: None,
+        has_group_scope,
+        composite_state: composite_state.as_ref(),
     };
     let surface = compute_session_verb_surface(&surface_ctx);
 
@@ -399,6 +434,7 @@ async fn prepare_turn_context(
         sem_reg_verb_names,
         envelope,
         surface,
+        composite_state,
     }
 }
 
@@ -416,15 +452,8 @@ fn can_use_coder_for_serve(
         return true;
     }
 
-    let phase2 = Phase2Service::evaluate(
-        prepared.lookup_result.clone(),
-        Some(prepared.envelope.clone()),
-    );
-    let allowed = if phase2.has_usable_legal_set {
-        prepared.surface.allowed_fqns()
-    } else {
-        std::collections::HashSet::new()
-    };
+    // Use the pre-computed surface — no need to re-evaluate Phase2.
+    let allowed = prepared.surface.allowed_fqns();
     if !allowed.is_empty() {
         return allowed.contains(&coder_result.verb_fqn);
     }
@@ -452,10 +481,7 @@ async fn build_sage_serve_outcome(
             .unwrap_or_default(),
     )];
     let chosen = Some(coder_result.verb_fqn.clone());
-    let prepared_phase2 = Phase2Service::evaluate(
-        prepared.lookup_result.clone(),
-        Some(prepared.envelope.clone()),
-    );
+    let semreg_unavail = prepared.envelope.is_unavailable();
     let mut trace = build_trace(
         utterance,
         ctx,
@@ -471,7 +497,7 @@ async fn build_sage_serve_outcome(
         &prepared.envelope,
         Some(selection_source.to_string()),
         false,
-        !prepared_phase2.is_available,
+        semreg_unavail,
         &[],
         false,
         None,
@@ -1276,8 +1302,13 @@ async fn persist_trace_scaffold(
 ) -> Option<NewUtteranceTrace> {
     let repository = UtteranceTraceRepository::new(ctx.pool.clone());
     let session_id = ctx.session_id.unwrap_or_else(Uuid::nil);
-    let mut trace =
-        NewUtteranceTrace::in_progress(session_id, Uuid::new_v4(), utterance, TraceKind::Original);
+    let mut trace = NewUtteranceTrace::in_progress(
+        session_id,
+        Uuid::new_v4(),
+        utterance,
+        TraceKind::Original,
+        false,
+    );
     let sage_ctx = sage_context_from_orchestrator(ctx);
     trace.correlation_id = ctx.case_id;
     let mut trace_payload = build_trace_scaffold_payload(
@@ -1534,12 +1565,15 @@ pub async fn legacy_handle_utterance(
     } else {
         VerbSurfaceFailPolicy::FailOpen
     };
+    let has_group_scope_2 = ctx.scope.as_ref().and_then(|s| s.client_group_id).is_some();
     let surface_ctx = VerbSurfaceContext {
         agent_mode: ctx.agent_mode,
         stage_focus: ctx.stage_focus.as_deref(),
         envelope: &envelope,
         fail_policy,
         entity_state: None, // Lifecycle filtering deferred to Phase 3
+        has_group_scope: has_group_scope_2,
+        composite_state: None, // TODO: load from group composite when available
     };
     let surface = compute_session_verb_surface(&surface_ctx);
 
@@ -1564,6 +1598,7 @@ pub async fn legacy_handle_utterance(
             sem_reg_verb_names: None,
             envelope,
             surface,
+            composite_state: None,
         };
         return build_semos_unavailable_outcome(ctx, utterance, prepared, sage_intent.clone())
             .await;
@@ -1578,6 +1613,7 @@ pub async fn legacy_handle_utterance(
             sem_reg_verb_names: None,
             envelope,
             surface,
+            composite_state: None,
         };
         return build_semos_discovery_outcome(ctx, utterance, prepared, sage_intent.clone()).await;
     }
@@ -1764,57 +1800,23 @@ pub async fn legacy_handle_utterance(
     // NOTE: Direct DSL early-exit (dsl: prefix) was removed in Phase 0B CCIR.
     // All DSL — including operator-provided — flows through SemReg filtering below.
 
-    // -- Stage A.2+A.3: Apply SessionVerbSurface as post-filter (belt-and-suspenders) --
-    // The pre-constraint (surface_allowed) should have already filtered verb search results.
-    // This post-filter catches any verbs that slipped through (e.g., from phonetic fallback).
-    let mut sem_reg_denied_all = false;
-    let mut semreg_unavailable = false;
+    // -- Stage A.2: Derive governance flags from envelope (single source of truth) --
+    // Pre-constraint via with_allowed_verbs() already filtered verb search results.
+    // No redundant post-filter — trust the pre-constraint.
+    let semreg_unavailable = envelope.is_unavailable();
+    let sem_reg_denied_all = envelope.is_deny_all();
     let mut blocked_reason: Option<String> = None;
     let mut filtered_candidates = discovery_result.verb_candidates.clone();
-    let mut agent_mode_blocked = Vec::new();
+    let agent_mode_blocked: Vec<String> = Vec::new();
 
-    let phase2 = Phase2Service::evaluate_from_envelope(envelope.clone());
-    match phase2.halt_reason_code {
-        Some("sem_os_unavailable") => {
-            semreg_unavailable = true;
-            let before_count = filtered_candidates.len();
-            filtered_candidates.clear();
-            if before_count > 0 {
-                tracing::warn!("SemReg unavailable -- blocking utterance discovery");
-                blocked_reason =
-                    Some("SemReg unavailable (utterance discovery requires Sem OS)".into());
-            }
-        }
-        Some("no_allowed_verbs") => {
-            sem_reg_denied_all = true;
-            tracing::warn!("SemReg returned DenyAll -- blocking utterance discovery");
-            blocked_reason = Some("SemReg denied all verbs for this subject".into());
-            filtered_candidates.clear();
-        }
-        _ => {
-            // Post-filter against consolidated surface (SemReg + AgentMode + workflow)
-            let before_count = filtered_candidates.len();
-            filtered_candidates.retain(|v| {
-                if surface_allowed.contains(&v.verb) {
-                    true
-                } else {
-                    // Track why the verb was blocked (for trace)
-                    if !ctx.agent_mode.is_verb_allowed(&v.verb) {
-                        agent_mode_blocked.push(v.verb.clone());
-                    }
-                    false
-                }
-            });
-            if filtered_candidates.is_empty() && before_count > 0 {
-                sem_reg_denied_all = true;
-                tracing::warn!(
-                before = before_count,
-                surface_count = surface_allowed.len(),
-                "SessionVerbSurface filtered ALL verb candidates -- blocking utterance discovery"
-            );
-                blocked_reason = Some("All verb candidates excluded by governance surface".into());
-            }
-        }
+    if semreg_unavailable {
+        filtered_candidates.clear();
+        blocked_reason = Some("SemReg unavailable (utterance discovery requires Sem OS)".into());
+        tracing::warn!("SemReg unavailable -- blocking utterance discovery");
+    } else if sem_reg_denied_all {
+        filtered_candidates.clear();
+        blocked_reason = Some("SemReg denied all verbs for this subject".into());
+        tracing::warn!("SemReg returned DenyAll -- blocking utterance discovery");
     }
 
     let before_data_management = filtered_candidates.len();
@@ -3618,6 +3620,7 @@ mod tests {
             discovery_selected_family: None,
             discovery_selected_constellation: None,
             discovery_answers: HashMap::new(),
+            session_cbu_ids: None,
         }
     }
 

@@ -1,0 +1,42 @@
+- fixture_state:
+  - binding_key: target
+    current_state: DISCOVERED
+    entity_id: 80e73d4c-1fec-42ad-9dda-13c55abb3bf5
+    entity_type: cbu
+  trace_id: 91dc3ebc-c3cb-404b-a04d-b88c0e6166cf
+  utterance_id: dee880c9-c098-4fef-9d1b-c12c68288e59
+- fixture_state:
+  - binding_key: target
+    current_state: DISCOVERED
+    entity_id: 80e73d4c-1fec-42ad-9dda-13c55abb3bf5
+    entity_type: cbu
+  trace_id: 64daa2f4-1914-4284-8b84-734c37423961
+  utterance_id: 11e3a297-c438-4cd6-a701-86a42e6b2e79
+- fixture_state:
+  - binding_key: target
+    current_state: DISCOVERED
+    entity_id: 80e73d4c-1fec-42ad-9dda-13c55abb3bf5
+    entity_type: cbu
+  trace_id: 20967dba-5ee1-4e56-b9cc-0b07ce5ca633
+  utterance_id: 66ed3889-9a0f-4b63-97bf-b9b9e28032ee
+- fixture_state:
+  - binding_key: target
+    current_state: DISCOVERED
+    entity_id: 80e73d4c-1fec-42ad-9dda-13c55abb3bf5
+    entity_type: cbu
+  trace_id: b745e02a-3c94-45d4-b1e5-76bbd36a3dcb
+  utterance_id: 5e49e2da-3529-44ff-9473-72bce0c9e931
+- fixture_state:
+  - binding_key: target
+    current_state: DISCOVERED
+    entity_id: 80e73d4c-1fec-42ad-9dda-13c55abb3bf5
+    entity_type: cbu
+  trace_id: 8c6e697f-e61a-4587-a23c-502c08652599
+  utterance_id: 9134648b-9273-455d-b6be-21eb45d6cfa0
+- fixture_state:
+  - binding_key: target
+    current_state: DISCOVERED
+    entity_id: 80e73d4c-1fec-42ad-9dda-13c55abb3bf5
+    entity_type: cbu
+  trace_id: c9313717-2c84-4002-a918-590659c1426b
+  utterance_id: 2dce021c-c657-403b-903e-4ce3486537d4

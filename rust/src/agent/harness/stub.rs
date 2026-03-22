@@ -66,6 +66,7 @@ pub fn build_stub_context(
         discovery_selected_family: None,
         discovery_selected_constellation: None,
         discovery_answers: std::collections::HashMap::new(),
+        session_cbu_ids: None,
     }
 }
 

@@ -1,0 +1,21 @@
+- actual_halt_reason: no_match
+  code: GAP.CAL.CBU-READ
+  entity_state: DISCOVERED
+  entity_type: cbu
+  source: loopback_calibration
+  target_verb: cbu.read
+  utterance: show me the cbu
+- actual_halt_reason: no_match
+  code: GAP.CAL.CBU-READ
+  entity_state: DISCOVERED
+  entity_type: cbu
+  source: loopback_calibration
+  target_verb: cbu.read
+  utterance: open the cbu record
+- actual_halt_reason: no_match
+  code: GAP.CAL.CBU-READ
+  entity_state: DISCOVERED
+  entity_type: cbu
+  source: loopback_calibration
+  target_verb: cbu.read
+  utterance: view the fund shell details

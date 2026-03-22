@@ -1720,6 +1720,7 @@ impl ToolHandlers {
             discovery_selected_family: None,
             discovery_selected_constellation: None,
             discovery_answers: std::collections::HashMap::new(),
+            session_cbu_ids: None,
         };
         let outcome = crate::agent::orchestrator::handle_utterance(&orch_ctx, instruction).await?;
         let result = outcome.pipeline_result;

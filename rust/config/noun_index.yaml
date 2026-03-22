@@ -85,6 +85,8 @@ nouns:
       - feeder fund
       - master fund
       - compartment
+      - aif
+      - raif
     natural_aliases:
       - investment fund
       - fund vehicle
@@ -92,12 +94,26 @@ nouns:
       - ucits
       - pe fund
       - hedge fund
+      - standalone fund
+      - master-feeder
     entity_type_fqn: fund
     noun_keys:
       - fund
       - share_class
     action_verbs:
-      create: [fund.create, fund.ensure]
+      create:
+        [
+          fund.create,
+          fund.ensure,
+          fund.create-umbrella,
+          fund.create-subfund,
+          fund.create-feeder,
+          fund.create-master,
+          fund.create-standalone,
+          fund.ensure-standalone,
+          fund.create-share-class,
+          share-class.create,
+        ]
       list:
         [
           fund.list-subfunds,
@@ -105,7 +121,10 @@ nouns:
           fund.list-feeders,
           fund.list-investments,
           fund.list-investors,
+          share-class.list,
         ]
+      get: [fund.read-vehicle, fund.read-compartment, share-class.read]
+      delete: [fund.delete-vehicle, fund.delete-compartment]
 
   client-group:
     aliases:
@@ -197,17 +216,24 @@ nouns:
       - screening
       - sanctions screening
       - sanctions
+      - pep
+      - adverse media
     natural_aliases:
       - ofac
       - pep screening
-      - adverse media
       - sanctions check
       - watchlist
+      - pep check
+      - media check
+      - sanctions list
     entity_type_fqn: entity
     noun_keys:
       - screening
     action_verbs:
-      compute: [screening.pep, screening.sanctions, screening.adverse-media]
+      compute: [screening.pep, screening.sanctions, screening.adverse-media, screening.run]
+      create: [screening.run, case-screening.run]
+      list: [screening.list-by-workstream, case-screening.list-by-workstream]
+      update: [screening.review-hit, screening.complete]
 
   control:
     aliases:
@@ -272,16 +298,21 @@ nouns:
       - deal
       - deal record
       - commercial deal
+      - rate card
+      - fee schedule
     natural_aliases:
       - sales deal
       - client deal
       - engagement
       - mandate deal
+      - deal pipeline
+      - deal status
+      - deal timeline
     entity_type_fqn: deal
     noun_keys:
       - deal
     action_verbs:
-      create: [deal.create, deal.create-rate-card]
+      create: [deal.create, deal.create-rate-card, deal.add-rate-card-line, deal.add-participant, deal.add-product]
       list:
         [
           deal.list,
@@ -289,13 +320,15 @@ nouns:
           deal.list-products,
           deal.list-contracts,
           deal.list-rate-cards,
+          deal.list-rate-card-lines,
           deal.list-slas,
           deal.list-documents,
           deal.list-onboarding-requests,
-          deal.read-timeline,
         ]
-      update: [deal.update-record, deal.update-status]
-      search: [deal.search-records, deal.read-record, deal.read-summary]
+      get: [deal.read-record, deal.read-summary, deal.read-timeline, deal.get, deal.timeline, deal.summary]
+      update: [deal.update-record, deal.update-status, deal.request-onboarding]
+      search: [deal.search-records, deal.search]
+      delete: [deal.cancel]
 
   contract:
     aliases:
@@ -548,31 +581,233 @@ nouns:
       - passport
       - proof
       - certificate
+      - doc
+      - cdd
     natural_aliases:
       - evidence document
       - identity document
       - supporting document
       - uploaded document
+      - kyc document
+      - doc pack
+      - cdd pack
+      - cert of inc
+      - articles of association
     entity_type_fqn: document
     noun_keys:
       - document
       - requirement
     action_verbs:
-      create: [document.solicit, document.solicit-set, document.create]
+      create: [document.solicit, document.solicit-set, document.create, document.request, doc-request.create]
       list:
         [
           document.catalog,
           document.list-versions,
           document.for-entity,
           document.missing-for-entity,
+          document.list-types,
+          document.list-requests-by-workstream,
         ]
+      search: [document.missing-for-entity, document.for-entity, document.compute-requirements]
       update:
         [
           document.verify,
           document.reject,
           document.start-qa,
           document.upload-version,
+          document.upload,
         ]
+      reject: [document.reject, document.reject-request]
+      delete: [document.reject, document.reject-request, document.waive-request]
+
+  # =========================================================================
+  # AGENT / META
+  # =========================================================================
+
+  agent:
+    aliases:
+      - agent
+      - tool
+      - tools
+      - command
+    natural_aliases:
+      - system
+      - bot
+      - assistant
+      - teach
+      - learning
+      - capabilities
+    noun_keys:
+      - agent
+    action_verbs:
+      create: [agent.teach]
+      list: [agent.list-tools, agent.read-teaching-status, agent.read-status]
+      get: [agent.read-mode, agent.read-policy, agent.read-telemetry-summary]
+      delete: [agent.unteach]
+      update: [agent.set-mode, agent.set-threshold]
+
+  booking-principal:
+    aliases:
+      - booking principal
+      - booking entity
+      - booking location
+    natural_aliases:
+      - booking coverage
+      - principal entity
+      - booking setup
+    entity_type_fqn: booking-principal
+    noun_keys:
+      - booking_principal
+    action_verbs:
+      create: [booking-principal.create]
+      list: [booking-principal.coverage-matrix, booking-principal.gap-report]
+      get: [booking-principal.explain, booking-principal.select]
+      update: [booking-principal.update, booking-principal.evaluate]
+      delete: [booking-principal.retire]
+
+  evidence:
+    aliases:
+      - evidence
+      - requirement
+      - evidence requirement
+    natural_aliases:
+      - kyc evidence
+      - supporting evidence
+      - proof document
+      - evidence gap
+    entity_type_fqn: evidence
+    noun_keys:
+      - evidence
+    action_verbs:
+      create: [evidence.create-requirement, evidence.attach-document]
+      update: [evidence.mark-verified, evidence.mark-rejected]
+
+  red-flag:
+    aliases:
+      - red flag
+      - risk flag
+      - alert
+    natural_aliases:
+      - compliance flag
+      - risk indicator
+      - warning flag
+    entity_type_fqn: red-flag
+    noun_keys:
+      - red_flag
+    action_verbs:
+      create: [red-flag.raise, red-flag.create]
+      list: [red-flag.list, red-flag.list-by-case]
+      update: [red-flag.resolve, red-flag.dismiss]
+
+  # =========================================================================
+  # DISAMBIGUATION NOUNS (near-neighbour resolution)
+  # =========================================================================
+
+  transfer-agent:
+    aliases:
+      - transfer agent
+      - ta
+      - registrar
+    natural_aliases:
+      - transfer agency
+      - ta role
+    entity_type_fqn: role
+    noun_keys:
+      - role
+    action_verbs:
+      assign: [cbu.assign-role]
+      create: [cbu.assign-role]
+
+  depositary:
+    aliases:
+      - depositary
+      - custodian
+      - depository
+    natural_aliases:
+      - depositary role
+      - custodian role
+    entity_type_fqn: role
+    noun_keys:
+      - role
+    action_verbs:
+      assign: [cbu.assign-role]
+      create: [cbu.assign-role]
+
+  galaxy:
+    aliases:
+      - galaxy
+      - universe
+    natural_aliases:
+      - full universe
+      - all structures
+      - everything
+    noun_keys:
+      - galaxy
+    action_verbs:
+      list: [session.load-galaxy, session.load-universe, view.universe]
+      get: [session.load-galaxy]
+
+  relationship:
+    aliases:
+      - relationship
+      - relationships
+    natural_aliases:
+      - group relationships
+      - entity relationships
+      - connections
+    noun_keys:
+      - relationship
+    action_verbs:
+      list: [client-group.list-relationships]
+      create: [client-group.add-relationship]
+      search: [client-group.search-entities, client-group.discover-entities]
+
+  persona:
+    aliases:
+      - persona
+      - role
+      - compliance officer
+      - analyst
+    natural_aliases:
+      - work as
+      - act as
+      - my role
+    noun_keys:
+      - persona
+    action_verbs:
+      update: [session.set-persona]
+      get: [session.info]
+
+  product:
+    aliases:
+      - product
+      - service
+      - product subscription
+    natural_aliases:
+      - custody product
+      - fund accounting
+      - ta service
+    entity_type_fqn: product
+    noun_keys:
+      - product
+    action_verbs:
+      create: [cbu.add-product]
+      list: [cbu.list-products, deal.list-products]
+      delete: [cbu.remove-product]
+
+  chain:
+    aliases:
+      - chain
+      - ownership chain
+      - control chain
+    natural_aliases:
+      - trace chain
+      - follow the chain
+      - chain of ownership
+    noun_keys:
+      - ownership
+    action_verbs:
+      search: [ownership.trace-chain, ubo.trace-chains, control.trace-chain]
 
   # =========================================================================
   # LIFECYCLE / MONITORING

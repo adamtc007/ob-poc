@@ -1,0 +1,65 @@
+[
+  {
+    "text": "create an umbrella fund structure",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["fund.create-umbrella", "fund.create"] },
+    "generation_rationale": "Direct umbrella fund creation."
+  },
+  {
+    "text": "set up a UCITS umbrella in Luxembourg",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["fund.create-umbrella", "struct.lux.ucits.sicav"] },
+    "generation_rationale": "UCITS umbrella with jurisdiction — may hit macro."
+  },
+  {
+    "text": "register a new umbrella vehicle",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["fund.create-umbrella", "fund.create"] },
+    "generation_rationale": "Vehicle terminology for umbrella."
+  },
+  {
+    "text": "create a subfund under the umbrella",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["fund.create-subfund", "fund.add-to-umbrella"] },
+    "generation_rationale": "Subfund creation."
+  },
+  {
+    "text": "add a new compartment to this umbrella",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["fund.create-subfund", "fund.upsert-compartment"] },
+    "generation_rationale": "Compartment = subfund in Lux terminology."
+  },
+  {
+    "text": "list all subfunds in this umbrella",
+    "calibration_mode": "negative",
+    "negative_type": "type_b",
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["fund.list-subfunds", "fund.list-compartments-by-umbrella"] },
+    "generation_rationale": "Type-B: list, not create."
+  },
+  {
+    "text": "delete this fund vehicle",
+    "calibration_mode": "negative",
+    "negative_type": "type_b",
+    "expected_outcome": { "type": "resolves_to", "value": "fund.delete-vehicle" },
+    "generation_rationale": "Type-B: delete, not create."
+  },
+  {
+    "text": "set up a new fund",
+    "calibration_mode": "boundary",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["fund.create", "fund.create-umbrella", "fund.create-standalone"] },
+    "generation_rationale": "Boundary: generic fund create — which sub-type?"
+  },
+  {
+    "text": "crystalline photon fund derivatives",
+    "calibration_mode": "negative",
+    "negative_type": "type_a",
+    "expected_outcome": { "type": "falls_to_sage" },
+    "generation_rationale": "Nonsense with fund-like words."
+  }
+]

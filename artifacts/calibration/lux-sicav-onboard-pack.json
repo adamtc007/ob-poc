@@ -1,0 +1,58 @@
+[
+  {
+    "text": "Onboard a Luxembourg SICAV",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to", "value": "struct.lux.ucits.sicav" },
+    "generation_rationale": "Direct macro match for Lux SICAV."
+  },
+  {
+    "text": "set up a UCITS SICAV in Luxembourg with three sub-funds",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to", "value": "struct.lux.ucits.sicav" },
+    "generation_rationale": "Detailed Lux SICAV with quantifier."
+  },
+  {
+    "text": "I need to onboard a Lux UCITS structure",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to", "value": "struct.lux.ucits.sicav" },
+    "generation_rationale": "Informal Lux UCITS onboarding."
+  },
+  {
+    "text": "Luxembourg RAIF structure please",
+    "calibration_mode": "negative",
+    "negative_type": "type_b",
+    "expected_outcome": { "type": "resolves_to", "value": "struct.lux.aif.raif" },
+    "generation_rationale": "Type-B: RAIF, not SICAV."
+  },
+  {
+    "text": "Irish ICAV onboarding",
+    "calibration_mode": "negative",
+    "negative_type": "type_b",
+    "expected_outcome": { "type": "resolves_to", "value": "struct.ie.ucits.icav" },
+    "generation_rationale": "Type-B: Ireland, not Luxembourg."
+  },
+  {
+    "text": "create a new fund in Luxembourg",
+    "calibration_mode": "boundary",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["struct.lux.ucits.sicav", "struct.lux.aif.raif", "struct.lux.pe.scsp", "fund.create"] },
+    "generation_rationale": "Boundary: Lux fund without specifying type — SICAV vs RAIF vs PE."
+  },
+  {
+    "text": "onboard a fund",
+    "calibration_mode": "boundary",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["cbu.create", "structure.setup", "fund.create"] },
+    "generation_rationale": "Boundary: no jurisdiction — could be any structure."
+  },
+  {
+    "text": "subatomic fiduciary crystallization Luxembourg",
+    "calibration_mode": "negative",
+    "negative_type": "type_a",
+    "expected_outcome": { "type": "falls_to_sage" },
+    "generation_rationale": "Nonsense with jurisdiction word."
+  }
+]

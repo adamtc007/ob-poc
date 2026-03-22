@@ -1,0 +1,6 @@
+show me the cbu -> Did you want 'cbu.read' or 'unknown.neighbour'?
+open the cbu record -> Did you want 'cbu.read' or 'unknown.neighbour'?
+view the fund shell details -> Did you want 'cbu.read' or 'unknown.neighbour'?
+abracadabra banana telescope -> Did you want 'cbu.read' or 'ubo.registry.expire'?
+terminate this cbu -> Did you want 'cbu.read' or 'unknown.neighbour'?
+show the cbu and maybe change it -> Did you want 'cbu.read' or 'unknown.neighbour'?

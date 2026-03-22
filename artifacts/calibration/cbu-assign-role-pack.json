@@ -1,0 +1,65 @@
+[
+  {
+    "text": "assign Goldman Sachs as custodian",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["cbu.assign-role", "party.assign"] },
+    "generation_rationale": "Direct role assignment."
+  },
+  {
+    "text": "make State Street the transfer agent",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["cbu.assign-role", "party.assign"] },
+    "generation_rationale": "Make X the Y = role assignment."
+  },
+  {
+    "text": "appoint BNY Mellon as depositary",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["cbu.assign-role", "party.assign"] },
+    "generation_rationale": "Appoint as role assignment synonym."
+  },
+  {
+    "text": "set the management company for this fund",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["cbu.assign-role", "party.assign"] },
+    "generation_rationale": "Set management company = assign ManCo role."
+  },
+  {
+    "text": "add a general partner to this structure",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["cbu.assign-role", "party.assign"] },
+    "generation_rationale": "GP assignment."
+  },
+  {
+    "text": "who are the parties on this CBU?",
+    "calibration_mode": "negative",
+    "negative_type": "type_b",
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["cbu.parties", "cbu.list-roles"] },
+    "generation_rationale": "Type-B: list parties, not assign."
+  },
+  {
+    "text": "remove the custodian role",
+    "calibration_mode": "negative",
+    "negative_type": "type_b",
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["cbu.remove-role"] },
+    "generation_rationale": "Type-B: remove, not assign."
+  },
+  {
+    "text": "set up the parties",
+    "calibration_mode": "boundary",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["cbu.assign-role", "party.assign", "party.add"] },
+    "generation_rationale": "Boundary: set up could mean assign or add."
+  },
+  {
+    "text": "antimatter custodian wavelength",
+    "calibration_mode": "negative",
+    "negative_type": "type_a",
+    "expected_outcome": { "type": "falls_to_sage" },
+    "generation_rationale": "Nonsense with role-adjacent words."
+  }
+]

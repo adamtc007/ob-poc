@@ -44,6 +44,14 @@ pub async fn verbs_compile(verbose: bool) -> Result<()> {
         .await
         .context("Failed to sync verbs")?;
 
+    // Also sync invocation phrases from YAML
+    println!("\nSyncing invocation phrases...");
+    let phrases_synced = sync_service
+        .sync_invocation_phrases(&verbs_config)
+        .await
+        .context("Failed to sync invocation phrases")?;
+    println!("  Synced phrases for {} verbs", phrases_synced);
+
     println!("\n===========================================");
     println!("  Compilation Summary");
     println!("===========================================");

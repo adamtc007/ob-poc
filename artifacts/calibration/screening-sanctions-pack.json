@@ -1,0 +1,72 @@
+[
+  {
+    "text": "run sanctions screening on this entity",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["screening.sanctions", "screening.sanctions-check"] },
+    "generation_rationale": "Direct sanctions screening request."
+  },
+  {
+    "text": "check if they're on the OFAC list",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["screening.sanctions", "screening.sanctions-check"] },
+    "generation_rationale": "OFAC = specific sanctions list reference."
+  },
+  {
+    "text": "are they sanctioned?",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["screening.sanctions", "screening.sanctions-check"] },
+    "generation_rationale": "Shorthand question form."
+  },
+  {
+    "text": "screen this name against the consolidated sanctions list",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["screening.sanctions", "screening.sanctions-check"] },
+    "generation_rationale": "Formal compliance language."
+  },
+  {
+    "text": "check sanctions on all related parties",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["screening.sanctions", "screening.sanctions-check"] },
+    "generation_rationale": "Batch sanctions check."
+  },
+  {
+    "text": "is this person a PEP?",
+    "calibration_mode": "negative",
+    "negative_type": "type_b",
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["screening.pep", "screening.pep-check"] },
+    "generation_rationale": "Type-B: PEP check, not sanctions."
+  },
+  {
+    "text": "check for adverse media coverage",
+    "calibration_mode": "negative",
+    "negative_type": "type_b",
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["screening.adverse-media", "screening.media-check"] },
+    "generation_rationale": "Type-B: adverse media, not sanctions."
+  },
+  {
+    "text": "run all the screening checks",
+    "calibration_mode": "boundary",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["screening.full", "screening.run", "screening.sanctions"] },
+    "generation_rationale": "Boundary: 'all checks' could be full screening or individual."
+  },
+  {
+    "text": "screen them",
+    "calibration_mode": "boundary",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["screening.run", "screening.sanctions", "screening.full"] },
+    "generation_rationale": "Maximally ambiguous — no indication of which screening type."
+  },
+  {
+    "text": "banana peel compliance override",
+    "calibration_mode": "negative",
+    "negative_type": "type_a",
+    "expected_outcome": { "type": "falls_to_sage" },
+    "generation_rationale": "Nonsense — should not match screening verbs."
+  }
+]

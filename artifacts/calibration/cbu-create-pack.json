@@ -1,0 +1,65 @@
+[
+  {
+    "text": "create a new CBU",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["cbu.create", "structure.setup"] },
+    "generation_rationale": "Direct CBU creation."
+  },
+  {
+    "text": "set up a new client business unit for Allianz",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["cbu.create", "structure.setup"] },
+    "generation_rationale": "Full form with client name."
+  },
+  {
+    "text": "spin up a fund structure",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["cbu.create", "structure.setup"] },
+    "generation_rationale": "Informal terminology."
+  },
+  {
+    "text": "onboard a new trading unit",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["cbu.create", "structure.setup"] },
+    "generation_rationale": "Trading unit = CBU synonym."
+  },
+  {
+    "text": "register a new structure for this client",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["cbu.create", "structure.setup"] },
+    "generation_rationale": "Register + structure."
+  },
+  {
+    "text": "list all CBUs",
+    "calibration_mode": "negative",
+    "negative_type": "type_b",
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["cbu.list", "session.list-cbus"] },
+    "generation_rationale": "Type-B: list, not create."
+  },
+  {
+    "text": "delete this CBU",
+    "calibration_mode": "negative",
+    "negative_type": "type_b",
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["cbu.delete", "cbu.delete-cascade"] },
+    "generation_rationale": "Type-B: delete, not create."
+  },
+  {
+    "text": "add a structure",
+    "calibration_mode": "boundary",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["cbu.create", "structure.setup"] },
+    "generation_rationale": "Boundary: could be macro or primitive."
+  },
+  {
+    "text": "warp drive custodial lattice",
+    "calibration_mode": "negative",
+    "negative_type": "type_a",
+    "expected_outcome": { "type": "falls_to_sage" },
+    "generation_rationale": "Nonsense — should not match CBU verbs."
+  }
+]
