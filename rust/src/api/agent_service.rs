@@ -500,7 +500,6 @@ fn agent_phase5_recheck_record(
     })
 }
 
-#[cfg(any(test, feature = "runbook-gate-vnext"))]
 fn agent_phase5_recheck_failure(
     verb_fqn: &str,
     envelope: &crate::agent::sem_os_context_envelope::SemOsContextEnvelope,
@@ -1640,6 +1639,13 @@ impl AgentService {
     ) -> Result<AgentChatResponse, String> {
         use crate::dsl_v2::parse_program;
         use crate::mcp::intent_pipeline::PipelineOutcome;
+        // NOTE: User message is added here before validation. This is intentional —
+        // many downstream branches read session.messages.last() and expect the user
+        // message to be present. The session is only persisted to the database AFTER
+        // the entire process_chat() completes (line ~2931), so if we return Err()
+        // here the session with the orphaned message is NOT saved. The Err case
+        // is handled by the caller which does NOT persist the session on error.
+        // AgentChatResponse (Ok path) always pairs the user message with an agent response.
         session.add_user_message(request.message.clone());
 
         let input = request.message.trim().to_lowercase();
@@ -1649,6 +1655,31 @@ impl AgentService {
         if let Some(pending) = session.pending_mutation.clone() {
             if crate::agent::orchestrator::is_confirmation(&request.message) {
                 let direct_trace = self.start_direct_trace(session, &request.message).await;
+
+                // TOCTOU recheck: validate the pending verb against CURRENT envelope
+                // before executing stale DSL. The pending DSL was generated in a
+                // previous turn — SemOS policy may have changed since then.
+                let recheck_actor = crate::policy::ActorResolver::from_env();
+                if let Ok(recheck_env) = self.resolve_options(session, recheck_actor).await {
+                    if let Some(block_reason) =
+                        agent_phase5_recheck_failure(&pending.coder_result.verb_fqn, &recheck_env)
+                    {
+                        // Pending verb is no longer allowed — clear pending and report
+                        session.pending_mutation = None;
+                        session.pending_decision = None;
+                        session.pending_intent_tier = None;
+                        session.pending_verb_disambiguation = None;
+                        if session.has_pending() {
+                            session.cancel_pending();
+                        }
+                        return Ok(self.fail(&format!(
+                            "The pending action '{}' is no longer permitted: {}",
+                            pending.coder_result.verb_fqn, block_reason
+                        ), session));
+                    }
+                }
+
+                // Clear pending states AFTER recheck passes
                 session.pending_mutation = None;
                 session.pending_decision = None;
                 session.pending_intent_tier = None;
@@ -3538,6 +3569,20 @@ impl AgentService {
         session.pending_execution_rechecks.clear();
         session.pending_execution_artifacts.clear();
 
+        // Fetch envelope ONCE before the execution loop — not per statement.
+        // Using a fresh envelope per statement (the old pattern) creates a TOCTOU
+        // window where SemOS policy can change mid-batch, causing inconsistent
+        // governance within a single DSL execution.
+        let recheck_envelope = {
+            let actor = crate::policy::ActorResolver::from_env();
+            match self.resolve_options(session, actor).await {
+                Ok(env) => env,
+                Err(_) => {
+                    crate::agent::sem_os_context_envelope::SemOsContextEnvelope::unavailable()
+                }
+            }
+        };
+
         for stmt in &program.statements {
             if let crate::dsl_v2::ast::Statement::VerbCall(vc) = stmt {
                 let verb_fqn = vc.full_name();
@@ -3548,9 +3593,12 @@ impl AgentService {
                     .collect();
                 let dsl_source = vc.to_dsl_string();
 
-                if let Some(error) = self
-                    .phase5_runtime_recheck_agent(session, &verb_fqn, &dsl_source)
-                    .await
+                // Phase 5 recheck: validate each verb against the SINGLE envelope
+                session.pending_execution_rechecks.push(
+                    agent_phase5_recheck_record(&verb_fqn, &dsl_source, &recheck_envelope),
+                );
+                if let Some(error) =
+                    agent_phase5_recheck_failure(&verb_fqn, &recheck_envelope)
                 {
                     return Ok(self.fail(&error, session));
                 }
@@ -3758,35 +3806,6 @@ impl AgentService {
             parked_entries: None,
             onboarding_state: None,
         })
-    }
-
-    #[cfg(feature = "runbook-gate-vnext")]
-    async fn phase5_runtime_recheck_agent(
-        &self,
-        session: &mut UnifiedSession,
-        verb_fqn: &str,
-        dsl_source: &str,
-    ) -> Option<String> {
-        let Some(_) = self.sem_os_client else {
-            session.pending_execution_rechecks.push(serde_json::json!({
-                "verb": verb_fqn,
-                "dsl_command": dsl_source,
-                "status": "skipped",
-                "reason": "sem_os_client_unconfigured",
-            }));
-            return None;
-        };
-
-        let actor = crate::policy::ActorResolver::from_env();
-        let envelope = match self.resolve_options(session, actor).await {
-            Ok(envelope) => envelope,
-            Err(_) => crate::agent::sem_os_context_envelope::SemOsContextEnvelope::unavailable(),
-        };
-        session
-            .pending_execution_rechecks
-            .push(agent_phase5_recheck_record(verb_fqn, dsl_source, &envelope));
-
-        agent_phase5_recheck_failure(verb_fqn, &envelope)
     }
 
     /// Sync scope from execution context into session (legacy path only).
