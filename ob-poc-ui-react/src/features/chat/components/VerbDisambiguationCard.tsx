@@ -65,9 +65,13 @@ function VerbOptionRow({
     ? kindColors[option.verb_kind] || "bg-gray-100 text-gray-800"
     : "";
 
+  // Submit the numeric index (e.g., "1") rather than the utterance text.
+  // The server has pending_verb_disambiguation stored and will select
+  // option[n-1] directly — no re-search through the pipeline needed.
+  // This is deterministic: click "1" → server picks option[0] → done.
   return (
     <button
-      onClick={() => onSelect?.(utterance)}
+      onClick={() => onSelect?.(String(index + 1))}
       className="w-full rounded-md border border-amber-200 bg-white p-2 text-left transition-colors hover:border-amber-400 hover:bg-amber-50"
     >
       <div className="flex items-start gap-2">
