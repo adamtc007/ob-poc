@@ -2925,7 +2925,7 @@ async fn chat_session(
     let actor = crate::policy::ActorResolver::from_headers(&headers);
 
     // Delegate to centralized AgentService (single pipeline)
-    let response = match state
+    let mut response = match state
         .agent_service
         .process_chat(&mut session, &req, actor)
         .await
@@ -2975,6 +2975,40 @@ async fn chat_session(
 
     // Notify watchers that session changed
     state.session_manager.notify(session_id).await;
+
+    // =========================================================================
+    // ONBOARDING STATE VIEW — compute from group composite state
+    // =========================================================================
+    // This is the "where am I + what can I do" view. Computed from the session's
+    // group composite state (UBO, CBUs, cases, screenings) and injected into
+    // every chat response. SemOS is the source of truth for state — this view
+    // projects that state into a UI-renderable DAG.
+    #[cfg(feature = "database")]
+    if response.onboarding_state.is_none() {
+        let has_group = session.context.client_group_id().is_some();
+        if has_group {
+            let cbu_ids: Vec<uuid::Uuid> = session.context.cbu_ids.clone();
+            if !cbu_ids.is_empty() {
+                match crate::agent::composite_state_loader::load_group_composite_state(
+                    &state.pool, &cbu_ids,
+                ).await {
+                    Ok(Some(composite)) => {
+                        let group_name = session.context.client_group_name();
+                        response.onboarding_state = Some(
+                            crate::agent::onboarding_state_view::project_onboarding_state(
+                                &composite,
+                                group_name,
+                            )
+                        );
+                    }
+                    Ok(None) => {}
+                    Err(e) => {
+                        tracing::warn!("Failed to load composite state for onboarding view: {e}");
+                    }
+                }
+            }
+        }
+    }
 
     // Build DslState from response fields
     let dsl_state = build_dsl_state(
