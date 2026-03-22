@@ -842,6 +842,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                     // 6. Build HybridVerbSearcher via factory
                     let macro_reg_for_orchestrator = macro_reg.clone();
+                    let lexicon_for_lookup = lexicon.clone();
                     let searcher = Arc::new(VerbSearcherFactory::build(
                         &pool,
                         dyn_embedder,
@@ -899,7 +900,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                     let mut lookup_service =
                         LookupService::new(entity_linker).with_verb_searcher(searcher.clone());
-                    if let Some(ref lexicon_service) = lexicon {
+                    if let Some(ref lexicon_service) = lexicon_for_lookup {
                         lookup_service = lookup_service.with_lexicon(lexicon_service.clone());
                     }
 
