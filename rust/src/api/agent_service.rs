@@ -4147,6 +4147,64 @@ impl AgentService {
                     _ => description.clone(),
                 });
 
+                // ── Entity & constellation context ────────────────────
+                // Derive what entity type this verb targets and where
+                // it sits in the constellation from verb metadata.
+                let target_entity_kind = rv
+                    .and_then(|v| v.subject_kinds.first().cloned())
+                    .or_else(|| {
+                        rv.and_then(|v| {
+                            v.produces.as_ref().map(|p| p.produced_type.clone())
+                        })
+                    });
+
+                // Map domain → constellation slot name for context
+                let constellation_slot = match parts.first().copied() {
+                    Some("kyc-case" | "kyc") => Some("kyc_case"),
+                    Some("screening") => Some("screening"),
+                    Some("document" | "requirement") => Some("evidence"),
+                    Some("ubo" | "ownership" | "control") => Some("ubo_discovery"),
+                    Some("cbu") => Some("cbu"),
+                    Some("entity") => Some("entity"),
+                    Some("sla") => Some("sla"),
+                    Some("deal") => Some("deal"),
+                    Some("tollgate") => Some("tollgate"),
+                    _ => None,
+                };
+
+                // Build human-readable entity context
+                let entity_context = match (constellation_slot, target_entity_kind.as_deref()) {
+                    (Some("kyc_case"), _) => {
+                        Some("Operates on the KYC case for this CBU".into())
+                    }
+                    (Some("screening"), _) => {
+                        Some("Compliance screening on entities in this workstream".into())
+                    }
+                    (Some("evidence"), _) => {
+                        Some("Document/evidence requirement for an entity".into())
+                    }
+                    (Some("ubo_discovery"), _) => {
+                        Some("Group-level ownership and control discovery".into())
+                    }
+                    (Some("cbu"), _) => {
+                        Some("Operates on a Client Business Unit (structure)".into())
+                    }
+                    (Some("entity"), Some(kind)) => {
+                        Some(format!("Operates on a {} entity", kind))
+                    }
+                    (Some("tollgate"), _) => {
+                        Some("KYC approval tollgate evaluation".into())
+                    }
+                    (Some(slot), _) => Some(format!("Operates in the {} context", slot)),
+                    _ => None,
+                };
+
+                // Get the dominant entity name from session context if available
+                let target_entity_name = session
+                    .context
+                    .dominant_entity_id
+                    .map(|id| id.to_string());
+
                 VerbOption {
                     verb_fqn: c.verb.clone(),
                     description,
@@ -4158,17 +4216,21 @@ impl AgentService {
                     suggested_utterance: suggested,
                     verb_kind: Some(verb_kind.to_string()),
                     differentiation,
-                    requires_state: None, // Populated from GroundedActionSurface when available
-                    produces_state: None, // Populated from state machine transitions when available
+                    requires_state: None,
+                    produces_state: None,
                     scope: None,
                     step_count,
+                    target_entity_kind,
+                    constellation_slot: constellation_slot.map(String::from),
+                    entity_context,
+                    target_entity_name,
                 }
             })
             .collect();
 
         let request_id = Uuid::new_v4().to_string();
 
-        // Build message for display with differentiation context
+        // Build message for display with differentiation + entity context
         let options_text: Vec<String> = options
             .iter()
             .enumerate()
@@ -4181,7 +4243,12 @@ impl AgentService {
                     .differentiation
                     .as_deref()
                     .unwrap_or(&opt.description);
-                format!("{}. \"{}\" — {}", i + 1, utterance, reason)
+                let context = opt
+                    .entity_context
+                    .as_deref()
+                    .map(|ctx| format!(" [{}]", ctx))
+                    .unwrap_or_default();
+                format!("{}. \"{}\" — {}{}", i + 1, utterance, reason, context)
             })
             .collect();
 

@@ -212,6 +212,32 @@ pub struct VerbOption {
     /// Number of steps if this is a macro/workflow verb.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub step_count: Option<u32>,
+
+    // ── Entity & constellation context ─────────────────────────────
+    // Shows WHERE in the constellation this verb operates.
+    // This is almost always the cause of confusion — the user is
+    // looking at entity A but the verb applies to entity B.
+
+    /// The entity type this verb operates on (e.g., "cbu", "entity", "case").
+    /// Derived from the verb's `subject_kinds` or `produces` declaration.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target_entity_kind: Option<String>,
+
+    /// The constellation slot this verb belongs to (e.g., "kyc_case", "screening").
+    /// Shows the user WHERE in the onboarding DAG this action lives.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub constellation_slot: Option<String>,
+
+    /// Human-readable constellation position context.
+    /// E.g., "Operates on the KYC case for this CBU" or
+    /// "Applies to the depositary entity in this structure".
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub entity_context: Option<String>,
+
+    /// The specific entity name if one is in scope and relevant.
+    /// E.g., "Allianz Dynamic Commodities" or "HSBC Holdings plc".
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target_entity_name: Option<String>,
 }
 
 // ============================================================================
