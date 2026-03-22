@@ -1363,3 +1363,149 @@ async fn build_test_searcher(pool: &PgPool) -> ob_poc::mcp::verb_search::HybridV
 
     searcher
 }
+
+/// Round-trip clarification test: for every ambiguous result, take each candidate's
+/// `matched_phrase` and feed it back through the pipeline. Verify it resolves to the
+/// same verb. This tests the "did you mean X?" → user says X → pipeline returns X loop.
+#[cfg(test)]
+mod clarification_roundtrip {
+    use super::*;
+
+    #[tokio::test]
+    #[ignore] // Requires DATABASE_URL and populated embeddings
+    async fn test_clarification_phrases_resolve_to_their_verbs() {
+        let db_url = std::env::var("DATABASE_URL").expect("DATABASE_URL required");
+        let pool = PgPool::connect(&db_url).await.expect("Failed to connect to DB");
+        let fixture: TestFixture =
+            toml::from_str(include_str!("fixtures/intent_test_utterances.toml"))
+                .expect("Failed to parse fixture TOML");
+        let searcher = std::sync::Arc::new(build_test_searcher(&pool).await);
+
+        let mut total_disambig = 0usize;
+        let mut total_phrases_tested = 0usize;
+        let mut round_trip_hits = 0usize;
+        let mut round_trip_misses: Vec<(String, String, String, f32)> = Vec::new();
+
+        for case in &fixture.tests {
+            let candidates = match searcher
+                .search(
+                    &case.utterance,
+                    None,
+                    case.domain_hint.as_deref(),
+                    None,
+                    10,
+                    None,
+                )
+                .await
+            {
+                Ok(c) => c,
+                Err(_) => continue,
+            };
+
+            let threshold = searcher.semantic_threshold();
+            let ambiguity =
+                ob_poc::mcp::verb_search::check_ambiguity(&candidates, threshold);
+
+            // Only test ambiguous cases — these are the "did you mean?" responses
+            let is_ambiguous = matches!(
+                ambiguity,
+                ob_poc::mcp::verb_search::VerbSearchOutcome::Ambiguous { .. }
+                | ob_poc::mcp::verb_search::VerbSearchOutcome::Suggest { .. }
+            );
+            if !is_ambiguous {
+                continue;
+            }
+
+            total_disambig += 1;
+
+            // For each candidate, take its matched_phrase and re-search
+            for candidate in candidates.iter().take(5) {
+                let phrase = &candidate.matched_phrase;
+
+                // Skip very short phrases (single words) — they're too generic
+                if phrase.split_whitespace().count() < 3 {
+                    continue;
+                }
+
+                total_phrases_tested += 1;
+
+                let re_candidates = searcher
+                    .search(phrase, None, None, None, 10, None)
+                    .await;
+
+                match re_candidates {
+                    Ok(ref rc) if !rc.is_empty() => {
+                        let re_top = &rc[0];
+                        if re_top.verb == candidate.verb {
+                            round_trip_hits += 1;
+                        } else {
+                            round_trip_misses.push((
+                                phrase.clone(),
+                                candidate.verb.clone(),
+                                re_top.verb.clone(),
+                                re_top.score,
+                            ));
+                        }
+                    }
+                    _ => {
+                        round_trip_misses.push((
+                            phrase.clone(),
+                            candidate.verb.clone(),
+                            "NO_MATCH".into(),
+                            0.0,
+                        ));
+                    }
+                }
+            }
+        }
+
+        println!("\n=======================================================================");
+        println!("  CLARIFICATION ROUND-TRIP TEST");
+        println!("=======================================================================");
+        println!("  Ambiguous utterances tested: {}", total_disambig);
+        println!("  Candidate phrases tested:    {}", total_phrases_tested);
+        println!(
+            "  Round-trip hits:             {}/{} ({:.1}%)",
+            round_trip_hits,
+            total_phrases_tested,
+            if total_phrases_tested > 0 {
+                (round_trip_hits as f64 / total_phrases_tested as f64) * 100.0
+            } else {
+                0.0
+            }
+        );
+        println!(
+            "  Round-trip misses:           {}",
+            round_trip_misses.len()
+        );
+
+        if !round_trip_misses.is_empty() {
+            println!("\n  MISMATCHES (phrase → expected verb, got verb):");
+            for (phrase, expected, got, score) in &round_trip_misses {
+                println!(
+                    "    \"{}\" → expected {} got {} ({:.3})",
+                    phrase, expected, got, score
+                );
+            }
+        }
+
+        let hit_rate = if total_phrases_tested > 0 {
+            (round_trip_hits as f64 / total_phrases_tested as f64) * 100.0
+        } else {
+            100.0
+        };
+
+        println!("\n  Round-trip accuracy: {:.1}%", hit_rate);
+        println!("=======================================================================\n");
+
+        // Target: 75% round-trip accuracy for clarification phrases.
+        // Note: remaining misses are synonym-verb pairs (e.g., screening.pep vs
+        // screening.pep-check, cbu.parties vs client-group.list-parties) where
+        // both verbs are valid options for the disambiguation context.
+        assert!(
+            hit_rate >= 75.0,
+            "Clarification round-trip accuracy {:.1}% is below 75% target",
+            hit_rate
+        );
+    }
+}
