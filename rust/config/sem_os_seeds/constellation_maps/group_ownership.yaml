@@ -13,6 +13,26 @@ slots:
       read: { verb: client-group.read, when: filled }
       research: { verb: client-group.research, when: [empty, filled] }
       update: { verb: client-group.update, when: filled }
+      set_canonical: { verb: client-group.set-canonical, when: filled }
+      start_discovery: { verb: client-group.start-discovery, when: [empty, filled] }
+      discover_entities: { verb: client-group.discover-entities, when: [empty, filled] }
+      complete_discovery: { verb: client-group.complete-discovery, when: filled }
+      entity_add: { verb: client-group.entity-add, when: [empty, filled] }
+      entity_remove: { verb: client-group.entity-remove, when: filled }
+      list_entities: { verb: client-group.list-entities, when: filled }
+      search_entities: { verb: client-group.search-entities, when: [empty, filled] }
+      list_parties: { verb: client-group.list-parties, when: filled }
+      list_unverified: { verb: client-group.list-unverified, when: filled }
+      list_discrepancies: { verb: client-group.list-discrepancies, when: filled }
+      verify_ownership: { verb: client-group.verify-ownership, when: filled }
+      reject_entity: { verb: client-group.reject-entity, when: filled }
+      assign_role: { verb: client-group.assign-role, when: filled }
+      remove_role: { verb: client-group.remove-role, when: filled }
+      list_roles: { verb: client-group.list-roles, when: filled }
+      add_relationship: { verb: client-group.add-relationship, when: filled }
+      list_relationships: { verb: client-group.list-relationships, when: filled }
+      tag_add: { verb: client-group.tag-add, when: filled }
+      tag_remove: { verb: client-group.tag-remove, when: filled }
   gleif_import:
     type: entity
     entity_kinds: [company]
@@ -21,8 +41,21 @@ slots:
     depends_on: [client_group]
     verbs:
       import: { verb: gleif.import-tree, when: empty }
+      import_to_group: { verb: gleif.import-to-client-group, when: [empty, filled] }
+      import_managed_funds: { verb: gleif.import-managed-funds, when: [empty, filled] }
       search: { verb: gleif.search, when: [empty, filled] }
       refresh: { verb: gleif.refresh, when: filled }
+      enrich: { verb: gleif.enrich, when: filled }
+      get_record: { verb: gleif.get-record, when: filled }
+      get_parent: { verb: gleif.get-parent, when: filled }
+      get_children: { verb: gleif.get-children, when: filled }
+      get_manager: { verb: gleif.get-manager, when: filled }
+      get_managed_funds: { verb: gleif.get-managed-funds, when: filled }
+      get_master_fund: { verb: gleif.get-master-fund, when: filled }
+      get_umbrella: { verb: gleif.get-umbrella, when: filled }
+      lookup_by_isin: { verb: gleif.lookup-by-isin, when: [empty, filled] }
+      resolve_successor: { verb: gleif.resolve-successor, when: filled }
+      trace_ownership: { verb: gleif.trace-ownership, when: filled }
   ubo_discovery:
     type: entity_graph
     entity_kinds: [person, company]
@@ -36,11 +69,36 @@ slots:
     verbs:
       discover: { verb: ubo.discover, when: empty }
       allege: { verb: ubo.allege, when: [empty, filled] }
+      calculate: { verb: ubo.calculate, when: [empty, filled] }
+      compute_chains: { verb: ubo.compute-chains, when: [empty, filled] }
+      trace_chains: { verb: ubo.trace-chains, when: filled }
       verify: { verb: ubo.verify, when: filled }
       promote: { verb: ubo.promote, when: filled }
       approve: { verb: ubo.approve, when: filled }
       reject: { verb: ubo.reject, when: filled }
       list: { verb: ubo.list, when: filled }
+      list_ubos: { verb: ubo.list-ubos, when: filled }
+      list_owned: { verb: ubo.list-owned, when: filled }
+      list_owners: { verb: ubo.list-owners, when: filled }
+      add_ownership: { verb: ubo.add-ownership, when: filled }
+      update_ownership: { verb: ubo.update-ownership, when: filled }
+      add_control: { verb: ubo.add-control, when: filled }
+      transfer_control: { verb: ubo.transfer-control, when: filled }
+      add_trust_role: { verb: ubo.add-trust-role, when: filled }
+      delete_relationship: { verb: ubo.delete-relationship, when: filled }
+      end_relationship: { verb: ubo.end-relationship, when: filled }
+      waive_verification: { verb: ubo.waive-verification, when: filled }
+      mark_deceased: { verb: ubo.mark-deceased, when: filled }
+      mark_terminus: { verb: ubo.mark-terminus, when: filled }
+      convergence_supersede: { verb: ubo.convergence-supersede, when: filled }
+      registry_create: { verb: ubo.registry.create, when: [empty, filled] }
+      registry_advance: { verb: ubo.registry.advance, when: filled }
+      registry_promote: { verb: ubo.registry.promote, when: filled }
+      registry_reject: { verb: ubo.registry.reject, when: filled }
+      registry_expire: { verb: ubo.registry.expire, when: filled }
+      registry_waive: { verb: ubo.registry.waive, when: filled }
+      snapshot_capture: { verb: ubo.snapshot.capture, when: filled }
+      snapshot_diff: { verb: ubo.snapshot.diff, when: filled }
   control_chain:
     type: entity_graph
     entity_kinds: [company]
@@ -56,6 +114,36 @@ slots:
       refresh: { verb: ownership.refresh, when: filled }
       read: { verb: control.read, when: filled }
       list_links: { verb: control.list-links, when: filled }
+      add: { verb: control.add, when: [empty, filled] }
+      end: { verb: control.end, when: filled }
+      analyze: { verb: control.analyze, when: filled }
+      list_controllers: { verb: control.list-controllers, when: filled }
+      list_controlled: { verb: control.list-controlled, when: filled }
+      trace_chain: { verb: control.trace-chain, when: filled }
+      compute_controllers: { verb: control.compute-controllers, when: filled }
+      identify_ubos: { verb: control.identify-ubos, when: filled }
+      reconcile_ownership: { verb: control.reconcile-ownership, when: filled }
+      set_board_controller: { verb: control.set-board-controller, when: filled }
+      show_board_controller: { verb: control.show-board-controller, when: filled }
+      recompute_board_controller: { verb: control.recompute-board-controller, when: filled }
+      clear_board_controller_override: { verb: control.clear-board-controller-override, when: filled }
+      import_gleif_control: { verb: control.import-gleif-control, when: [empty, filled] }
+      import_psc_register: { verb: control.import-psc-register, when: [empty, filled] }
+      ownership_compute: { verb: ownership.compute, when: filled }
+      ownership_control_positions: { verb: ownership.control-positions, when: filled }
+      ownership_who_controls: { verb: ownership.who-controls, when: filled }
+      ownership_analyze_gaps: { verb: ownership.analyze-gaps, when: filled }
+      ownership_reconcile: { verb: ownership.reconcile, when: filled }
+      ownership_reconcile_findings: { verb: ownership.reconcile.findings, when: filled }
+      ownership_reconcile_list_runs: { verb: ownership.reconcile.list-runs, when: filled }
+      ownership_reconcile_resolve: { verb: ownership.reconcile.resolve-finding, when: filled }
+      ownership_right_add_class: { verb: ownership.right.add-to-class, when: filled }
+      ownership_right_add_holder: { verb: ownership.right.add-to-holder, when: filled }
+      ownership_right_end: { verb: ownership.right.end, when: filled }
+      ownership_right_list_holder: { verb: ownership.right.list-for-holder, when: filled }
+      ownership_right_list_issuer: { verb: ownership.right.list-for-issuer, when: filled }
+      ownership_snapshot_get: { verb: ownership.snapshot.get, when: filled }
+      ownership_snapshot_list: { verb: ownership.snapshot.list, when: filled }
   cbu_identification:
     type: cbu
     table: cbus
@@ -66,8 +154,38 @@ slots:
     verbs:
       create: { verb: cbu.create, when: empty }
       create_from_group: { verb: cbu.create-from-client-group, when: empty }
-      list: { verb: cbu.list, when: filled }
+      ensure: { verb: cbu.ensure, when: [empty, filled] }
       read: { verb: cbu.read, when: filled }
+      list: { verb: cbu.list, when: filled }
+      list_subscriptions: { verb: cbu.list-subscriptions, when: filled }
+      list_evidence: { verb: cbu.list-evidence, when: filled }
+      list_structure_links: { verb: cbu.list-structure-links, when: filled }
+      parties: { verb: cbu.parties, when: filled }
+      update: { verb: cbu.update, when: filled }
+      rename: { verb: cbu.rename, when: filled }
+      set_jurisdiction: { verb: cbu.set-jurisdiction, when: filled }
+      set_client_type: { verb: cbu.set-client-type, when: filled }
+      set_commercial_client: { verb: cbu.set-commercial-client, when: filled }
+      add_product: { verb: cbu.add-product, when: filled }
+      remove_product: { verb: cbu.remove-product, when: filled }
+      assign_control: { verb: cbu.assign-control, when: filled }
+      assign_ownership: { verb: cbu.assign-ownership, when: filled }
+      assign_fund_role: { verb: cbu.assign-fund-role, when: filled }
+      assign_trust_role: { verb: cbu.assign-trust-role, when: filled }
+      assign_service_provider: { verb: cbu.assign-service-provider, when: filled }
+      assign_signatory: { verb: cbu.assign-signatory, when: filled }
+      remove_role: { verb: cbu.remove-role, when: filled }
+      validate_roles: { verb: cbu.validate-roles, when: filled }
+      attach_evidence: { verb: cbu.attach-evidence, when: filled }
+      verify_evidence: { verb: cbu.verify-evidence, when: filled }
+      request_proof_update: { verb: cbu.request-proof-update, when: filled }
+      link_structure: { verb: cbu.link-structure, when: filled }
+      unlink_structure: { verb: cbu.unlink-structure, when: filled }
+      submit_for_validation: { verb: cbu.submit-for-validation, when: filled }
+      reopen_validation: { verb: cbu.reopen-validation, when: filled }
+      decide: { verb: cbu.decide, when: filled }
+      delete: { verb: cbu.delete, when: filled }
+      delete_cascade: { verb: cbu.delete-cascade, when: filled }
       # cbu.assign-role is owned by struct_* constellations (role assignment
       # within a specific fund structure). Group ownership identifies CBUs,
       # not their role composition.

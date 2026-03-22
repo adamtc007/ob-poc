@@ -13,11 +13,22 @@ slots:
       read: { verb: deal.read-record, when: filled }
       list: { verb: deal.list, when: [empty, filled] }
       search: { verb: deal.search-records, when: [empty, filled] }
-      update: { verb: deal.update-record, when: filled }
-      update_status: { verb: deal.update-status, when: filled }
-      cancel: { verb: deal.cancel, when: filled }
       summary: { verb: deal.read-summary, when: filled }
       timeline: { verb: deal.read-timeline, when: filled }
+      list_documents: { verb: deal.list-documents, when: filled }
+      list_slas: { verb: deal.list-slas, when: filled }
+      list_active_rate_cards: { verb: deal.list-active-rate-cards, when: filled }
+      list_rate_card_lines: { verb: deal.list-rate-card-lines, when: filled }
+      list_rate_card_history: { verb: deal.list-rate-card-history, when: filled }
+      update: { verb: deal.update-record, when: filled }
+      update_status: { verb: deal.update-status, when: filled }
+      add_document: { verb: deal.add-document, when: filled }
+      update_document_status: { verb: deal.update-document-status, when: filled }
+      add_sla: { verb: deal.add-sla, when: filled }
+      remove_sla: { verb: deal.remove-sla, when: filled }
+      add_ubo_assessment: { verb: deal.add-ubo-assessment, when: filled }
+      update_ubo_assessment: { verb: deal.update-ubo-assessment, when: filled }
+      cancel: { verb: deal.cancel, when: filled }
   participant:
     type: entity
     entity_kinds: [person]
@@ -48,13 +59,17 @@ slots:
       create: { verb: contract.create, when: empty }
       read: { verb: contract.get, when: filled }
       list: { verb: contract.list, when: [empty, filled] }
-      update: { verb: contract.update, when: filled }
-      terminate: { verb: contract.terminate, when: filled }
-      add_product: { verb: contract.add-product, when: filled }
       list_products: { verb: contract.list-products, when: filled }
-      subscribe: { verb: contract.subscribe, when: filled }
+      list_rate_cards: { verb: contract.list-rate-cards, when: filled }
       list_subscriptions: { verb: contract.list-subscriptions, when: filled }
       for_client: { verb: contract.for-client, when: [empty, filled] }
+      update: { verb: contract.update, when: filled }
+      add_product: { verb: contract.add-product, when: filled }
+      remove_product: { verb: contract.remove-product, when: filled }
+      create_rate_card: { verb: contract.create-rate-card, when: filled }
+      subscribe: { verb: contract.subscribe, when: filled }
+      unsubscribe: { verb: contract.unsubscribe, when: filled }
+      terminate: { verb: contract.terminate, when: filled }
   deal_product:
     type: entity
     entity_kinds: [entity]
@@ -75,10 +90,15 @@ slots:
     verbs:
       create: { verb: deal.create-rate-card, when: empty }
       add_line: { verb: deal.add-rate-card-line, when: filled }
+      update_line: { verb: deal.update-rate-card-line, when: filled }
+      remove_line: { verb: deal.remove-rate-card-line, when: filled }
+      list: { verb: deal.list-rate-cards, when: filled }
+      list_lines: { verb: deal.list-rate-card-lines, when: filled }
+      list_history: { verb: deal.list-rate-card-history, when: filled }
+      list_active: { verb: deal.list-active-rate-cards, when: filled }
       propose: { verb: deal.propose-rate-card, when: filled }
       counter: { verb: deal.counter-rate-card, when: filled }
       agree: { verb: deal.agree-rate-card, when: filled }
-      list: { verb: deal.list-rate-cards, when: filled }
   onboarding_request:
     type: entity
     entity_kinds: [entity]

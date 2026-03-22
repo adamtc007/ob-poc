@@ -23,6 +23,9 @@ slots:
       create: { verb: kyc-case.create, when: empty }
       open: { verb: kyc.open-case, when: empty }
       read: { verb: kyc-case.read, when: filled }
+      list_by_cbu: { verb: kyc-case.list-by-cbu, when: filled }
+      state: { verb: kyc-case.state, when: filled }
+      assign: { verb: kyc-case.assign, when: filled }
       update_status: { verb: kyc-case.update-status, when: filled }
       set_risk: { verb: kyc-case.set-risk-rating, when: filled }
       close: { verb: kyc-case.close, when: filled }
@@ -38,7 +41,16 @@ slots:
         depends_on: [{ slot: kyc_case, min_state: review }]
         verbs:
           evaluate: { verb: tollgate.evaluate, when: empty }
+          evaluate_gate: { verb: tollgate.evaluate-gate, when: [empty, filled] }
           read: { verb: tollgate.read, when: filled }
+          get_decision_readiness: { verb: tollgate.get-decision-readiness, when: filled }
+          get_metrics: { verb: tollgate.get-metrics, when: filled }
+          list_evaluations: { verb: tollgate.list-evaluations, when: filled }
+          list_thresholds: { verb: tollgate.list-thresholds, when: filled }
+          set_threshold: { verb: tollgate.set-threshold, when: filled }
+          override: { verb: tollgate.override, when: filled }
+          list_overrides: { verb: tollgate.list-overrides, when: filled }
+          expire_override: { verb: tollgate.expire-override, when: filled }
   entity_workstream:
     type: entity
     entity_kinds: [person, company]
@@ -48,7 +60,12 @@ slots:
     verbs:
       create: { verb: entity-workstream.create, when: empty }
       read: { verb: entity-workstream.read, when: filled }
+      list_by_case: { verb: entity-workstream.list-by-case, when: filled }
+      state: { verb: entity-workstream.state, when: filled }
       update: { verb: entity-workstream.update-status, when: filled }
+      set_enhanced_dd: { verb: entity-workstream.set-enhanced-dd, when: filled }
+      set_ubo: { verb: entity-workstream.set-ubo, when: filled }
+      complete: { verb: entity-workstream.complete, when: filled }
       block: { verb: entity-workstream.block, when: filled }
   screening:
     type: entity
@@ -63,8 +80,11 @@ slots:
       sanctions: { verb: screening.sanctions, when: [empty, filled] }
       pep: { verb: screening.pep, when: [empty, filled] }
       adverse_media: { verb: screening.adverse-media, when: [empty, filled] }
+      bulk_refresh: { verb: screening.bulk-refresh, when: filled }
       read: { verb: screening.read, when: filled }
       list: { verb: screening.list, when: filled }
+      list_by_workstream: { verb: screening.list-by-workstream, when: filled }
+      review_hit: { verb: screening.review-hit, when: filled }
       update: { verb: screening.update-status, when: filled }
       escalate: { verb: screening.escalate, when: filled }
       resolve: { verb: screening.resolve, when: filled }
@@ -81,5 +101,7 @@ slots:
     verbs:
       create: { verb: kyc-agreement.create, when: empty }
       read: { verb: kyc-agreement.read, when: filled }
+      list: { verb: kyc-agreement.list, when: filled }
       update: { verb: kyc-agreement.update, when: filled }
+      update_status: { verb: kyc-agreement.update-status, when: filled }
       sign: { verb: kyc-agreement.sign, when: filled }

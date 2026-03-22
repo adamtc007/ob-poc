@@ -66,11 +66,36 @@ slots:
     cardinality: optional
     depends_on: [fund]
     verbs:
+      allocate: { verb: capital.allocate, when: filled }
+      issue_initial: { verb: capital.issue.initial, when: [empty, filled] }
+      issue_new: { verb: capital.issue.new, when: filled }
+      issue_shares: { verb: capital.issue-shares, when: filled }
+      cancel_shares: { verb: capital.cancel-shares, when: filled }
+      transfer: { verb: capital.transfer, when: filled }
       split: { verb: capital.split, when: filled }
       buyback: { verb: capital.buyback, when: filled }
       cancel: { verb: capital.cancel, when: filled }
+      reconcile: { verb: capital.reconcile, when: filled }
       cap_table: { verb: capital.cap-table, when: filled }
       holders: { verb: capital.holders, when: filled }
+      list_by_issuer: { verb: capital.list-by-issuer, when: filled }
+      list_shareholders: { verb: capital.list-shareholders, when: filled }
+      get_ownership_chain: { verb: capital.get-ownership-chain, when: filled }
+      define_share_class: { verb: capital.define-share-class, when: [empty, filled] }
+      share_class_create: { verb: capital.share-class.create, when: [empty, filled] }
+      share_class_list: { verb: capital.share-class.list, when: filled }
+      share_class_get_supply: { verb: capital.share-class.get-supply, when: filled }
+      share_class_add_identifier: { verb: capital.share-class.add-identifier, when: filled }
+      control_config_get: { verb: capital.control-config.get, when: filled }
+      control_config_set: { verb: capital.control-config.set, when: filled }
+      dilution_grant_options: { verb: capital.dilution.grant-options, when: filled }
+      dilution_issue_warrant: { verb: capital.dilution.issue-warrant, when: filled }
+      dilution_create_safe: { verb: capital.dilution.create-safe, when: filled }
+      dilution_create_note: { verb: capital.dilution.create-convertible-note, when: filled }
+      dilution_exercise: { verb: capital.dilution.exercise, when: filled }
+      dilution_forfeit: { verb: capital.dilution.forfeit, when: filled }
+      dilution_list: { verb: capital.dilution.list, when: filled }
+      dilution_get_summary: { verb: capital.dilution.get-summary, when: filled }
   investment_manager:
     type: entity
     entity_kinds: [company]

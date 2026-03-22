@@ -19,13 +19,26 @@ slots:
     verbs:
       create: { verb: sla.create, when: empty }
       read: { verb: sla.read, when: filled }
+      read_template: { verb: sla.read-template, when: filled }
       list: { verb: sla.list, when: [empty, filled] }
+      list_templates: { verb: sla.list-templates, when: [empty, filled] }
+      list_commitments: { verb: sla.list-commitments, when: filled }
+      list_measurements: { verb: sla.list-measurements, when: filled }
+      list_breaches: { verb: sla.list-breaches, when: filled }
+      list_open_breaches: { verb: sla.list-open-breaches, when: filled }
       update: { verb: sla.update, when: filled }
+      bind: { verb: sla.bind, when: filled }
+      commit: { verb: sla.commit, when: filled }
+      record_measurement: { verb: sla.record-measurement, when: filled }
       activate: { verb: sla.activate, when: filled }
       suspend: { verb: sla.suspend, when: filled }
+      suspend_commitment: { verb: sla.suspend-commitment, when: filled }
       renew: { verb: sla.renew, when: filled }
       breach: { verb: sla.record-breach, when: filled }
-      list_breaches: { verb: sla.list-breaches, when: filled }
+      report_breach: { verb: sla.report-breach, when: filled }
+      escalate_breach: { verb: sla.escalate-breach, when: filled }
+      resolve_breach: { verb: sla.resolve-breach, when: filled }
+      update_remediation: { verb: sla.update-remediation, when: filled }
   access_review:
     type: entity
     entity_kinds: [entity]
@@ -34,8 +47,22 @@ slots:
     depends_on: [group]
     verbs:
       create: { verb: access-review.create, when: empty }
+      create_campaign: { verb: access-review.create-campaign, when: [empty, filled] }
       read: { verb: access-review.read, when: filled }
       list: { verb: access-review.list, when: [empty, filled] }
+      list_items: { verb: access-review.list-items, when: filled }
+      list_flagged: { verb: access-review.list-flagged, when: filled }
+      my_pending: { verb: access-review.my-pending, when: filled }
+      campaign_status: { verb: access-review.campaign-status, when: filled }
+      audit_report: { verb: access-review.audit-report, when: filled }
+      populate_campaign: { verb: access-review.populate-campaign, when: filled }
+      launch_campaign: { verb: access-review.launch-campaign, when: filled }
+      send_reminders: { verb: access-review.send-reminders, when: filled }
+      process_deadline: { verb: access-review.process-deadline, when: filled }
+      attest: { verb: access-review.attest, when: filled }
+      extend_access: { verb: access-review.extend-access, when: filled }
+      revoke_access: { verb: access-review.revoke-access, when: filled }
+      escalate_item: { verb: access-review.escalate-item, when: filled }
       start: { verb: access-review.start, when: filled }
       complete: { verb: access-review.complete, when: filled }
       approve: { verb: access-review.approve, when: filled }
@@ -48,10 +75,15 @@ slots:
     depends_on: [group]
     verbs:
       create: { verb: regulatory.create, when: empty }
+      registration_add: { verb: regulatory.registration.add, when: [empty, filled] }
       read: { verb: regulatory.read, when: filled }
       list: { verb: regulatory.list, when: [empty, filled] }
-      submit: { verb: regulatory.submit, when: filled }
+      registration_list: { verb: regulatory.registration.list, when: filled }
+      registration_check: { verb: regulatory.registration.check, when: filled }
+      registration_verify: { verb: regulatory.registration.verify, when: filled }
       update: { verb: regulatory.update, when: filled }
+      submit: { verb: regulatory.submit, when: filled }
+      registration_remove: { verb: regulatory.registration.remove, when: filled }
   ruleset:
     type: entity
     entity_kinds: [entity]
@@ -62,6 +94,7 @@ slots:
       create: { verb: ruleset.create, when: empty }
       read: { verb: ruleset.read, when: filled }
       publish: { verb: ruleset.publish, when: filled }
+      retire: { verb: ruleset.retire, when: filled }
   delegation:
     type: entity
     entity_kinds: [entity]
@@ -70,6 +103,10 @@ slots:
     depends_on: [group]
     verbs:
       create: { verb: delegation.create, when: empty }
+      add: { verb: delegation.add, when: [empty, filled] }
       read: { verb: delegation.read, when: filled }
-      revoke: { verb: delegation.revoke, when: filled }
       list: { verb: delegation.list, when: [empty, filled] }
+      list_delegates: { verb: delegation.list-delegates, when: filled }
+      list_received: { verb: delegation.list-delegations-received, when: filled }
+      end: { verb: delegation.end, when: filled }
+      revoke: { verb: delegation.revoke, when: filled }

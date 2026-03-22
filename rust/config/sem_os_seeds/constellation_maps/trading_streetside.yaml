@@ -23,6 +23,7 @@ slots:
       read: { verb: trading-profile.read, when: filled }
       get_active: { verb: trading-profile.get-active, when: filled }
       list_versions: { verb: trading-profile.list-versions, when: filled }
+      materialize: { verb: trading-profile.materialize, when: filled }
       activate: { verb: trading-profile.activate, when: filled }
       diff: { verb: trading-profile.diff, when: filled }
       clone: { verb: trading-profile.clone-to, when: filled }
@@ -32,6 +33,14 @@ slots:
       set_base_currency: { verb: trading-profile.set-base-currency, when: filled }
       link_csa_ssi: { verb: trading-profile.link-csa-ssi, when: filled }
       update_im_scope: { verb: trading-profile.update-im-scope, when: filled }
+      ca_add_cutoff_rule: { verb: trading-profile.ca.add-cutoff-rule, when: filled }
+      ca_remove_cutoff_rule: { verb: trading-profile.ca.remove-cutoff-rule, when: filled }
+      ca_enable_event_types: { verb: trading-profile.ca.enable-event-types, when: filled }
+      ca_disable_event_types: { verb: trading-profile.ca.disable-event-types, when: filled }
+      ca_set_default_option: { verb: trading-profile.ca.set-default-option, when: filled }
+      ca_remove_default_option: { verb: trading-profile.ca.remove-default-option, when: filled }
+      ca_link_proceeds_ssi: { verb: trading-profile.ca.link-proceeds-ssi, when: filled }
+      ca_remove_proceeds_ssi: { verb: trading-profile.ca.remove-proceeds-ssi, when: filled }
       validate_golive: { verb: trading-profile.validate-go-live-ready, when: filled }
       validate_coverage: { verb: trading-profile.validate-universe-coverage, when: filled }
       submit: { verb: trading-profile.submit, when: filled }
