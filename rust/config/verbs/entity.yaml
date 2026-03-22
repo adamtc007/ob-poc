@@ -34,6 +34,9 @@ domains:
           - "onboard a new counterparty"
           - "add a new legal entity to the system"
           - "register a new organisation"
+          - "create a legal entity for HSBC"
+          - "create a legal entity for this company"
+          - "create an entity for this bank"
           - "create a new counterparty record"
           - "add this company to the system"
           # Trust sub-type phrases — discretionary

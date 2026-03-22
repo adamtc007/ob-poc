@@ -182,6 +182,10 @@ domains:
           - "do a complete compliance screen"
           - "run all the checks on this entity"
           - "initiate screening"
+          - "run the RBA assessment"
+          - "risk based approach assessment"
+          - "run a risk based approach check"
+          - "conduct RBA screening"
         behavior: crud
         produces:
           type: screening

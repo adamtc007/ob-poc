@@ -51,7 +51,7 @@ scenarios:
     signals:
       actions: [onboard, "set up", establish, launch, configure]
       jurisdictions: [LU]
-      nouns_any: [scsp, slp, lp, "private equity", pe]
+      nouns_any: [scsp, slp, lp, "private equity", pe, "pe structure", "pe fund"]
     routes:
       kind: macro
       macro_fqn: struct.lux.pe.scsp
@@ -83,7 +83,8 @@ scenarios:
     signals:
       actions: [onboard, "set up", establish, launch, configure]
       jurisdictions: [IE]
-      nouns_any: [icav, aif, qiaif, riaif]
+      nouns_any: [qiaif, riaif, "aif icav", "alternative icav"]
+      phrases_any: ["aif icav", "alternative investment fund"]
     routes:
       kind: macro
       macro_fqn: struct.ie.aif.icav
@@ -116,7 +117,7 @@ scenarios:
     signals:
       actions: [onboard, "set up", establish, launch, configure]
       jurisdictions: [UK]
-      nouns_any: [oeic, fund, ucits]
+      nouns_any: [oeic, fund, ucits, "oeic structure", "uk fund"]
     routes:
       kind: macro
       macro_fqn: struct.uk.authorised.oeic
@@ -230,7 +231,8 @@ scenarios:
     signals:
       actions: [onboard, "set up", establish, launch, configure]
       jurisdictions: [US]
-      nouns_any: [fund, "closed-end", "closed end", "40-act", "40 act"]
+      nouns_any: ["closed-end", "closed end", "closed-end fund"]
+      phrases_any: ["closed-end", "closed end fund"]
     routes:
       kind: macro
       macro_fqn: struct.us.40act.closed-end

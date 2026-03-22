@@ -671,6 +671,10 @@ domains:
           - "what operations are available"
           - "show tool list"
           - "what commands can I use"
+          - "what tools do you have?"
+          - "show me your tools"
+          - "what are your capabilities"
+          - "help me understand what you can do"
         args:
           - name: category
             type: string

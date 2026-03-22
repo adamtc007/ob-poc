@@ -112,6 +112,10 @@ struct.uk.authorised.oeic:
     - "uk fund"
     - "oeic structure"
     - "uk authorised fund"
+    - "UK OEIC structure"
+    - "set up a UK OEIC"
+    - "create UK OEIC"
+    - "onboard a UK OEIC"
 
 struct.hedge.cross-border:
   aliases:

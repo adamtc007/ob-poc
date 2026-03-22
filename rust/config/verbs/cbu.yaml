@@ -425,6 +425,10 @@ domains:
           - "wipe CBU entirely"
           - "remove structure and all linked data"
           - "cascade remove business unit"
+          - "nuke everything under this CBU"
+          - "nuke this CBU including all roles"
+          - "destroy this CBU and everything in it"
+          - "remove everything under this structure"
         behavior: plugin
         metadata:
           tier: intent
@@ -653,6 +657,12 @@ domains:
           - "appoint a party on this cbu"
           - "make this entity the depositary"
           - "assign a service role on this onboarding unit"
+          - "make them the transfer agent"
+          - "make State Street the transfer agent"
+          - "appoint transfer agent"
+          - "assign transfer agent role"
+          - "make them the custodian"
+          - "make them the auditor"
         behavior: crud
         metadata:
           tier: intent
@@ -1077,6 +1087,13 @@ domains:
           - "subscribe this cbu to custody"
           - "enable this product on the onboarding unit"
           - "add a product to this onboarding unit"
+          - "set up the NAV calc service"
+          - "set up NAV calculation"
+          - "add the transfer agent service"
+          - "add TA and fund accounting"
+          - "add fund accounting service"
+          - "set up fund administration"
+          - "add the TA service"
         behavior: plugin
         metadata:
           tier: intent

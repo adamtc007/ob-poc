@@ -721,6 +721,10 @@ domains:
           - "trace complete chain"
           - "follow all ownership paths"
           - "trace client ownership"
+          - "pierce the veil"
+          - "look through the nominee structure"
+          - "nominee structure need to pierce the veil"
+          - "pierce through nominee to find UBO"
         metadata:
           tier: intent
           source_of_truth: operational
@@ -1019,6 +1023,9 @@ domains:
           - "approve waiver"
           - "grant exemption"
           - "low risk waiver"
+          - "waive the ownership verification"
+          - "waive ownership verification low risk client"
+          - "skip the UBO verification for this low risk client"
         metadata:
           tier: intent
           source_of_truth: operational

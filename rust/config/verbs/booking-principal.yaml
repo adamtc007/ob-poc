@@ -36,6 +36,8 @@ domains:
         - "add a principal for booking"
         - "create a booking entity for custody"
         - "establish a booking principal"
+        - "set up a booking principal for this deal"
+        - "create the booking principal for this deal"
         args:
         - name: legal-entity-id
           type: uuid

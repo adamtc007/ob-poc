@@ -950,6 +950,10 @@ domains:
         - "map ownership route"
         - "trace beneficial ownership chain upward"
         - "show equity stake path between entities"
+        - "trace the chain from Vanguard down to the subfund"
+        - "trace the ownership chain down to the subfund"
+        - "trace the chain down"
+        - "follow the ownership chain from parent to subfund"
         metadata:
           tier: intent
           source_of_truth: entity

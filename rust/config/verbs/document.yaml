@@ -854,6 +854,10 @@ domains:
           - kick back this document version
           - the document is expired reject it
           - reject this upload wrong person
+          - reject the articles of association wrong entity name
+          - reject this document version it has the wrong entity
+          - this document has the wrong entity reject it
+          - reject this uploaded document
         metadata:
           tier: intent
           source_of_truth: operational

@@ -322,6 +322,10 @@ domains:
           - "get the"
           - "which is the"
           - "who is the"
+          - "search for entities matching"
+          - "search entities in this group"
+          - "find entities matching Vanguard"
+          - "search for this entity in the group"
         metadata:
           tier: intent
           source_of_truth: operational

@@ -1055,3 +1055,82 @@ nouns:
           tax-config.list-reporting,
         ]
       delete: [tax-config.deactivate-reclaim]
+
+  # =========================================================================
+  # ADDITIONAL NOUNS (pipeline leak remediation round)
+  # =========================================================================
+
+  rba:
+    aliases:
+      - rba
+      - risk based approach
+    natural_aliases:
+      - rba assessment
+      - risk based approach assessment
+    noun_keys: [screening]
+    action_verbs:
+      run: [screening.run, screening.sanctions]
+      assess: [screening.run]
+
+  nav:
+    aliases:
+      - nav
+      - nav calc
+      - nav calculation
+    natural_aliases:
+      - net asset value
+      - fund accounting
+    noun_keys: [cbu]
+    action_verbs:
+      create: [cbu.add-product]
+      setup: [cbu.add-product]
+
+  transfer-agent:
+    aliases:
+      - transfer agent
+      - ta
+    natural_aliases:
+      - ta service
+      - transfer agency
+    noun_keys: [cbu]
+    action_verbs:
+      assign: [cbu.assign-role]
+      add: [cbu.add-product]
+      create: [cbu.add-product]
+
+  tools:
+    aliases:
+      - tools
+      - capabilities
+    natural_aliases:
+      - commands
+      - what can you do
+    noun_keys: [tool_list]
+    action_verbs:
+      list: [agent.list-tools]
+      show: [agent.list-tools]
+
+  persona:
+    aliases:
+      - persona
+      - role
+      - compliance officer
+    natural_aliases:
+      - work as
+      - set my role
+    noun_keys: [session_context]
+    action_verbs:
+      set: [session.set-persona]
+      switch: [session.set-persona]
+
+  nominee:
+    aliases:
+      - nominee
+      - nominee structure
+    natural_aliases:
+      - pierce the veil
+      - look through nominee
+    noun_keys: [ubo]
+    action_verbs:
+      trace: [ubo.trace-chains]
+      discover: [ubo.discover]

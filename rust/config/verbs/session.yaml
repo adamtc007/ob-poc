@@ -78,6 +78,11 @@ domains:
         - "bring up all CBUs for region"
         - "scope to jurisdiction"
         - "load all trading units in"
+        - "show me the galaxy for Germany"
+        - "show the galaxy for this jurisdiction"
+        - "load the galaxy for UK"
+        - "show all funds in Germany"
+        - "load all structures in this country"
         metadata:
           tier: intent
           source_of_truth: session
@@ -503,6 +508,10 @@ domains:
         - "working on client"
         - "scope to client group"
         - "select client group"
+        - "switch to the BlackRock client"
+        - "switch to this client"
+        - "change to the Allianz client"
+        - "work with BlackRock"
         metadata:
           tier: intent
           source_of_truth: session
@@ -549,6 +558,10 @@ domains:
         - "switch to onboarding persona"
         - "set session persona"
         - "change to operations view"
+        - "I want to work as a compliance officer"
+        - "work as compliance"
+        - "switch to compliance officer role"
+        - "set my role to analyst"
         metadata:
           tier: intent
           source_of_truth: session
