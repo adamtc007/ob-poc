@@ -602,6 +602,40 @@ fn print_summary_report(results: &[TestResult]) {
     println!("  No match at all:           {}", no_matches);
     println!("  Errors:                    {}", errors);
     println!();
+
+    // ── Source tier distribution ────────────────────────────────
+    println!("  RESOLUTION SOURCE DISTRIBUTION");
+    println!("  --------------------------------------------------------------------");
+    let mut source_counts: HashMap<String, (usize, usize)> = HashMap::new(); // (total, hits)
+    for r in results {
+        let source = r
+            .top_source
+            .as_deref()
+            .unwrap_or("Unknown")
+            .to_string();
+        let entry = source_counts.entry(source).or_insert((0, 0));
+        entry.0 += 1;
+        if r.outcome.is_first_attempt_hit() {
+            entry.1 += 1;
+        }
+    }
+    let mut source_vec: Vec<(String, usize, usize)> = source_counts
+        .into_iter()
+        .map(|(k, (t, h))| (k, t, h))
+        .collect();
+    source_vec.sort_by(|a, b| b.1.cmp(&a.1));
+    for (source, fired, hit) in &source_vec {
+        let acc = if *fired > 0 {
+            *hit as f64 / *fired as f64 * 100.0
+        } else {
+            0.0
+        };
+        println!(
+            "  {:30} {:>4} fired  {:>4} hit  ({:>5.1}% accuracy)",
+            source, fired, hit, acc
+        );
+    }
+    println!();
 }
 
 fn print_ecir_report(results: &[TestResult]) {
