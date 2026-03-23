@@ -18,7 +18,9 @@
 
 use ob_poc_types::onboarding_state::*;
 
-use super::composite_state::{BlockedVerbHint, CbuStateSummary, GroupCompositeState, ScoredVerbHint};
+use super::composite_state::{
+    BlockedVerbHint, CbuStateSummary, GroupCompositeState, ScoredVerbHint,
+};
 
 /// Build an `OnboardingStateView` from the engine's `GroupCompositeState`.
 ///
@@ -123,8 +125,15 @@ fn build_cbu_identification_layer(c: &GroupCompositeState) -> OnboardingLayer {
         (LayerState::Complete, 100)
     };
 
-    let forward = filter_hints(&c.next_likely_verbs, &["cbu.create"], VerbDirection::Forward);
-    let blocked = filter_blocked(&c.blocked_verbs, &["kyc-case", "screening", "document", "custody"]);
+    let forward = filter_hints(
+        &c.next_likely_verbs,
+        &["cbu.create"],
+        VerbDirection::Forward,
+    );
+    let blocked = filter_blocked(
+        &c.blocked_verbs,
+        &["kyc-case", "screening", "document", "custody"],
+    );
 
     OnboardingLayer {
         index: 1,
@@ -144,12 +153,21 @@ fn build_cbu_identification_layer(c: &GroupCompositeState) -> OnboardingLayer {
 
 fn build_kyc_case_layer(c: &GroupCompositeState) -> OnboardingLayer {
     if c.cbu_count == 0 {
-        return blocked_layer(2, "KYC Case", "Open KYC cases for each CBU", "No CBUs identified");
+        return blocked_layer(
+            2,
+            "KYC Case",
+            "Open KYC cases for each CBU",
+            "No CBUs identified",
+        );
     }
 
     let with_case = c.cbu_states.iter().filter(|s| s.has_kyc_case).count();
     let total = c.cbu_states.len();
-    let progress = if total == 0 { 0 } else { ((with_case * 100) / total) as u8 };
+    let progress = if total == 0 {
+        0
+    } else {
+        ((with_case * 100) / total) as u8
+    };
 
     let state = match (with_case, total) {
         (w, t) if w == t && t > 0 => LayerState::Complete,
@@ -196,12 +214,23 @@ fn build_kyc_case_layer(c: &GroupCompositeState) -> OnboardingLayer {
 
 fn build_screening_layer(c: &GroupCompositeState) -> OnboardingLayer {
     if c.cbu_count == 0 {
-        return blocked_layer(3, "Screening", "Run compliance screening checks", "No CBUs identified");
+        return blocked_layer(
+            3,
+            "Screening",
+            "Run compliance screening checks",
+            "No CBUs identified",
+        );
     }
 
-    let cbus_with_case: Vec<&CbuStateSummary> = c.cbu_states.iter().filter(|s| s.has_kyc_case).collect();
+    let cbus_with_case: Vec<&CbuStateSummary> =
+        c.cbu_states.iter().filter(|s| s.has_kyc_case).collect();
     if cbus_with_case.is_empty() {
-        return blocked_layer(3, "Screening", "Run compliance screening checks", "No KYC cases opened");
+        return blocked_layer(
+            3,
+            "Screening",
+            "Run compliance screening checks",
+            "No KYC cases opened",
+        );
     }
 
     let screened = cbus_with_case.iter().filter(|s| s.has_screening).count();
@@ -253,7 +282,12 @@ fn build_screening_layer(c: &GroupCompositeState) -> OnboardingLayer {
 
 fn build_document_layer(c: &GroupCompositeState) -> OnboardingLayer {
     if c.cbu_count == 0 {
-        return blocked_layer(4, "Documents", "Collect required documents", "No CBUs identified");
+        return blocked_layer(
+            4,
+            "Documents",
+            "Collect required documents",
+            "No CBUs identified",
+        );
     }
 
     let cbus_with_screening: Vec<&CbuStateSummary> = c
@@ -263,7 +297,12 @@ fn build_document_layer(c: &GroupCompositeState) -> OnboardingLayer {
         .collect();
 
     if cbus_with_screening.is_empty() {
-        return blocked_layer(4, "Documents", "Collect required documents", "Screening not complete");
+        return blocked_layer(
+            4,
+            "Documents",
+            "Collect required documents",
+            "Screening not complete",
+        );
     }
 
     let complete = cbus_with_screening
@@ -291,7 +330,9 @@ fn build_document_layer(c: &GroupCompositeState) -> OnboardingLayer {
         description: "Collect required identity and corporate documents".into(),
         state,
         progress_pct: progress,
-        summary: Some(format!("{complete} of {total} CBU(s) have complete documentation")),
+        summary: Some(format!(
+            "{complete} of {total} CBU(s) have complete documentation"
+        )),
         forward_verbs: forward,
         revert_verbs: vec![], // Document solicitation isn't "undoable" — it's a request
         blocked_verbs: vec![],
@@ -310,7 +351,12 @@ fn build_approval_layer(c: &GroupCompositeState) -> OnboardingLayer {
     let total = c.cbu_count;
 
     if total == 0 {
-        return blocked_layer(5, "Approval", "Final KYC approval tollgate", "No CBUs identified");
+        return blocked_layer(
+            5,
+            "Approval",
+            "Final KYC approval tollgate",
+            "No CBUs identified",
+        );
     }
 
     let progress = ((approved * 100) / total) as u8;
@@ -345,7 +391,8 @@ fn build_approval_layer(c: &GroupCompositeState) -> OnboardingLayer {
     OnboardingLayer {
         index: 5,
         name: "Approval".into(),
-        description: "Final KYC approval tollgate — all screening and documentation complete".into(),
+        description: "Final KYC approval tollgate — all screening and documentation complete"
+            .into(),
         state,
         progress_pct: progress,
         summary: Some(format!("{approved} of {total} CBU(s) approved")),
@@ -506,7 +553,11 @@ fn compute_cbu_revert_action(cbu: &CbuStateSummary) -> Option<SuggestedVerb> {
 
 // ── Helpers ─────────────────────────────────────────────────────────
 
-fn filter_hints(hints: &[ScoredVerbHint], prefixes: &[&str], direction: VerbDirection) -> Vec<SuggestedVerb> {
+fn filter_hints(
+    hints: &[ScoredVerbHint],
+    prefixes: &[&str],
+    direction: VerbDirection,
+) -> Vec<SuggestedVerb> {
     hints
         .iter()
         .filter(|h| prefixes.iter().any(|p| h.verb_fqn == *p))
@@ -525,11 +576,7 @@ fn filter_hints(hints: &[ScoredVerbHint], prefixes: &[&str], direction: VerbDire
 fn filter_blocked(blocked: &[BlockedVerbHint], domain_prefixes: &[&str]) -> Vec<BlockedVerb> {
     blocked
         .iter()
-        .filter(|b| {
-            domain_prefixes
-                .iter()
-                .any(|p| b.verb_fqn.starts_with(p))
-        })
+        .filter(|b| domain_prefixes.iter().any(|p| b.verb_fqn.starts_with(p)))
         .map(|b| BlockedVerb {
             verb_fqn: b.verb_fqn.clone(),
             label: verb_fqn_to_label(&b.verb_fqn),
@@ -689,7 +736,10 @@ mod tests {
 
         // Layer 2 has revert verbs (case can be withdrawn)
         assert!(!view.layers[2].revert_verbs.is_empty());
-        assert_eq!(view.layers[2].revert_verbs[0].direction, VerbDirection::Revert);
+        assert_eq!(
+            view.layers[2].revert_verbs[0].direction,
+            VerbDirection::Revert
+        );
 
         // Layer 5 has revert verbs (approved case can be reopened)
         assert!(!view.layers[5].revert_verbs.is_empty());

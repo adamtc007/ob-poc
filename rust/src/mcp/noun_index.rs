@@ -651,15 +651,15 @@ impl NounIndex {
             | "status" | "tell" => {
                 return Some(ActionCategory::List);
             }
-            "update" | "change" | "modify" | "edit" | "rename" | "amend" => {
+            "update" | "change" | "modify" | "edit" | "rename" | "amend" | "upload" => {
                 return Some(ActionCategory::Update);
             }
             "delete" | "remove" | "drop" | "cancel" | "revoke" | "archive" | "close"
             | "withdraw" | "terminate" | "nuke" | "destroy" | "purge" => {
                 return Some(ActionCategory::Delete);
             }
-            "assign" | "link" | "connect" | "attach" | "map" | "bind" | "associate"
-            | "appoint" | "designate" | "make" | "nominate" => {
+            "assign" | "link" | "connect" | "attach" | "map" | "bind" | "associate" | "appoint"
+            | "designate" | "make" | "nominate" => {
                 return Some(ActionCategory::Assign);
             }
             "compute" | "calculate" | "run" | "check" | "screen" | "verify" | "validate"
@@ -695,14 +695,87 @@ impl NounIndex {
         None
     }
 
+    /// Check compound signal rules: (action_word, object_noun) → specific verb.
+    ///
+    /// These fire BEFORE general noun+action resolution to handle cases where
+    /// the combination of action + object changes the meaning. For example,
+    /// "request" + "document" → document.solicit (not [entity].create).
+    fn resolve_compound(utterance: &str, nouns: &[NounMatch]) -> Option<NounResolution> {
+        if nouns.is_empty() {
+            return None;
+        }
+        let lower = utterance.to_lowercase();
+        let words: Vec<&str> = lower.split_whitespace().collect();
+        let first = words.first().copied().unwrap_or("");
+        let noun_key = &nouns[0].noun.key;
+
+        // Pre-check: if the utterance contains document-related words AND a request action,
+        // force document.solicit regardless of which noun was matched first.
+        // This handles "Request identity documents for due diligence" where "due diligence"
+        // matches kyc-case before "documents" matches document.
+        let has_doc_word = lower.contains("document")
+            || lower.contains("passport")
+            || lower.contains("certificate")
+            || lower.contains("identity");
+        let is_request_action = matches!(first, "request" | "solicit" | "obtain" | "ask");
+        if has_doc_word && is_request_action {
+            return Some(NounResolution {
+                candidates: vec!["document.solicit".to_string()],
+                noun_key: "document".to_string(),
+                action: None,
+                resolution_path: ResolutionPath::ExplicitMapping,
+            });
+        }
+
+        // Compound rules: (first_word_or_prefix, noun_key) → verb FQN(s)
+        let resolved = match (first, noun_key.as_str()) {
+            // Document domain: "request/solicit/ask for" + document → solicit, not create
+            ("request" | "solicit", "document") => Some(("document.solicit", "document")),
+            // Share class: "add/create" + share-class noun → share-class.create
+            ("add" | "create" | "new", "share-class") => {
+                Some(("share-class.create", "share-class"))
+            }
+            // Screening: "run/do" + screening → screening.run ONLY when no specific type/macro mentioned
+            ("run" | "do", "screening")
+                if !lower.contains("sanctions")
+                    && !lower.contains("pep")
+                    && !lower.contains("adverse media")
+                    && !lower.contains("media")
+                    && !lower.contains("full") =>
+            {
+                Some(("screening.run", "screening"))
+            }
+            // KYC: "start/open/begin" + kyc → kyc-case.create
+            ("start" | "open" | "begin", "kyc-case") => Some(("kyc-case.create", "kyc-case")),
+            // Ownership: "who" questions + ownership/control/ubo
+            ("who", "ownership" | "control" | "ubo") => {
+                Some(("ownership.who-controls", "ownership"))
+            }
+            _ => None,
+        };
+
+        resolved.map(|(verb, nk)| NounResolution {
+            candidates: vec![verb.to_string()],
+            noun_key: nk.to_string(),
+            action: None,
+            resolution_path: ResolutionPath::ExplicitMapping,
+        })
+    }
+
     /// Resolve: given extracted nouns + optional action, return verb FQN candidates.
     ///
     /// Resolution chain:
+    /// 0. Compound signal rules: (action_word, noun) → specific verb (highest priority)
     /// 1. If noun has `action_verbs[action]` → return those (ExplicitMapping)
     /// 2. If noun has `noun_keys` → find all verbs whose `metadata.noun` is in noun_keys (NounKeyMatch)
     /// 3. If noun has `entity_type_fqn` → find all verbs whose `subject_kinds` contains it (SubjectKindMatch)
     /// 4. No match → return empty (NoMatch)
-    pub fn resolve(&self, nouns: &[NounMatch], action: Option<ActionCategory>, raw_utterance: Option<&str>) -> NounResolution {
+    pub fn resolve(
+        &self,
+        nouns: &[NounMatch],
+        action: Option<ActionCategory>,
+        raw_utterance: Option<&str>,
+    ) -> NounResolution {
         if nouns.is_empty() {
             return NounResolution {
                 candidates: vec![],
@@ -710,6 +783,13 @@ impl NounIndex {
                 action,
                 resolution_path: ResolutionPath::NoMatch,
             };
+        }
+
+        // Path 0: Compound signal rules (action + noun → specific verb)
+        if let Some(utterance) = raw_utterance {
+            if let Some(resolution) = Self::resolve_compound(utterance, nouns) {
+                return resolution;
+            }
         }
 
         // Use the first (leftmost) noun match as primary
@@ -737,7 +817,11 @@ impl NounIndex {
         // YAML action_verbs may use raw verb words ("request", "solicit", "reject")
         // instead of ActionCategory keys ("create", "delete").
         if let Some(utterance) = raw_utterance {
-            let first_word = utterance.split_whitespace().next().unwrap_or("").to_lowercase();
+            let first_word = utterance
+                .split_whitespace()
+                .next()
+                .unwrap_or("")
+                .to_lowercase();
             if !first_word.is_empty() {
                 if let Some(verbs) = primary.noun.action_verbs.get(&first_word) {
                     if !verbs.is_empty() {
@@ -1314,7 +1398,10 @@ nouns:
 
         // "structure" should NOT match (inside exclusion)
         let has_structure = matches.iter().any(|m| m.matched_alias == "structure");
-        assert!(!has_structure, "Nouns inside exclusion span should not match");
+        assert!(
+            !has_structure,
+            "Nouns inside exclusion span should not match"
+        );
     }
 
     #[test]
@@ -1327,6 +1414,57 @@ nouns:
         for (a, b) in normal.iter().zip(with_empty.iter()) {
             assert_eq!(a.noun.key, b.noun.key);
             assert_eq!(a.span, b.span);
+        }
+    }
+
+    #[test]
+    fn test_compound_request_document_resolves_to_solicit() {
+        let idx = test_noun_index();
+        let nouns = idx.extract("request the certificate of incorporation");
+        // Should match "document" noun via "certificate" alias
+        // Compound rule: ("request", "document") → document.solicit
+        if let Some(doc_match) = nouns.iter().find(|m| m.noun.key == "document") {
+            let doc_nouns = vec![doc_match.clone()];
+            let resolution =
+                NounIndex::resolve_compound("request the certificate of incorporation", &doc_nouns);
+            assert!(
+                resolution.is_some(),
+                "Compound rule should fire for request + document"
+            );
+            let res = resolution.unwrap();
+            assert_eq!(res.candidates, vec!["document.solicit"]);
+        }
+        // Also test via the full resolve() path
+        if !nouns.is_empty() {
+            let action = NounIndex::classify_action("request the certificate of incorporation");
+            let resolution = idx.resolve(
+                &nouns,
+                action,
+                Some("request the certificate of incorporation"),
+            );
+            // Should contain document.solicit (either via compound or via explicit mapping)
+            assert!(
+                resolution
+                    .candidates
+                    .contains(&"document.solicit".to_string()),
+                "Expected document.solicit in candidates, got: {:?}",
+                resolution.candidates
+            );
+        }
+    }
+
+    #[test]
+    fn test_compound_who_controls_resolves_to_ownership() {
+        let idx = test_noun_index();
+        let nouns = idx.extract("who controls this entity");
+        if let Some(ctrl_match) = nouns.iter().find(|m| m.noun.key == "control") {
+            let resolution =
+                NounIndex::resolve_compound("who controls this entity", &[ctrl_match.clone()]);
+            assert!(resolution.is_some());
+            assert_eq!(
+                resolution.unwrap().candidates,
+                vec!["ownership.who-controls"]
+            );
         }
     }
 }

@@ -358,23 +358,56 @@ impl VerbService {
         threshold: f32,
         limit: usize,
     ) -> Result<Vec<SemanticMatch>, sqlx::Error> {
+        self.find_global_learned_semantic_topk_scoped(query_embedding, threshold, limit, None)
+            .await
+    }
+
+    /// Domain-scoped variant of learned phrase semantic search.
+    pub async fn find_global_learned_semantic_topk_scoped(
+        &self,
+        query_embedding: &[f32],
+        threshold: f32,
+        limit: usize,
+        domain_prefix: Option<&str>,
+    ) -> Result<Vec<SemanticMatch>, sqlx::Error> {
         let embedding_vec = Vector::from(query_embedding.to_vec());
 
-        let rows = sqlx::query_as::<_, GlobalLearnedSemanticRow>(
-            r#"
-            SELECT phrase, verb, 1 - (embedding <=> $1::vector) as similarity
-            FROM "ob-poc".invocation_phrases
-            WHERE embedding IS NOT NULL
-              AND 1 - (embedding <=> $1::vector) > $3
-            ORDER BY embedding <=> $1::vector
-            LIMIT $2
-            "#,
-        )
-        .bind(&embedding_vec)
-        .bind(limit as i32)
-        .bind(threshold)
-        .fetch_all(&self.pool)
-        .await?;
+        let rows = if let Some(domain) = domain_prefix {
+            let domain_pattern = format!("{}.%", domain);
+            sqlx::query_as::<_, GlobalLearnedSemanticRow>(
+                r#"
+                SELECT phrase, verb, 1 - (embedding <=> $1::vector) as similarity
+                FROM "ob-poc".invocation_phrases
+                WHERE embedding IS NOT NULL
+                  AND 1 - (embedding <=> $1::vector) > $3
+                  AND verb LIKE $4
+                ORDER BY embedding <=> $1::vector
+                LIMIT $2
+                "#,
+            )
+            .bind(&embedding_vec)
+            .bind(limit as i32)
+            .bind(threshold)
+            .bind(&domain_pattern)
+            .fetch_all(&self.pool)
+            .await?
+        } else {
+            sqlx::query_as::<_, GlobalLearnedSemanticRow>(
+                r#"
+                SELECT phrase, verb, 1 - (embedding <=> $1::vector) as similarity
+                FROM "ob-poc".invocation_phrases
+                WHERE embedding IS NOT NULL
+                  AND 1 - (embedding <=> $1::vector) > $3
+                ORDER BY embedding <=> $1::vector
+                LIMIT $2
+                "#,
+            )
+            .bind(&embedding_vec)
+            .bind(limit as i32)
+            .bind(threshold)
+            .fetch_all(&self.pool)
+            .await?
+        };
 
         Ok(rows
             .into_iter()
@@ -400,36 +433,75 @@ impl VerbService {
         limit: usize,
         min_similarity: f32,
     ) -> Result<Vec<SemanticMatch>, sqlx::Error> {
+        self.search_verb_patterns_semantic_scoped(query_embedding, limit, min_similarity, None)
+            .await
+    }
+
+    /// Search verb pattern embeddings with optional domain scoping.
+    ///
+    /// When `domain_prefix` is Some (e.g., "document"), the pgvector query
+    /// is narrowed to `WHERE verb_name LIKE 'document.%'`. This reduces the
+    /// search space from ~23K patterns to the domain's ~50-200 patterns,
+    /// dramatically improving precision.
+    pub async fn search_verb_patterns_semantic_scoped(
+        &self,
+        query_embedding: &[f32],
+        limit: usize,
+        min_similarity: f32,
+        domain_prefix: Option<&str>,
+    ) -> Result<Vec<SemanticMatch>, sqlx::Error> {
         tracing::debug!(
             embedding_len = query_embedding.len(),
             limit = limit,
             min_similarity = min_similarity,
-            first_values = ?&query_embedding[..5.min(query_embedding.len())],
-            "VerbService: search_verb_patterns_semantic called"
+            domain_prefix = ?domain_prefix,
+            "VerbService: search_verb_patterns_semantic_scoped called"
         );
 
-        // Convert &[f32] to pgvector::Vector for proper sqlx binding
         let embedding_vec = Vector::from(query_embedding.to_vec());
 
-        let rows = sqlx::query_as::<_, VerbPatternSemanticRow>(
-            r#"
-            SELECT pattern_phrase, verb_name, 1 - (embedding <=> $1::vector) as similarity, category
-            FROM "ob-poc".verb_pattern_embeddings
-            WHERE embedding IS NOT NULL
-              AND 1 - (embedding <=> $1::vector) > $3
-            ORDER BY embedding <=> $1::vector
-            LIMIT $2
-            "#,
-        )
-        .bind(&embedding_vec)
-        .bind(limit as i32)
-        .bind(min_similarity)
-        .fetch_all(&self.pool)
-        .await;
+        let rows = if let Some(domain) = domain_prefix {
+            let domain_pattern = format!("{}.%", domain);
+            sqlx::query_as::<_, VerbPatternSemanticRow>(
+                r#"
+                SELECT pattern_phrase, verb_name, 1 - (embedding <=> $1::vector) as similarity, category
+                FROM "ob-poc".verb_pattern_embeddings
+                WHERE embedding IS NOT NULL
+                  AND 1 - (embedding <=> $1::vector) > $3
+                  AND verb_name LIKE $4
+                ORDER BY embedding <=> $1::vector
+                LIMIT $2
+                "#,
+            )
+            .bind(&embedding_vec)
+            .bind(limit as i32)
+            .bind(min_similarity)
+            .bind(&domain_pattern)
+            .fetch_all(&self.pool)
+            .await
+        } else {
+            sqlx::query_as::<_, VerbPatternSemanticRow>(
+                r#"
+                SELECT pattern_phrase, verb_name, 1 - (embedding <=> $1::vector) as similarity, category
+                FROM "ob-poc".verb_pattern_embeddings
+                WHERE embedding IS NOT NULL
+                  AND 1 - (embedding <=> $1::vector) > $3
+                ORDER BY embedding <=> $1::vector
+                LIMIT $2
+                "#,
+            )
+            .bind(&embedding_vec)
+            .bind(limit as i32)
+            .bind(min_similarity)
+            .fetch_all(&self.pool)
+            .await
+        };
 
         match &rows {
-            Ok(r) => tracing::debug!(row_count = r.len(), "VerbService: query returned"),
-            Err(e) => tracing::error!(error = %e, "VerbService: query failed"),
+            Ok(r) => {
+                tracing::debug!(row_count = r.len(), domain = ?domain_prefix, "VerbService: scoped query returned")
+            }
+            Err(e) => tracing::error!(error = %e, "VerbService: scoped query failed"),
         }
 
         let rows = rows?;
@@ -442,6 +514,119 @@ impl VerbService {
                 similarity: r.similarity,
                 confidence: None,
                 category: r.category,
+            })
+            .collect())
+    }
+
+    /// Search verb pattern embeddings constrained to a specific set of verb FQNs.
+    ///
+    /// When the session has an `allowed_verbs` set (from SemOS SessionVerbSurface),
+    /// this narrows the pgvector query from ~23K patterns to only patterns belonging
+    /// to the allowed verbs (~200-600 patterns for 30-80 verbs). This is the key
+    /// architectural change for SemOS-scoped resolution.
+    pub async fn search_verb_patterns_semantic_constrained(
+        &self,
+        query_embedding: &[f32],
+        limit: usize,
+        min_similarity: f32,
+        verb_fqns: &[String],
+    ) -> Result<Vec<SemanticMatch>, sqlx::Error> {
+        if verb_fqns.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        tracing::debug!(
+            verb_count = verb_fqns.len(),
+            limit = limit,
+            min_similarity = min_similarity,
+            "VerbService: constrained embedding search (verb_name = ANY)"
+        );
+
+        let embedding_vec = Vector::from(query_embedding.to_vec());
+
+        let rows = sqlx::query_as::<_, VerbPatternSemanticRow>(
+            r#"
+            SELECT pattern_phrase, verb_name, 1 - (embedding <=> $1::vector) as similarity, category
+            FROM "ob-poc".verb_pattern_embeddings
+            WHERE embedding IS NOT NULL
+              AND 1 - (embedding <=> $1::vector) > $3
+              AND verb_name = ANY($4)
+            ORDER BY embedding <=> $1::vector
+            LIMIT $2
+            "#,
+        )
+        .bind(&embedding_vec)
+        .bind(limit as i32)
+        .bind(min_similarity)
+        .bind(verb_fqns)
+        .fetch_all(&self.pool)
+        .await;
+
+        match &rows {
+            Ok(r) => {
+                tracing::debug!(
+                    row_count = r.len(),
+                    verb_whitelist_size = verb_fqns.len(),
+                    "VerbService: constrained query returned"
+                )
+            }
+            Err(e) => tracing::error!(error = %e, "VerbService: constrained query failed"),
+        }
+
+        let rows = rows?;
+
+        Ok(rows
+            .into_iter()
+            .map(|r| SemanticMatch {
+                phrase: r.pattern_phrase,
+                verb: r.verb_name,
+                similarity: r.similarity,
+                confidence: None,
+                category: r.category,
+            })
+            .collect())
+    }
+
+    /// Search learned phrases constrained to a specific set of verb FQNs.
+    pub async fn find_global_learned_semantic_topk_constrained(
+        &self,
+        query_embedding: &[f32],
+        threshold: f32,
+        limit: usize,
+        verb_fqns: &[String],
+    ) -> Result<Vec<SemanticMatch>, sqlx::Error> {
+        if verb_fqns.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let embedding_vec = Vector::from(query_embedding.to_vec());
+
+        let rows = sqlx::query_as::<_, GlobalLearnedSemanticRow>(
+            r#"
+            SELECT phrase, verb, 1 - (embedding <=> $1::vector) as similarity
+            FROM "ob-poc".invocation_phrases
+            WHERE embedding IS NOT NULL
+              AND 1 - (embedding <=> $1::vector) > $3
+              AND verb = ANY($4)
+            ORDER BY embedding <=> $1::vector
+            LIMIT $2
+            "#,
+        )
+        .bind(&embedding_vec)
+        .bind(limit as i32)
+        .bind(threshold)
+        .bind(verb_fqns)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows
+            .into_iter()
+            .map(|r| SemanticMatch {
+                phrase: r.phrase,
+                verb: r.verb,
+                similarity: r.similarity,
+                confidence: None,
+                category: None,
             })
             .collect())
     }

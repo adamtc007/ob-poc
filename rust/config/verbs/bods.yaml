@@ -10,6 +10,11 @@ domains:
         - "find beneficial owners"
         - "who are the UBOs"
         - "trace ownership"
+        - "pull the BODS data"
+        - "BODS lookup"
+        - "get BODS data for this LEI"
+        - "check BODS for this entity"
+        - "beneficial ownership data standard lookup"
         metadata:
           tier: composite
           source_of_truth: external

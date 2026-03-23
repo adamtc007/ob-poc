@@ -234,7 +234,9 @@ impl VerbSearchTestHarness {
         margin: f32,
     ) -> Result<(VerbSearchOutcome, Vec<VerbSearchResult>)> {
         let searcher = self.create_searcher_with_thresholds(semantic_threshold, fallback_threshold);
-        let results = searcher.search(query, None, None, None, 5, None, None).await?;
+        let results = searcher
+            .search(query, None, None, None, 5, None, None)
+            .await?;
         // Belt & braces: normalize candidates explicitly so sweep logic stays correct
         // even if searcher internals change
         let candidates = normalize_candidates(results, 5);

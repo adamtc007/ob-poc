@@ -1672,10 +1672,13 @@ impl AgentService {
                         if session.has_pending() {
                             session.cancel_pending();
                         }
-                        return Ok(self.fail(&format!(
-                            "The pending action '{}' is no longer permitted: {}",
-                            pending.coder_result.verb_fqn, block_reason
-                        ), session));
+                        return Ok(self.fail(
+                            &format!(
+                                "The pending action '{}' is no longer permitted: {}",
+                                pending.coder_result.verb_fqn, block_reason
+                            ),
+                            session,
+                        ));
                     }
                 }
 
@@ -1825,7 +1828,7 @@ impl AgentService {
                         coder_proposal: None,
                         discovery_bootstrap: None,
                         parked_entries: None,
-            onboarding_state: None,
+                        onboarding_state: None,
                     };
                     self.finalize_direct_trace(session, direct_trace, &response)
                         .await;
@@ -2346,7 +2349,7 @@ impl AgentService {
                         coder_proposal,
                         discovery_bootstrap: None,
                         parked_entries: None,
-            onboarding_state: None,
+                        onboarding_state: None,
                     };
                     session.pending_trace_id = self
                         .emit_agent_prompt_trace(session, trace_id, &response)
@@ -2412,7 +2415,7 @@ impl AgentService {
                         coder_proposal: None,
                         discovery_bootstrap: None,
                         parked_entries: None,
-            onboarding_state: None,
+                        onboarding_state: None,
                     });
                 }
                 session.pending_trace_id = None;
@@ -2462,7 +2465,7 @@ impl AgentService {
                             coder_proposal: None,
                             discovery_bootstrap: Some(bootstrap),
                             parked_entries: None,
-            onboarding_state: None,
+                            onboarding_state: None,
                         };
                         session.pending_trace_id = self
                             .emit_agent_prompt_trace(session, trace_id, &response)
@@ -2601,7 +2604,7 @@ impl AgentService {
                             coder_proposal: None,
                             discovery_bootstrap: None,
                             parked_entries: None,
-            onboarding_state: None,
+                            onboarding_state: None,
                         };
                         session.pending_trace_id = self
                             .emit_agent_prompt_trace(session, trace_id, &response)
@@ -3504,7 +3507,7 @@ impl AgentService {
                                     coder_proposal: None,
                                     discovery_bootstrap: None,
                                     parked_entries: None,
-            onboarding_state: None,
+                                    onboarding_state: None,
                                 });
                             }
                         }
@@ -3547,9 +3550,7 @@ impl AgentService {
                                 )
                                 .await
                             {
-                                tracing::debug!(
-                                    "Failed to record execution learning signal: {e}"
-                                );
+                                tracing::debug!("Failed to record execution learning signal: {e}");
                             }
                         }
                     }
@@ -3580,7 +3581,7 @@ impl AgentService {
                     coder_proposal: None,
                     discovery_bootstrap: None,
                     parked_entries: None,
-            onboarding_state: None,
+                    onboarding_state: None,
                 })
             }
             Err(e) => {
@@ -3655,12 +3656,14 @@ impl AgentService {
                 let dsl_source = vc.to_dsl_string();
 
                 // Phase 5 recheck: validate each verb against the SINGLE envelope
-                session.pending_execution_rechecks.push(
-                    agent_phase5_recheck_record(&verb_fqn, &dsl_source, &recheck_envelope),
-                );
-                if let Some(error) =
-                    agent_phase5_recheck_failure(&verb_fqn, &recheck_envelope)
-                {
+                session
+                    .pending_execution_rechecks
+                    .push(agent_phase5_recheck_record(
+                        &verb_fqn,
+                        &dsl_source,
+                        &recheck_envelope,
+                    ));
+                if let Some(error) = agent_phase5_recheck_failure(&verb_fqn, &recheck_envelope) {
                     return Ok(self.fail(&error, session));
                 }
 
@@ -4215,9 +4218,7 @@ impl AgentService {
                 let suggested = {
                     let phrase = &c.matched_phrase;
                     let word_count = phrase.split_whitespace().count();
-                    let is_specific = word_count >= 4
-                        && !phrase.contains('.')
-                        && phrase.len() > 15;
+                    let is_specific = word_count >= 4 && !phrase.contains('.') && phrase.len() > 15;
                     let base = if is_specific {
                         phrase.clone()
                     } else {
@@ -4227,7 +4228,9 @@ impl AgentService {
                     // Interpolate entity name if available — the utterance should
                     // be plain English that resolves through entity linking.
                     // "Open a KYC case" → "Open a KYC case for Allianz Dynamic Commodities"
-                    let entity_name: Option<&str> = session.context.client_group_name()
+                    let entity_name: Option<&str> = session
+                        .context
+                        .client_group_name()
                         .or(session.context.deal_name.as_deref());
 
                     let enriched = if let Some(name) = entity_name {
@@ -4254,30 +4257,33 @@ impl AgentService {
                     None
                 };
 
-                let verb_kind = match c.source {
-                    VerbSearchSource::MacroIndex | VerbSearchSource::ScenarioIndex => "macro",
-                    _ => match rv {
-                        Some(v) => match &v.behavior {
-                            crate::dsl_v2::runtime_registry::RuntimeBehavior::Crud(crud) => {
-                                match crud.operation {
-                                    crate::dsl_v2::config::types::CrudOperation::Select => "query",
-                                    _ => "primitive",
+                let verb_kind =
+                    match c.source {
+                        VerbSearchSource::MacroIndex | VerbSearchSource::ScenarioIndex => "macro",
+                        _ => match rv {
+                            Some(v) => match &v.behavior {
+                                crate::dsl_v2::runtime_registry::RuntimeBehavior::Crud(crud) => {
+                                    match crud.operation {
+                                        crate::dsl_v2::config::types::CrudOperation::Select => {
+                                            "query"
+                                        }
+                                        _ => "primitive",
+                                    }
                                 }
-                            }
-                            crate::dsl_v2::runtime_registry::RuntimeBehavior::Plugin(_) => {
-                                if v.produces.is_none() && v.harm_class.as_ref().map(|h| {
+                                crate::dsl_v2::runtime_registry::RuntimeBehavior::Plugin(_) => {
+                                    if v.produces.is_none() && v.harm_class.as_ref().map(|h| {
                                     matches!(h, crate::dsl_v2::config::types::HarmClass::ReadOnly)
                                 }).unwrap_or(false) {
                                     "query"
                                 } else {
                                     "primitive"
                                 }
-                            }
-                            _ => "primitive",
+                                }
+                                _ => "primitive",
+                            },
+                            None => "primitive",
                         },
-                        None => "primitive",
-                    },
-                };
+                    };
 
                 let step_count: Option<u32> = None; // Populated when macro metadata available
 
@@ -4293,13 +4299,11 @@ impl AgentService {
                 // ── Entity & constellation context ────────────────────
                 // Derive what entity type this verb targets and where
                 // it sits in the constellation from verb metadata.
-                let target_entity_kind = rv
-                    .and_then(|v| v.subject_kinds.first().cloned())
-                    .or_else(|| {
-                        rv.and_then(|v| {
-                            v.produces.as_ref().map(|p| p.produced_type.clone())
-                        })
-                    });
+                let target_entity_kind =
+                    rv.and_then(|v| v.subject_kinds.first().cloned())
+                        .or_else(|| {
+                            rv.and_then(|v| v.produces.as_ref().map(|p| p.produced_type.clone()))
+                        });
 
                 // Map domain → constellation slot name for context
                 let constellation_slot = match parts.first().copied() {
@@ -4317,9 +4321,7 @@ impl AgentService {
 
                 // Build human-readable entity context
                 let entity_context = match (constellation_slot, target_entity_kind.as_deref()) {
-                    (Some("kyc_case"), _) => {
-                        Some("Operates on the KYC case for this CBU".into())
-                    }
+                    (Some("kyc_case"), _) => Some("Operates on the KYC case for this CBU".into()),
                     (Some("screening"), _) => {
                         Some("Compliance screening on entities in this workstream".into())
                     }
@@ -4332,21 +4334,15 @@ impl AgentService {
                     (Some("cbu"), _) => {
                         Some("Operates on a Client Business Unit (structure)".into())
                     }
-                    (Some("entity"), Some(kind)) => {
-                        Some(format!("Operates on a {} entity", kind))
-                    }
-                    (Some("tollgate"), _) => {
-                        Some("KYC approval tollgate evaluation".into())
-                    }
+                    (Some("entity"), Some(kind)) => Some(format!("Operates on a {} entity", kind)),
+                    (Some("tollgate"), _) => Some("KYC approval tollgate evaluation".into()),
                     (Some(slot), _) => Some(format!("Operates in the {} context", slot)),
                     _ => None,
                 };
 
                 // Get the dominant entity name from session context if available
-                let target_entity_name = session
-                    .context
-                    .dominant_entity_id
-                    .map(|id| id.to_string());
+                let target_entity_name =
+                    session.context.dominant_entity_id.map(|id| id.to_string());
 
                 VerbOption {
                     verb_fqn: c.verb.clone(),
@@ -4382,10 +4378,7 @@ impl AgentService {
                     .suggested_utterance
                     .as_deref()
                     .unwrap_or(&opt.description);
-                let reason = opt
-                    .differentiation
-                    .as_deref()
-                    .unwrap_or(&opt.description);
+                let reason = opt.differentiation.as_deref().unwrap_or(&opt.description);
                 let context = opt
                     .entity_context
                     .as_deref()

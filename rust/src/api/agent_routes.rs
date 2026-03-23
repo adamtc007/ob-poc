@@ -2886,7 +2886,7 @@ async fn chat_session(
                 coder_proposal: None,
                 discovery_bootstrap: None,
                 parked_entries: None,
-            onboarding_state: None,
+                onboarding_state: None,
             }));
         }
         #[cfg(not(feature = "database"))]
@@ -2913,7 +2913,7 @@ async fn chat_session(
                 coder_proposal: None,
                 discovery_bootstrap: None,
                 parked_entries: None,
-            onboarding_state: None,
+                onboarding_state: None,
             }));
         }
     }
@@ -2952,7 +2952,7 @@ async fn chat_session(
                 coder_proposal: None,
                 discovery_bootstrap: None,
                 parked_entries: None,
-            onboarding_state: None,
+                onboarding_state: None,
             }));
         }
     };
@@ -2990,15 +2990,17 @@ async fn chat_session(
             let cbu_ids: Vec<uuid::Uuid> = session.context.cbu_ids.clone();
             if !cbu_ids.is_empty() {
                 match crate::agent::composite_state_loader::load_group_composite_state(
-                    &state.pool, &cbu_ids,
-                ).await {
+                    &state.pool,
+                    &cbu_ids,
+                )
+                .await
+                {
                     Ok(Some(composite)) => {
                         let group_name = session.context.client_group_name();
                         response.onboarding_state = Some(
                             crate::agent::onboarding_state_view::project_onboarding_state(
-                                &composite,
-                                group_name,
-                            )
+                                &composite, group_name,
+                            ),
                         );
                     }
                     Ok(None) => {}

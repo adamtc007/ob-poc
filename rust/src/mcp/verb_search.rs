@@ -53,7 +53,7 @@ use crate::entity_kind::canonicalize as canonicalize_entity_kind;
 use crate::lexicon::LexiconService;
 use crate::mcp::compound_intent::extract_compound_signals;
 use crate::mcp::macro_index::{MacroIndex, MacroResolveOutcome};
-use crate::mcp::noun_index::NounIndex;
+use crate::mcp::noun_index::{NounIndex, ResolutionPath};
 use crate::mcp::scenario_index::{ResolvedRoute, ScenarioIndex, ScenarioResolveOutcome};
 
 /// Shared lexicon service type alias
@@ -549,6 +549,7 @@ impl HybridVerbSearcher {
         // after embedding tiers run (domain knowledge helps break ties without
         // overriding embedding verb selection).
         let mut ecir_boost_set: HashSet<String> = HashSet::new();
+        let mut ecir_domain: Option<String> = None; // Domain identified by ECIR for scoped embedding
         if let Some(ref noun_index) = self.noun_index {
             let nouns = if let Some(spans) = entity_mention_spans {
                 noun_index.extract_with_exclusions(&normalized, spans)
@@ -559,12 +560,26 @@ impl HybridVerbSearcher {
                 let action = NounIndex::classify_action(&normalized);
                 let resolution = noun_index.resolve(&nouns, action, Some(&normalized));
 
+                // Capture ECIR-identified domain for scoped embedding search.
+                // Only set on ExplicitMapping (high confidence) to avoid over-constraining.
+                // NounKeyMatch/SubjectKindMatch are too broad and may derive the wrong domain.
+                if matches!(resolution.resolution_path, ResolutionPath::ExplicitMapping)
+                    && !resolution.candidates.is_empty()
+                {
+                    // Extract domain prefix from first candidate verb FQN
+                    if let Some(dot_pos) = resolution.candidates[0].find('.') {
+                        ecir_domain = Some(resolution.candidates[0][..dot_pos].to_string());
+                    }
+                }
+
                 match resolution.candidates.len() {
                     0 => {
                         // No verb candidates from noun — fall through to embedding
+                        // but ecir_domain is set for scoped search
                         tracing::debug!(
                             noun = %resolution.noun_key,
-                            "ECIR: noun matched but no verb candidates, falling through"
+                            ecir_domain = ?ecir_domain,
+                            "ECIR: noun matched but no verb candidates, falling through with domain hint"
                         );
                     }
                     1 => {
@@ -1015,9 +1030,18 @@ impl HybridVerbSearcher {
                 "VerbSearch: checking global semantic search"
             );
             if let Some(ref embedding) = query_embedding {
-                tracing::debug!("VerbSearch: calling search_global_semantic_with_embedding...");
+                tracing::debug!(
+                    ecir_domain = ?ecir_domain,
+                    allowed_verbs_count = allowed_verbs.map(|a| a.len()),
+                    "VerbSearch: calling search_global_semantic_with_embedding..."
+                );
                 match self
-                    .search_global_semantic_with_embedding(embedding, limit - results.len())
+                    .search_global_semantic_with_embedding(
+                        embedding,
+                        limit - results.len(),
+                        ecir_domain.as_deref(),
+                        allowed_verbs,
+                    )
                     .await
                 {
                     Ok(semantic_results) => {
@@ -1117,7 +1141,7 @@ impl HybridVerbSearcher {
         // break ties in favor of domain-relevant verbs without overriding
         // embedding verb selection (unlike the old 0.80 narrow score approach).
         if !ecir_boost_set.is_empty() {
-            let boost = 0.05_f32;
+            let boost = 0.10_f32;
             let mut boosted_count = 0u32;
             for result in &mut results {
                 if ecir_boost_set.contains(&result.verb) {
@@ -1260,37 +1284,192 @@ impl HybridVerbSearcher {
     /// Uses `fallback_threshold` (0.55) instead of hardcoded 0.5.
     ///
     /// Issue I fix: Also fetches from agent.invocation_phrases (learned) and unions.
+    /// Search embedding space with 3-strategy selection:
+    ///
+    /// 1. **Constrained** (best): If `allowed_verbs` is provided with ≤100 verbs,
+    ///    search ONLY patterns for those verbs (`verb_name = ANY($verbs)`).
+    ///    This is the SemOS-scoped resolution path — 40-100x search space reduction.
+    ///
+    /// 2. **Domain-scoped**: If ECIR identified a domain, search that domain's patterns
+    ///    (`verb_name LIKE 'domain.%'`).
+    ///
+    /// 3. **Full-space** (fallback): Search all ~23K patterns.
+    ///
+    /// Each strategy falls back to the next if no results exceed `semantic_threshold`.
     async fn search_global_semantic_with_embedding(
         &self,
         query_embedding: &[f32],
         limit: usize,
+        ecir_domain: Option<&str>,
+        allowed_verbs: Option<&HashSet<String>>,
     ) -> Result<Vec<VerbSearchResult>> {
         let verb_service = match &self.verb_service {
             Some(s) => s,
             None => return Ok(Vec::new()),
         };
 
-        self.search_patterns_directly(verb_service, query_embedding, limit)
+        // Strategy 1: Verb-set-constrained search (SemOS-scoped resolution)
+        // When SessionVerbSurface provides ≤100 allowed verbs, search only those.
+        if let Some(allowed) = allowed_verbs {
+            if !allowed.is_empty() && allowed.len() <= 100 {
+                let verb_fqns: Vec<String> = allowed.iter().cloned().collect();
+                let constrained_results = self
+                    .search_patterns_constrained(verb_service, query_embedding, limit, &verb_fqns)
+                    .await?;
+
+                let has_good_result = constrained_results
+                    .iter()
+                    .any(|r| r.score >= self.semantic_threshold);
+                if has_good_result {
+                    tracing::info!(
+                        allowed_count = allowed.len(),
+                        results = constrained_results.len(),
+                        top_score = constrained_results.first().map(|r| r.score),
+                        "VerbSearch: SemOS-constrained embedding search succeeded"
+                    );
+                    return Ok(constrained_results);
+                }
+                tracing::debug!(
+                    allowed_count = allowed.len(),
+                    "VerbSearch: SemOS-constrained search found nothing above threshold, trying domain/full"
+                );
+            }
+        }
+
+        // Strategy 2: Domain-scoped search (if ECIR identified a domain)
+        if let Some(domain) = ecir_domain {
+            let scoped_results = self
+                .search_patterns_directly_scoped(verb_service, query_embedding, limit, Some(domain))
+                .await?;
+
+            let has_good_result = scoped_results
+                .iter()
+                .any(|r| r.score >= self.semantic_threshold);
+            if has_good_result {
+                tracing::info!(
+                    domain = domain,
+                    results = scoped_results.len(),
+                    top_score = scoped_results.first().map(|r| r.score),
+                    "VerbSearch: domain-scoped embedding search succeeded"
+                );
+                return Ok(scoped_results);
+            }
+            tracing::debug!(
+                domain = domain,
+                "VerbSearch: domain-scoped search found nothing above threshold, falling back to full space"
+            );
+        }
+
+        // Strategy 3: Full-space search (fallback)
+        self.search_patterns_directly_scoped(verb_service, query_embedding, limit, None)
             .await
     }
 
-    /// Direct pattern search
-    async fn search_patterns_directly(
+    /// Search patterns constrained to a specific set of verb FQNs.
+    async fn search_patterns_constrained(
         &self,
         verb_service: &VerbService,
         query_embedding: &[f32],
         limit: usize,
+        verb_fqns: &[String],
     ) -> Result<Vec<VerbSearchResult>> {
         use std::collections::HashMap;
 
-        // Fetch top-k from BOTH sources (Issue I)
         let learned_matches = verb_service
-            .find_global_learned_semantic_topk(query_embedding, self.fallback_threshold, limit)
+            .find_global_learned_semantic_topk_constrained(
+                query_embedding,
+                self.fallback_threshold,
+                limit,
+                verb_fqns,
+            )
             .await
             .unwrap_or_default();
 
         let pattern_matches = verb_service
-            .search_verb_patterns_semantic(query_embedding, limit, self.fallback_threshold)
+            .search_verb_patterns_semantic_constrained(
+                query_embedding,
+                limit,
+                self.fallback_threshold,
+                verb_fqns,
+            )
+            .await
+            .unwrap_or_default();
+
+        let learned_results: Vec<VerbSearchResult> = learned_matches
+            .into_iter()
+            .map(|m| VerbSearchResult {
+                verb: m.verb,
+                score: m.similarity as f32,
+                source: VerbSearchSource::GlobalLearned,
+                matched_phrase: m.phrase,
+                description: None,
+                journey: None,
+            })
+            .collect();
+
+        let pattern_results: Vec<VerbSearchResult> = pattern_matches
+            .into_iter()
+            .map(|m| VerbSearchResult {
+                verb: m.verb,
+                score: m.similarity as f32,
+                source: VerbSearchSource::PatternEmbedding,
+                matched_phrase: m.phrase,
+                description: None,
+                journey: None,
+            })
+            .collect();
+
+        let mut combined: HashMap<String, VerbSearchResult> = HashMap::new();
+        for result in learned_results.into_iter().chain(pattern_results) {
+            combined
+                .entry(result.verb.clone())
+                .and_modify(|existing| {
+                    if result.score > existing.score {
+                        *existing = result.clone();
+                    }
+                })
+                .or_insert(result);
+        }
+
+        let mut sorted: Vec<VerbSearchResult> = combined.into_values().collect();
+        sorted.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        sorted.truncate(limit);
+
+        Ok(sorted)
+    }
+
+    /// Direct pattern search with optional domain scoping.
+    async fn search_patterns_directly_scoped(
+        &self,
+        verb_service: &VerbService,
+        query_embedding: &[f32],
+        limit: usize,
+        domain_prefix: Option<&str>,
+    ) -> Result<Vec<VerbSearchResult>> {
+        use std::collections::HashMap;
+
+        // Fetch top-k from BOTH sources, optionally scoped to domain
+        let learned_matches = verb_service
+            .find_global_learned_semantic_topk_scoped(
+                query_embedding,
+                self.fallback_threshold,
+                limit,
+                domain_prefix,
+            )
+            .await
+            .unwrap_or_default();
+
+        let pattern_matches = verb_service
+            .search_verb_patterns_semantic_scoped(
+                query_embedding,
+                limit,
+                self.fallback_threshold,
+                domain_prefix,
+            )
             .await
             .unwrap_or_default();
 

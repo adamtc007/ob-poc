@@ -184,7 +184,6 @@ pub struct VerbOption {
     // ── Differentiation context ───────────────────────────────────
     // Explains WHY this option differs from the alternatives.
     // Without this, the user sees two identical-looking options.
-
     /// What kind of verb this is: "primitive" (single operation),
     /// "macro" (multi-step workflow), "query" (read-only).
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -217,7 +216,6 @@ pub struct VerbOption {
     // Shows WHERE in the constellation this verb operates.
     // This is almost always the cause of confusion — the user is
     // looking at entity A but the verb applies to entity B.
-
     /// The entity type this verb operates on (e.g., "cbu", "entity", "case").
     /// Derived from the verb's `subject_kinds` or `produces` declaration.
     #[serde(default, skip_serializing_if = "Option::is_none")]

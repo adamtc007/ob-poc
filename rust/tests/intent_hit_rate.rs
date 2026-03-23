@@ -609,11 +609,7 @@ fn print_summary_report(results: &[TestResult]) {
     println!("  --------------------------------------------------------------------");
     let mut source_counts: HashMap<String, (usize, usize)> = HashMap::new(); // (total, hits)
     for r in results {
-        let source = r
-            .top_source
-            .as_deref()
-            .unwrap_or("Unknown")
-            .to_string();
+        let source = r.top_source.as_deref().unwrap_or("Unknown").to_string();
         let entry = source_counts.entry(source).or_insert((0, 0));
         entry.0 += 1;
         if r.outcome.is_first_attempt_hit() {
@@ -1410,7 +1406,9 @@ mod clarification_roundtrip {
     #[ignore] // Requires DATABASE_URL and populated embeddings
     async fn test_clarification_phrases_resolve_to_their_verbs() {
         let db_url = std::env::var("DATABASE_URL").expect("DATABASE_URL required");
-        let pool = PgPool::connect(&db_url).await.expect("Failed to connect to DB");
+        let pool = PgPool::connect(&db_url)
+            .await
+            .expect("Failed to connect to DB");
         let fixture: TestFixture =
             toml::from_str(include_str!("fixtures/intent_test_utterances.toml"))
                 .expect("Failed to parse fixture TOML");
@@ -1439,14 +1437,13 @@ mod clarification_roundtrip {
             };
 
             let threshold = searcher.semantic_threshold();
-            let ambiguity =
-                ob_poc::mcp::verb_search::check_ambiguity(&candidates, threshold);
+            let ambiguity = ob_poc::mcp::verb_search::check_ambiguity(&candidates, threshold);
 
             // Only test ambiguous cases — these are the "did you mean?" responses
             let is_ambiguous = matches!(
                 ambiguity,
                 ob_poc::mcp::verb_search::VerbSearchOutcome::Ambiguous { .. }
-                | ob_poc::mcp::verb_search::VerbSearchOutcome::Suggest { .. }
+                    | ob_poc::mcp::verb_search::VerbSearchOutcome::Suggest { .. }
             );
             if !is_ambiguous {
                 continue;
@@ -1510,10 +1507,7 @@ mod clarification_roundtrip {
                 0.0
             }
         );
-        println!(
-            "  Round-trip misses:           {}",
-            round_trip_misses.len()
-        );
+        println!("  Round-trip misses:           {}", round_trip_misses.len());
 
         if !round_trip_misses.is_empty() {
             println!("\n  MISMATCHES (phrase → expected verb, got verb):");

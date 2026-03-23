@@ -41,8 +41,8 @@ pub use chat::*;
 pub use commands::*;
 pub use decision::*;
 pub use disambiguation::*;
-pub use resolution::*;
 pub use onboarding_state::*;
+pub use resolution::*;
 pub use session_input::*;
 
 // ============================================================================

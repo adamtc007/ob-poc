@@ -510,7 +510,7 @@ domains:
         invocation_phrases:
           - "list owners"
           - "show who owns"
-          - "view ownership"
+          - "view ownership stakes"
           - "who owns this"
           - "display owners"
           - "show shareholders"
@@ -521,6 +521,10 @@ domains:
           - "show the ownership chain"
           - "tell me who owns this"
           - "list the owners of this company"
+          - "show ownership percentages"
+          - "what are the ownership stakes"
+          - "list all ownership interests"
+          - "who has equity in this entity"
         behavior: plugin
         metadata:
           tier: diagnostics

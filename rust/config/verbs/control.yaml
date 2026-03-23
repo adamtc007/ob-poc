@@ -366,21 +366,16 @@ domains:
           - Trust control (trustee discretion, appointor power)
           - Partnership GP control
         invocation_phrases:
-        - "who owns this company"
-        - "who owns this"
-        - "identify owners"
-        - "find ubos"
-        - "identify ubos"
-        - "who are the beneficial owners"
-        - "find ultimate beneficial owners"
-        - "discover ubos"
-        - "identify beneficial owners"
-        - "who ultimately owns"
-        - "who owns this entity"
-        - "find the ubos"
-        - "calculate ownership"
-        - "trace beneficial ownership"
-        - "who controls this company"
+        - "identify UBOs across all control vectors"
+        - "run UBO identification for this CBU"
+        - "find UBOs including board and trust control"
+        - "identify beneficial owners for regulatory purposes"
+        - "run 4AMLD UBO determination"
+        - "determine UBOs for KYC"
+        - "run regulatory UBO check"
+        - "identify UBOs for this structure"
+        - "run the 25% threshold test across all vectors"
+        - "identify who controls this through board or voting"
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -825,6 +820,9 @@ domains:
         - "pull PSC data from companies house"
         - "load corporate governance from PSC register"
         - "import significant control persons for entity"
+        - "check the PSC register"
+        - "PSC data import"
+        - "get PSC filings"
         metadata:
           tier: composite
           source_of_truth: external

@@ -3,9 +3,8 @@ mod tests {
     use uuid::Uuid;
 
     use ob_poc::sem_os_runtime::constellation_runtime::{
-        compute_summary, load_builtin_constellation_map, normalize_slots,
-        HydratedCardinality, HydratedSlot, HydratedSlotType, RawGraphEdge, RawHydrationData,
-        RawSlotRow,
+        compute_summary, load_builtin_constellation_map, normalize_slots, HydratedCardinality,
+        HydratedSlot, HydratedSlotType, RawGraphEdge, RawHydrationData, RawSlotRow,
     };
 
     #[test]

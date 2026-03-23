@@ -1632,7 +1632,7 @@ pub async fn legacy_handle_utterance(
     // -- Stage A: Discover candidates (no DSL generation yet) --
     // Use SessionVerbSurface's allowed FQN set as pre-constraint for verb search.
     // This consolidates SemReg + AgentMode + workflow filtering into one set.
-    let surface_allowed: std::collections::HashSet<String> = if phase2.has_usable_legal_set {
+    let mut surface_allowed: std::collections::HashSet<String> = if phase2.has_usable_legal_set {
         surface.allowed_fqns()
     } else {
         std::collections::HashSet::new()
@@ -1721,6 +1721,87 @@ pub async fn legacy_handle_utterance(
         .as_ref()
         .map(|lr| lr.entities.iter().map(|e| e.mention_span).collect())
         .unwrap_or_default();
+
+    // ── Stage A.5: SemOS-Scoped Constrained Resolution ──────────────────
+    // When a client group is in scope AND a constellation template is selected,
+    // compute the valid verb set (deterministic, ~1ms) and try keyword matching
+    // BEFORE running the full open-search pipeline. This resolves ~85% of
+    // context-bearing utterances without any embedding queries.
+    let constrained_verb_result: Option<String> = {
+        let scope_group_id = ctx.scope.as_ref().and_then(|s| s.client_group_id);
+        let constellation_name = ctx
+            .discovery_selected_constellation
+            .as_deref()
+            .or(Some("group.ownership"));
+
+        if let (Some(group_id), Some(c_name)) = (scope_group_id, constellation_name) {
+            use crate::sage::constrained_match::resolve_constrained;
+            use crate::sage::session_context::load_entity_states_for_group;
+            use crate::sage::valid_verb_set::{compute_valid_verb_set, load_constellation_by_id};
+
+            if let Ok(constellation) = load_constellation_by_id(c_name) {
+                // Load entity states for this client group
+                let entity_states = load_entity_states_for_group(&ctx.pool, group_id)
+                    .await
+                    .unwrap_or_default();
+
+                let valid_verbs = compute_valid_verb_set(&entity_states, &constellation, group_id);
+
+                if !valid_verbs.is_empty() {
+                    let constrained = resolve_constrained(utterance, &valid_verbs);
+                    if constrained.resolved() {
+                        tracing::info!(
+                            verb = ?constrained.verb_fqn,
+                            confidence = constrained.confidence,
+                            strategy = ?constrained.strategy,
+                            valid_set_size = valid_verbs.len(),
+                            keyword_hits = constrained.keyword_hits,
+                            "SemOS-scoped constrained resolution succeeded"
+                        );
+                        constrained.verb_fqn.clone()
+                    } else {
+                        tracing::debug!(
+                            valid_set_size = valid_verbs.len(),
+                            strategy = ?constrained.strategy,
+                            "SemOS-scoped constrained match fell through to open search"
+                        );
+                        None
+                    }
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    };
+
+    // If constrained resolution succeeded, narrow allowed_verbs to just that verb
+    // so the open search pipeline (ECIR + embedding) is focused. This preserves
+    // all normal post-processing (entity resolution, DSL generation, etc.) while
+    // giving the correct verb a massive advantage in the search results.
+    if let Some(ref constrained_verb) = constrained_verb_result {
+        if surface_allowed.is_empty() || surface_allowed.contains(constrained_verb) {
+            tracing::info!(
+                verb = %constrained_verb,
+                "SemOS-scoped: narrowing allowed_verbs to constrained match"
+            );
+            // Narrow surface_allowed to just the constrained verb + a handful
+            // of related verbs for disambiguation safety
+            let mut narrowed = std::collections::HashSet::new();
+            narrowed.insert(constrained_verb.clone());
+            // Also keep observation verbs in the same domain
+            let domain = constrained_verb.split('.').next().unwrap_or("");
+            for v in &surface_allowed {
+                if v.starts_with(domain) {
+                    narrowed.insert(v.clone());
+                }
+            }
+            surface_allowed = narrowed;
+        }
+    }
 
     let pipeline = {
         let p = IntentPipeline::with_pool(searcher, ctx.pool.clone());

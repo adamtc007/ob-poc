@@ -25,6 +25,10 @@ domains:
         - "compute as of date"
         - "derive ownership from register"
         - "calculate who owns what"
+        - "compute the ownership waterfall"
+        - "run ownership waterfall analysis"
+        - "calculate the ownership percentages"
+        - "compute beneficial ownership thresholds"
         metadata:
           tier: intent
           source_of_truth: entity
@@ -251,6 +255,11 @@ domains:
         - "find who controls"
         - "identify beneficial owner with control"
         - "who holds majority voting rights"
+        - "who ultimately controls this entity"
+        - "who is the controlling party"
+        - "find the ultimate controller"
+        - "who has voting control"
+        - "show the control hierarchy"
         metadata:
           tier: intent
           source_of_truth: entity

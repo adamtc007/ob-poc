@@ -233,7 +233,11 @@ impl LookupService {
             for candidate in &mut entity_resolution.candidates {
                 let kind_matches = verb_subject_kinds.iter().any(|vk| {
                     vk == &candidate.entity_kind
-                        || (vk == "entity" && matches!(candidate.entity_kind.as_str(), "person" | "company" | "trust" | "partnership"))
+                        || (vk == "entity"
+                            && matches!(
+                                candidate.entity_kind.as_str(),
+                                "person" | "company" | "trust" | "partnership"
+                            ))
                         || (vk == "cbu" && candidate.entity_kind == "fund")
                 });
 
@@ -251,9 +255,11 @@ impl LookupService {
             }
 
             // Re-sort candidates by score and re-select dominant
-            entity_resolution
-                .candidates
-                .sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+            entity_resolution.candidates.sort_by(|a, b| {
+                b.score
+                    .partial_cmp(&a.score)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
 
             // Update the selected entity if re-ranking changed the winner
             if let Some(top) = entity_resolution.candidates.first() {

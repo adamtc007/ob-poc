@@ -235,11 +235,15 @@ mod tests {
         let seeds = scan_state_machines().unwrap();
         assert_eq!(seeds.len(), 9);
         assert!(seeds.iter().any(|seed| seed.fqn == "kyc_case_lifecycle"));
-        assert!(seeds.iter().any(|seed| seed.fqn == "client_group_lifecycle"));
+        assert!(seeds
+            .iter()
+            .any(|seed| seed.fqn == "client_group_lifecycle"));
         assert!(seeds.iter().any(|seed| seed.fqn == "screening_lifecycle"));
         assert!(seeds.iter().any(|seed| seed.fqn == "document_lifecycle"));
         assert!(seeds.iter().any(|seed| seed.fqn == "deal_lifecycle"));
-        assert!(seeds.iter().any(|seed| seed.fqn == "trading_profile_lifecycle"));
+        assert!(seeds
+            .iter()
+            .any(|seed| seed.fqn == "trading_profile_lifecycle"));
         assert!(seeds.iter().any(|seed| seed.fqn == "fund_lifecycle"));
     }
 

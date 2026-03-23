@@ -52,6 +52,13 @@ domains:
           - solicit proof of address from this person
           - can you request the KYC document
           - send out a request for this document
+          - request identity documents
+          - request identity documents for due diligence
+          - ask for the identity documents
+          - solicit the KYC documents from this entity
+          - request the CDD documents
+          - chase the outstanding documents
+          - ask them for their passport
         metadata:
           tier: intent
           source_of_truth: operational

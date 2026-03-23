@@ -81,7 +81,6 @@ nouns:
       - fund
       - umbrella
       - subfund
-      - share class
       - feeder fund
       - master fund
       - compartment
@@ -99,7 +98,6 @@ nouns:
     entity_type_fqn: fund
     noun_keys:
       - fund
-      - share_class
     action_verbs:
       create:
         [
@@ -111,8 +109,6 @@ nouns:
           fund.create-master,
           fund.create-standalone,
           fund.ensure-standalone,
-          fund.create-share-class,
-          share-class.create,
         ]
       list:
         [
@@ -175,15 +171,8 @@ nouns:
       search: [ubo.calculate, ubo.trace-chains, ubo.compute-chains]
       list:
         [ubo.list-owners, ubo.list-owned, ubo.list-ubos, ubo.list-by-subject]
-      delete:
-        [
-          ubo.end-relationship,
-          ubo.end-relationship,
-          ubo.end-relationship,
-          ubo.delete-relationship,
-          ubo.delete-relationship,
-          ubo.delete-relationship,
-        ]
+      delete: [ubo.end-relationship, ubo.delete-relationship]
+      compute: [ubo.calculate, ubo.compute-chains]
 
   kyc-case:
     aliases:
@@ -210,6 +199,11 @@ nouns:
           kyc-case.close,
           kyc-case.reopen,
         ]
+      move: [kyc-case.update-status]
+      approve: [kyc-case.update-status]
+      submit: [kyc-case.update-status]
+      escalate: [kyc-case.escalate]
+      close: [kyc-case.close]
 
   screening:
     aliases:
@@ -232,6 +226,8 @@ nouns:
     action_verbs:
       compute: [screening.pep, screening.sanctions, screening.adverse-media, screening.run]
       create: [screening.run, case-screening.run]
+      run: [screening.run, screening.sanctions, screening.pep, screening.adverse-media]
+      check: [screening.sanctions, screening.pep, screening.adverse-media]
       list: [screening.list-by-workstream, case-screening.list-by-workstream]
       update: [screening.review-hit, screening.complete]
 
@@ -327,6 +323,10 @@ nouns:
         ]
       get: [deal.read-record, deal.read-summary, deal.read-timeline, deal.get, deal.timeline, deal.summary]
       update: [deal.update-record, deal.update-status, deal.request-onboarding]
+      move: [deal.update-status]
+      approve: [deal.update-status]
+      submit: [deal.update-status]
+      propose: [deal.propose-rate-card]
       search: [deal.search-records, deal.search]
       delete: [deal.cancel]
 
@@ -598,7 +598,9 @@ nouns:
       - document
       - requirement
     action_verbs:
-      create: [document.solicit, document.solicit-set, document.create, document.request, doc-request.create]
+      create: [document.create]
+      request: [document.solicit, document.solicit-set]
+      solicit: [document.solicit, document.solicit-set]
       list:
         [
           document.catalog,
@@ -609,16 +611,11 @@ nouns:
           document.list-requests-by-workstream,
         ]
       search: [document.missing-for-entity, document.for-entity, document.compute-requirements]
-      update:
-        [
-          document.verify,
-          document.reject,
-          document.start-qa,
-          document.upload-version,
-          document.upload,
-        ]
+      update: [document.upload-version, document.upload, document.start-qa]
+      verify: [document.verify]
       reject: [document.reject, document.reject-request]
-      delete: [document.reject, document.reject-request, document.waive-request]
+      delete: [document.waive-request]
+      compute: [document.extract, document.compute-requirements]
 
   # =========================================================================
   # AGENT / META
@@ -988,6 +985,24 @@ nouns:
           capital.cap-table,
           capital.holders,
         ]
+
+  share-class:
+    aliases:
+      - share class
+      - share classes
+    natural_aliases:
+      - accumulating class
+      - distributing class
+      - class of shares
+      - unit class
+    entity_type_fqn: share-class
+    noun_keys:
+      - share_class
+    action_verbs:
+      create: [share-class.create]
+      add: [share-class.create]
+      list: [share-class.list, fund.list-share-classes]
+      get: [share-class.read]
 
   # =========================================================================
   # WORKFLOW / PROCESS
