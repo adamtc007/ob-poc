@@ -3423,7 +3423,7 @@ impl AgentService {
         &self,
         session: &mut UnifiedSession,
         resolved_dsl: String,
-        _program: crate::dsl_v2::ast::Program,
+        program: crate::dsl_v2::ast::Program,
     ) -> Result<AgentChatResponse, String> {
         use crate::dsl_v2::{DslExecutor, ExecutionContext};
 
@@ -3493,6 +3493,46 @@ impl AgentService {
                 // Normal execution - mark as executed
                 session.run_sheet.mark_all_executed();
                 self.sync_scope_from_exec_ctx(session, &mut exec_ctx);
+
+                // Record positive learning signal (non-vnext path)
+                if !results.is_empty() {
+                    let original_utterance = session
+                        .messages
+                        .iter()
+                        .rev()
+                        .find(|m| m.role == crate::session::unified::MessageRole::User)
+                        .map(|m| m.content.clone());
+
+                    if let Some(utterance) = original_utterance {
+                        let executed_verbs: Vec<String> = program
+                            .statements
+                            .iter()
+                            .filter_map(|stmt| {
+                                if let crate::dsl_v2::ast::Statement::VerbCall(vc) = stmt {
+                                    Some(vc.full_name())
+                                } else {
+                                    None
+                                }
+                            })
+                            .collect();
+
+                        for verb_fqn in &executed_verbs {
+                            if let Err(e) =
+                                crate::api::agent_learning_routes::record_verb_selection_signal(
+                                    &self.pool,
+                                    &utterance,
+                                    verb_fqn,
+                                    &executed_verbs,
+                                )
+                                .await
+                            {
+                                tracing::debug!(
+                                    "Failed to record execution learning signal: {e}"
+                                );
+                            }
+                        }
+                    }
+                }
 
                 let msg = Self::narrate_execution(
                     &session.run_sheet,
@@ -3778,6 +3818,45 @@ impl AgentService {
 
         // Mark as executed
         session.run_sheet.mark_all_executed();
+
+        // Record positive learning signal: utterance → verb → executed successfully.
+        // This feeds the promotion pipeline so successful phrases strengthen over time.
+        if executed_count > 0 {
+            let original_utterance = session
+                .messages
+                .iter()
+                .rev()
+                .find(|m| m.role == crate::session::unified::MessageRole::User)
+                .map(|m| m.content.clone());
+
+            if let Some(utterance) = original_utterance {
+                // Extract verb FQNs from the executed program
+                let executed_verbs: Vec<String> = program
+                    .statements
+                    .iter()
+                    .filter_map(|stmt| {
+                        if let crate::dsl_v2::ast::Statement::VerbCall(vc) = stmt {
+                            Some(vc.full_name())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+
+                for verb_fqn in &executed_verbs {
+                    if let Err(e) = crate::api::agent_learning_routes::record_verb_selection_signal(
+                        &self.pool,
+                        &utterance,
+                        verb_fqn,
+                        &executed_verbs,
+                    )
+                    .await
+                    {
+                        tracing::debug!("Failed to record execution learning signal: {e}");
+                    }
+                }
+            }
+        }
 
         let msg = Self::narrate_execution(
             &session.run_sheet,
