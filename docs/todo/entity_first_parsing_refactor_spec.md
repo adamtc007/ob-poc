@@ -29,62 +29,120 @@ the UUID flows silently through every subsequent stage.
 UUID is a first-class value from utterance parsing through to execution.
 No second lookup. No `<Entity>` placeholder resolution later.
 
-## Proposed Pipeline
+## Proposed Pipeline: Co-Resolution (Entity + Verb Mutually Constrain)
+
+The key insight: the entity name and the verb context are **correlated
+clues**. "Open a KYC case for HSBC" — "KYC case" hints that HSBC is
+probably a CBU (you open cases for CBUs, not groups). "Trace the
+ownership chain for HSBC" — "ownership chain" hints group.
+
+The parser must use BOTH signals simultaneously, not sequentially.
 
 ```
 Utterance: "open a KYC case for HSBC"
     │
     ▼
-Stage 0: Entity Mention Extraction (fast, in-memory)
-    │ MentionExtractor.extract() against EntitySnapshot
-    │ Returns: Vec<MentionSpan> with candidates + scores
+Stage 0: Parallel Extraction (both run, neither commits)
     │
-    ├─ CLEAR HIT (1 candidate, score > 0.90)
-    │   Entity: "HSBC Holdings plc" (uuid-123, kind=group)
-    │   Spans: [(25, 29)]
-    │   → Continue to Stage 1 silently
+    ├─ Entity Mention Extraction (fast, in-memory)
+    │   MentionExtractor.extract() against EntitySnapshot
+    │   "HSBC" → 3 candidates:
+    │     HSBC Holdings plc (group, 0.92)
+    │     HSBC Bank plc (company, 0.88)
+    │     HSBC Custody Services (cbu, 0.85)
     │
-    ├─ AMBIGUOUS (2+ candidates, close scores)
-    │   Candidates:
-    │     1. HSBC Holdings plc (group, score 0.92)
-    │     2. HSBC Bank plc (company, score 0.88)
-    │     3. HSBC Custody Services (cbu, score 0.85)
-    │   → PAUSE: Return ClarifyEntity decision to user
-    │   → User picks → UUID resolved → Resume from Stage 1
-    │
-    └─ NO MATCH (no candidates above threshold)
-        Spans: [] (no masking)
-        → Continue to Stage 1 without entity context
-        → If verb requires entity, prompt later
+    └─ ECIR Noun Scan (masked by entity spans)
+        NounIndex.extract_with_exclusions(utterance, entity_spans)
+        "KYC case" → noun=kyc-case, action=open → kyc-case.create
+        Verb subject_kinds = [cbu]  ← THIS IS THE HINT
     │
     ▼
-Stage 1: ECIR Noun Scan (with entity masking)
-    │ NounIndex.extract_with_exclusions(utterance, entity_spans)
-    │ Entity name spans pre-marked as covered → not scanned for nouns
-    │ Extracts: "KYC case" noun + "open" action
+Stage 1: Co-Resolution (entity + verb constrain each other)
+    │
+    │ Verb context says: subject_kind = [cbu]
+    │ Entity candidates: group(0.92), company(0.88), cbu(0.85)
+    │
+    │ Re-rank by verb hint:
+    │   HSBC Custody Services (cbu) → boosted by verb match (+0.15)
+    │   HSBC Holdings plc (group) → penalised (kind mismatch)
+    │   HSBC Bank plc (company) → penalised (kind mismatch)
+    │
+    │ After re-ranking:
+    │   HSBC Custody Services (cbu, 1.00) ← now dominant
+    │
+    ├─ CLEAR (dominant candidate after re-ranking)
+    │   → UUID resolved silently, continue pipeline
+    │
+    ├─ STILL AMBIGUOUS (re-ranking didn't resolve)
+    │   → Show candidates to user WITH verb context:
+    │     "Which HSBC for this KYC case?"
+    │     1. HSBC Custody Services (CBU) ← recommended
+    │     2. HSBC Holdings plc (group)
+    │     3. HSBC Bank plc (company)
+    │   → User picks → resume
+    │
+    └─ NO ENTITY MATCH
+        → Continue without entity context
     │
     ▼
-Stage 2: Verb Resolution (entity-constrained)
-    │ ECIR resolve (noun + action → verb candidates)
-    │ OR embedding search (with entity_kind from Stage 0)
-    │ Verb surface filtered by entity kind (company → kyc verbs)
+Stage 2: Verb Resolution (entity-kind locked)
+    │ Entity kind = cbu (from co-resolution)
+    │ Verb candidates filtered: only cbu-applicable verbs
+    │ kyc-case.create confirmed (subject_kinds includes cbu)
     │
     ▼
 Stage 3: SemOS Grounding
-    │ Subject = resolved entity UUID
-    │ Constellation grounding: uuid-123 → kyc.onboarding slot
-    │ GroundedActionSurface: current_state + valid_actions
+    │ Subject = uuid (HSBC Custody Services)
+    │ Constellation: kyc.onboarding
+    │ State: entity_workstream state for this CBU
+    │ Valid actions from GroundedActionSurface
     │
     ▼
 Stage 4: DSL Assembly
-    │ Verb + entity UUID → DSL with pre-resolved entity
-    │ (kyc-case.create :entity-id "uuid-123")
-    │ No <HSBC> placeholder. No resolution modal. Already resolved.
+    │ (kyc-case.create :cbu-id "uuid-789")
+    │ Entity UUID pre-resolved. No placeholder.
     │
     ▼
 Stage 5: Confirm + Execute
-    │ Entity UUID in runbook → direct DB operation
-    │ No re-resolution at execution time
+    │ UUID in runbook → direct DB operation
+```
+
+### The Co-Resolution Algorithm
+
+```
+fn co_resolve(entity_candidates, verb_candidates) → (entity, verb):
+
+    1. If no entity candidates → use verb alone (existing behavior)
+    2. If no verb candidates → use entity alone (kind → default verbs)
+    3. If both present:
+       a. For each entity candidate, score verb compatibility:
+          - verb.subject_kinds contains entity.kind → +0.15 boost
+          - verb.subject_kinds empty (global) → no change
+          - verb.subject_kinds doesn't contain entity.kind → -0.10 penalty
+       b. For each verb candidate, score entity compatibility:
+          - entity.kind matches verb.subject_kinds → +0.10 boost
+       c. Re-rank both lists
+       d. If entity now has clear winner → resolve silently
+       e. If still ambiguous → show options with verb context hint
+```
+
+### Contextual Clues from the Utterance
+
+The parser extracts hints beyond just the first word:
+
+| Utterance Fragment | Hint | Entity Kind Boost |
+|---|---|---|
+| "KYC case for X" | KYC case → subject_kinds=[cbu] | Boost cbu entities |
+| "ownership chain for X" | ownership → subject_kinds=[group,entity] | Boost group entities |
+| "screening for X" | screening → subject_kinds=[entity] | Boost person/company entities |
+| "assign X as depositary" | depositary role → kind=company | Boost company entities |
+| "trading profile for X" | trading → subject_kinds=[cbu] | Boost cbu entities |
+| "board of X" | board → subject_kinds=[company] | Boost company entities |
+| "shares in X" | capital → subject_kinds=[fund] | Boost fund entities |
+
+These hints come from the ECIR noun scan (Stage 0) — the domain noun
+tells us what kind of entity is expected. The verb's `subject_kinds`
+declaration provides the ground truth for re-ranking.
 ```
 
 ## Entity Resolution Outcomes
