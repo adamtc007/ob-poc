@@ -77,6 +77,26 @@ slots:
       flag_update: { verb: red-flag.update, when: filled }
       flag_list_severity: { verb: red-flag.list-by-severity, when: filled }
       flag_close: { verb: red-flag.close, when: filled }
+      # Evidence/document state verbs — documents are evidence FOR the entity,
+      # not positioned entities. The requirement dictionary defines what's needed,
+      # the state machine tracks each requirement instance.
+      req_create: { verb: requirement.create, when: [empty, filled] }
+      req_create_set: { verb: requirement.create-set, when: [empty, filled] }
+      req_check: { verb: requirement.check, when: filled }
+      req_list: { verb: requirement.list, when: filled }
+      req_for_entity: { verb: requirement.for-entity, when: filled }
+      req_unsatisfied: { verb: requirement.unsatisfied, when: filled }
+      req_waive: { verb: requirement.waive, when: filled }
+      req_reinstate: { verb: requirement.reinstate, when: filled }
+      doc_solicit: { verb: document.solicit, when: [empty, filled] }
+      doc_solicit_set: { verb: document.solicit-set, when: [empty, filled] }
+      doc_upload: { verb: document.upload, when: filled }
+      doc_verify: { verb: document.verify, when: filled }
+      doc_reject: { verb: document.reject, when: filled }
+      doc_read: { verb: document.read, when: filled }
+      doc_list: { verb: document.list, when: filled }
+      doc_compute_reqs: { verb: document.compute-requirements, when: filled }
+      doc_missing: { verb: document.missing-for-entity, when: filled }
   screening:
     type: entity
     entity_kinds: [person, company]
