@@ -486,23 +486,153 @@ The constellation model is the system's approach to organizing entities into dom
 
 ### 4.2 Complete State Machine Inventory
 
-**1. `client_group_lifecycle` (9 states):** prospect → researching → ubo_mapped → control_mapped → cbus_identified → onboarding → active → dormant → offboarded. Revert paths: ubo_mapped → researching, control_mapped → ubo_mapped. Dormant ↔ active.
+#### 4.2.1 `client_group_lifecycle` (9 states)
 
-**2. `kyc_case_lifecycle` (11 states):** intake → discovery → assessment → review → approved/rejected/refer_to_regulator. Blocked → discovery/withdrawn. Approved → review (reopen). Terminal: rejected, withdrawn, expired, refer_to_regulator, do_not_onboard.
+| From | To | Trigger Verbs | Business Meaning |
+|------|-----|--------------|------------------|
+| prospect | researching | `gleif.import-tree`, `client-group.research` | Begin GLEIF/corporate hierarchy research |
+| researching | ubo_mapped | `ubo.discover`, `ubo.allege` | UBO determination completed |
+| ubo_mapped | control_mapped | `control.build-graph`, `ownership.trace-chain` | Control chain mapped from UBO |
+| control_mapped | cbus_identified | `cbu.create`, `cbu.create-from-client-group` | Revenue units identified |
+| cbus_identified | onboarding | `kyc-case.create`, `kyc.open-case` | KYC cases opened for CBUs |
+| onboarding | active | `kyc-case.update-status` | All KYC cases approved |
+| active | dormant | `client-group.suspend` | Client relationship paused |
+| dormant | active | `client-group.reactivate` | Relationship resumed |
+| active | offboarded | `client-group.offboard` | Client relationship terminated |
+| ubo_mapped | researching | `ubo.reset` | **Revert:** re-do UBO discovery |
+| control_mapped | ubo_mapped | `control.reset` | **Revert:** re-do control mapping |
 
-**3. `entity_kyc_lifecycle` (8 states):** empty → placeholder → filled → workstream_open → screening_complete/evidence_collected → verified → approved. Uses overlay sources: entity_ref, workstream, screenings, evidence, red_flags, doc_requests.
+**Terminal states:** offboarded. **Absorbing:** none (dormant is reversible).
 
-**4. `ubo_epistemic_lifecycle` (5 states):** undiscovered → alleged → provable → proved → approved. Consistency checks on proved (blocking screening) and provable (missing evidence).
+#### 4.2.2 `kyc_case_lifecycle` (11 states)
 
-**5. `screening_lifecycle` (13 states):** not_started → sanctions_pending → sanctions_clear → pep_pending → pep_clear → media_pending → media_clear → all_clear. Hit paths: sanctions/pep/media_hit → escalated → resolved. Re-screen: all_clear → not_started.
+| From | To | Trigger Verbs | Business Meaning |
+|------|-----|--------------|------------------|
+| intake | discovery | `kyc-case.update-status` | Begin CDD information gathering |
+| discovery | assessment | `kyc-case.update-status` | Information gathered, assess risk |
+| assessment | review | `kyc-case.update-status`, `kyc-case.set-risk-rating` | Risk rated, senior review |
+| review | approved | `kyc-case.update-status` | KYC approved — client can trade |
+| review | rejected | `kyc-case.close` | KYC rejected — cannot onboard |
+| review | refer_to_regulator | `kyc-case.escalate` | Suspicious activity referral (SAR) |
+| blocked | discovery | `kyc-case.reopen` | Unblock: return to discovery |
+| blocked | withdrawn | `kyc-case.close` | Withdraw blocked case |
+| approved | review | `kyc-case.reopen` | **Revert:** reopen approved case for periodic review |
 
-**6. `document_lifecycle` (8 states):** missing → requested → received → in_qa → verified → expired. Rejection: in_qa → rejected → requested. Waiver: missing ↔ waived. Cancel: requested → missing.
+**Terminal states:** rejected, withdrawn, expired, refer_to_regulator, do_not_onboard.
+**Key invariant:** Cannot reach `approved` without passing through `review`. Risk rating required at `assessment → review`.
 
-**7. `deal_lifecycle` (9 states):** prospect → qualifying → negotiating → contracted → onboarding → active → winding_down → offboarded. Cancellation from any pre-active state.
+#### 4.2.3 `entity_kyc_lifecycle` (8 states)
 
-**8. `trading_profile_lifecycle` (7 states):** draft → submitted → approved → active → suspended/archived. Rejection: submitted → rejected → draft. Suspension ↔ active.
+| From | To | Trigger Verbs | Business Meaning |
+|------|-----|--------------|------------------|
+| empty | placeholder | `entity.ensure-or-placeholder` | Slot reserved, entity TBD |
+| empty | filled | `party.add`, `cbu.assign-role` | Entity identified and assigned |
+| placeholder | filled | `party.search`, `entity.identify`, `cbu.assign-role` | Placeholder resolved to real entity |
+| filled | workstream_open | `kyc-workstream.add` | KYC workstream initiated for entity |
+| workstream_open | screening_complete | `screening.run` | All screening checks completed |
+| workstream_open | evidence_collected | `evidence.verify` | Required evidence verified |
+| screening_complete | verified | `kyc-workstream.close` | Workstream closed after screening |
+| evidence_collected | verified | `kyc-workstream.close` | Workstream closed after evidence |
+| verified | approved | `case.approve` | Entity approved within case |
 
-**9. `fund_lifecycle` (8 states):** draft → registered → authorized → active → soft_closed → hard_closed → winding_down → terminated. Soft_closed ↔ active.
+**Overlay sources:** entity_ref, workstream, screenings, evidence, red_flags, doc_requests. This lifecycle governs entity slots within fund structure constellations (struct.*).
+
+#### 4.2.4 `ubo_epistemic_lifecycle` (5 states)
+
+| From | To | Trigger Verbs | Business Meaning |
+|------|-----|--------------|------------------|
+| undiscovered | alleged | `ubo.allege` | UBO relationship claimed but unverified |
+| alleged | provable | `ubo.collect-evidence` | Evidence gathered, can be verified |
+| provable | proved | `ubo.verify` | UBO relationship verified |
+| proved | approved | `case.approve` | UBO approved within KYC case |
+
+**Key invariant:** Epistemic lifecycle — tracks knowledge state, not entity state. "Alleged" means "we believe this is a UBO but haven't proved it yet." Novel approach: most systems model UBO as binary (is/isn't), this models the evidence journey.
+
+#### 4.2.5 `screening_lifecycle` (13 states)
+
+| From | To | Trigger Verbs | Business Meaning |
+|------|-----|--------------|------------------|
+| not_started | sanctions_pending | `screening.run`, `screening.sanctions` | Sanctions check initiated |
+| not_started | pep_pending | `screening.pep` | PEP check initiated directly |
+| not_started | media_pending | `screening.adverse-media` | Media check initiated directly |
+| sanctions_pending | sanctions_clear | `screening.update-status` | No sanctions match |
+| sanctions_pending | sanctions_hit | `screening.update-status` | Sanctions match found |
+| sanctions_clear | pep_pending | `screening.pep` | Proceed to PEP after sanctions clear |
+| pep_pending | pep_clear | `screening.update-status` | No PEP match |
+| pep_pending | pep_hit | `screening.update-status` | PEP match found |
+| pep_clear | media_pending | `screening.adverse-media` | Proceed to media after PEP clear |
+| media_pending | media_clear | `screening.update-status` | No adverse media |
+| media_pending | media_hit | `screening.update-status` | Adverse media found |
+| media_clear | all_clear | `screening.complete` | All three checks clear |
+| sanctions_hit | escalated | `screening.escalate` | Hit escalated for review |
+| pep_hit | escalated | `screening.escalate` | Hit escalated for review |
+| media_hit | escalated | `screening.escalate` | Hit escalated for review |
+| escalated | resolved | `screening.resolve` | Escalation resolved |
+| all_clear | not_started | `screening.run` | **Re-screen:** periodic refresh |
+
+**Note:** Sequential model (sanctions → PEP → media). Industry practice often runs checks in parallel. This is a known structural divergence flagged in the risk register.
+
+#### 4.2.6 `document_lifecycle` (8 states)
+
+| From | To | Trigger Verbs | Business Meaning |
+|------|-----|--------------|------------------|
+| missing | requested | `document.solicit`, `document.solicit-set` | Document solicited from client |
+| missing | waived | `requirement.waive` | Requirement waived (low risk) |
+| requested | received | `document.upload` | Document uploaded by client |
+| received | in_qa | `document.review` | QA review started |
+| in_qa | verified | `document.verify` | Document passes QA |
+| in_qa | rejected | `document.reject` | Document fails QA (wrong entity, expired, etc.) |
+| rejected | requested | `document.solicit` | Re-solicit after rejection |
+| verified | expired | `document.expire` | Document validity lapsed |
+| expired | requested | `document.solicit` | Re-solicit expired document |
+| waived | missing | `requirement.reinstate` | **Revert:** reinstate waived requirement |
+| requested | missing | `document.cancel-request` | **Revert:** cancel solicitation |
+
+**Key invariant:** Per-requirement-instance lifecycle. An entity can have N requirements, each tracking independently. Coverage % derived from aggregate.
+
+#### 4.2.7 `deal_lifecycle` (9 states)
+
+| From | To | Trigger Verbs | Business Meaning |
+|------|-----|--------------|------------------|
+| prospect | qualifying | `deal.create`, `deal.update-status` | Sales qualifying opportunity |
+| qualifying | negotiating | `deal.update-status`, `deal.create-rate-card` | Rate card negotiation started |
+| negotiating | contracted | `deal.update-status`, `deal.agree-rate-card` | Rate card agreed, MSA signed |
+| contracted | onboarding | `deal.update-status`, `deal.request-onboarding` | Handoff to onboarding |
+| onboarding | active | `deal.update-status` | Client fully onboarded |
+| active | winding_down | `deal.update-status` | Relationship winding down |
+| winding_down | offboarded | `deal.update-status` | Deal terminated |
+| prospect/qualifying/negotiating/contracted/onboarding | cancelled | `deal.cancel` | Deal cancelled at any pre-active stage |
+
+**Terminal states:** offboarded, cancelled.
+
+#### 4.2.8 `trading_profile_lifecycle` (7 states)
+
+| From | To | Trigger Verbs | Business Meaning |
+|------|-----|--------------|------------------|
+| draft | submitted | `trading-profile.submit` | Profile submitted for approval |
+| submitted | approved | `trading-profile.approve` | Profile approved |
+| submitted | rejected | `trading-profile.reject` | Profile rejected |
+| approved | active | `trading-profile.activate` | Profile goes live — client can trade |
+| active | suspended | `trading-profile.archive` | Trading suspended |
+| suspended | active | `trading-profile.activate` | Trading resumed |
+| active | archived | `trading-profile.archive` | Profile permanently archived |
+| rejected | draft | `trading-profile.create-draft` | **Revert:** create new draft from rejection |
+| submitted | draft | `trading-profile.create-draft` | **Revert:** withdraw submission |
+
+#### 4.2.9 `fund_lifecycle` (8 states)
+
+| From | To | Trigger Verbs | Business Meaning |
+|------|-----|--------------|------------------|
+| draft | registered | `fund.create`, `fund.ensure` | Fund entity created/registered |
+| registered | authorized | `fund.upsert-vehicle` | Regulatory authorization obtained |
+| authorized | active | `fund.upsert-vehicle` | Fund accepting subscriptions |
+| active | soft_closed | `fund.upsert-vehicle` | Closed to new subscriptions |
+| soft_closed | active | `fund.upsert-vehicle` | **Revert:** reopened to subscriptions |
+| soft_closed | hard_closed | `fund.upsert-vehicle` | Closed to all activity |
+| hard_closed | winding_down | `fund.upsert-vehicle` | Liquidation in progress |
+| winding_down | terminated | `fund.delete-vehicle` | Fund terminated |
+
+**Terminal state:** terminated.
 
 ### 4.3 Constellation Map Inventory
 
@@ -533,6 +663,92 @@ The constellation model is the system's approach to organizing entities into dom
 | `struct.us.private-fund.delaware-lp` | US | Delaware LP slots | cbu, company |
 | `struct.hedge.cross-border` | ALL | Cross-border hedge fund | cbu, company |
 | `struct.pe.cross-border` | ALL | Cross-border PE fund | cbu, company |
+
+#### Detailed Slot Topology (Non-Structural Constellations)
+
+**`group.ownership`** — The root constellation. All onboarding begins here.
+| Slot | Type | State Machine | Overlays | Depends On | Verb Count |
+|------|------|--------------|----------|-----------|-----------|
+| client_group | cbu | client_group_lifecycle | — | root | 35 |
+| gleif_import | entity | — | — | client_group | 16 |
+| ubo_discovery | entity_graph | ubo_epistemic_lifecycle | registry, evidence, screenings | gleif_import | 33 |
+| control_chain | entity_graph | — | ownership | ubo_discovery | 35 |
+| cbu_identification | cbu | — | — | control_chain | 34 |
+
+**`kyc.onboarding`** — Per-CBU KYC lifecycle. Entered from group.ownership.
+| Slot | Type | State Machine | Overlays | Depends On | Verb Count |
+|------|------|--------------|----------|-----------|-----------|
+| cbu | cbu | — | — | root | 1 |
+| kyc_case | case | kyc_case_lifecycle | — | cbu | 11 |
+| tollgate (child of case) | tollgate | — | — | kyc_case min_state: review | 11 |
+| entity_workstream | entity | — | red_flags, evidence | kyc_case | 28 |
+| screening | entity | screening_lifecycle | screening_result | entity_workstream | 12 |
+| kyc_agreement | entity | — | — | kyc_case | 6 |
+| identifier | entity | — | — | entity_workstream | 11 |
+| request | entity | — | — | kyc_case | 9 |
+
+**`deal.lifecycle`** — Commercial origination hub.
+| Slot | Type | State Machine | Overlays | Depends On | Verb Count |
+|------|------|--------------|----------|-----------|-----------|
+| deal | cbu | deal_lifecycle | — | root | 21 |
+| participant | entity | — | — | deal | 3 |
+| deal_contract | entity | — | — | deal | 3 |
+| contract | entity | — | — | deal | 11 |
+| deal_product | entity | — | — | deal | 4 |
+| rate_card | entity | — | — | deal_product | 11 |
+| onboarding_request | entity | — | — | deal min_state: contracted | 4 |
+| billing_profile | entity | — | — | rate_card | 17 |
+| pricing | entity | — | — | rate_card | 12 |
+| contract_template | entity | — | — | contract | 2 |
+
+**`trading.streetside`** — Post-KYC street-side operations.
+| Slot | Type | State Machine | Overlays | Depends On | Verb Count |
+|------|------|--------------|----------|-----------|-----------|
+| cbu | cbu | — | — | root | 1 |
+| trading_profile | mandate | trading_profile_lifecycle | matrix_overlay | cbu | 28 |
+| custody | entity | — | — | trading_profile | 8 |
+| booking_principal | entity | — | — | cbu | 9 |
+| cash_sweep | entity | — | — | custody | 9 |
+| service_resource | entity | — | — | cbu | 8 |
+| service_intent | entity | — | — | cbu | 12 |
+| booking_location | entity | — | — | booking_principal | 3 |
+| legal_entity | entity | — | — | booking_principal | 3 |
+| product | entity | — | — | cbu | 2 |
+| delivery | entity | — | — | cbu | 3 |
+
+**`fund.administration`** — Fund vehicle lifecycle and structure.
+| Slot | Type | State Machine | Overlays | Depends On | Verb Count |
+|------|------|--------------|----------|-----------|-----------|
+| fund | cbu | fund_lifecycle | — | root | 12 |
+| umbrella | entity | — | — | fund | 6 |
+| share_class | entity | — | — | fund | 2 |
+| feeder | entity | — | — | fund | 2 |
+| investment | entity | — | — | fund | 5 |
+| capital | entity | — | — | fund | 25 |
+| investment_manager | entity | — | — | fund | 7 |
+| manco_group | entity | — | — | fund | 16 |
+| trust | entity | — | — | fund | 8 |
+| partnership | entity | — | — | fund | 7 |
+
+**`governance.compliance`** — Governance and compliance framework.
+| Slot | Type | State Machine | Overlays | Depends On | Verb Count |
+|------|------|--------------|----------|-----------|-----------|
+| group | cbu | — | — | root | 0 (navigation only) |
+| sla | entity | — | — | group | 21 |
+| access_review | entity | — | — | group | 19 |
+| regulatory | entity | — | — | group | 10 |
+| ruleset | entity | — | — | group | 4 |
+| delegation | entity | — | — | group | 8 |
+| team | entity | — | — | group | 19 |
+| rule | entity | — | — | ruleset | 3 |
+| rule_field | entity | — | — | ruleset | 2 |
+
+**`kyc.extended`** — Deep KYC investigation (board, BODS).
+| Slot | Type | State Machine | Overlays | Depends On | Verb Count |
+|------|------|--------------|----------|-----------|-----------|
+| entity | entity | — | — | root | 1 |
+| board | entity | — | — | entity | 9 |
+| bods | entity | — | — | entity | 9 |
 
 ### 4.4 The SemOS Closed Loop
 
