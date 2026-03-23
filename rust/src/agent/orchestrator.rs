@@ -1715,9 +1715,17 @@ pub async fn legacy_handle_utterance(
         }
     }
 
+    // Extract entity mention spans from the lookup result so the ECIR noun
+    // scanner in IntentPipeline can skip entity names (entity-first parsing PR 3).
+    let entity_mention_spans: Vec<(usize, usize)> = lookup_result
+        .as_ref()
+        .map(|lr| lr.entities.iter().map(|e| e.mention_span).collect())
+        .unwrap_or_default();
+
     let pipeline = {
         let p = IntentPipeline::with_pool(searcher, ctx.pool.clone());
         p.with_allowed_verbs(surface_allowed.clone())
+            .with_entity_mention_spans(entity_mention_spans)
     };
 
     let rewrite = data_management_rewrite(ctx.stage_focus.as_deref(), utterance);

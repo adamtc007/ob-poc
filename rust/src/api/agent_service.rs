@@ -2108,7 +2108,7 @@ impl AgentService {
         // UNIFIED LOOKUP - Verb-first dual search
         // If LookupService is available (entity_linker configured), use it for combined
         // verb + entity discovery. Otherwise fall back to separate entity linking.
-        let (entity_resolution_debug, dominant_entity_id, resolved_kinds) =
+        let (entity_resolution_debug, dominant_entity_id, resolved_kinds, dominant_entity_detail) =
             if let Some(lookup_service) = self.get_lookup_service() {
                 // Unified path: verb-first ordering
                 let lookup_result = lookup_service.analyze(&request.message, 5).await;
@@ -2187,6 +2187,8 @@ impl AgentService {
                 };
 
                 let dominant_id = lookup_result.dominant_entity.as_ref().map(|d| d.entity_id);
+                // Capture dominant entity detail for session resolved_entities cache.
+                let dominant_detail = lookup_result.dominant_entity.clone();
                 let kinds: Vec<String> = lookup_result
                     .entities
                     .iter()
@@ -2195,10 +2197,12 @@ impl AgentService {
                     .map(|c| c.entity_kind.clone())
                     .collect();
 
-                (er_debug, dominant_id, kinds)
+                (er_debug, dominant_id, kinds, dominant_detail)
             } else {
                 // Legacy path: separate entity linking
-                self.extract_entity_mentions(&request.message, None)
+                let (er_debug, dom_id, kinds) =
+                    self.extract_entity_mentions(&request.message, None);
+                (er_debug, dom_id, kinds, None)
             };
 
         if let Some(ref er_debug) = entity_resolution_debug {
@@ -2215,6 +2219,23 @@ impl AgentService {
         // Store dominant entity in session context for downstream resolution
         if let Some(entity_id) = dominant_entity_id {
             session.context.dominant_entity_id = Some(entity_id);
+        }
+
+        // Store resolved entity in session cache so subsequent utterances
+        // referencing the same name can reuse the UUID without re-resolution.
+        if let Some(ref dominant) = dominant_entity_detail {
+            use crate::api::session::ResolvedEntity;
+            let key = dominant.canonical_name.to_lowercase();
+            session.context.resolved_entities.insert(
+                key,
+                ResolvedEntity {
+                    entity_id: dominant.entity_id,
+                    canonical_name: dominant.canonical_name.clone(),
+                    entity_kind: dominant.entity_kind.clone(),
+                    confidence: dominant.confidence as f64,
+                    constellation_slot: None,
+                },
+            );
         }
 
         // ONE PIPELINE - generate/validate DSL via unified orchestrator

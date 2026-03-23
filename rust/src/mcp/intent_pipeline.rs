@@ -197,6 +197,10 @@ pub struct IntentPipeline {
     /// SemReg-allowed verb FQNs (Phase 3 CCIR pre-constraint).
     /// When set, verb search only considers verbs in this set.
     allowed_verbs: Option<std::collections::HashSet<String>>,
+    /// Entity mention spans from entity linking (PR 2 entity-first parsing).
+    /// When set, the ECIR noun scanner skips these character ranges so that
+    /// entity names (e.g., "Goldman Sachs") don't pollute domain noun matching.
+    entity_mention_spans: Option<Vec<(usize, usize)>>,
 }
 
 impl IntentPipeline {
@@ -209,6 +213,7 @@ impl IntentPipeline {
             #[cfg(feature = "database")]
             pool: None,
             allowed_verbs: None,
+            entity_mention_spans: None,
         }
     }
 
@@ -221,6 +226,7 @@ impl IntentPipeline {
             scope_resolver: ScopeResolver::new(),
             pool: Some(pool),
             allowed_verbs: None,
+            entity_mention_spans: None,
         }
     }
 
@@ -228,6 +234,16 @@ impl IntentPipeline {
     /// When set, verb search only considers verbs in this set.
     pub fn with_allowed_verbs(mut self, allowed: std::collections::HashSet<String>) -> Self {
         self.allowed_verbs = Some(allowed);
+        self
+    }
+
+    /// Set entity mention spans from entity linking (entity-first parsing).
+    /// When set, the ECIR noun scanner skips these character ranges so that
+    /// entity names don't pollute domain noun matching.
+    pub fn with_entity_mention_spans(mut self, spans: Vec<(usize, usize)>) -> Self {
+        if !spans.is_empty() {
+            self.entity_mention_spans = Some(spans);
+        }
         self
     }
 
@@ -507,6 +523,8 @@ impl IntentPipeline {
         // Step 1: Find verb candidates via semantic search
         // Domain filter narrows results to relevant verbs (e.g., "session" domain for "set session...")
         // When allowed_verbs is set (Phase 3 CCIR), search is pre-constrained to SemReg-approved verbs.
+        // When entity_mention_spans is set (entity-first parsing), the ECIR noun scanner skips entity names.
+        let spans_ref = self.entity_mention_spans.as_deref();
         let candidates = self
             .verb_searcher
             .search(
@@ -516,6 +534,7 @@ impl IntentPipeline {
                 entity_kind,
                 5,
                 self.allowed_verbs.as_ref(),
+                spans_ref,
             )
             .await?;
 

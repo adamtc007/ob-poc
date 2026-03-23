@@ -479,6 +479,7 @@ impl HybridVerbSearcher {
     /// 6. Blocklist filter (rejects blocked verbs)
     /// 7. Global semantic (cold start) - score fallback_threshold-0.95
     /// 8. Phonetic fallback (typo handling) - score 0.5-0.7
+    #[allow(clippy::too_many_arguments)]
     pub async fn search(
         &self,
         query: &str,
@@ -487,6 +488,7 @@ impl HybridVerbSearcher {
         entity_kind: Option<&str>,
         limit: usize,
         allowed_verbs: Option<&HashSet<String>>,
+        entity_mention_spans: Option<&[(usize, usize)]>,
     ) -> Result<Vec<VerbSearchResult>> {
         let mut results = Vec::new();
         let mut seen_verbs: HashSet<String> = HashSet::new();
@@ -548,7 +550,11 @@ impl HybridVerbSearcher {
         // overriding embedding verb selection).
         let mut ecir_boost_set: HashSet<String> = HashSet::new();
         if let Some(ref noun_index) = self.noun_index {
-            let nouns = noun_index.extract(&normalized);
+            let nouns = if let Some(spans) = entity_mention_spans {
+                noun_index.extract_with_exclusions(&normalized, spans)
+            } else {
+                noun_index.extract(&normalized)
+            };
             if !nouns.is_empty() {
                 let action = NounIndex::classify_action(&normalized);
                 let resolution = noun_index.resolve(&nouns, action, Some(&normalized));
@@ -1539,7 +1545,7 @@ mod tests {
     async fn test_minimal_searcher() {
         let searcher = HybridVerbSearcher::minimal();
         let results = searcher
-            .search("create cbu", None, None, None, 5, None)
+            .search("create cbu", None, None, None, 5, None, None)
             .await
             .unwrap();
 

@@ -2098,6 +2098,30 @@ impl ActiveBatchState {
     }
 }
 
+// ============================================================================
+// ResolvedEntity — Pre-resolved entity from entity-first parsing
+// ============================================================================
+
+/// An entity that was resolved from entity linking during utterance parsing.
+///
+/// Stored in `SessionContext.resolved_entities` keyed by the lowercased
+/// mention text so that subsequent utterances referencing the same name
+/// can reuse the UUID without re-resolution.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResolvedEntity {
+    /// The resolved entity UUID.
+    pub entity_id: Uuid,
+    /// Canonical display name from the entity snapshot.
+    pub canonical_name: String,
+    /// Entity kind (e.g., "cbu", "group", "company", "fund").
+    pub entity_kind: String,
+    /// Confidence score from entity linking (0.0–1.0).
+    pub confidence: f64,
+    /// Constellation slot this entity occupies, if known.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub constellation_slot: Option<String>,
+}
+
 /// Context maintained across the session for reference resolution
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct SessionContext {
@@ -2297,6 +2321,16 @@ pub struct SessionContext {
     /// Structured answers collected during Sage bootstrap.
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub discovery_answers: HashMap<String, String>,
+
+    // =========================================================================
+    // Pre-Resolved Entities — Entity-First Parsing (PR 1)
+    // =========================================================================
+    /// Entities resolved from entity linking during the current session.
+    /// Keyed by the mention text (lowercased) that was resolved, so subsequent
+    /// utterances referencing the same name can reuse the UUID without
+    /// re-resolution.
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub resolved_entities: HashMap<String, ResolvedEntity>,
 }
 
 /// Primary domain keys tracked across the session

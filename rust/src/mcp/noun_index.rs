@@ -568,6 +568,65 @@ impl NounIndex {
         matches
     }
 
+    /// Extract nouns from utterance, masking out pre-identified spans.
+    ///
+    /// Identical to [`extract()`] but pre-seeds the coverage array with
+    /// `exclusion_spans` so that characters in those ranges are never matched
+    /// by the noun scanner. This prevents entity names (e.g., "Goldman Sachs
+    /// Group") from polluting the noun scan when the entity linker has already
+    /// identified them.
+    ///
+    /// Each span is a `(start, end)` pair of **byte offsets** into the
+    /// **lowercased** utterance (consistent with `extract()`).
+    pub fn extract_with_exclusions(
+        &self,
+        utterance: &str,
+        exclusion_spans: &[(usize, usize)],
+    ) -> Vec<NounMatch> {
+        let lower = utterance.to_lowercase();
+        let mut matches: Vec<NounMatch> = Vec::new();
+        let mut covered: Vec<bool> = vec![false; lower.len()];
+
+        // Pre-seed covered array with exclusion spans
+        for &(start, end) in exclusion_spans {
+            let clamped_end = end.min(covered.len());
+            let clamped_start = start.min(clamped_end);
+            for c in &mut covered[clamped_start..clamped_end] {
+                *c = true;
+            }
+        }
+
+        for (alias, entry, is_canonical) in &self.sorted_aliases {
+            let mut search_from = 0;
+            while let Some(pos) = lower[search_from..].find(alias.as_str()) {
+                let start = search_from + pos;
+                let end = start + alias.len();
+
+                let left_ok = start == 0 || !lower.as_bytes()[start - 1].is_ascii_alphanumeric();
+                let right_ok = end == lower.len() || !lower.as_bytes()[end].is_ascii_alphanumeric();
+
+                if left_ok && right_ok {
+                    let overlaps = covered[start..end].iter().any(|&c| c);
+                    if !overlaps {
+                        for c in &mut covered[start..end] {
+                            *c = true;
+                        }
+                        matches.push(NounMatch {
+                            noun: Arc::clone(entry),
+                            matched_alias: alias.clone(),
+                            is_canonical: *is_canonical,
+                            span: (start, end),
+                        });
+                    }
+                }
+                search_from = start + 1;
+            }
+        }
+
+        matches.sort_by_key(|m| m.span.0);
+        matches
+    }
+
     /// Classify action from utterance surface patterns.
     ///
     /// Uses imperative verb at start of utterance and question patterns.
@@ -1202,5 +1261,72 @@ nouns:
         );
         assert_eq!(domain_to_subject_kind("party"), "entity");
         assert_eq!(domain_to_subject_kind("case"), "kyc-case");
+    }
+
+    // -----------------------------------------------------------------------
+    // extract_with_exclusions tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_exclusion_masks_entity_name_containing_noun() {
+        let idx = test_noun_index();
+        // "Goldman Sachs Group" contains "group" which is NOT in our test YAML,
+        // but "structure" IS an alias for "cbu". Simulate an entity name
+        // containing a domain noun: "Acme Structure Holdings" where "structure"
+        // is a cbu alias.
+        let utterance = "create acme structure holdings";
+        let lower = utterance.to_lowercase();
+
+        // Without exclusion: "structure" should match cbu
+        let no_excl = idx.extract(&lower);
+        let has_structure = no_excl.iter().any(|m| m.matched_alias == "structure");
+        assert!(
+            has_structure,
+            "Without exclusion, 'structure' should match cbu alias"
+        );
+
+        // With exclusion spanning "acme structure holdings" (bytes 7..30)
+        let entity_start = lower.find("acme structure holdings").unwrap();
+        let entity_end = entity_start + "acme structure holdings".len();
+        let with_excl = idx.extract_with_exclusions(&lower, &[(entity_start, entity_end)]);
+        let still_has = with_excl.iter().any(|m| m.matched_alias == "structure");
+        assert!(
+            !still_has,
+            "With exclusion, 'structure' inside entity span should NOT match"
+        );
+    }
+
+    #[test]
+    fn test_exclusion_preserves_nouns_outside_spans() {
+        let idx = test_noun_index();
+        // "run screening for acme structure holdings" — "screening" is outside
+        // the entity span, "structure" is inside it.
+        let utterance = "run screening for acme structure holdings";
+        let lower = utterance.to_lowercase();
+
+        let entity_start = lower.find("acme structure holdings").unwrap();
+        let entity_end = entity_start + "acme structure holdings".len();
+        let matches = idx.extract_with_exclusions(&lower, &[(entity_start, entity_end)]);
+
+        // "screening" should still match (outside exclusion)
+        let has_screening = matches.iter().any(|m| m.noun.key == "screening");
+        assert!(has_screening, "Nouns outside exclusion span should match");
+
+        // "structure" should NOT match (inside exclusion)
+        let has_structure = matches.iter().any(|m| m.matched_alias == "structure");
+        assert!(!has_structure, "Nouns inside exclusion span should not match");
+    }
+
+    #[test]
+    fn test_exclusion_empty_spans_behaves_like_extract() {
+        let idx = test_noun_index();
+        let utterance = "create a new client business unit";
+        let normal = idx.extract(utterance);
+        let with_empty = idx.extract_with_exclusions(utterance, &[]);
+        assert_eq!(normal.len(), with_empty.len());
+        for (a, b) in normal.iter().zip(with_empty.iter()) {
+            assert_eq!(a.noun.key, b.noun.key);
+            assert_eq!(a.span, b.span);
+        }
     }
 }

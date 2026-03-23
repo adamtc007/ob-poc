@@ -198,6 +198,7 @@ mod tests {
                     None,                        // entity_kind
                     5,                           // limit
                     None,                        // allowed_verbs (no SemReg in test)
+                    None,                        // entity_mention_spans
                 )
                 .await;
 
@@ -1429,6 +1430,7 @@ mod clarification_roundtrip {
                     None,
                     10,
                     None,
+                    None, // entity_mention_spans
                 )
                 .await
             {
@@ -1464,7 +1466,7 @@ mod clarification_roundtrip {
                 total_phrases_tested += 1;
 
                 let re_candidates = searcher
-                    .search(phrase, None, None, None, 10, None)
+                    .search(phrase, None, None, None, 10, None, None)
                     .await;
 
                 match re_candidates {

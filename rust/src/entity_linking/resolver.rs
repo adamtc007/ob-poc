@@ -96,6 +96,18 @@ pub trait EntityLinkingService: Send + Sync {
         context_concepts: Option<&[String]>,
         limit: usize,
     ) -> Vec<EntityResolution>;
+
+    /// Extract raw mention spans from the utterance without full resolution.
+    ///
+    /// Returns `(start, end)` byte-offset pairs for each detected entity
+    /// mention. These spans can be fed to `NounIndex::extract_with_exclusions`
+    /// to mask out entity names before the ECIR noun scan.
+    ///
+    /// Default implementation returns an empty vec (safe for stubs).
+    fn extract_mention_spans(&self, utterance: &str) -> Vec<(usize, usize)> {
+        let _ = utterance;
+        vec![]
+    }
 }
 
 /// Default implementation of EntityLinkingService
@@ -156,6 +168,14 @@ impl EntityLinkingService for EntityLinkingServiceImpl {
         spans
             .into_iter()
             .map(|span| self.resolve_span(span, expected_kinds, context_concepts, limit))
+            .collect()
+    }
+
+    fn extract_mention_spans(&self, utterance: &str) -> Vec<(usize, usize)> {
+        self.extractor
+            .extract(utterance, &self.snapshot)
+            .into_iter()
+            .map(|span| (span.start, span.end))
             .collect()
     }
 }

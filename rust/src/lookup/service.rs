@@ -79,16 +79,32 @@ impl LookupService {
         self
     }
 
-    /// Analyze utterance with verb-first ordering
+    /// Analyze utterance with entity-masked verb search
     ///
-    /// 1. Search verbs to find likely intent
-    /// 2. Derive expected entity kinds from verb schema
-    /// 3. Resolve entities with kind constraints
+    /// 1. Extract entity mention spans (fast, in-memory)
+    /// 2. Search verbs with entity names masked from ECIR noun scan
+    /// 3. Derive expected entity kinds from verb schema
+    /// 4. Resolve entities with kind constraints
     pub async fn analyze(&self, utterance: &str, limit: usize) -> LookupResult {
-        // Step 1: Verb search (verb-first ordering)
+        // Step 0: Extract entity mention spans before verb search.
+        // These spans tell the ECIR noun scanner to skip entity names
+        // (e.g., "Goldman Sachs Group") so they don't pollute domain noun matching.
+        let mention_spans = self.entity_linker.extract_mention_spans(utterance);
+        let spans_ref: Option<&[(usize, usize)]> = if mention_spans.is_empty() {
+            None
+        } else {
+            tracing::debug!(
+                span_count = mention_spans.len(),
+                spans = ?mention_spans,
+                "LookupService: masking entity mention spans for ECIR"
+            );
+            Some(&mention_spans)
+        };
+
+        // Step 1: Verb search with entity names masked from ECIR
         let verbs = if let Some(searcher) = &self.verb_searcher {
             searcher
-                .search(utterance, None, None, None, limit, None)
+                .search(utterance, None, None, None, limit, None, spans_ref)
                 .await
                 .unwrap_or_default()
         } else {
