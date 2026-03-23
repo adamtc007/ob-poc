@@ -134,7 +134,17 @@ impl LookupService {
             limit,
         );
 
-        // Step 4: Find dominant entity
+        // Step 4: Co-resolution — entity kind ↔ verb subject_kinds mutual boosting
+        //
+        // The verb context narrows entity candidates:
+        //   "open a KYC case for HSBC" → kyc-case verbs have subject_kinds=[cbu]
+        //   → boost HSBC Custody Services (cbu), penalise HSBC Holdings (group)
+        //
+        // The entity kind narrows verb candidates:
+        //   entity is a fund → boost fund.* verbs, penalise group.* verbs
+        let entities = self.co_resolve_entities(&verbs, entities);
+
+        // Step 5: Find dominant entity (after co-resolution re-ranking)
         let dominant_entity = self.find_dominant(&entities);
         let has_dominant = dominant_entity.is_some();
 
@@ -143,7 +153,7 @@ impl LookupService {
             entities,
             dominant_entity,
             expected_kinds,
-            concepts: vec![], // Concepts not extracted in this version
+            concepts: vec![],
             verb_matched,
             entities_resolved: has_dominant,
         }
@@ -181,6 +191,80 @@ impl LookupService {
         }
 
         kinds
+    }
+
+    /// Co-resolve: boost entity candidates whose kind matches top verb subject_kinds.
+    ///
+    /// "Open a KYC case for HSBC" → kyc-case.create has subject_kinds=[cbu]
+    /// → HSBC Custody Services (cbu) boosted, HSBC Holdings (group) penalised.
+    fn co_resolve_entities(
+        &self,
+        verbs: &[VerbSearchResult],
+        mut entities: Vec<EntityResolution>,
+    ) -> Vec<EntityResolution> {
+        use crate::dsl_v2::runtime_registry::runtime_registry;
+
+        if entities.is_empty() || verbs.is_empty() {
+            return entities;
+        }
+
+        // Collect subject_kinds from top 3 verb candidates
+        let registry = runtime_registry();
+        let mut verb_subject_kinds: Vec<String> = Vec::new();
+        for verb_result in verbs.iter().take(3) {
+            let parts: Vec<&str> = verb_result.verb.splitn(2, '.').collect();
+            if parts.len() == 2 {
+                if let Some(rv) = registry.get(parts[0], parts[1]) {
+                    for kind in &rv.subject_kinds {
+                        if !verb_subject_kinds.contains(kind) {
+                            verb_subject_kinds.push(kind.clone());
+                        }
+                    }
+                }
+            }
+        }
+
+        if verb_subject_kinds.is_empty() {
+            return entities; // No kind constraint from verbs → no re-ranking
+        }
+
+        // Boost/penalise entity candidates based on kind match
+        for entity_resolution in &mut entities {
+            for candidate in &mut entity_resolution.candidates {
+                let kind_matches = verb_subject_kinds.iter().any(|vk| {
+                    vk == &candidate.entity_kind
+                        || (vk == "entity" && matches!(candidate.entity_kind.as_str(), "person" | "company" | "trust" | "partnership"))
+                        || (vk == "cbu" && candidate.entity_kind == "fund")
+                });
+
+                if kind_matches {
+                    candidate.score += 0.15; // Boost matching kind
+                    tracing::debug!(
+                        entity = %candidate.canonical_name,
+                        kind = %candidate.entity_kind,
+                        verb_kinds = ?verb_subject_kinds,
+                        "Co-resolution: entity kind matches verb subject_kinds (+0.15)"
+                    );
+                } else if !verb_subject_kinds.is_empty() {
+                    candidate.score -= 0.10; // Penalise mismatching kind
+                }
+            }
+
+            // Re-sort candidates by score and re-select dominant
+            entity_resolution
+                .candidates
+                .sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+
+            // Update the selected entity if re-ranking changed the winner
+            if let Some(top) = entity_resolution.candidates.first() {
+                if top.score > 0.5 {
+                    entity_resolution.selected = Some(top.entity_id);
+                    entity_resolution.confidence = top.score;
+                }
+            }
+        }
+
+        entities
     }
 
     /// Find the dominant entity (highest confidence with selection)
