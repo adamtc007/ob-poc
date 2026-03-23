@@ -1132,5 +1132,190 @@ nouns:
       - look through nominee
     noun_keys: [ubo]
     action_verbs:
+
+  # =========================================================================
+  # ECIR EXPANSION (accuracy improvement round)
+  # =========================================================================
+
+  isda:
+    aliases:
+      - isda
+      - isda agreement
+    natural_aliases:
+      - master agreement
+      - derivatives agreement
+    noun_keys: [contract]
+    action_verbs:
+      create: [contract.create]
+      list: [contract.list]
+      read: [contract.get]
+
+  ssi:
+    aliases:
+      - ssi
+      - settlement instruction
+    natural_aliases:
+      - standing settlement instruction
+      - settlement details
+    noun_keys: [custody]
+    action_verbs:
+      setup: [custody.setup-ssi]
+      list: [custody.list-ssis]
+      lookup: [custody.lookup-ssi]
+
+  rate-card:
+    aliases:
+      - rate card
+      - fee schedule
+    natural_aliases:
+      - pricing schedule
+      - fee structure
+      - rate schedule
+    noun_keys: [deal]
+    action_verbs:
+      create: [deal.create-rate-card]
+      list: [deal.list-rate-cards]
+      propose: [deal.propose-rate-card]
+      agree: [deal.agree-rate-card]
+
+  invoice:
+    aliases:
+      - invoice
+      - billing
+    natural_aliases:
+      - fee invoice
+      - billing period
+    noun_keys: [deal]
+    action_verbs:
+      create: [billing.create-period]
+      generate: [billing.generate-invoice]
+      list: [billing.list-profiles]
+      review: [billing.review-period]
+
+  passport:
+    aliases:
+      - passport
+    natural_aliases:
+      - identity document
+      - travel document
+    noun_keys: [document_rejection]
+    action_verbs:
+      solicit: [document.solicit]
+      upload: [document.upload]
+      verify: [document.verify]
+      reject: [document.reject]
+
+  certificate:
+    aliases:
+      - certificate of incorporation
+      - cert of inc
+      - articles of association
+    natural_aliases:
+      - incorporation docs
+      - corporate documents
+    noun_keys: [document]
+    action_verbs:
+      request: [document.solicit]
+      solicit: [document.solicit]
+      get: [document.solicit]
+      upload: [document.upload]
+      verify: [document.verify]
+      reject: [document.reject]
+
+  tollgate:
+    aliases:
+      - tollgate
+      - approval gate
+    natural_aliases:
+      - approval checkpoint
+      - quality gate
+      - decision point
+    noun_keys: [tollgate]
+    action_verbs:
+      evaluate: [tollgate.evaluate, tollgate.evaluate-gate]
+      read: [tollgate.read]
+      list: [tollgate.list-evaluations]
+      override: [tollgate.override]
+
+  workstream:
+    aliases:
+      - workstream
+      - entity workstream
+    natural_aliases:
+      - kyc workstream
+      - compliance workstream
+    noun_keys: [entity_workstream]
+    action_verbs:
+      create: [entity-workstream.create]
+      read: [entity-workstream.read]
+      list: [entity-workstream.list-by-case]
+      complete: [entity-workstream.complete]
+      block: [entity-workstream.block]
+
+  subfund:
+    aliases:
+      - subfund
+      - sub-fund
+      - compartment
+    natural_aliases:
+      - fund compartment
+      - sub fund
+    noun_keys: [fund]
+    action_verbs:
+      create: [fund.add-to-umbrella, fund.upsert-compartment]
+      list: [fund.list-subfunds, fund.list-compartments-by-umbrella]
+      read: [fund.read-compartment]
+
+  share-class:
+    aliases:
+      - share class
+      - unit class
+    natural_aliases:
+      - share type
+      - unit type
+    noun_keys: [fund]
+    action_verbs:
+      create: [fund.add-share-class]
+      list: [fund.list-share-classes]
+
+  feeder-fund:
+    aliases:
+      - feeder
+      - feeder fund
+    natural_aliases:
+      - feeder vehicle
+      - feeder structure
+    noun_keys: [fund]
+    action_verbs:
+      link: [fund.link-feeder]
+      list: [fund.list-feeders]
+
+  depositary:
+    aliases:
+      - depositary
+      - custodian
+    natural_aliases:
+      - fund depositary
+      - asset custodian
+    noun_keys: [cbu]
+    action_verbs:
+      assign: [cbu.assign-role]
+
+  manco:
+    aliases:
+      - manco
+      - management company
+      - manco
+    natural_aliases:
+      - fund manager
+      - asset manager
+    noun_keys: [manco_group]
+    action_verbs:
+      create: [manco.create]
+      list: [manco.list]
+      derive: [manco.derive-groups]
+
+  # lei: removed — too broad, overrides domain-specific intents (BODS, entity)
+  # "LEI" appears in many contexts; GLEIF verbs already covered by gleif noun
       trace: [ubo.trace-chains]
       discover: [ubo.discover]
