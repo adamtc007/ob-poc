@@ -579,7 +579,8 @@ impl NounIndex {
 
         // Imperative verb at start
         match first {
-            "create" | "add" | "new" | "register" | "establish" | "onboard" | "open" => {
+            "create" | "add" | "new" | "register" | "establish" | "onboard" | "open"
+            | "request" | "solicit" | "ask" => {
                 return Some(ActionCategory::Create);
             }
             "set" => {
@@ -587,16 +588,19 @@ impl NounIndex {
                     return Some(ActionCategory::Create);
                 }
             }
-            "show" | "list" | "display" | "get" | "view" | "describe" | "see" => {
+            "show" | "list" | "display" | "get" | "view" | "describe" | "see" | "read"
+            | "status" | "tell" => {
                 return Some(ActionCategory::List);
             }
             "update" | "change" | "modify" | "edit" | "rename" | "amend" => {
                 return Some(ActionCategory::Update);
             }
-            "delete" | "remove" | "drop" | "cancel" | "revoke" | "archive" | "close" => {
+            "delete" | "remove" | "drop" | "cancel" | "revoke" | "archive" | "close"
+            | "withdraw" | "terminate" | "nuke" | "destroy" | "purge" => {
                 return Some(ActionCategory::Delete);
             }
-            "assign" | "link" | "connect" | "attach" | "map" | "bind" | "associate" => {
+            "assign" | "link" | "connect" | "attach" | "map" | "bind" | "associate"
+            | "appoint" | "designate" | "make" | "nominate" => {
                 return Some(ActionCategory::Assign);
             }
             "compute" | "calculate" | "run" | "check" | "screen" | "verify" | "validate"
@@ -639,7 +643,7 @@ impl NounIndex {
     /// 2. If noun has `noun_keys` → find all verbs whose `metadata.noun` is in noun_keys (NounKeyMatch)
     /// 3. If noun has `entity_type_fqn` → find all verbs whose `subject_kinds` contains it (SubjectKindMatch)
     /// 4. No match → return empty (NoMatch)
-    pub fn resolve(&self, nouns: &[NounMatch], action: Option<ActionCategory>) -> NounResolution {
+    pub fn resolve(&self, nouns: &[NounMatch], action: Option<ActionCategory>, raw_utterance: Option<&str>) -> NounResolution {
         if nouns.is_empty() {
             return NounResolution {
                 candidates: vec![],
@@ -654,6 +658,8 @@ impl NounIndex {
         let noun_key = primary.noun.key.clone();
 
         // Path 1: Explicit action→verb mapping
+        // Try both the ActionCategory key ("create") AND the raw first word ("request")
+        // because YAML action_verbs may use either convention.
         if let Some(action_cat) = action {
             let action_key = action_cat.as_key();
             if let Some(verbs) = primary.noun.action_verbs.get(action_key) {
@@ -664,6 +670,25 @@ impl NounIndex {
                         action: Some(action_cat),
                         resolution_path: ResolutionPath::ExplicitMapping,
                     };
+                }
+            }
+        }
+
+        // Path 1b: Try raw first word as action key (handles "request" → "request" in YAML)
+        // YAML action_verbs may use raw verb words ("request", "solicit", "reject")
+        // instead of ActionCategory keys ("create", "delete").
+        if let Some(utterance) = raw_utterance {
+            let first_word = utterance.split_whitespace().next().unwrap_or("").to_lowercase();
+            if !first_word.is_empty() {
+                if let Some(verbs) = primary.noun.action_verbs.get(&first_word) {
+                    if !verbs.is_empty() {
+                        return NounResolution {
+                            candidates: verbs.clone(),
+                            noun_key,
+                            action,
+                            resolution_path: ResolutionPath::ExplicitMapping,
+                        };
+                    }
                 }
             }
         }
@@ -1041,7 +1066,7 @@ nouns:
         let idx = test_noun_index();
         let matches = idx.extract("create a new cbu");
         let action = NounIndex::classify_action("create a new cbu");
-        let resolution = idx.resolve(&matches, action);
+        let resolution = idx.resolve(&matches, action, None);
 
         assert_eq!(resolution.resolution_path, ResolutionPath::ExplicitMapping);
         assert_eq!(resolution.candidates, vec!["cbu.create"]);
@@ -1053,7 +1078,7 @@ nouns:
         let idx = test_noun_index();
         let matches = idx.extract("create a share class");
         let action = NounIndex::classify_action("create a share class");
-        let resolution = idx.resolve(&matches, action);
+        let resolution = idx.resolve(&matches, action, None);
 
         assert_eq!(resolution.resolution_path, ResolutionPath::ExplicitMapping);
         assert_eq!(resolution.candidates.len(), 2);
@@ -1067,7 +1092,7 @@ nouns:
     fn test_resolve_no_noun_empty() {
         let idx = test_noun_index();
         let matches = idx.extract("do something random");
-        let resolution = idx.resolve(&matches, None);
+        let resolution = idx.resolve(&matches, None, None);
 
         assert_eq!(resolution.resolution_path, ResolutionPath::NoMatch);
         assert!(resolution.candidates.is_empty());
@@ -1091,7 +1116,7 @@ nouns:
             span: (0, 3),
         }];
 
-        let resolution = idx.resolve(&matches, Some(ActionCategory::Compute));
+        let resolution = idx.resolve(&matches, Some(ActionCategory::Compute), None);
         // Should fall through to NounKeyMatch since there's no "compute" in action_verbs
         assert_eq!(resolution.resolution_path, ResolutionPath::NounKeyMatch);
         assert!(!resolution.candidates.is_empty());
@@ -1160,7 +1185,7 @@ nouns:
         .unwrap();
 
         let matches = idx.extract("open a kyc case");
-        let resolution = idx.resolve(&matches, Some(ActionCategory::Create));
+        let resolution = idx.resolve(&matches, Some(ActionCategory::Create), None);
         assert_eq!(resolution.resolution_path, ResolutionPath::SubjectKindMatch);
         assert_eq!(resolution.candidates, vec!["kyc-case.create".to_string()]);
     }

@@ -551,7 +551,7 @@ impl HybridVerbSearcher {
             let nouns = noun_index.extract(&normalized);
             if !nouns.is_empty() {
                 let action = NounIndex::classify_action(&normalized);
-                let resolution = noun_index.resolve(&nouns, action);
+                let resolution = noun_index.resolve(&nouns, action, Some(&normalized));
 
                 match resolution.candidates.len() {
                     0 => {
