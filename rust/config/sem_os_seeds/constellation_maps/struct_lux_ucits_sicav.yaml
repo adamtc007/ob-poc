@@ -11,6 +11,7 @@ slots:
       create: cbu.create
       read: cbu.read
       show: cbu.show
+      parties: cbu.parties
   management_company:
     type: entity
     entity_kinds: [company]
@@ -37,6 +38,9 @@ slots:
       search:
         verb: party.search
         when: [placeholder, filled]
+      resolve:
+        verb: entity.resolve-placeholder
+        when: [empty, placeholder]
       add:
         verb: party.add
         when: empty
@@ -68,6 +72,9 @@ slots:
       search:
         verb: party.search
         when: [placeholder, filled]
+      resolve:
+        verb: entity.resolve-placeholder
+        when: [empty, placeholder]
       add:
         verb: party.add
         when: empty
@@ -93,6 +100,9 @@ slots:
       assign:
         verb: cbu.assign-role
         when: placeholder
+      resolve:
+        verb: entity.resolve-placeholder
+        when: [empty, placeholder]
   ownership_chain:
     type: entity_graph
     entity_kinds: [person, company]

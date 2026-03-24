@@ -424,6 +424,10 @@ domains:
         handler: ClientGroupConfirmEntityOp
         invocation_phrases:
           - "confirm this entity"
+          - "confirm this entity belongs to the group"
+          - "confirm this entity belongs to the client group"
+          - "yes this entity belongs to the group"
+          - "this entity belongs to the group"
           - "yes this belongs"
           - "add to group"
         metadata:

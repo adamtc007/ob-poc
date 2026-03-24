@@ -101,6 +101,7 @@ pub struct EntityState {
 #[cfg(feature = "database")]
 type WorkstreamRow = (
     Uuid,
+    Uuid,
     String,
     String,
     Option<String>,
@@ -213,6 +214,27 @@ pub async fn load_entity_states_for_group(
     client_group_id: Uuid,
 ) -> Result<Vec<EntityState>> {
     let mut states = Vec::new();
+    let mut entity_slot_states: HashMap<Uuid, String> = HashMap::new();
+
+    if let Some(discovery_status) = sqlx::query_scalar::<_, Option<String>>(
+        r#"
+        SELECT discovery_status
+        FROM "ob-poc".client_group
+        WHERE id = $1
+        "#,
+    )
+    .bind(client_group_id)
+    .fetch_optional(pool)
+    .await?
+    .flatten()
+    {
+        states.push(EntityState {
+            entity_id: client_group_id,
+            entity_type: "client_group".to_string(),
+            current_state: client_group_state(&discovery_status),
+            slot_name: Some("client_group".to_string()),
+        });
+    }
 
     // CBUs linked to this client group
     let cbu_rows = sqlx::query_as::<_, (Uuid, String)>(
@@ -273,6 +295,7 @@ pub async fn load_entity_states_for_group(
             r#"
             SELECT
                 w.workstream_id,
+                w.entity_id,
                 COALESCE(et.type_code, 'entity'),
                 COALESCE(w.status, 'PENDING'),
                 w.blocker_type,
@@ -295,6 +318,9 @@ pub async fn load_entity_states_for_group(
         if let Some((workstream_id, entity_type, current_state)) =
             aggregate_workstream_state(&workstream_rows)
         {
+            for row in &workstream_rows {
+                entity_slot_states.insert(row.1, entity_role_state_from_workstream(row));
+            }
             states.push(EntityState {
                 entity_id: workstream_id,
                 entity_type,
@@ -433,6 +459,62 @@ pub async fn load_entity_states_for_group(
         }
     }
 
+    let group_entity_rows = sqlx::query_as::<_, (Uuid, String)>(
+        r#"
+        SELECT cge.entity_id, COALESCE(et.type_code, 'entity')
+        FROM "ob-poc".client_group_entity cge
+        JOIN "ob-poc".entities e ON e.entity_id = cge.entity_id
+        JOIN "ob-poc".entity_types et ON et.entity_type_id = e.entity_type_id
+        WHERE cge.group_id = $1
+        ORDER BY cge.added_at ASC NULLS LAST, cge.entity_id ASC
+        "#,
+    )
+    .bind(client_group_id)
+    .fetch_all(pool)
+    .await
+    .unwrap_or_default();
+
+    if let Some((entity_id, entity_type)) = group_entity_rows.first() {
+        states.push(EntityState {
+            entity_id: *entity_id,
+            entity_type: normalize_entity_type(entity_type),
+            current_state: "filled".to_string(),
+            slot_name: Some("gleif_import".to_string()),
+        });
+    }
+
+    if !cbu_rows.is_empty() {
+        let cbu_ids: Vec<Uuid> = cbu_rows.iter().map(|(id, _)| *id).collect();
+        let role_rows = sqlx::query_as::<_, (Uuid, String, String)>(
+            r#"
+            SELECT cer.entity_id, COALESCE(r.name, ''), COALESCE(et.type_code, 'entity')
+            FROM "ob-poc".cbu_entity_roles cer
+            JOIN "ob-poc".entities e ON e.entity_id = cer.entity_id
+            JOIN "ob-poc".entity_types et ON et.entity_type_id = e.entity_type_id
+            LEFT JOIN "ob-poc".roles r ON r.role_id = cer.role_id
+            WHERE cer.cbu_id = ANY($1)
+            "#,
+        )
+        .bind(&cbu_ids)
+        .fetch_all(pool)
+        .await
+        .unwrap_or_default();
+
+        for (entity_id, role_name, entity_type) in role_rows {
+            if let Some(slot_name) = struct_role_slot_name(&role_name) {
+                states.push(EntityState {
+                    entity_id,
+                    entity_type: normalize_entity_type(&entity_type),
+                    current_state: entity_slot_states
+                        .get(&entity_id)
+                        .cloned()
+                        .unwrap_or_else(|| "filled".to_string()),
+                    slot_name: Some(slot_name.to_string()),
+                });
+            }
+        }
+    }
+
     Ok(states)
 }
 
@@ -442,6 +524,7 @@ fn aggregate_workstream_state(rows: &[WorkstreamRow]) -> Option<(Uuid, String, S
         .map(
             |(
                 workstream_id,
+                _entity_id,
                 entity_type,
                 status,
                 blocker_type,
@@ -479,6 +562,34 @@ fn aggregate_workstream_state(rows: &[WorkstreamRow]) -> Option<(Uuid, String, S
             },
         )
         .min_by_key(|(_, _, state)| entity_workstream_state_rank(state))
+}
+
+#[cfg(feature = "database")]
+fn entity_role_state_from_workstream(row: &WorkstreamRow) -> String {
+    let (
+        _workstream_id,
+        _entity_id,
+        _entity_type,
+        status,
+        _blocker_type,
+        identity_verified,
+        ownership_proved,
+        screening_cleared,
+        evidence_complete,
+        has_risk_rating,
+    ) = row;
+
+    if status.eq_ignore_ascii_case("COMPLETE")
+        && (*has_risk_rating || *identity_verified || *ownership_proved)
+    {
+        "verified".to_string()
+    } else if *screening_cleared {
+        "screening_complete".to_string()
+    } else if *evidence_complete {
+        "evidence_collected".to_string()
+    } else {
+        "workstream_open".to_string()
+    }
 }
 
 #[cfg(feature = "database")]
@@ -621,6 +732,28 @@ fn agreement_state(status: &str) -> String {
         "terminated".to_string()
     } else {
         "pending".to_string()
+    }
+}
+
+#[cfg(feature = "database")]
+fn client_group_state(discovery_status: &str) -> String {
+    if discovery_status.eq_ignore_ascii_case("complete") {
+        "onboarding".to_string()
+    } else if discovery_status.eq_ignore_ascii_case("in_progress") {
+        "researching".to_string()
+    } else {
+        "prospect".to_string()
+    }
+}
+
+#[cfg(feature = "database")]
+fn struct_role_slot_name(role_name: &str) -> Option<&'static str> {
+    let normalized = role_name.to_ascii_uppercase().replace('-', "_");
+    match normalized.as_str() {
+        "MANAGEMENT_COMPANY" => Some("management_company"),
+        "DEPOSITARY" => Some("depositary"),
+        "INVESTMENT_MANAGER" => Some("investment_manager"),
+        _ => None,
     }
 }
 

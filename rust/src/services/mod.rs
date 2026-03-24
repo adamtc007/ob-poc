@@ -12,6 +12,8 @@
 
 // Attribute services
 pub mod attribute_executor;
+pub(crate) mod attribute_identity_service;
+pub(crate) mod attribute_registry_enrichment;
 
 // Dictionary and document services
 pub mod dictionary_service_impl;

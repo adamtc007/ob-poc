@@ -219,7 +219,8 @@ slots:
         filter_column: screening_type,
       }
     cardinality: optional
-    depends_on: [entity_workstream]
+    depends_on:
+      - { slot: entity_workstream, min_state: open }
     state_machine: screening_lifecycle
     overlays: [screening_result]
     verbs:
@@ -266,7 +267,8 @@ slots:
     join:
       { via: entity_identifiers, parent_fk: entity_id, child_fk: identifier_id }
     cardinality: optional
-    depends_on: [entity_workstream]
+    depends_on:
+      - { slot: entity_workstream, min_state: open }
     state_machine: identifier_lifecycle
     verbs:
       add: { verb: identifier.add, when: [empty, failed] }

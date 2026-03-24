@@ -1737,16 +1737,22 @@ pub async fn legacy_handle_utterance(
         if let (Some(group_id), Some(c_name)) = (scope_group_id, constellation_name) {
             use crate::sage::constrained_match::resolve_constrained_hybrid;
             use crate::sage::session_context::load_entity_states_for_group;
-            use crate::sage::valid_verb_set::{compute_valid_verb_set, load_constellation_by_id};
+            use crate::sage::valid_verb_set::{
+                compute_valid_verb_set_for_constellations, load_constellation_stack,
+            };
             let scoped_searcher = (*ctx.verb_searcher).clone();
 
-            if let Ok(constellation) = load_constellation_by_id(c_name) {
+            if let Ok(constellations) = load_constellation_stack(c_name) {
                 // Load entity states for this client group
                 let entity_states = load_entity_states_for_group(&ctx.pool, group_id)
                     .await
                     .unwrap_or_default();
 
-                let valid_verbs = compute_valid_verb_set(&entity_states, &constellation, group_id);
+                let valid_verbs = compute_valid_verb_set_for_constellations(
+                    &entity_states,
+                    &constellations,
+                    group_id,
+                );
 
                 if !valid_verbs.is_empty() {
                     let constrained =

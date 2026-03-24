@@ -857,6 +857,9 @@ domains:
         behavior: plugin
         invocation_phrases:
           - "resolve placeholder"
+          - "resolve this placeholder to the real entity"
+          - "resolve placeholder to the real entity"
+          - "replace this placeholder with the real entity"
           - "link placeholder to entity"
           - "replace placeholder"
           - "resolve placeholder entity"

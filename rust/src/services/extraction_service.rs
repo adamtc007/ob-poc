@@ -9,6 +9,8 @@ use sqlx::PgPool;
 use std::time::Instant;
 use uuid::Uuid;
 
+use super::attribute_identity_service::AttributeIdentityService;
+
 // Note: ObPocError removed - not available in current error module
 
 /// Result type for extraction operations
@@ -156,19 +158,24 @@ impl OcrExtractionService {
         &self,
         attr_id: &Uuid,
     ) -> ExtractionResult<AttributeDefinition> {
-        let attr = sqlx::query_as::<_, AttributeDefinition>(
-            r#"
-            SELECT attribute_id, name, mask as data_type
-            FROM "ob-poc".dictionary
-            WHERE attribute_id = $1
-            "#,
-        )
-        .bind(attr_id)
-        .fetch_optional(&self.pool)
-        .await?
-        .ok_or_else(|| ExtractionError::AttributeNotFound(*attr_id))?;
+        let resolved = AttributeIdentityService::new(self.pool.clone())
+            .resolve_reference(&attr_id.to_string())
+            .await
+            .map_err(|e| ExtractionError::ExtractionFailed {
+                method: "attribute_identity".to_string(),
+                reason: e.to_string(),
+            })?
+            .ok_or_else(|| ExtractionError::AttributeNotFound(*attr_id))?;
 
-        Ok(attr)
+        let runtime_uuid = resolved
+            .runtime_uuid()
+            .ok_or_else(|| ExtractionError::AttributeNotFound(*attr_id))?;
+
+        Ok(AttributeDefinition {
+            attribute_id: runtime_uuid,
+            name: resolved.best_display_name(),
+            data_type: resolved.best_data_type(),
+        })
     }
 
     /// Extract date from document content

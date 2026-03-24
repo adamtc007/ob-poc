@@ -10,6 +10,7 @@ use ob_poc_macros::register_custom_op;
 use super::CustomOperation;
 use crate::dsl_v2::ast::VerbCall;
 use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
+use crate::services::attribute_identity_service::AttributeIdentityService;
 
 #[cfg(feature = "database")]
 use sqlx::PgPool;
@@ -79,12 +80,9 @@ impl CustomOperation for ObservationFromDocumentOp {
             .and_then(|a| a.value.as_string())
             .ok_or_else(|| anyhow::anyhow!("Missing attribute argument"))?;
 
-        let attribute_id: Option<Uuid> = sqlx::query_scalar(
-            r#"SELECT uuid FROM "ob-poc".attribute_registry WHERE id = $1 OR display_name = $1"#,
-        )
-        .bind(attr_name)
-        .fetch_optional(pool)
-        .await?;
+        let attribute_id = AttributeIdentityService::new(pool.clone())
+            .resolve_runtime_uuid(attr_name)
+            .await?;
 
         let attribute_id =
             attribute_id.ok_or_else(|| anyhow::anyhow!("Unknown attribute: {}", attr_name))?;
@@ -212,12 +210,9 @@ impl CustomOperation for ObservationGetCurrentOp {
             .and_then(|a| a.value.as_string())
             .ok_or_else(|| anyhow::anyhow!("Missing attribute argument"))?;
 
-        let attribute_id: Option<Uuid> = sqlx::query_scalar(
-            r#"SELECT uuid FROM "ob-poc".attribute_registry WHERE id = $1 OR display_name = $1"#,
-        )
-        .bind(attr_name)
-        .fetch_optional(pool)
-        .await?;
+        let attribute_id = AttributeIdentityService::new(pool.clone())
+            .resolve_runtime_uuid(attr_name)
+            .await?;
 
         let attribute_id =
             attribute_id.ok_or_else(|| anyhow::anyhow!("Unknown attribute: {}", attr_name))?;
@@ -334,12 +329,9 @@ impl CustomOperation for ObservationReconcileOp {
             .ok_or_else(|| anyhow::anyhow!("Missing attribute argument"))?;
 
         // Lookup attribute ID
-        let attribute_id: Option<Uuid> = sqlx::query_scalar(
-            r#"SELECT uuid FROM "ob-poc".attribute_registry WHERE id = $1 OR display_name = $1"#,
-        )
-        .bind(attr_name)
-        .fetch_optional(pool)
-        .await?;
+        let attribute_id = AttributeIdentityService::new(pool.clone())
+            .resolve_runtime_uuid(attr_name)
+            .await?;
 
         let attribute_id =
             attribute_id.ok_or_else(|| anyhow::anyhow!("Unknown attribute: {}", attr_name))?;

@@ -8,6 +8,8 @@ use sqlx::PgPool;
 use std::sync::Arc;
 use uuid::Uuid;
 
+use super::attribute_identity_service::AttributeIdentityService;
+
 /// Stub ExecutionContext for attribute operations
 #[derive(Debug, Clone)]
 pub struct ExecutionContext {
@@ -66,19 +68,22 @@ impl AttributeDictionary {
 
     /// Get attribute definition
     pub async fn get_attribute(&self, attribute_id: &Uuid) -> ExecutorResult<AttributeDef> {
-        let attr = sqlx::query_as::<_, AttributeDef>(
-            r#"
-            SELECT attribute_id, name, mask as data_type, long_description as description
-            FROM "ob-poc".dictionary
-            WHERE attribute_id = $1
-            "#,
-        )
-        .bind(attribute_id)
-        .fetch_optional(&self.pool)
-        .await?
-        .ok_or_else(|| ExecutorError::NoValueFound(*attribute_id))?;
+        let resolved = AttributeIdentityService::new(self.pool.clone())
+            .resolve_reference(&attribute_id.to_string())
+            .await
+            .map_err(|e| ExecutorError::SinkError(e.to_string()))?
+            .ok_or_else(|| ExecutorError::NoValueFound(*attribute_id))?;
 
-        Ok(attr)
+        let runtime_uuid = resolved
+            .runtime_uuid()
+            .ok_or_else(|| ExecutorError::NoValueFound(*attribute_id))?;
+
+        Ok(AttributeDef {
+            attribute_id: runtime_uuid,
+            name: resolved.best_display_name(),
+            data_type: resolved.best_data_type(),
+            description: resolved.description,
+        })
     }
 
     /// Validate attribute value against its definition

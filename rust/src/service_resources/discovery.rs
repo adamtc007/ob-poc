@@ -8,12 +8,16 @@ use anyhow::{Context, Result};
 use serde_json::{json, Value as JsonValue};
 use sqlx::PgPool;
 use std::collections::{HashMap, HashSet};
+use std::sync::{Arc, LazyLock};
 use tracing::{debug, info};
 use uuid::Uuid;
 
 use super::service::ServiceResourcePipelineService;
 use super::srdef_loader::SrdefRegistry;
 use super::types::*;
+use crate::sem_reg::{DerivationFunctionRegistry, DerivationSpecBody};
+use crate::services::attribute_identity_service::AttributeIdentityService;
+use crate::services::attribute_registry_enrichment::ensure_semos_registry_bridge;
 
 // =============================================================================
 // DISCOVERY ENGINE
@@ -428,6 +432,21 @@ pub struct RollupResult {
 pub struct PopulationEngine<'a> {
     pool: &'a PgPool,
     service: ServiceResourcePipelineService,
+    identity: AttributeIdentityService,
+}
+
+#[derive(Debug, Clone)]
+struct ActiveDerivationSpec {
+    snapshot_id: Uuid,
+    body: DerivationSpecBody,
+}
+
+#[derive(Debug)]
+struct DerivationInputCollection {
+    inputs: JsonValue,
+    evidence_refs: Vec<EvidenceRef>,
+    input_snapshot_ids: Vec<Uuid>,
+    input_snapshot_status: &'static str,
 }
 
 impl<'a> PopulationEngine<'a> {
@@ -435,15 +454,18 @@ impl<'a> PopulationEngine<'a> {
         Self {
             pool,
             service: ServiceResourcePipelineService::new(pool.clone()),
+            identity: AttributeIdentityService::new(pool.clone()),
         }
     }
 
     /// Attempt to populate missing attribute values for a CBU
     pub async fn populate_for_cbu(&self, cbu_id: Uuid) -> Result<PopulationResult> {
         info!("Starting attribute population for CBU {}", cbu_id);
+        ensure_semos_registry_bridge(self.pool).await?;
 
         // Get unified requirements
         let requirements = self.service.get_unified_attr_requirements(cbu_id).await?;
+        let derivation_specs = self.load_derivation_specs_by_attr().await?;
 
         // Get existing values
         let existing_values = self.service.get_cbu_attr_values(cbu_id).await?;
@@ -470,7 +492,10 @@ impl<'a> PopulationEngine<'a> {
                 });
 
             for source in &source_policy {
-                match self.try_populate(cbu_id, req.attr_id, source).await? {
+                match self
+                    .try_populate(cbu_id, req.attr_id, source, &derivation_specs)
+                    .await?
+                {
                     Some(value) => {
                         let input = SetCbuAttrValue {
                             cbu_id,
@@ -511,9 +536,16 @@ impl<'a> PopulationEngine<'a> {
         cbu_id: Uuid,
         attr_id: Uuid,
         source: &str,
+        derivation_specs: &HashMap<Uuid, Vec<ActiveDerivationSpec>>,
     ) -> Result<Option<JsonValue>> {
         match source {
-            "derived" => self.try_derive(cbu_id, attr_id).await,
+            "derived" => {
+                let specs = derivation_specs
+                    .get(&attr_id)
+                    .map(Vec::as_slice)
+                    .unwrap_or(&[]);
+                self.try_derive(cbu_id, attr_id, specs).await
+            }
             "entity" => self.try_from_entity(cbu_id, attr_id).await,
             "cbu" => self.try_from_cbu(cbu_id, attr_id).await,
             "document" => Ok(None), // TODO: Document extraction
@@ -523,9 +555,167 @@ impl<'a> PopulationEngine<'a> {
     }
 
     /// Try to derive a value from other data
-    async fn try_derive(&self, _cbu_id: Uuid, _attr_id: Uuid) -> Result<Option<JsonValue>> {
-        // TODO: Implement derivation rules
+    async fn try_derive(
+        &self,
+        cbu_id: Uuid,
+        attr_id: Uuid,
+        specs: &[ActiveDerivationSpec],
+    ) -> Result<Option<JsonValue>> {
+        if specs.is_empty() {
+            return Ok(None);
+        }
+
+        for spec in specs {
+            let collected_inputs = self.collect_derivation_inputs(cbu_id, &spec.body).await?;
+
+            let result = match DERIVATION_REGISTRY.evaluate(
+                &spec.body,
+                &collected_inputs.inputs,
+                &[],
+                spec.snapshot_id,
+                collected_inputs.input_snapshot_ids.clone(),
+            ) {
+                Ok(result) => result,
+                Err(err) => {
+                    debug!(
+                        "Derivation {} failed for CBU {}: {}",
+                        spec.body.fqn, cbu_id, err
+                    );
+                    continue;
+                }
+            };
+
+            if result.value.is_null() {
+                continue;
+            }
+
+            let explain_ref = ExplainRef {
+                rule: format!("derivation:{}", spec.body.fqn),
+                input: Some(json!({
+                    "spec_snapshot_id": spec.snapshot_id,
+                    "output_attribute_fqn": spec.body.output_attribute_fqn,
+                    "inputs": collected_inputs.inputs,
+                    "input_snapshot_ids": collected_inputs.input_snapshot_ids,
+                    "input_snapshot_status": collected_inputs.input_snapshot_status,
+                })),
+                output: Some(json!({
+                    "value": result.value,
+                    "evaluated_at": result.evaluated_at,
+                    "inherited_security_label": result.inherited_label,
+                })),
+            };
+
+            let set_input = SetCbuAttrValue {
+                cbu_id,
+                attr_id,
+                value: result.value.clone(),
+                source: AttributeSource::Derived,
+                evidence_refs: Some(collected_inputs.evidence_refs),
+                explain_refs: Some(vec![explain_ref]),
+            };
+
+            self.service.set_cbu_attr_value(&set_input).await?;
+            return Ok(Some(result.value));
+        }
+
         Ok(None)
+    }
+
+    async fn load_derivation_specs_by_attr(
+        &self,
+    ) -> Result<HashMap<Uuid, Vec<ActiveDerivationSpec>>> {
+        let rows: Vec<(Uuid, serde_json::Value)> = sqlx::query_as(
+            r#"
+            SELECT snapshot_id, definition
+            FROM sem_reg.snapshots
+            WHERE object_type = 'derivation_spec'
+              AND status = 'active'
+              AND effective_until IS NULL
+            "#,
+        )
+        .fetch_all(self.pool)
+        .await?;
+
+        let mut output_attr_cache: HashMap<String, Option<Uuid>> = HashMap::new();
+        let mut out: HashMap<Uuid, Vec<ActiveDerivationSpec>> = HashMap::new();
+        for (snapshot_id, definition) in rows {
+            let body: DerivationSpecBody = match serde_json::from_value(definition) {
+                Ok(body) => body,
+                Err(_) => continue,
+            };
+
+            let mapped_attr_id =
+                if let Some(cached) = output_attr_cache.get(&body.output_attribute_fqn) {
+                    *cached
+                } else {
+                    let resolved = self
+                        .resolve_operational_attr_for_semos_fqn(&body.output_attribute_fqn)
+                        .await?;
+                    output_attr_cache.insert(body.output_attribute_fqn.clone(), resolved);
+                    resolved
+                };
+
+            let Some(mapped_attr_id) = mapped_attr_id else {
+                continue;
+            };
+
+            out.entry(mapped_attr_id)
+                .or_default()
+                .push(ActiveDerivationSpec { snapshot_id, body });
+        }
+
+        Ok(out)
+    }
+
+    async fn collect_derivation_inputs(
+        &self,
+        cbu_id: Uuid,
+        spec: &DerivationSpecBody,
+    ) -> Result<DerivationInputCollection> {
+        let mut inputs = serde_json::Map::new();
+        let mut evidence_refs = Vec::new();
+
+        for input in &spec.inputs {
+            let Some(input_attr_id) = self
+                .resolve_operational_attr_for_semos_fqn(&input.attribute_fqn)
+                .await?
+            else {
+                continue;
+            };
+
+            let Some(existing) = self
+                .service
+                .get_cbu_attr_value(cbu_id, input_attr_id)
+                .await?
+            else {
+                continue;
+            };
+
+            inputs.insert(input.attribute_fqn.clone(), existing.value.clone());
+            inputs.insert(input.role.clone(), existing.value.clone());
+            evidence_refs.push(EvidenceRef {
+                ref_type: "cbu_attr_value".to_string(),
+                id: Some(input_attr_id.to_string()),
+                path: Some(input.attribute_fqn.clone()),
+                details: Some(json!({
+                    "source": existing.source,
+                    "as_of": existing.as_of,
+                })),
+            });
+        }
+
+        Ok(DerivationInputCollection {
+            inputs: JsonValue::Object(inputs),
+            evidence_refs,
+            input_snapshot_ids: Vec::new(),
+            // Current cbu_attr_values rows do not retain source snapshot ids, so lineage is
+            // explicit about this gap instead of silently implying complete snapshot pinning.
+            input_snapshot_status: "not_available_from_cbu_attr_values_v1",
+        })
+    }
+
+    async fn resolve_operational_attr_for_semos_fqn(&self, fqn: &str) -> Result<Option<Uuid>> {
+        self.identity.resolve_runtime_uuid(fqn).await
     }
 
     /// Try to get value from entity data
@@ -600,6 +790,111 @@ fn parse_source(s: &str) -> AttributeSource {
         "external" => AttributeSource::External,
         _ => AttributeSource::Manual,
     }
+}
+
+fn build_derivation_registry() -> DerivationFunctionRegistry {
+    let mut registry = DerivationFunctionRegistry::new();
+    registry.register("sum_ownership_chain", Arc::new(sum_ownership_chain));
+    registry.register("weighted_average", Arc::new(weighted_average));
+    registry.register("percentage_ratio", Arc::new(percentage_ratio));
+    registry.register("threshold_flag", Arc::new(threshold_flag));
+    registry.register("sum_aggregate", Arc::new(sum_aggregate));
+    registry
+}
+
+static DERIVATION_REGISTRY: LazyLock<DerivationFunctionRegistry> =
+    LazyLock::new(build_derivation_registry);
+
+fn numeric_value(input: &JsonValue, key: &str) -> Option<f64> {
+    input.get(key).and_then(|value| match value {
+        JsonValue::Number(num) => num.as_f64(),
+        JsonValue::String(text) => text.parse::<f64>().ok(),
+        _ => None,
+    })
+}
+
+fn sum_ownership_chain(
+    inputs: &JsonValue,
+) -> std::result::Result<JsonValue, crate::sem_reg::derivation::DerivationError> {
+    let direct = numeric_value(inputs, "ubo.direct_holding_pct")
+        .or_else(|| numeric_value(inputs, "primary"))
+        .unwrap_or(0.0);
+    let indirect = numeric_value(inputs, "ubo.indirect_holding_pct")
+        .or_else(|| numeric_value(inputs, "secondary"))
+        .unwrap_or(0.0);
+    Ok(json!(direct + indirect))
+}
+
+fn weighted_average(
+    inputs: &JsonValue,
+) -> std::result::Result<JsonValue, crate::sem_reg::derivation::DerivationError> {
+    // Seeded v1 risk model: fixed weights and coarse credit normalization are intentional until
+    // derivation functions accept authored parameters from DerivationSpecBody.
+    let credit = numeric_value(inputs, "risk.credit_score")
+        .or_else(|| numeric_value(inputs, "primary"))
+        .unwrap_or(0.0);
+    let credit = if credit > 1.0 {
+        credit / 1000.0
+    } else {
+        credit
+    };
+    let market = numeric_value(inputs, "risk.market_volatility")
+        .or_else(|| numeric_value(inputs, "secondary"))
+        .unwrap_or(0.0);
+    let operational = numeric_value(inputs, "risk.operational_score")
+        .or_else(|| numeric_value(inputs, "weight"))
+        .unwrap_or(0.0);
+    Ok(json!(
+        (credit * 0.5) + ((1.0 - market) * 0.2) + (operational * 0.3)
+    ))
+}
+
+fn percentage_ratio(
+    inputs: &JsonValue,
+) -> std::result::Result<JsonValue, crate::sem_reg::derivation::DerivationError> {
+    let denominator = numeric_value(inputs, "kyc.required_document_count")
+        .or_else(|| numeric_value(inputs, "denominator"))
+        .unwrap_or(0.0);
+    let numerator = numeric_value(inputs, "kyc.verified_document_count")
+        .or_else(|| numeric_value(inputs, "numerator"))
+        .unwrap_or(0.0);
+    if denominator <= f64::EPSILON {
+        return Ok(JsonValue::Null);
+    }
+    Ok(json!((numerator / denominator) * 100.0))
+}
+
+fn threshold_flag(
+    inputs: &JsonValue,
+) -> std::result::Result<JsonValue, crate::sem_reg::derivation::DerivationError> {
+    let value = numeric_value(inputs, "ubo.total_ownership_pct_value")
+        .or_else(|| numeric_value(inputs, "primary"))
+        .unwrap_or(0.0);
+    Ok(json!(value >= 25.0))
+}
+
+fn sum_aggregate(
+    inputs: &JsonValue,
+) -> std::result::Result<JsonValue, crate::sem_reg::derivation::DerivationError> {
+    if let Some(JsonValue::Array(values)) = inputs
+        .get("trading.cbu_aum")
+        .or_else(|| inputs.get("addend"))
+    {
+        let sum: f64 = values
+            .iter()
+            .filter_map(|value| match value {
+                JsonValue::Number(num) => num.as_f64(),
+                JsonValue::String(text) => text.parse::<f64>().ok(),
+                _ => None,
+            })
+            .sum();
+        return Ok(json!(sum));
+    }
+
+    let single = numeric_value(inputs, "trading.cbu_aum")
+        .or_else(|| numeric_value(inputs, "addend"))
+        .unwrap_or(0.0);
+    Ok(json!(single))
 }
 
 /// Result of population operation

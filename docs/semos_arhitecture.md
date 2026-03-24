@@ -1,8 +1,8 @@
 # Semantic OS — Vision & Scope v3.0
 
 > **Version:** 3.0
-> **Date:** 2026-03-21
-> **Status:** Living document — consolidation of 9 prior specs, updated for the 2026-03-08 runtime schema consolidation, the 2026-03-12 document-governance bootstrap, the 2026-03-13 NLCI/CBU surface reconciliation, the 2026-03-15 reducer/constellation runtime cutover, the 2026-03-16 DB harness/runtime verification pass, the 2026-03-16 CODEX data-integrity/parser/serialization remediation, the 2026-03-17 discovery-universe + single-pipeline cutover, and the 2026-03-21 SemOS reconciliation remediation verification pass
+> **Date:** 2026-03-24
+> **Status:** Living document — consolidation of 9 prior specs, updated for the 2026-03-08 runtime schema consolidation, the 2026-03-12 document-governance bootstrap, the 2026-03-13 NLCI/CBU surface reconciliation, the 2026-03-15 reducer/constellation runtime cutover, the 2026-03-16 DB harness/runtime verification pass, the 2026-03-16 CODEX data-integrity/parser/serialization remediation, the 2026-03-17 discovery-universe + single-pipeline cutover, the 2026-03-21 SemOS reconciliation remediation verification pass, and the 2026-03-24 attribute identity + derivation reconciliation pass
 > **Audience:** Engineering, governance, architecture review
 
 ---
@@ -82,6 +82,38 @@ Residual full-suite failures are environment-dependent integration issues rather
 Peer-review bundle for the execution set:
 
 - `artifacts/semos-recon-remediation-review-2026-03-21.tar.gz`
+
+### Attribute Identity + Derivation Reconciliation State (2026-03-24)
+
+The SemOS attribute/data-dictionary plane is now materially closer to the intended architecture: a single governed identity space above an operational registry backbone, with derivations executed through the live population path rather than as dormant metadata.
+
+The 2026-03-24 reconciliation landed in four functional slices plus one refinement pass:
+
+- a shared `AttributeIdentityService` now resolves attribute references across SemOS FQNs, operational registry UUID/ID, metadata aliases, and the remaining legacy dictionary identifiers
+- the active runtime/API call paths no longer perform ad-hoc attribute identity lookups; they route through the shared resolver instead
+- the derivation engine in the service-resource population flow is live and now evaluates governed `derivation_spec` snapshots into `cbu_attr_values`
+- derivation writes now persist lineage/explanation envelopes through `evidence_refs` and `explain_refs`
+- the SemOS-to-operational attribute bridge is now authored through `attribute_registry.metadata.sem_os` rather than hardcoded in the derivation path
+
+The refinement pass then removed the main hot-path inefficiencies without changing the architecture:
+
+- registry bridge enrichment runs once per population pass, not once per SemOS FQN resolution
+- derivation specs are indexed once per population run instead of scanning all active specs for each target attribute
+- the derivation function registry is a static `LazyLock`, not rebuilt per derivation
+- the current lineage gap is explicit: `input_snapshot_ids` remain unavailable from `cbu_attr_values` v1, and this is surfaced as a stated status rather than implied completeness
+
+This leaves the attribute plane in the intended architectural shape:
+
+- SemOS governs attribute meaning, derivation intent, and cross-object identity
+- `"ob-poc".attribute_registry` remains the operational backbone for runtime UUIDs and persisted values
+- `"ob-poc".cbu_attr_values` is now populated by both direct source collection and governed derivations
+- the legacy `data_dictionary/` module remains only as a compatibility layer, not the primary runtime definition source
+
+Remaining work in this plane is now mostly additive and coordinated:
+
+- taxonomy/evidence vocabulary unification
+- DSL authoring surface for governed attribute management
+- later coordinated schema tightening for derived-attribute invariants and stronger lineage columns
 
 ### Non-Lossy Utterance Contract (2026-03-17)
 

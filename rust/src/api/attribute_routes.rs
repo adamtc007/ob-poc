@@ -2,7 +2,7 @@
 //!
 //! All database access goes through VisualizationRepository or DictionaryServiceImpl.
 
-use crate::data_dictionary::{AttributeId, DictionaryService};
+use crate::data_dictionary::DictionaryService;
 use crate::database::VisualizationRepository;
 use crate::services::DictionaryServiceImpl;
 use axum::{
@@ -14,7 +14,6 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
-use std::str::FromStr;
 use uuid::Uuid;
 
 // ============================================================================
@@ -145,10 +144,8 @@ async fn validate_value(
 ) -> Result<Json<ValidateValueResponse>, StatusCode> {
     let dict_service = DictionaryServiceImpl::new(pool);
 
-    let attr_id = AttributeId::from_str(&req.attribute_id).map_err(|_| StatusCode::BAD_REQUEST)?;
-
     match dict_service
-        .validate_attribute_value(&attr_id, &req.value)
+        .validate_attribute_value_ref(&req.attribute_id, &req.value)
         .await
     {
         Ok(()) => Ok(Json(ValidateValueResponse {

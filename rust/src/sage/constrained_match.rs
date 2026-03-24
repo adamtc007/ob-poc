@@ -70,6 +70,8 @@ const COMPOUND_SIGNAL_WORDS: &[&str] = &[
     "struct.",
     "macro:",
     "scenario:",
+    "full screening",
+    "full kyc review",
     "set up",
     "setup",
     "onboard",
@@ -167,6 +169,9 @@ const OWNERSHIP_WORDS: &[&str] = &[
     "parent",
     "waterfall",
 ];
+const SANCTIONS_WORDS: &[&str] = &["sanction", "ofac", "aml", "rba"];
+const PEP_WORDS: &[&str] = &["pep", "politically", "exposed"];
+const ADVERSE_MEDIA_WORDS: &[&str] = &["adverse", "media", "news", "negative"];
 const NAVIGATION_WORDS: &[&str] = &["back", "previous", "return"];
 const IMPERATIVE_WORDS: &[&str] = &[
     "run",
@@ -178,6 +183,42 @@ const IMPERATIVE_WORDS: &[&str] = &[
     "calculate",
     "compute",
     "start",
+];
+const GLEIF_WORDS: &[&str] = &["gleif", "lei", "hierarchy", "parent", "successor"];
+const STRUCTURE_WORDS: &[&str] = &[
+    "structure",
+    "fund",
+    "sicav",
+    "icav",
+    "ucits",
+    "oeic",
+    "lp",
+    "hedge",
+    "cross-border",
+];
+const STRUCTURE_SETUP_WORDS: &[&str] = &[
+    "set up",
+    "setup",
+    "launch",
+    "onboard",
+    "spin up",
+    "create structure",
+    "complete structure",
+];
+const UNIVERSE_WORDS: &[&str] = &["everything", "all", "universe"];
+const ROLE_ASSIGNMENT_WORDS: &[&str] = &[
+    "custodian",
+    "depositary",
+    "transfer",
+    "agent",
+    "administrator",
+    "auditor",
+    "prime",
+    "broker",
+    "legal",
+    "counsel",
+    "signatory",
+    "director",
 ];
 
 const DOMAIN_SIGNAL_WORDS: &[(&str, &[&str])] = &[
@@ -208,6 +249,7 @@ const DOMAIN_SIGNAL_WORDS: &[(&str, &[&str])] = &[
     ("client-group", &["client group", "group", "discovery"]),
     ("cbu", &["cbu", "delete", "nuke"]),
     ("gleif", &["lei", "gleif", "hierarchy"]),
+    ("contract", &["contract", "msa", "master services"]),
     ("trading-profile", &["trading", "mandate", "profile"]),
     ("struct", &["structure", "oeic", "sicav", "icav", "lp"]),
 ];
@@ -286,6 +328,12 @@ fn has_any_token(tokens: &[String], needles: &[&str]) -> bool {
         .any(|needle| tokens.iter().any(|token| token == &needle))
 }
 
+fn utterance_has_any_signal(utterance_lower: &str, tokens: &[String], signals: &[&str]) -> bool {
+    signals
+        .iter()
+        .any(|signal| utterance_has_signal(utterance_lower, tokens, signal))
+}
+
 fn utterance_has_signal(utterance_lower: &str, tokens: &[String], signal: &str) -> bool {
     if signal.contains(' ') || signal.contains('%') {
         return utterance_lower.contains(signal);
@@ -295,6 +343,105 @@ fn utterance_has_signal(utterance_lower: &str, tokens: &[String], signal: &str) 
     tokens.iter().any(|token| {
         token == &normalized || token.contains(&normalized) || normalized.contains(token)
     })
+}
+
+fn is_structure_macro_intent(utterance_lower: &str, tokens: &[String]) -> bool {
+    utterance_has_any_signal(utterance_lower, tokens, STRUCTURE_SETUP_WORDS)
+        && utterance_has_any_signal(utterance_lower, tokens, STRUCTURE_WORDS)
+}
+
+fn is_universe_prompt(tokens: &[String]) -> bool {
+    let has_universe = has_any_token(tokens, UNIVERSE_WORDS);
+    let has_domain = has_any_token(tokens, OWNERSHIP_WORDS)
+        || has_any_token(tokens, SCREENING_WORDS)
+        || has_any_token(tokens, DOCUMENT_COLLECTION_WORDS)
+        || has_any_token(tokens, GLEIF_WORDS);
+    has_universe && !has_domain
+}
+
+fn has_placeholder_resolution_intent(tokens: &[String]) -> bool {
+    has_any_token(tokens, &["placeholder"])
+        && has_any_token(
+            tokens,
+            &["resolve", "replace", "real", "link", "swap", "fill"],
+        )
+}
+
+fn has_group_confirm_intent(utterance_lower: &str, tokens: &[String]) -> bool {
+    (has_any_token(tokens, &["confirm"]) || utterance_lower.contains("belongs"))
+        && has_any_token(tokens, &["group", "client"])
+        && has_any_token(tokens, &["entity", "belong"])
+}
+
+fn has_circular_ownership_intent(tokens: &[String]) -> bool {
+    has_any_token(tokens, &["circular", "cycle", "loop"])
+        && has_any_token(tokens, &["ownership", "owner", "control"])
+}
+
+fn has_parent_lookup_intent(tokens: &[String]) -> bool {
+    has_any_token(tokens, &["parent", "holding", "ultimate"])
+}
+
+fn has_gleif_enrich_intent(tokens: &[String]) -> bool {
+    has_any_token(tokens, &["enrich", "refresh", "update", "record", "data"])
+}
+
+fn has_gleif_import_intent(tokens: &[String]) -> bool {
+    has_any_token(
+        tokens,
+        &["import", "hierarchy", "tree", "structure", "load"],
+    )
+}
+
+fn has_entity_creation_intent(tokens: &[String]) -> bool {
+    has_any_token(tokens, &["create", "add", "register", "new", "onboard"])
+        && has_any_token(
+            tokens,
+            &[
+                "company",
+                "person",
+                "trust",
+                "partnership",
+                "entity",
+                "party",
+            ],
+        )
+}
+
+fn has_investor_lookup_intent(tokens: &[String]) -> bool {
+    has_any_token(tokens, &["invest", "investor", "investment"]) && has_any_token(tokens, &["fund"])
+}
+
+fn preferred_scoped_verbs(utterance_lower: &str, tokens: &[String]) -> &'static [&'static str] {
+    if has_placeholder_resolution_intent(tokens) {
+        &["entity.resolve-placeholder"]
+    } else if has_group_confirm_intent(utterance_lower, tokens) {
+        &["client-group.confirm-entity"]
+    } else if has_circular_ownership_intent(tokens) {
+        &["ownership.reconcile", "ownership.analyze-gaps"]
+    } else if utterance_lower.contains("run the check") || has_any_token(tokens, &["rba"]) {
+        &["screening.sanctions", "screening.run"]
+    } else if has_any_token(tokens, GLEIF_WORDS) {
+        if has_parent_lookup_intent(tokens) {
+            &[
+                "gleif.get-parent",
+                "gleif.trace-ownership",
+                "gleif.import-tree",
+            ]
+        } else if has_gleif_enrich_intent(tokens) {
+            &["gleif.enrich", "gleif.get-record"]
+        } else if has_gleif_import_intent(tokens) {
+            &[
+                "gleif.import-tree",
+                "gleif.import-to-client-group",
+                "gleif.search",
+            ]
+        } else {
+            &["gleif.search", "gleif.get-record"]
+        }
+    } else {
+        &[]
+    }
 }
 
 fn fqn_token_parts(verb_fqn: &str) -> (Vec<String>, Vec<String>) {
@@ -324,7 +471,11 @@ fn fqn_token_parts(verb_fqn: &str) -> (Vec<String>, Vec<String>) {
 }
 
 fn action_is_generic(candidate: &VerbCandidate) -> bool {
-    let action = candidate.verb_fqn.rsplit('.').next().unwrap_or("");
+    action_is_generic_fqn(&candidate.verb_fqn)
+}
+
+fn action_is_generic_fqn(verb_fqn: &str) -> bool {
+    let action = verb_fqn.rsplit('.').next().unwrap_or("");
     matches!(
         action,
         "read"
@@ -441,6 +592,9 @@ pub fn resolve_constrained(utterance: &str, valid_verbs: &ValidVerbSet) -> Const
     let has_screening_intent = has_any_token(&tokens, SCREENING_WORDS);
     let has_document_collection_intent = has_any_token(&tokens, DOCUMENT_COLLECTION_WORDS);
     let has_ownership_intent = has_any_token(&tokens, OWNERSHIP_WORDS);
+    let has_sanctions_intent = has_any_token(&tokens, SANCTIONS_WORDS);
+    let has_pep_intent = has_any_token(&tokens, PEP_WORDS);
+    let has_adverse_media_intent = has_any_token(&tokens, ADVERSE_MEDIA_WORDS);
     let has_navigation_intent = has_any_token(&tokens, NAVIGATION_WORDS);
     let has_imperative_intent = has_any_token(&tokens, IMPERATIVE_WORDS);
 
@@ -493,6 +647,27 @@ pub fn resolve_constrained(utterance: &str, valid_verbs: &ValidVerbSet) -> Const
             if has_screening_intent {
                 if verb_fqn.starts_with("screening.") {
                     score += 0.24;
+                    if has_sanctions_intent {
+                        if verb_fqn == "screening.sanctions" {
+                            score += 0.20;
+                        } else if verb_fqn != "screening.run" {
+                            score -= 0.08;
+                        }
+                    }
+                    if has_pep_intent {
+                        if verb_fqn == "screening.pep" {
+                            score += 0.20;
+                        } else if verb_fqn != "screening.run" {
+                            score -= 0.08;
+                        }
+                    }
+                    if has_adverse_media_intent {
+                        if verb_fqn == "screening.adverse-media" {
+                            score += 0.20;
+                        } else if verb_fqn != "screening.run" {
+                            score -= 0.08;
+                        }
+                    }
                 } else if action_is_generic(candidate) {
                     score -= 0.18;
                 }
@@ -633,6 +808,37 @@ pub async fn resolve_constrained_hybrid(
     searcher: &HybridVerbSearcher,
     session_domain: Option<&str>,
 ) -> Result<ConstrainedResult> {
+    let utterance_lower = utterance.to_lowercase();
+    let tokens = tokenize_utterance(utterance);
+    if utterance_lower.is_empty() {
+        return Ok(ConstrainedResult::fallthrough());
+    }
+    if COMPOUND_SIGNAL_WORDS
+        .iter()
+        .any(|signal| utterance_lower.contains(signal))
+    {
+        return Ok(ConstrainedResult::fallthrough());
+    }
+    if is_structure_macro_intent(&utterance_lower, &tokens) || is_universe_prompt(&tokens) {
+        return Ok(ConstrainedResult::fallthrough());
+    }
+
+    let has_ownership_intent = has_any_token(&tokens, OWNERSHIP_WORDS);
+    let has_gleif_intent = utterance_has_any_signal(&utterance_lower, &tokens, GLEIF_WORDS);
+    let has_contract_intent = DOMAIN_SIGNAL_WORDS
+        .iter()
+        .find(|(domain, _)| *domain == "contract")
+        .is_some_and(|(_, signals)| {
+            signals
+                .iter()
+                .any(|signal| utterance_has_signal(&utterance_lower, &tokens, signal))
+        });
+    let has_entity_create_intent = has_entity_creation_intent(&tokens);
+    let has_investor_intent = has_investor_lookup_intent(&tokens);
+    let has_role_assignment_intent = has_any_token(&tokens, ROLE_ASSIGNMENT_WORDS);
+    let has_circular_ownership = has_circular_ownership_intent(&tokens);
+    let has_generic_screening_check = utterance_lower.contains("run the check");
+
     let keyword = resolve_constrained(utterance, valid_verbs);
     if keyword.resolved() {
         return Ok(keyword);
@@ -647,7 +853,7 @@ pub async fn resolve_constrained_hybrid(
         .search_embeddings_only(utterance, 5, None, Some(&allowed_verbs))
         .await?;
 
-    let Some(top) = scoped_results.first() else {
+    let Some(mut top) = scoped_results.first().cloned() else {
         return Ok(ConstrainedResult::fallthrough_with_candidates(0));
     };
     if !allowed_verbs.contains(&top.verb) {
@@ -656,16 +862,63 @@ pub async fn resolve_constrained_hybrid(
         ));
     }
 
+    let preferred_verbs = preferred_scoped_verbs(&utterance_lower, &tokens);
+    if !preferred_verbs.is_empty() {
+        if let Some(preferred) = scoped_results.iter().find(|result| {
+            preferred_verbs.contains(&result.verb.as_str())
+                && allowed_verbs.contains(&result.verb)
+                && result.score >= 0.72
+        }) {
+            top = preferred.clone();
+        }
+    }
+
     let result_domain = top.verb.split('.').next().unwrap_or("");
     let session_domain = session_domain.unwrap_or("");
     let second_score = scoped_results
         .get(1)
         .map(|result| result.score)
         .unwrap_or(0.0);
-    let margin = top.score - second_score;
+    let margin = if scoped_results
+        .first()
+        .is_some_and(|result| result.verb == top.verb)
+    {
+        top.score - second_score
+    } else {
+        let runner_up = scoped_results
+            .iter()
+            .filter(|result| result.verb != top.verb)
+            .map(|result| result.score)
+            .max_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+            .unwrap_or(0.0);
+        top.score - runner_up
+    };
     let domain_ok = session_domain.is_empty() || result_domain == session_domain;
+    let high_margin_accept =
+        top.score >= 0.74 && margin >= 0.30 && !action_is_generic_fqn(&top.verb);
+    let gleif_domain_ok = !has_gleif_intent || top.verb.starts_with("gleif.");
+    let role_assignment_ok = !top.verb.starts_with("cbu.assign-role")
+        || has_role_assignment_intent
+        || utterance_lower.contains("add a role");
+    let entity_creation_ok = !has_entity_create_intent || !top.verb.starts_with("cbu.assign-role");
+    let investor_lookup_ok = !has_investor_intent || top.verb != "cbu.parties";
+    let circular_ownership_ok = !has_circular_ownership || !top.verb.starts_with("ubo.calculate");
+    let generic_screening_ok = !has_generic_screening_check || top.verb == "screening.sanctions";
+    let ownership_domain_ok = !has_ownership_intent
+        || top.verb.starts_with("ubo.")
+        || top.verb.starts_with("ownership.")
+        || top.verb.starts_with("control.");
+    let contract_domain_ok = !has_contract_intent || top.verb.starts_with("contract.");
     let accept = domain_ok
-        && ((top.score >= 0.80 && margin >= 0.06) || (top.score >= 0.74 && margin >= 0.30));
+        && gleif_domain_ok
+        && role_assignment_ok
+        && entity_creation_ok
+        && investor_lookup_ok
+        && circular_ownership_ok
+        && generic_screening_ok
+        && ownership_domain_ok
+        && contract_domain_ok
+        && ((top.score >= 0.80 && margin >= 0.06) || high_margin_accept);
     if !accept {
         log::debug!(
             "SemOS scoped near-miss: '{}' top-3: [{}] (margin: {:.3})",

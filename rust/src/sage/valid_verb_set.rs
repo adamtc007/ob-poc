@@ -145,6 +145,33 @@ pub fn load_constellation_by_id(id: &str) -> Result<ConstellationMapDefBody> {
     anyhow::bail!("Constellation not found: {}", id)
 }
 
+/// Load the composed constellation stack for a session-facing constellation ID.
+///
+/// Struct constellations compose the ownership, structure, and KYC maps so the
+/// valid verb surface reflects the full onboarding business plane.
+///
+/// # Examples
+/// ```rust
+/// use ob_poc::sage::valid_verb_set::load_constellation_stack;
+///
+/// let stack = load_constellation_stack("struct.lux.ucits.sicav").unwrap();
+/// assert!(stack.iter().any(|map| map.constellation == "group.ownership"));
+/// assert!(stack.iter().any(|map| map.constellation == "kyc.onboarding"));
+/// ```
+pub fn load_constellation_stack(id: &str) -> Result<Vec<ConstellationMapDefBody>> {
+    let ids: Vec<&str> = if id.starts_with("struct.") {
+        vec!["group.ownership", id, "kyc.onboarding"]
+    } else {
+        vec![id]
+    };
+
+    let mut stack = Vec::new();
+    for constellation_id in ids {
+        stack.push(load_constellation_by_id(constellation_id)?);
+    }
+    Ok(stack)
+}
+
 // ---------------------------------------------------------------------------
 // Core computation
 // ---------------------------------------------------------------------------
@@ -163,6 +190,70 @@ pub fn compute_valid_verb_set(
     constellation: &ConstellationMapDefBody,
     client_group_id: Uuid,
 ) -> ValidVerbSet {
+    compute_valid_verb_set_for_constellations(
+        entity_states,
+        std::slice::from_ref(constellation),
+        client_group_id,
+    )
+}
+
+/// Compute the union of legal verbs across a composed constellation stack.
+///
+/// # Examples
+/// ```rust
+/// use uuid::Uuid;
+/// use ob_poc::sage::session_context::EntityState;
+/// use ob_poc::sage::valid_verb_set::{compute_valid_verb_set_for_constellations, load_constellation_stack};
+///
+/// let stack = load_constellation_stack("group.ownership").unwrap();
+/// let valid = compute_valid_verb_set_for_constellations(&Vec::<EntityState>::new(), &stack, Uuid::nil());
+/// assert_eq!(valid.client_group_id, Uuid::nil());
+/// ```
+pub fn compute_valid_verb_set_for_constellations(
+    entity_states: &[EntityState],
+    constellations: &[ConstellationMapDefBody],
+    client_group_id: Uuid,
+) -> ValidVerbSet {
+    let mut verbs = Vec::new();
+
+    for constellation in constellations {
+        verbs.extend(compute_valid_verb_set_for_single_constellation(
+            entity_states,
+            constellation,
+        ));
+    }
+
+    // Sort by priority (lower = higher priority), dedup by verb_fqn
+    verbs.sort_by(|a, b| {
+        a.verb_fqn
+            .cmp(&b.verb_fqn)
+            .then_with(|| a.priority.cmp(&b.priority))
+    });
+    verbs.dedup_by(|a, b| a.verb_fqn == b.verb_fqn);
+    verbs.sort_by(|a, b| {
+        a.priority
+            .cmp(&b.priority)
+            .then_with(|| a.verb_fqn.cmp(&b.verb_fqn))
+    });
+
+    let constellation_id = constellations
+        .iter()
+        .map(|constellation| constellation.constellation.as_str())
+        .collect::<Vec<_>>()
+        .join(" + ");
+
+    ValidVerbSet {
+        verbs,
+        client_group_id,
+        constellation_id,
+        computed_at: Utc::now(),
+    }
+}
+
+fn compute_valid_verb_set_for_single_constellation(
+    entity_states: &[EntityState],
+    constellation: &ConstellationMapDefBody,
+) -> Vec<VerbCandidate> {
     let model = ConstellationModel::from_parts(
         constellation.clone(),
         load_state_machine_bodies().unwrap_or_default(),
@@ -190,17 +281,17 @@ pub fn compute_valid_verb_set(
         if !slot_states.contains_key(slot_name)
             && slot_dependencies_met(&model, &slot_states, slot_name)
         {
-            if let Some(create_verb) = find_creation_verb(&slot.def) {
-                let entity_type = slot
-                    .def
-                    .entity_kinds
-                    .first()
-                    .cloned()
-                    .unwrap_or_else(|| entity_type_for_slot(slot_name, &model));
+            let entity_type = slot
+                .def
+                .entity_kinds
+                .first()
+                .cloned()
+                .unwrap_or_else(|| entity_type_for_slot(slot_name, &model));
+            for create_verb in empty_slot_verbs(&slot.def) {
                 verbs.push(VerbCandidate {
                     verb_fqn: create_verb.clone(),
                     entity_id: None,
-                    entity_type,
+                    entity_type: entity_type.clone(),
                     source: VerbSource::CreationVerb,
                     priority: 5,
                     keywords: extract_keywords_for_verb(&create_verb),
@@ -208,26 +299,7 @@ pub fn compute_valid_verb_set(
             }
         }
     }
-
-    // Sort by priority (lower = higher priority), dedup by verb_fqn
-    verbs.sort_by(|a, b| {
-        a.verb_fqn
-            .cmp(&b.verb_fqn)
-            .then_with(|| a.priority.cmp(&b.priority))
-    });
-    verbs.dedup_by(|a, b| a.verb_fqn == b.verb_fqn);
-    verbs.sort_by(|a, b| {
-        a.priority
-            .cmp(&b.priority)
-            .then_with(|| a.verb_fqn.cmp(&b.verb_fqn))
-    });
-
-    ValidVerbSet {
-        verbs,
-        client_group_id,
-        constellation_id: constellation.constellation.clone(),
-        computed_at: Utc::now(),
-    }
+    verbs
 }
 
 // ---------------------------------------------------------------------------
@@ -396,10 +468,16 @@ fn state_rank_fallback(state: &str) -> usize {
         "empty" => 0,
         "placeholder" => 1,
         "filled" | "intake" => 2,
+        "prospect" => 2,
+        "researching" => 3,
         "workstream_open" | "discovery" | "alleged" => 3,
+        "ubo_mapped" => 4,
+        "control_mapped" => 5,
+        "cbus_identified" => 5,
+        "onboarding" => 6,
         "screening_complete" | "evidence_collected" | "assessment" | "provable" => 4,
         "review" | "verified" | "proved" => 5,
-        "approved" => 6,
+        "active" | "approved" => 7,
         _ => 0,
     }
 }
@@ -454,6 +532,41 @@ fn find_creation_verb(slot: &CoreSlotDef) -> Option<String> {
     }
     // Fallback: first verb in palette
     slot.verbs.values().next().map(|e| e.verb_fqn().to_string())
+}
+
+fn empty_slot_verbs(slot: &CoreSlotDef) -> Vec<String> {
+    let mut verbs = Vec::new();
+    for (key, entry) in &slot.verbs {
+        let include = match entry {
+            CoreVerbPaletteEntry::Simple(_) => {
+                key.contains("create")
+                    || key.contains("open")
+                    || key.contains("add")
+                    || key.contains("ensure")
+                    || key.contains("import")
+                    || key.contains("discover")
+                    || key.contains("search")
+                    || key.contains("lookup")
+            }
+            CoreVerbPaletteEntry::Gated { when, .. } => when
+                .to_vec()
+                .iter()
+                .any(|state| matches!(state.as_str(), "empty" | "placeholder")),
+        };
+        if include {
+            verbs.push(entry.verb_fqn().to_string());
+        }
+    }
+
+    if verbs.is_empty() {
+        if let Some(create_verb) = find_creation_verb(slot) {
+            verbs.push(create_verb);
+        }
+    }
+
+    verbs.sort();
+    verbs.dedup();
+    verbs
 }
 
 /// Check if a verb is an observation (read-only) verb.
@@ -870,7 +983,7 @@ mod tests {
 
         // Build a realistic valid verb set from a single session-scoped constellation.
         let group_id = Uuid::new_v4();
-        let constellation_id = "kyc.onboarding";
+        let constellation_id = "struct.lux.ucits.sicav";
         let entity_states = vec![
             EntityState {
                 entity_id: Uuid::new_v4(),
@@ -886,8 +999,9 @@ mod tests {
             },
         ];
 
-        let map = load_constellation_by_id(constellation_id).expect("failed to load constellation");
-        let valid = compute_valid_verb_set(&entity_states, &map, group_id);
+        let stack =
+            load_constellation_stack(constellation_id).expect("failed to load constellation");
+        let valid = compute_valid_verb_set_for_constellations(&entity_states, &stack, group_id);
 
         // Run all utterances through constrained match
         let total = fixture.test.len();
@@ -1666,8 +1780,13 @@ mod tests {
 
         let pool = test_pool().await?;
         let scenarios = seed_kyc_onboarding_scenarios(&pool).await?;
-        let map = load_constellation_by_id("kyc.onboarding")?;
-        let model = ConstellationModel::from_parts(map.clone(), load_state_machine_bodies()?);
+        let stack = load_constellation_stack("struct.lux.ucits.sicav")?;
+        let kyc_map = stack
+            .iter()
+            .find(|map| map.constellation == "kyc.onboarding")
+            .cloned()
+            .expect("kyc.onboarding must be present in composed stack");
+        let model = ConstellationModel::from_parts(kyc_map.clone(), load_state_machine_bodies()?);
         let embedder = tokio::task::spawn_blocking(CandleEmbedder::new).await??;
         let shared_embedder: Arc<dyn Embedder> = Arc::new(embedder);
         let searcher = HybridVerbSearcher::new(Arc::new(VerbService::new(pool.clone())), None)
@@ -1676,7 +1795,11 @@ mod tests {
         for scenario in &scenarios {
             let entity_states = load_entity_states_for_group(&pool, scenario.group_id).await?;
             let slot_states = build_slot_states(&entity_states, &model);
-            let valid = compute_valid_verb_set(&entity_states, &map, scenario.group_id);
+            let valid = compute_valid_verb_set_for_constellations(
+                &entity_states,
+                &stack,
+                scenario.group_id,
+            );
             println!("\nScenario {}:", scenario.name);
             println!(
                 "  session: {:?}",
@@ -1741,7 +1864,7 @@ mod tests {
             .find(|scenario| scenario.name == "mid")
             .expect("mid scenario must exist");
         let entity_states = load_entity_states_for_group(&pool, mid.group_id).await?;
-        let valid = compute_valid_verb_set(&entity_states, &map, mid.group_id);
+        let valid = compute_valid_verb_set_for_constellations(&entity_states, &stack, mid.group_id);
 
         for verb_fqn in [
             "document.solicit",
