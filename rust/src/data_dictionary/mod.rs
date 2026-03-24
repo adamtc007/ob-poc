@@ -1,20 +1,7 @@
-//! Data Dictionary - Attribute metadata with RAG support
-//!
-//! This module defines the metadata structure for attributes used in KYC workflows.
-//! Each attribute has:
-//! - Semantic descriptions for RAG/LLM understanding
-//! - UI layout hints for form generation
-//! - Data lineage (sources and sinks)
-//! - Validation rules
+//! Transitional compatibility seam for legacy dictionary-facing services.
 
 use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-
 pub mod attribute;
-pub mod validation;
-
-pub use attribute::*;
 
 // Re-export key types for convenience
 pub use attribute::{AttributeId, DbAttributeDefinition, SinkConfig, SourceConfig};

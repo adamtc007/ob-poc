@@ -2,7 +2,7 @@
 
 > **Version:** 3.0
 > **Date:** 2026-03-24
-> **Status:** Living document — consolidation of 9 prior specs, updated for the 2026-03-08 runtime schema consolidation, the 2026-03-12 document-governance bootstrap, the 2026-03-13 NLCI/CBU surface reconciliation, the 2026-03-15 reducer/constellation runtime cutover, the 2026-03-16 DB harness/runtime verification pass, the 2026-03-16 CODEX data-integrity/parser/serialization remediation, the 2026-03-17 discovery-universe + single-pipeline cutover, the 2026-03-21 SemOS reconciliation remediation verification pass, the 2026-03-24 attribute identity + derivation reconciliation pass, and the 2026-03-24 taxonomy/evidence unification pass
+> **Status:** Living document — consolidation of 9 prior specs, updated for the 2026-03-08 runtime schema consolidation, the 2026-03-12 document-governance bootstrap, the 2026-03-13 NLCI/CBU surface reconciliation, the 2026-03-15 reducer/constellation runtime cutover, the 2026-03-16 DB harness/runtime verification pass, the 2026-03-16 CODEX data-integrity/parser/serialization remediation, the 2026-03-17 discovery-universe + single-pipeline cutover, the 2026-03-21 SemOS reconciliation remediation verification pass, the 2026-03-24 attribute identity + derivation reconciliation pass, the 2026-03-24 taxonomy/evidence unification pass, and the 2026-03-24 attribute DSL + Phase 4 schema cleanup pass
 > **Audience:** Engineering, governance, architecture review
 
 ---
@@ -114,6 +114,21 @@ Remaining work in this plane is now mostly additive and coordinated:
 - taxonomy/evidence vocabulary unification
 - DSL authoring surface for governed attribute management
 - later coordinated schema tightening for derived-attribute invariants and stronger lineage columns
+
+### Attribute DSL + Phase 4 Schema State (2026-03-24)
+
+The attribute-management DSL and the final reconciliation schema pass are now live in code:
+
+- `attribute.define` dual-writes the operational registry and governed `attribute_def` snapshots
+- `attribute.define-derived` publishes coupled `attribute_def` + `derivation_spec` snapshots
+- `attribute.set-evidence-grade`, `attribute.deprecate`, and `attribute.inspect` are wired through the same governed path
+- attribute seed macros are authored through the SemOS macro surface rather than legacy JSON packs
+- the Phase 4 migration adds `sem_reg_snapshot_id`, `is_derived`, `derivation_spec_fqn`, and `evidence_grade` to `"ob-poc".attribute_registry`
+- stale registry columns (`embedding*`, reconciliation-rule fields, `requires_authoritative_source`) are removed from the live target schema
+- `"ob-poc".v_attribute_registry_reconciled` and `"ob-poc".v_attribute_reconciliation_summary` provide the operational/governed reconciliation surface
+- the legacy `data_dictionary/` module is now reduced to a compatibility seam instead of a second runtime definition plane
+
+The migration was applied against the local `data_designer` database on 2026-03-24. The schema changes succeeded, but the live reconciliation count remains `0/310` bridged attributes in that database. This is not a migration failure; it means the current operational `attribute_registry.id` values and governed `attribute_def.fqn` values still do not overlap in the local dataset, so targeted identity alignment/backfill remains the next operational task.
 
 ### Taxonomy / Evidence Unification State (2026-03-24)
 

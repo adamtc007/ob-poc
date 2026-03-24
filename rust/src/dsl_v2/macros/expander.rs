@@ -24,6 +24,7 @@ use sha2::{Digest, Sha256};
 use thiserror::Error;
 use uuid::Uuid;
 
+use super::attribute_seed::try_expand_attribute_seed_macro;
 use super::registry::MacroRegistry;
 use super::schema::MacroSchema;
 use super::variable::{substitute_variables, ArgValue, VariableContext, VariableError};
@@ -175,6 +176,14 @@ pub fn expand_macro(
     // 4. Check structure type constraints
     check_structure_type_constraints(schema, args, session)?;
 
+    if let Some(result) = try_expand_attribute_seed_macro(macro_fqn, args) {
+        let statements = result.map_err(|error| MacroExpansionError::InvalidArgument {
+            arg: "domain".to_string(),
+            message: error.to_string(),
+        })?;
+        return Ok(build_expansion_output(macro_fqn, args, schema, statements));
+    }
+
     // 5. Build variable context
     let mut ctx = build_variable_context(schema, args, session)?;
 
@@ -199,7 +208,15 @@ pub fn expand_macro(
         statements.push(dsl);
     }
 
-    // 7. Build audit trail
+    Ok(build_expansion_output(macro_fqn, args, schema, statements))
+}
+
+fn build_expansion_output(
+    macro_fqn: &str,
+    args: &BTreeMap<String, String>,
+    schema: &MacroSchema,
+    statements: Vec<String>,
+) -> MacroExpansionOutput {
     let args_json = serde_json::to_string(args).unwrap_or_default();
     let output_str = statements.join("\n");
 
@@ -211,21 +228,18 @@ pub fn expand_macro(
         expanded_at: Utc::now(),
     };
 
-    // 8. Collect sets_state and unlocks
     let sets_state: Vec<_> = schema
         .sets_state
         .iter()
         .map(|s| (s.key.clone(), s.value.clone()))
         .collect();
 
-    let unlocks = schema.unlocks.clone();
-
-    Ok(MacroExpansionOutput {
+    MacroExpansionOutput {
         statements,
         sets_state,
-        unlocks,
+        unlocks: schema.unlocks.clone(),
         audit,
-    })
+    }
 }
 
 // ---------------------------------------------------------------------------

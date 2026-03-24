@@ -36,6 +36,7 @@
 //! Normal DSL Pipeline (parse → enrich → compile → execute)
 //! ```
 
+mod attribute_seed;
 mod conditions;
 mod expander;
 mod registry;

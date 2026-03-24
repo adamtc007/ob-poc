@@ -456,6 +456,56 @@ pub fn infer_attributes_from_verbs(
     seen.into_values().collect()
 }
 
+/// Generate auditable `attribute.define` macro calls for a single verb domain.
+///
+/// This preserves the scanner's inference logic but emits replayable DSL
+/// instead of publishing snapshots directly.
+///
+/// # Examples
+///
+/// ```
+/// use dsl_core::config::types::{DomainConfig, VerbsConfig};
+/// use sem_os_obpoc_adapter::scanner::generate_seed_domain_macro_calls;
+/// use std::collections::HashMap;
+///
+/// let config = VerbsConfig {
+///     version: "1.0".into(),
+///     domains: HashMap::from([(
+///         "cbu".into(),
+///         DomainConfig {
+///             description: "CBU".into(),
+///             verbs: HashMap::new(),
+///             dynamic_verbs: vec![],
+///             invocation_hints: vec![],
+///         },
+///     )]),
+/// };
+///
+/// let calls = generate_seed_domain_macro_calls(&config, "cbu");
+/// assert!(calls.iter().all(|call| call.starts_with("(attribute.define")));
+/// ```
+pub fn generate_seed_domain_macro_calls(verbs_config: &VerbsConfig, domain: &str) -> Vec<String> {
+    let entity_types = infer_entity_types_from_verbs(verbs_config);
+    let mut attrs: Vec<_> = infer_attributes_from_verbs(verbs_config, &entity_types)
+        .into_iter()
+        .filter(|attr| attr.domain == domain)
+        .collect();
+    attrs.sort_by(|left, right| left.fqn.cmp(&right.fqn));
+
+    attrs.into_iter()
+        .map(|attr| {
+            format!(
+                "(attribute.define :id \"{}\" :display-name \"{}\" :category \"{}\" :value-type \"{}\" :domain \"{}\")",
+                escape_dsl_string(&attr.fqn),
+                escape_dsl_string(&attr.name),
+                inferred_category_for_fqn(&attr.fqn),
+                attr.data_type.to_pg_check_value(),
+                escape_dsl_string(domain)
+            )
+        })
+        .collect()
+}
+
 /// Suggest a security label for a snapshot based on FQN/domain/tag heuristics.
 pub fn suggest_security_label(fqn: &str, domain: &str, tags: &[String]) -> SecurityLabel {
     let fqn_lower = fqn.to_lowercase();
@@ -607,6 +657,27 @@ pub fn title_case(s: &str) -> String {
         })
         .collect::<Vec<_>>()
         .join(" ")
+}
+
+fn inferred_category_for_fqn(fqn: &str) -> &'static str {
+    let lower = fqn.to_ascii_lowercase();
+    if lower.contains("risk") {
+        "risk"
+    } else if lower.contains("ubo") {
+        "ubo"
+    } else if lower.contains("document") {
+        "document"
+    } else if lower.contains("fund") {
+        "fund"
+    } else if lower.contains("entity") {
+        "entity"
+    } else {
+        "compliance"
+    }
+}
+
+fn escape_dsl_string(value: &str) -> String {
+    value.replace('\\', "\\\\").replace('"', "\\\"")
 }
 
 /// Map a verb domain name to its primary subject kind.

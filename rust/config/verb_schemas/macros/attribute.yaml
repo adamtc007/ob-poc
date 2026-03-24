@@ -1,0 +1,51 @@
+attribute.seed-domain:
+  kind: macro
+  ui:
+    label: "Seed Attribute Domain"
+    description: "Generate governed attribute.define calls for a verb domain"
+    target-label: "Attribute"
+  routing:
+    mode-tags: [stewardship, governance]
+    operator-domain: attribute
+  target:
+    operates-on: client-ref
+    produces: null
+  args:
+    style: keyworded
+    required:
+      domain:
+        type: str
+        ui-label: "Domain"
+        description: "Verb domain to seed"
+    optional: {}
+  prereqs: []
+  expands_to:
+    - verb: attribute.list
+      args:
+        domain: "${arg.domain}"
+
+attribute.seed-derived:
+  kind: macro
+  ui:
+    label: "Seed Derived Attributes"
+    description: "Generate governed attribute.define-derived calls for a derivation domain"
+    target-label: "Attribute"
+  routing:
+    mode-tags: [stewardship, governance]
+    operator-domain: attribute
+  target:
+    operates-on: client-ref
+    produces: null
+  args:
+    style: keyworded
+    required:
+      domain:
+        type: str
+        ui-label: "Domain"
+        description: "Derivation domain to seed"
+    optional: {}
+  prereqs: []
+  expands_to:
+    - verb: attribute.list
+      args:
+        domain: "${arg.domain}"
