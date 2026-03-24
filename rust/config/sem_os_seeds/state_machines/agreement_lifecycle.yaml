@@ -1,0 +1,23 @@
+state_machine: agreement_lifecycle
+description: Agreement lifecycle for KYC service agreements
+states: [pending, draft, sent, signed, active, terminated]
+initial: pending
+transitions:
+  - from: pending
+    to: draft
+    verbs: [kyc-agreement.create, kyc-agreement.update]
+  - from: draft
+    to: sent
+    verbs: [kyc-agreement.update-status]
+  - from: sent
+    to: signed
+    verbs: [kyc-agreement.sign]
+  - from: signed
+    to: active
+    verbs: [kyc-agreement.update-status]
+  - from: active
+    to: terminated
+    verbs: [kyc-agreement.update-status]
+  - from: draft
+    to: pending
+    verbs: [kyc-agreement.update-status]

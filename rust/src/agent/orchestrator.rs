@@ -1735,9 +1735,10 @@ pub async fn legacy_handle_utterance(
             .or(Some("group.ownership"));
 
         if let (Some(group_id), Some(c_name)) = (scope_group_id, constellation_name) {
-            use crate::sage::constrained_match::resolve_constrained;
+            use crate::sage::constrained_match::resolve_constrained_hybrid;
             use crate::sage::session_context::load_entity_states_for_group;
             use crate::sage::valid_verb_set::{compute_valid_verb_set, load_constellation_by_id};
+            let scoped_searcher = (*ctx.verb_searcher).clone();
 
             if let Ok(constellation) = load_constellation_by_id(c_name) {
                 // Load entity states for this client group
@@ -1748,7 +1749,12 @@ pub async fn legacy_handle_utterance(
                 let valid_verbs = compute_valid_verb_set(&entity_states, &constellation, group_id);
 
                 if !valid_verbs.is_empty() {
-                    let constrained = resolve_constrained(utterance, &valid_verbs);
+                    let constrained =
+                        resolve_constrained_hybrid(utterance, &valid_verbs, &scoped_searcher, None)
+                            .await
+                            .unwrap_or_else(|_| {
+                                crate::sage::constrained_match::ConstrainedResult::fallthrough()
+                            });
                     if constrained.resolved() {
                         tracing::info!(
                             verb = ?constrained.verb_fqn,

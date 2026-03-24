@@ -1,0 +1,47 @@
+state_machine: entity_workstream_lifecycle
+description: Entity workstream lifecycle for KYC onboarding progression
+states:
+  [
+    open,
+    documents_requested,
+    screening_initiated,
+    screening_complete,
+    evidence_collected,
+    verified,
+    closed,
+  ]
+initial: open
+transitions:
+  - from: open
+    to: documents_requested
+    verbs: [document.solicit, document.solicit-set]
+  - from: open
+    to: screening_initiated
+    verbs: [screening.run, screening.sanctions, screening.pep, screening.adverse-media]
+  - from: documents_requested
+    to: screening_initiated
+    verbs: [screening.run, screening.sanctions, screening.pep, screening.adverse-media]
+  - from: documents_requested
+    to: evidence_collected
+    verbs: [document.verify]
+  - from: screening_initiated
+    to: screening_complete
+    verbs: [screening.complete, screening.resolve]
+  - from: screening_complete
+    to: evidence_collected
+    verbs: [document.verify]
+  - from: evidence_collected
+    to: verified
+    verbs: [entity-workstream.complete]
+  - from: verified
+    to: closed
+    verbs: [entity-workstream.complete]
+  - from: screening_complete
+    to: screening_initiated
+    verbs: [screening.run]
+  - from: evidence_collected
+    to: documents_requested
+    verbs: [document.solicit]
+  - from: verified
+    to: open
+    verbs: [entity-workstream.update-status]

@@ -1,0 +1,17 @@
+state_machine: identifier_lifecycle
+description: Identifier capture and verification lifecycle
+states: [empty, captured, verified, failed]
+initial: empty
+transitions:
+  - from: empty
+    to: captured
+    verbs: [identifier.add, identifier.search]
+  - from: failed
+    to: captured
+    verbs: [identifier.add, identifier.search]
+  - from: captured
+    to: verified
+    verbs: [identifier.verify, identifier.resolve]
+  - from: captured
+    to: failed
+    verbs: [identifier.expire]

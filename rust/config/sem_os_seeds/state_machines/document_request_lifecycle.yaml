@@ -1,0 +1,26 @@
+state_machine: document_request_lifecycle
+description: Document request lifecycle for KYC evidence collection
+states: [pending, requested, received, verified, rejected, waived]
+initial: pending
+transitions:
+  - from: pending
+    to: requested
+    verbs: [request.create]
+  - from: pending
+    to: waived
+    verbs: [request.cancel]
+  - from: requested
+    to: received
+    verbs: [request.update]
+  - from: received
+    to: verified
+    verbs: [request.complete]
+  - from: received
+    to: rejected
+    verbs: [request.escalate]
+  - from: rejected
+    to: requested
+    verbs: [request.reopen]
+  - from: waived
+    to: pending
+    verbs: [request.reopen]

@@ -1198,6 +1198,58 @@ impl HybridVerbSearcher {
         Ok(results)
     }
 
+    /// Search only semantic tiers, optionally constrained to a verb whitelist.
+    ///
+    /// This bypasses lexicon, macro, and learned exact stages and goes straight
+    /// to embedding-based retrieval. When `allowed_verbs` is provided with a
+    /// small set, the search is restricted to those verb patterns only.
+    ///
+    /// # Examples
+    /// ```ignore
+    /// let results = searcher
+    ///     .search_embeddings_only("request identity documents", 5, None, Some(&allowed_verbs))
+    ///     .await?;
+    /// assert!(results.len() <= 5);
+    /// # Ok::<(), anyhow::Error>(())
+    /// ```
+    pub async fn search_embeddings_only(
+        &self,
+        query: &str,
+        limit: usize,
+        ecir_domain: Option<&str>,
+        allowed_verbs: Option<&HashSet<String>>,
+    ) -> Result<Vec<VerbSearchResult>> {
+        if !self.has_semantic_search() {
+            return Ok(Vec::new());
+        }
+
+        let Some(embedder) = self.embedder.as_ref() else {
+            return Ok(Vec::new());
+        };
+        let Some(verb_service) = self.verb_service.as_ref() else {
+            return Ok(Vec::new());
+        };
+
+        let query_embedding = embedder.embed_query(query).await?;
+
+        if let Some(allowed) = allowed_verbs {
+            if !allowed.is_empty() && allowed.len() <= 100 {
+                let verb_fqns: Vec<String> = allowed.iter().cloned().collect();
+                return self
+                    .search_patterns_constrained(verb_service, &query_embedding, limit, &verb_fqns)
+                    .await;
+            }
+        }
+
+        self.search_global_semantic_with_embedding(
+            &query_embedding,
+            limit,
+            ecir_domain,
+            allowed_verbs,
+        )
+        .await
+    }
+
     /// Search user-specific learned phrases by exact match
     async fn search_user_learned_exact(
         &self,

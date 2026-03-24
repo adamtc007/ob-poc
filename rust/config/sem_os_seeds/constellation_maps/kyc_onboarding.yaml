@@ -36,14 +36,20 @@ slots:
         type: tollgate
         table: tollgate_evaluations
         pk: evaluation_id
-        join: { via: tollgate_evaluations, parent_fk: case_id, child_fk: evaluation_id }
+        join:
+          {
+            via: tollgate_evaluations,
+            parent_fk: case_id,
+            child_fk: evaluation_id,
+          }
         cardinality: optional
         depends_on: [{ slot: kyc_case, min_state: review }]
         verbs:
           evaluate: { verb: tollgate.evaluate, when: empty }
           evaluate_gate: { verb: tollgate.evaluate-gate, when: [empty, filled] }
           read: { verb: tollgate.read, when: filled }
-          get_decision_readiness: { verb: tollgate.get-decision-readiness, when: filled }
+          get_decision_readiness:
+            { verb: tollgate.get-decision-readiness, when: filled }
           get_metrics: { verb: tollgate.get-metrics, when: filled }
           list_evaluations: { verb: tollgate.list-evaluations, when: filled }
           list_thresholds: { verb: tollgate.list-thresholds, when: filled }
@@ -57,59 +63,172 @@ slots:
     join: { via: entity_workstreams, parent_fk: case_id, child_fk: entity_id }
     cardinality: optional
     depends_on: [kyc_case]
+    state_machine: entity_workstream_lifecycle
     overlays: [red_flags, evidence]
     verbs:
       create: { verb: entity-workstream.create, when: empty }
-      read: { verb: entity-workstream.read, when: filled }
-      list_by_case: { verb: entity-workstream.list-by-case, when: filled }
-      state: { verb: entity-workstream.state, when: filled }
-      update: { verb: entity-workstream.update-status, when: filled }
-      set_enhanced_dd: { verb: entity-workstream.set-enhanced-dd, when: filled }
-      set_ubo: { verb: entity-workstream.set-ubo, when: filled }
-      complete: { verb: entity-workstream.complete, when: filled }
-      block: { verb: entity-workstream.block, when: filled }
+      read: entity-workstream.read
+      list_by_case: entity-workstream.list-by-case
+      state: entity-workstream.state
+      update:
+        {
+          verb: entity-workstream.update-status,
+          when:
+            [
+              open,
+              documents_requested,
+              screening_initiated,
+              screening_complete,
+              evidence_collected,
+              verified,
+            ],
+        }
+      set_enhanced_dd:
+        {
+          verb: entity-workstream.set-enhanced-dd,
+          when:
+            [
+              open,
+              documents_requested,
+              screening_initiated,
+              screening_complete,
+            ],
+        }
+      set_ubo:
+        { verb: entity-workstream.set-ubo, when: [open, documents_requested] }
+      complete:
+        {
+          verb: entity-workstream.complete,
+          when: [evidence_collected, verified],
+        }
+      block:
+        {
+          verb: entity-workstream.block,
+          when:
+            [
+              open,
+              documents_requested,
+              screening_initiated,
+              screening_complete,
+              evidence_collected,
+            ],
+        }
       # Red flag state verbs — flags are a state of the entity, not a separate entity
-      flag_raise: { verb: red-flag.raise, when: [empty, filled] }
-      flag_read: { verb: red-flag.read, when: filled }
-      flag_list: { verb: red-flag.list, when: filled }
-      flag_resolve: { verb: red-flag.resolve, when: filled }
-      flag_escalate: { verb: red-flag.escalate, when: filled }
-      flag_update: { verb: red-flag.update, when: filled }
-      flag_list_severity: { verb: red-flag.list-by-severity, when: filled }
-      flag_close: { verb: red-flag.close, when: filled }
+      flag_raise:
+        {
+          verb: red-flag.raise,
+          when:
+            [
+              open,
+              documents_requested,
+              screening_initiated,
+              screening_complete,
+              evidence_collected,
+            ],
+        }
+      flag_read: red-flag.read
+      flag_list: red-flag.list
+      flag_resolve:
+        {
+          verb: red-flag.resolve,
+          when: [screening_complete, evidence_collected, verified],
+        }
+      flag_escalate:
+        {
+          verb: red-flag.escalate,
+          when: [screening_initiated, screening_complete, evidence_collected],
+        }
+      flag_update:
+        {
+          verb: red-flag.update,
+          when:
+            [
+              open,
+              documents_requested,
+              screening_initiated,
+              screening_complete,
+              evidence_collected,
+            ],
+        }
+      flag_list_severity: red-flag.list-by-severity
+      flag_close:
+        {
+          verb: red-flag.close,
+          when: [screening_complete, evidence_collected, verified],
+        }
       # Evidence/document state verbs — documents are evidence FOR the entity,
       # not positioned entities. The requirement dictionary defines what's needed,
       # the state machine tracks each requirement instance.
-      req_create: { verb: requirement.create, when: [empty, filled] }
-      req_create_set: { verb: requirement.create-set, when: [empty, filled] }
-      req_check: { verb: requirement.check, when: filled }
-      req_list: { verb: requirement.list, when: filled }
-      req_for_entity: { verb: requirement.for-entity, when: filled }
-      req_unsatisfied: { verb: requirement.unsatisfied, when: filled }
-      req_waive: { verb: requirement.waive, when: filled }
-      req_reinstate: { verb: requirement.reinstate, when: filled }
-      doc_solicit: { verb: document.solicit, when: [empty, filled] }
-      doc_solicit_set: { verb: document.solicit-set, when: [empty, filled] }
-      doc_upload: { verb: document.upload, when: filled }
-      doc_verify: { verb: document.verify, when: filled }
-      doc_reject: { verb: document.reject, when: filled }
-      doc_read: { verb: document.read, when: filled }
-      doc_list: { verb: document.list, when: filled }
-      doc_compute_reqs: { verb: document.compute-requirements, when: filled }
-      doc_missing: { verb: document.missing-for-entity, when: filled }
+      req_create:
+        { verb: requirement.create, when: [open, documents_requested] }
+      req_create_set:
+        { verb: requirement.create-set, when: [open, documents_requested] }
+      req_check:
+        {
+          verb: requirement.check,
+          when: [documents_requested, evidence_collected, verified],
+        }
+      req_list: requirement.list
+      req_for_entity: requirement.for-entity
+      req_unsatisfied:
+        {
+          verb: requirement.unsatisfied,
+          when: [documents_requested, screening_complete, evidence_collected],
+        }
+      req_waive: { verb: requirement.waive, when: [documents_requested] }
+      req_reinstate:
+        { verb: requirement.reinstate, when: [evidence_collected, verified] }
+      doc_solicit:
+        {
+          verb: document.solicit,
+          when: [open, documents_requested, evidence_collected],
+        }
+      doc_solicit_set:
+        { verb: document.solicit-set, when: [open, documents_requested] }
+      doc_upload: { verb: document.upload, when: [documents_requested] }
+      doc_verify:
+        {
+          verb: document.verify,
+          when: [documents_requested, screening_complete, evidence_collected],
+        }
+      doc_reject:
+        {
+          verb: document.reject,
+          when: [documents_requested, screening_complete],
+        }
+      doc_read: document.read
+      doc_list: document.list
+      doc_compute_reqs:
+        {
+          verb: document.compute-requirements,
+          when: [open, documents_requested, evidence_collected],
+        }
+      doc_missing:
+        {
+          verb: document.missing-for-entity,
+          when: [documents_requested, screening_complete, evidence_collected],
+        }
   screening:
     type: entity
     entity_kinds: [person, company]
-    join: { via: screenings, parent_fk: workstream_id, child_fk: screening_id, filter_column: screening_type }
+    join:
+      {
+        via: screenings,
+        parent_fk: workstream_id,
+        child_fk: screening_id,
+        filter_column: screening_type,
+      }
     cardinality: optional
     depends_on: [entity_workstream]
     state_machine: screening_lifecycle
     overlays: [screening_result]
     verbs:
-      run: { verb: screening.run, when: empty }
-      sanctions: { verb: screening.sanctions, when: [empty, filled] }
-      pep: { verb: screening.pep, when: [empty, filled] }
-      adverse_media: { verb: screening.adverse-media, when: [empty, filled] }
+      run: { verb: screening.run, when: [empty, not_started] }
+      sanctions:
+        { verb: screening.sanctions, when: [empty, not_started, filled] }
+      pep: { verb: screening.pep, when: [empty, not_started, filled] }
+      adverse_media:
+        { verb: screening.adverse-media, when: [empty, not_started, filled] }
       bulk_refresh: { verb: screening.bulk-refresh, when: filled }
       read: { verb: screening.read, when: filled }
       list: { verb: screening.list, when: filled }
@@ -128,47 +247,56 @@ slots:
     join: { via: kyc_agreements, parent_fk: case_id, child_fk: agreement_id }
     cardinality: optional
     depends_on: [kyc_case]
+    state_machine: agreement_lifecycle
     verbs:
-      create: { verb: kyc-agreement.create, when: empty }
-      read: { verb: kyc-agreement.read, when: filled }
-      list: { verb: kyc-agreement.list, when: filled }
-      update: { verb: kyc-agreement.update, when: filled }
-      update_status: { verb: kyc-agreement.update-status, when: filled }
-      sign: { verb: kyc-agreement.sign, when: filled }
+      create: { verb: kyc-agreement.create, when: [empty, pending] }
+      read: kyc-agreement.read
+      list: kyc-agreement.list
+      update:
+        { verb: kyc-agreement.update, when: [draft, sent, signed, active] }
+      update_status:
+        {
+          verb: kyc-agreement.update-status,
+          when: [draft, sent, signed, active],
+        }
+      sign: { verb: kyc-agreement.sign, when: [sent, signed] }
   identifier:
     type: entity
     entity_kinds: [entity]
-    join: { via: entity_identifiers, parent_fk: entity_id, child_fk: identifier_id }
+    join:
+      { via: entity_identifiers, parent_fk: entity_id, child_fk: identifier_id }
     cardinality: optional
     depends_on: [entity_workstream]
+    state_machine: identifier_lifecycle
     verbs:
-      add: { verb: identifier.add, when: [empty, filled] }
-      read: { verb: identifier.read, when: filled }
-      list: { verb: identifier.list, when: filled }
-      verify: { verb: identifier.verify, when: filled }
-      expire: { verb: identifier.expire, when: filled }
-      update: { verb: identifier.update, when: filled }
-      search: { verb: identifier.search, when: [empty, filled] }
-      resolve: { verb: identifier.resolve, when: filled }
-      list_by_type: { verb: identifier.list-by-type, when: filled }
-      set_primary: { verb: identifier.set-primary, when: filled }
-      remove: { verb: identifier.remove, when: filled }
+      add: { verb: identifier.add, when: [empty, failed] }
+      read: identifier.read
+      list: identifier.list
+      verify: { verb: identifier.verify, when: [captured] }
+      expire: { verb: identifier.expire, when: [captured, verified] }
+      update: { verb: identifier.update, when: [captured, verified] }
+      search: { verb: identifier.search, when: [empty, failed, captured] }
+      resolve: { verb: identifier.resolve, when: [captured, verified] }
+      list_by_type: identifier.list-by-type
+      set_primary: { verb: identifier.set-primary, when: [verified] }
+      remove: { verb: identifier.remove, when: [captured, verified, failed] }
   request:
     type: entity
     entity_kinds: [entity]
     join: { via: kyc_requests, parent_fk: case_id, child_fk: request_id }
     cardinality: optional
     depends_on: [kyc_case]
+    state_machine: document_request_lifecycle
     verbs:
-      create: { verb: request.create, when: empty }
-      read: { verb: request.read, when: filled }
-      list: { verb: request.list, when: [empty, filled] }
-      update: { verb: request.update, when: filled }
-      complete: { verb: request.complete, when: filled }
-      cancel: { verb: request.cancel, when: filled }
-      assign: { verb: request.assign, when: filled }
-      reopen: { verb: request.reopen, when: filled }
-      escalate: { verb: request.escalate, when: filled }
+      create: { verb: request.create, when: [empty, pending, rejected] }
+      read: request.read
+      list: request.list
+      update: { verb: request.update, when: [requested, received] }
+      complete: { verb: request.complete, when: [received] }
+      cancel: { verb: request.cancel, when: [pending, requested] }
+      assign: { verb: request.assign, when: [pending, requested, received] }
+      reopen: { verb: request.reopen, when: [rejected, waived, verified] }
+      escalate: { verb: request.escalate, when: [requested, received] }
   # red_flag is a STATE of an entity workstream (like "screened" or
   # "document requested"), not a separate positioned entity.
   # Red flag verbs are on the entity_workstream slot above.

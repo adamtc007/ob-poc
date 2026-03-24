@@ -39,6 +39,7 @@ domains:
           - solicit document
           - ask for passport
           - request proof of address
+          - request proof of identity
           - get document from entity
           - ask the client for this document
           - request the missing document from this entity
@@ -54,6 +55,11 @@ domains:
           - send out a request for this document
           - request identity documents
           - request identity documents for due diligence
+          - request documents for due diligence
+          - ask for identity documents
+          - request KYC documents
+          - request CDD documents
+          - solicit identity documents
           - ask for the identity documents
           - solicit the KYC documents from this entity
           - request the CDD documents
@@ -144,8 +150,11 @@ domains:
           - ask for passport and proof of address
           - get KYC documents
           - request identity documents
+          - send out the full document request pack
           - send out the whole doc pack for this entity
           - request the full CDD document pack
+          - request all outstanding documents
+          - solicit the complete document set
           - solicit all required documents from entity
           - send out the KYC document pack
           - request the full set of KYC documents

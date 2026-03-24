@@ -1,6 +1,8 @@
 //! Sage session context — tracks which client group, constellation, and entity
 //! are in focus for the SemOS-scoped verb resolution pipeline.
 
+use std::collections::HashMap;
+
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use sqlx::PgPool;
@@ -96,6 +98,19 @@ pub struct EntityState {
     pub slot_name: Option<String>,
 }
 
+#[cfg(feature = "database")]
+type WorkstreamRow = (
+    Uuid,
+    String,
+    String,
+    Option<String>,
+    bool,
+    bool,
+    bool,
+    bool,
+    bool,
+);
+
 // ---------------------------------------------------------------------------
 // Database operations
 // ---------------------------------------------------------------------------
@@ -188,8 +203,10 @@ pub async fn list_active_client_groups(pool: &PgPool) -> Result<Vec<(Uuid, Strin
 
 /// Load entity states for all entities belonging to a client group.
 ///
-/// Queries CBUs linked via `client_group_entity` and returns their current
-/// status as FSM states. Also queries KYC cases linked through those CBUs.
+/// Queries the current client-group scope and projects it into the SemOS
+/// constellation slots used by constrained matching. This includes CBUs,
+/// KYC cases, entity workstreams, screening, requests, identifiers,
+/// service agreements, and tollgate evaluations.
 #[cfg(feature = "database")]
 pub async fn load_entity_states_for_group(
     pool: &PgPool,
@@ -200,7 +217,7 @@ pub async fn load_entity_states_for_group(
     // CBUs linked to this client group
     let cbu_rows = sqlx::query_as::<_, (Uuid, String)>(
         r#"
-        SELECT c.cbu_id, COALESCE(c.status, 'DISCOVERED')
+        SELECT DISTINCT c.cbu_id, COALESCE(c.status, 'DISCOVERED')
         FROM "ob-poc".cbus c
         JOIN "ob-poc".client_group_entity cge ON cge.cbu_id = c.cbu_id
         WHERE cge.group_id = $1
@@ -228,7 +245,6 @@ pub async fn load_entity_states_for_group(
             SELECT case_id, COALESCE(status, 'INTAKE')
             FROM "ob-poc".cases
             WHERE cbu_id = ANY($1)
-              AND deleted_at IS NULL
             "#,
         )
         .bind(&cbu_ids)
@@ -246,7 +262,366 @@ pub async fn load_entity_states_for_group(
         }
     }
 
+    let case_ids: Vec<Uuid> = states
+        .iter()
+        .filter(|state| state.slot_name.as_deref() == Some("kyc_case"))
+        .map(|state| state.entity_id)
+        .collect();
+
+    if !case_ids.is_empty() {
+        let workstream_rows = sqlx::query_as::<_, WorkstreamRow>(
+            r#"
+            SELECT
+                w.workstream_id,
+                COALESCE(et.type_code, 'entity'),
+                COALESCE(w.status, 'PENDING'),
+                w.blocker_type,
+                COALESCE(w.identity_verified, false),
+                COALESCE(w.ownership_proved, false),
+                COALESCE(w.screening_cleared, false),
+                COALESCE(w.evidence_complete, false),
+                w.risk_rating IS NOT NULL
+            FROM "ob-poc".entity_workstreams w
+            JOIN "ob-poc".entities e ON e.entity_id = w.entity_id
+            JOIN "ob-poc".entity_types et ON et.entity_type_id = e.entity_type_id
+            WHERE w.case_id = ANY($1)
+            "#,
+        )
+        .bind(&case_ids)
+        .fetch_all(pool)
+        .await
+        .unwrap_or_default();
+
+        if let Some((workstream_id, entity_type, current_state)) =
+            aggregate_workstream_state(&workstream_rows)
+        {
+            states.push(EntityState {
+                entity_id: workstream_id,
+                entity_type,
+                current_state,
+                slot_name: Some("entity_workstream".to_string()),
+            });
+        }
+
+        let workstream_ids: Vec<Uuid> = workstream_rows.iter().map(|row| row.0).collect();
+        let entity_ids: Vec<Uuid> = sqlx::query_scalar(
+            r#"
+            SELECT DISTINCT entity_id
+            FROM "ob-poc".entity_workstreams
+            WHERE case_id = ANY($1)
+            "#,
+        )
+        .bind(&case_ids)
+        .fetch_all(pool)
+        .await
+        .unwrap_or_default();
+
+        if !workstream_ids.is_empty() {
+            let screening_rows = sqlx::query_as::<_, (Uuid, String, String)>(
+                r#"
+                SELECT screening_id, screening_type, COALESCE(status, 'PENDING')
+                FROM "ob-poc".screenings
+                WHERE workstream_id = ANY($1)
+                "#,
+            )
+            .bind(&workstream_ids)
+            .fetch_all(pool)
+            .await
+            .unwrap_or_default();
+
+            if let Some((screening_id, screening_state)) =
+                aggregate_screening_state(&workstream_ids, &screening_rows)
+            {
+                states.push(EntityState {
+                    entity_id: screening_id,
+                    entity_type: "entity".to_string(),
+                    current_state: screening_state,
+                    slot_name: Some("screening".to_string()),
+                });
+            }
+        }
+
+        if !entity_ids.is_empty() {
+            if let Some((identifier_id, is_validated, identifier_type)) =
+                sqlx::query_as::<_, (Uuid, bool, String)>(
+                    r#"
+                SELECT identifier_id, COALESCE(is_validated, false), COALESCE(identifier_type, '')
+                FROM "ob-poc".entity_identifiers
+                WHERE entity_id = ANY($1)
+                ORDER BY created_at DESC
+                LIMIT 1
+                "#,
+                )
+                .bind(&entity_ids)
+                .fetch_optional(pool)
+                .await
+                .unwrap_or(None)
+            {
+                states.push(EntityState {
+                    entity_id: identifier_id,
+                    entity_type: "entity".to_string(),
+                    current_state: identifier_state(is_validated, &identifier_type),
+                    slot_name: Some("identifier".to_string()),
+                });
+            }
+        }
+
+        if let Some((request_id, request_status)) = sqlx::query_as::<_, (Uuid, String)>(
+            r#"
+            SELECT request_id, COALESCE(status, 'PENDING')
+            FROM "ob-poc".outstanding_requests
+            WHERE case_id = ANY($1)
+            ORDER BY requested_at DESC NULLS LAST, created_at DESC
+            LIMIT 1
+            "#,
+        )
+        .bind(&case_ids)
+        .fetch_optional(pool)
+        .await
+        .unwrap_or(None)
+        {
+            states.push(EntityState {
+                entity_id: request_id,
+                entity_type: "entity".to_string(),
+                current_state: request_state(&request_status),
+                slot_name: Some("request".to_string()),
+            });
+        }
+
+        let agreement_rows = sqlx::query_as::<_, (Uuid, String)>(
+            r#"
+            SELECT a.agreement_id, COALESCE(a.status, 'ACTIVE')
+            FROM "ob-poc".kyc_service_agreements a
+            JOIN "ob-poc".cases c ON c.service_agreement_id = a.agreement_id
+            WHERE c.case_id = ANY($1)
+            "#,
+        )
+        .bind(&case_ids)
+        .fetch_all(pool)
+        .await
+        .unwrap_or_default();
+
+        if let Some((agreement_id, agreement_status)) = agreement_rows.into_iter().next() {
+            states.push(EntityState {
+                entity_id: agreement_id,
+                entity_type: "company".to_string(),
+                current_state: agreement_state(&agreement_status),
+                slot_name: Some("kyc_agreement".to_string()),
+            });
+        }
+
+        if let Some(tollgate_id) = sqlx::query_scalar(
+            r#"
+            SELECT evaluation_id
+            FROM "ob-poc".tollgate_evaluations
+            WHERE case_id = ANY($1)
+            ORDER BY evaluated_at DESC
+            LIMIT 1
+            "#,
+        )
+        .bind(&case_ids)
+        .fetch_optional(pool)
+        .await
+        .unwrap_or(None)
+        {
+            states.push(EntityState {
+                entity_id: tollgate_id,
+                entity_type: "tollgate".to_string(),
+                current_state: "filled".to_string(),
+                slot_name: Some("tollgate".to_string()),
+            });
+        }
+    }
+
     Ok(states)
+}
+
+#[cfg(feature = "database")]
+fn aggregate_workstream_state(rows: &[WorkstreamRow]) -> Option<(Uuid, String, String)> {
+    rows.iter()
+        .map(
+            |(
+                workstream_id,
+                entity_type,
+                status,
+                blocker_type,
+                identity_verified,
+                ownership_proved,
+                screening_cleared,
+                evidence_complete,
+                has_risk_rating,
+            )| {
+                let normalized_entity_type = normalize_entity_type(entity_type);
+                let normalized_state = if status.eq_ignore_ascii_case("COMPLETE")
+                    && (*has_risk_rating || *identity_verified || *ownership_proved)
+                {
+                    "verified"
+                } else if blocker_type
+                    .as_deref()
+                    .is_some_and(|value: &str| value.eq_ignore_ascii_case("AWAITING_DOCUMENT"))
+                    || status.eq_ignore_ascii_case("COLLECT")
+                {
+                    "documents_requested"
+                } else if status.eq_ignore_ascii_case("SCREEN") {
+                    "screening_initiated"
+                } else if *evidence_complete {
+                    "evidence_collected"
+                } else if *screening_cleared {
+                    "screening_complete"
+                } else {
+                    "open"
+                };
+                (
+                    *workstream_id,
+                    normalized_entity_type,
+                    normalized_state.to_string(),
+                )
+            },
+        )
+        .min_by_key(|(_, _, state)| entity_workstream_state_rank(state))
+}
+
+#[cfg(feature = "database")]
+fn aggregate_screening_state(
+    workstream_ids: &[Uuid],
+    rows: &[(Uuid, String, String)],
+) -> Option<(Uuid, String)> {
+    if rows.is_empty() {
+        return workstream_ids
+            .first()
+            .copied()
+            .map(|workstream_id| (workstream_id, "not_started".to_string()));
+    }
+
+    let first_id = rows[0].0;
+    let mut per_type: HashMap<&str, &str> = HashMap::new();
+    for (_, screening_type, status) in rows {
+        per_type.insert(screening_type.as_str(), status.as_str());
+    }
+
+    if screening_all_clear(&per_type) {
+        return Some((first_id, "all_clear".to_string()));
+    }
+
+    if let Some(state) = screening_type_state("SANCTIONS", &per_type, "sanctions") {
+        return Some((first_id, state));
+    }
+    if let Some(state) = screening_type_state("PEP", &per_type, "pep") {
+        return Some((first_id, state));
+    }
+    if let Some(state) = screening_type_state("ADVERSE_MEDIA", &per_type, "media") {
+        return Some((first_id, state));
+    }
+
+    Some((first_id, "not_started".to_string()))
+}
+
+#[cfg(feature = "database")]
+fn screening_all_clear(per_type: &HashMap<&str, &str>) -> bool {
+    ["SANCTIONS", "PEP", "ADVERSE_MEDIA"].iter().all(|key| {
+        per_type
+            .get(key)
+            .is_some_and(|status| status.eq_ignore_ascii_case("CLEAR"))
+    })
+}
+
+#[cfg(feature = "database")]
+fn screening_type_state(
+    screening_type: &'static str,
+    per_type: &HashMap<&str, &str>,
+    prefix: &str,
+) -> Option<String> {
+    let status = per_type.get(screening_type)?;
+    let suffix = if status.eq_ignore_ascii_case("PENDING") || status.eq_ignore_ascii_case("RUNNING")
+    {
+        "pending"
+    } else if status.eq_ignore_ascii_case("CLEAR") {
+        "clear"
+    } else if status.eq_ignore_ascii_case("HIT_PENDING_REVIEW")
+        || status.eq_ignore_ascii_case("HIT_CONFIRMED")
+    {
+        "hit"
+    } else if status.eq_ignore_ascii_case("HIT_DISMISSED") {
+        "clear"
+    } else {
+        return None;
+    };
+    Some(format!("{prefix}_{suffix}"))
+}
+
+#[cfg(feature = "database")]
+fn entity_workstream_state_rank(state: &str) -> usize {
+    match state {
+        "open" => 0,
+        "documents_requested" => 1,
+        "screening_initiated" => 2,
+        "screening_complete" => 3,
+        "evidence_collected" => 4,
+        "verified" => 5,
+        "closed" => 6,
+        _ => usize::MAX,
+    }
+}
+
+#[cfg(feature = "database")]
+fn normalize_entity_type(entity_type: &str) -> String {
+    let upper = entity_type.to_ascii_uppercase();
+    if upper.contains("PERSON") || upper.contains("INDIVIDUAL") || upper.contains("NATURAL") {
+        "person".to_string()
+    } else if upper.contains("COMPANY")
+        || upper.contains("LEGAL")
+        || upper.contains("CORPORATE")
+        || upper.contains("FUND")
+    {
+        "company".to_string()
+    } else {
+        "entity".to_string()
+    }
+}
+
+#[cfg(feature = "database")]
+fn identifier_state(is_validated: bool, identifier_type: &str) -> String {
+    if is_validated {
+        "verified".to_string()
+    } else if identifier_type.is_empty() {
+        "empty".to_string()
+    } else {
+        "captured".to_string()
+    }
+}
+
+#[cfg(feature = "database")]
+fn request_state(status: &str) -> String {
+    if status.eq_ignore_ascii_case("PENDING") {
+        "requested".to_string()
+    } else if status.eq_ignore_ascii_case("FULFILLED") {
+        "verified".to_string()
+    } else if status.eq_ignore_ascii_case("CANCELLED") || status.eq_ignore_ascii_case("EXPIRED") {
+        "rejected".to_string()
+    } else if status.eq_ignore_ascii_case("WAIVED") {
+        "waived".to_string()
+    } else if status.eq_ignore_ascii_case("PARTIAL") {
+        "received".to_string()
+    } else {
+        "pending".to_string()
+    }
+}
+
+#[cfg(feature = "database")]
+fn agreement_state(status: &str) -> String {
+    if status.eq_ignore_ascii_case("DRAFT") {
+        "draft".to_string()
+    } else if status.eq_ignore_ascii_case("SENT") {
+        "sent".to_string()
+    } else if status.eq_ignore_ascii_case("SIGNED") {
+        "signed".to_string()
+    } else if status.eq_ignore_ascii_case("ACTIVE") {
+        "active".to_string()
+    } else if status.eq_ignore_ascii_case("TERMINATED") {
+        "terminated".to_string()
+    } else {
+        "pending".to_string()
+    }
 }
 
 /// Try to extract a client group from the utterance by name matching.
