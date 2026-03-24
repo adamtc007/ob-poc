@@ -12,6 +12,7 @@ use crate::sem_reg::verb_contract::{
     VerbReturnSpec,
 };
 use crate::sem_reg::view_def::ViewColumn;
+use crate::sem_reg::EvidenceGrade;
 
 // ── Step 2: Default attributes ──────────────────────────────────────────────
 
@@ -63,6 +64,7 @@ fn attribute_from_fqn(fqn: &str, domain: &str, required: bool) -> AttributeDefBo
         description: format!("Attribute {fqn}"),
         domain: domain.to_string(),
         data_type: AttributeDataType::String,
+        evidence_grade: EvidenceGrade::None,
         source: None,
         constraints: if required {
             Some(crate::sem_reg::attribute_def::AttributeConstraints {

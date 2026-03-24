@@ -18,6 +18,7 @@ use crate::sem_reg::relationship_type_def::{RelationshipCardinality, Relationshi
 use crate::sem_reg::store::SnapshotStore;
 use crate::sem_reg::types::{ObjectType, SnapshotMeta};
 use crate::sem_reg::verb_contract::VerbContractBody;
+use crate::sem_reg::EvidenceGrade;
 
 use super::entity_infer::{
     EdgeClass, EntityTypeCandidate, InferredCardinality, RelationshipCandidate,
@@ -186,6 +187,7 @@ async fn seed_attribute_def(pool: &PgPool, candidate: &AttributeCandidate) -> Re
         ),
         domain: infer_domain(&candidate.schema),
         data_type: sql_type_to_attribute_data_type(&candidate.sql_type),
+        evidence_grade: EvidenceGrade::None,
         source: Some(AttributeSource {
             producing_verb,
             schema: Some(candidate.schema.clone()),
@@ -407,19 +409,16 @@ fn sql_type_to_attribute_data_type(sql_type: &str) -> AttributeDataType {
         AttributeDataType::Uuid
     } else if lower.contains("int") || lower == "serial" || lower == "bigserial" {
         AttributeDataType::Integer
-    } else if lower.contains("numeric")
-        || lower.contains("decimal")
-        || lower.contains("real")
-        || lower.contains("double")
-        || lower.contains("float")
-    {
+    } else if lower.contains("numeric") || lower.contains("decimal") {
         AttributeDataType::Decimal
+    } else if lower.contains("real") || lower.contains("double") || lower.contains("float") {
+        AttributeDataType::Number
     } else if lower.contains("bool") {
         AttributeDataType::Boolean
     } else if lower == "date" {
         AttributeDataType::Date
     } else if lower.contains("timestamp") {
-        AttributeDataType::Timestamp
+        AttributeDataType::DateTime
     } else if lower.contains("json") {
         AttributeDataType::Json
     } else {
@@ -489,6 +488,10 @@ mod tests {
             AttributeDataType::Decimal
         ));
         assert!(matches!(
+            sql_type_to_attribute_data_type("double precision"),
+            AttributeDataType::Number
+        ));
+        assert!(matches!(
             sql_type_to_attribute_data_type("boolean"),
             AttributeDataType::Boolean
         ));
@@ -498,7 +501,7 @@ mod tests {
         ));
         assert!(matches!(
             sql_type_to_attribute_data_type("timestamp with time zone"),
-            AttributeDataType::Timestamp
+            AttributeDataType::DateTime
         ));
         assert!(matches!(
             sql_type_to_attribute_data_type("jsonb"),

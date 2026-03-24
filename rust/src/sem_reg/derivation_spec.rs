@@ -7,6 +7,7 @@
 //! MVP: Only `FunctionRef` expressions — Rust function dispatch via the
 //! `DerivationFunctionRegistry`. AST-based expressions can be added later.
 
+use sem_os_core::types::EvidenceGrade;
 use serde::{Deserialize, Serialize};
 
 /// Body type for `ObjectType::DerivationSpec`.
@@ -95,17 +96,6 @@ pub enum SecurityInheritanceMode {
     Strict,
     /// Allow declared override with steward approval.
     DeclaredOverride,
-}
-
-/// Whether a derivation may be used as regulatory evidence.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum EvidenceGrade {
-    /// This derivation MUST NOT be used as evidence (default for operational).
-    #[default]
-    Prohibited,
-    /// May be used as evidence with constraints (governed tier only).
-    AllowedWithConstraints,
 }
 
 /// Freshness constraint on input data.

@@ -10,6 +10,7 @@ use sem_os_core::{
     attribute_def::{AttributeConstraints, AttributeDataType, AttributeDefBody},
     entity_type_def::EntityTypeDefBody,
     membership::{MembershipKind, MembershipRuleBody},
+    types::EvidenceGrade,
     verb_contract::{
         VerbArgDef, VerbContractBody, VerbContractMetadata, VerbPrecondition, VerbProducesSpec,
         VerbReturnSpec,
@@ -62,6 +63,7 @@ fn attribute_from_fqn(fqn: &str, domain: &str, required: bool) -> AttributeDefBo
         description: format!("Attribute {fqn}"),
         domain: domain.to_string(),
         data_type: AttributeDataType::String,
+        evidence_grade: EvidenceGrade::None,
         source: None,
         constraints: if required {
             Some(AttributeConstraints {

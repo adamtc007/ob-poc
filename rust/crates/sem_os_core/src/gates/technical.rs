@@ -493,6 +493,7 @@ mod tests {
     #[test]
     fn test_dependency_correctness_catches_cycle() {
         use crate::derivation_spec::*;
+        use crate::types::EvidenceGrade;
 
         let specs = vec![
             DerivationSpecBody {

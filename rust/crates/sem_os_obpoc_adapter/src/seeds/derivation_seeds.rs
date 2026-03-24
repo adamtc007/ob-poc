@@ -4,9 +4,10 @@
 //! remains in `ob-poc/src/sem_reg/seeds/derivation_seeds.rs`.
 
 use sem_os_core::derivation_spec::{
-    DerivationExpression, DerivationInput, DerivationSpecBody, DerivationTestCase, EvidenceGrade,
-    FreshnessRule, NullSemantics, SecurityInheritanceMode,
+    DerivationExpression, DerivationInput, DerivationSpecBody, DerivationTestCase, FreshnessRule,
+    NullSemantics, SecurityInheritanceMode,
 };
+use sem_os_core::types::EvidenceGrade;
 
 /// Core derivation specs to bootstrap.
 pub fn core_derivation_specs() -> Vec<DerivationSpecBody> {

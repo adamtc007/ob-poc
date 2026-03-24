@@ -502,6 +502,7 @@ mod tests {
     #[test]
     fn test_dependency_correctness_catches_cycle() {
         use crate::sem_reg::derivation_spec::*;
+        use sem_os_core::types::EvidenceGrade;
 
         let specs = vec![
             DerivationSpecBody {

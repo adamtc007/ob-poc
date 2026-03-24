@@ -582,6 +582,7 @@ mod tests {
             description: "ISO jurisdiction".into(),
             domain: "cbu".into(),
             data_type: crate::attribute_def::AttributeDataType::String,
+            evidence_grade: crate::types::EvidenceGrade::None,
             source: Some(crate::attribute_def::AttributeSource {
                 producing_verb: Some("cbu.create".into()),
                 schema: Some("ob-poc".into()),
@@ -855,6 +856,7 @@ mod tests {
             description: "CBU name".into(),
             domain: "cbu".into(),
             data_type: crate::attribute_def::AttributeDataType::String,
+            evidence_grade: crate::types::EvidenceGrade::None,
             source: Some(crate::attribute_def::AttributeSource {
                 producing_verb: Some("cbu.create".into()),
                 schema: Some("ob-poc".into()),

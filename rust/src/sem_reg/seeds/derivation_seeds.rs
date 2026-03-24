@@ -14,12 +14,13 @@ use uuid::Uuid;
 use crate::sem_reg::{
     derivation_spec::{
         DerivationExpression, DerivationInput, DerivationSpecBody, DerivationTestCase,
-        EvidenceGrade, FreshnessRule, NullSemantics, SecurityInheritanceMode,
+        FreshnessRule, NullSemantics, SecurityInheritanceMode,
     },
     ids::{definition_hash, object_id_for},
     store::SnapshotStore,
     types::{ChangeType, ObjectType, SnapshotMeta},
 };
+use sem_os_core::types::EvidenceGrade;
 
 /// Report from derivation spec seeding.
 #[derive(Debug, Default)]

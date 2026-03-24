@@ -15,7 +15,7 @@ use dsl_core::config::types::{
 use sem_os_core::{
     attribute_def::{AttributeDataType, AttributeDefBody, AttributeSource},
     entity_type_def::{DbTableMapping, EntityTypeDefBody},
-    types::{Classification, HandlingControl, SecurityLabel},
+    types::{Classification, EvidenceGrade, HandlingControl, SecurityLabel},
     verb_contract::{
         ActionClass, HarmClass, VerbArgDef, VerbArgLookup, VerbContractBody, VerbContractMetadata,
         VerbCrudMapping, VerbPrecondition, VerbProducesSpec, VerbReturnSpec,
@@ -438,6 +438,7 @@ pub fn infer_attributes_from_verbs(
                     }),
                     domain: domain.clone(),
                     data_type: arg_type_to_attribute_type(arg),
+                    evidence_grade: EvidenceGrade::None,
                     source: Some(AttributeSource {
                         producing_verb: Some(format!("{}.{}", domain, action)),
                         schema,
@@ -841,11 +842,18 @@ pub fn arg_type_to_attribute_type(arg: &ArgConfig) -> AttributeDataType {
     match to_wire_str(&arg.arg_type).as_str() {
         "string" => AttributeDataType::String,
         "integer" | "int" => AttributeDataType::Integer,
-        "decimal" | "number" | "float" => AttributeDataType::Decimal,
+        "decimal" => AttributeDataType::Decimal,
+        "number" | "float" => AttributeDataType::Number,
         "boolean" | "bool" => AttributeDataType::Boolean,
         "uuid" => AttributeDataType::Uuid,
         "date" => AttributeDataType::Date,
-        "timestamp" => AttributeDataType::Timestamp,
+        "timestamp" | "datetime" => AttributeDataType::DateTime,
+        "email" => AttributeDataType::Email,
+        "phone" => AttributeDataType::Phone,
+        "address" => AttributeDataType::Address,
+        "currency" => AttributeDataType::Currency,
+        "percentage" | "percent" => AttributeDataType::Percentage,
+        "tax_id" | "taxid" => AttributeDataType::TaxId,
         _ => {
             if let Some(ref valid_values) = arg.valid_values {
                 AttributeDataType::Enum(valid_values.clone())

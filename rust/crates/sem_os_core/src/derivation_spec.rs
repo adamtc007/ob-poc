@@ -2,6 +2,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::types::EvidenceGrade;
+
 fn default_true() -> bool {
     true
 }
@@ -61,15 +63,6 @@ pub enum SecurityInheritanceMode {
     #[default]
     Strict,
     DeclaredOverride,
-}
-
-/// Whether derived attributes can be used as evidence.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum EvidenceGrade {
-    #[default]
-    Prohibited,
-    AllowedWithConstraints,
 }
 
 /// Freshness constraint on input data.

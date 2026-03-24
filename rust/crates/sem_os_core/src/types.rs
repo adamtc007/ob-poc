@@ -129,6 +129,35 @@ pub enum HandlingControl {
     NoLlmExternal,
 }
 
+/// Whether a derived or governed attribute may be used as evidence.
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    Default,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    Display,
+    EnumString,
+    AsRefStr,
+)]
+#[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
+pub enum EvidenceGrade {
+    /// No evidence-bearing semantics are asserted for this object.
+    None,
+    /// This object must not be treated as evidence.
+    #[default]
+    Prohibited,
+    /// Evidence use is permitted only with additional policy constraints.
+    AllowedWithConstraints,
+    /// This object is intended for regulated evidence-bearing workflows.
+    RegulatoryEvidence,
+}
+
 // ── Snapshot metadata ─────────────────────────────────────────
 
 /// Common metadata for every snapshot.

@@ -19,6 +19,7 @@
 mod invariants {
     use anyhow::Result;
     use chrono::Utc;
+    use sem_os_core::types::EvidenceGrade;
     use sqlx::PgPool;
     use uuid::Uuid;
 
@@ -71,6 +72,7 @@ mod invariants {
                 description: "Invariant test attribute".into(),
                 domain: "inv_test".into(),
                 data_type: AttributeDataType::String,
+                evidence_grade: EvidenceGrade::None,
                 source: None,
                 constraints: None,
                 sinks: vec![],

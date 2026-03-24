@@ -117,6 +117,7 @@ mod tests {
     use super::*;
     use crate::sem_reg::attribute_def::{AttributeDataType, AttributeDefBody};
     use crate::sem_reg::entity_type_def::EntityTypeDefBody;
+    use crate::sem_reg::EvidenceGrade;
 
     fn minimal_entity_type() -> EntityTypeDefBody {
         EntityTypeDefBody {
@@ -191,6 +192,7 @@ mod tests {
             description: "A name".to_string(),
             domain: "test".to_string(),
             data_type: AttributeDataType::String,
+            evidence_grade: EvidenceGrade::None,
             source: None,
             constraints: None,
             sinks: vec![],
@@ -209,6 +211,7 @@ mod tests {
             description: "A name".to_string(),
             domain: "test".to_string(),
             data_type: AttributeDataType::String,
+            evidence_grade: EvidenceGrade::None,
             source: None,
             constraints: None,
             sinks: vec![],
@@ -227,6 +230,7 @@ mod tests {
             description: "A name".to_string(),
             domain: "test".to_string(),
             data_type: AttributeDataType::String,
+            evidence_grade: EvidenceGrade::None,
             source: None,
             constraints: None,
             sinks: vec![],
@@ -245,6 +249,7 @@ mod tests {
             description: "A name".to_string(),
             domain: "test".to_string(),
             data_type: AttributeDataType::String,
+            evidence_grade: EvidenceGrade::None,
             source: None,
             constraints: None,
             sinks: vec![],

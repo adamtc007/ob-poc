@@ -6,9 +6,10 @@
 //! 3. Evidence grade policy — governed derivations with AllowedWithConstraints
 //!    need passing tests + policy link
 
-use super::derivation_spec::{DerivationSpecBody, EvidenceGrade};
+use super::derivation_spec::DerivationSpecBody;
 use super::gates::{GateFailure, GateSeverity};
 use super::types::{GovernanceTier, SnapshotRow};
+use sem_os_core::types::EvidenceGrade;
 
 // ── Gate 1: Taxonomy membership ──────────────────────────────
 
@@ -89,11 +90,11 @@ pub fn check_stewardship(snapshot: &SnapshotRow, tier: GovernanceTier) -> Vec<Ga
 
 // ── Gate 3: Evidence grade policy ────────────────────────────
 
-/// Check that governed derivations with `AllowedWithConstraints` evidence grade
-/// have passing tests and a policy link.
+/// Check that governed derivations with evidence-bearing grades have passing
+/// tests and a policy link.
 ///
-/// - `EvidenceGrade::Prohibited` → always passes (no evidence concerns)
-/// - `EvidenceGrade::AllowedWithConstraints` on governed tier → needs tests + policy
+/// - `EvidenceGrade::None` / `EvidenceGrade::Prohibited` → always passes
+/// - constrained or regulatory evidence grades on governed tier → need tests + policy
 /// - Operational tier → pass (no evidence policy enforcement)
 pub fn check_evidence_grade_policy(
     derivation: &DerivationSpecBody,
@@ -104,9 +105,10 @@ pub fn check_evidence_grade_policy(
     match tier {
         GovernanceTier::Operational => vec![],
         GovernanceTier::Governed => match derivation.evidence_grade {
-            EvidenceGrade::Prohibited => vec![],
-            EvidenceGrade::AllowedWithConstraints => {
+            EvidenceGrade::None | EvidenceGrade::Prohibited => vec![],
+            EvidenceGrade::AllowedWithConstraints | EvidenceGrade::RegulatoryEvidence => {
                 let mut failures = Vec::new();
+                let grade = derivation.evidence_grade.to_string();
 
                 if !has_passing_tests {
                     failures.push(
@@ -114,9 +116,9 @@ pub fn check_evidence_grade_policy(
                             "evidence_grade_policy",
                             "derivation_spec",
                             format!(
-                                "Governed derivation '{}' with AllowedWithConstraints \
+                                "Governed derivation '{}' with {} \
                                  evidence grade must have passing test cases",
-                                derivation.fqn
+                                derivation.fqn, grade
                             ),
                         )
                         .with_fqn(&derivation.fqn)
@@ -133,9 +135,9 @@ pub fn check_evidence_grade_policy(
                             "evidence_grade_policy",
                             "derivation_spec",
                             format!(
-                                "Governed derivation '{}' with AllowedWithConstraints \
+                                "Governed derivation '{}' with {} \
                                  evidence grade must reference a policy rule",
-                                derivation.fqn
+                                derivation.fqn, grade
                             ),
                         )
                         .with_fqn(&derivation.fqn)

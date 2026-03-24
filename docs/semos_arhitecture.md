@@ -2,7 +2,7 @@
 
 > **Version:** 3.0
 > **Date:** 2026-03-24
-> **Status:** Living document — consolidation of 9 prior specs, updated for the 2026-03-08 runtime schema consolidation, the 2026-03-12 document-governance bootstrap, the 2026-03-13 NLCI/CBU surface reconciliation, the 2026-03-15 reducer/constellation runtime cutover, the 2026-03-16 DB harness/runtime verification pass, the 2026-03-16 CODEX data-integrity/parser/serialization remediation, the 2026-03-17 discovery-universe + single-pipeline cutover, the 2026-03-21 SemOS reconciliation remediation verification pass, and the 2026-03-24 attribute identity + derivation reconciliation pass
+> **Status:** Living document — consolidation of 9 prior specs, updated for the 2026-03-08 runtime schema consolidation, the 2026-03-12 document-governance bootstrap, the 2026-03-13 NLCI/CBU surface reconciliation, the 2026-03-15 reducer/constellation runtime cutover, the 2026-03-16 DB harness/runtime verification pass, the 2026-03-16 CODEX data-integrity/parser/serialization remediation, the 2026-03-17 discovery-universe + single-pipeline cutover, the 2026-03-21 SemOS reconciliation remediation verification pass, the 2026-03-24 attribute identity + derivation reconciliation pass, and the 2026-03-24 taxonomy/evidence unification pass
 > **Audience:** Engineering, governance, architecture review
 
 ---
@@ -114,6 +114,20 @@ Remaining work in this plane is now mostly additive and coordinated:
 - taxonomy/evidence vocabulary unification
 - DSL authoring surface for governed attribute management
 - later coordinated schema tightening for derived-attribute invariants and stronger lineage columns
+
+### Taxonomy / Evidence Unification State (2026-03-24)
+
+The taxonomy/evidence cleanup pass is now materially complete at the type-system and enforcement layer:
+
+- there is now a single canonical derivation/attribute `EvidenceGrade` in `sem_os_core::types`
+- the duplicate derivation-local `EvidenceGrade` enums were removed from both `sem_os_core` and `sem_reg`
+- `AttributeDefBody` and `AttributeDataType` are now canonical in `sem_os_core`; `sem_reg` re-exports them instead of carrying a second real copy
+- `AttributeDefBody` now carries `evidence_grade`, allowing attribute metadata to participate in evidence-aware governance
+- `AttributeDataType` was expanded to the richer canonical set (`number`, `datetime`, `email`, `phone`, `address`, `currency`, `percentage`, `tax_id`) with explicit conversion helpers
+- ABAC/evidence narrowing now exists as a distinct helper: base label ABAC remains unchanged, while attribute-definition reads flow through evidence-aware enforcement
+- the duplicate `sem_reg` ABAC and enforcement implementations were removed and replaced with canonical `sem_os_core` re-export modules
+
+The remaining intentionally separate evidence-grade concept is the observation-instance reliability layer in `evidence_instances` / `EvidenceInstance`. That enum is not a duplicate of derivation/attribute evidence admissibility; it is a separate instance-plane semantics and was intentionally left outside this slice.
 
 ### Non-Lossy Utterance Contract (2026-03-17)
 

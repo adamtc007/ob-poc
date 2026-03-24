@@ -7,7 +7,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::types::{Classification, SecurityLabel};
+use crate::types::{Classification, EvidenceGrade, SecurityLabel};
 
 /// Context about the actor requesting access.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -138,6 +138,95 @@ pub fn evaluate_abac(
     AccessDecision::Allow
 }
 
+/// Evaluate ABAC with an additional evidence-grade constraint.
+///
+/// This preserves the base security-label decision from [`evaluate_abac`] and
+/// then applies evidence-plane narrowing for attribute semantics:
+///
+/// - `None` / `Prohibited`: no extra restriction
+/// - `AllowedWithConstraints`: analytics requires stewardship/compliance privilege
+/// - `RegulatoryEvidence`: analytics and administration require stewardship/compliance privilege
+///
+/// # Examples
+///
+/// ```
+/// use sem_os_core::abac::{evaluate_abac_with_evidence_grade, AccessDecision, AccessPurpose, ActorContext};
+/// use sem_os_core::types::{Classification, EvidenceGrade, SecurityLabel};
+///
+/// let actor = ActorContext {
+///     actor_id: "user-1".into(),
+///     roles: vec!["analyst".into()],
+///     department: None,
+///     clearance: Some(Classification::Confidential),
+///     jurisdictions: vec![],
+/// };
+/// let label = SecurityLabel {
+///     classification: Classification::Confidential,
+///     pii: false,
+///     jurisdictions: vec![],
+///     purpose_limitation: vec!["analytics".into()],
+///     handling_controls: vec![],
+/// };
+///
+/// let decision = evaluate_abac_with_evidence_grade(
+///     &actor,
+///     &label,
+///     AccessPurpose::Analytics,
+///     EvidenceGrade::AllowedWithConstraints,
+/// );
+/// assert!(matches!(decision, AccessDecision::Deny { .. }));
+/// ```
+pub fn evaluate_abac_with_evidence_grade(
+    actor: &ActorContext,
+    label: &SecurityLabel,
+    purpose: AccessPurpose,
+    evidence_grade: EvidenceGrade,
+) -> AccessDecision {
+    let base = evaluate_abac(actor, label, purpose);
+    if !base.is_allowed() {
+        return base;
+    }
+
+    match evidence_grade {
+        EvidenceGrade::None | EvidenceGrade::Prohibited => base,
+        EvidenceGrade::AllowedWithConstraints => {
+            if purpose == AccessPurpose::Analytics && !has_evidence_steward_privilege(actor) {
+                AccessDecision::Deny {
+                    reason: "Evidence grade requires steward/compliance privilege for analytics"
+                        .into(),
+                }
+            } else {
+                base
+            }
+        }
+        EvidenceGrade::RegulatoryEvidence => {
+            if matches!(
+                purpose,
+                AccessPurpose::Analytics | AccessPurpose::Administration
+            ) && !has_evidence_steward_privilege(actor)
+            {
+                AccessDecision::Deny {
+                    reason:
+                        "Regulatory evidence requires steward/compliance privilege for this purpose"
+                            .into(),
+                }
+            } else {
+                base
+            }
+        }
+    }
+}
+
+fn has_evidence_steward_privilege(actor: &ActorContext) -> bool {
+    actor.roles.iter().any(|role| {
+        let role = role.to_lowercase();
+        role.contains("steward")
+            || role == "compliance_officer"
+            || role == "compliance-manager"
+            || role == "regulatory_officer"
+    })
+}
+
 /// Check if an actor's clearance is sufficient for an object's classification.
 fn clearance_sufficient(actor: &Classification, object: &Classification) -> bool {
     classification_level(actor) >= classification_level(object)
@@ -183,6 +272,16 @@ mod tests {
             roles: vec!["analyst".into()],
             department: Some("compliance".into()),
             clearance: Some(Classification::Confidential),
+            jurisdictions: vec!["LU".into(), "DE".into(), "IE".into()],
+        }
+    }
+
+    fn steward() -> ActorContext {
+        ActorContext {
+            actor_id: "user-3".into(),
+            roles: vec!["data_steward".into()],
+            department: Some("governance".into()),
+            clearance: Some(Classification::Restricted),
             jurisdictions: vec!["LU".into(), "DE".into(), "IE".into()],
         }
     }
@@ -274,5 +373,81 @@ mod tests {
             reason: "test".into()
         }
         .is_allowed());
+    }
+
+    #[test]
+    fn none_grade_no_escalation() {
+        let mut label = confidential_pii_label();
+        label.purpose_limitation = vec!["analytics".into()];
+        let result = evaluate_abac_with_evidence_grade(
+            &analyst(),
+            &label,
+            AccessPurpose::Analytics,
+            EvidenceGrade::None,
+        );
+        assert!(matches!(result, AccessDecision::AllowWithMasking { .. }));
+    }
+
+    #[test]
+    fn prohibited_grade_no_escalation() {
+        let result = evaluate_abac_with_evidence_grade(
+            &analyst(),
+            &confidential_pii_label(),
+            AccessPurpose::Operations,
+            EvidenceGrade::Prohibited,
+        );
+        assert_eq!(result, AccessDecision::Allow);
+    }
+
+    #[test]
+    fn allowed_with_constraints_blocks_analytics_for_analyst() {
+        let mut label = confidential_pii_label();
+        label.purpose_limitation = vec!["analytics".into()];
+        let result = evaluate_abac_with_evidence_grade(
+            &analyst(),
+            &label,
+            AccessPurpose::Analytics,
+            EvidenceGrade::AllowedWithConstraints,
+        );
+        assert!(matches!(result, AccessDecision::Deny { .. }));
+    }
+
+    #[test]
+    fn allowed_with_constraints_permits_steward_analytics() {
+        let mut label = confidential_pii_label();
+        label.purpose_limitation = vec!["analytics".into()];
+        let result = evaluate_abac_with_evidence_grade(
+            &steward(),
+            &label,
+            AccessPurpose::Analytics,
+            EvidenceGrade::AllowedWithConstraints,
+        );
+        assert!(matches!(result, AccessDecision::AllowWithMasking { .. }));
+    }
+
+    #[test]
+    fn regulatory_evidence_blocks_admin_for_analyst() {
+        let mut label = confidential_pii_label();
+        label.purpose_limitation = vec!["administration".into()];
+        let result = evaluate_abac_with_evidence_grade(
+            &analyst(),
+            &label,
+            AccessPurpose::Administration,
+            EvidenceGrade::RegulatoryEvidence,
+        );
+        assert!(matches!(result, AccessDecision::Deny { .. }));
+    }
+
+    #[test]
+    fn regulatory_evidence_permits_steward_admin() {
+        let mut label = confidential_pii_label();
+        label.purpose_limitation = vec!["administration".into()];
+        let result = evaluate_abac_with_evidence_grade(
+            &steward(),
+            &label,
+            AccessPurpose::Administration,
+            EvidenceGrade::RegulatoryEvidence,
+        );
+        assert_eq!(result, AccessDecision::Allow);
     }
 }

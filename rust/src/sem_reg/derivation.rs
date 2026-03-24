@@ -223,6 +223,7 @@ mod tests {
     use super::*;
     use crate::sem_reg::derivation_spec::*;
     use crate::sem_reg::types::{Classification, HandlingControl};
+    use sem_os_core::types::EvidenceGrade;
 
     fn sample_spec() -> DerivationSpecBody {
         DerivationSpecBody {

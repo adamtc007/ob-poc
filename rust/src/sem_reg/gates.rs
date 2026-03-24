@@ -492,7 +492,8 @@ impl ExtendedPublishGateResult {
 
 // ── Phase 5: Derivation-specific gates ───────────────────────
 
-use super::derivation_spec::{DerivationSpecBody, EvidenceGrade};
+use super::derivation_spec::DerivationSpecBody;
+use sem_os_core::types::EvidenceGrade;
 
 /// Check for cycles in a set of derivation specs.
 ///
@@ -581,7 +582,7 @@ pub fn check_derivation_cycle(specs: &[DerivationSpecBody]) -> Vec<GateFailure> 
     }
 }
 
-/// Check that operational derivations have EvidenceGrade::Prohibited.
+/// Check that operational derivations do not declare evidence-bearing grades.
 ///
 /// Invariant: operational-tier derivations cannot be used as regulatory evidence.
 pub fn check_derivation_evidence_grade(
@@ -589,15 +590,18 @@ pub fn check_derivation_evidence_grade(
     tier: GovernanceTier,
 ) -> Vec<GateFailure> {
     if tier == GovernanceTier::Operational
-        && matches!(spec.evidence_grade, EvidenceGrade::AllowedWithConstraints)
+        && matches!(
+            spec.evidence_grade,
+            EvidenceGrade::AllowedWithConstraints | EvidenceGrade::RegulatoryEvidence
+        )
     {
         vec![GateFailure::error(
             "derivation_evidence_grade",
             "derivation_spec",
             format!(
-                "Derivation '{}' is operational-tier but has EvidenceGrade::AllowedWithConstraints — \
-                 promote to Governed tier or set evidence_grade to Prohibited",
-                spec.fqn
+                "Derivation '{}' is operational-tier but has evidence_grade '{}' — \
+                 promote to Governed tier or set evidence_grade to prohibited/none",
+                spec.fqn, spec.evidence_grade
             ),
         )
         .with_fqn(&spec.fqn)]

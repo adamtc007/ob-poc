@@ -29,6 +29,7 @@ mod integration {
         ContextResolutionRequest, DiscoveryContext, EvidenceMode, SubjectRef,
     };
     use sem_os_core::service::{CoreService, CoreServiceImpl};
+    use sem_os_core::types::EvidenceGrade;
     use sem_os_postgres::PgStores;
     use serde_json::json;
     use sqlx::PgPool;
@@ -91,6 +92,7 @@ mod integration {
                 description: format!("Test attribute: {}", name),
                 domain: fqn.split('.').next().unwrap_or("test").into(),
                 data_type: AttributeDataType::String,
+                evidence_grade: EvidenceGrade::None,
                 source: None,
                 constraints: None,
                 sinks: vec![],
@@ -605,6 +607,7 @@ mod integration {
             description: "Updated version for PIT test".into(),
             domain: "attr".into(),
             data_type: AttributeDataType::String,
+            evidence_grade: EvidenceGrade::None,
             source: None,
             constraints: None,
             sinks: vec![],
@@ -1048,6 +1051,7 @@ mod integration {
             description: "Should fail proof rule".into(),
             domain: "gate".into(),
             data_type: ob_poc::sem_reg::attribute_def::AttributeDataType::String,
+            evidence_grade: EvidenceGrade::None,
             source: None,
             constraints: None,
             sinks: vec![],
@@ -1113,6 +1117,7 @@ mod integration {
             description: "Governed but no taxonomy membership".into(),
             domain: "gate".into(),
             data_type: ob_poc::sem_reg::attribute_def::AttributeDataType::String,
+            evidence_grade: EvidenceGrade::None,
             source: None,
             constraints: None,
             sinks: vec![],

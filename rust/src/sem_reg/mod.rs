@@ -88,6 +88,7 @@ pub mod stewardship;
 
 // Re-export core types at module boundary
 pub use gates::{check_evidence_proof_rule, evaluate_publish_gates, GateResult, PublishGateResult};
+pub use sem_os_core::types::EvidenceGrade;
 pub use store::SnapshotStore;
 pub use types::{
     ChangeType, Classification, GovernanceTier, HandlingControl, ObjectType, SecurityLabel,
@@ -105,7 +106,9 @@ pub use verb_contract::VerbContractBody;
 pub use view_def::ViewDefBody;
 
 // Re-export Phase 3 types
-pub use abac::{evaluate_abac, AccessDecision, AccessPurpose, ActorContext};
+pub use abac::{
+    evaluate_abac, evaluate_abac_with_evidence_grade, AccessDecision, AccessPurpose, ActorContext,
+};
 pub use derivation_spec::DerivationSpecBody;
 pub use document_type_def::DocumentTypeDefBody;
 pub use evidence::EvidenceRequirementBody;
@@ -135,8 +138,9 @@ pub use onboarding::{OnboardingPipeline, OnboardingRequest, OnboardingResult, St
 
 // Re-export evidence instance types
 pub use evidence_instances::{
-    ArchiveAction, DocumentInstance, DocumentInstanceStatus, EvidenceGrade, EvidenceInstanceStore,
-    Observation, ProvenanceEdge, ProvenanceEdgeClass, RetentionPolicy,
+    ArchiveAction, DocumentInstance, DocumentInstanceStatus,
+    EvidenceGrade as EvidenceInstanceGrade, EvidenceInstanceStore, Observation, ProvenanceEdge,
+    ProvenanceEdgeClass, RetentionPolicy,
 };
 
 // Re-export Phase 9 types

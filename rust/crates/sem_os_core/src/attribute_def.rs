@@ -2,6 +2,12 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::types::EvidenceGrade;
+
+fn default_attribute_evidence_grade() -> EvidenceGrade {
+    EvidenceGrade::None
+}
+
 /// Body of an `attribute_def` registry snapshot.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AttributeDefBody {
@@ -10,6 +16,8 @@ pub struct AttributeDefBody {
     pub description: String,
     pub domain: String,
     pub data_type: AttributeDataType,
+    #[serde(default = "default_attribute_evidence_grade")]
+    pub evidence_grade: EvidenceGrade,
     #[serde(default)]
     pub source: Option<AttributeSource>,
     #[serde(default)]
@@ -19,7 +27,7 @@ pub struct AttributeDefBody {
 }
 
 /// Supported attribute data types.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum AttributeDataType {
     String,
@@ -30,7 +38,87 @@ pub enum AttributeDataType {
     Date,
     Timestamp,
     Json,
+    Number,
+    DateTime,
+    Email,
+    Phone,
+    Address,
+    Currency,
+    Percentage,
+    TaxId,
     Enum(Vec<std::string::String>),
+}
+
+impl AttributeDataType {
+    /// Return the canonical string used for DB/check/value-type interoperability.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use sem_os_core::attribute_def::AttributeDataType;
+    ///
+    /// assert_eq!(AttributeDataType::String.to_pg_check_value(), "string");
+    /// assert_eq!(AttributeDataType::TaxId.to_pg_check_value(), "tax_id");
+    /// ```
+    pub fn to_pg_check_value(&self) -> &'static str {
+        match self {
+            Self::String => "string",
+            Self::Integer => "integer",
+            Self::Decimal => "decimal",
+            Self::Boolean => "boolean",
+            Self::Uuid => "uuid",
+            Self::Date => "date",
+            Self::Timestamp => "timestamp",
+            Self::Json => "json",
+            Self::Enum(_) => "enum",
+            Self::Number => "number",
+            Self::DateTime => "datetime",
+            Self::Email => "email",
+            Self::Phone => "phone",
+            Self::Address => "address",
+            Self::Currency => "currency",
+            Self::Percentage => "percentage",
+            Self::TaxId => "tax_id",
+        }
+    }
+
+    /// Parse a DB/check/value-type string into the canonical enum.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use sem_os_core::attribute_def::AttributeDataType;
+    ///
+    /// assert_eq!(
+    ///     AttributeDataType::from_pg_check_value("datetime"),
+    ///     Some(AttributeDataType::DateTime)
+    /// );
+    /// assert_eq!(
+    ///     AttributeDataType::from_pg_check_value("tax_id"),
+    ///     Some(AttributeDataType::TaxId)
+    /// );
+    /// ```
+    pub fn from_pg_check_value(value: &str) -> Option<Self> {
+        match value.trim().to_lowercase().as_str() {
+            "string" | "text" | "varchar" | "character_varying" => Some(Self::String),
+            "integer" | "int" | "bigint" | "smallint" => Some(Self::Integer),
+            "decimal" | "numeric" => Some(Self::Decimal),
+            "number" | "float" | "double" | "real" => Some(Self::Number),
+            "boolean" | "bool" => Some(Self::Boolean),
+            "uuid" => Some(Self::Uuid),
+            "date" => Some(Self::Date),
+            "timestamp" => Some(Self::Timestamp),
+            "datetime" | "timestamp_tz" => Some(Self::DateTime),
+            "json" | "jsonb" => Some(Self::Json),
+            "email" => Some(Self::Email),
+            "phone" => Some(Self::Phone),
+            "address" => Some(Self::Address),
+            "currency" => Some(Self::Currency),
+            "percentage" | "percent" => Some(Self::Percentage),
+            "tax_id" | "taxid" => Some(Self::TaxId),
+            _ => None,
+        }
+    }
 }
 
 /// Where an attribute value comes from.
@@ -87,6 +175,7 @@ mod tests {
             description: "ISO jurisdiction".into(),
             domain: "cbu".into(),
             data_type: AttributeDataType::Enum(vec!["LU".into(), "IE".into(), "DE".into()]),
+            evidence_grade: EvidenceGrade::None,
             source: Some(AttributeSource {
                 producing_verb: Some("cbu.create".into()),
                 schema: Some("ob-poc".into()),
@@ -115,11 +204,39 @@ mod tests {
             r#"{"fqn":"x","name":"x","description":"x","domain":"x","data_type":"string"}"#,
         )
         .unwrap();
+        assert_eq!(minimal.evidence_grade, EvidenceGrade::None);
         assert!(minimal.source.is_none());
         assert!(minimal.sinks.is_empty());
         // Round-trip
         let back: AttributeDefBody = serde_json::from_value(json.clone()).unwrap();
         let json2 = serde_json::to_value(&back).unwrap();
         assert_eq!(json, json2);
+    }
+
+    #[test]
+    fn attribute_data_type_pg_value_round_trip() {
+        let samples = [
+            AttributeDataType::String,
+            AttributeDataType::Integer,
+            AttributeDataType::Decimal,
+            AttributeDataType::Boolean,
+            AttributeDataType::Uuid,
+            AttributeDataType::Date,
+            AttributeDataType::Timestamp,
+            AttributeDataType::Json,
+            AttributeDataType::Number,
+            AttributeDataType::DateTime,
+            AttributeDataType::Email,
+            AttributeDataType::Phone,
+            AttributeDataType::Address,
+            AttributeDataType::Currency,
+            AttributeDataType::Percentage,
+            AttributeDataType::TaxId,
+        ];
+
+        for sample in samples {
+            let pg = sample.to_pg_check_value();
+            assert_eq!(AttributeDataType::from_pg_check_value(pg), Some(sample));
+        }
     }
 }

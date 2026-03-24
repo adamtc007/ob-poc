@@ -5,8 +5,11 @@
 
 use serde_json::json;
 
-use crate::abac::{evaluate_abac, AccessDecision, AccessPurpose, ActorContext};
-use crate::types::{SecurityLabel, SnapshotRow};
+use crate::abac::{
+    evaluate_abac, evaluate_abac_with_evidence_grade, AccessDecision, AccessPurpose, ActorContext,
+};
+use crate::attribute_def::AttributeDefBody;
+use crate::types::{ObjectType, SecurityLabel, SnapshotRow};
 
 /// Result of an enforcement check on a single snapshot.
 pub enum EnforceResult {
@@ -23,6 +26,10 @@ pub enum EnforceResult {
 /// Parses the `security_label` JSONB from the `SnapshotRow` and evaluates
 /// ABAC rules. Falls back to deny if the label is unparseable.
 pub fn enforce_read(actor: &ActorContext, row: &SnapshotRow) -> EnforceResult {
+    if row.object_type == ObjectType::AttributeDef {
+        return enforce_attribute_read(actor, row);
+    }
+
     let label: SecurityLabel = match serde_json::from_value(row.security_label.clone()) {
         Ok(l) => l,
         Err(_) => {
@@ -34,6 +41,93 @@ pub fn enforce_read(actor: &ActorContext, row: &SnapshotRow) -> EnforceResult {
     };
 
     match evaluate_abac(actor, &label, AccessPurpose::Operations) {
+        AccessDecision::Allow => EnforceResult::Allow,
+        AccessDecision::AllowWithMasking { masked_fields } => {
+            EnforceResult::AllowWithMasking { masked_fields }
+        }
+        AccessDecision::Deny { reason } => EnforceResult::Deny { reason },
+    }
+}
+
+/// Check whether the actor may read an attribute definition, including
+/// evidence-grade restrictions.
+///
+/// # Examples
+///
+/// ```
+/// use sem_os_core::abac::{AccessDecision, ActorContext};
+/// use sem_os_core::enforce::{enforce_attribute_read, EnforceResult};
+/// use sem_os_core::types::{ChangeType, Classification, GovernanceTier, ObjectType, SecurityLabel, SnapshotRow, SnapshotStatus, TrustClass};
+///
+/// let row = SnapshotRow {
+///     snapshot_id: uuid::Uuid::new_v4(),
+///     snapshot_set_id: None,
+///     object_type: ObjectType::AttributeDef,
+///     object_id: uuid::Uuid::new_v4(),
+///     version_major: 1,
+///     version_minor: 0,
+///     status: SnapshotStatus::Active,
+///     governance_tier: GovernanceTier::Operational,
+///     trust_class: TrustClass::Convenience,
+///     security_label: serde_json::to_value(SecurityLabel {
+///         classification: Classification::Internal,
+///         pii: false,
+///         jurisdictions: vec![],
+///         purpose_limitation: vec![],
+///         handling_controls: vec![],
+///     }).unwrap(),
+///     effective_from: chrono::Utc::now(),
+///     effective_until: None,
+///     predecessor_id: None,
+///     change_type: ChangeType::Created,
+///     change_rationale: None,
+///     created_by: "test".into(),
+///     approved_by: None,
+///     definition: serde_json::json!({
+///         "fqn": "test.attr",
+///         "name": "test",
+///         "description": "test",
+///         "domain": "test",
+///         "data_type": "string",
+///         "evidence_grade": "none"
+///     }),
+///     created_at: chrono::Utc::now(),
+/// };
+/// let actor = ActorContext {
+///     actor_id: "user-1".into(),
+///     roles: vec!["analyst".into()],
+///     department: None,
+///     clearance: Some(Classification::Internal),
+///     jurisdictions: vec![],
+/// };
+///
+/// assert!(matches!(enforce_attribute_read(&actor, &row), EnforceResult::Allow));
+/// ```
+pub fn enforce_attribute_read(actor: &ActorContext, row: &SnapshotRow) -> EnforceResult {
+    let label: SecurityLabel = match serde_json::from_value(row.security_label.clone()) {
+        Ok(l) => l,
+        Err(_) => {
+            return EnforceResult::Deny {
+                reason: "Security label unparseable — access denied by default".into(),
+            };
+        }
+    };
+
+    let body: AttributeDefBody = match serde_json::from_value(row.definition.clone()) {
+        Ok(b) => b,
+        Err(_) => {
+            return EnforceResult::Deny {
+                reason: "Attribute definition unparseable — access denied by default".into(),
+            };
+        }
+    };
+
+    match evaluate_abac_with_evidence_grade(
+        actor,
+        &label,
+        AccessPurpose::Operations,
+        body.evidence_grade,
+    ) {
         AccessDecision::Allow => EnforceResult::Allow,
         AccessDecision::AllowWithMasking { masked_fields } => {
             EnforceResult::AllowWithMasking { masked_fields }
