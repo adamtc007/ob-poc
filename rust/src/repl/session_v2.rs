@@ -450,7 +450,7 @@ impl ReplSessionV2 {
         if let Some(tos) = self.workspace_stack.last_mut() {
             // Only mark stale if the popped frame had writes — a pure peek doesn't
             // invalidate the frame underneath.
-            tos.stale = popped.as_ref().map_or(false, |p| p.writes_since_push > 0);
+            tos.stale = popped.as_ref().is_some_and(|p| p.writes_since_push > 0);
             self.active_workspace = Some(tos.workspace.clone());
         }
         self.last_active_at = Utc::now();

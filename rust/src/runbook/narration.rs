@@ -102,7 +102,7 @@ pub fn narrate_step(
                 .steps
                 .get(result.step_seq - 1)
                 .map(|p| &p.workspace);
-            if prev_workspace.map_or(false, |pw| pw != &s.workspace) {
+            if prev_workspace.is_some_and(|pw| pw != &s.workspace) {
                 Some(format!(
                     "Workspace transition from {:?} — frame may have stale state",
                     prev_workspace.unwrap()

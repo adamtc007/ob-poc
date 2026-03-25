@@ -14,10 +14,11 @@ use super::types_v2::{AgentMode, WorkspaceKind};
 // ---------------------------------------------------------------------------
 
 /// Controls when hydrated state snapshots are captured in trace entries.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum SnapshotPolicy {
     /// Never capture snapshots.
+    #[default]
     Never,
     /// Capture every N operations.
     EveryN(u32),
@@ -25,12 +26,6 @@ pub enum SnapshotPolicy {
     OnStackOp,
     /// Capture on every verb execution.
     OnExecution,
-}
-
-impl Default for SnapshotPolicy {
-    fn default() -> Self {
-        Self::Never
-    }
 }
 
 // ---------------------------------------------------------------------------

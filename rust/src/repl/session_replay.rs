@@ -178,7 +178,7 @@ fn apply_trace_op(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::repl::session_trace::{FrameRef, TraceEntry, TraceOp};
+    use crate::repl::session_trace::{TraceEntry, TraceOp};
     use crate::repl::types_v2::{AgentMode, WorkspaceKind};
     use uuid::Uuid;
 

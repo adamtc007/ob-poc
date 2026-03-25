@@ -69,7 +69,7 @@ pub fn compile_runbook_plan(
                 subject_kind: input.subject_kind.clone(),
                 subject_binding,
                 verb: verb.clone(),
-                sentence: format!("{}", verb.display_name),
+                sentence: verb.display_name.clone(),
                 args: BTreeMap::new(),
                 preconditions: Vec::new(),
                 expected_effect: format!("{} executed", verb.verb_fqn),
@@ -106,14 +106,13 @@ fn find_forward_ref(
     _bindings: &BindingTable,
 ) -> Option<EntityBinding> {
     // Look backwards for the most recent step that might produce this entity
-    if let Some(last) = prior_steps.last() {
-        Some(EntityBinding::ForwardRef {
-            source_step: last.seq,
-            output_field: format!("created_{}_id", last.verb.verb_fqn.split('.').next().unwrap_or("entity")),
-        })
-    } else {
-        None
-    }
+    prior_steps.last().map(|last| EntityBinding::ForwardRef {
+        source_step: last.seq,
+        output_field: format!(
+            "created_{}_id",
+            last.verb.verb_fqn.split('.').next().unwrap_or("entity")
+        ),
+    })
 }
 
 /// Compute dependency edges for a step based on workspace transitions.
@@ -123,10 +122,7 @@ fn compute_dependencies(current_seq: usize, prior_steps: &[RunbookPlanStep]) -> 
     }
     // A step depends on the immediately preceding step if it's in a different workspace
     if let Some(prev) = prior_steps.last() {
-        if prior_steps
-            .last()
-            .map_or(false, |p| p.workspace != prior_steps.first().map(|f| f.workspace.clone()).unwrap_or(p.workspace.clone()))
-        {
+        if prior_steps.first().is_some_and(|first| first.workspace != prev.workspace) {
             return vec![prev.seq];
         }
         // Within same workspace, depend on prev for ordering

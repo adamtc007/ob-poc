@@ -106,7 +106,7 @@ impl TraceRow {
         let op: TraceOp = serde_json::from_value(self.op)?;
         let stack_snapshot: Vec<FrameRef> = self
             .stack_snapshot
-            .map(|v| serde_json::from_value(v))
+            .map(serde_json::from_value)
             .transpose()?
             .unwrap_or_default();
 
