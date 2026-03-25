@@ -94,6 +94,9 @@ pub struct ReplSessionV2 {
     pub last_active_at: DateTime<Utc>,
     #[serde(default)]
     pub(super) next_runbook_version: u64,
+    /// When true, `append_trace` is a no-op (used during replay).
+    #[serde(default, skip)]
+    pub(crate) tracing_suppressed: bool,
 }
 
 impl ReplSessionV2 {
@@ -145,6 +148,7 @@ impl ReplSessionV2 {
             created_at: now,
             last_active_at: now,
             next_runbook_version: 0,
+            tracing_suppressed: false,
         }
     }
 
@@ -339,6 +343,9 @@ impl ReplSessionV2 {
 
     /// Append a trace entry for the given operation.
     pub fn append_trace(&mut self, op: super::session_trace::TraceOp) {
+        if self.tracing_suppressed {
+            return;
+        }
         self.trace_sequence += 1;
         let snapshot = self.stack_snapshot();
         self.trace.push(super::session_trace::TraceEntry::new(

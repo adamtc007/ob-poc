@@ -169,6 +169,7 @@ impl SessionRepositoryV2 {
                     // Transient field — the authoritative counter is on `runbook.next_version_counter`
                     // which is persisted in the runbook JSONB. We sync the legacy field below.
                     next_runbook_version: 0, // set below from persisted counter
+                    tracing_suppressed: false,
                 };
 
                 // Rebuild transient indexes after deserialization.

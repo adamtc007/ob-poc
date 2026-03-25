@@ -128,6 +128,12 @@ impl TraceEntry {
         self.execution_result = Some(result);
         self
     }
+
+    /// Attach a hydrated state snapshot.
+    pub fn with_snapshot(mut self, snapshot: serde_json::Value) -> Self {
+        self.snapshot = Some(snapshot);
+        self
+    }
 }
 
 // ---------------------------------------------------------------------------

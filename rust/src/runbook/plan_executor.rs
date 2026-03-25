@@ -12,23 +12,6 @@ use super::plan_types::{
 };
 
 // ---------------------------------------------------------------------------
-// Executor types
-// ---------------------------------------------------------------------------
-
-/// Result of advancing the plan by one or more steps.
-#[derive(Debug, Clone)]
-pub struct PlanAdvanceResult {
-    /// Steps that were executed in this advance.
-    pub executed_steps: Vec<StepResult>,
-    /// Whether the plan is complete.
-    pub plan_complete: bool,
-    /// Whether a workspace transition is needed before the next step.
-    pub needs_workspace_transition: bool,
-    /// The target workspace for the next step (if transition needed).
-    pub next_workspace: Option<crate::repl::types_v2::WorkspaceKind>,
-}
-
-// ---------------------------------------------------------------------------
 // Executor logic
 // ---------------------------------------------------------------------------
 
@@ -103,14 +86,36 @@ pub fn record_step_output(
     bindings.resolved.insert(field_name.to_string(), value);
 }
 
-/// Skip all steps that depend on a failed step.
+/// Skip all steps that depend (directly or transitively) on a failed step.
 pub fn skip_dependent_steps(
     plan: &mut RunbookPlan,
     failed_step: usize,
 ) -> Vec<StepResult> {
+    let mut skipped_seqs = std::collections::HashSet::new();
+    skipped_seqs.insert(failed_step);
+
+    // Iterate until no new skips are found (transitive cascade)
+    loop {
+        let mut new_skips = Vec::new();
+        for step in plan.steps.iter() {
+            if step.status == PlanStepStatus::Pending
+                && !skipped_seqs.contains(&step.seq)
+                && step.depends_on.iter().any(|d| skipped_seqs.contains(d))
+            {
+                new_skips.push(step.seq);
+            }
+        }
+        if new_skips.is_empty() {
+            break;
+        }
+        skipped_seqs.extend(&new_skips);
+    }
+
+    // Apply skips (exclude the original failed step itself)
     let mut skipped = Vec::new();
     for step in &mut plan.steps {
-        if step.depends_on.contains(&failed_step)
+        if skipped_seqs.contains(&step.seq)
+            && step.seq != failed_step
             && step.status == PlanStepStatus::Pending
         {
             step.status = PlanStepStatus::Skipped;
@@ -302,5 +307,68 @@ mod tests {
         let skipped = skip_dependent_steps(&mut plan, 0);
         assert_eq!(skipped.len(), 1);
         assert_eq!(skipped[0].step_seq, 1);
+    }
+
+    #[test]
+    fn advance_step_out_of_range() {
+        let mut plan = two_step_plan();
+        let result = advance_plan_step(&mut plan, 99, Ok(serde_json::json!({})));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn update_plan_status_all_succeeded() {
+        let mut plan = two_step_plan();
+        plan.steps[0].status = PlanStepStatus::Succeeded;
+        plan.steps[1].status = PlanStepStatus::Succeeded;
+        update_plan_status(&mut plan);
+        assert!(matches!(plan.status, RunbookPlanStatus::Completed { .. }));
+    }
+
+    #[test]
+    fn update_plan_status_with_failure() {
+        let mut plan = two_step_plan();
+        plan.steps[0].status = PlanStepStatus::Failed;
+        plan.steps[1].status = PlanStepStatus::Skipped;
+        update_plan_status(&mut plan);
+        assert!(matches!(plan.status, RunbookPlanStatus::Failed { .. }));
+    }
+
+    #[test]
+    fn same_workspace_no_transition() {
+        let mut plan = two_step_plan();
+        // Make both steps same workspace
+        plan.steps[1].workspace = WorkspaceKind::Cbu;
+        let next = needs_workspace_transition(&plan, 0);
+        assert_eq!(next, None);
+    }
+
+    #[test]
+    fn skip_cascades_transitively() {
+        // Step 0 → Step 1 → Step 2 (transitive chain)
+        let mut plan = two_step_plan();
+        plan.steps.push(RunbookPlanStep {
+            seq: 2,
+            workspace: WorkspaceKind::Deal,
+            constellation_map: "deal-lifecycle".into(),
+            subject_kind: SubjectKind::Deal,
+            subject_binding: EntityBinding::Literal { id: Uuid::nil() },
+            verb: VerbRef {
+                verb_fqn: "deal.create".into(),
+                display_name: "Create Deal".into(),
+            },
+            sentence: "Create a deal".into(),
+            args: BTreeMap::new(),
+            preconditions: vec![],
+            expected_effect: "Deal created".into(),
+            depends_on: vec![1], // depends on step 1, which depends on step 0
+            status: PlanStepStatus::Pending,
+        });
+        plan.steps[0].status = PlanStepStatus::Failed;
+        let skipped = skip_dependent_steps(&mut plan, 0);
+        // Both step 1 (direct) and step 2 (transitive) should be skipped
+        assert_eq!(skipped.len(), 2);
+        assert!(skipped.iter().any(|s| s.step_seq == 1));
+        assert!(skipped.iter().any(|s| s.step_seq == 2));
     }
 }

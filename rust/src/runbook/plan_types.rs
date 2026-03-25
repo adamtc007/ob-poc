@@ -36,6 +36,12 @@ impl std::fmt::Display for RunbookPlanId {
     }
 }
 
+impl AsRef<str> for RunbookPlanId {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
+
 // ---------------------------------------------------------------------------
 // EntityBinding — literal or forward-ref entity references
 // ---------------------------------------------------------------------------
@@ -68,6 +74,18 @@ pub struct BindingTable {
 }
 
 impl BindingTable {
+    /// Number of named bindings.
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Whether the binding table has no entries.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
     /// Resolve a binding name to a UUID, if available.
     ///
     /// Literal bindings always resolve. Forward refs resolve only after the
@@ -99,7 +117,7 @@ pub enum PlanStepStatus {
 }
 
 /// A single step in a multi-workspace runbook plan.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RunbookPlanStep {
     pub seq: usize,
     pub workspace: WorkspaceKind,
@@ -143,7 +161,7 @@ pub struct RunbookApproval {
 }
 
 /// Result of executing a single plan step.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct StepResult {
     pub step_seq: usize,
     pub verb_fqn: String,
@@ -174,7 +192,8 @@ pub struct RunbookPlan {
 impl RunbookPlan {
     /// Compute a content-addressed ID from the plan's canonical representation.
     pub fn compute_id(steps: &[RunbookPlanStep], bindings: &BindingTable) -> RunbookPlanId {
-        let canonical = serde_json::to_vec(&(steps, bindings)).unwrap_or_default();
+        let canonical = serde_json::to_vec(&(steps, bindings))
+            .expect("RunbookPlan steps and bindings must be serializable");
         RunbookPlanId::from_bytes(&canonical)
     }
 
@@ -339,7 +358,34 @@ mod tests {
         ];
         for s in &statuses {
             let json = serde_json::to_value(s).unwrap();
-            let _back: RunbookPlanStatus = serde_json::from_value(json).unwrap();
+            let back: RunbookPlanStatus = serde_json::from_value(json).unwrap();
+            // Verify variant discrimination survived round-trip
+            assert_eq!(
+                std::mem::discriminant(&back),
+                std::mem::discriminant(s),
+                "Status variant mismatch for {:?}",
+                s
+            );
         }
+    }
+
+    #[test]
+    fn binding_table_len_and_is_empty() {
+        let table = BindingTable::default();
+        assert!(table.is_empty());
+        assert_eq!(table.len(), 0);
+
+        let mut table2 = BindingTable::default();
+        table2
+            .entries
+            .insert("$x".into(), EntityBinding::Literal { id: Uuid::nil() });
+        assert!(!table2.is_empty());
+        assert_eq!(table2.len(), 1);
+    }
+
+    #[test]
+    fn binding_table_resolve_missing_name() {
+        let table = BindingTable::default();
+        assert_eq!(table.resolve("$nonexistent"), None);
     }
 }

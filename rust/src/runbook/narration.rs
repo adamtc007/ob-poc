@@ -98,21 +98,16 @@ pub fn narrate_step(
     // Check for stale workspace warning
     let stale_warning = step.and_then(|s| {
         if result.step_seq > 0 {
-            let prev_workspace = plan
-                .steps
-                .get(result.step_seq - 1)
-                .map(|p| &p.workspace);
-            if prev_workspace.is_some_and(|pw| pw != &s.workspace) {
-                Some(format!(
-                    "Workspace transition from {:?} — frame may have stale state",
-                    prev_workspace.unwrap()
-                ))
-            } else {
-                None
+            if let Some(pw) = plan.steps.get(result.step_seq - 1).map(|p| &p.workspace) {
+                if pw != &s.workspace {
+                    return Some(format!(
+                        "Workspace transition from {:?} — frame may have stale state",
+                        pw
+                    ));
+                }
             }
-        } else {
-            None
         }
+        None
     });
 
     StepNarration {

@@ -3,7 +3,7 @@
 //! Provides `SessionTraceRepository` for batch-appending and querying
 //! trace entries from the `session_traces` table.
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use uuid::Uuid;
 
 use super::session_trace::TraceEntry;
@@ -28,7 +28,10 @@ impl SessionTraceRepository {
             )
             .bind(entry.session_id)
             .bind(entry.sequence as i64)
-            .bind(format!("{:?}", entry.agent_mode).to_lowercase())
+            .bind(match entry.agent_mode {
+                super::types_v2::AgentMode::Sage => "sage",
+                super::types_v2::AgentMode::Repl => "repl",
+            })
             .bind(&op_json)
             .bind(&stack_json)
             .bind(&entry.snapshot)
@@ -112,7 +115,8 @@ impl TraceRow {
 
         Ok(TraceEntry {
             session_id: self.session_id,
-            sequence: self.sequence as u64,
+            sequence: u64::try_from(self.sequence)
+                .context("trace sequence must be non-negative")?,
             timestamp: self.created_at,
             agent_mode,
             op,

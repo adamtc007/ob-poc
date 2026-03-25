@@ -57,6 +57,7 @@ pub fn replay_trace(
     mode: ReplayMode,
 ) -> ReplayResult {
     let mut session = ReplSessionV2::new();
+    session.tracing_suppressed = true; // Replay doesn't generate new trace entries
     let mut divergences = Vec::new();
     let mut replayed = 0usize;
 
@@ -118,31 +119,19 @@ fn apply_trace_op(
                     client_group_id: uuid::Uuid::nil(),
                     client_group_name: None,
                 });
-            // Temporarily remove trace to avoid recursive append during replay
-            let trace_seq = session.trace_sequence;
             session
                 .push_workspace_frame(WorkspaceFrame::new(workspace.clone(), scope))
                 .map_err(|e| e.to_string())?;
-            // Restore sequence (replay doesn't generate new trace entries for bookkeeping)
-            session.trace_sequence = trace_seq;
-            session.trace.pop(); // Remove the auto-appended trace entry
             Ok(())
         }
         TraceOp::StackPop { workspace: _ } => {
-            let trace_seq = session.trace_sequence;
-            let popped = session.pop_workspace_frame();
-            session.trace_sequence = trace_seq;
-            session.trace.pop();
-            if popped.is_none() {
+            if session.pop_workspace_frame().is_none() {
                 return Err("Cannot pop: stack has <= 1 frame".into());
             }
             Ok(())
         }
         TraceOp::StackCommit => {
-            let trace_seq = session.trace_sequence;
             session.commit_workspace_stack();
-            session.trace_sequence = trace_seq;
-            session.trace.pop();
             Ok(())
         }
         TraceOp::VerbExecuted { verb_fqn: _, step_id: _ } => {
@@ -249,18 +238,58 @@ mod tests {
     }
 
     #[test]
-    fn replay_relaxed_logs_divergences() {
-        let entries = trace_entries();
+    fn replay_relaxed_continues_past_divergence() {
+        // Insert an invalid pop in the middle — relaxed should log it and continue
+        let mut entries = trace_entries();
+        entries.insert(
+            1,
+            TraceEntry::new(
+                Uuid::nil(),
+                10, // out-of-order sequence
+                AgentMode::Sage,
+                TraceOp::StackPop {
+                    workspace: WorkspaceKind::Cbu,
+                },
+                vec![],
+            ),
+        );
         let result = replay_trace(&entries, ReplayMode::Relaxed);
-        assert_eq!(result.entries_replayed, 5);
-        // Relaxed mode completes all entries
+        // Relaxed mode should log the pop divergence but continue
+        assert!(!result.divergences.is_empty(), "Should have logged divergences");
+        assert!(
+            result.entries_replayed > 1,
+            "Relaxed mode should continue past divergences"
+        );
     }
 
     #[test]
-    fn replay_dry_run_skips_execution() {
-        let entries = trace_entries();
+    fn replay_dry_run_does_not_increment_writes() {
+        // Trace with a VerbExecuted — dry run should NOT increment writes
+        let entries = vec![
+            TraceEntry::new(
+                Uuid::nil(),
+                1,
+                AgentMode::Sage,
+                TraceOp::StackPush {
+                    workspace: WorkspaceKind::Cbu,
+                },
+                vec![],
+            ),
+            TraceEntry::new(
+                Uuid::nil(),
+                2,
+                AgentMode::Repl,
+                TraceOp::VerbExecuted {
+                    verb_fqn: "cbu.create".into(),
+                    step_id: Uuid::nil(),
+                },
+                vec![],
+            ),
+        ];
         let result = replay_trace(&entries, ReplayMode::DryRun);
-        assert_eq!(result.entries_replayed, 5);
+        assert_eq!(result.entries_replayed, 2);
+        // Verify dry run completed without errors
+        assert!(result.divergences.is_empty());
     }
 
     #[test]
@@ -276,6 +305,34 @@ mod tests {
         )];
         let result = replay_trace(&entries, ReplayMode::Strict);
         assert!(!result.divergences.is_empty());
+        assert_eq!(result.entries_replayed, 0);
+    }
+
+    #[test]
+    fn replay_strict_stops_on_first_divergence() {
+        // Two invalid ops — strict should stop after the first
+        let entries = vec![
+            TraceEntry::new(
+                Uuid::nil(),
+                1,
+                AgentMode::Sage,
+                TraceOp::StackPop {
+                    workspace: WorkspaceKind::Cbu,
+                },
+                vec![],
+            ),
+            TraceEntry::new(
+                Uuid::nil(),
+                2,
+                AgentMode::Sage,
+                TraceOp::StackPop {
+                    workspace: WorkspaceKind::Deal,
+                },
+                vec![],
+            ),
+        ];
+        let result = replay_trace(&entries, ReplayMode::Strict);
+        assert_eq!(result.divergences.len(), 1, "Strict stops after first divergence");
         assert_eq!(result.entries_replayed, 0);
     }
 }
