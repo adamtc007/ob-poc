@@ -28,6 +28,7 @@ import {
 import type { CbuSummary } from "../../../api/scope";
 import { queryKeys } from "../../../lib/query";
 import { cn } from "../../../lib/utils";
+import type { SessionFeedback } from "../../../api/replV2";
 
 const DEFAULT_MAP_NAME = "struct.lux.ucits.sicav";
 
@@ -764,10 +765,12 @@ function SlotInspector({
 
 export function ConstellationPanel({
   selectedCbu,
+  sessionFeedback,
   className,
   onPromptAgent,
 }: {
   selectedCbu: CbuSummary | null;
+  sessionFeedback?: SessionFeedback;
   className?: string;
   onPromptAgent?: (prompt: string) => void;
 }) {
@@ -776,6 +779,19 @@ export function ConstellationPanel({
     undefined,
   );
   const [selectedSlotPath, setSelectedSlotPath] = useState<string | null>(null);
+
+  const sessionHydrated =
+    (sessionFeedback?.tos?.hydrated_constellation as HydratedConstellation | undefined) ??
+    undefined;
+  const sessionSummary = sessionFeedback?.tos?.progress_summary;
+  const sessionAllSlots = useMemo(
+    () => flattenSlots(sessionHydrated?.slots ?? []),
+    [sessionHydrated],
+  );
+  const sessionSelectedSlot = useMemo(() => {
+    const fromPath = findSlotByPath(sessionHydrated?.slots ?? [], selectedSlotPath);
+    return fromPath ?? sessionAllSlots[0] ?? null;
+  }, [selectedSlotPath, sessionAllSlots, sessionHydrated]);
 
   const constellationQuery = useQuery({
     queryKey: queryKeys.constellation.detail(
@@ -857,6 +873,77 @@ export function ConstellationPanel({
   const refreshAll = async () => {
     await Promise.all([constellationQuery.refetch(), summaryQuery.refetch()]);
   };
+
+  if (sessionHydrated) {
+    return (
+      <div
+        className={cn(
+          "flex min-h-0 flex-1 flex-col border-t border-[var(--border-primary)]",
+          className,
+        )}
+      >
+        <div className="border-b border-[var(--border-primary)] px-4 py-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-xs uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                Session Context
+              </div>
+              <div className="mt-1 truncate text-base font-semibold text-[var(--text-primary)]">
+                {sessionFeedback?.tos.workspace.replaceAll("_", " ")}
+              </div>
+              <div className="mt-1 text-xs text-[var(--text-muted)]">
+                {sessionFeedback?.tos.constellation_family} • {sessionFeedback?.tos.constellation_map}
+              </div>
+              {sessionFeedback?.stale_warning && (
+                <div className="mt-2 rounded-lg border border-[var(--accent-yellow)]/30 bg-[var(--accent-yellow)]/10 px-3 py-2 text-xs text-[var(--accent-yellow)]">
+                  Restored frame may be stale. Re-hydrate before relying on pronouns for writes.
+                </div>
+              )}
+            </div>
+          </div>
+          {sessionSummary && (
+            <div className="mt-3 grid grid-cols-3 gap-2">
+              <SummaryMetric label="Slots" value={sessionSummary.total_slots} />
+              <SummaryMetric label="Complete" value={`${sessionSummary.completion_pct}%`} />
+              <SummaryMetric label="Blocking" value={sessionSummary.blocking_slots} emphasis={sessionSummary.blocking_slots > 0} />
+            </div>
+          )}
+        </div>
+        <div className="flex-1 overflow-auto px-4 py-4">
+          <div className="space-y-4">
+            <div className="rounded-xl border border-[var(--border-primary)] bg-[var(--bg-primary)]">
+              <div className="border-b border-[var(--border-primary)] px-4 py-3">
+                <div className="text-xs uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                  Slot Tree
+                </div>
+                <div className="mt-1 text-sm text-[var(--text-secondary)]">
+                  Session-scoped hydrated top-of-stack constellation.
+                </div>
+              </div>
+              <div className="space-y-1 px-2 py-3">
+                {sessionHydrated.slots.map((slot) => (
+                  <SlotTreeRow
+                    key={slot.path}
+                    slot={slot}
+                    depth={0}
+                    selectedPath={sessionSelectedSlot?.path ?? null}
+                    onSelect={setSelectedSlotPath}
+                  />
+                ))}
+              </div>
+            </div>
+
+            <SlotInspector
+              slot={sessionSelectedSlot}
+              hydrated={sessionHydrated}
+              cbuName={selectedCbu?.name ?? sessionFeedback?.tos.workspace ?? "session context"}
+              onPromptAgent={onPromptAgent}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!selectedCbu) {
     return (

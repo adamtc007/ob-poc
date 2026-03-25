@@ -9,7 +9,9 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use super::proposal_engine::StepProposal;
-use super::types_v2::{PackCandidate, ReplStateV2, VerbCandidate, WorkspaceOption};
+use super::types_v2::{
+    PackCandidate, ReplStateV2, SessionFeedback, VerbCandidate, WorkspaceOption,
+};
 
 // ---------------------------------------------------------------------------
 // ReplResponseV2
@@ -32,6 +34,10 @@ pub struct ReplResponseV2 {
 
     /// Number of steps in the current runbook.
     pub step_count: usize,
+
+    /// Session-scoped navigation feedback for the active top-of-stack frame.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub session_feedback: Option<SessionFeedback>,
 }
 
 // ---------------------------------------------------------------------------
@@ -166,6 +172,7 @@ mod tests {
             message: "Please confirm this step.".to_string(),
             runbook_summary: None,
             step_count: 1,
+            session_feedback: None,
         };
 
         let json = serde_json::to_string(&response).unwrap();
@@ -185,6 +192,7 @@ mod tests {
             message: "I couldn't find a matching verb.".to_string(),
             runbook_summary: None,
             step_count: 0,
+            session_feedback: None,
         };
 
         let json = serde_json::to_string(&response).unwrap();
@@ -214,6 +222,7 @@ mod tests {
             message: "Which journey would you like to start?".to_string(),
             runbook_summary: None,
             step_count: 0,
+            session_feedback: None,
         };
 
         let json = serde_json::to_string(&response).unwrap();
@@ -240,6 +249,7 @@ mod tests {
             message: "Execution complete.".to_string(),
             runbook_summary: Some("1 step completed successfully.".to_string()),
             step_count: 1,
+            session_feedback: None,
         };
 
         let json = serde_json::to_string(&response).unwrap();

@@ -26,6 +26,7 @@ import type {
   VerbDisambiguationRequest,
   OnboardingStateView,
 } from "../types/chat";
+import type { SessionFeedback } from "./replV2";
 
 /**
  * Backend session response structure
@@ -40,6 +41,7 @@ interface BackendMessage {
   sage_explain?: SageExplain;
   coder_proposal?: CoderProposal;
   discovery_bootstrap?: DiscoveryBootstrap;
+  session_feedback?: SessionFeedback;
 }
 
 interface BackendSession {
@@ -87,6 +89,7 @@ function mapBackendSession(backend: BackendSession): ChatSession {
       sage_explain: msg.sage_explain,
       coder_proposal: msg.coder_proposal,
       discovery_bootstrap: msg.discovery_bootstrap,
+      session_feedback: msg.session_feedback,
     })),
   };
 }
@@ -502,6 +505,7 @@ interface ChatInputEnvelope {
     sage_explain?: SageExplain;
     coder_proposal?: CoderProposal;
     discovery_bootstrap?: DiscoveryBootstrap;
+    session_feedback?: SessionFeedback;
     available_verbs?: VerbProfile[];
     surface_fingerprint?: string;
     decision?: {
@@ -551,6 +555,7 @@ function buildAssistantMessage(
     coder_proposal: response.coder_proposal,
     discovery_bootstrap: response.discovery_bootstrap,
     onboarding_state: response.onboarding_state,
+    session_feedback: response.session_feedback,
   };
 
   if (response.verb_disambiguation) {

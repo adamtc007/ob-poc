@@ -5,6 +5,14 @@
  */
 
 import { api } from "./client";
+import type {
+  ConstellationContextRef,
+  ProgressSummary,
+  ResolvedConstellationContext,
+  SubjectKind,
+  WorkspaceKind,
+  WorkspaceStateView,
+} from "./replV2";
 
 export interface BlockReason {
   message: string;
@@ -96,6 +104,52 @@ export interface ConstellationSummary {
 }
 
 export const constellationApi = {
+  async resolveContext(
+    context: ConstellationContextRef,
+  ): Promise<ResolvedConstellationContext> {
+    return api.post<ResolvedConstellationContext>("/constellation/resolve", context);
+  },
+
+  async hydrateContext(params: {
+    sessionId: string;
+    clientGroupId: string;
+    workspace: WorkspaceKind;
+    constellationFamily?: string;
+    constellationMap?: string;
+    subjectKind?: SubjectKind;
+    subjectId?: string;
+  }): Promise<WorkspaceStateView> {
+    return api.get<WorkspaceStateView>("/constellation/hydrate", {
+      session_id: params.sessionId,
+      client_group_id: params.clientGroupId,
+      workspace: params.workspace,
+      constellation_family: params.constellationFamily,
+      constellation_map: params.constellationMap,
+      subject_kind: params.subjectKind,
+      subject_id: params.subjectId,
+    });
+  },
+
+  async getWorkspaceSummary(params: {
+    sessionId: string;
+    clientGroupId: string;
+    workspace: WorkspaceKind;
+    constellationFamily?: string;
+    constellationMap?: string;
+    subjectKind?: SubjectKind;
+    subjectId?: string;
+  }): Promise<ProgressSummary> {
+    return api.get<ProgressSummary>("/constellation/summary", {
+      session_id: params.sessionId,
+      client_group_id: params.clientGroupId,
+      workspace: params.workspace,
+      constellation_family: params.constellationFamily,
+      constellation_map: params.constellationMap,
+      subject_kind: params.subjectKind,
+      subject_id: params.subjectId,
+    });
+  },
+
   async getConstellation(
     cbuId: string,
     params?: { caseId?: string; mapName?: string },

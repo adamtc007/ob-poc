@@ -22,10 +22,14 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use uuid::Uuid;
 
+use crate::api::constellation_routes::{hydrate_workspace_state, resolve_context};
 use crate::repl::orchestrator_v2::ReplOrchestratorV2;
 use crate::repl::response_v2::ReplResponseV2;
 use crate::repl::session_v2::ReplSessionV2;
-use crate::repl::types_v2::{ReplCommandV2, ReplStateV2, UserInputV2, WorkspaceKind};
+use crate::repl::types_v2::{
+    ConstellationContextRef, ReplCommandV2, ReplStateV2, ResolvedConstellationContext,
+    SessionFeedback, UserInputV2, WorkspaceFrame, WorkspaceKind,
+};
 
 // ============================================================================
 // Route State
@@ -212,6 +216,31 @@ pub struct SessionStateResponseV2 {
     pub last_active_at: String,
 }
 
+/// Request to push a new workspace context onto the session stack.
+#[derive(Debug, Clone, Deserialize)]
+pub struct SessionPushRequest {
+    pub context: ConstellationContextRef,
+}
+
+/// Request for stack commit/pop operations.
+#[derive(Debug, Clone, Deserialize)]
+pub struct SessionStackRequest {
+    pub session_id: Uuid,
+}
+
+/// Query for current session-scoped constellation context.
+#[derive(Debug, Clone, Deserialize)]
+pub struct SessionContextQuery {
+    pub session_id: Uuid,
+}
+
+/// Response returned by session stack routes.
+#[derive(Debug, Clone, Serialize)]
+pub struct SessionFeedbackResponse {
+    pub resolved: ResolvedConstellationContext,
+    pub feedback: SessionFeedback,
+}
+
 impl From<ReplSessionV2> for SessionStateResponseV2 {
     fn from(session: ReplSessionV2) -> Self {
         Self {
@@ -287,6 +316,7 @@ async fn create_session_v2(
         message: greeting,
         runbook_summary: None,
         step_count: 0,
+        session_feedback: None,
     };
 
     Ok(Json(CreateSessionResponseV2 {
@@ -352,6 +382,116 @@ async fn delete_session_v2(
     }
 
     Ok(StatusCode::NO_CONTENT)
+}
+
+async fn get_constellation_context(
+    State(state): State<ReplV2RouteState>,
+    axum::extract::Query(query): axum::extract::Query<SessionContextQuery>,
+) -> Result<Json<SessionFeedback>, (StatusCode, Json<ErrorResponseV2>)> {
+    match state.orchestrator.session_feedback(query.session_id).await {
+        Ok(feedback) => Ok(Json(feedback)),
+        Err(error) => Err((
+            StatusCode::NOT_FOUND,
+            Json(ErrorResponseV2 {
+                error: error.to_string(),
+                recoverable: true,
+            }),
+        )),
+    }
+}
+
+async fn push_session_context(
+    State(state): State<ReplV2RouteState>,
+    Json(request): Json<SessionPushRequest>,
+) -> Result<Json<SessionFeedbackResponse>, (StatusCode, Json<ErrorResponseV2>)> {
+    let resolved = resolve_context(state.orchestrator_pool()?, &request.context)
+        .await
+        .map_err(as_json_error)?;
+    let hydrated = hydrate_workspace_state(state.orchestrator_pool()?, &resolved)
+        .await
+        .map_err(as_json_error)?;
+
+    let existing = state
+        .orchestrator
+        .get_session(request.context.session_id)
+        .await
+        .ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                Json(ErrorResponseV2 {
+                    error: format!("Unknown session {}", request.context.session_id),
+                    recoverable: false,
+                }),
+            )
+        })?;
+
+    if existing.workspace_stack.is_empty() {
+        state
+            .orchestrator
+            .apply_root_context(request.context.session_id, &request.context)
+            .await
+            .map_err(anyhow_json_error)?;
+    } else {
+        let mut frame =
+            WorkspaceFrame::new(resolved.workspace.clone(), resolved.session_scope.clone());
+        frame.constellation_family = resolved.constellation_family.clone();
+        frame.constellation_map = resolved.constellation_map.clone();
+        frame.subject_kind = resolved.subject_kind.clone();
+        frame.subject_id = resolved.subject_id;
+        state
+            .orchestrator
+            .push_workspace_frame(request.context.session_id, frame)
+            .await
+            .map_err(anyhow_json_error)?;
+    }
+
+    state
+        .orchestrator
+        .hydrate_tos(request.context.session_id, hydrated)
+        .await
+        .map_err(anyhow_json_error)?;
+
+    let feedback = state
+        .orchestrator
+        .session_feedback(request.context.session_id)
+        .await
+        .map_err(anyhow_json_error)?;
+
+    Ok(Json(SessionFeedbackResponse { resolved, feedback }))
+}
+
+async fn commit_session_context(
+    State(state): State<ReplV2RouteState>,
+    Json(request): Json<SessionStackRequest>,
+) -> Result<Json<SessionFeedback>, (StatusCode, Json<ErrorResponseV2>)> {
+    state
+        .orchestrator
+        .commit_workspace_stack(request.session_id)
+        .await
+        .map_err(anyhow_json_error)?;
+    let feedback = state
+        .orchestrator
+        .session_feedback(request.session_id)
+        .await
+        .map_err(anyhow_json_error)?;
+    Ok(Json(feedback))
+}
+
+async fn pop_session_context(
+    State(state): State<ReplV2RouteState>,
+    Json(request): Json<SessionStackRequest>,
+) -> Result<Json<SessionFeedback>, (StatusCode, Json<ErrorResponseV2>)> {
+    state
+        .orchestrator
+        .pop_workspace_frame(request.session_id)
+        .await
+        .map_err(anyhow_json_error)?;
+    let feedback = state
+        .orchestrator
+        .session_feedback(request.session_id)
+        .await
+        .map_err(anyhow_json_error)?;
+    Ok(Json(feedback))
 }
 
 /// POST /api/repl/v2/signal — External system signals completion of a parked entry.
@@ -420,6 +560,72 @@ pub fn router() -> Router<ReplV2RouteState> {
         )
         .route("/session/:id/input", post(input_v2_legacy_blocked))
         .route("/signal", post(signal_v2))
+}
+
+/// Create the session-scoped navigation router.
+///
+/// Mount this router at the application root so the routes resolve as:
+/// `/api/constellation/context`, `/api/session/push`, `/api/session/commit`, `/api/session/pop`.
+///
+/// # Examples
+/// ```rust,ignore
+/// let app = Router::new()
+///     .merge(repl_routes_v2::navigation_router().with_state(v2_state));
+/// ```
+pub fn navigation_router() -> Router<ReplV2RouteState> {
+    Router::new()
+        .route("/api/constellation/context", get(get_constellation_context))
+        .route("/api/session/push", post(push_session_context))
+        .route("/api/session/commit", post(commit_session_context))
+        .route("/api/session/pop", post(pop_session_context))
+}
+
+fn as_json_error(error: (StatusCode, String)) -> (StatusCode, Json<ErrorResponseV2>) {
+    let (status, message) = error;
+    (
+        status,
+        Json(ErrorResponseV2 {
+            error: message,
+            recoverable: true,
+        }),
+    )
+}
+
+fn anyhow_json_error(error: anyhow::Error) -> (StatusCode, Json<ErrorResponseV2>) {
+    (
+        StatusCode::BAD_REQUEST,
+        Json(ErrorResponseV2 {
+            error: error.to_string(),
+            recoverable: true,
+        }),
+    )
+}
+
+impl ReplV2RouteState {
+    fn orchestrator_pool(&self) -> Result<&sqlx::PgPool, (StatusCode, Json<ErrorResponseV2>)> {
+        #[cfg(feature = "database")]
+        {
+            self.orchestrator.pool().ok_or_else(|| {
+                (
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    Json(ErrorResponseV2 {
+                        error: "REPL V2 orchestrator has no database pool".to_string(),
+                        recoverable: false,
+                    }),
+                )
+            })
+        }
+        #[cfg(not(feature = "database"))]
+        {
+            Err((
+                StatusCode::SERVICE_UNAVAILABLE,
+                Json(ErrorResponseV2 {
+                    error: "database feature is not enabled".to_string(),
+                    recoverable: false,
+                }),
+            ))
+        }
+    }
 }
 
 // ============================================================================

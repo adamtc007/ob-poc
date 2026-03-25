@@ -9,8 +9,11 @@
 
 use std::collections::HashMap;
 
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+
+use crate::sem_os_runtime::constellation_runtime::HydratedConstellation;
 
 // ---------------------------------------------------------------------------
 // ReplStateV2 — 7-state machine
@@ -82,7 +85,7 @@ pub struct PackCandidate {
 }
 
 /// A top-level workspace available after scope selection.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "snake_case")]
 pub enum WorkspaceKind {
     ProductMaintenance,
@@ -94,6 +97,14 @@ pub enum WorkspaceKind {
 }
 
 impl WorkspaceKind {
+    /// Human-readable display label for the workspace.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use ob_poc::repl::types_v2::WorkspaceKind;
+    ///
+    /// assert_eq!(WorkspaceKind::Deal.label(), "Deal");
+    /// ```
     pub fn label(&self) -> &'static str {
         match self {
             Self::ProductMaintenance => "Product Maintenance",
@@ -104,6 +115,117 @@ impl WorkspaceKind {
             Self::OnBoarding => "OnBoarding",
         }
     }
+
+    /// Registry metadata for this workspace.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use ob_poc::repl::types_v2::WorkspaceKind;
+    ///
+    /// let entry = WorkspaceKind::Kyc.registry_entry();
+    /// assert_eq!(entry.default_constellation_family, "ownership");
+    /// ```
+    pub fn registry_entry(&self) -> WorkspaceRegistryEntry {
+        match self {
+            Self::ProductMaintenance => WorkspaceRegistryEntry {
+                workspace_id: self.clone(),
+                display_name: self.label(),
+                constellation_families: vec!["product_service_taxonomy"],
+                subject_kinds: vec![
+                    SubjectKind::Product,
+                    SubjectKind::Service,
+                    SubjectKind::Resource,
+                    SubjectKind::Attribute,
+                ],
+                subject_required: false,
+                default_constellation_family: "product_service_taxonomy",
+                default_constellation_map: "product.service.resource.taxonomy",
+                supports_handoff_mode: false,
+            },
+            Self::Deal => WorkspaceRegistryEntry {
+                workspace_id: self.clone(),
+                display_name: self.label(),
+                constellation_families: vec!["commercial", "handoff"],
+                subject_kinds: vec![SubjectKind::Deal, SubjectKind::Handoff],
+                subject_required: true,
+                default_constellation_family: "commercial",
+                default_constellation_map: "deal.lifecycle",
+                supports_handoff_mode: true,
+            },
+            Self::Cbu => WorkspaceRegistryEntry {
+                workspace_id: self.clone(),
+                display_name: self.label(),
+                constellation_families: vec![
+                    "operating",
+                    "maintenance",
+                    "lu_ucits",
+                    "ie_icav",
+                    "uk_auth",
+                    "us_40act",
+                    "cross_border_hedge",
+                    "cross_border_pe",
+                ],
+                subject_kinds: vec![SubjectKind::Cbu, SubjectKind::Resource],
+                subject_required: true,
+                default_constellation_family: "operating",
+                default_constellation_map: "struct.lux.ucits.sicav",
+                supports_handoff_mode: true,
+            },
+            Self::Kyc => WorkspaceRegistryEntry {
+                workspace_id: self.clone(),
+                display_name: self.label(),
+                constellation_families: vec!["ownership", "clearance", "delta_review", "screening"],
+                subject_kinds: vec![
+                    SubjectKind::ClientGroup,
+                    SubjectKind::Case,
+                    SubjectKind::Cbu,
+                ],
+                subject_required: false,
+                default_constellation_family: "ownership",
+                default_constellation_map: "group.ownership",
+                supports_handoff_mode: true,
+            },
+            Self::InstrumentMatrix => WorkspaceRegistryEntry {
+                workspace_id: self.clone(),
+                display_name: self.label(),
+                constellation_families: vec!["trading_permission", "lifecycle"],
+                subject_kinds: vec![SubjectKind::Matrix, SubjectKind::Cbu],
+                subject_required: true,
+                default_constellation_family: "trading_permission",
+                default_constellation_map: "cbu.trading.matrix",
+                supports_handoff_mode: true,
+            },
+            Self::OnBoarding => WorkspaceRegistryEntry {
+                workspace_id: self.clone(),
+                display_name: self.label(),
+                constellation_families: vec!["handoff", "activation"],
+                subject_kinds: vec![SubjectKind::Handoff, SubjectKind::Cbu],
+                subject_required: true,
+                default_constellation_family: "handoff",
+                default_constellation_map: "deal.lifecycle",
+                supports_handoff_mode: true,
+            },
+        }
+    }
+
+    /// Known workspaces exposed in session-scoped navigation.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use ob_poc::repl::types_v2::WorkspaceKind;
+    ///
+    /// assert!(WorkspaceKind::all().contains(&WorkspaceKind::Cbu));
+    /// ```
+    pub fn all() -> Vec<Self> {
+        vec![
+            Self::ProductMaintenance,
+            Self::Deal,
+            Self::Cbu,
+            Self::Kyc,
+            Self::InstrumentMatrix,
+            Self::OnBoarding,
+        ]
+    }
 }
 
 /// A selectable workspace option.
@@ -112,6 +234,454 @@ pub struct WorkspaceOption {
     pub workspace: WorkspaceKind,
     pub label: String,
     pub description: String,
+}
+
+/// Session scope anchored on a client group.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SessionScope {
+    pub client_group_id: Uuid,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub client_group_name: Option<String>,
+}
+
+/// Sage vs REPL mode at the current top-of-stack context.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum AgentMode {
+    Sage,
+    Repl,
+}
+
+/// Subject kinds supported by the session-scoped navigation layer.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
+pub enum SubjectKind {
+    ClientGroup,
+    Cbu,
+    Deal,
+    Case,
+    Handoff,
+    Matrix,
+    Product,
+    Service,
+    Resource,
+    Attribute,
+}
+
+/// A lightweight subject reference for UI and feedback surfaces.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SubjectRef {
+    pub kind: SubjectKind,
+    pub id: Uuid,
+}
+
+/// Provisioning dependency attached to a handoff context.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ProvisioningDep {
+    pub kind: String,
+    pub reference: String,
+}
+
+/// Cross-workspace handoff payload carried alongside a working context.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct HandoffContext {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_deal_id: Option<Uuid>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target_cbu_id: Option<Uuid>,
+    pub handoff_id: Uuid,
+    pub activation_path: String,
+    #[serde(default)]
+    pub provisioning_deps: Vec<ProvisioningDep>,
+}
+
+/// A scoped verb reference returned in hydrated workspace views.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct VerbRef {
+    pub verb_fqn: String,
+    pub display_name: String,
+}
+
+/// Progress summary for the current constellation context.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ProgressSummary {
+    pub total_slots: usize,
+    pub completion_pct: u8,
+    pub blocking_slots: usize,
+}
+
+/// A suggested action derived from the current scoped verb surface.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ActionHint {
+    pub label: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub verb_fqn: Option<String>,
+    pub action_type: String,
+}
+
+/// A workspace available to the user for navigation.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct WorkspaceHint {
+    pub workspace: WorkspaceKind,
+    pub label: String,
+    pub default_constellation_family: String,
+    pub default_constellation_map: String,
+}
+
+/// Self-contained view of the hydrated working surface for one frame.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorkspaceStateView {
+    pub workspace: WorkspaceKind,
+    pub constellation_family: String,
+    pub constellation_map: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub subject_ref: Option<SubjectRef>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hydrated_constellation: Option<HydratedConstellation>,
+    #[serde(default)]
+    pub scoped_verb_surface: Vec<VerbRef>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub progress_summary: Option<ProgressSummary>,
+    #[serde(default)]
+    pub available_actions: Vec<ActionHint>,
+}
+
+/// One entry in the workspace stack.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorkspaceFrame {
+    pub workspace: WorkspaceKind,
+    pub constellation_family: String,
+    pub constellation_map: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub subject_kind: Option<SubjectKind>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub subject_id: Option<Uuid>,
+    pub session_scope: SessionScope,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hydrated_state: Option<WorkspaceStateView>,
+    pub pushed_at: DateTime<Utc>,
+    #[serde(default)]
+    pub stale: bool,
+}
+
+impl WorkspaceFrame {
+    /// Create a new frame using workspace defaults.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use ob_poc::repl::types_v2::{SessionScope, WorkspaceFrame, WorkspaceKind};
+    /// use uuid::Uuid;
+    ///
+    /// let frame = WorkspaceFrame::new(
+    ///     WorkspaceKind::Deal,
+    ///     SessionScope { client_group_id: Uuid::nil(), client_group_name: None },
+    /// );
+    /// assert_eq!(frame.constellation_family, "commercial");
+    /// ```
+    pub fn new(workspace: WorkspaceKind, session_scope: SessionScope) -> Self {
+        let registry = workspace.registry_entry();
+        Self {
+            workspace,
+            constellation_family: registry.default_constellation_family.to_string(),
+            constellation_map: registry.default_constellation_map.to_string(),
+            subject_kind: registry.subject_kinds.first().cloned(),
+            subject_id: None,
+            session_scope,
+            hydrated_state: None,
+            pushed_at: Utc::now(),
+            stale: false,
+        }
+    }
+}
+
+/// Request envelope for navigation resolution.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConstellationContextRef {
+    pub session_id: Uuid,
+    pub client_group_id: Uuid,
+    pub workspace: WorkspaceKind,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub constellation_family: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub constellation_map: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub subject_kind: Option<SubjectKind>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub subject_id: Option<Uuid>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub handoff_context: Option<HandoffContext>,
+}
+
+/// Resolved context after defaults and subject resolution are applied.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResolvedConstellationContext {
+    pub session_id: Uuid,
+    pub client_group_id: Uuid,
+    pub workspace: WorkspaceKind,
+    pub constellation_family: String,
+    pub constellation_map: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub subject_kind: Option<SubjectKind>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub subject_id: Option<Uuid>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub handoff_context: Option<HandoffContext>,
+    pub session_scope: SessionScope,
+    pub agent_mode: AgentMode,
+}
+
+/// Feedback returned with session-scoped navigation responses.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SessionFeedback {
+    pub stack_depth: usize,
+    pub tos: WorkspaceStateView,
+    pub tos_is_peek: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub previous_workspace: Option<WorkspaceKind>,
+    pub stale_warning: bool,
+    #[serde(default)]
+    pub scoped_verb_surface: Vec<VerbRef>,
+    #[serde(default)]
+    pub available_workspaces: Vec<WorkspaceHint>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pending_verb: Option<VerbRef>,
+    pub conversation_mode: ConversationMode,
+}
+
+/// Semantic IR frame used before deterministic or probabilistic resolution.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct UtteranceFrame {
+    pub action_phrase: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target_workspace_hint: Option<WorkspaceKind>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub subject_hint: Option<String>,
+    pub conversation_mode: ConversationMode,
+    pub scope_cue: ScopeCue,
+    pub temporal_cue: TemporalCue,
+}
+
+impl UtteranceFrame {
+    /// Build a deterministic utterance frame from free text cues.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use ob_poc::repl::types_v2::{ConversationMode, UtteranceFrame};
+    ///
+    /// let frame = UtteranceFrame::from_message("show me the current KYC case");
+    /// assert_eq!(frame.conversation_mode, ConversationMode::Inspect);
+    /// ```
+    pub fn from_message(message: &str) -> Self {
+        let normalized = message.trim().to_lowercase();
+        Self {
+            action_phrase: normalized.clone(),
+            target_workspace_hint: WorkspaceKind::from_hint(&normalized),
+            subject_hint: extract_subject_hint(&normalized),
+            conversation_mode: ConversationMode::classify(&normalized),
+            scope_cue: ScopeCue::classify(&normalized),
+            temporal_cue: TemporalCue::classify(&normalized),
+        }
+    }
+}
+
+/// High-level conversational mode used to select stack operations.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ConversationMode {
+    Inspect,
+    Navigate,
+    Compare,
+    Prepare,
+    Mutate,
+    Confirm,
+    Return,
+}
+
+impl Default for ConversationMode {
+    fn default() -> Self {
+        Self::Inspect
+    }
+}
+
+impl ConversationMode {
+    /// Classify a conversational mode from simple lexical cues.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use ob_poc::repl::types_v2::ConversationMode;
+    ///
+    /// assert_eq!(ConversationMode::classify("compare this cbu with that one"), ConversationMode::Compare);
+    /// ```
+    pub fn classify(message: &str) -> Self {
+        let msg = message.trim().to_lowercase();
+        if matches!(msg.as_str(), "yes" | "confirm" | "approved" | "do it") {
+            return Self::Confirm;
+        }
+        if msg.contains("go back") || msg.contains("return") || msg == "back" {
+            return Self::Return;
+        }
+        if msg.contains("compare") || msg.contains("versus") {
+            return Self::Compare;
+        }
+        if msg.contains("switch to")
+            || msg.contains("go to ")
+            || msg.contains("open the ")
+            || msg.contains("take me to")
+        {
+            return Self::Navigate;
+        }
+        if msg.contains("would")
+            || msg.contains("could")
+            || msg.contains("can you")
+            || msg.ends_with('?')
+        {
+            return Self::Prepare;
+        }
+        if msg.starts_with("create ")
+            || msg.starts_with("add ")
+            || msg.starts_with("update ")
+            || msg.starts_with("remove ")
+            || msg.starts_with("delete ")
+            || msg.starts_with("activate ")
+            || msg.starts_with("provision ")
+        {
+            return Self::Mutate;
+        }
+        Self::Inspect
+    }
+}
+
+/// Scope cue used in utterance decomposition.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ScopeCue {
+    Here,
+    There,
+    Across,
+    Unspecified,
+}
+
+impl ScopeCue {
+    /// Classify a scope cue from lexical markers.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use ob_poc::repl::types_v2::ScopeCue;
+    ///
+    /// assert_eq!(ScopeCue::classify("show me this cbu"), ScopeCue::Here);
+    /// ```
+    pub fn classify(message: &str) -> Self {
+        let msg = message.to_lowercase();
+        if msg.contains("across") || msg.contains("compare") {
+            return Self::Across;
+        }
+        if msg.contains("that ") || msg.contains("there") || msg.contains("other workspace") {
+            return Self::There;
+        }
+        if msg.contains("this ") || msg.contains("current") || msg.contains("here") {
+            return Self::Here;
+        }
+        Self::Unspecified
+    }
+}
+
+/// Temporal cue used in utterance decomposition.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum TemporalCue {
+    Now,
+    Before,
+    Back,
+    Unspecified,
+}
+
+impl TemporalCue {
+    /// Classify a temporal cue from lexical markers.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use ob_poc::repl::types_v2::TemporalCue;
+    ///
+    /// assert_eq!(TemporalCue::classify("go back to the deal"), TemporalCue::Back);
+    /// ```
+    pub fn classify(message: &str) -> Self {
+        let msg = message.to_lowercase();
+        if msg.contains("go back") || msg == "back" || msg.contains("return") {
+            return Self::Back;
+        }
+        if msg.contains("before") || msg.contains("previous") {
+            return Self::Before;
+        }
+        if msg.contains("now") || msg.contains("current") {
+            return Self::Now;
+        }
+        Self::Unspecified
+    }
+}
+
+impl WorkspaceKind {
+    /// Detect a workspace hint from free text.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use ob_poc::repl::types_v2::WorkspaceKind;
+    ///
+    /// assert_eq!(WorkspaceKind::from_hint("show me the kyc workspace"), Some(WorkspaceKind::Kyc));
+    /// ```
+    pub fn from_hint(message: &str) -> Option<Self> {
+        let msg = message.to_lowercase();
+        if msg.contains("product")
+            || msg.contains("service catalog")
+            || msg.contains("resource dictionary")
+        {
+            return Some(Self::ProductMaintenance);
+        }
+        if msg.contains("deal") || msg.contains("contract") || msg.contains("rate card") {
+            return Some(Self::Deal);
+        }
+        if msg.contains("cbu") || msg.contains("operating") {
+            return Some(Self::Cbu);
+        }
+        if msg.contains("kyc") || msg.contains("ubo") || msg.contains("clearance") {
+            return Some(Self::Kyc);
+        }
+        if msg.contains("matrix")
+            || msg.contains("instruction")
+            || msg.contains("trading permission")
+        {
+            return Some(Self::InstrumentMatrix);
+        }
+        if msg.contains("onboarding") || msg.contains("handoff") || msg.contains("activation") {
+            return Some(Self::OnBoarding);
+        }
+        None
+    }
+}
+
+fn extract_subject_hint(message: &str) -> Option<String> {
+    let subject_markers = [" for ", " on ", " about ", " regarding "];
+    for marker in subject_markers {
+        if let Some((_, tail)) = message.split_once(marker) {
+            let trimmed = tail.trim();
+            if !trimmed.is_empty() {
+                return Some(trimmed.to_string());
+            }
+        }
+    }
+    None
+}
+
+/// Static registry entry for one workspace.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WorkspaceRegistryEntry {
+    pub workspace_id: WorkspaceKind,
+    pub display_name: &'static str,
+    pub constellation_families: Vec<&'static str>,
+    pub subject_kinds: Vec<SubjectKind>,
+    pub subject_required: bool,
+    pub default_constellation_family: &'static str,
+    pub default_constellation_map: &'static str,
+    pub supports_handoff_mode: bool,
 }
 
 /// A candidate verb for clarification.

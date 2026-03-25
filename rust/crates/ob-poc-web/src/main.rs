@@ -603,7 +603,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // =========================================================================
     // REPL V2 — Pack-Guided Runbook Pipeline
     // =========================================================================
-    let (repl_v2_router, repl_v2_orchestrator) = {
+    let (repl_v2_router, repl_navigation_router, repl_v2_orchestrator) = {
         use ob_poc::api::repl_routes_v2::{self, ReplV2RouteState};
         use ob_poc::journey::router::PackRouter;
         use ob_poc::repl::orchestrator_v2::ReplOrchestratorV2;
@@ -958,7 +958,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         tracing::info!("REPL V2 orchestrator initialized with semantic intent service");
 
         (
-            repl_routes_v2::router().with_state(v2_state),
+            repl_routes_v2::router().with_state(v2_state.clone()),
+            repl_routes_v2::navigation_router().with_state(v2_state),
             repl_v2_orchestrator,
         )
     };
@@ -996,6 +997,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .merge(create_universe_router(pool.clone()))
         // Constellation graph hydration API for UI feedback and debugging
         .merge(create_constellation_router(pool.clone()))
+        // Session-scoped navigation stack and TOS feedback
+        .merge(repl_navigation_router)
         // Control/ownership routes (board controller, control sphere)
         .merge(control_routes(pool.clone()))
         // Session-scoped entity search (constraint cascade)

@@ -153,6 +153,10 @@ impl SessionRepositoryV2 {
                     pending_sem_os_envelope: None,
                     pending_lookup_result: None,
                     pending_execution_rechecks: Vec::new(),
+                    active_workspace: None,
+                    workspace_stack: Vec::new(),
+                    pending_verb: None,
+                    conversation_mode: super::types_v2::ConversationMode::Inspect,
                     created_at: r.created_at,
                     last_active_at: r.last_active_at,
                     // Transient field — the authoritative counter is on `runbook.next_version_counter`

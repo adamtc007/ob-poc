@@ -436,6 +436,17 @@ pub async fn create_agent_router_with_semantic_and_repl(
     repl_v2_orchestrator: Option<Arc<crate::repl::orchestrator_v2::ReplOrchestratorV2>>,
 ) -> Router {
     let mut state = AgentState::with_semantic(pool, sessions, sem_os_client).await;
-    state.repl_v2_orchestrator = repl_v2_orchestrator;
-    crate::api::agent_routes::create_agent_router_with_state(state)
+    state.repl_v2_orchestrator = repl_v2_orchestrator.clone();
+    let router = crate::api::agent_routes::create_agent_router_with_state(state);
+    if let Some(orchestrator) = repl_v2_orchestrator {
+        let repl_state = crate::api::repl_routes_v2::ReplV2RouteState { orchestrator };
+        router
+            .nest(
+                "/api/repl/v2",
+                crate::api::repl_routes_v2::router().with_state(repl_state.clone()),
+            )
+            .merge(crate::api::repl_routes_v2::navigation_router().with_state(repl_state))
+    } else {
+        router
+    }
 }

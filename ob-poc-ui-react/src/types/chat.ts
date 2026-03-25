@@ -4,6 +4,8 @@
  * Types for agent chat sessions and the DecisionPacket protocol.
  */
 
+import type { SessionFeedback } from "../api/replV2";
+
 /** Chat message role */
 export type MessageRole = "user" | "assistant" | "system";
 
@@ -20,6 +22,7 @@ export interface ChatMessage {
   discovery_bootstrap?: DiscoveryBootstrap;
   parked_entries?: ParkedEntry[];
   onboarding_state?: OnboardingStateView;
+  session_feedback?: SessionFeedback;
   verb_disambiguation_detail?: VerbDisambiguationRequest;
 }
 

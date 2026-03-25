@@ -4,7 +4,7 @@
 
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useEffect, useRef, useCallback, useState } from "react";
+import { useEffect, useRef, useCallback, useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { chatApi } from "../../api/chat";
 import { scopeApi, type CbuSummary } from "../../api/scope";
@@ -21,6 +21,7 @@ import {
 } from "./components";
 import { DealPanel } from "../deal/components";
 import type { DecisionReply, DiscoverySelection } from "../../types/chat";
+import type { SessionFeedback } from "../../api/replV2";
 
 export function ChatPage() {
   const { sessionId } = useParams<{ sessionId?: string }>();
@@ -249,6 +250,17 @@ export function ChatPage() {
     [sendMutation],
   );
 
+  const latestSessionFeedback = useMemo<SessionFeedback | undefined>(() => {
+    const messages = currentSession?.messages ?? [];
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      const feedback = messages[index]?.session_feedback;
+      if (feedback) {
+        return feedback;
+      }
+    }
+    return undefined;
+  }, [currentSession?.messages]);
+
   const handleVerbSubmit = useCallback(
     (sexpr: string) => {
       sendMutation.mutate(sexpr);
@@ -377,6 +389,7 @@ export function ChatPage() {
 
           <ConstellationPanel
             selectedCbu={selectedCbu}
+            sessionFeedback={latestSessionFeedback}
             className="min-h-0"
             onPromptAgent={handleSend}
           />

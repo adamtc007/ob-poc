@@ -424,6 +424,7 @@ mod tests {
             message: "done".to_string(),
             runbook_summary: None,
             step_count: 1,
+            session_feedback: None,
         };
 
         let session = ReplSessionV2::new();
@@ -485,6 +486,7 @@ mod tests {
             message: "done".to_string(),
             runbook_summary: None,
             step_count: 2,
+            session_feedback: None,
         };
 
         let payload = build_phase5_repl_payload(&session, &response);
@@ -513,6 +515,7 @@ mod tests {
             message: "done".to_string(),
             runbook_summary: None,
             step_count: 1,
+            session_feedback: None,
         };
 
         let evaluation = evaluate_phase5_repl(&session, &response);

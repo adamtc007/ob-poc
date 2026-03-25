@@ -185,4 +185,7 @@ pub use deal_routes::{create_deal_router, create_deal_router_simple, DealState};
 pub use stewardship_routes::create_stewardship_router;
 
 #[cfg(feature = "vnext-repl")]
-pub use repl_routes_v2::{router as create_repl_v2_router, ReplV2RouteState};
+pub use repl_routes_v2::{
+    navigation_router as create_repl_navigation_router, router as create_repl_v2_router,
+    ReplV2RouteState,
+};

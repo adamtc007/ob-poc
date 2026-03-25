@@ -76,6 +76,121 @@ export interface WorkspaceOption {
   description: string;
 }
 
+export type SubjectKind =
+  | "client_group"
+  | "cbu"
+  | "deal"
+  | "case"
+  | "handoff"
+  | "matrix"
+  | "product"
+  | "service"
+  | "resource"
+  | "attribute";
+
+export interface SessionScope {
+  client_group_id: string;
+  client_group_name?: string;
+}
+
+export interface SubjectRef {
+  kind: SubjectKind;
+  id: string;
+}
+
+export interface VerbRef {
+  verb_fqn: string;
+  display_name: string;
+}
+
+export interface ProgressSummary {
+  total_slots: number;
+  completion_pct: number;
+  blocking_slots: number;
+}
+
+export interface ActionHint {
+  label: string;
+  verb_fqn?: string;
+  action_type: string;
+}
+
+export interface WorkspaceHint {
+  workspace: WorkspaceKind;
+  label: string;
+  default_constellation_family: string;
+  default_constellation_map: string;
+}
+
+export interface WorkspaceStateView {
+  workspace: WorkspaceKind;
+  constellation_family: string;
+  constellation_map: string;
+  subject_ref?: SubjectRef;
+  hydrated_constellation?: unknown;
+  scoped_verb_surface: VerbRef[];
+  progress_summary?: ProgressSummary;
+  available_actions: ActionHint[];
+}
+
+export type ConversationMode =
+  | "inspect"
+  | "navigate"
+  | "compare"
+  | "prepare"
+  | "mutate"
+  | "confirm"
+  | "return";
+
+export interface SessionFeedback {
+  stack_depth: number;
+  tos: WorkspaceStateView;
+  tos_is_peek: boolean;
+  previous_workspace?: WorkspaceKind;
+  stale_warning: boolean;
+  scoped_verb_surface: VerbRef[];
+  available_workspaces: WorkspaceHint[];
+  pending_verb?: VerbRef;
+  conversation_mode: ConversationMode;
+}
+
+export interface HandoffContext {
+  source_deal_id?: string;
+  target_cbu_id?: string;
+  handoff_id: string;
+  activation_path: string;
+  provisioning_deps: { kind: string; reference: string }[];
+}
+
+export interface ConstellationContextRef {
+  session_id: string;
+  client_group_id: string;
+  workspace: WorkspaceKind;
+  constellation_family?: string;
+  constellation_map?: string;
+  subject_kind?: SubjectKind;
+  subject_id?: string;
+  handoff_context?: HandoffContext;
+}
+
+export interface ResolvedConstellationContext {
+  session_id: string;
+  client_group_id: string;
+  workspace: WorkspaceKind;
+  constellation_family: string;
+  constellation_map: string;
+  subject_kind?: SubjectKind;
+  subject_id?: string;
+  handoff_context?: HandoffContext;
+  session_scope: SessionScope;
+  agent_mode: "sage" | "repl";
+}
+
+export interface SessionFeedbackResponse {
+  resolved: ResolvedConstellationContext;
+  feedback: SessionFeedback;
+}
+
 export interface ExecutionProgress {
   total_steps: number;
   completed_steps: number;
@@ -90,6 +205,7 @@ export interface ReplResponseV2 {
   message: string;
   runbook_summary?: string;
   step_count: number;
+  session_feedback?: SessionFeedback;
 }
 
 /** Response kind — determines UI rendering */
@@ -255,6 +371,46 @@ export const replV2Api = {
    */
   async deleteSession(sessionId: string): Promise<void> {
     await api.delete(`${V2_BASE}/session/${sessionId}`);
+  },
+
+  /**
+   * Read the current top-of-stack session feedback.
+   * GET /api/constellation/context?session_id=:id
+   */
+  async getSessionContext(sessionId: string): Promise<SessionFeedback> {
+    return api.get<SessionFeedback>("/constellation/context", {
+      session_id: sessionId,
+    });
+  },
+
+  /**
+   * Push a new workspace context onto the session stack.
+   * POST /api/session/push
+   */
+  async pushContext(
+    context: ConstellationContextRef,
+  ): Promise<SessionFeedbackResponse> {
+    return api.post<SessionFeedbackResponse>("/session/push", { context });
+  },
+
+  /**
+   * Commit the current top-of-stack workspace.
+   * POST /api/session/commit
+   */
+  async commitContext(sessionId: string): Promise<SessionFeedback> {
+    return api.post<SessionFeedback>("/session/commit", {
+      session_id: sessionId,
+    });
+  },
+
+  /**
+   * Pop the current top-of-stack workspace.
+   * POST /api/session/pop
+   */
+  async popContext(sessionId: string): Promise<SessionFeedback> {
+    return api.post<SessionFeedback>("/session/pop", {
+      session_id: sessionId,
+    });
   },
 
   // =========================================================================
