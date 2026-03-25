@@ -217,6 +217,11 @@ domains:
           type: uuid
           name: entity_id
           capture: true
+        outputs:
+          - name: created_entity_id
+            type: uuid
+            entity_kind: entity
+            description: ID of the newly created entity
 
       ensure:
         description: Create or update an entity of the requested entity type
@@ -617,6 +622,11 @@ domains:
           type: uuid
           name: entity_id
           capture: true
+        outputs:
+          - name: created_entity_id
+            type: uuid
+            entity_kind: entity
+            description: ID of the newly created ghost entity
 
       identify:
         description: Add identifying attributes to a ghost entity (transitions to IDENTIFIED state)

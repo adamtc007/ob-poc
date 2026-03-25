@@ -102,6 +102,11 @@ domains:
           description: |
             Returns KycCaseCreateResult with case_id, case_ref (KYC-YYYY-SEQ),
             deal_id (if linked), client_group_id, and status (INTAKE).
+        outputs:
+          - name: created_case_id
+            type: uuid
+            entity_kind: case
+            description: ID of the newly created KYC case
       update-status:
         description: Update case status with transition validation
         invocation_phrases:

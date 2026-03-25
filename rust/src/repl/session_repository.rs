@@ -157,6 +157,13 @@ impl SessionRepositoryV2 {
                     workspace_stack: Vec::new(),
                     pending_verb: None,
                     conversation_mode: super::types_v2::ConversationMode::Inspect,
+                    agent_mode: super::types_v2::AgentMode::default(),
+                    trace: Vec::new(),
+                    trace_sequence: 0,
+                    snapshot_policy: super::session_trace::SnapshotPolicy::default(),
+                    runbook_plan: None,
+                    runbook_plan_cursor: None,
+                    execution_log: Vec::new(),
                     created_at: r.created_at,
                     last_active_at: r.last_active_at,
                     // Transient field — the authoritative counter is on `runbook.next_version_counter`

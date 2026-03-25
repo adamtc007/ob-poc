@@ -99,6 +99,25 @@ pub struct VerbConfig {
     /// Controls whether the REPL requires explicit user confirmation before execution.
     #[serde(default)]
     pub confirm_policy: Option<ConfirmPolicyConfig>,
+    /// Typed output declarations for forward-reference resolution in runbook plans.
+    #[serde(default)]
+    pub outputs: Vec<VerbOutputConfig>,
+}
+
+/// Configuration for a verb output declaration.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VerbOutputConfig {
+    /// Output field name (e.g. "created_cbu_id").
+    pub name: String,
+    /// Output type — "uuid", "record", etc.
+    #[serde(rename = "type")]
+    pub output_type: String,
+    /// Entity kind this output refers to (e.g. "cbu", "entity").
+    #[serde(default)]
+    pub entity_kind: Option<String>,
+    /// Human description.
+    #[serde(default)]
+    pub description: Option<String>,
 }
 
 // =============================================================================

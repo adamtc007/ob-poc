@@ -113,6 +113,11 @@ domains:
             - cbu_id
             - created
             - skipped_reason
+        outputs:
+          - name: created_cbu_id
+            type: uuid
+            entity_kind: cbu
+            description: ID of the newly created CBU
       read:
         description: Read a CBU by ID
         invocation_phrases:

@@ -56,6 +56,9 @@ pub struct VerbContractBody {
     /// Tables this verb writes to (populated from domain metadata verb_data_footprint).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub writes_to: Vec<String>,
+    /// Typed output declarations for forward-reference resolution in runbook plans.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub outputs: Vec<VerbOutput>,
 }
 
 /// Safety tier for routing and confirmation policy.
@@ -158,6 +161,21 @@ pub struct VerbProducesSpec {
     pub resolved: bool,
 }
 
+/// Typed output declaration for forward-reference resolution in multi-workspace plans.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct VerbOutput {
+    /// Output field name (e.g. "created_cbu_id").
+    pub field_name: String,
+    /// Output type — "uuid", "record", etc.
+    pub output_type: String,
+    /// Entity kind this output refers to (e.g. "cbu", "entity").
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub entity_kind: Option<String>,
+    /// Human description.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+}
+
 /// Optional metadata attached to a verb contract.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VerbContractMetadata {
@@ -238,6 +256,12 @@ mod tests {
             }),
             reads_from: vec![],
             writes_to: vec!["cbus".into()],
+            outputs: vec![VerbOutput {
+                field_name: "created_cbu_id".into(),
+                output_type: "uuid".into(),
+                entity_kind: Some("cbu".into()),
+                description: Some("ID of the newly created CBU".into()),
+            }],
         };
         let json = serde_json::to_value(&val).unwrap();
         // Check #[serde(rename = "type")] on returns and produces

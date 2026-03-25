@@ -16,7 +16,7 @@ use super::decision_log::SessionDecisionLog;
 use super::proposal_engine::ProposalSet;
 use super::runbook::{ArgExtractionAudit, Runbook, SlotSource};
 use super::types_v2::{
-    ConversationMode, ReplStateV2, SessionFeedback, SessionScope, SubjectRef, VerbRef,
+    AgentMode, ConversationMode, ReplStateV2, SessionFeedback, SessionScope, SubjectRef, VerbRef,
     WorkspaceFrame, WorkspaceHint, WorkspaceKind, WorkspaceStateView,
 };
 use crate::agent::sem_os_context_envelope::SemOsContextEnvelope;
@@ -69,6 +69,27 @@ pub struct ReplSessionV2 {
     pub pending_verb: Option<VerbRef>,
     #[serde(default)]
     pub conversation_mode: ConversationMode,
+    /// Current agent mode — determines permission gates for stack ops vs execution.
+    #[serde(default)]
+    pub agent_mode: AgentMode,
+    /// Append-only trace log capturing every session mutation.
+    #[serde(default, skip)]
+    pub trace: Vec<super::session_trace::TraceEntry>,
+    /// Monotonic trace sequence counter.
+    #[serde(default)]
+    pub trace_sequence: u64,
+    /// Controls when hydrated snapshots are captured in trace entries.
+    #[serde(default)]
+    pub snapshot_policy: super::session_trace::SnapshotPolicy,
+    /// Current runbook plan (multi-workspace orchestration).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub runbook_plan: Option<crate::runbook::plan_types::RunbookPlan>,
+    /// Cursor within the runbook plan (which step to execute next).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub runbook_plan_cursor: Option<usize>,
+    /// Results of executed plan steps.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub execution_log: Vec<crate::runbook::plan_types::StepResult>,
     pub created_at: DateTime<Utc>,
     pub last_active_at: DateTime<Utc>,
     #[serde(default)]
@@ -114,6 +135,13 @@ impl ReplSessionV2 {
             workspace_stack: Vec::new(),
             pending_verb: None,
             conversation_mode: ConversationMode::Inspect,
+            agent_mode: AgentMode::default(),
+            trace: Vec::new(),
+            trace_sequence: 0,
+            snapshot_policy: super::session_trace::SnapshotPolicy::default(),
+            runbook_plan: None,
+            runbook_plan_cursor: None,
+            execution_log: Vec::new(),
             created_at: now,
             last_active_at: now,
             next_runbook_version: 0,
@@ -168,7 +196,10 @@ impl ReplSessionV2 {
     /// assert!(matches!(session.state, ReplStateV2::RunbookEditing));
     /// ```
     pub fn set_state(&mut self, new_state: ReplStateV2) {
+        let from = format!("{:?}", self.state);
+        let to = format!("{:?}", new_state);
         self.state = new_state;
+        self.append_trace(super::session_trace::TraceOp::StateTransition { from, to });
         self.last_active_at = Utc::now();
     }
 
@@ -270,6 +301,85 @@ impl ReplSessionV2 {
         self.workspace_stack.last_mut()
     }
 
+    /// Increment the write counter on the top-of-stack frame.
+    ///
+    /// Called after each verb execution to track whether a pop should mark
+    /// the restored frame as stale.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use ob_poc::repl::session_v2::ReplSessionV2;
+    /// use ob_poc::repl::types_v2::{SessionScope, WorkspaceFrame, WorkspaceKind};
+    /// use uuid::Uuid;
+    ///
+    /// let mut session = ReplSessionV2::new();
+    /// let scope = SessionScope { client_group_id: Uuid::nil(), client_group_name: None };
+    /// session.push_workspace_frame(WorkspaceFrame::new(WorkspaceKind::Deal, scope)).unwrap();
+    /// session.increment_tos_writes();
+    /// assert_eq!(session.tos_frame().unwrap().writes_since_push, 1);
+    /// ```
+    pub fn increment_tos_writes(&mut self) {
+        if let Some(tos) = self.workspace_stack.last_mut() {
+            tos.writes_since_push += 1;
+        }
+    }
+
+    /// Build a lightweight snapshot of the current workspace stack for trace entries.
+    pub(crate) fn stack_snapshot(&self) -> Vec<super::session_trace::FrameRef> {
+        self.workspace_stack
+            .iter()
+            .map(|f| super::session_trace::FrameRef {
+                workspace: f.workspace.clone(),
+                constellation_map: f.constellation_map.clone(),
+                subject_id: f.subject_id,
+                stale: f.stale,
+            })
+            .collect()
+    }
+
+    /// Append a trace entry for the given operation.
+    pub fn append_trace(&mut self, op: super::session_trace::TraceOp) {
+        self.trace_sequence += 1;
+        let snapshot = self.stack_snapshot();
+        self.trace.push(super::session_trace::TraceEntry::new(
+            self.id,
+            self.trace_sequence,
+            self.agent_mode,
+            op,
+            snapshot,
+        ));
+    }
+
+    /// Append an enriched trace entry with verb resolution and execution result.
+    pub fn append_trace_enriched(
+        &mut self,
+        op: super::session_trace::TraceOp,
+        verb_fqn: Option<String>,
+        execution_result: Option<serde_json::Value>,
+    ) {
+        self.trace_sequence += 1;
+        let snapshot = self.stack_snapshot();
+        let mut entry = super::session_trace::TraceEntry::new(
+            self.id,
+            self.trace_sequence,
+            self.agent_mode,
+            op,
+            snapshot,
+        );
+        if let Some(v) = verb_fqn {
+            entry = entry.with_verb_resolved(v);
+        }
+        if let Some(r) = execution_result {
+            entry = entry.with_execution_result(r);
+        }
+        // Attach lightweight session feedback (without hydrated constellation)
+        let feedback = self.build_session_feedback(false);
+        if let Ok(fb_json) = serde_json::to_value(&feedback) {
+            entry = entry.with_session_feedback(fb_json);
+        }
+        self.trace.push(entry);
+    }
+
     /// Push a new frame onto the workspace stack.
     ///
     /// # Examples
@@ -290,8 +400,10 @@ impl ReplSessionV2 {
             self.workspace_stack.len() < 3,
             "workspace stack depth exceeds max depth 3"
         );
-        self.active_workspace = Some(frame.workspace.clone());
+        let ws = frame.workspace.clone();
+        self.active_workspace = Some(ws.clone());
         self.workspace_stack.push(frame);
+        self.append_trace(super::session_trace::TraceOp::StackPush { workspace: ws });
         self.last_active_at = Utc::now();
         Ok(())
     }
@@ -330,8 +442,15 @@ impl ReplSessionV2 {
             return None;
         }
         let popped = self.workspace_stack.pop();
+        if let Some(ref p) = popped {
+            self.append_trace(super::session_trace::TraceOp::StackPop {
+                workspace: p.workspace.clone(),
+            });
+        }
         if let Some(tos) = self.workspace_stack.last_mut() {
-            tos.stale = true;
+            // Only mark stale if the popped frame had writes — a pure peek doesn't
+            // invalidate the frame underneath.
+            tos.stale = popped.as_ref().map_or(false, |p| p.writes_since_push > 0);
             self.active_workspace = Some(tos.workspace.clone());
         }
         self.last_active_at = Utc::now();
@@ -359,8 +478,10 @@ impl ReplSessionV2 {
             self.active_workspace = Some(tos.workspace.clone());
             self.workspace_stack.push(WorkspaceFrame {
                 stale: false,
+                is_peek: false,
                 ..tos
             });
+            self.append_trace(super::session_trace::TraceOp::StackCommit);
         }
         self.last_active_at = Utc::now();
     }

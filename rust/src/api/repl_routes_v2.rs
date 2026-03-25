@@ -425,6 +425,17 @@ async fn push_session_context(
             )
         })?;
 
+    // R1.3: AgentMode gate — stack ops require Sage mode
+    if !existing.agent_mode.can_stack_op() {
+        return Err((
+            StatusCode::FORBIDDEN,
+            Json(ErrorResponseV2 {
+                error: "Stack operations require Sage mode".into(),
+                recoverable: true,
+            }),
+        ));
+    }
+
     if existing.workspace_stack.is_empty() {
         state
             .orchestrator
@@ -464,6 +475,18 @@ async fn commit_session_context(
     State(state): State<ReplV2RouteState>,
     Json(request): Json<SessionStackRequest>,
 ) -> Result<Json<SessionFeedback>, (StatusCode, Json<ErrorResponseV2>)> {
+    // R1.3: AgentMode gate
+    if let Some(session) = state.orchestrator.get_session(request.session_id).await {
+        if !session.agent_mode.can_stack_op() {
+            return Err((
+                StatusCode::FORBIDDEN,
+                Json(ErrorResponseV2 {
+                    error: "Stack operations require Sage mode".into(),
+                    recoverable: true,
+                }),
+            ));
+        }
+    }
     state
         .orchestrator
         .commit_workspace_stack(request.session_id)
@@ -481,6 +504,18 @@ async fn pop_session_context(
     State(state): State<ReplV2RouteState>,
     Json(request): Json<SessionStackRequest>,
 ) -> Result<Json<SessionFeedback>, (StatusCode, Json<ErrorResponseV2>)> {
+    // R1.3: AgentMode gate
+    if let Some(session) = state.orchestrator.get_session(request.session_id).await {
+        if !session.agent_mode.can_stack_op() {
+            return Err((
+                StatusCode::FORBIDDEN,
+                Json(ErrorResponseV2 {
+                    error: "Stack operations require Sage mode".into(),
+                    recoverable: true,
+                }),
+            ));
+        }
+    }
     state
         .orchestrator
         .pop_workspace_frame(request.session_id)
@@ -578,6 +613,626 @@ pub fn navigation_router() -> Router<ReplV2RouteState> {
         .route("/api/session/push", post(push_session_context))
         .route("/api/session/commit", post(commit_session_context))
         .route("/api/session/pop", post(pop_session_context))
+        // Runbook plan routes (R5-R7)
+        .route("/api/session/:id/runbook/compile", post(compile_runbook_plan))
+        .route("/api/session/:id/runbook/plan", get(get_runbook_plan))
+        .route("/api/session/:id/runbook/approve", post(approve_runbook_plan))
+        .route("/api/session/:id/runbook/execute", post(execute_runbook_plan))
+        .route("/api/session/:id/runbook/cancel", post(cancel_runbook_plan))
+        .route("/api/session/:id/runbook/status", get(get_runbook_status))
+        // Session trace routes (R9)
+        .route("/api/session/:id/trace", get(get_session_trace))
+        .route("/api/session/:id/trace/:seq", get(get_trace_entry))
+        .route("/api/session/:id/trace/replay", post(replay_session_trace))
+}
+
+// ============================================================================
+// Runbook Plan Handlers (R5-R7)
+// ============================================================================
+
+/// POST /api/session/:id/runbook/compile — compile a multi-workspace runbook plan.
+async fn compile_runbook_plan(
+    State(state): State<ReplV2RouteState>,
+    Path(session_id): Path<Uuid>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponseV2>)> {
+    let sessions = state.orchestrator.sessions_for_test();
+    let mut sessions_write = sessions.write().await;
+    let session = sessions_write.get_mut(&session_id).ok_or_else(|| {
+        (
+            StatusCode::NOT_FOUND,
+            Json(ErrorResponseV2 {
+                error: format!("Unknown session {session_id}"),
+                recoverable: false,
+            }),
+        )
+    })?;
+
+    // AgentMode gate: compilation requires Sage mode
+    if !session.agent_mode.can_compile() {
+        return Err((
+            StatusCode::FORBIDDEN,
+            Json(ErrorResponseV2 {
+                error: "Runbook compilation requires Sage mode".into(),
+                recoverable: true,
+            }),
+        ));
+    }
+
+    // Build workspace inputs from the current stack.
+    // When hydrated constellation is available, use DAG discovery to find
+    // non-terminal slots and their advancing verbs automatically.
+    let inputs: Vec<crate::runbook::plan_compiler::WorkspaceInput> = session
+        .workspace_stack
+        .iter()
+        .map(|f| {
+            let subject_kind = f
+                .subject_kind
+                .clone()
+                .unwrap_or(crate::repl::types_v2::SubjectKind::Cbu);
+
+            // Try constellation DAG discovery first
+            if let Some(ref hs) = f.hydrated_state {
+                if let Some(ref hydrated) = hs.hydrated_constellation {
+                    return crate::runbook::plan_compiler::input_from_hydrated_constellation(
+                        &f.workspace,
+                        &f.constellation_map,
+                        subject_kind,
+                        f.subject_id,
+                        hydrated,
+                        &std::collections::BTreeMap::new(),
+                    );
+                }
+            }
+
+            // Fallback: use the scoped verb surface from hydrated state
+            crate::runbook::plan_compiler::WorkspaceInput {
+                workspace: f.workspace.clone(),
+                constellation_map: f.constellation_map.clone(),
+                subject_kind,
+                subject_id: f.subject_id,
+                advancing_verbs: f
+                    .hydrated_state
+                    .as_ref()
+                    .map(|h| h.scoped_verb_surface.clone())
+                    .unwrap_or_default(),
+                verb_outputs: std::collections::BTreeMap::new(),
+            }
+        })
+        .collect();
+
+    if inputs.is_empty() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(ErrorResponseV2 {
+                error: "No workspace frames to compile from".into(),
+                recoverable: true,
+            }),
+        ));
+    }
+
+    let plan = crate::runbook::plan_compiler::compile_runbook_plan(
+        session_id,
+        &inputs,
+        vec![], // source_research trace refs
+    )
+    .map_err(anyhow_json_error)?;
+
+    let plan_id = plan.id.0.clone();
+    let step_count = plan.steps.len();
+
+    // Append trace and store plan on session
+    session.append_trace(crate::repl::session_trace::TraceOp::RunbookCompiled {
+        runbook_id: plan_id.clone(),
+    });
+    session.runbook_plan = Some(plan);
+    session.runbook_plan_cursor = Some(0);
+
+    Ok(Json(serde_json::json!({
+        "status": "compiled",
+        "plan_id": plan_id,
+        "step_count": step_count
+    })))
+}
+
+/// GET /api/session/:id/runbook/plan — returns current RunbookPlan for rendering.
+async fn get_runbook_plan(
+    State(state): State<ReplV2RouteState>,
+    Path(session_id): Path<Uuid>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponseV2>)> {
+    let session = state
+        .orchestrator
+        .get_session(session_id)
+        .await
+        .ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                Json(ErrorResponseV2 {
+                    error: format!("Unknown session {session_id}"),
+                    recoverable: false,
+                }),
+            )
+        })?;
+
+    match &session.runbook_plan {
+        Some(plan) => Ok(Json(serde_json::to_value(plan).unwrap_or_default())),
+        None => Err((
+            StatusCode::NOT_FOUND,
+            Json(ErrorResponseV2 {
+                error: "No runbook plan compiled for this session".into(),
+                recoverable: true,
+            }),
+        )),
+    }
+}
+
+/// POST /api/session/:id/runbook/approve — transition Compiled → Approved.
+async fn approve_runbook_plan(
+    State(state): State<ReplV2RouteState>,
+    Path(session_id): Path<Uuid>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponseV2>)> {
+    let sessions = state.orchestrator.sessions_for_test();
+    let mut sessions_write = sessions.write().await;
+    let session = sessions_write.get_mut(&session_id).ok_or_else(|| {
+        (
+            StatusCode::NOT_FOUND,
+            Json(ErrorResponseV2 {
+                error: format!("Unknown session {session_id}"),
+                recoverable: false,
+            }),
+        )
+    })?;
+
+    use crate::runbook::plan_types::{RunbookApproval, RunbookPlanStatus};
+
+    // Check plan exists and status is valid
+    let plan_id = {
+        let plan = session.runbook_plan.as_ref().ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                Json(ErrorResponseV2 {
+                    error: "No runbook plan to approve".into(),
+                    recoverable: true,
+                }),
+            )
+        })?;
+        match &plan.status {
+            RunbookPlanStatus::Compiled | RunbookPlanStatus::AwaitingApproval => {
+                plan.id.0.clone()
+            }
+            other => {
+                return Err((
+                    StatusCode::CONFLICT,
+                    Json(ErrorResponseV2 {
+                        error: format!("Cannot approve plan in {:?} status", other),
+                        recoverable: false,
+                    }),
+                ));
+            }
+        }
+    };
+
+    // Now mutate plan and session separately
+    if let Some(plan) = session.runbook_plan.as_mut() {
+        plan.approval = Some(RunbookApproval {
+            approved_by: "session_user".into(),
+            approved_at: chrono::Utc::now(),
+            plan_hash: plan_id.clone(),
+        });
+        plan.status = RunbookPlanStatus::Approved;
+    }
+    session.append_trace(crate::repl::session_trace::TraceOp::RunbookApproved {
+        runbook_id: plan_id.clone(),
+    });
+    Ok(Json(serde_json::json!({ "status": "approved", "plan_id": plan_id })))
+}
+
+/// POST /api/session/:id/runbook/execute — start or resume execution.
+async fn execute_runbook_plan(
+    State(state): State<ReplV2RouteState>,
+    Path(session_id): Path<Uuid>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponseV2>)> {
+    // Phase 1: Read session data under a brief read lock, then release before async work.
+    // RwLockWriteGuard is !Send so we cannot hold it across .await points.
+    let (_step_verb, _step_sentence, _step_args, step_id, cursor, compiled, compiled_id) = {
+        let sessions = state.orchestrator.sessions_for_test();
+        let mut sessions_write = sessions.write().await;
+        let session = sessions_write.get_mut(&session_id).ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                Json(ErrorResponseV2 {
+                    error: format!("Unknown session {session_id}"),
+                    recoverable: false,
+                }),
+            )
+        })?;
+
+        // AgentMode gate: execution requires Repl mode
+        if !session.agent_mode.can_execute() {
+            return Err((
+                StatusCode::FORBIDDEN,
+                Json(ErrorResponseV2 {
+                    error: "Runbook execution requires Repl mode".into(),
+                    recoverable: true,
+                }),
+            ));
+        }
+
+        let plan = session.runbook_plan.as_ref().ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                Json(ErrorResponseV2 {
+                    error: "No runbook plan to execute".into(),
+                    recoverable: true,
+                }),
+            )
+        })?;
+
+        use crate::runbook::plan_types::RunbookPlanStatus;
+        match &plan.status {
+            RunbookPlanStatus::Approved | RunbookPlanStatus::Executing { .. } => {}
+            other => {
+                return Err((
+                    StatusCode::CONFLICT,
+                    Json(ErrorResponseV2 {
+                        error: format!(
+                            "Cannot execute plan in {:?} status (must be Approved)",
+                            other
+                        ),
+                        recoverable: false,
+                    }),
+                ));
+            }
+        }
+
+        let cursor = session.runbook_plan_cursor.unwrap_or(0);
+        let plan = session.runbook_plan.as_ref().unwrap();
+
+        if cursor >= plan.steps.len() {
+            // All steps done
+            crate::runbook::plan_executor::update_plan_status(
+                session.runbook_plan.as_mut().unwrap(),
+            );
+            let narration = crate::runbook::narration::narrate_plan(
+                session.runbook_plan.as_ref().unwrap(),
+                &session.execution_log,
+            );
+            return Ok(Json(serde_json::to_value(&narration).unwrap_or_default()));
+        }
+
+        // Check for workspace transition
+        if let Some(next_ws) = crate::runbook::plan_executor::needs_workspace_transition(
+            plan,
+            cursor.saturating_sub(1),
+        ) {
+            // In a real implementation this would push workspace and hydrate.
+            // For now, record the transition need.
+            if cursor > 0 {
+                return Ok(Json(serde_json::json!({
+                    "status": "workspace_transition_needed",
+                    "target_workspace": next_ws,
+                    "cursor": cursor,
+                })));
+            }
+        }
+
+        // Resolve forward references for this step
+        let resolved_subject =
+            crate::runbook::plan_executor::resolve_step_bindings(plan, cursor)
+                .map_err(anyhow_json_error)?;
+
+        if resolved_subject.is_none() {
+            // Forward ref not yet resolved — dependency not fulfilled
+            let plan_mut = session.runbook_plan.as_mut().unwrap();
+            let skipped = crate::runbook::plan_executor::skip_dependent_steps(plan_mut, cursor);
+            session.execution_log.extend(skipped);
+            return Err((
+                StatusCode::CONFLICT,
+                Json(ErrorResponseV2 {
+                    error: format!("Step {} has unresolved forward reference", cursor),
+                    recoverable: false,
+                }),
+            ));
+        }
+
+        // Extract step data for async execution outside the lock
+        let step = &plan.steps[cursor];
+        let step_verb = step.verb.verb_fqn.clone();
+        let step_sentence = step.sentence.clone();
+        let step_args = step.args.clone();
+        let step_id = Uuid::new_v4();
+
+        // Construct DSL from verb + args
+        let dsl = crate::repl::orchestrator_v2::rebuild_dsl(&step_verb, &{
+            let mut m = std::collections::HashMap::new();
+            for (k, v) in &step_args {
+                m.insert(k.clone(), v.clone());
+            }
+            m
+        });
+
+        // Build CompiledStep + CompiledRunbook wrapper
+        let compiled_step = crate::runbook::types::CompiledStep {
+            step_id,
+            sentence: step_sentence.clone(),
+            verb: step_verb.clone(),
+            dsl,
+            args: step_args.clone(),
+            depends_on: vec![],
+            execution_mode: crate::runbook::types::ExecutionMode::Sync,
+            write_set: vec![],
+            verb_contract_snapshot_id: None,
+        };
+        let compiled = crate::runbook::types::CompiledRunbook::new(
+            session_id,
+            session.allocate_runbook_version(),
+            vec![compiled_step],
+            crate::runbook::envelope::ReplayEnvelope::empty(),
+        );
+        let compiled_id = compiled.id;
+
+        (
+            step_verb,
+            step_sentence,
+            step_args,
+            step_id,
+            cursor,
+            compiled,
+            compiled_id,
+        )
+    }; // write lock released here
+
+    // Phase 2: Async execution work (no lock held)
+    let store = state
+        .orchestrator
+        .runbook_store()
+        .unwrap_or_else(|| std::sync::Arc::new(crate::runbook::RunbookStore::new()));
+
+    use crate::runbook::RunbookStoreBackend;
+    store
+        .insert(&compiled)
+        .await
+        .map_err(|e| anyhow_json_error(anyhow::anyhow!("{}", e)))?;
+
+    // Build step executor bridge and run through execute_runbook
+    let bridge = crate::runbook::step_executor_bridge::DslStepExecutor::new(
+        state.orchestrator.executor(),
+    );
+    let execution_outcome = match crate::runbook::execute_runbook(
+        &*store,
+        compiled_id,
+        None,
+        &bridge,
+    )
+    .await
+    {
+        Ok(result) => {
+            let output_json = serde_json::to_value(&result).unwrap_or_default();
+            Ok(output_json)
+        }
+        Err(e) => Err(anyhow::anyhow!("{}", e)),
+    };
+
+    // Phase 3: Re-acquire write lock to store results back
+    {
+        let sessions = state.orchestrator.sessions_for_test();
+        let mut sessions_write = sessions.write().await;
+        let session = sessions_write.get_mut(&session_id).ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                Json(ErrorResponseV2 {
+                    error: format!("Session {session_id} disappeared during execution"),
+                    recoverable: false,
+                }),
+            )
+        })?;
+
+        // Advance plan step with the execution result
+        let plan_mut = session.runbook_plan.as_mut().ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                Json(ErrorResponseV2 {
+                    error: "Runbook plan disappeared during execution".into(),
+                    recoverable: false,
+                }),
+            )
+        })?;
+        let step_result = crate::runbook::plan_executor::advance_plan_step(
+            plan_mut,
+            cursor,
+            execution_outcome,
+        )
+        .map_err(anyhow_json_error)?;
+
+        // Record enriched verb execution in trace
+        let verb_fqn = step_result.verb_fqn.clone();
+        let exec_result_json = step_result.output.clone();
+        session.append_trace_enriched(
+            crate::repl::session_trace::TraceOp::VerbExecuted {
+                verb_fqn: verb_fqn.clone(),
+                step_id,
+            },
+            Some(verb_fqn.clone()),
+            exec_result_json,
+        );
+        session.increment_tos_writes();
+        session.execution_log.push(step_result.clone());
+        session.runbook_plan_cursor = Some(cursor + 1);
+
+        // Check if plan is complete
+        crate::runbook::plan_executor::update_plan_status(
+            session.runbook_plan.as_mut().unwrap(),
+        );
+
+        // Generate narration
+        let narration = crate::runbook::narration::narrate_step(
+            session.runbook_plan.as_ref().unwrap(),
+            &step_result,
+        );
+
+        Ok(Json(serde_json::json!({
+            "status": "step_executed",
+            "cursor": cursor + 1,
+            "step_narration": narration,
+            "plan_status": session.runbook_plan.as_ref().unwrap().status,
+        })))
+    }
+}
+
+/// POST /api/session/:id/runbook/cancel — cancel mid-execution.
+async fn cancel_runbook_plan(
+    State(state): State<ReplV2RouteState>,
+    Path(session_id): Path<Uuid>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponseV2>)> {
+    let sessions = state.orchestrator.sessions_for_test();
+    let mut sessions_write = sessions.write().await;
+    let session = sessions_write.get_mut(&session_id).ok_or_else(|| {
+        (
+            StatusCode::NOT_FOUND,
+            Json(ErrorResponseV2 {
+                error: format!("Unknown session {session_id}"),
+                recoverable: false,
+            }),
+        )
+    })?;
+
+    let plan = session.runbook_plan.as_mut().ok_or_else(|| {
+        (
+            StatusCode::NOT_FOUND,
+            Json(ErrorResponseV2 {
+                error: "No runbook plan to cancel".into(),
+                recoverable: true,
+            }),
+        )
+    })?;
+
+    let cancelled = crate::runbook::plan_executor::cancel_plan(plan);
+    Ok(Json(serde_json::json!({
+        "status": "cancelled",
+        "steps_cancelled": cancelled.len()
+    })))
+}
+
+/// GET /api/session/:id/runbook/status — current plan status.
+async fn get_runbook_status(
+    State(state): State<ReplV2RouteState>,
+    Path(session_id): Path<Uuid>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponseV2>)> {
+    let session = state
+        .orchestrator
+        .get_session(session_id)
+        .await
+        .ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                Json(ErrorResponseV2 {
+                    error: format!("Unknown session {session_id}"),
+                    recoverable: false,
+                }),
+            )
+        })?;
+
+    match &session.runbook_plan {
+        Some(plan) => Ok(Json(serde_json::json!({
+            "plan_id": plan.id.0,
+            "status": plan.status,
+            "total_steps": plan.steps.len(),
+            "cursor": session.runbook_plan_cursor,
+        }))),
+        None => Ok(Json(serde_json::json!({ "status": "no_plan" }))),
+    }
+}
+
+// ============================================================================
+// Session Trace Handlers (R9)
+// ============================================================================
+
+/// GET /api/session/:id/trace — retrieve session trace.
+async fn get_session_trace(
+    State(state): State<ReplV2RouteState>,
+    Path(session_id): Path<Uuid>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponseV2>)> {
+    let session = state
+        .orchestrator
+        .get_session(session_id)
+        .await
+        .ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                Json(ErrorResponseV2 {
+                    error: format!("Unknown session {session_id}"),
+                    recoverable: false,
+                }),
+            )
+        })?;
+
+    Ok(Json(serde_json::to_value(&session.trace).unwrap_or_default()))
+}
+
+/// GET /api/session/:id/trace/:seq — retrieve a single trace entry.
+async fn get_trace_entry(
+    State(state): State<ReplV2RouteState>,
+    Path((session_id, seq)): Path<(Uuid, u64)>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponseV2>)> {
+    let session = state
+        .orchestrator
+        .get_session(session_id)
+        .await
+        .ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                Json(ErrorResponseV2 {
+                    error: format!("Unknown session {session_id}"),
+                    recoverable: false,
+                }),
+            )
+        })?;
+
+    // Check in-memory trace first
+    if let Some(entry) = session.trace.iter().find(|e| e.sequence == seq) {
+        return Ok(Json(serde_json::to_value(entry).unwrap_or_default()));
+    }
+
+    Err((
+        StatusCode::NOT_FOUND,
+        Json(ErrorResponseV2 {
+            error: format!("Trace entry {seq} not found for session {session_id}"),
+            recoverable: false,
+        }),
+    ))
+}
+
+/// POST /api/session/:id/trace/replay — replay from trace tape.
+async fn replay_session_trace(
+    State(state): State<ReplV2RouteState>,
+    Path(session_id): Path<Uuid>,
+    Json(body): Json<serde_json::Value>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponseV2>)> {
+    let session = state
+        .orchestrator
+        .get_session(session_id)
+        .await
+        .ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                Json(ErrorResponseV2 {
+                    error: format!("Unknown session {session_id}"),
+                    recoverable: false,
+                }),
+            )
+        })?;
+
+    let mode_str = body
+        .get("mode")
+        .and_then(|v| v.as_str())
+        .unwrap_or("relaxed");
+    let mode = match mode_str {
+        "strict" => crate::repl::session_replay::ReplayMode::Strict,
+        "dry_run" => crate::repl::session_replay::ReplayMode::DryRun,
+        _ => crate::repl::session_replay::ReplayMode::Relaxed,
+    };
+
+    let result = crate::repl::session_replay::replay_trace(&session.trace, mode);
+    Ok(Json(serde_json::to_value(&result).unwrap_or_default()))
 }
 
 fn as_json_error(error: (StatusCode, String)) -> (StatusCode, Json<ErrorResponseV2>) {

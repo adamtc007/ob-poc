@@ -374,6 +374,7 @@ mod tests {
             crud_mapping: None,
             reads_from: vec![],
             writes_to: vec![],
+            outputs: vec![],
         })
         .unwrap();
 
@@ -422,6 +423,7 @@ mod tests {
             }),
             reads_from: vec![],
             writes_to: vec![],
+            outputs: vec![],
         })
         .unwrap();
 
@@ -478,6 +480,7 @@ mod tests {
             crud_mapping: None,
             reads_from: vec![],
             writes_to: vec![],
+            outputs: vec![],
         })
         .unwrap();
 
@@ -521,6 +524,7 @@ mod tests {
             crud_mapping: None,
             reads_from: vec!["entities".into()],
             writes_to: vec!["cbus".into()],
+            outputs: vec![],
         })
         .unwrap();
 
@@ -725,6 +729,7 @@ mod tests {
             }),
             reads_from: vec![],
             writes_to: vec![],
+            outputs: vec![],
         })
         .unwrap();
 
@@ -757,6 +762,7 @@ mod tests {
             }),
             reads_from: vec![],
             writes_to: vec![],
+            outputs: vec![],
         })
         .unwrap();
 
@@ -824,6 +830,7 @@ mod tests {
             }),
             reads_from: vec![],
             writes_to: vec![],
+            outputs: vec![],
         })
         .unwrap();
 

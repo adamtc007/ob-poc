@@ -82,3 +82,13 @@ pub mod decision_log;
 
 #[cfg(feature = "vnext-repl")]
 pub mod preconditions;
+
+#[cfg(feature = "vnext-repl")]
+pub mod session_trace;
+
+#[cfg(feature = "vnext-repl")]
+#[cfg(feature = "database")]
+pub mod trace_repository;
+
+#[cfg(feature = "vnext-repl")]
+pub mod session_replay;

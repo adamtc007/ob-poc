@@ -831,6 +831,7 @@ mod tests {
             invocation_phrases: vec![],
             required_context: vec![],
             optional_context: vec![],
+            workspaces: vec![],
             allowed_verbs,
             forbidden_verbs,
             risk_policy: Default::default(),

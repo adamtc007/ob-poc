@@ -41,6 +41,14 @@ pub mod response;
 pub mod sem_os_filter;
 #[cfg(feature = "vnext-repl")]
 pub mod step_executor_bridge;
+#[cfg(feature = "vnext-repl")]
+pub mod narration;
+#[cfg(feature = "vnext-repl")]
+pub mod plan_compiler;
+#[cfg(feature = "vnext-repl")]
+pub mod plan_executor;
+#[cfg(feature = "vnext-repl")]
+pub mod plan_types;
 pub mod types;
 #[cfg(feature = "vnext-repl")]
 pub mod verb_classifier;

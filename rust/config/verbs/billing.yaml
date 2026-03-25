@@ -116,6 +116,11 @@ domains:
           type: uuid
           name: profile_id
           capture: true
+        outputs:
+          - name: created_billing_profile_id
+            type: uuid
+            entity_kind: billing_profile
+            description: ID of the newly created billing profile
 
       activate-profile:
         description: "Activate a billing profile (CBU is live and generating activity)"

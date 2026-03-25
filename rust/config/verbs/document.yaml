@@ -756,6 +756,11 @@ domains:
           type: uuid
           name: document_id
           capture: true
+        outputs:
+          - name: created_document_id
+            type: uuid
+            entity_kind: document
+            description: ID of the newly created document
 
       upload-version:
         description: Upload a new version of a document (Layer C - immutable submission)

@@ -445,6 +445,7 @@ mod tests {
                 invocation_phrases: vec![],
                 policy: None,
                 confirm_policy: None,
+                outputs: vec![],
             },
         );
 
@@ -480,6 +481,7 @@ mod tests {
                     invocation_phrases: vec![],
                     policy: None,
                     confirm_policy: None,
+                    outputs: vec![],
                 },
             );
         }

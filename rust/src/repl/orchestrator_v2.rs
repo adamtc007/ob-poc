@@ -491,6 +491,16 @@ impl ReplOrchestratorV2 {
         &self.sessions
     }
 
+    /// Expose the runbook store for plan execution.
+    pub fn runbook_store(&self) -> Option<Arc<RunbookStore>> {
+        self.runbook_store.clone()
+    }
+
+    /// Expose the DSL executor for plan step execution.
+    pub fn executor(&self) -> Arc<dyn DslExecutor> {
+        self.executor.clone()
+    }
+
     /// Signal that an external task completed (or failed) for a parked entry.
     ///
     /// Finds the session owning `correlation_key` via the runbook invocation

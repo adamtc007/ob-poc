@@ -360,6 +360,7 @@ pub fn synthesize_chain(
 ///     crud_mapping: None,
 ///     reads_from: vec![],
 ///     writes_to: vec![],
+///     outputs: vec![],
 /// };
 /// let prompts = generate_disambiguation(&verb, None);
 /// assert!(!prompts.is_empty());
@@ -563,6 +564,7 @@ mod tests {
             crud_mapping: None,
             reads_from: vec![],
             writes_to: vec![],
+            outputs: vec![],
         }
     }
 

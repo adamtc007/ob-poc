@@ -2429,6 +2429,7 @@ mod tests {
             invocation_phrases: Vec::new(),
             required_context: Vec::new(),
             optional_context: Vec::new(),
+            workspaces: vec![],
             allowed_verbs: Vec::new(),
             forbidden_verbs: Vec::new(),
             risk_policy: Default::default(),

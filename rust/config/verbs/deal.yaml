@@ -90,6 +90,11 @@ domains:
           type: uuid
           name: deal_id
           capture: true
+        outputs:
+          - name: created_deal_id
+            type: uuid
+            entity_kind: deal
+            description: ID of the newly created deal
 
       read-record:
         description: "Read the primary deal record by ID"

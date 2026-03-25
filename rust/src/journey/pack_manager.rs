@@ -467,6 +467,7 @@ mod tests {
             invocation_phrases: vec![],
             required_context: vec![],
             optional_context: vec![],
+            workspaces: vec![],
             allowed_verbs: allowed.iter().map(|s| s.to_string()).collect(),
             forbidden_verbs: forbidden.iter().map(|s| s.to_string()).collect(),
             risk_policy: Default::default(),

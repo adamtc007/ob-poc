@@ -253,6 +253,11 @@ domains:
           type: uuid
           name: entity_id
           capture: true
+        outputs:
+          - name: created_fund_id
+            type: uuid
+            entity_kind: fund
+            description: ID of the newly created fund
 
       ensure:
         description: Create or update a fund structure or share class using a fund-type discriminator

@@ -18,7 +18,7 @@ use sem_os_core::{
     types::{Classification, EvidenceGrade, HandlingControl, SecurityLabel},
     verb_contract::{
         ActionClass, HarmClass, VerbArgDef, VerbArgLookup, VerbContractBody, VerbContractMetadata,
-        VerbCrudMapping, VerbPrecondition, VerbProducesSpec, VerbReturnSpec,
+        VerbCrudMapping, VerbOutput, VerbPrecondition, VerbProducesSpec, VerbReturnSpec,
     },
 };
 
@@ -185,6 +185,16 @@ pub fn verb_config_to_contract(
         crud_mapping,
         reads_from: vec![],
         writes_to: vec![],
+        outputs: config
+            .outputs
+            .iter()
+            .map(|o| VerbOutput {
+                field_name: o.name.clone(),
+                output_type: o.output_type.clone(),
+                entity_kind: o.entity_kind.clone(),
+                description: o.description.clone(),
+            })
+            .collect(),
     }
 }
 
@@ -1410,6 +1420,7 @@ domains:
                 crud_mapping: None,
                 reads_from: vec![],
                 writes_to: vec![],
+                outputs: vec![],
             },
             VerbContractBody {
                 fqn: "cbu.create".into(),
@@ -1435,6 +1446,7 @@ domains:
                 crud_mapping: None,
                 reads_from: vec![],
                 writes_to: vec![],
+                outputs: vec![],
             },
         ];
 
@@ -1478,6 +1490,7 @@ domains:
             crud_mapping: None,
             reads_from: vec![],
             writes_to: vec![],
+            outputs: vec![],
         }];
 
         enrich_verb_contracts(&mut contracts, &meta);

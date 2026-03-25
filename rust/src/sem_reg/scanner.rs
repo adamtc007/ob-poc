@@ -520,6 +520,7 @@ mod tests {
             policy: None,
             sentences: None,
             confirm_policy: None,
+            outputs: vec![],
         }
     }
 

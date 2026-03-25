@@ -240,6 +240,7 @@ mod tests {
                 crud_mapping: None,
                 reads_from: vec![],
                 writes_to: vec![],
+                outputs: vec![],
             },
             VerbContractBody {
                 fqn: "cbu.create".into(),
@@ -265,6 +266,7 @@ mod tests {
                 crud_mapping: None,
                 reads_from: vec![],
                 writes_to: vec![],
+                outputs: vec![],
             },
         ]);
 

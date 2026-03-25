@@ -245,11 +245,29 @@ pub struct SessionScope {
 }
 
 /// Sage vs REPL mode at the current top-of-stack context.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum AgentMode {
+    #[default]
     Sage,
     Repl,
+}
+
+impl AgentMode {
+    /// Whether this mode permits stack operations (push/pop/commit).
+    pub fn can_stack_op(&self) -> bool {
+        matches!(self, Self::Sage)
+    }
+
+    /// Whether this mode permits verb execution.
+    pub fn can_execute(&self) -> bool {
+        matches!(self, Self::Repl)
+    }
+
+    /// Whether this mode permits runbook compilation.
+    pub fn can_compile(&self) -> bool {
+        matches!(self, Self::Sage)
+    }
 }
 
 /// Subject kinds supported by the session-scoped navigation layer.
@@ -362,6 +380,12 @@ pub struct WorkspaceFrame {
     pub pushed_at: DateTime<Utc>,
     #[serde(default)]
     pub stale: bool,
+    /// Number of write operations (verb executions) since this frame was pushed.
+    #[serde(default)]
+    pub writes_since_push: u32,
+    /// Whether this frame was pushed as a peek (read-only workspace glance).
+    #[serde(default)]
+    pub is_peek: bool,
 }
 
 impl WorkspaceFrame {
@@ -377,6 +401,8 @@ impl WorkspaceFrame {
     ///     SessionScope { client_group_id: Uuid::nil(), client_group_name: None },
     /// );
     /// assert_eq!(frame.constellation_family, "commercial");
+    /// assert_eq!(frame.writes_since_push, 0);
+    /// assert!(!frame.is_peek);
     /// ```
     pub fn new(workspace: WorkspaceKind, session_scope: SessionScope) -> Self {
         let registry = workspace.registry_entry();
@@ -390,6 +416,8 @@ impl WorkspaceFrame {
             hydrated_state: None,
             pushed_at: Utc::now(),
             stale: false,
+            writes_since_push: 0,
+            is_peek: false,
         }
     }
 }
