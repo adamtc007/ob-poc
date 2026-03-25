@@ -936,6 +936,7 @@ fn build_attribute_def_body(
 }
 
 #[cfg(feature = "database")]
+#[allow(clippy::too_many_arguments)]
 fn build_derivation_spec_body(
     semantic_id: &str,
     display_name: &str,
@@ -973,6 +974,7 @@ fn build_derivation_spec_body(
 }
 
 #[cfg(feature = "database")]
+#[allow(clippy::too_many_arguments)]
 async fn upsert_attribute_registry(
     tx: &mut Transaction<'_, Postgres>,
     semantic_id: &str,
@@ -1892,9 +1894,9 @@ impl CustomOperation for AttributeInspectOp {
                     .map(str::to_string);
                 json!({
                     "function": function,
-                    "inputs": definition.get("inputs").cloned().unwrap_or_else(|| json!([])),
-                    "null_semantics": definition.get("null_semantics").cloned().unwrap_or_else(|| json!(null)),
-                    "freshness_rule": definition.get("freshness_rule").cloned().unwrap_or_else(|| json!(null)),
+                    "inputs": definition.get("inputs").cloned().unwrap_or(json!([])),
+                    "null_semantics": definition.get("null_semantics").cloned().unwrap_or(serde_json::Value::Null),
+                    "freshness_rule": definition.get("freshness_rule").cloned().unwrap_or(serde_json::Value::Null),
                 })
             })
             .unwrap_or_else(|| json!(null));

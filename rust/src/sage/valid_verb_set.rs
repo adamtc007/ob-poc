@@ -884,9 +884,8 @@ mod tests {
         assert!(!valid.is_empty(), "Valid verb set should not be empty");
         // With no entities, we should get creation verbs for root/mandatory slots
         assert!(
-            valid.len() >= 1,
-            "Expected at least 1 creation verb, got {}",
-            valid.len()
+            !valid.is_empty(),
+            "Expected at least 1 creation verb, got 0",
         );
     }
 
