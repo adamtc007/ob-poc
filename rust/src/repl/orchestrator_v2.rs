@@ -7,8 +7,9 @@
 //!
 //! | Current State       | Input           | Handler                | Next State              |
 //! |---------------------|-----------------|------------------------|-------------------------|
-//! | ScopeGate           | Message         | try_resolve_scope()    | JourneySelection or ScopeGate |
-//! | ScopeGate           | SelectScope     | set_scope()            | JourneySelection        |
+//! | ScopeGate           | Message         | try_resolve_scope()    | WorkspaceSelection or ScopeGate |
+//! | ScopeGate           | SelectScope     | set_scope()            | WorkspaceSelection      |
+//! | WorkspaceSelection  | SelectWorkspace | set_workspace()        | JourneySelection        |
 //! | JourneySelection    | Message         | route_pack()           | InPack or JourneySelection |
 //! | JourneySelection    | SelectPack      | activate_pack()        | InPack                  |
 //! | InPack              | Message         | handle_in_pack_msg()   | SentencePlayback or InPack |
@@ -41,7 +42,9 @@ use super::runbook::{
 };
 use super::sentence_gen::SentenceGenerator;
 use super::session_v2::{MessageRole, ReplSessionV2};
-use super::types_v2::{ExecutionProgress, ReplCommandV2, ReplStateV2, UserInputV2};
+use super::types_v2::{
+    ExecutionProgress, ReplCommandV2, ReplStateV2, UserInputV2, WorkspaceKind, WorkspaceOption,
+};
 use super::verb_config_index::VerbConfigIndex;
 use crate::dsl_v2::macros::MacroRegistry;
 use crate::journey::handoff::PackHandoff;
@@ -478,6 +481,9 @@ impl ReplOrchestratorV2 {
         // Dispatch based on current state.
         let response = match session.state.clone() {
             ReplStateV2::ScopeGate { .. } => self.handle_scope_gate(session, input).await,
+            ReplStateV2::WorkspaceSelection { .. } => {
+                self.handle_workspace_selection(session, input)
+            }
             ReplStateV2::JourneySelection { .. } => self.handle_journey_selection(session, input),
             ReplStateV2::InPack { .. } => self.handle_in_pack(session, input).await,
             ReplStateV2::Clarifying { .. } => self.handle_clarifying(session, input),
@@ -764,6 +770,33 @@ impl ReplOrchestratorV2 {
         }
     }
 
+    fn handle_workspace_selection(
+        &self,
+        session: &mut ReplSessionV2,
+        input: UserInputV2,
+    ) -> ReplResponseV2 {
+        match input {
+            UserInputV2::SelectWorkspace { workspace } => {
+                session.set_workspace(workspace.clone());
+                session.set_state(ReplStateV2::JourneySelection { candidates: None });
+                let packs = self.pack_router.list_packs_for_workspace(&workspace);
+                ReplResponseV2 {
+                    state: session.state.clone(),
+                    kind: ReplResponseKindV2::JourneyOptions {
+                        packs: packs.clone(),
+                    },
+                    message: format!(
+                        "{} workspace selected. Which journey would you like to start?",
+                        workspace.label()
+                    ),
+                    runbook_summary: None,
+                    step_count: session.runbook.entries.len(),
+                }
+            }
+            _ => self.invalid_input(session, "Please select a workspace first."),
+        }
+    }
+
     fn handle_journey_selection(
         &self,
         session: &mut ReplSessionV2,
@@ -772,8 +805,12 @@ impl ReplOrchestratorV2 {
         match input {
             UserInputV2::SelectPack { pack_id } => self.activate_pack_by_id(session, &pack_id),
             UserInputV2::Message { content } => {
+                let Some(workspace) = session.active_workspace.as_ref() else {
+                    return self
+                        .invalid_input(session, "Select a workspace before choosing a journey.");
+                };
                 // Route via PackRouter.
-                match self.pack_router.route(&content) {
+                match self.pack_router.route_for_workspace(&content, workspace) {
                     PackRouteOutcome::Matched(manifest, hash) => {
                         let pack_id = manifest.id.clone();
                         let pack_name = manifest.name.clone();
@@ -806,7 +843,7 @@ impl ReplOrchestratorV2 {
                         }
                     }
                     PackRouteOutcome::NoMatch => {
-                        let packs = self.pack_router.list_packs();
+                        let packs = self.pack_router.list_packs_for_workspace(workspace);
                         session.set_state(ReplStateV2::JourneySelection {
                             candidates: Some(packs.clone()),
                         });
@@ -1440,7 +1477,7 @@ impl ReplOrchestratorV2 {
     // -----------------------------------------------------------------------
 
     /// Complete the scope gate: build scope DSL, add to runbook, execute,
-    /// and only on success set client context and transition to JourneySelection.
+    /// and only on success set client context and transition to WorkspaceSelection.
     ///
     /// Nothing is real until it's DSL on the runsheet, executed through the executor.
     async fn complete_scope_gate(
@@ -1537,18 +1574,20 @@ impl ReplOrchestratorV2 {
         // 5. Only set context and transition if the DSL actually succeeded.
         if succeeded {
             session.set_client_scope(group_id);
-            session.set_state(ReplStateV2::JourneySelection { candidates: None });
-
-            let examples = super::bootstrap::default_example_phrases();
-            let message = super::bootstrap::format_ready_message(group_name, &examples);
-            let packs = self.pack_router.list_packs();
+            let workspaces = self.workspace_options();
+            session.set_state(ReplStateV2::WorkspaceSelection {
+                workspaces: workspaces.clone(),
+            });
 
             ReplResponseV2 {
                 state: session.state.clone(),
-                kind: ReplResponseKindV2::JourneyOptions {
-                    packs: packs.clone(),
+                kind: ReplResponseKindV2::WorkspaceOptions {
+                    workspaces: workspaces.clone(),
                 },
-                message,
+                message: format!(
+                    "Scope set to {}. Which workspace would you like to enter?",
+                    group_name
+                ),
                 runbook_summary: None,
                 step_count: 1,
             }
@@ -1576,6 +1615,46 @@ impl ReplOrchestratorV2 {
                 step_count: 1,
             }
         }
+    }
+
+    fn workspace_options(&self) -> Vec<WorkspaceOption> {
+        vec![
+            WorkspaceOption {
+                workspace: WorkspaceKind::ProductMaintenance,
+                label: WorkspaceKind::ProductMaintenance.label().to_string(),
+                description:
+                    "Design-time product, service, servicing-resource, and resource dictionary taxonomy"
+                        .to_string(),
+            },
+            WorkspaceOption {
+                workspace: WorkspaceKind::Deal,
+                label: WorkspaceKind::Deal.label().to_string(),
+                description: "Commercial deal, contracts, pricing, and onboarding handoff"
+                    .to_string(),
+            },
+            WorkspaceOption {
+                workspace: WorkspaceKind::Cbu,
+                label: WorkspaceKind::Cbu.label().to_string(),
+                description: "CBU maintenance, roles, and operating structure state".to_string(),
+            },
+            WorkspaceOption {
+                workspace: WorkspaceKind::Kyc,
+                label: WorkspaceKind::Kyc.label().to_string(),
+                description: "Group and delta KYC, UBO, screening, and evidence".to_string(),
+            },
+            WorkspaceOption {
+                workspace: WorkspaceKind::InstrumentMatrix,
+                label: WorkspaceKind::InstrumentMatrix.label().to_string(),
+                description: "Trading profile, instruction matrix, and executable mandate rules"
+                    .to_string(),
+            },
+            WorkspaceOption {
+                workspace: WorkspaceKind::OnBoarding,
+                label: WorkspaceKind::OnBoarding.label().to_string(),
+                description: "Onboarding activation, handoff progress, and runtime provisioning"
+                    .to_string(),
+            },
+        ]
     }
 
     /// Handle a `BootstrapOutcome` from the resolution logic.
@@ -1666,7 +1745,12 @@ impl ReplOrchestratorV2 {
     // -----------------------------------------------------------------------
 
     fn activate_pack_by_id(&self, session: &mut ReplSessionV2, pack_id: &str) -> ReplResponseV2 {
-        if let Some((manifest, hash)) = self.pack_router.get_pack(pack_id) {
+        let Some(workspace) = session.active_workspace.as_ref() else {
+            return self.invalid_input(session, "Select a workspace before choosing a journey.");
+        };
+
+        if let Some((manifest, hash)) = self.pack_router.get_pack_for_workspace(pack_id, workspace)
+        {
             let pack_id_str = manifest.id.clone();
             let pack_name = manifest.name.clone();
             let pack_version = manifest.version.clone();
@@ -1687,7 +1771,14 @@ impl ReplOrchestratorV2 {
             // 3. Enter the pack (ask first question or prompt for input).
             self.enter_pack(session, &pack_id_str)
         } else {
-            self.invalid_input(session, &format!("Pack '{}' not found.", pack_id))
+            self.invalid_input(
+                session,
+                &format!(
+                    "Pack '{}' is not available in the {} workspace.",
+                    pack_id,
+                    workspace.label()
+                ),
+            )
         }
     }
 
@@ -5008,34 +5099,37 @@ mod tests {
 id: onboarding-request
 name: Onboarding Request
 version: "1.0"
-description: Onboard a new client structure
+description: Hand off a contracted deal into onboarding for an existing CBU
 invocation_phrases:
-  - "onboard a client"
-  - "set up new client"
+  - "request onboarding for this deal"
+  - "submit onboarding handoff"
 required_context:
   - client_group_id
 required_questions:
-  - field: products
-    prompt: "Which products should be added?"
-    answer_kind: list
-  - field: jurisdiction
-    prompt: "Which jurisdiction?"
+  - field: deal_id
+    prompt: "Which deal should be handed off?"
     answer_kind: string
-    default: "LU"
+  - field: cbu_id
+    prompt: "Which existing CBU should receive the onboarding handoff?"
+    answer_kind: string
 templates:
   - template_id: basic-onboarding
-    when_to_use: "Standard onboarding"
+    when_to_use: "Standard onboarding handoff"
     steps:
-      - verb: cbu.create
+      - verb: deal.read-record
         args:
-          name: "{context.client_name}"
-          jurisdiction: "{answers.jurisdiction}"
-      - verb: cbu.assign-product
-        repeat_for: "answers.products"
+          deal-id: "{answers.deal_id}"
+      - verb: cbu.read
         args:
-          product: "{item}"
+          cbu-id: "{answers.cbu_id}"
+      - verb: deal.request-onboarding
+        args:
+          deal-id: "{answers.deal_id}"
+          contract-id: "{context.contract_id}"
+          cbu-id: "{answers.cbu_id}"
+          product-id: "{context.product_id}"
 definition_of_done:
-  - "All products assigned"
+  - "Onboarding handoff submitted"
 "#
     }
 

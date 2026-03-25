@@ -1,0 +1,48 @@
+constellation: product.service.taxonomy
+description: Product-maintenance constellation for governed product, service, servicing-resource, and resource-dictionary taxonomy. Design-time catalog view consumed by onboarding and activation flows.
+jurisdiction: ALL
+slots:
+  product:
+    type: entity
+    entity_kinds: [product]
+    table: products
+    pk: product_id
+    cardinality: root
+    verbs:
+      read: { verb: product.read, when: filled }
+      list: { verb: product.list, when: [empty, filled] }
+  service:
+    type: entity
+    entity_kinds: [service]
+    table: services
+    pk: service_id
+    join: { via: product_services, parent_fk: product_id, child_fk: service_id }
+    cardinality: optional
+    depends_on: [product]
+    verbs:
+      read: { verb: service.read, when: filled }
+      list: { verb: service.list, when: [empty, filled] }
+      list_by_product: { verb: service.list-by-product, when: [empty, filled] }
+  service_resource:
+    type: entity
+    entity_kinds: [resource_type]
+    table: service_resource_types
+    pk: resource_type_id
+    join: { via: service_resource_capabilities, parent_fk: service_id, child_fk: resource_id }
+    cardinality: optional
+    depends_on: [service]
+    verbs:
+      read: { verb: service-resource.read, when: filled }
+      list: { verb: service-resource.list, when: [empty, filled] }
+      list_by_service: { verb: service-resource.list-by-service, when: [empty, filled] }
+      list_attributes: { verb: service-resource.list-attributes, when: [empty, filled] }
+  resource_dictionary:
+    type: entity
+    entity_kinds: [attribute]
+    table: attribute_registry
+    pk: id
+    cardinality: optional
+    depends_on: [service_resource]
+    verbs:
+      read: { verb: attribute.read, when: filled }
+      list: { verb: attribute.list, when: [empty, filled] }

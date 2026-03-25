@@ -1,0 +1,35 @@
+fqn: family.product_service_taxonomy
+family_id: product_service_taxonomy
+label: Product Service Resource Taxonomy
+description: Family governing the design-time product catalog, service catalog, servicing-resource taxonomy, and resource dictionary used by onboarding and activation flows.
+domain_id: product
+selection_rules:
+  - condition: "true"
+    target_constellation: product.service.taxonomy
+    priority: 35
+constellation_refs:
+  - constellation_id: product.service.taxonomy
+    label: Product Service Resource Taxonomy
+    jurisdiction: ALL
+    entity_kind: product
+    triggers:
+      - product
+      - service
+      - resource
+      - service resource
+      - servicing resource
+      - product catalog
+      - service catalog
+      - resource dictionary
+      - attribute dictionary
+candidate_jurisdictions:
+  - ALL
+candidate_entity_kinds:
+  - product
+  - service
+  - resource_type
+  - attribute
+grounding_threshold:
+  required_input_keys: []
+  requires_entity_instance: false
+  allows_draft_instance: true

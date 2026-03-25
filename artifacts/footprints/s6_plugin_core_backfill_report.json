@@ -1,0 +1,1174 @@
+{
+  "delegated_binding_count": 1,
+  "delegated_bindings": [
+    {
+      "domain": "onboarding",
+      "evidence_source": [
+        "rust_handler",
+        "dsl_executor",
+        "delegated_execution"
+      ],
+      "fqn": "onboarding.auto-complete",
+      "lookup_entity_types": [
+        "cbu"
+      ],
+      "lookup_tables": [
+        "cbus"
+      ],
+      "rationale": "Handler derives semantic state, generates DSL, and executes downstream verbs through DslExecutor; the mutating footprint belongs to those delegated verbs rather than a stable direct table set",
+      "required_args": [
+        "cbu-id"
+      ],
+      "status": "delegated_handler",
+      "workspace_affinity": [
+        "OnBoarding"
+      ]
+    }
+  ],
+  "derived_entry_count": 43,
+  "entries": [
+    {
+      "domain": "cbu",
+      "evidence_source": [
+        "rust_handler",
+        "sqlx"
+      ],
+      "fqn": "cbu.assign-ownership",
+      "postconditions": [
+        "ownership role assignment upserted",
+        "ownership relationship edge upserted"
+      ],
+      "preconditions": [
+        "cbu-id, owner-entity-id, owned-entity-id, percentage",
+        "role must resolve in roles taxonomy"
+      ],
+      "rationale": "Atomic dual-write in cbu_role_ops for ownership role plus ownership relationship",
+      "reads": [
+        "roles"
+      ],
+      "workspace_affinity": [
+        "CBU",
+        "OnBoarding"
+      ],
+      "writes": [
+        "cbu_entity_roles",
+        "entity_relationships"
+      ]
+    },
+    {
+      "domain": "cbu",
+      "evidence_source": [
+        "rust_handler",
+        "sqlx"
+      ],
+      "fqn": "cbu.assign-control",
+      "postconditions": [
+        "control role assignment upserted",
+        "control relationship edge upserted"
+      ],
+      "preconditions": [
+        "cbu-id, controller-entity-id, controlled-entity-id, role",
+        "role must resolve in roles taxonomy"
+      ],
+      "rationale": "Atomic dual-write in cbu_role_ops for control role plus control relationship",
+      "reads": [
+        "roles"
+      ],
+      "workspace_affinity": [
+        "CBU",
+        "OnBoarding"
+      ],
+      "writes": [
+        "cbu_entity_roles",
+        "entity_relationships"
+      ]
+    },
+    {
+      "domain": "cbu",
+      "evidence_source": [
+        "rust_handler",
+        "sqlx"
+      ],
+      "fqn": "cbu.assign-trust-role",
+      "postconditions": [
+        "trust role assignment upserted",
+        "trust relationship edge upserted"
+      ],
+      "preconditions": [
+        "cbu-id, trust-entity-id, participant-entity-id, role",
+        "role must resolve in roles taxonomy"
+      ],
+      "rationale": "Atomic dual-write in cbu_role_ops for trust role plus trust relationship",
+      "reads": [
+        "roles"
+      ],
+      "workspace_affinity": [
+        "CBU",
+        "OnBoarding"
+      ],
+      "writes": [
+        "cbu_entity_roles",
+        "entity_relationships"
+      ]
+    },
+    {
+      "domain": "cbu",
+      "evidence_source": [
+        "rust_handler",
+        "sqlx"
+      ],
+      "fqn": "cbu.assign-fund-role",
+      "postconditions": [
+        "fund role assignment upserted",
+        "fund relationship edge upserted when fund-entity-id is supplied"
+      ],
+      "preconditions": [
+        "cbu-id, entity-id, role",
+        "role must resolve in roles taxonomy"
+      ],
+      "rationale": "Fund-role handler writes cbu roles and optionally entity relationships",
+      "reads": [
+        "roles"
+      ],
+      "workspace_affinity": [
+        "CBU",
+        "OnBoarding"
+      ],
+      "writes": [
+        "cbu_entity_roles",
+        "entity_relationships"
+      ]
+    },
+    {
+      "domain": "cbu",
+      "evidence_source": [
+        "rust_handler",
+        "sqlx"
+      ],
+      "fqn": "cbu.assign-service-provider",
+      "postconditions": [
+        "service provider role assignment upserted"
+      ],
+      "preconditions": [
+        "cbu-id, provider-entity-id, role",
+        "role must resolve in roles taxonomy"
+      ],
+      "rationale": "Service-provider handler writes only cbu_entity_roles",
+      "reads": [
+        "roles"
+      ],
+      "workspace_affinity": [
+        "CBU",
+        "OnBoarding"
+      ],
+      "writes": [
+        "cbu_entity_roles"
+      ]
+    },
+    {
+      "domain": "cbu",
+      "evidence_source": [
+        "rust_handler",
+        "sqlx"
+      ],
+      "fqn": "cbu.assign-signatory",
+      "postconditions": [
+        "signatory assignment upserted with authority metadata"
+      ],
+      "preconditions": [
+        "cbu-id, person-entity-id, role",
+        "role must resolve in roles taxonomy"
+      ],
+      "rationale": "Signatory handler writes cbu_entity_roles with authority limit fields",
+      "reads": [
+        "roles"
+      ],
+      "workspace_affinity": [
+        "CBU",
+        "OnBoarding"
+      ],
+      "writes": [
+        "cbu_entity_roles"
+      ]
+    },
+    {
+      "domain": "cbu",
+      "evidence_source": [
+        "rust_handler",
+        "sqlx"
+      ],
+      "fqn": "cbu.validate-roles",
+      "postconditions": [
+        "validation result returned",
+        "missing-role and orphan-relationship issues surfaced"
+      ],
+      "preconditions": [
+        "cbu-id must exist"
+      ],
+      "rationale": "Validation handler reads CBU, role, and relationship state but does not mutate data",
+      "reads": [
+        "cbus",
+        "cbu_entity_roles",
+        "roles",
+        "entity_relationships"
+      ],
+      "workspace_affinity": [
+        "CBU",
+        "OnBoarding"
+      ],
+      "writes": []
+    },
+    {
+      "domain": "cbu",
+      "evidence_source": [
+        "rust_handler",
+        "sqlx"
+      ],
+      "fqn": "cbu.delete-cascade",
+      "postconditions": [
+        "CBU soft-deleted",
+        "role links removed",
+        "group and structure links removed",
+        "exclusive entities optionally soft-deleted"
+      ],
+      "preconditions": [
+        "cbu-id must exist",
+        "optional delete-entities flag controls entity soft-delete path"
+      ],
+      "rationale": "Cascade delete handler performs transactional detach/soft-delete across CBU-linked tables",
+      "reads": [
+        "cbus",
+        "cbu_entity_roles",
+        "entities"
+      ],
+      "workspace_affinity": [
+        "CBU",
+        "OnBoarding"
+      ],
+      "writes": [
+        "client_group_entity",
+        "cbu_group_members",
+        "cbu_structure_links",
+        "entities",
+        "cbu_entity_roles",
+        "cbus"
+      ]
+    },
+    {
+      "domain": "deal",
+      "evidence_source": [
+        "rust_handler",
+        "sqlx"
+      ],
+      "fqn": "deal.add-sla",
+      "postconditions": [
+        "deal SLA row created",
+        "SLA_ADDED event recorded"
+      ],
+      "preconditions": [
+        "deal-id, sla-name, metric-name, target-value, effective-from"
+      ],
+      "rationale": "Direct sqlx inserts into deal_slas and deal_events",
+      "reads": [
+        "deals"
+      ],
+      "workspace_affinity": [
+        "Deal",
+        "OnBoarding"
+      ],
+      "writes": [
+        "deal_slas",
+        "deal_events"
+      ]
+    },
+    {
+      "domain": "deal",
+      "evidence_source": [
+        "rust_handler",
+        "sqlx"
+      ],
+      "fqn": "deal.add-document",
+      "postconditions": [
+        "deal document link created or updated"
+      ],
+      "preconditions": [
+        "deal-id, document-id, document-type"
+      ],
+      "rationale": "Upsert into deal_documents with status defaulting to DRAFT",
+      "reads": [],
+      "workspace_affinity": [
+        "Deal",
+        "OnBoarding"
+      ],
+      "writes": [
+        "deal_documents"
+      ]
+    },
+    {
+      "domain": "deal",
+      "evidence_source": [
+        "rust_handler",
+        "sqlx"
+      ],
+      "fqn": "deal.update-document-status",
+      "postconditions": [
+        "deal document status updated"
+      ],
+      "preconditions": [
+        "deal-id, document-id, document-status"
+      ],
+      "rationale": "Status update hits deal_documents only; no event insert in current implementation",
+      "reads": [
+        "deal_documents"
+      ],
+      "workspace_affinity": [
+        "Deal",
+        "OnBoarding"
+      ],
+      "writes": [
+        "deal_documents"
+      ]
+    },
+    {
+      "domain": "deal",
+      "evidence_source": [
+        "rust_handler",
+        "sqlx"
+      ],
+      "fqn": "deal.add-ubo-assessment",
+      "postconditions": [
+        "deal UBO assessment created"
+      ],
+      "preconditions": [
+        "deal-id, entity-id"
+      ],
+      "rationale": "Direct insert into deal_ubo_assessments",
+      "reads": [],
+      "workspace_affinity": [
+        "Deal",
+        "OnBoarding"
+      ],
+      "writes": [
+        "deal_ubo_assessments"
+      ]
+    },
+    {
+      "domain": "deal",
+      "evidence_source": [
+        "rust_handler",
+        "sqlx"
+      ],
+      "fqn": "deal.update-ubo-assessment",
+      "postconditions": [
+        "assessment status/risk updated",
+        "completed_at set when status becomes COMPLETED"
+      ],
+      "preconditions": [
+        "assessment-id"
+      ],
+      "rationale": "Direct update of deal_ubo_assessments",
+      "reads": [
+        "deal_ubo_assessments"
+      ],
+      "workspace_affinity": [
+        "Deal",
+        "OnBoarding"
+      ],
+      "writes": [
+        "deal_ubo_assessments"
+      ]
+    },
+    {
+      "domain": "deal",
+      "evidence_source": [
+        "rust_handler",
+        "sqlx"
+      ],
+      "fqn": "deal.remove-rate-card-line",
+      "postconditions": [
+        "rate card line removed"
+      ],
+      "preconditions": [
+        "line-id",
+        "no dependent fee_billing_account_targets may exist"
+      ],
+      "rationale": "Delete guarded by dependency check on fee_billing_account_targets",
+      "reads": [
+        "fee_billing_account_targets",
+        "deal_rate_card_lines"
+      ],
+      "workspace_affinity": [
+        "Deal",
+        "OnBoarding"
+      ],
+      "writes": [
+        "deal_rate_card_lines"
+      ]
+    },
+    {
+      "domain": "deal",
+      "evidence_source": [
+        "rust_handler",
+        "sqlx"
+      ],
+      "fqn": "deal.update-rate-card-line",
+      "postconditions": [
+        "rate card line updated in place"
+      ],
+      "preconditions": [
+        "line-id",
+        "parent rate card must not be AGREED"
+      ],
+      "rationale": "Update guarded by parent deal_rate_cards status check",
+      "reads": [
+        "deal_rate_cards",
+        "deal_rate_card_lines"
+      ],
+      "workspace_affinity": [
+        "Deal",
+        "OnBoarding"
+      ],
+      "writes": [
+        "deal_rate_card_lines"
+      ]
+    },
+    {
+      "domain": "deal",
+      "evidence_source": [
+        "rust_handler",
+        "sqlx"
+      ],
+      "fqn": "deal.update-product-status",
+      "postconditions": [
+        "product status updated",
+        "PRODUCT_STATUS_CHANGED event recorded",
+        "agreed_at set when status is AGREED"
+      ],
+      "preconditions": [
+        "deal-id, product-id, product-status"
+      ],
+      "rationale": "Product status update writes deal_products and appends deal event",
+      "reads": [
+        "deal_products"
+      ],
+      "workspace_affinity": [
+        "Deal",
+        "OnBoarding"
+      ],
+      "writes": [
+        "deal_products",
+        "deal_events"
+      ]
+    },
+    {
+      "domain": "deal",
+      "evidence_source": [
+        "rust_handler",
+        "sqlx"
+      ],
+      "fqn": "deal.update-onboarding-status",
+      "postconditions": [
+        "onboarding request status updated",
+        "KYC/completion timestamps advanced",
+        "deal transitions to ACTIVE when all requests complete"
+      ],
+      "preconditions": [
+        "request-id, request-status"
+      ],
+      "rationale": "Onboarding status handler updates request rows and conditionally activates the parent deal",
+      "reads": [
+        "deal_onboarding_requests",
+        "deals"
+      ],
+      "workspace_affinity": [
+        "Deal",
+        "OnBoarding"
+      ],
+      "writes": [
+        "deal_onboarding_requests",
+        "deals",
+        "deal_events"
+      ]
+    },
+    {
+      "domain": "trading-profile",
+      "evidence_source": [
+        "rust_handler",
+        "sqlx"
+      ],
+      "fqn": "trading-profile.ca.enable-event-types",
+      "postconditions": [
+        "CA enabled_event_types merged into trading profile document"
+      ],
+      "preconditions": [
+        "profile-id, event-types"
+      ],
+      "rationale": "CA profile mutation loads and saves the JSONB document in cbu_trading_profiles",
+      "reads": [
+        "cbu_trading_profiles"
+      ],
+      "workspace_affinity": [
+        "InstrumentMatrix"
+      ],
+      "writes": [
+        "cbu_trading_profiles"
+      ]
+    },
+    {
+      "domain": "trading-profile",
+      "evidence_source": [
+        "rust_handler",
+        "sqlx"
+      ],
+      "fqn": "trading-profile.ca.disable-event-types",
+      "postconditions": [
+        "requested event types removed from CA enabled_event_types"
+      ],
+      "preconditions": [
+        "profile-id, event-types"
+      ],
+      "rationale": "CA profile mutation edits the JSONB document stored in cbu_trading_profiles",
+      "reads": [
+        "cbu_trading_profiles"
+      ],
+      "workspace_affinity": [
+        "InstrumentMatrix"
+      ],
+      "writes": [
+        "cbu_trading_profiles"
+      ]
+    },
+    {
+      "domain": "trading-profile",
+      "evidence_source": [
+        "rust_handler",
+        "sqlx"
+      ],
+      "fqn": "trading-profile.ca.set-notification-policy",
+      "postconditions": [
+        "CA notification_policy replaced in trading profile document"
+      ],
+      "preconditions": [
+        "profile-id, channels"
+      ],
+      "rationale": "CA notification policy is persisted by saving the updated profile JSONB document",
+      "reads": [
+        "cbu_trading_profiles"
+      ],
+      "workspace_affinity": [
+        "InstrumentMatrix"
+      ],
+      "writes": [
+        "cbu_trading_profiles"
+      ]
+    },
+    {
+      "domain": "trading-profile",
+      "evidence_source": [
+        "rust_handler",
+        "sqlx"
+      ],
+      "fqn": "trading-profile.ca.set-election-policy",
+      "postconditions": [
+        "CA election_policy replaced in trading profile document"
+      ],
+      "preconditions": [
+        "profile-id, elector"
+      ],
+      "rationale": "CA election policy is persisted through ast_db document save",
+      "reads": [
+        "cbu_trading_profiles"
+      ],
+      "workspace_affinity": [
+        "InstrumentMatrix"
+      ],
+      "writes": [
+        "cbu_trading_profiles"
+      ]
+    },
+    {
+      "domain": "trading-profile",
+      "evidence_source": [
+        "rust_handler",
+        "sqlx"
+      ],
+      "fqn": "trading-profile.ca.set-default-option",
+      "postconditions": [
+        "CA default_options entry upserted for the target event type"
+      ],
+      "preconditions": [
+        "profile-id, event-type, default-option"
+      ],
+      "rationale": "Default-option mutation is a JSONB document write against cbu_trading_profiles",
+      "reads": [
+        "cbu_trading_profiles"
+      ],
+      "workspace_affinity": [
+        "InstrumentMatrix"
+      ],
+      "writes": [
+        "cbu_trading_profiles"
+      ]
+    },
+    {
+      "domain": "trading-profile",
+      "evidence_source": [
+        "rust_handler",
+        "sqlx"
+      ],
+      "fqn": "trading-profile.ca.remove-default-option",
+      "postconditions": [
+        "matching CA default_options entry removed"
+      ],
+      "preconditions": [
+        "profile-id, event-type"
+      ],
+      "rationale": "Default-option removal is persisted by saving the updated trading profile document",
+      "reads": [
+        "cbu_trading_profiles"
+      ],
+      "workspace_affinity": [
+        "InstrumentMatrix"
+      ],
+      "writes": [
+        "cbu_trading_profiles"
+      ]
+    },
+    {
+      "domain": "trading-profile",
+      "evidence_source": [
+        "rust_handler",
+        "sqlx"
+      ],
+      "fqn": "trading-profile.ca.add-cutoff-rule",
+      "postconditions": [
+        "CA cutoff rule appended to trading profile document"
+      ],
+      "preconditions": [
+        "profile-id, days-before",
+        "optional event-type, market-code, depository-code filter fields"
+      ],
+      "rationale": "Cutoff rule mutation is stored in cbu_trading_profiles JSONB",
+      "reads": [
+        "cbu_trading_profiles"
+      ],
+      "workspace_affinity": [
+        "InstrumentMatrix"
+      ],
+      "writes": [
+        "cbu_trading_profiles"
+      ]
+    },
+    {
+      "domain": "trading-profile",
+      "evidence_source": [
+        "rust_handler",
+        "sqlx"
+      ],
+      "fqn": "trading-profile.ca.remove-cutoff-rule",
+      "postconditions": [
+        "matching CA cutoff rules removed from trading profile document"
+      ],
+      "preconditions": [
+        "profile-id",
+        "optional market-code, depository-code filter fields"
+      ],
+      "rationale": "Cutoff-rule removal rewrites the JSONB profile document in cbu_trading_profiles",
+      "reads": [
+        "cbu_trading_profiles"
+      ],
+      "workspace_affinity": [
+        "InstrumentMatrix"
+      ],
+      "writes": [
+        "cbu_trading_profiles"
+      ]
+    },
+    {
+      "domain": "trading-profile",
+      "evidence_source": [
+        "rust_handler",
+        "sqlx"
+      ],
+      "fqn": "trading-profile.ca.link-proceeds-ssi",
+      "postconditions": [
+        "CA proceeds-to-SSI mapping upserted in trading profile document"
+      ],
+      "preconditions": [
+        "profile-id, proceeds-type, ssi-name"
+      ],
+      "rationale": "Proceeds SSI linkage is persisted as a JSONB document mutation",
+      "reads": [
+        "cbu_trading_profiles"
+      ],
+      "workspace_affinity": [
+        "InstrumentMatrix"
+      ],
+      "writes": [
+        "cbu_trading_profiles"
+      ]
+    },
+    {
+      "domain": "trading-profile",
+      "evidence_source": [
+        "rust_handler",
+        "sqlx"
+      ],
+      "fqn": "trading-profile.ca.remove-proceeds-ssi",
+      "postconditions": [
+        "CA proceeds-to-SSI mapping removed from trading profile document"
+      ],
+      "preconditions": [
+        "profile-id, proceeds-type"
+      ],
+      "rationale": "Proceeds SSI unlink is a JSONB document write against cbu_trading_profiles",
+      "reads": [
+        "cbu_trading_profiles"
+      ],
+      "workspace_affinity": [
+        "InstrumentMatrix"
+      ],
+      "writes": [
+        "cbu_trading_profiles"
+      ]
+    },
+    {
+      "domain": "trading-profile",
+      "evidence_source": [
+        "rust_handler",
+        "sqlx"
+      ],
+      "fqn": "trading-profile.link-csa-ssi",
+      "postconditions": [
+        "CSA SSI reference updated in trading profile document"
+      ],
+      "preconditions": [
+        "profile-id, counterparty-ref, ssi-name",
+        "profile must be in DRAFT status"
+      ],
+      "rationale": "CSA SSI linkage goes through ast_db::apply_and_save after a draft-status guard",
+      "reads": [
+        "cbu_trading_profiles"
+      ],
+      "workspace_affinity": [
+        "InstrumentMatrix"
+      ],
+      "writes": [
+        "cbu_trading_profiles"
+      ]
+    },
+    {
+      "domain": "trading-profile",
+      "evidence_source": [
+        "rust_handler",
+        "sqlx"
+      ],
+      "fqn": "trading-profile.validate-go-live-ready",
+      "postconditions": [
+        "go-live readiness checklist and issues returned without mutating persisted state"
+      ],
+      "preconditions": [
+        "profile-id"
+      ],
+      "rationale": "Go-live readiness validation only reads the trading profile document and returns diagnostics",
+      "reads": [
+        "cbu_trading_profiles"
+      ],
+      "workspace_affinity": [
+        "InstrumentMatrix"
+      ],
+      "writes": []
+    },
+    {
+      "domain": "trading-profile",
+      "evidence_source": [
+        "rust_handler",
+        "sqlx"
+      ],
+      "fqn": "trading-profile.create-new-version",
+      "postconditions": [
+        "new DRAFT trading profile version inserted from the active profile"
+      ],
+      "preconditions": [
+        "cbu-id",
+        "an ACTIVE profile must exist",
+        "no working DRAFT version may already exist"
+      ],
+      "rationale": "New-version flow clones the active profile into a fresh DRAFT row in cbu_trading_profiles",
+      "reads": [
+        "cbu_trading_profiles"
+      ],
+      "workspace_affinity": [
+        "InstrumentMatrix"
+      ],
+      "writes": [
+        "cbu_trading_profiles"
+      ]
+    },
+    {
+      "domain": "service-resource",
+      "evidence_source": [
+        "rust_handler",
+        "sqlx"
+      ],
+      "fqn": "service-resource.provision-lifecycle",
+      "postconditions": [
+        "lifecycle instance provisioned with PROVISIONED status",
+        "instance bound into execution context"
+      ],
+      "preconditions": [
+        "cbu-id, resource-type",
+        "market and counterparty required when the resource type demands them"
+      ],
+      "rationale": "Lifecycle provisioning aliases into LifecycleProvisionOp and upserts cbu_lifecycle_instances",
+      "reads": [
+        "lifecycle_resource_types",
+        "markets"
+      ],
+      "workspace_affinity": [
+        "CBU",
+        "OnBoarding"
+      ],
+      "writes": [
+        "cbu_lifecycle_instances"
+      ]
+    },
+    {
+      "domain": "service-resource",
+      "evidence_source": [
+        "rust_handler",
+        "sqlx"
+      ],
+      "fqn": "service-resource.generate-lifecycle-plan",
+      "postconditions": [
+        "lifecycle gap DSL plan and pending prompts returned without direct writes"
+      ],
+      "preconditions": [
+        "cbu-id",
+        "optional user-responses"
+      ],
+      "rationale": "Lifecycle plan generation reads the lifecycle gap view and emits an execution plan only",
+      "reads": [
+        "v_cbu_lifecycle_gaps"
+      ],
+      "workspace_affinity": [
+        "CBU",
+        "OnBoarding"
+      ],
+      "writes": []
+    },
+    {
+      "domain": "service-resource",
+      "evidence_source": [
+        "rust_handler",
+        "sqlx"
+      ],
+      "fqn": "service-resource.execute-lifecycle-plan",
+      "postconditions": [
+        "placeholder execution records returned",
+        "no direct database mutation in current implementation"
+      ],
+      "preconditions": [
+        "plan",
+        "optional dry-run"
+      ],
+      "rationale": "Current lifecycle plan execution path is a non-persistent placeholder and does not yet integrate downstream execution",
+      "reads": [],
+      "workspace_affinity": [
+        "CBU",
+        "OnBoarding"
+      ],
+      "writes": []
+    },
+    {
+      "domain": "service-resource",
+      "evidence_source": [
+        "rust_handler",
+        "sqlx"
+      ],
+      "fqn": "service-resource.provision",
+      "postconditions": [
+        "resource instance inserted or reused with PENDING status",
+        "resource dependencies recorded when depends-on is supplied",
+        "instance bound into execution context"
+      ],
+      "preconditions": [
+        "cbu-id",
+        "resource-type",
+        "resource-type must resolve in service_resource_types",
+        "instance-url is generated when omitted"
+      ],
+      "rationale": "ResourceCreateOp in resource_ops.rs resolves the resource type, optionally derives service_id from service_resource_capabilities, inserts cbu_resource_instances, and records resource_instance_dependencies",
+      "reads": [
+        "service_resource_types",
+        "service_resource_capabilities",
+        "cbus",
+        "products",
+        "services"
+      ],
+      "workspace_affinity": [
+        "CBU",
+        "OnBoarding"
+      ],
+      "writes": [
+        "cbu_resource_instances",
+        "resource_instance_dependencies"
+      ]
+    },
+    {
+      "domain": "service-resource",
+      "evidence_source": [
+        "rust_handler",
+        "sqlx"
+      ],
+      "fqn": "service-resource.set-attr",
+      "postconditions": [
+        "resource instance attribute upserted with observed_at timestamp and state",
+        "value id returned"
+      ],
+      "preconditions": [
+        "instance-id",
+        "attr",
+        "value",
+        "attr must resolve via AttributeIdentityService"
+      ],
+      "rationale": "ResourceSetAttrOp in resource_ops.rs resolves the governed attribute and upserts resource_instance_attributes for the target instance",
+      "reads": [
+        "attribute_registry",
+        "cbu_resource_instances"
+      ],
+      "workspace_affinity": [
+        "CBU",
+        "OnBoarding"
+      ],
+      "writes": [
+        "resource_instance_attributes"
+      ]
+    },
+    {
+      "domain": "service-resource",
+      "evidence_source": [
+        "rust_handler",
+        "sqlx"
+      ],
+      "fqn": "service-resource.activate",
+      "postconditions": [
+        "resource instance status transitioned to ACTIVE",
+        "activated_at timestamp set"
+      ],
+      "preconditions": [
+        "instance-id",
+        "instance must exist",
+        "all mandatory resource attributes must be present before activation"
+      ],
+      "rationale": "ResourceActivateOp in resource_ops.rs validates resource_attribute_requirements against resource_instance_attributes before updating cbu_resource_instances",
+      "reads": [
+        "cbu_resource_instances",
+        "resource_attribute_requirements",
+        "resource_instance_attributes",
+        "attribute_registry"
+      ],
+      "workspace_affinity": [
+        "CBU",
+        "OnBoarding"
+      ],
+      "writes": [
+        "cbu_resource_instances"
+      ]
+    },
+    {
+      "domain": "service-resource",
+      "evidence_source": [
+        "rust_handler",
+        "sqlx"
+      ],
+      "fqn": "service-resource.suspend",
+      "postconditions": [
+        "resource instance status transitioned to SUSPENDED"
+      ],
+      "preconditions": [
+        "instance-id"
+      ],
+      "rationale": "ResourceSuspendOp in resource_ops.rs updates cbu_resource_instances to SUSPENDED",
+      "reads": [
+        "cbu_resource_instances"
+      ],
+      "workspace_affinity": [
+        "CBU",
+        "OnBoarding"
+      ],
+      "writes": [
+        "cbu_resource_instances"
+      ]
+    },
+    {
+      "domain": "service-resource",
+      "evidence_source": [
+        "rust_handler",
+        "sqlx"
+      ],
+      "fqn": "service-resource.decommission",
+      "postconditions": [
+        "resource instance status transitioned to DECOMMISSIONED",
+        "decommissioned_at timestamp set"
+      ],
+      "preconditions": [
+        "instance-id"
+      ],
+      "rationale": "ResourceDecommissionOp in resource_ops.rs applies the terminal status update to cbu_resource_instances",
+      "reads": [
+        "cbu_resource_instances"
+      ],
+      "workspace_affinity": [
+        "CBU",
+        "OnBoarding"
+      ],
+      "writes": [
+        "cbu_resource_instances"
+      ]
+    },
+    {
+      "domain": "service-resource",
+      "evidence_source": [
+        "rust_handler",
+        "sqlx"
+      ],
+      "fqn": "service-resource.validate-attrs",
+      "postconditions": [
+        "validation record returned with valid flag and missing attribute names"
+      ],
+      "preconditions": [
+        "instance-id"
+      ],
+      "rationale": "ResourceValidateAttrsOp in resource_ops.rs reads required attributes and current instance attributes to return a validation report",
+      "reads": [
+        "cbu_resource_instances",
+        "resource_attribute_requirements",
+        "attribute_registry",
+        "resource_instance_attributes"
+      ],
+      "workspace_affinity": [
+        "CBU",
+        "OnBoarding"
+      ],
+      "writes": []
+    },
+    {
+      "domain": "document",
+      "evidence_source": [
+        "rust_handler",
+        "sqlx"
+      ],
+      "fqn": "document.catalog",
+      "postconditions": [
+        "document catalog row created or existing row rebound into context"
+      ],
+      "preconditions": [
+        "doc-type/document-type",
+        "optional cbu-id or entity-id",
+        "document_name participates in idempotent lookup when supplied"
+      ],
+      "rationale": "Document catalog lookup reads document_types and existing catalog rows before inserting document_catalog",
+      "reads": [
+        "document_types",
+        "document_catalog"
+      ],
+      "workspace_affinity": [
+        "KYC",
+        "OnBoarding"
+      ],
+      "writes": [
+        "document_catalog"
+      ]
+    },
+    {
+      "domain": "document",
+      "evidence_source": [
+        "rust_handler",
+        "sqlx"
+      ],
+      "fqn": "document.extract",
+      "postconditions": [
+        "extraction_status set to IN_PROGRESS on document_catalog",
+        "downstream OCR/extraction remains TODO in current implementation"
+      ],
+      "preconditions": [
+        "document-id/doc-id"
+      ],
+      "rationale": "Current extract implementation only marks extraction_status on document_catalog",
+      "reads": [
+        "document_catalog"
+      ],
+      "workspace_affinity": [
+        "KYC",
+        "OnBoarding"
+      ],
+      "writes": [
+        "document_catalog"
+      ]
+    },
+    {
+      "domain": "document",
+      "evidence_source": [
+        "rust_handler",
+        "sqlx"
+      ],
+      "fqn": "document.upload-version",
+      "postconditions": [
+        "document version inserted",
+        "cargo_ref URI returned",
+        "version bound into context"
+      ],
+      "preconditions": [
+        "document-id",
+        "content-type",
+        "either blob-ref or structured-data is required"
+      ],
+      "rationale": "Upload-version verifies the parent document, computes next version number, and inserts document_versions",
+      "reads": [
+        "documents"
+      ],
+      "workspace_affinity": [
+        "KYC",
+        "OnBoarding"
+      ],
+      "writes": [
+        "document_versions"
+      ]
+    },
+    {
+      "domain": "kyc-case",
+      "evidence_source": [
+        "rust_handler",
+        "sqlx"
+      ],
+      "fqn": "kyc-case.state",
+      "postconditions": [
+        "case state snapshot returned with workstreams, awaiting requests, and attention summary"
+      ],
+      "preconditions": [
+        "case-id"
+      ],
+      "rationale": "Case-state handler is a complex read-only aggregate across case, CBU, workstream, role, and outstanding-request tables",
+      "reads": [
+        "cases",
+        "cbus",
+        "entity_workstreams",
+        "entities",
+        "cbu_entity_roles",
+        "roles",
+        "outstanding_requests"
+      ],
+      "workspace_affinity": [
+        "KYC",
+        "OnBoarding"
+      ],
+      "writes": []
+    }
+  ],
+  "generated_at": "2026-03-25T14:21:37.305104+00:00",
+  "repo_revision": "56b2f9b413f2b5ddc2c6ba269ad8cb610e18c7a4",
+  "slice_id": "S6.5A",
+  "unresolved_binding_count": 0,
+  "unresolved_bindings": []
+}

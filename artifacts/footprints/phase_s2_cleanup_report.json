@@ -1,0 +1,508 @@
+{
+  "broken_macro_refs": 0,
+  "fatal_collision_count": 0,
+  "fatal_collisions": [],
+  "generated_at": "2026-03-25T12:59:09.715523+00:00",
+  "lexicon_missing_live_verbs": 1063,
+  "orphan_footprint_entries": 0,
+  "policy_default": "fatal",
+  "repo_revision": "56b2f9b413f2b5ddc2c6ba269ad8cb610e18c7a4",
+  "scoped_allowed_collision_count": 70,
+  "scoped_allowed_collisions": [
+    {
+      "phrase": "add board member",
+      "verb_fqns": [
+        "board.appoint",
+        "ubo.add-control"
+      ]
+    },
+    {
+      "phrase": "add controller",
+      "verb_fqns": [
+        "control.add",
+        "ubo.add-control"
+      ]
+    },
+    {
+      "phrase": "add document requirements",
+      "verb_fqns": [
+        "docs-bundle.apply",
+        "requirement.create-set"
+      ]
+    },
+    {
+      "phrase": "add ownership",
+      "verb_fqns": [
+        "client-group.add-relationship",
+        "ubo.add-ownership"
+      ]
+    },
+    {
+      "phrase": "add service level agreement",
+      "verb_fqns": [
+        "deal.add-sla",
+        "sla.commit"
+      ]
+    },
+    {
+      "phrase": "add voting control",
+      "verb_fqns": [
+        "control.add",
+        "ubo.add-control"
+      ]
+    },
+    {
+      "phrase": "appoint director to board",
+      "verb_fqns": [
+        "board.appoint",
+        "cbu.assign-control"
+      ]
+    },
+    {
+      "phrase": "appoint sub-advisor",
+      "verb_fqns": [
+        "delegation.add",
+        "investment-manager.assign"
+      ]
+    },
+    {
+      "phrase": "approve evidence",
+      "verb_fqns": [
+        "cbu.verify-evidence",
+        "evidence.mark-verified"
+      ]
+    },
+    {
+      "phrase": "check for circular ownership",
+      "verb_fqns": [
+        "ownership.reconcile",
+        "verify.detect-patterns"
+      ]
+    },
+    {
+      "phrase": "check universe completeness",
+      "verb_fqns": [
+        "cbu-custody.list-universe",
+        "trading-profile.validate-universe-coverage"
+      ]
+    },
+    {
+      "phrase": "close cbu",
+      "verb_fqns": [
+        "cbu.delete",
+        "session.unload-system"
+      ]
+    },
+    {
+      "phrase": "compare changes",
+      "verb_fqns": [
+        "focus.diff",
+        "trading-profile.diff"
+      ]
+    },
+    {
+      "phrase": "create control link",
+      "verb_fqns": [
+        "control.add",
+        "ubo.add-control"
+      ]
+    },
+    {
+      "phrase": "create legal entity",
+      "verb_fqns": [
+        "entity.create",
+        "legal-entity.create"
+      ]
+    },
+    {
+      "phrase": "create share class",
+      "verb_fqns": [
+        "capital.share-class.create",
+        "fund.create"
+      ]
+    },
+    {
+      "phrase": "describe this verb",
+      "verb_fqns": [
+        "discovery.verb-detail",
+        "registry.describe-object"
+      ]
+    },
+    {
+      "phrase": "diff against active snapshots",
+      "verb_fqns": [
+        "changeset.diff",
+        "governance.plan-publish"
+      ]
+    },
+    {
+      "phrase": "enumerate role types",
+      "verb_fqns": [
+        "admin.role-types.list",
+        "role.list"
+      ]
+    },
+    {
+      "phrase": "find ultimate parent",
+      "verb_fqns": [
+        "gleif.trace-ownership",
+        "graph.ancestors"
+      ]
+    },
+    {
+      "phrase": "issue new shares",
+      "verb_fqns": [
+        "capital.issue-shares",
+        "capital.issue.new"
+      ]
+    },
+    {
+      "phrase": "link controller",
+      "verb_fqns": [
+        "control.add",
+        "ubo.add-control"
+      ]
+    },
+    {
+      "phrase": "link feeder to master",
+      "verb_fqns": [
+        "cbu.link-structure",
+        "fund.link-feeder"
+      ]
+    },
+    {
+      "phrase": "list all attributes",
+      "verb_fqns": [
+        "attribute.list",
+        "registry.list-objects"
+      ]
+    },
+    {
+      "phrase": "list beneficial owners",
+      "verb_fqns": [
+        "bods.list-persons",
+        "ubo.list-owners"
+      ]
+    },
+    {
+      "phrase": "list cbus",
+      "verb_fqns": [
+        "cbu.list",
+        "session.list"
+      ]
+    },
+    {
+      "phrase": "list relationships",
+      "verb_fqns": [
+        "client-group.list-relationships",
+        "client-principal-relationship.list"
+      ]
+    },
+    {
+      "phrase": "list share classes",
+      "verb_fqns": [
+        "capital.share-class.list",
+        "fund.list-share-classes"
+      ]
+    },
+    {
+      "phrase": "list subsidiaries",
+      "verb_fqns": [
+        "control.list-controlled",
+        "ubo.list-owned"
+      ]
+    },
+    {
+      "phrase": "new share class",
+      "verb_fqns": [
+        "capital.share-class.create",
+        "fund.create"
+      ]
+    },
+    {
+      "phrase": "none of these",
+      "verb_fqns": [
+        "agent.reject-decision",
+        "research.workflow.reject-decision"
+      ]
+    },
+    {
+      "phrase": "open case",
+      "verb_fqns": [
+        "kyc-case.create",
+        "session.set-case"
+      ]
+    },
+    {
+      "phrase": "override document requirement",
+      "verb_fqns": [
+        "document.waive-request",
+        "requirement.waive"
+      ]
+    },
+    {
+      "phrase": "ownership chain",
+      "verb_fqns": [
+        "control.trace-chain",
+        "manco.control-chain"
+      ]
+    },
+    {
+      "phrase": "process return of capital",
+      "verb_fqns": [
+        "movement.distribution",
+        "partnership.record-distribution"
+      ]
+    },
+    {
+      "phrase": "reject",
+      "verb_fqns": [
+        "agent.reject-decision",
+        "research.workflow.reject-decision"
+      ]
+    },
+    {
+      "phrase": "reject evidence",
+      "verb_fqns": [
+        "cbu.verify-evidence",
+        "evidence.mark-rejected"
+      ]
+    },
+    {
+      "phrase": "remove cbu",
+      "verb_fqns": [
+        "cbu.delete",
+        "session.unload-system"
+      ]
+    },
+    {
+      "phrase": "request identity documents",
+      "verb_fqns": [
+        "document.solicit",
+        "document.solicit-set"
+      ]
+    },
+    {
+      "phrase": "research this entity",
+      "verb_fqns": [
+        "agent.start",
+        "discovery.cascade-research"
+      ]
+    },
+    {
+      "phrase": "revoke entity role",
+      "verb_fqns": [
+        "cbu.remove-role",
+        "client-group.remove-role"
+      ]
+    },
+    {
+      "phrase": "run the rba assessment",
+      "verb_fqns": [
+        "screening.run",
+        "screening.sanctions"
+      ]
+    },
+    {
+      "phrase": "search entities",
+      "verb_fqns": [
+        "discovery.search-entities",
+        "entity.query"
+      ]
+    },
+    {
+      "phrase": "show all cbus",
+      "verb_fqns": [
+        "cbu.list",
+        "session.load-cluster"
+      ]
+    },
+    {
+      "phrase": "show cbu details",
+      "verb_fqns": [
+        "cbu.show",
+        "view.cbu"
+      ]
+    },
+    {
+      "phrase": "show cbu subscriptions",
+      "verb_fqns": [
+        "cbu.list-subscriptions",
+        "contract.list-subscriptions"
+      ]
+    },
+    {
+      "phrase": "show entity relationships",
+      "verb_fqns": [
+        "discovery.entity-relationships",
+        "schema.entity.list-relationships"
+      ]
+    },
+    {
+      "phrase": "show me all entities",
+      "verb_fqns": [
+        "entity.list",
+        "view.universe"
+      ]
+    },
+    {
+      "phrase": "show overdue requests",
+      "verb_fqns": [
+        "request.overdue",
+        "research.outreach.list-overdue"
+      ]
+    },
+    {
+      "phrase": "show rate cards",
+      "verb_fqns": [
+        "contract.list-rate-cards",
+        "deal.list-rate-cards"
+      ]
+    },
+    {
+      "phrase": "show sub-funds",
+      "verb_fqns": [
+        "fund.list-compartments-by-umbrella",
+        "fund.list-subfunds"
+      ]
+    },
+    {
+      "phrase": "start fresh",
+      "verb_fqns": [
+        "session.clear",
+        "view.clear-refinements"
+      ]
+    },
+    {
+      "phrase": "strip role from entity",
+      "verb_fqns": [
+        "cbu.remove-role",
+        "client-group.remove-role"
+      ]
+    },
+    {
+      "phrase": "submit for review",
+      "verb_fqns": [
+        "governance.submit-for-review",
+        "trading-profile.submit"
+      ]
+    },
+    {
+      "phrase": "subscribe cbu to product",
+      "verb_fqns": [
+        "cbu.add-product",
+        "contract.subscribe"
+      ]
+    },
+    {
+      "phrase": "terminate relationship",
+      "verb_fqns": [
+        "client-principal-relationship.terminate",
+        "ubo.end-relationship"
+      ]
+    },
+    {
+      "phrase": "trace ownership",
+      "verb_fqns": [
+        "bods.discover-ubos",
+        "control.trace-chain",
+        "gleif.trace-ownership"
+      ]
+    },
+    {
+      "phrase": "trace ownership chain",
+      "verb_fqns": [
+        "economic-exposure.compute",
+        "ownership.trace-chain"
+      ]
+    },
+    {
+      "phrase": "trace ownership upward",
+      "verb_fqns": [
+        "graph.ancestors",
+        "manco.control-chain"
+      ]
+    },
+    {
+      "phrase": "unsubscribe cbu from product",
+      "verb_fqns": [
+        "cbu.remove-product",
+        "contract.unsubscribe"
+      ]
+    },
+    {
+      "phrase": "validate settlement coverage",
+      "verb_fqns": [
+        "cbu-custody.validate-booking-coverage",
+        "trading-profile.validate-universe-coverage"
+      ]
+    },
+    {
+      "phrase": "what is this attribute",
+      "verb_fqns": [
+        "attribute.read",
+        "registry.describe-object"
+      ]
+    },
+    {
+      "phrase": "what products is cbu subscribed to",
+      "verb_fqns": [
+        "cbu.list-subscriptions",
+        "contract.list-subscriptions"
+      ]
+    },
+    {
+      "phrase": "what share classes exist",
+      "verb_fqns": [
+        "capital.list-by-issuer",
+        "capital.share-class.list"
+      ]
+    },
+    {
+      "phrase": "who are the beneficial owners",
+      "verb_fqns": [
+        "bods.list-persons",
+        "trust.identify-ubos",
+        "ubo.list-ubos"
+      ]
+    },
+    {
+      "phrase": "who are the ubos",
+      "verb_fqns": [
+        "bods.discover-ubos",
+        "ubo.list-ubos"
+      ]
+    },
+    {
+      "phrase": "who controls the board",
+      "verb_fqns": [
+        "board.analyze-control",
+        "control.show-board-controller"
+      ]
+    },
+    {
+      "phrase": "who controls this",
+      "verb_fqns": [
+        "control.list-controllers",
+        "ownership.who-controls"
+      ]
+    },
+    {
+      "phrase": "who manages this cbu",
+      "verb_fqns": [
+        "investment-manager.list",
+        "manco.group.for-cbu"
+      ]
+    },
+    {
+      "phrase": "who owns this entity",
+      "verb_fqns": [
+        "bods.list-ownership",
+        "graph.ancestors",
+        "ubo.list-by-subject",
+        "ubo.list-owners"
+      ]
+    }
+  ],
+  "slice_id": "S2"
+}

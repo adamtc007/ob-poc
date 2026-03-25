@@ -1,0 +1,1037 @@
+{
+  "exceptions": [],
+  "fully_hydrated_verbs": 292,
+  "generated_at": "2026-03-25T12:59:09.781907+00:00",
+  "missing_verbs": 811,
+  "orphans": 0,
+  "overall": {
+    "footprint_entry_pct": 26.67269439421338,
+    "fully_hydrated_pct": 26.401446654611213,
+    "missing_pct": 73.32730560578662,
+    "partial_pct": 0.27124773960216997
+  },
+  "partially_hydrated_verbs": 3,
+  "per_domain": [
+    {
+      "domain": "access-review",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 17,
+      "missing": 17,
+      "partial": 0
+    },
+    {
+      "domain": "admin.regulators",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 5,
+      "missing": 5,
+      "partial": 0
+    },
+    {
+      "domain": "admin.regulatory-tiers",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 2,
+      "missing": 2,
+      "partial": 0
+    },
+    {
+      "domain": "admin.role-types",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 5,
+      "missing": 5,
+      "partial": 0
+    },
+    {
+      "domain": "agent",
+      "footprint_entries": 2,
+      "fully_hydrated": 2,
+      "live_verbs": 20,
+      "missing": 18,
+      "partial": 0
+    },
+    {
+      "domain": "allegation",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 6,
+      "missing": 6,
+      "partial": 0
+    },
+    {
+      "domain": "attribute",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 16,
+      "missing": 16,
+      "partial": 0
+    },
+    {
+      "domain": "attributes",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 4,
+      "missing": 4,
+      "partial": 0
+    },
+    {
+      "domain": "audit",
+      "footprint_entries": 8,
+      "fully_hydrated": 8,
+      "live_verbs": 8,
+      "missing": 0,
+      "partial": 0
+    },
+    {
+      "domain": "batch",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 7,
+      "missing": 7,
+      "partial": 0
+    },
+    {
+      "domain": "billing",
+      "footprint_entries": 8,
+      "fully_hydrated": 8,
+      "live_verbs": 17,
+      "missing": 9,
+      "partial": 0
+    },
+    {
+      "domain": "board",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 9,
+      "missing": 9,
+      "partial": 0
+    },
+    {
+      "domain": "bods",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 9,
+      "missing": 9,
+      "partial": 0
+    },
+    {
+      "domain": "booking-location",
+      "footprint_entries": 1,
+      "fully_hydrated": 1,
+      "live_verbs": 3,
+      "missing": 2,
+      "partial": 0
+    },
+    {
+      "domain": "booking-principal",
+      "footprint_entries": 3,
+      "fully_hydrated": 3,
+      "live_verbs": 9,
+      "missing": 6,
+      "partial": 0
+    },
+    {
+      "domain": "bpmn",
+      "footprint_entries": 4,
+      "fully_hydrated": 4,
+      "live_verbs": 5,
+      "missing": 1,
+      "partial": 0
+    },
+    {
+      "domain": "capital",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 30,
+      "missing": 30,
+      "partial": 0
+    },
+    {
+      "domain": "case-event",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 2,
+      "missing": 2,
+      "partial": 0
+    },
+    {
+      "domain": "cash-sweep",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 9,
+      "missing": 9,
+      "partial": 0
+    },
+    {
+      "domain": "cbu",
+      "footprint_entries": 28,
+      "fully_hydrated": 28,
+      "live_verbs": 37,
+      "missing": 9,
+      "partial": 0
+    },
+    {
+      "domain": "cbu-custody",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 8,
+      "missing": 8,
+      "partial": 0
+    },
+    {
+      "domain": "changeset",
+      "footprint_entries": 14,
+      "fully_hydrated": 14,
+      "live_verbs": 14,
+      "missing": 0,
+      "partial": 0
+    },
+    {
+      "domain": "client-group",
+      "footprint_entries": 26,
+      "fully_hydrated": 26,
+      "live_verbs": 26,
+      "missing": 0,
+      "partial": 0
+    },
+    {
+      "domain": "client-principal-relationship",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 4,
+      "missing": 4,
+      "partial": 0
+    },
+    {
+      "domain": "constellation",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 2,
+      "missing": 2,
+      "partial": 0
+    },
+    {
+      "domain": "contract",
+      "footprint_entries": 10,
+      "fully_hydrated": 10,
+      "live_verbs": 14,
+      "missing": 4,
+      "partial": 0
+    },
+    {
+      "domain": "contract-pack",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 2,
+      "missing": 2,
+      "partial": 0
+    },
+    {
+      "domain": "control",
+      "footprint_entries": 1,
+      "fully_hydrated": 1,
+      "live_verbs": 16,
+      "missing": 15,
+      "partial": 0
+    },
+    {
+      "domain": "corporate-action",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 9,
+      "missing": 9,
+      "partial": 0
+    },
+    {
+      "domain": "coverage",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 1,
+      "missing": 1,
+      "partial": 0
+    },
+    {
+      "domain": "deal",
+      "footprint_entries": 17,
+      "fully_hydrated": 17,
+      "live_verbs": 42,
+      "missing": 25,
+      "partial": 0
+    },
+    {
+      "domain": "delegation",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 4,
+      "missing": 4,
+      "partial": 0
+    },
+    {
+      "domain": "delivery",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 3,
+      "missing": 3,
+      "partial": 0
+    },
+    {
+      "domain": "discovery",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 12,
+      "missing": 12,
+      "partial": 0
+    },
+    {
+      "domain": "discrepancy",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 4,
+      "missing": 4,
+      "partial": 0
+    },
+    {
+      "domain": "docs-bundle",
+      "footprint_entries": 1,
+      "fully_hydrated": 1,
+      "live_verbs": 3,
+      "missing": 2,
+      "partial": 0
+    },
+    {
+      "domain": "document",
+      "footprint_entries": 10,
+      "fully_hydrated": 10,
+      "live_verbs": 21,
+      "missing": 11,
+      "partial": 0
+    },
+    {
+      "domain": "economic-exposure",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 2,
+      "missing": 2,
+      "partial": 0
+    },
+    {
+      "domain": "edge",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 1,
+      "missing": 1,
+      "partial": 0
+    },
+    {
+      "domain": "entity",
+      "footprint_entries": 12,
+      "fully_hydrated": 12,
+      "live_verbs": 15,
+      "missing": 3,
+      "partial": 0
+    },
+    {
+      "domain": "entity-settlement",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 3,
+      "missing": 3,
+      "partial": 0
+    },
+    {
+      "domain": "entity-workstream",
+      "footprint_entries": 3,
+      "fully_hydrated": 3,
+      "live_verbs": 9,
+      "missing": 6,
+      "partial": 0
+    },
+    {
+      "domain": "evidence",
+      "footprint_entries": 5,
+      "fully_hydrated": 5,
+      "live_verbs": 5,
+      "missing": 0,
+      "partial": 0
+    },
+    {
+      "domain": "focus",
+      "footprint_entries": 6,
+      "fully_hydrated": 6,
+      "live_verbs": 6,
+      "missing": 0,
+      "partial": 0
+    },
+    {
+      "domain": "fund",
+      "footprint_entries": 3,
+      "fully_hydrated": 3,
+      "live_verbs": 22,
+      "missing": 19,
+      "partial": 0
+    },
+    {
+      "domain": "gleif",
+      "footprint_entries": 4,
+      "fully_hydrated": 4,
+      "live_verbs": 16,
+      "missing": 12,
+      "partial": 0
+    },
+    {
+      "domain": "governance",
+      "footprint_entries": 9,
+      "fully_hydrated": 9,
+      "live_verbs": 9,
+      "missing": 0,
+      "partial": 0
+    },
+    {
+      "domain": "graph",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 10,
+      "missing": 10,
+      "partial": 0
+    },
+    {
+      "domain": "holding",
+      "footprint_entries": 1,
+      "fully_hydrated": 1,
+      "live_verbs": 10,
+      "missing": 9,
+      "partial": 0
+    },
+    {
+      "domain": "identifier",
+      "footprint_entries": 1,
+      "fully_hydrated": 1,
+      "live_verbs": 11,
+      "missing": 10,
+      "partial": 0
+    },
+    {
+      "domain": "instruction-profile",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 7,
+      "missing": 7,
+      "partial": 0
+    },
+    {
+      "domain": "instrument-class",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 3,
+      "missing": 3,
+      "partial": 0
+    },
+    {
+      "domain": "investment-manager",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 7,
+      "missing": 7,
+      "partial": 0
+    },
+    {
+      "domain": "investor",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 20,
+      "missing": 20,
+      "partial": 0
+    },
+    {
+      "domain": "investor-role",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 10,
+      "missing": 10,
+      "partial": 0
+    },
+    {
+      "domain": "isda",
+      "footprint_entries": 1,
+      "fully_hydrated": 1,
+      "live_verbs": 6,
+      "missing": 5,
+      "partial": 0
+    },
+    {
+      "domain": "issuer-control-config",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 2,
+      "missing": 2,
+      "partial": 0
+    },
+    {
+      "domain": "kyc",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 1,
+      "missing": 1,
+      "partial": 0
+    },
+    {
+      "domain": "kyc-agreement",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 4,
+      "missing": 4,
+      "partial": 0
+    },
+    {
+      "domain": "kyc-case",
+      "footprint_entries": 9,
+      "fully_hydrated": 9,
+      "live_verbs": 10,
+      "missing": 1,
+      "partial": 0
+    },
+    {
+      "domain": "legal-entity",
+      "footprint_entries": 1,
+      "fully_hydrated": 1,
+      "live_verbs": 3,
+      "missing": 2,
+      "partial": 0
+    },
+    {
+      "domain": "maintenance",
+      "footprint_entries": 7,
+      "fully_hydrated": 7,
+      "live_verbs": 7,
+      "missing": 0,
+      "partial": 0
+    },
+    {
+      "domain": "manco",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 10,
+      "missing": 10,
+      "partial": 0
+    },
+    {
+      "domain": "matrix-overlay",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 9,
+      "missing": 9,
+      "partial": 0
+    },
+    {
+      "domain": "movement",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 14,
+      "missing": 14,
+      "partial": 0
+    },
+    {
+      "domain": "observation",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 8,
+      "missing": 8,
+      "partial": 0
+    },
+    {
+      "domain": "onboarding",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 1,
+      "missing": 1,
+      "partial": 0
+    },
+    {
+      "domain": "ownership",
+      "footprint_entries": 3,
+      "fully_hydrated": 3,
+      "live_verbs": 22,
+      "missing": 19,
+      "partial": 0
+    },
+    {
+      "domain": "pack",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 2,
+      "missing": 2,
+      "partial": 0
+    },
+    {
+      "domain": "partnership",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 7,
+      "missing": 7,
+      "partial": 0
+    },
+    {
+      "domain": "pipeline",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 1,
+      "missing": 1,
+      "partial": 0
+    },
+    {
+      "domain": "pricing-config",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 14,
+      "missing": 14,
+      "partial": 0
+    },
+    {
+      "domain": "product",
+      "footprint_entries": 1,
+      "fully_hydrated": 1,
+      "live_verbs": 2,
+      "missing": 1,
+      "partial": 0
+    },
+    {
+      "domain": "provisioning",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 2,
+      "missing": 2,
+      "partial": 0
+    },
+    {
+      "domain": "readiness",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 2,
+      "missing": 2,
+      "partial": 0
+    },
+    {
+      "domain": "red-flag",
+      "footprint_entries": 3,
+      "fully_hydrated": 3,
+      "live_verbs": 8,
+      "missing": 5,
+      "partial": 0
+    },
+    {
+      "domain": "refdata",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 9,
+      "missing": 9,
+      "partial": 0
+    },
+    {
+      "domain": "registry",
+      "footprint_entries": 26,
+      "fully_hydrated": 26,
+      "live_verbs": 26,
+      "missing": 0,
+      "partial": 0
+    },
+    {
+      "domain": "regulatory.registration",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 4,
+      "missing": 4,
+      "partial": 0
+    },
+    {
+      "domain": "regulatory.status",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 1,
+      "missing": 1,
+      "partial": 0
+    },
+    {
+      "domain": "request",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 9,
+      "missing": 9,
+      "partial": 0
+    },
+    {
+      "domain": "requirement",
+      "footprint_entries": 1,
+      "fully_hydrated": 1,
+      "live_verbs": 10,
+      "missing": 9,
+      "partial": 0
+    },
+    {
+      "domain": "research.companies-house",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 5,
+      "missing": 5,
+      "partial": 0
+    },
+    {
+      "domain": "research.generic",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 1,
+      "missing": 1,
+      "partial": 0
+    },
+    {
+      "domain": "research.import-run",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 3,
+      "missing": 3,
+      "partial": 0
+    },
+    {
+      "domain": "research.outreach",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 9,
+      "missing": 9,
+      "partial": 0
+    },
+    {
+      "domain": "research.sec-edgar",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 5,
+      "missing": 5,
+      "partial": 0
+    },
+    {
+      "domain": "research.sources",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 5,
+      "missing": 5,
+      "partial": 0
+    },
+    {
+      "domain": "research.workflow",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 10,
+      "missing": 10,
+      "partial": 0
+    },
+    {
+      "domain": "role",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 4,
+      "missing": 4,
+      "partial": 0
+    },
+    {
+      "domain": "rule",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 3,
+      "missing": 3,
+      "partial": 0
+    },
+    {
+      "domain": "rule-field",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 2,
+      "missing": 2,
+      "partial": 0
+    },
+    {
+      "domain": "ruleset",
+      "footprint_entries": 2,
+      "fully_hydrated": 2,
+      "live_verbs": 3,
+      "missing": 1,
+      "partial": 0
+    },
+    {
+      "domain": "schema",
+      "footprint_entries": 13,
+      "fully_hydrated": 13,
+      "live_verbs": 13,
+      "missing": 0,
+      "partial": 0
+    },
+    {
+      "domain": "screening",
+      "footprint_entries": 6,
+      "fully_hydrated": 6,
+      "live_verbs": 8,
+      "missing": 2,
+      "partial": 0
+    },
+    {
+      "domain": "security-type",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 2,
+      "missing": 2,
+      "partial": 0
+    },
+    {
+      "domain": "semantic",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 6,
+      "missing": 6,
+      "partial": 0
+    },
+    {
+      "domain": "service",
+      "footprint_entries": 1,
+      "fully_hydrated": 1,
+      "live_verbs": 3,
+      "missing": 2,
+      "partial": 0
+    },
+    {
+      "domain": "service-availability",
+      "footprint_entries": 1,
+      "fully_hydrated": 1,
+      "live_verbs": 3,
+      "missing": 2,
+      "partial": 0
+    },
+    {
+      "domain": "service-intent",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 3,
+      "missing": 3,
+      "partial": 0
+    },
+    {
+      "domain": "service-resource",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 26,
+      "missing": 26,
+      "partial": 0
+    },
+    {
+      "domain": "session",
+      "footprint_entries": 10,
+      "fully_hydrated": 7,
+      "live_verbs": 18,
+      "missing": 8,
+      "partial": 3
+    },
+    {
+      "domain": "settlement-chain",
+      "footprint_entries": 1,
+      "fully_hydrated": 1,
+      "live_verbs": 13,
+      "missing": 12,
+      "partial": 0
+    },
+    {
+      "domain": "share-class",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 10,
+      "missing": 10,
+      "partial": 0
+    },
+    {
+      "domain": "skeleton",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 1,
+      "missing": 1,
+      "partial": 0
+    },
+    {
+      "domain": "sla",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 13,
+      "missing": 13,
+      "partial": 0
+    },
+    {
+      "domain": "state",
+      "footprint_entries": 8,
+      "fully_hydrated": 8,
+      "live_verbs": 8,
+      "missing": 0,
+      "partial": 0
+    },
+    {
+      "domain": "subcustodian",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 3,
+      "missing": 3,
+      "partial": 0
+    },
+    {
+      "domain": "tax-config",
+      "footprint_entries": 1,
+      "fully_hydrated": 1,
+      "live_verbs": 11,
+      "missing": 10,
+      "partial": 0
+    },
+    {
+      "domain": "team",
+      "footprint_entries": 3,
+      "fully_hydrated": 3,
+      "live_verbs": 15,
+      "missing": 12,
+      "partial": 0
+    },
+    {
+      "domain": "template",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 2,
+      "missing": 2,
+      "partial": 0
+    },
+    {
+      "domain": "temporal",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 8,
+      "missing": 8,
+      "partial": 0
+    },
+    {
+      "domain": "tollgate",
+      "footprint_entries": 2,
+      "fully_hydrated": 2,
+      "live_verbs": 10,
+      "missing": 8,
+      "partial": 0
+    },
+    {
+      "domain": "trade-gateway",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 12,
+      "missing": 12,
+      "partial": 0
+    },
+    {
+      "domain": "trading-profile",
+      "footprint_entries": 13,
+      "fully_hydrated": 13,
+      "live_verbs": 32,
+      "missing": 19,
+      "partial": 0
+    },
+    {
+      "domain": "trust",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 8,
+      "missing": 8,
+      "partial": 0
+    },
+    {
+      "domain": "ubo",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 20,
+      "missing": 20,
+      "partial": 0
+    },
+    {
+      "domain": "ubo.registry",
+      "footprint_entries": 5,
+      "fully_hydrated": 5,
+      "live_verbs": 6,
+      "missing": 1,
+      "partial": 0
+    },
+    {
+      "domain": "user",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 7,
+      "missing": 7,
+      "partial": 0
+    },
+    {
+      "domain": "verify",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 16,
+      "missing": 16,
+      "partial": 0
+    },
+    {
+      "domain": "view",
+      "footprint_entries": 0,
+      "fully_hydrated": 0,
+      "live_verbs": 14,
+      "missing": 14,
+      "partial": 0
+    }
+  ],
+  "per_workspace": [
+    {
+      "footprint_entries": 105,
+      "fully_hydrated": 102,
+      "live_verbs": 233,
+      "missing": 128,
+      "partial": 3,
+      "workspace": "*"
+    },
+    {
+      "footprint_entries": 58,
+      "fully_hydrated": 58,
+      "live_verbs": 318,
+      "missing": 260,
+      "partial": 0,
+      "workspace": "CBU"
+    },
+    {
+      "footprint_entries": 36,
+      "fully_hydrated": 36,
+      "live_verbs": 104,
+      "missing": 68,
+      "partial": 0,
+      "workspace": "Deal"
+    },
+    {
+      "footprint_entries": 20,
+      "fully_hydrated": 20,
+      "live_verbs": 151,
+      "missing": 131,
+      "partial": 0,
+      "workspace": "InstrumentMatrix"
+    },
+    {
+      "footprint_entries": 93,
+      "fully_hydrated": 93,
+      "live_verbs": 361,
+      "missing": 268,
+      "partial": 0,
+      "workspace": "KYC"
+    },
+    {
+      "footprint_entries": 74,
+      "fully_hydrated": 74,
+      "live_verbs": 211,
+      "missing": 137,
+      "partial": 0,
+      "workspace": "OnBoarding"
+    }
+  ],
+  "repo_revision": "56b2f9b413f2b5ddc2c6ba269ad8cb610e18c7a4",
+  "slice_id": "S1",
+  "total_live_verbs": 1106
+}

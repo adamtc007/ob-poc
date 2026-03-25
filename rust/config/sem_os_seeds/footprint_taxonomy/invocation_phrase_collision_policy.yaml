@@ -1,0 +1,73 @@
+default_classification: fatal
+
+scoped_allowed:
+  - add board member
+  - add controller
+  - add document requirements
+  - add ownership
+  - add service level agreement
+  - add voting control
+  - appoint director to board
+  - appoint sub-advisor
+  - approve evidence
+  - check for circular ownership
+  - check universe completeness
+  - close cbu
+  - compare changes
+  - create control link
+  - create legal entity
+  - create share class
+  - describe this verb
+  - diff against active snapshots
+  - enumerate role types
+  - find ultimate parent
+  - issue new shares
+  - link controller
+  - link feeder to master
+  - list all attributes
+  - list beneficial owners
+  - list cbus
+  - list relationships
+  - list share classes
+  - list subsidiaries
+  - new share class
+  - none of these
+  - open case
+  - override document requirement
+  - ownership chain
+  - process return of capital
+  - reject
+  - reject evidence
+  - remove cbu
+  - request identity documents
+  - research this entity
+  - revoke entity role
+  - run the rba assessment
+  - search entities
+  - show all cbus
+  - show cbu details
+  - show cbu subscriptions
+  - show entity relationships
+  - show me all entities
+  - show overdue requests
+  - show rate cards
+  - show sub-funds
+  - start fresh
+  - strip role from entity
+  - submit for review
+  - subscribe cbu to product
+  - terminate relationship
+  - trace ownership
+  - trace ownership chain
+  - trace ownership upward
+  - unsubscribe cbu from product
+  - validate settlement coverage
+  - what is this attribute
+  - what products is cbu subscribed to
+  - what share classes exist
+  - who are the beneficial owners
+  - who are the ubos
+  - who controls the board
+  - who controls this
+  - who manages this cbu
+  - who owns this entity

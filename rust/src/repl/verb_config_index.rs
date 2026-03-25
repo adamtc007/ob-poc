@@ -335,8 +335,12 @@ pub fn pack_verb_sentence_templates() -> HashMap<String, Vec<String>> {
 
     // -- Onboarding verbs --
     m.insert(
-        "onboarding.create-request".to_string(),
-        vec!["Create onboarding request for {client-name}".to_string()],
+        "deal.request-onboarding".to_string(),
+        vec!["Create onboarding handoff for deal {deal-id} into CBU {cbu-id}".to_string()],
+    );
+    m.insert(
+        "deal.request-onboarding-batch".to_string(),
+        vec!["Create onboarding batch handoff for deal {deal-id}".to_string()],
     );
 
     // -- Session/navigation verbs --
@@ -650,7 +654,7 @@ mod tests {
             "kyc.open-case",
             "kyc.request-docs",
             "kyc.review-gate",
-            "onboarding.create-request",
+            "deal.request-onboarding",
             "session.load-galaxy",
             "session.load-cbu",
             "contract.subscribe",

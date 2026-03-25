@@ -1,0 +1,827 @@
+{
+  "counts_by_domain": {
+    "cbu": 8,
+    "deal": 9,
+    "document": 3,
+    "kyc-case": 1,
+    "onboarding": 1,
+    "service-resource": 9,
+    "trading-profile": 13
+  },
+  "entries": [
+    {
+      "behavior": "plugin",
+      "domain": "cbu",
+      "fqn": "cbu.assign-control",
+      "lookup_entity_types": [],
+      "lookup_tables": [],
+      "priority_reason": "High-value business/plugin domain for handler-level footprint extraction",
+      "required_args": [
+        "cbu-id",
+        "controlled-entity-id",
+        "controller-entity-id",
+        "role"
+      ],
+      "side_effects": "state_write",
+      "workspace_affinity": [
+        "CBU",
+        "OnBoarding"
+      ]
+    },
+    {
+      "behavior": "plugin",
+      "domain": "cbu",
+      "fqn": "cbu.assign-fund-role",
+      "lookup_entity_types": [],
+      "lookup_tables": [],
+      "priority_reason": "High-value business/plugin domain for handler-level footprint extraction",
+      "required_args": [
+        "cbu-id",
+        "entity-id",
+        "role"
+      ],
+      "side_effects": "state_write",
+      "workspace_affinity": [
+        "CBU",
+        "OnBoarding"
+      ]
+    },
+    {
+      "behavior": "plugin",
+      "domain": "cbu",
+      "fqn": "cbu.assign-ownership",
+      "lookup_entity_types": [],
+      "lookup_tables": [],
+      "priority_reason": "High-value business/plugin domain for handler-level footprint extraction",
+      "required_args": [
+        "cbu-id",
+        "owned-entity-id",
+        "owner-entity-id",
+        "percentage"
+      ],
+      "side_effects": "state_write",
+      "workspace_affinity": [
+        "CBU",
+        "OnBoarding"
+      ]
+    },
+    {
+      "behavior": "plugin",
+      "domain": "cbu",
+      "fqn": "cbu.assign-service-provider",
+      "lookup_entity_types": [],
+      "lookup_tables": [],
+      "priority_reason": "High-value business/plugin domain for handler-level footprint extraction",
+      "required_args": [
+        "cbu-id",
+        "provider-entity-id",
+        "role"
+      ],
+      "side_effects": "state_write",
+      "workspace_affinity": [
+        "CBU",
+        "OnBoarding"
+      ]
+    },
+    {
+      "behavior": "plugin",
+      "domain": "cbu",
+      "fqn": "cbu.assign-signatory",
+      "lookup_entity_types": [],
+      "lookup_tables": [],
+      "priority_reason": "High-value business/plugin domain for handler-level footprint extraction",
+      "required_args": [
+        "cbu-id",
+        "person-entity-id",
+        "role"
+      ],
+      "side_effects": "state_write",
+      "workspace_affinity": [
+        "CBU",
+        "OnBoarding"
+      ]
+    },
+    {
+      "behavior": "plugin",
+      "domain": "cbu",
+      "fqn": "cbu.assign-trust-role",
+      "lookup_entity_types": [],
+      "lookup_tables": [],
+      "priority_reason": "High-value business/plugin domain for handler-level footprint extraction",
+      "required_args": [
+        "cbu-id",
+        "participant-entity-id",
+        "role",
+        "trust-entity-id"
+      ],
+      "side_effects": "state_write",
+      "workspace_affinity": [
+        "CBU",
+        "OnBoarding"
+      ]
+    },
+    {
+      "behavior": "plugin",
+      "domain": "cbu",
+      "fqn": "cbu.delete-cascade",
+      "lookup_entity_types": [
+        "cbu"
+      ],
+      "lookup_tables": [
+        "cbus"
+      ],
+      "priority_reason": "High-value business/plugin domain for handler-level footprint extraction",
+      "required_args": [
+        "cbu-id"
+      ],
+      "side_effects": "state_write",
+      "workspace_affinity": [
+        "CBU",
+        "OnBoarding"
+      ]
+    },
+    {
+      "behavior": "plugin",
+      "domain": "cbu",
+      "fqn": "cbu.validate-roles",
+      "lookup_entity_types": [],
+      "lookup_tables": [],
+      "priority_reason": "High-value business/plugin domain for handler-level footprint extraction",
+      "required_args": [
+        "cbu-id"
+      ],
+      "side_effects": "state_write",
+      "workspace_affinity": [
+        "CBU",
+        "OnBoarding"
+      ]
+    },
+    {
+      "behavior": "plugin",
+      "domain": "deal",
+      "fqn": "deal.add-document",
+      "lookup_entity_types": [],
+      "lookup_tables": [],
+      "priority_reason": "High-value business/plugin domain for handler-level footprint extraction",
+      "required_args": [
+        "deal-id",
+        "document-id",
+        "document-type"
+      ],
+      "side_effects": "state_write",
+      "workspace_affinity": [
+        "Deal",
+        "OnBoarding"
+      ]
+    },
+    {
+      "behavior": "plugin",
+      "domain": "deal",
+      "fqn": "deal.add-sla",
+      "lookup_entity_types": [],
+      "lookup_tables": [],
+      "priority_reason": "High-value business/plugin domain for handler-level footprint extraction",
+      "required_args": [
+        "deal-id",
+        "effective-from",
+        "metric-name",
+        "sla-name",
+        "target-value"
+      ],
+      "side_effects": "state_write",
+      "workspace_affinity": [
+        "Deal",
+        "OnBoarding"
+      ]
+    },
+    {
+      "behavior": "plugin",
+      "domain": "deal",
+      "fqn": "deal.add-ubo-assessment",
+      "lookup_entity_types": [],
+      "lookup_tables": [],
+      "priority_reason": "High-value business/plugin domain for handler-level footprint extraction",
+      "required_args": [
+        "deal-id",
+        "entity-id"
+      ],
+      "side_effects": "state_write",
+      "workspace_affinity": [
+        "Deal",
+        "OnBoarding"
+      ]
+    },
+    {
+      "behavior": "plugin",
+      "domain": "deal",
+      "fqn": "deal.remove-rate-card-line",
+      "lookup_entity_types": [],
+      "lookup_tables": [],
+      "priority_reason": "High-value business/plugin domain for handler-level footprint extraction",
+      "required_args": [
+        "line-id"
+      ],
+      "side_effects": "state_write",
+      "workspace_affinity": [
+        "Deal",
+        "OnBoarding"
+      ]
+    },
+    {
+      "behavior": "plugin",
+      "domain": "deal",
+      "fqn": "deal.update-document-status",
+      "lookup_entity_types": [],
+      "lookup_tables": [],
+      "priority_reason": "High-value business/plugin domain for handler-level footprint extraction",
+      "required_args": [
+        "deal-id",
+        "document-id",
+        "document-status"
+      ],
+      "side_effects": "state_write",
+      "workspace_affinity": [
+        "Deal",
+        "OnBoarding"
+      ]
+    },
+    {
+      "behavior": "plugin",
+      "domain": "deal",
+      "fqn": "deal.update-onboarding-status",
+      "lookup_entity_types": [],
+      "lookup_tables": [],
+      "priority_reason": "High-value business/plugin domain for handler-level footprint extraction",
+      "required_args": [
+        "request-id",
+        "request-status"
+      ],
+      "side_effects": "state_write",
+      "workspace_affinity": [
+        "Deal",
+        "OnBoarding"
+      ]
+    },
+    {
+      "behavior": "plugin",
+      "domain": "deal",
+      "fqn": "deal.update-product-status",
+      "lookup_entity_types": [],
+      "lookup_tables": [],
+      "priority_reason": "High-value business/plugin domain for handler-level footprint extraction",
+      "required_args": [
+        "deal-id",
+        "product-id",
+        "product-status"
+      ],
+      "side_effects": "state_write",
+      "workspace_affinity": [
+        "Deal",
+        "OnBoarding"
+      ]
+    },
+    {
+      "behavior": "plugin",
+      "domain": "deal",
+      "fqn": "deal.update-rate-card-line",
+      "lookup_entity_types": [],
+      "lookup_tables": [],
+      "priority_reason": "High-value business/plugin domain for handler-level footprint extraction",
+      "required_args": [
+        "line-id"
+      ],
+      "side_effects": "state_write",
+      "workspace_affinity": [
+        "Deal",
+        "OnBoarding"
+      ]
+    },
+    {
+      "behavior": "plugin",
+      "domain": "deal",
+      "fqn": "deal.update-ubo-assessment",
+      "lookup_entity_types": [],
+      "lookup_tables": [],
+      "priority_reason": "High-value business/plugin domain for handler-level footprint extraction",
+      "required_args": [
+        "assessment-id"
+      ],
+      "side_effects": "state_write",
+      "workspace_affinity": [
+        "Deal",
+        "OnBoarding"
+      ]
+    },
+    {
+      "behavior": "plugin",
+      "domain": "document",
+      "fqn": "document.catalog",
+      "lookup_entity_types": [
+        "cbu",
+        "entity"
+      ],
+      "lookup_tables": [
+        "cbus",
+        "entities"
+      ],
+      "priority_reason": "High-value business/plugin domain for handler-level footprint extraction",
+      "required_args": [
+        "doc-type"
+      ],
+      "side_effects": "state_write",
+      "workspace_affinity": [
+        "KYC",
+        "OnBoarding"
+      ]
+    },
+    {
+      "behavior": "plugin",
+      "domain": "document",
+      "fqn": "document.extract",
+      "lookup_entity_types": [],
+      "lookup_tables": [],
+      "priority_reason": "High-value business/plugin domain for handler-level footprint extraction",
+      "required_args": [
+        "document-id"
+      ],
+      "side_effects": "state_write",
+      "workspace_affinity": [
+        "KYC",
+        "OnBoarding"
+      ]
+    },
+    {
+      "behavior": "plugin",
+      "domain": "document",
+      "fqn": "document.upload-version",
+      "lookup_entity_types": [],
+      "lookup_tables": [],
+      "priority_reason": "High-value business/plugin domain for handler-level footprint extraction",
+      "required_args": [
+        "content-type",
+        "document-id"
+      ],
+      "side_effects": "state_write",
+      "workspace_affinity": [
+        "KYC",
+        "OnBoarding"
+      ]
+    },
+    {
+      "behavior": "plugin",
+      "domain": "kyc-case",
+      "fqn": "kyc-case.state",
+      "lookup_entity_types": [
+        "kyc_case"
+      ],
+      "lookup_tables": [
+        "cases"
+      ],
+      "priority_reason": "High-value business/plugin domain for handler-level footprint extraction",
+      "required_args": [
+        "case-id"
+      ],
+      "side_effects": "state_write",
+      "workspace_affinity": [
+        "KYC",
+        "OnBoarding"
+      ]
+    },
+    {
+      "behavior": "plugin",
+      "domain": "onboarding",
+      "fqn": "onboarding.auto-complete",
+      "lookup_entity_types": [
+        "cbu"
+      ],
+      "lookup_tables": [
+        "cbus"
+      ],
+      "priority_reason": "High-value business/plugin domain for handler-level footprint extraction",
+      "required_args": [
+        "cbu-id"
+      ],
+      "side_effects": "state_write",
+      "workspace_affinity": [
+        "OnBoarding"
+      ]
+    },
+    {
+      "behavior": "plugin",
+      "domain": "service-resource",
+      "fqn": "service-resource.activate",
+      "lookup_entity_types": [],
+      "lookup_tables": [],
+      "priority_reason": "High-value business/plugin domain for handler-level footprint extraction",
+      "required_args": [
+        "instance-id"
+      ],
+      "side_effects": "state_write",
+      "workspace_affinity": [
+        "CBU",
+        "OnBoarding"
+      ]
+    },
+    {
+      "behavior": "plugin",
+      "domain": "service-resource",
+      "fqn": "service-resource.decommission",
+      "lookup_entity_types": [
+        "resource_instance"
+      ],
+      "lookup_tables": [
+        "cbu_resource_instances"
+      ],
+      "priority_reason": "High-value business/plugin domain for handler-level footprint extraction",
+      "required_args": [
+        "instance-id"
+      ],
+      "side_effects": "state_write",
+      "workspace_affinity": [
+        "CBU",
+        "OnBoarding"
+      ]
+    },
+    {
+      "behavior": "plugin",
+      "domain": "service-resource",
+      "fqn": "service-resource.execute-lifecycle-plan",
+      "lookup_entity_types": [
+        "cbu"
+      ],
+      "lookup_tables": [
+        "cbus"
+      ],
+      "priority_reason": "High-value business/plugin domain for handler-level footprint extraction",
+      "required_args": [
+        "cbu-id",
+        "plan"
+      ],
+      "side_effects": "state_write",
+      "workspace_affinity": [
+        "CBU",
+        "OnBoarding"
+      ]
+    },
+    {
+      "behavior": "plugin",
+      "domain": "service-resource",
+      "fqn": "service-resource.generate-lifecycle-plan",
+      "lookup_entity_types": [
+        "cbu"
+      ],
+      "lookup_tables": [
+        "cbus"
+      ],
+      "priority_reason": "High-value business/plugin domain for handler-level footprint extraction",
+      "required_args": [
+        "cbu-id"
+      ],
+      "side_effects": "state_write",
+      "workspace_affinity": [
+        "CBU",
+        "OnBoarding"
+      ]
+    },
+    {
+      "behavior": "plugin",
+      "domain": "service-resource",
+      "fqn": "service-resource.provision",
+      "lookup_entity_types": [
+        "cbu",
+        "product",
+        "service"
+      ],
+      "lookup_tables": [
+        "cbus",
+        "products",
+        "services"
+      ],
+      "priority_reason": "High-value business/plugin domain for handler-level footprint extraction",
+      "required_args": [
+        "cbu-id",
+        "resource-type"
+      ],
+      "side_effects": "state_write",
+      "workspace_affinity": [
+        "CBU",
+        "OnBoarding"
+      ]
+    },
+    {
+      "behavior": "plugin",
+      "domain": "service-resource",
+      "fqn": "service-resource.provision-lifecycle",
+      "lookup_entity_types": [
+        "cbu",
+        "entity",
+        "lifecycle_resource_type",
+        "market"
+      ],
+      "lookup_tables": [
+        "cbus",
+        "entities",
+        "lifecycle_resource_types",
+        "markets"
+      ],
+      "priority_reason": "High-value business/plugin domain for handler-level footprint extraction",
+      "required_args": [
+        "cbu-id",
+        "resource-type"
+      ],
+      "side_effects": "state_write",
+      "workspace_affinity": [
+        "CBU",
+        "OnBoarding"
+      ]
+    },
+    {
+      "behavior": "plugin",
+      "domain": "service-resource",
+      "fqn": "service-resource.set-attr",
+      "lookup_entity_types": [
+        "resource_instance"
+      ],
+      "lookup_tables": [
+        "cbu_resource_instances"
+      ],
+      "priority_reason": "High-value business/plugin domain for handler-level footprint extraction",
+      "required_args": [
+        "attr",
+        "instance-id",
+        "value"
+      ],
+      "side_effects": "state_write",
+      "workspace_affinity": [
+        "CBU",
+        "OnBoarding"
+      ]
+    },
+    {
+      "behavior": "plugin",
+      "domain": "service-resource",
+      "fqn": "service-resource.suspend",
+      "lookup_entity_types": [
+        "resource_instance"
+      ],
+      "lookup_tables": [
+        "cbu_resource_instances"
+      ],
+      "priority_reason": "High-value business/plugin domain for handler-level footprint extraction",
+      "required_args": [
+        "instance-id"
+      ],
+      "side_effects": "state_write",
+      "workspace_affinity": [
+        "CBU",
+        "OnBoarding"
+      ]
+    },
+    {
+      "behavior": "plugin",
+      "domain": "service-resource",
+      "fqn": "service-resource.validate-attrs",
+      "lookup_entity_types": [
+        "resource_instance"
+      ],
+      "lookup_tables": [
+        "cbu_resource_instances"
+      ],
+      "priority_reason": "High-value business/plugin domain for handler-level footprint extraction",
+      "required_args": [
+        "instance-id"
+      ],
+      "side_effects": "state_write",
+      "workspace_affinity": [
+        "CBU",
+        "OnBoarding"
+      ]
+    },
+    {
+      "behavior": "plugin",
+      "domain": "trading-profile",
+      "fqn": "trading-profile.ca.add-cutoff-rule",
+      "lookup_entity_types": [],
+      "lookup_tables": [],
+      "priority_reason": "High-value business/plugin domain for handler-level footprint extraction",
+      "required_args": [
+        "days-before",
+        "profile-id"
+      ],
+      "side_effects": "state_write",
+      "workspace_affinity": [
+        "InstrumentMatrix"
+      ]
+    },
+    {
+      "behavior": "plugin",
+      "domain": "trading-profile",
+      "fqn": "trading-profile.ca.disable-event-types",
+      "lookup_entity_types": [],
+      "lookup_tables": [],
+      "priority_reason": "High-value business/plugin domain for handler-level footprint extraction",
+      "required_args": [
+        "event-types",
+        "profile-id"
+      ],
+      "side_effects": "state_write",
+      "workspace_affinity": [
+        "InstrumentMatrix"
+      ]
+    },
+    {
+      "behavior": "plugin",
+      "domain": "trading-profile",
+      "fqn": "trading-profile.ca.enable-event-types",
+      "lookup_entity_types": [],
+      "lookup_tables": [],
+      "priority_reason": "High-value business/plugin domain for handler-level footprint extraction",
+      "required_args": [
+        "event-types",
+        "profile-id"
+      ],
+      "side_effects": "state_write",
+      "workspace_affinity": [
+        "InstrumentMatrix"
+      ]
+    },
+    {
+      "behavior": "plugin",
+      "domain": "trading-profile",
+      "fqn": "trading-profile.ca.link-proceeds-ssi",
+      "lookup_entity_types": [],
+      "lookup_tables": [],
+      "priority_reason": "High-value business/plugin domain for handler-level footprint extraction",
+      "required_args": [
+        "proceeds-type",
+        "profile-id",
+        "ssi-name"
+      ],
+      "side_effects": "state_write",
+      "workspace_affinity": [
+        "InstrumentMatrix"
+      ]
+    },
+    {
+      "behavior": "plugin",
+      "domain": "trading-profile",
+      "fqn": "trading-profile.ca.remove-cutoff-rule",
+      "lookup_entity_types": [],
+      "lookup_tables": [],
+      "priority_reason": "High-value business/plugin domain for handler-level footprint extraction",
+      "required_args": [
+        "profile-id"
+      ],
+      "side_effects": "state_write",
+      "workspace_affinity": [
+        "InstrumentMatrix"
+      ]
+    },
+    {
+      "behavior": "plugin",
+      "domain": "trading-profile",
+      "fqn": "trading-profile.ca.remove-default-option",
+      "lookup_entity_types": [],
+      "lookup_tables": [],
+      "priority_reason": "High-value business/plugin domain for handler-level footprint extraction",
+      "required_args": [
+        "event-type",
+        "profile-id"
+      ],
+      "side_effects": "state_write",
+      "workspace_affinity": [
+        "InstrumentMatrix"
+      ]
+    },
+    {
+      "behavior": "plugin",
+      "domain": "trading-profile",
+      "fqn": "trading-profile.ca.remove-proceeds-ssi",
+      "lookup_entity_types": [],
+      "lookup_tables": [],
+      "priority_reason": "High-value business/plugin domain for handler-level footprint extraction",
+      "required_args": [
+        "proceeds-type",
+        "profile-id"
+      ],
+      "side_effects": "state_write",
+      "workspace_affinity": [
+        "InstrumentMatrix"
+      ]
+    },
+    {
+      "behavior": "plugin",
+      "domain": "trading-profile",
+      "fqn": "trading-profile.ca.set-default-option",
+      "lookup_entity_types": [],
+      "lookup_tables": [],
+      "priority_reason": "High-value business/plugin domain for handler-level footprint extraction",
+      "required_args": [
+        "default-option",
+        "event-type",
+        "profile-id"
+      ],
+      "side_effects": "state_write",
+      "workspace_affinity": [
+        "InstrumentMatrix"
+      ]
+    },
+    {
+      "behavior": "plugin",
+      "domain": "trading-profile",
+      "fqn": "trading-profile.ca.set-election-policy",
+      "lookup_entity_types": [],
+      "lookup_tables": [],
+      "priority_reason": "High-value business/plugin domain for handler-level footprint extraction",
+      "required_args": [
+        "elector",
+        "profile-id"
+      ],
+      "side_effects": "state_write",
+      "workspace_affinity": [
+        "InstrumentMatrix"
+      ]
+    },
+    {
+      "behavior": "plugin",
+      "domain": "trading-profile",
+      "fqn": "trading-profile.ca.set-notification-policy",
+      "lookup_entity_types": [],
+      "lookup_tables": [],
+      "priority_reason": "High-value business/plugin domain for handler-level footprint extraction",
+      "required_args": [
+        "channels",
+        "profile-id"
+      ],
+      "side_effects": "state_write",
+      "workspace_affinity": [
+        "InstrumentMatrix"
+      ]
+    },
+    {
+      "behavior": "plugin",
+      "domain": "trading-profile",
+      "fqn": "trading-profile.create-new-version",
+      "lookup_entity_types": [
+        "cbu"
+      ],
+      "lookup_tables": [
+        "cbus"
+      ],
+      "priority_reason": "High-value business/plugin domain for handler-level footprint extraction",
+      "required_args": [
+        "cbu-id"
+      ],
+      "side_effects": "state_write",
+      "workspace_affinity": [
+        "InstrumentMatrix"
+      ]
+    },
+    {
+      "behavior": "plugin",
+      "domain": "trading-profile",
+      "fqn": "trading-profile.link-csa-ssi",
+      "lookup_entity_types": [],
+      "lookup_tables": [],
+      "priority_reason": "High-value business/plugin domain for handler-level footprint extraction",
+      "required_args": [
+        "counterparty-ref",
+        "profile-id",
+        "ssi-name"
+      ],
+      "side_effects": "state_write",
+      "workspace_affinity": [
+        "InstrumentMatrix"
+      ]
+    },
+    {
+      "behavior": "plugin",
+      "domain": "trading-profile",
+      "fqn": "trading-profile.validate-go-live-ready",
+      "lookup_entity_types": [],
+      "lookup_tables": [],
+      "priority_reason": "High-value business/plugin domain for handler-level footprint extraction",
+      "required_args": [
+        "profile-id"
+      ],
+      "side_effects": "state_write",
+      "workspace_affinity": [
+        "InstrumentMatrix"
+      ]
+    }
+  ],
+  "entry_count": 44,
+  "generated_at": "2026-03-25T13:37:08.389852+00:00",
+  "priority_domains": [
+    "deal",
+    "cbu",
+    "kyc-case",
+    "screening",
+    "document",
+    "trading-profile",
+    "service-resource",
+    "onboarding"
+  ],
+  "repo_revision": "56b2f9b413f2b5ddc2c6ba269ad8cb610e18c7a4",
+  "slice_id": "S6.5"
+}

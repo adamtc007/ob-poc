@@ -819,7 +819,7 @@ Booking Principles tests whether the negotiated commercial intent is actually pe
 
 ### 12.2 Relationship to Onboarding Request
 
-The Onboarding Request wraps a set of CBUs and requested services. Booking Principles should influence:
+The Onboarding Request targets one existing CBU-product onboarding path. Operationally, multiple requests may be grouped as a batch or rollout wave. Booking Principles should influence:
 
 - whether the request can proceed,
 - which product/service/resource combinations are eligible,
@@ -999,4 +999,3 @@ For OB-POC, this capability provides a natural governed decision layer between:
 - and Product / Service / Resource provisioning.
 
 That makes it strategically important not only for onboarding control, but for the broader vision of deterministic, agent-assisted institutional client lifecycle orchestration.
-

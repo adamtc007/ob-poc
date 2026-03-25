@@ -24,6 +24,11 @@ optional_context:
   - default_cbu
   - jurisdiction
 
+workspaces:
+  - cbu
+  - instrument_matrix
+  - on_boarding
+
 allowed_verbs:
   - cbu.create
   - cbu.assign-product

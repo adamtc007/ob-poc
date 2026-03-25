@@ -1,0 +1,4 @@
+id	display_name	category	value_type	domain	uuid	is_required	metadata	triage_category	suggested_fqn
+access_level	access_level	resource	string	resource	a72a22d1-9608-4db3-b140-15dae5481b2d	f	{}	B_infrastructure	
+api_key	api_key	resource	string	resource	17e42903-6726-452d-aa32-d9467b884d11	f	{}	B_infrastructure	
+api_secret	api_secret	resource	string	resource	01fba04a-3609-46f6-8dd2-3ab5951f3a4e	f	{}	B_infrastructure	

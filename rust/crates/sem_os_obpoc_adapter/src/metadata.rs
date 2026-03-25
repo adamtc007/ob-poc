@@ -62,6 +62,14 @@ pub struct VerbFootprint {
     pub reads: Vec<String>,
     #[serde(default)]
     pub writes: Vec<String>,
+    #[serde(default)]
+    pub workspace_affinity: Vec<String>,
+    #[serde(default)]
+    pub constellation_families: Vec<String>,
+    #[serde(default)]
+    pub subject_kinds: Vec<String>,
+    #[serde(default)]
+    pub node_state_gates: Vec<String>,
 }
 
 /// Computed reverse index: for each table, which verbs read/write it.

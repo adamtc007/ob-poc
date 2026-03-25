@@ -1,5 +1,5 @@
 constellation: group.ownership
-description: Client group ownership and control constellation — the root context for all onboarding. Maps group identity, GLEIF hierarchy, UBO discovery, control chain, and CBU identification.
+description: Client group ownership and control constellation — the root context for all onboarding. Maps group identity, GLEIF hierarchy, UBO discovery, control chain, group-level KYC clearance, and the controlled CBUs that inherit that baseline through control links such as ManCo relationships.
 jurisdiction: ALL
 slots:
   client_group:
@@ -11,7 +11,6 @@ slots:
     verbs:
       create: { verb: client-group.create, when: empty }
       read: { verb: client-group.read, when: filled }
-      research: { verb: client-group.research, when: [empty, filled] }
       update: { verb: client-group.update, when: filled }
       set_canonical: { verb: client-group.set-canonical, when: filled }
       start_discovery:
@@ -30,6 +29,7 @@ slots:
               researching,
               ubo_mapped,
               control_mapped,
+              group_kyc_cleared,
               cbus_identified,
               onboarding,
               active,
@@ -191,13 +191,27 @@ slots:
         { verb: ownership.right.list-for-issuer, when: filled }
       ownership_snapshot_get: { verb: ownership.snapshot.get, when: filled }
       ownership_snapshot_list: { verb: ownership.snapshot.list, when: filled }
+  group_kyc_clearance:
+    type: case
+    table: cases
+    pk: case_id
+    join: { via: cases, parent_fk: client_group_id, child_fk: case_id }
+    cardinality: optional
+    depends_on: [control_chain]
+    state_machine: kyc_case_lifecycle
+    verbs:
+      read: { verb: kyc-case.read, when: filled }
+      state: { verb: kyc-case.state, when: filled }
+      update_status: { verb: kyc-case.update-status, when: filled }
+      close: { verb: kyc-case.close, when: filled }
   cbu_identification:
     type: cbu
     table: cbus
     pk: cbu_id
-    join: { via: cbu_entity_roles, parent_fk: entity_id, child_fk: cbu_id }
+    join: { via: client_group_entity, parent_fk: entity_id, child_fk: cbu_id }
     cardinality: optional
-    depends_on: [control_chain]
+    depends_on:
+      [control_chain, { slot: group_kyc_clearance, min_state: approved }]
     verbs:
       create: { verb: cbu.create, when: empty }
       create_from_group: { verb: cbu.create-from-client-group, when: empty }

@@ -1,0 +1,12 @@
+{
+  "exceptions": [],
+  "fully_hydrated_verbs": 292,
+  "generated_at": "2026-03-25T12:59:17.602205+00:00",
+  "missing_verbs": 811,
+  "orphans": 0,
+  "partially_hydrated_verbs": 3,
+  "repo_revision": "56b2f9b413f2b5ddc2c6ba269ad8cb610e18c7a4",
+  "slice_id": "S1",
+  "strict": false,
+  "total_live_verbs": 1106
+}

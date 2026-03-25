@@ -136,7 +136,7 @@ nouns:
     noun_keys:
       - client_group
     action_verbs:
-      create: [client-group.entity-add, client-group.start-discovery]
+      create: [client-group.create, client-group.start-discovery]
       list:
         [
           client-group.list-entities,
@@ -147,7 +147,9 @@ nouns:
           client-group.list-unverified,
           client-group.list-discrepancies,
         ]
+      get: [client-group.read]
       search: [client-group.search-entities, client-group.discover-entities]
+      update: [client-group.update, client-group.entity-add]
 
   # =========================================================================
   # KYC / COMPLIANCE
@@ -192,16 +194,16 @@ nouns:
       list: [kyc-case.list-by-cbu, kyc-case.read, kyc-case.state]
       update:
         [
+          kyc-case.close,
           kyc-case.update-status,
           kyc-case.escalate,
           kyc-case.assign,
           kyc-case.set-risk-rating,
-          kyc-case.close,
           kyc-case.reopen,
         ]
       move: [kyc-case.update-status]
-      approve: [kyc-case.update-status]
-      submit: [kyc-case.update-status]
+      approve: [kyc-case.close]
+      submit: [kyc-case.close]
       escalate: [kyc-case.escalate]
       close: [kyc-case.close]
 
@@ -322,7 +324,13 @@ nouns:
           deal.list-onboarding-requests,
         ]
       get: [deal.read-record, deal.read-summary, deal.read-timeline, deal.get, deal.timeline, deal.summary]
-      update: [deal.update-record, deal.update-status, deal.request-onboarding]
+      update:
+        [
+          deal.update-record,
+          deal.update-status,
+          deal.request-onboarding,
+          deal.request-onboarding-batch,
+        ]
       move: [deal.update-status]
       approve: [deal.update-status]
       submit: [deal.update-status]

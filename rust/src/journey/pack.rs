@@ -18,6 +18,7 @@
 
 use std::path::Path;
 
+use crate::repl::types_v2::WorkspaceKind;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -44,6 +45,10 @@ pub struct PackManifest {
     /// Context fields that are useful but not blocking.
     #[serde(default)]
     pub optional_context: Vec<String>,
+
+    /// Workspaces in which this pack is valid.
+    #[serde(default)]
+    pub workspaces: Vec<WorkspaceKind>,
 
     /// Verbs this pack is allowed to use.
     #[serde(default)]

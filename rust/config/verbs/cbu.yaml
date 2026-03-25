@@ -21,7 +21,6 @@ domains:
           - "create business unit"
           - "create client"
           - "create fund"
-          - "onboard client"
           - "create onboarding unit"
           - "open a new onboarding cbu"
           - "set up a new onboarding unit"

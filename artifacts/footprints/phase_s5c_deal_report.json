@@ -1,0 +1,1895 @@
+{
+  "families": [
+    "billing_operations",
+    "contract_lifecycle",
+    "deal_commercial",
+    "deal_lifecycle"
+  ],
+  "generated_at": "2026-03-25T13:01:39.881420+00:00",
+  "repo_revision": "56b2f9b413f2b5ddc2c6ba269ad8cb610e18c7a4",
+  "slice_id": "S5",
+  "subject_kinds": [
+    "client-group",
+    "contract",
+    "deal",
+    "onboarding-request",
+    "pricing-config",
+    "sla"
+  ],
+  "verb_count": 104,
+  "verbs": [
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "billing",
+      "fqn": "billing.activate-profile",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "billing",
+      "fqn": "billing.add-account-target",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "billing",
+      "fqn": "billing.approve-period",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "billing",
+      "fqn": "billing.calculate-period",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "billing",
+      "fqn": "billing.close-profile",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "billing",
+      "fqn": "billing.create-period",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "billing",
+      "fqn": "billing.create-profile",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "billing",
+      "fqn": "billing.dispute-period",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "billing",
+      "fqn": "billing.generate-invoice",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "billing",
+      "fqn": "billing.get-profile",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "billing",
+      "fqn": "billing.list-account-targets",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "billing",
+      "fqn": "billing.list-profiles",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "billing",
+      "fqn": "billing.period-summary",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "billing",
+      "fqn": "billing.remove-account-target",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "billing",
+      "fqn": "billing.revenue-summary",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "billing",
+      "fqn": "billing.review-period",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "billing",
+      "fqn": "billing.suspend-profile",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "contract-pack",
+      "fqn": "contract-pack.add-template",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "contract-pack",
+      "fqn": "contract-pack.create",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "contract",
+      "fqn": "contract.add-product",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "contract",
+      "fqn": "contract.create",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "contract",
+      "fqn": "contract.create-rate-card",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "contract",
+      "fqn": "contract.for-client",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "contract",
+      "fqn": "contract.get",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "contract",
+      "fqn": "contract.list",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "contract",
+      "fqn": "contract.list-products",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "contract",
+      "fqn": "contract.list-rate-cards",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "contract",
+      "fqn": "contract.list-subscriptions",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "contract",
+      "fqn": "contract.remove-product",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "contract",
+      "fqn": "contract.subscribe",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "contract",
+      "fqn": "contract.terminate",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "contract",
+      "fqn": "contract.unsubscribe",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "contract",
+      "fqn": "contract.update",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "deal",
+      "fqn": "deal.add-contract",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "deal",
+      "fqn": "deal.add-document",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "deal",
+      "fqn": "deal.add-participant",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "deal",
+      "fqn": "deal.add-product",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "deal",
+      "fqn": "deal.add-rate-card-line",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "deal",
+      "fqn": "deal.add-sla",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "deal",
+      "fqn": "deal.add-ubo-assessment",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "deal",
+      "fqn": "deal.agree-rate-card",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "deal",
+      "fqn": "deal.cancel",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "deal",
+      "fqn": "deal.counter-rate-card",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "deal",
+      "fqn": "deal.create",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "deal",
+      "fqn": "deal.create-rate-card",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "deal",
+      "fqn": "deal.list",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "deal",
+      "fqn": "deal.list-active-rate-cards",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "deal",
+      "fqn": "deal.list-contracts",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "deal",
+      "fqn": "deal.list-documents",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "deal",
+      "fqn": "deal.list-onboarding-requests",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "deal",
+      "fqn": "deal.list-participants",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "deal",
+      "fqn": "deal.list-products",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "deal",
+      "fqn": "deal.list-rate-card-history",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "deal",
+      "fqn": "deal.list-rate-card-lines",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "deal",
+      "fqn": "deal.list-rate-cards",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "deal",
+      "fqn": "deal.list-slas",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "deal",
+      "fqn": "deal.propose-rate-card",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "deal",
+      "fqn": "deal.read-record",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "deal",
+      "fqn": "deal.read-summary",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "deal",
+      "fqn": "deal.read-timeline",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "deal",
+      "fqn": "deal.remove-contract",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "deal",
+      "fqn": "deal.remove-participant",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "deal",
+      "fqn": "deal.remove-product",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "deal",
+      "fqn": "deal.remove-rate-card-line",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "deal",
+      "fqn": "deal.remove-sla",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "deal",
+      "fqn": "deal.request-onboarding",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "deal",
+      "fqn": "deal.request-onboarding-batch",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "deal",
+      "fqn": "deal.search-records",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "deal",
+      "fqn": "deal.update-document-status",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "deal",
+      "fqn": "deal.update-onboarding-status",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "deal",
+      "fqn": "deal.update-product-status",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "deal",
+      "fqn": "deal.update-rate-card-line",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "deal",
+      "fqn": "deal.update-record",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "deal",
+      "fqn": "deal.update-status",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "deal",
+      "fqn": "deal.update-ubo-assessment",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "pricing-config",
+      "fqn": "pricing-config.deactivate",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "pricing-config",
+      "fqn": "pricing-config.find-for-instrument",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "pricing-config",
+      "fqn": "pricing-config.link-resource",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "pricing-config",
+      "fqn": "pricing-config.list",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "pricing-config",
+      "fqn": "pricing-config.list-fallback-chains",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "pricing-config",
+      "fqn": "pricing-config.list-nav-thresholds",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "pricing-config",
+      "fqn": "pricing-config.list-stale-policies",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "pricing-config",
+      "fqn": "pricing-config.list-valuation-schedules",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "pricing-config",
+      "fqn": "pricing-config.remove",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "pricing-config",
+      "fqn": "pricing-config.set",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "pricing-config",
+      "fqn": "pricing-config.set-fallback-chain",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "pricing-config",
+      "fqn": "pricing-config.set-nav-threshold",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "pricing-config",
+      "fqn": "pricing-config.set-stale-policy",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "pricing-config",
+      "fqn": "pricing-config.set-valuation-schedule",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "product",
+      "fqn": "product.list",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "product",
+      "fqn": "product.read",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "sla",
+      "fqn": "sla.bind",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "sla",
+      "fqn": "sla.commit",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "sla",
+      "fqn": "sla.escalate-breach",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "sla",
+      "fqn": "sla.list-commitments",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "sla",
+      "fqn": "sla.list-measurements",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "sla",
+      "fqn": "sla.list-open-breaches",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "sla",
+      "fqn": "sla.list-templates",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "sla",
+      "fqn": "sla.read-template",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "sla",
+      "fqn": "sla.record-measurement",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "sla",
+      "fqn": "sla.report-breach",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "sla",
+      "fqn": "sla.resolve-breach",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "sla",
+      "fqn": "sla.suspend-commitment",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    },
+    {
+      "constellation_families": [
+        "billing_operations",
+        "contract_lifecycle",
+        "deal_commercial",
+        "deal_lifecycle"
+      ],
+      "domain": "sla",
+      "fqn": "sla.update-remediation",
+      "subject_kinds": [
+        "client-group",
+        "contract",
+        "deal",
+        "onboarding-request",
+        "pricing-config",
+        "sla"
+      ]
+    }
+  ],
+  "workspace": "Deal"
+}

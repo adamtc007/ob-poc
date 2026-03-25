@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use super::proposal_engine::StepProposal;
-use super::types_v2::{PackCandidate, ReplStateV2, VerbCandidate};
+use super::types_v2::{PackCandidate, ReplStateV2, VerbCandidate, WorkspaceOption};
 
 // ---------------------------------------------------------------------------
 // ReplResponseV2
@@ -44,6 +44,9 @@ pub struct ReplResponseV2 {
 pub enum ReplResponseKindV2 {
     /// User needs to select a scope (client group / CBU set).
     ScopeRequired { prompt: String },
+
+    /// User needs to select a workspace after scope resolution.
+    WorkspaceOptions { workspaces: Vec<WorkspaceOption> },
 
     /// Available journey packs for selection.
     JourneyOptions { packs: Vec<PackCandidate> },
@@ -196,7 +199,7 @@ mod tests {
                 candidates: Some(vec![PackCandidate {
                     pack_id: "onboarding-request".to_string(),
                     pack_name: "Onboarding Request".to_string(),
-                    description: "Onboard a new client".to_string(),
+                    description: "Onboard an existing CBU".to_string(),
                     score: 0.95,
                 }]),
             },
@@ -204,7 +207,7 @@ mod tests {
                 packs: vec![PackCandidate {
                     pack_id: "onboarding-request".to_string(),
                     pack_name: "Onboarding Request".to_string(),
-                    description: "Onboard a new client".to_string(),
+                    description: "Onboard an existing CBU".to_string(),
                     score: 0.95,
                 }],
             },

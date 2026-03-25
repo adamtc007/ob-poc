@@ -1,0 +1,481 @@
+{
+  "gated_verb_count": 53,
+  "gated_verbs": [
+    {
+      "fqn": "cbu.assign-role",
+      "node_state_gates": [
+        "empty",
+        "placeholder"
+      ]
+    },
+    {
+      "fqn": "cbu.create",
+      "node_state_gates": [
+        "group_kyc_cleared"
+      ]
+    },
+    {
+      "fqn": "cbu.create-from-client-group",
+      "node_state_gates": [
+        "group_kyc_cleared"
+      ]
+    },
+    {
+      "fqn": "cbu.ensure",
+      "node_state_gates": [
+        "group_kyc_cleared"
+      ]
+    },
+    {
+      "fqn": "client-group.discover-entities",
+      "node_state_gates": [
+        "prospect"
+      ]
+    },
+    {
+      "fqn": "client-group.start-discovery",
+      "node_state_gates": [
+        "prospect"
+      ]
+    },
+    {
+      "fqn": "client-group.verify-ownership",
+      "node_state_gates": [
+        "control_mapped"
+      ]
+    },
+    {
+      "fqn": "control.build-graph",
+      "node_state_gates": [
+        "ubo_mapped"
+      ]
+    },
+    {
+      "fqn": "deal.add-contract",
+      "node_state_gates": [
+        "kyc_clearance"
+      ]
+    },
+    {
+      "fqn": "deal.cancel",
+      "node_state_gates": [
+        "contracted",
+        "kyc_clearance",
+        "negotiating",
+        "onboarding",
+        "prospect",
+        "qualifying"
+      ]
+    },
+    {
+      "fqn": "deal.create",
+      "node_state_gates": [
+        "prospect"
+      ]
+    },
+    {
+      "fqn": "deal.create-rate-card",
+      "node_state_gates": [
+        "qualifying"
+      ]
+    },
+    {
+      "fqn": "deal.request-onboarding",
+      "node_state_gates": [
+        "contracted"
+      ]
+    },
+    {
+      "fqn": "deal.request-onboarding-batch",
+      "node_state_gates": [
+        "contracted"
+      ]
+    },
+    {
+      "fqn": "deal.update-status",
+      "node_state_gates": [
+        "active",
+        "contracted",
+        "kyc_clearance",
+        "negotiating",
+        "onboarding",
+        "prospect",
+        "qualifying",
+        "winding_down"
+      ]
+    },
+    {
+      "fqn": "document.reject",
+      "node_state_gates": [
+        "in_qa"
+      ]
+    },
+    {
+      "fqn": "document.solicit",
+      "node_state_gates": [
+        "evidence_collected",
+        "expired",
+        "missing",
+        "open",
+        "rejected"
+      ]
+    },
+    {
+      "fqn": "document.solicit-set",
+      "node_state_gates": [
+        "missing",
+        "open"
+      ]
+    },
+    {
+      "fqn": "document.verify",
+      "node_state_gates": [
+        "documents_requested",
+        "in_qa",
+        "screening_complete"
+      ]
+    },
+    {
+      "fqn": "entity-workstream.complete",
+      "node_state_gates": [
+        "evidence_collected",
+        "verified"
+      ]
+    },
+    {
+      "fqn": "entity-workstream.update-status",
+      "node_state_gates": [
+        "verified"
+      ]
+    },
+    {
+      "fqn": "entity.ensure-or-placeholder",
+      "node_state_gates": [
+        "empty"
+      ]
+    },
+    {
+      "fqn": "entity.identify",
+      "node_state_gates": [
+        "placeholder"
+      ]
+    },
+    {
+      "fqn": "fund.create",
+      "node_state_gates": [
+        "draft"
+      ]
+    },
+    {
+      "fqn": "fund.delete-vehicle",
+      "node_state_gates": [
+        "winding_down"
+      ]
+    },
+    {
+      "fqn": "fund.ensure",
+      "node_state_gates": [
+        "draft"
+      ]
+    },
+    {
+      "fqn": "fund.upsert-vehicle",
+      "node_state_gates": [
+        "active",
+        "authorized",
+        "hard_closed",
+        "registered",
+        "soft_closed"
+      ]
+    },
+    {
+      "fqn": "gleif.import-to-client-group",
+      "node_state_gates": [
+        "prospect"
+      ]
+    },
+    {
+      "fqn": "gleif.import-tree",
+      "node_state_gates": [
+        "prospect"
+      ]
+    },
+    {
+      "fqn": "kyc-agreement.create",
+      "node_state_gates": [
+        "pending"
+      ]
+    },
+    {
+      "fqn": "kyc-agreement.update-status",
+      "node_state_gates": [
+        "active",
+        "draft",
+        "signed"
+      ]
+    },
+    {
+      "fqn": "kyc-case.close",
+      "node_state_gates": [
+        "blocked",
+        "control_mapped",
+        "intake",
+        "onboarding",
+        "review"
+      ]
+    },
+    {
+      "fqn": "kyc-case.create",
+      "node_state_gates": [
+        "cbus_identified"
+      ]
+    },
+    {
+      "fqn": "kyc-case.reopen",
+      "node_state_gates": [
+        "approved",
+        "blocked"
+      ]
+    },
+    {
+      "fqn": "kyc-case.set-risk-rating",
+      "node_state_gates": [
+        "assessment"
+      ]
+    },
+    {
+      "fqn": "kyc-case.update-status",
+      "node_state_gates": [
+        "assessment",
+        "blocked",
+        "discovery",
+        "intake",
+        "review"
+      ]
+    },
+    {
+      "fqn": "kyc.open-case",
+      "node_state_gates": [
+        "cbus_identified"
+      ]
+    },
+    {
+      "fqn": "ownership.trace-chain",
+      "node_state_gates": [
+        "ubo_mapped"
+      ]
+    },
+    {
+      "fqn": "request.cancel",
+      "node_state_gates": [
+        "pending"
+      ]
+    },
+    {
+      "fqn": "request.create",
+      "node_state_gates": [
+        "pending"
+      ]
+    },
+    {
+      "fqn": "request.escalate",
+      "node_state_gates": [
+        "received"
+      ]
+    },
+    {
+      "fqn": "requirement.waive",
+      "node_state_gates": [
+        "missing"
+      ]
+    },
+    {
+      "fqn": "screening.adverse-media",
+      "node_state_gates": [
+        "documents_requested",
+        "not_started",
+        "open",
+        "pep_clear"
+      ]
+    },
+    {
+      "fqn": "screening.complete",
+      "node_state_gates": [
+        "media_clear",
+        "screening_initiated"
+      ]
+    },
+    {
+      "fqn": "screening.pep",
+      "node_state_gates": [
+        "documents_requested",
+        "not_started",
+        "open",
+        "sanctions_clear"
+      ]
+    },
+    {
+      "fqn": "screening.run",
+      "node_state_gates": [
+        "all_clear",
+        "documents_requested",
+        "not_started",
+        "open",
+        "screening_complete",
+        "workstream_open"
+      ]
+    },
+    {
+      "fqn": "screening.sanctions",
+      "node_state_gates": [
+        "documents_requested",
+        "not_started",
+        "open"
+      ]
+    },
+    {
+      "fqn": "trading-profile.activate",
+      "node_state_gates": [
+        "approved",
+        "suspended"
+      ]
+    },
+    {
+      "fqn": "trading-profile.approve",
+      "node_state_gates": [
+        "submitted"
+      ]
+    },
+    {
+      "fqn": "trading-profile.archive",
+      "node_state_gates": [
+        "active"
+      ]
+    },
+    {
+      "fqn": "trading-profile.create-draft",
+      "node_state_gates": [
+        "rejected",
+        "submitted"
+      ]
+    },
+    {
+      "fqn": "trading-profile.reject",
+      "node_state_gates": [
+        "submitted"
+      ]
+    },
+    {
+      "fqn": "trading-profile.submit",
+      "node_state_gates": [
+        "draft"
+      ]
+    }
+  ],
+  "generated_at": "2026-03-25T13:01:39.889702+00:00",
+  "repo_revision": "56b2f9b413f2b5ddc2c6ba269ad8cb610e18c7a4",
+  "slice_id": "S7",
+  "ungated_examples": [
+    "access-review.attest",
+    "access-review.audit-report",
+    "access-review.bulk-confirm",
+    "access-review.campaign-status",
+    "access-review.confirm-access",
+    "access-review.confirm-all-clean",
+    "access-review.create-campaign",
+    "access-review.escalate-item",
+    "access-review.extend-access",
+    "access-review.launch-campaign",
+    "access-review.list-flagged",
+    "access-review.list-items",
+    "access-review.my-pending",
+    "access-review.populate-campaign",
+    "access-review.process-deadline",
+    "access-review.revoke-access",
+    "access-review.send-reminders",
+    "admin.regulators.create",
+    "admin.regulators.deactivate",
+    "admin.regulators.list",
+    "admin.regulators.read",
+    "admin.regulators.update",
+    "admin.regulatory-tiers.list",
+    "admin.regulatory-tiers.read",
+    "admin.role-types.create",
+    "admin.role-types.deactivate",
+    "admin.role-types.list",
+    "admin.role-types.read",
+    "admin.role-types.update",
+    "agent.activate-teaching",
+    "agent.confirm-decision",
+    "agent.list-tools",
+    "agent.pause",
+    "agent.read-history",
+    "agent.read-mode",
+    "agent.read-policy",
+    "agent.read-status",
+    "agent.read-teaching-status",
+    "agent.read-telemetry-summary",
+    "agent.reject-decision",
+    "agent.resume",
+    "agent.select-decision-option",
+    "agent.set-authoring-mode",
+    "agent.set-execution-mode",
+    "agent.set-selection-threshold",
+    "agent.start",
+    "agent.stop",
+    "agent.teach",
+    "agent.unteach",
+    "allegation.contradict",
+    "allegation.list-by-entity",
+    "allegation.list-pending",
+    "allegation.mark-partial",
+    "allegation.record",
+    "allegation.verify",
+    "attribute.check-coverage",
+    "attribute.classify",
+    "attribute.define",
+    "attribute.define-derived",
+    "attribute.deprecate",
+    "attribute.inspect",
+    "attribute.list",
+    "attribute.list-by-document",
+    "attribute.list-sinks",
+    "attribute.list-sources",
+    "attribute.map-to-document",
+    "attribute.read",
+    "attribute.set-evidence-grade",
+    "attribute.trace-lineage",
+    "attribute.unmap-from-document",
+    "attribute.update",
+    "attributes.gaps",
+    "attributes.populate",
+    "attributes.rollup",
+    "attributes.set",
+    "audit.add-plan-step",
+    "audit.create-plan",
+    "audit.execute-plan-step",
+    "audit.record-decision",
+    "audit.record-disambiguation",
+    "audit.record-escalation",
+    "audit.record-observation",
+    "audit.validate-plan",
+    "batch.abort",
+    "batch.add-products",
+    "batch.continue",
+    "batch.pause",
+    "batch.resume",
+    "batch.skip",
+    "batch.status",
+    "billing.activate-profile",
+    "billing.add-account-target",
+    "billing.approve-period",
+    "billing.calculate-period",
+    "billing.close-profile",
+    "billing.create-period",
+    "billing.create-profile",
+    "billing.dispute-period",
+    "billing.generate-invoice",
+    "billing.get-profile"
+  ],
+  "ungated_verb_count": 1053
+}

@@ -1,6 +1,6 @@
 //! Deal-to-KYC-to-Approved Lifecycle Integration Test (Phase 4.5)
 //!
-//! Full lifecycle: deal CONTRACTED -> KYC case linked via deal_ubo_assessments ->
+//! Full lifecycle: deal KYC_CLEARANCE -> KYC case linked via deal_ubo_assessments ->
 //! skeleton.build -> ASSESSMENT -> REVIEW -> close-case APPROVED ->
 //! deal_events records KYC_GATE_COMPLETED.
 //!
@@ -362,7 +362,7 @@ mod deal_to_kyc_lifecycle {
     // Test 1: Full Happy Path — Deal -> KYC -> Approved -> Gate Event
     // =========================================================================
 
-    /// Full lifecycle: deal CONTRACTED -> KYC case created and linked ->
+    /// Full lifecycle: deal KYC_CLEARANCE -> KYC case created and linked ->
     /// case progresses -> APPROVED -> deal_events has KYC_GATE_COMPLETED.
     #[tokio::test]
     #[ignore = "requires database"]
@@ -376,7 +376,7 @@ mod deal_to_kyc_lifecycle {
             let cbu_id = db.create_cbu(&db.name("fund")).await;
             let entity_id = db.create_entity(&db.name("entity")).await;
             let deal_id = db
-                .create_deal(&db.name("deal"), group_id, "CONTRACTED")
+                .create_deal(&db.name("deal"), group_id, "KYC_CLEARANCE")
                 .await;
 
             // Verify deal creation event
@@ -629,7 +629,7 @@ mod deal_to_kyc_lifecycle {
             let cbu_id = db.create_cbu(&db.name("rej_fund")).await;
             let entity_id = db.create_entity(&db.name("rej_entity")).await;
             let deal_id = db
-                .create_deal(&db.name("rej_deal"), group_id, "CONTRACTED")
+                .create_deal(&db.name("rej_deal"), group_id, "KYC_CLEARANCE")
                 .await;
             let case_id = db.create_case_with_deal(cbu_id, deal_id, group_id).await;
             let _assessment_id = db.link_case_to_deal(deal_id, entity_id, case_id).await;
@@ -689,8 +689,8 @@ mod deal_to_kyc_lifecycle {
                     .await
                     .unwrap();
             assert_eq!(
-                deal_status.0, "CONTRACTED",
-                "Deal should remain CONTRACTED — KYC gate not cleared"
+                deal_status.0, "KYC_CLEARANCE",
+                "Deal should remain KYC_CLEARANCE — KYC gate not cleared"
             );
 
             db.cleanup().await;

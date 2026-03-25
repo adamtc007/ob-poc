@@ -879,7 +879,9 @@ impl VerbSyncService {
     /// ```yaml
     /// verbs:
     ///   cbu.create:
-    ///     intent_patterns: ["create a cbu", "onboard a client"]
+    ///     intent_patterns: ["create a cbu", "new cbu"]
+    ///   deal.request-onboarding:
+    ///     intent_patterns: ["onboarding request", "request onboarding for this deal"]
     ///     workflow_phases: ["intake"]
     ///   cbu.assign-role:
     ///     intent_patterns: ["add role", "assign role"]

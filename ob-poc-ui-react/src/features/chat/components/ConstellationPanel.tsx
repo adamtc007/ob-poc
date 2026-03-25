@@ -866,8 +866,9 @@ export function ConstellationPanel({
             Constellation
           </div>
           <div className="mt-2 rounded-xl border border-dashed border-[var(--border-primary)] px-4 py-5 text-sm text-[var(--text-muted)]">
-            Load or select a CBU from session scope to render the server-side
-            constellation.
+            Load or select a CBU from session scope to inspect the operating
+            constellation. Group clearance and linked delta-KYC context can be
+            layered onto this view when present.
           </div>
         </div>
       </div>
@@ -893,8 +894,8 @@ export function ConstellationPanel({
             <div className="mt-1 text-xs text-[var(--text-muted)]">
               {DEFAULT_MAP_NAME}
               {caseIdApplied
-                ? ` • case ${caseIdApplied}`
-                : " • structure-only view"}
+                ? ` • linked clearance case ${caseIdApplied}`
+                : " • structure-only operating view"}
             </div>
             {constellationQuery.dataUpdatedAt > 0 && (
               <div className="mt-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-muted)]">
@@ -931,7 +932,7 @@ export function ConstellationPanel({
             }}
             className="min-w-0 flex-1 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none ring-0"
           >
-            <option value="">No case selected</option>
+            <option value="">No linked case selected</option>
             {(casesQuery.data ?? []).map((item) => (
               <option key={item.case_id} value={item.case_id}>
                 {formatCaseLabel(item)}
@@ -952,7 +953,7 @@ export function ConstellationPanel({
         {selectedCase && (
           <div className="mt-3 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-primary)] px-3 py-3 text-sm">
             <div className="text-[11px] uppercase tracking-[0.14em] text-[var(--text-muted)]">
-              Active Case
+              Linked Case
             </div>
             <div className="mt-2 grid grid-cols-2 gap-2">
               <div>
@@ -986,8 +987,8 @@ export function ConstellationPanel({
         )}
         {casesQuery.data && casesQuery.data.length === 0 && (
           <div className="mt-2 text-xs text-[var(--text-muted)]">
-            No cases found for this CBU. Constellation is showing structure-only
-            state.
+            No linked clearance or delta-KYC case found for this CBU.
+            Constellation is showing structure-only operating state.
           </div>
         )}
       </div>

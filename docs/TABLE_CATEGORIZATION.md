@@ -62,7 +62,7 @@ Client Business Unit (trading unit) and all direct child tables.
 - `cbu_ownership_graph` - Ownership structure visualization
 - `fund_structure` - Fund specialization
 - `fund_investments` - Fund investment tracking
-- `onboarding_requests` - CBU creation/onboarding requests
+- `onboarding_requests` - Legacy direct-CBU onboarding requests
 - `onboarding_plans` - Staged onboarding plans
 
 ---

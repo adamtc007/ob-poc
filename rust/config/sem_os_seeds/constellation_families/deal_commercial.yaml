@@ -1,7 +1,7 @@
 fqn: family.deal_commercial
 family_id: deal_commercial
 label: Deal Commercial Operations
-description: Family governing the complete deal lifecycle — origination, contract negotiation, rate cards, billing, and onboarding handoff. Separate from structure-focused deal_lifecycle family.
+description: Family governing the complete deal lifecycle — origination, group-cleared contract negotiation, rate cards, billing, and onboarding handoff into controlled CBUs. Separate from structure-focused deal_lifecycle family.
 domain_id: deal
 selection_rules:
   - condition: "true"
@@ -26,6 +26,7 @@ constellation_refs:
 candidate_jurisdictions:
   - ALL
 candidate_entity_kinds:
+  - client-group
   - deal
   - contract
   - cbu

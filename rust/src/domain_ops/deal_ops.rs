@@ -57,9 +57,12 @@ fn is_valid_deal_status_transition(from: &str, to: &str) -> bool {
             | ("PROSPECT", "CANCELLED")
             | ("QUALIFYING", "NEGOTIATING")
             | ("QUALIFYING", "CANCELLED")
-            | ("NEGOTIATING", "CONTRACTED")
+            | ("NEGOTIATING", "KYC_CLEARANCE")
             | ("NEGOTIATING", "QUALIFYING")
             | ("NEGOTIATING", "CANCELLED")
+            | ("KYC_CLEARANCE", "CONTRACTED")
+            | ("KYC_CLEARANCE", "NEGOTIATING")
+            | ("KYC_CLEARANCE", "CANCELLED")
             | ("CONTRACTED", "ONBOARDING")
             | ("CONTRACTED", "CANCELLED")
             | ("ONBOARDING", "ACTIVE")
@@ -67,6 +70,50 @@ fn is_valid_deal_status_transition(from: &str, to: &str) -> bool {
             | ("ACTIVE", "WINDING_DOWN")
             | ("WINDING_DOWN", "OFFBOARDED")
     )
+}
+
+#[cfg(feature = "database")]
+async fn deal_has_group_approved_kyc_clearance(pool: &PgPool, deal_id: Uuid) -> Result<bool> {
+    let has_approved_case = sqlx::query_scalar(
+        r#"
+        SELECT EXISTS(
+            SELECT 1
+            FROM "ob-poc".deals d
+            JOIN "ob-poc".cases c
+              ON c.client_group_id = d.primary_client_group_id
+            WHERE d.deal_id = $1
+              AND status = 'APPROVED'
+        )
+        "#,
+    )
+    .bind(deal_id)
+    .fetch_one(pool)
+    .await?;
+
+    Ok(has_approved_case)
+}
+
+#[cfg(feature = "database")]
+async fn deal_controls_cbu(pool: &PgPool, deal_id: Uuid, cbu_id: Uuid) -> Result<bool> {
+    let is_controlled = sqlx::query_scalar(
+        r#"
+        SELECT EXISTS(
+            SELECT 1
+            FROM "ob-poc".deals d
+            JOIN "ob-poc".client_group_entity cge
+              ON cge.group_id = d.primary_client_group_id
+            WHERE d.deal_id = $1
+              AND cge.cbu_id = $2
+              AND cge.membership_type <> 'historical'
+        )
+        "#,
+    )
+    .bind(deal_id)
+    .bind(cbu_id)
+    .fetch_one(pool)
+    .await?;
+
+    Ok(is_controlled)
 }
 
 // =============================================================================
@@ -329,6 +376,14 @@ impl CustomOperation for DealUpdateStatusOp {
                 "Invalid status transition from {} to {}",
                 current_status,
                 new_status
+            ));
+        }
+
+        if new_status == "CONTRACTED"
+            && !deal_has_group_approved_kyc_clearance(pool, deal_id).await?
+        {
+            return Err(anyhow!(
+                "Deal cannot move to CONTRACTED until the primary client group has APPROVED KYC clearance"
             ));
         }
 
@@ -644,6 +699,12 @@ impl CustomOperation for DealAddContractOp {
             .and_then(|v| v.value.as_integer())
             .map(|i| i as i32)
             .unwrap_or(1);
+
+        if !deal_has_group_approved_kyc_clearance(pool, deal_id).await? {
+            return Err(anyhow!(
+                "Cannot link contract to deal until the primary client group has APPROVED KYC clearance"
+            ));
+        }
 
         sqlx::query(
             r#"
@@ -1955,6 +2016,18 @@ impl CustomOperation for DealRequestOnboardingOp {
             return Err(anyhow!("Contract is not linked to this deal"));
         }
 
+        if !deal_has_group_approved_kyc_clearance(pool, deal_id).await? {
+            return Err(anyhow!(
+                "Deal onboarding requires APPROVED KYC clearance for the primary client group"
+            ));
+        }
+
+        if !deal_controls_cbu(pool, deal_id, cbu_id).await? {
+            return Err(anyhow!(
+                "CBU must already be linked to the deal's primary client group before onboarding can be requested"
+            ));
+        }
+
         // Create request
         let request_id: Uuid = sqlx::query_scalar(
             r#"
@@ -2040,6 +2113,36 @@ impl CustomOperation for DealRequestOnboardingBatchOp {
         let requires_kyc = extract_bool_opt(verb_call, "requires-kyc").unwrap_or(true);
         let requested_by = extract_string_opt(verb_call, "requested-by");
 
+        let deal_status: String =
+            sqlx::query_scalar(r#"SELECT deal_status FROM "ob-poc".deals WHERE deal_id = $1"#)
+                .bind(deal_id)
+                .fetch_one(pool)
+                .await?;
+
+        if !matches!(deal_status.as_str(), "CONTRACTED" | "ONBOARDING") {
+            return Err(anyhow!(
+                "Deal must be in CONTRACTED or ONBOARDING status to request onboarding"
+            ));
+        }
+
+        let contract_linked: bool = sqlx::query_scalar(
+            r#"SELECT EXISTS(SELECT 1 FROM "ob-poc".deal_contracts WHERE deal_id = $1 AND contract_id = $2)"#,
+        )
+        .bind(deal_id)
+        .bind(contract_id)
+        .fetch_one(pool)
+        .await?;
+
+        if !contract_linked {
+            return Err(anyhow!("Contract is not linked to this deal"));
+        }
+
+        if !deal_has_group_approved_kyc_clearance(pool, deal_id).await? {
+            return Err(anyhow!(
+                "Deal onboarding requires APPROVED KYC clearance for the primary client group"
+            ));
+        }
+
         // Get requests array from arg
         let requests_arg = verb_call
             .get_arg("requests")
@@ -2067,6 +2170,13 @@ impl CustomOperation for DealRequestOnboardingBatchOp {
                 .and_then(|s| Uuid::parse_str(s).ok())
                 .ok_or_else(|| anyhow!("product-id required in each request"))?;
 
+            if !deal_controls_cbu(pool, deal_id, cbu_id).await? {
+                return Err(anyhow!(
+                    "CBU {} is not linked to the deal's primary client group",
+                    cbu_id
+                ));
+            }
+
             let target_live_date = req
                 .get("target-live-date")
                 .or_else(|| req.get("target_live_date"))
@@ -2093,6 +2203,15 @@ impl CustomOperation for DealRequestOnboardingBatchOp {
             .await?;
 
             request_ids.push(request_id);
+        }
+
+        if deal_status == "CONTRACTED" {
+            sqlx::query(
+                r#"UPDATE "ob-poc".deals SET deal_status = 'ONBOARDING', updated_at = NOW() WHERE deal_id = $1"#,
+            )
+            .bind(deal_id)
+            .execute(pool)
+            .await?;
         }
 
         let result = BatchOnboardingResult {

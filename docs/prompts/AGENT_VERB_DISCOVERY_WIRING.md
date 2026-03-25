@@ -75,8 +75,11 @@ pub fn get_intent_patterns() -> HashMap<&'static str, Vec<&'static str>> {
     
     // === CBU VERBS ===
     m.insert("cbu.create", vec![
-        "create cbu", "new cbu", "add client", "onboard client", 
+        "create cbu", "new cbu", "add client",
         "create client business unit", "new client"
+    ]);
+    m.insert("deal.request-onboarding", vec![
+        "onboarding request", "request onboarding for this deal", "submit onboarding handoff"
     ]);
     m.insert("cbu.ensure", vec![
         "ensure cbu exists", "upsert cbu", "create or update cbu"

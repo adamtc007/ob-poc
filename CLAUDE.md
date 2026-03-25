@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-> **Last reviewed:** 2026-03-21
+> **Last reviewed:** 2026-03-25
 > **Frontend:** React/TypeScript (`ob-poc-ui-react/`) - Chat UI with scope panel, Inspector, Semantic OS Tab
 > **Backend:** Rust/Axum (`rust/crates/ob-poc-web/`) - Serves React + REST API
 > **Crates:** 22 active Rust crates (16 ob-poc + 6 sem_os_*; esper_* deprecated; ob-poc-graph + viewport removed)
@@ -105,6 +105,8 @@
 > **Workspace Hygiene Pass (2026-03-19):** ✅ Full Rust workspace clean — `cargo fmt` plus `RUSTC_WRAPPER= SCCACHE_DISABLE=1 cargo clippy --workspace --all-targets -- -D warnings` now pass across workspace crates, tests, bins, xtask, and harness code; stale all-target drift after the SemOS reconciliation work was removed rather than suppressed
 > **SemOS Attribute Reconciliation (2026-03-24):** ✅ Code-complete — identity alignment, derivation wiring, taxonomy/evidence unification, canonical ABAC/enforcement reuse, governed attribute DSL verbs, seed macros, and Phase 4 registry/schema cleanup are all landed; `attribute_registry` now carries `sem_reg_snapshot_id`, `is_derived`, `derivation_spec_fqn`, and `evidence_grade`, and the live migration has been applied to `data_designer`
 > **SemOS Attribute Live-DB Status (2026-03-24):** ⚠️ Migration applied, data alignment pending — `"ob-poc".v_attribute_reconciliation_summary` currently reports `0/310` bridged attributes in the local `data_designer` DB because operational `attribute_registry.id` values do not yet overlap with governed `attribute_def.fqn` values; this is a dataset reconciliation task, not a failed migration
+> **Workspace-Scoped REPL Navigation (2026-03-25):** ✅ Live — the V2 REPL now enforces `Session -> Client Group -> Workspace -> Journey Pack -> Runbook`, with explicit `WorkspaceSelection` state, workspace-constrained pack routing/selection, and a new `ProductMaintenance` workspace backed by the `product-service-taxonomy` pack for design-time `product -> service -> resource -> attribute` exploration
+> **SemOS Footprint Hydration S6 Closure (2026-03-25):** ✅ Closed — the remaining `service-resource` runtime verbs now have explicit handler-derived `reads / writes / preconditions / postconditions` in the footprint audit output; `artifacts/footprints/s6_plugin_core_backfill_report.json` now reports `unresolved_binding_count = 0`, with `onboarding.auto-complete` retained separately as an intentional `delegated_handler`
 
 This is the root project guide for Claude Code. Domain-specific details are in annexes.
 

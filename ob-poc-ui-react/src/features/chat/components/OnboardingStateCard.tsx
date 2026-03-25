@@ -5,7 +5,7 @@
  * - 6 DAG layers with progress and state badges
  * - Forward verbs (advance state) as clickable utterances
  * - Revert verbs (back up state) as secondary actions
- * - Per-CBU state cards with next action
+ * - Linked-CBU state cards with next action
  */
 
 import type {
@@ -79,7 +79,7 @@ export function OnboardingStateCard({ message, onVerbClick }: Props) {
       {state.cbu_cards.length > 0 && (
         <div className="mt-3 border-t border-indigo-200 pt-2">
           <div className="mb-1 text-xs font-medium text-indigo-700">
-            CBU Status
+            Linked CBU Status
           </div>
           <div className="space-y-1">
             {state.cbu_cards.map((cbu) => (

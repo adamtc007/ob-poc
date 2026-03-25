@@ -1,0 +1,1703 @@
+{
+  "all_macro_refs": [
+    {
+      "live": true,
+      "source_file": "case.yaml",
+      "verb_fqn": "document.solicit"
+    },
+    {
+      "live": true,
+      "source_file": "case.yaml",
+      "verb_fqn": "entity-workstream.create"
+    },
+    {
+      "live": true,
+      "source_file": "case.yaml",
+      "verb_fqn": "kyc-case.create"
+    },
+    {
+      "live": true,
+      "source_file": "case.yaml",
+      "verb_fqn": "kyc-case.list-by-cbu"
+    },
+    {
+      "live": true,
+      "source_file": "case.yaml",
+      "verb_fqn": "kyc-case.update-status"
+    },
+    {
+      "live": true,
+      "source_file": "case.yaml",
+      "verb_fqn": "kyc-case.update-status"
+    },
+    {
+      "live": true,
+      "source_file": "case.yaml",
+      "verb_fqn": "kyc-case.update-status"
+    },
+    {
+      "live": true,
+      "source_file": "case.yaml",
+      "verb_fqn": "kyc-case.update-status"
+    },
+    {
+      "live": true,
+      "source_file": "case.yaml",
+      "verb_fqn": "session.set-case"
+    },
+    {
+      "live": true,
+      "source_file": "doc-request.yaml",
+      "verb_fqn": "document.create-request"
+    },
+    {
+      "live": true,
+      "source_file": "doc-request.yaml",
+      "verb_fqn": "document.mark-requested"
+    },
+    {
+      "live": true,
+      "source_file": "doc-request.yaml",
+      "verb_fqn": "document.receive-request"
+    },
+    {
+      "live": true,
+      "source_file": "doc-request.yaml",
+      "verb_fqn": "document.reject-request"
+    },
+    {
+      "live": true,
+      "source_file": "doc-request.yaml",
+      "verb_fqn": "document.verify-request"
+    },
+    {
+      "live": true,
+      "source_file": "evidence.yaml",
+      "verb_fqn": "evidence.attach-document"
+    },
+    {
+      "live": true,
+      "source_file": "evidence.yaml",
+      "verb_fqn": "evidence.create-requirement"
+    },
+    {
+      "live": true,
+      "source_file": "evidence.yaml",
+      "verb_fqn": "evidence.mark-rejected"
+    },
+    {
+      "live": true,
+      "source_file": "evidence.yaml",
+      "verb_fqn": "evidence.mark-verified"
+    },
+    {
+      "live": true,
+      "source_file": "evidence.yaml",
+      "verb_fqn": "evidence.mark-waived"
+    },
+    {
+      "live": true,
+      "source_file": "kyc-workflow.yaml",
+      "verb_fqn": "document.missing-for-entity"
+    },
+    {
+      "live": true,
+      "source_file": "kyc-workflow.yaml",
+      "verb_fqn": "document.solicit-set"
+    },
+    {
+      "live": true,
+      "source_file": "kyc-workflow.yaml",
+      "verb_fqn": "document.solicit-set"
+    },
+    {
+      "live": true,
+      "source_file": "kyc-workflow.yaml",
+      "verb_fqn": "requirement.unsatisfied"
+    },
+    {
+      "live": true,
+      "source_file": "kyc-workflow.yaml",
+      "verb_fqn": "screening.adverse-media"
+    },
+    {
+      "live": true,
+      "source_file": "kyc-workflow.yaml",
+      "verb_fqn": "screening.pep"
+    },
+    {
+      "live": true,
+      "source_file": "kyc-workflow.yaml",
+      "verb_fqn": "screening.sanctions"
+    },
+    {
+      "live": true,
+      "source_file": "kyc-workstream.yaml",
+      "verb_fqn": "entity-workstream.complete"
+    },
+    {
+      "live": true,
+      "source_file": "kyc-workstream.yaml",
+      "verb_fqn": "entity-workstream.create"
+    },
+    {
+      "live": true,
+      "source_file": "kyc-workstream.yaml",
+      "verb_fqn": "entity-workstream.update-status"
+    },
+    {
+      "live": true,
+      "source_file": "mandate.yaml",
+      "verb_fqn": "session.set-mandate"
+    },
+    {
+      "live": true,
+      "source_file": "mandate.yaml",
+      "verb_fqn": "trading-profile.add-component"
+    },
+    {
+      "live": true,
+      "source_file": "mandate.yaml",
+      "verb_fqn": "trading-profile.add-component"
+    },
+    {
+      "live": true,
+      "source_file": "mandate.yaml",
+      "verb_fqn": "trading-profile.add-component"
+    },
+    {
+      "live": true,
+      "source_file": "mandate.yaml",
+      "verb_fqn": "trading-profile.create-draft"
+    },
+    {
+      "live": true,
+      "source_file": "mandate.yaml",
+      "verb_fqn": "trading-profile.list-versions"
+    },
+    {
+      "live": true,
+      "source_file": "mandate.yaml",
+      "verb_fqn": "trading-profile.read"
+    },
+    {
+      "live": true,
+      "source_file": "party.yaml",
+      "verb_fqn": "entity.create"
+    },
+    {
+      "live": true,
+      "source_file": "party.yaml",
+      "verb_fqn": "entity.create"
+    },
+    {
+      "live": true,
+      "source_file": "party.yaml",
+      "verb_fqn": "entity.create"
+    },
+    {
+      "live": true,
+      "source_file": "party.yaml",
+      "verb_fqn": "entity.list"
+    },
+    {
+      "live": true,
+      "source_file": "party.yaml",
+      "verb_fqn": "entity.query"
+    },
+    {
+      "live": true,
+      "source_file": "party.yaml",
+      "verb_fqn": "entity.read"
+    },
+    {
+      "live": true,
+      "source_file": "party.yaml",
+      "verb_fqn": "entity.update"
+    },
+    {
+      "live": true,
+      "source_file": "party.yaml",
+      "verb_fqn": "entity.update"
+    },
+    {
+      "live": true,
+      "source_file": "party.yaml",
+      "verb_fqn": "identifier.attach"
+    },
+    {
+      "live": true,
+      "source_file": "red-flag.yaml",
+      "verb_fqn": "red-flag.close"
+    },
+    {
+      "live": true,
+      "source_file": "red-flag.yaml",
+      "verb_fqn": "red-flag.raise"
+    },
+    {
+      "live": true,
+      "source_file": "red-flag.yaml",
+      "verb_fqn": "red-flag.set-blocking"
+    },
+    {
+      "live": true,
+      "source_file": "screening-ops.yaml",
+      "verb_fqn": "screening.bulk-refresh"
+    },
+    {
+      "live": true,
+      "source_file": "screening-ops.yaml",
+      "verb_fqn": "screening.review-hit"
+    },
+    {
+      "live": true,
+      "source_file": "screening-ops.yaml",
+      "verb_fqn": "screening.run"
+    },
+    {
+      "live": true,
+      "source_file": "screening.yaml",
+      "verb_fqn": "screening.adverse-media"
+    },
+    {
+      "live": true,
+      "source_file": "screening.yaml",
+      "verb_fqn": "screening.adverse-media"
+    },
+    {
+      "live": true,
+      "source_file": "screening.yaml",
+      "verb_fqn": "screening.pep"
+    },
+    {
+      "live": true,
+      "source_file": "screening.yaml",
+      "verb_fqn": "screening.pep"
+    },
+    {
+      "live": true,
+      "source_file": "screening.yaml",
+      "verb_fqn": "screening.sanctions"
+    },
+    {
+      "live": true,
+      "source_file": "screening.yaml",
+      "verb_fqn": "screening.sanctions"
+    },
+    {
+      "live": true,
+      "source_file": "struct-cross-border.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-cross-border.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-cross-border.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-cross-border.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-cross-border.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-cross-border.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-cross-border.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-cross-border.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-cross-border.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-cross-border.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-cross-border.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-cross-border.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-cross-border.yaml",
+      "verb_fqn": "cbu.create"
+    },
+    {
+      "live": true,
+      "source_file": "struct-cross-border.yaml",
+      "verb_fqn": "cbu.create"
+    },
+    {
+      "live": true,
+      "source_file": "struct-cross-border.yaml",
+      "verb_fqn": "cbu.create"
+    },
+    {
+      "live": true,
+      "source_file": "struct-cross-border.yaml",
+      "verb_fqn": "cbu.create"
+    },
+    {
+      "live": true,
+      "source_file": "struct-cross-border.yaml",
+      "verb_fqn": "cbu.create"
+    },
+    {
+      "live": true,
+      "source_file": "struct-cross-border.yaml",
+      "verb_fqn": "cbu.link-structure"
+    },
+    {
+      "live": true,
+      "source_file": "struct-cross-border.yaml",
+      "verb_fqn": "cbu.link-structure"
+    },
+    {
+      "live": true,
+      "source_file": "struct-cross-border.yaml",
+      "verb_fqn": "cbu.link-structure"
+    },
+    {
+      "live": true,
+      "source_file": "struct-cross-border.yaml",
+      "verb_fqn": "cbu.link-structure"
+    },
+    {
+      "live": true,
+      "source_file": "struct-cross-border.yaml",
+      "verb_fqn": "cbu.link-structure"
+    },
+    {
+      "live": true,
+      "source_file": "struct-cross-border.yaml",
+      "verb_fqn": "docs-bundle.apply"
+    },
+    {
+      "live": true,
+      "source_file": "struct-cross-border.yaml",
+      "verb_fqn": "docs-bundle.apply"
+    },
+    {
+      "live": true,
+      "source_file": "struct-cross-border.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-cross-border.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-cross-border.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-cross-border.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-cross-border.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-cross-border.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-cross-border.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-cross-border.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-cross-border.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-cross-border.yaml",
+      "verb_fqn": "trading-profile.create-draft"
+    },
+    {
+      "live": true,
+      "source_file": "struct-cross-border.yaml",
+      "verb_fqn": "trading-profile.create-draft"
+    },
+    {
+      "live": true,
+      "source_file": "struct-ie.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-ie.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-ie.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-ie.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-ie.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-ie.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-ie.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-ie.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-ie.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-ie.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-ie.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-ie.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-ie.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-ie.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-ie.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-ie.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-ie.yaml",
+      "verb_fqn": "cbu.create"
+    },
+    {
+      "live": true,
+      "source_file": "struct-ie.yaml",
+      "verb_fqn": "cbu.create"
+    },
+    {
+      "live": true,
+      "source_file": "struct-ie.yaml",
+      "verb_fqn": "docs-bundle.apply"
+    },
+    {
+      "live": true,
+      "source_file": "struct-ie.yaml",
+      "verb_fqn": "docs-bundle.apply"
+    },
+    {
+      "live": true,
+      "source_file": "struct-ie.yaml",
+      "verb_fqn": "docs-bundle.apply"
+    },
+    {
+      "live": true,
+      "source_file": "struct-ie.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-ie.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-ie.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-ie.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-ie.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-ie.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-ie.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-ie.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-ie.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-ie.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-ie.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-ie.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-ie.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-ie.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-ie.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-ie.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-ie.yaml",
+      "verb_fqn": "trading-profile.create-draft"
+    },
+    {
+      "live": true,
+      "source_file": "struct-ie.yaml",
+      "verb_fqn": "trading-profile.create-draft"
+    },
+    {
+      "live": true,
+      "source_file": "struct-ie.yaml",
+      "verb_fqn": "trading-profile.create-draft"
+    },
+    {
+      "live": true,
+      "source_file": "struct-lux.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-lux.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-lux.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-lux.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-lux.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-lux.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-lux.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-lux.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-lux.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-lux.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-lux.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-lux.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-lux.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-lux.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-lux.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-lux.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-lux.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-lux.yaml",
+      "verb_fqn": "cbu.create"
+    },
+    {
+      "live": true,
+      "source_file": "struct-lux.yaml",
+      "verb_fqn": "cbu.create"
+    },
+    {
+      "live": true,
+      "source_file": "struct-lux.yaml",
+      "verb_fqn": "cbu.create"
+    },
+    {
+      "live": true,
+      "source_file": "struct-lux.yaml",
+      "verb_fqn": "docs-bundle.apply"
+    },
+    {
+      "live": true,
+      "source_file": "struct-lux.yaml",
+      "verb_fqn": "docs-bundle.apply"
+    },
+    {
+      "live": true,
+      "source_file": "struct-lux.yaml",
+      "verb_fqn": "docs-bundle.apply"
+    },
+    {
+      "live": true,
+      "source_file": "struct-lux.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-lux.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-lux.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-lux.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-lux.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-lux.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-lux.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-lux.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-lux.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-lux.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-lux.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-lux.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-lux.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-lux.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-lux.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-lux.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-lux.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-lux.yaml",
+      "verb_fqn": "trading-profile.create-draft"
+    },
+    {
+      "live": true,
+      "source_file": "struct-lux.yaml",
+      "verb_fqn": "trading-profile.create-draft"
+    },
+    {
+      "live": true,
+      "source_file": "struct-lux.yaml",
+      "verb_fqn": "trading-profile.create-draft"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "cbu.create"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "cbu.create"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "cbu.create"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "cbu.create"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "cbu.create"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "cbu.update"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "docs-bundle.apply"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "docs-bundle.apply"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "docs-bundle.apply"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "docs-bundle.apply"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "docs-bundle.apply"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "docs-bundle.apply"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "trading-profile.create-draft"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "trading-profile.create-draft"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "trading-profile.create-draft"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "trading-profile.create-draft"
+    },
+    {
+      "live": true,
+      "source_file": "struct-uk.yaml",
+      "verb_fqn": "trading-profile.create-draft"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "cbu.create"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "cbu.create"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "cbu.create"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "cbu.create"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "docs-bundle.apply"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "docs-bundle.apply"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "docs-bundle.apply"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "docs-bundle.apply"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "entity.ensure-or-placeholder"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "trading-profile.create-draft"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "trading-profile.create-draft"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "trading-profile.create-draft"
+    },
+    {
+      "live": true,
+      "source_file": "struct-us.yaml",
+      "verb_fqn": "trading-profile.create-draft"
+    },
+    {
+      "live": true,
+      "source_file": "structure.yaml",
+      "verb_fqn": "cbu.assign-role"
+    },
+    {
+      "live": true,
+      "source_file": "structure.yaml",
+      "verb_fqn": "cbu.create"
+    },
+    {
+      "live": true,
+      "source_file": "structure.yaml",
+      "verb_fqn": "cbu.list"
+    },
+    {
+      "live": true,
+      "source_file": "structure.yaml",
+      "verb_fqn": "cbu.parties"
+    },
+    {
+      "live": true,
+      "source_file": "structure.yaml",
+      "verb_fqn": "session.set-structure"
+    },
+    {
+      "live": true,
+      "source_file": "tollgate.yaml",
+      "verb_fqn": "tollgate.evaluate"
+    },
+    {
+      "live": true,
+      "source_file": "tollgate.yaml",
+      "verb_fqn": "tollgate.override"
+    },
+    {
+      "live": true,
+      "source_file": "ubo.yaml",
+      "verb_fqn": "ownership.compute"
+    },
+    {
+      "live": true,
+      "source_file": "ubo.yaml",
+      "verb_fqn": "ownership.snapshot.list"
+    },
+    {
+      "live": true,
+      "source_file": "ubo.yaml",
+      "verb_fqn": "ubo.registry.advance"
+    },
+    {
+      "live": true,
+      "source_file": "ubo.yaml",
+      "verb_fqn": "ubo.registry.advance"
+    },
+    {
+      "live": true,
+      "source_file": "ubo.yaml",
+      "verb_fqn": "ubo.registry.create"
+    },
+    {
+      "live": true,
+      "source_file": "ubo.yaml",
+      "verb_fqn": "ubo.registry.expire"
+    },
+    {
+      "live": true,
+      "source_file": "ubo.yaml",
+      "verb_fqn": "ubo.registry.promote"
+    },
+    {
+      "live": true,
+      "source_file": "ubo.yaml",
+      "verb_fqn": "ubo.registry.reject"
+    }
+  ],
+  "broken_macro_refs": [],
+  "generated_at": "2026-03-25T12:50:18.001328+00:00",
+  "repo_revision": "56b2f9b413f2b5ddc2c6ba269ad8cb610e18c7a4",
+  "slice_id": "S0"
+}

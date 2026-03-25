@@ -1,0 +1,239 @@
+aliases:
+  agreement:
+    - pending
+    - draft
+    - sent
+    - signed
+    - active
+    - terminated
+  client_group:
+    - prospect
+    - researching
+    - ubo_mapped
+    - control_mapped
+    - group_kyc_cleared
+    - cbus_identified
+    - onboarding
+    - active
+  deal:
+    - prospect
+    - qualifying
+    - negotiating
+    - kyc_clearance
+    - contracted
+    - onboarding
+    - active
+    - winding_down
+    - offboarded
+    - cancelled
+  document:
+    - missing
+    - requested
+    - received
+    - in_qa
+    - verified
+    - rejected
+    - waived
+    - expired
+  document_request:
+    - pending
+    - requested
+    - received
+    - verified
+    - rejected
+    - waived
+  entity_kyc:
+    - empty
+    - placeholder
+    - filled
+    - workstream_open
+    - screening_complete
+    - evidence_collected
+    - verified
+    - approved
+  entity_workstream:
+    - open
+    - documents_requested
+    - screening_initiated
+    - screening_complete
+    - evidence_collected
+    - verified
+    - closed
+  fund:
+    - draft
+    - registered
+    - authorized
+    - active
+    - soft_closed
+    - hard_closed
+    - winding_down
+    - terminated
+  identifier:
+    - empty
+    - captured
+    - verified
+    - failed
+  kyc_case:
+    - intake
+    - discovery
+    - assessment
+    - review
+    - blocked
+    - approved
+    - rejected
+    - withdrawn
+    - expired
+    - refer_to_regulator
+    - do_not_onboard
+  screening:
+    - not_started
+    - sanctions_pending
+    - sanctions_clear
+    - sanctions_hit
+    - pep_pending
+    - pep_clear
+    - pep_hit
+    - media_pending
+    - media_clear
+    - media_hit
+    - all_clear
+    - escalated
+    - resolved
+  trading_profile:
+    - draft
+    - submitted
+    - approved
+    - active
+    - suspended
+    - archived
+    - rejected
+  ubo_epistemic:
+    - undiscovered
+    - alleged
+    - provable
+    - proved
+    - approved
+  cbu:
+    - discovered
+    - draft
+    - pending_validation
+    - validated
+    - active
+    - suspended
+    - terminated
+
+state_machines:
+  agreement_lifecycle:
+    - pending
+    - draft
+    - sent
+    - signed
+    - active
+    - terminated
+  client_group_lifecycle:
+    - prospect
+    - researching
+    - ubo_mapped
+    - control_mapped
+    - group_kyc_cleared
+    - cbus_identified
+    - onboarding
+    - active
+  deal_lifecycle:
+    - prospect
+    - qualifying
+    - negotiating
+    - kyc_clearance
+    - contracted
+    - onboarding
+    - active
+    - winding_down
+    - offboarded
+    - cancelled
+  document_lifecycle:
+    - missing
+    - requested
+    - received
+    - in_qa
+    - verified
+    - rejected
+    - waived
+    - expired
+  document_request_lifecycle:
+    - pending
+    - requested
+    - received
+    - verified
+    - rejected
+    - waived
+  entity_kyc_lifecycle:
+    - empty
+    - placeholder
+    - filled
+    - workstream_open
+    - screening_complete
+    - evidence_collected
+    - verified
+    - approved
+  entity_workstream_lifecycle:
+    - open
+    - documents_requested
+    - screening_initiated
+    - screening_complete
+    - evidence_collected
+    - verified
+    - closed
+  fund_lifecycle:
+    - draft
+    - registered
+    - authorized
+    - active
+    - soft_closed
+    - hard_closed
+    - winding_down
+    - terminated
+  identifier_lifecycle:
+    - empty
+    - captured
+    - verified
+    - failed
+  kyc_case_lifecycle:
+    - intake
+    - discovery
+    - assessment
+    - review
+    - blocked
+    - approved
+    - rejected
+    - withdrawn
+    - expired
+    - refer_to_regulator
+    - do_not_onboard
+  screening_lifecycle:
+    - not_started
+    - sanctions_pending
+    - sanctions_clear
+    - sanctions_hit
+    - pep_pending
+    - pep_clear
+    - pep_hit
+    - media_pending
+    - media_clear
+    - media_hit
+    - all_clear
+    - escalated
+    - resolved
+  trading_profile_lifecycle:
+    - draft
+    - submitted
+    - approved
+    - active
+    - suspended
+    - archived
+    - rejected
+  ubo_epistemic_lifecycle:
+    - undiscovered
+    - alleged
+    - provable
+    - proved
+    - approved

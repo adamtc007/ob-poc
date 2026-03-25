@@ -1,13 +1,13 @@
 # KYC Onboarding Workflow
-# Full KYC onboarding for a new Client Business Unit (CBU)
+# Delta KYC onboarding for an existing Client Business Unit after group clearance
 
 workflow: kyc_onboarding
 version: 1
-description: Full KYC onboarding for a new CBU
+description: Delta KYC onboarding for an existing CBU after inherited group clearance
 
-# Workflow is triggered by CBU creation
+# Workflow is triggered when delta KYC is initiated for an existing CBU
 trigger:
-  event: cbu.created
+  event: kyc-case.created
   conditions:
     - field: client_type
       in: [FUND, CORPORATE, INSTITUTIONAL, TRUST]
@@ -34,11 +34,11 @@ states:
     description: Analyst review of complete package
 
   APPROVED:
-    description: Onboarding complete, ready for business
+    description: Delta KYC complete, ready for downstream activation
     terminal: true
 
   REJECTED:
-    description: Onboarding rejected
+    description: Delta KYC rejected
     terminal: true
 
   REMEDIATION:
@@ -49,7 +49,7 @@ transitions:
   - from: INTAKE
     to: ENTITY_COLLECTION
     auto: true
-    description: Automatic progression after CBU created
+    description: Automatic progression after KYC case opened
 
   - from: ENTITY_COLLECTION
     to: SCREENING
@@ -166,7 +166,7 @@ actions:
   SCREENING:
     - action: create_case
       verb: kyc-case.create
-      description: Create KYC case
+      description: Open delta KYC case
 
     - action: create_workstream
       verb: entity-workstream.create
@@ -208,11 +208,11 @@ actions:
       description: Set case risk rating
 
     - action: approve
-      verb: kyc-case.update-status
+      verb: kyc-case.close
       description: Approve the case
 
     - action: reject
-      verb: kyc-case.update-status
+      verb: kyc-case.close
       description: Reject the case
 
     - action: escalate

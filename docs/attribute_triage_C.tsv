@@ -1,0 +1,48 @@
+id	display_name	category	value_type	domain	uuid	is_required	metadata	triage_category	suggested_fqn
+cbu-name	cbu-name	cbu	string	CBU	7e2968c7-9b42-4d32-849e-791145a4b5d8	f	{}	C_ambiguous	
+client-type	client-type	cbu	string	CBU	a0869127-3f7b-48c3-9ad4-987bbeccaa6b	f	{}	C_ambiguous	
+jurisdiction	jurisdiction	cbu	string	CBU	650650c6-10cd-48f3-825c-75efc307ca47	f	{}	C_ambiguous	
+nature-purpose	nature-purpose	cbu	string	CBU	a896e1e7-cdd0-46db-9f5b-e62359ca69ed	f	{}	C_ambiguous	
+attr.employment.employer_address	Employer Address	employment	string		a0100000-0000-0000-0000-000000000005	f	{}	C_ambiguous	employment.employer-address
+attr.employment.employer_name	Employer Name	employment	string		a0100000-0000-0000-0000-000000000001	f	{}	C_ambiguous	employment.employer-name
+attr.employment.employment_status	Employment Status	employment	string		a0100000-0000-0000-0000-000000000003	f	{}	C_ambiguous	employment.employment-status
+attr.employment.industry	Industry / Sector	employment	string		a0100000-0000-0000-0000-000000000004	f	{}	C_ambiguous	employment.industry
+attr.employment.job_title	Job Title / Position	employment	string		a0100000-0000-0000-0000-000000000002	f	{}	C_ambiguous	employment.job-title
+attr.employment.years_employed	Years at Current Employer	employment	integer		a0100000-0000-0000-0000-000000000006	f	{}	C_ambiguous	employment.years-employed
+attr.kyc.corporate.employees_count	Number of Employees	employment	integer		5f372619-15e7-5f63-8774-b34e0aebb3fa	f	"{""domain"": ""kyc"", ""rust_type"": ""EmployeeCount""}"	C_ambiguous	kyc.corporate.employees-count
+attr.kyc.proper_person.occupation	Occupation	employment	string		9ecd482b-2298-5db1-89f0-2dd87462357c	f	"{""domain"": ""kyc"", ""rust_type"": ""Occupation""}"	C_ambiguous	kyc.proper-person.occupation
+attr.fund.management_fee	Management Fee (%)	product	percentage		1e156056-7e7b-5474-8317-e1d43743c0a9	f	"{""domain"": ""kyc"", ""rust_type"": ""ManagementFee""}"	C_ambiguous	fund.management-fee
+attr.fund.strategy	Investment Strategy	product	string		6937eb85-68bf-57e2-b4e0-1e1de38a9f1f	f	"{""domain"": ""kyc"", ""rust_type"": ""FundStrategy""}"	C_ambiguous	fund.strategy
+attr.hedge_fund.hurdle_rate	Hurdle Rate (%)	product	percentage		bdfddda0-2f6a-52b8-8f03-95c744d30ea3	f	"{""domain"": ""kyc"", ""rust_type"": ""HurdleRate""}"	C_ambiguous	hedge-fund.hurdle-rate
+attr.hedge_fund.lock_up_period	Lock-up Period (months)	product	integer		8e8a4050-361c-5447-b28e-7816012c52c4	f	"{""domain"": ""kyc"", ""rust_type"": ""LockUpPeriod""}"	C_ambiguous	hedge-fund.lock-up-period
+attr.hedge_fund.performance_fee	Performance Fee (%)	product	percentage		0d9faae2-1615-5099-bab2-891a8a9a7d9d	f	"{""domain"": ""kyc"", ""rust_type"": ""PerformanceFee""}"	C_ambiguous	hedge-fund.performance-fee
+attr.investment.redemption_notice_period	Redemption Notice Period (days)	product	integer		14b4cfcf-0e40-5b79-b4ea-81d61534f5b2	f	"{""domain"": ""kyc"", ""rust_type"": ""RedemptionNoticePeriod""}"	C_ambiguous	investment.redemption-notice-period
+account_number	account_number	resource	string	resource	2a8cae55-6c87-474b-958e-91c0d5202cbf	f	{}	C_ambiguous	
+bic_code	bic_code	resource	string	resource	cb9eb03c-7bb3-4e16-b9f5-78935d05fbad	f	{}	C_ambiguous	
+custodian_code	custodian_code	resource	string	resource	5b604f82-372f-4c2c-961c-2a2bfdd378c2	f	{}	C_ambiguous	
+iban	iban	resource	string	resource	cfad9150-cc1d-48c3-bcf7-1d06a4526032	f	{}	C_ambiguous	
+platform_user_id	platform_user_id	resource	string	resource	6fa4af3d-7dd3-4a62-812a-52c208613367	f	{}	C_ambiguous	
+resource.account.account_name	resource.account.account_name	resource	string	Resource	7651cf08-27a9-4a72-bea9-a0d1df44e557	f	{}	C_ambiguous	
+resource.account.account_number	resource.account.account_number	resource	string	Resource	333930ad-1ca5-42e0-9605-2e81fdc229ed	f	{}	C_ambiguous	
+resource.account.account_type	resource.account.account_type	resource	string	Resource	5cb03192-c451-4eff-a744-35de372ec704	f	{}	C_ambiguous	
+resource.account.base_currency	resource.account.base_currency	resource	string	Resource	6b0b7d9c-22c3-4876-a991-3fc5ca9b9455	f	{}	C_ambiguous	
+resource.account.market_codes	resource.account.market_codes	resource	json	Resource	e8651c96-db60-4700-a00b-46a8df57ec45	f	{}	C_ambiguous	
+resource.account.sub_custodian	resource.account.sub_custodian	resource	string	Resource	42d13cbe-0d60-4f28-8ad4-1b3a63a18779	f	{}	C_ambiguous	
+resource.fund.fund_code	resource.fund.fund_code	resource	string	Resource	afab4b67-0d59-4aa0-8546-b68b59182d6a	f	{}	C_ambiguous	
+resource.fund.nav_cutoff_time	resource.fund.nav_cutoff_time	resource	string	Resource	b29042bc-46a2-4d34-80e5-972021a3e322	f	{}	C_ambiguous	
+resource.fund.pricing_source	resource.fund.pricing_source	resource	string	Resource	8e81791e-ea02-4cd0-8b54-bdd01b9bb707	f	{}	C_ambiguous	
+resource.fund.share_classes	resource.fund.share_classes	resource	json	Resource	a67f8519-407a-483e-b9a9-6ba2502560fa	f	{}	C_ambiguous	
+resource.fund.valuation_frequency	resource.fund.valuation_frequency	resource	string	Resource	41992375-7104-454c-8cb4-756a85b978a3	f	{}	C_ambiguous	
+resource.ibor.accounting_basis	resource.ibor.accounting_basis	resource	string	Resource	8a33b2d8-4cab-41bb-b4c9-c8166e8901d1	f	{}	C_ambiguous	
+resource.ibor.portfolio_code	resource.ibor.portfolio_code	resource	string	Resource	77189a39-9c48-48aa-b24a-4f989c0f149a	f	{}	C_ambiguous	
+resource.ibor.position_source	resource.ibor.position_source	resource	string	Resource	563d1b98-366e-4a68-840f-63fe160a0093	f	{}	C_ambiguous	
+resource.ibor.reconciliation_enabled	resource.ibor.reconciliation_enabled	resource	boolean	Resource	211e9056-f5d0-4a1e-a43b-a1a25065cd6e	f	{}	C_ambiguous	
+resource.settlement.bic_code	resource.settlement.bic_code	resource	string	Resource	c1256133-ef6a-4e46-aa0e-a731b62a9533	f	{}	C_ambiguous	
+resource.settlement.csd_participant_id	resource.settlement.csd_participant_id	resource	string	Resource	d7f26e1e-736a-4e4d-be6d-2aa4ed1544ca	f	{}	C_ambiguous	
+resource.settlement.netting_enabled	resource.settlement.netting_enabled	resource	boolean	Resource	7b1b42d1-cb00-46c7-9c5c-bb698846daf7	f	{}	C_ambiguous	
+resource.settlement.settlement_currency	resource.settlement.settlement_currency	resource	string	Resource	6ff892ce-7238-4fdf-8637-c5c01c3d279e	f	{}	C_ambiguous	
+resource.swift.logical_terminal	resource.swift.logical_terminal	resource	string	Resource	d8db186f-c7ae-4332-b0e9-6e973c4bdcf2	f	{}	C_ambiguous	
+resource.swift.message_types	resource.swift.message_types	resource	json	Resource	6a676ee1-ed88-4a43-aa12-8f3bc799c4de	f	{}	C_ambiguous	
+resource.swift.rma_status	resource.swift.rma_status	resource	string	Resource	584c8f31-fbbf-4575-9e5d-e1845953ae46	f	{}	C_ambiguous	
+routing_number	routing_number	resource	string	resource	7250bdc5-53d9-4026-a0c7-051d0195ff4b	f	{}	C_ambiguous	
+settlement_currency	settlement_currency	resource	string	resource	3ff24684-cb28-426d-94cf-4067bb406fa3	f	{}	C_ambiguous	

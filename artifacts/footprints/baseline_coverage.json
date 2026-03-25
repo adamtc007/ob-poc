@@ -1,0 +1,17 @@
+{
+  "broken_macro_refs": 0,
+  "footprint_entries_total": 295,
+  "fully_hydrated_verbs": 292,
+  "generated_at": "2026-03-25T12:50:18.001328+00:00",
+  "invocation_phrase_collisions": 70,
+  "lexicon_entries": 43,
+  "lexicon_missing_live_verbs": 1063,
+  "live_verbs_with_footprint_entry": 295,
+  "missing_verbs": 811,
+  "orphans": 0,
+  "partially_hydrated_verbs": 3,
+  "repo_revision": "56b2f9b413f2b5ddc2c6ba269ad8cb610e18c7a4",
+  "slice_id": "S0",
+  "stale_lexicon_entries": 0,
+  "total_live_verbs": 1106
+}

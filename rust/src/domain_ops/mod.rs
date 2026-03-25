@@ -197,9 +197,9 @@ pub use ubo_compute_ops::{
 
 // Domain-specific operation modules
 pub use attribute_ops::{
-    AttributeCheckCoverageOp, AttributeListByDocumentOp, AttributeListSinksOp,
-    AttributeListSourcesOp, AttributeTraceLineageOp, DocumentCheckExtractionCoverageOp,
-    DocumentListAttributesOp,
+    AttributeCheckCoverageOp, AttributeDefineGovernedOp, AttributeListByDocumentOp,
+    AttributeListSinksOp, AttributeListSourcesOp, AttributeTraceLineageOp,
+    DocumentCheckExtractionCoverageOp, DocumentListAttributesOp,
 };
 pub use cbu_ops::{
     CbuAddProductOp, CbuDecideOp, CbuDeleteCascadeOp, CbuLinkStructureOp, CbuListStructureLinksOp,

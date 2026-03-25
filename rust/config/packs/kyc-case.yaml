@@ -25,6 +25,10 @@ optional_context:
   - default_cbu
   - target_entity
 
+workspaces:
+  - kyc
+  - on_boarding
+
 allowed_verbs:
   - kyc.create-case
   - kyc.assign-reviewer

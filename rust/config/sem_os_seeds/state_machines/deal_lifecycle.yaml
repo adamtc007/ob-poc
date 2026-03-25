@@ -1,10 +1,11 @@
 state_machine: deal_lifecycle
-description: Deal record lifecycle — from prospect qualification through active servicing
+description: Deal record lifecycle — from prospect qualification through client-group KYC clearance, contracting, and active servicing
 states:
   [
     prospect,
     qualifying,
     negotiating,
+    kyc_clearance,
     contracted,
     onboarding,
     active,
@@ -21,11 +22,19 @@ transitions:
     to: negotiating
     verbs: [deal.update-status, deal.create-rate-card]
   - from: negotiating
+    to: kyc_clearance
+    verbs: [deal.update-status]
+  - from: kyc_clearance
     to: contracted
-    verbs: [deal.update-status, deal.agree-rate-card]
+    verbs: [deal.update-status, deal.add-contract]
   - from: contracted
     to: onboarding
-    verbs: [deal.update-status, deal.request-onboarding]
+    verbs:
+      [
+        deal.update-status,
+        deal.request-onboarding,
+        deal.request-onboarding-batch,
+      ]
   - from: onboarding
     to: active
     verbs: [deal.update-status]
@@ -43,6 +52,9 @@ transitions:
     to: cancelled
     verbs: [deal.cancel]
   - from: negotiating
+    to: cancelled
+    verbs: [deal.cancel]
+  - from: kyc_clearance
     to: cancelled
     verbs: [deal.cancel]
   - from: contracted
@@ -69,6 +81,8 @@ reducer:
     - state: onboarding
       requires: []
     - state: contracted
+      requires: []
+    - state: kyc_clearance
       requires: []
     - state: negotiating
       requires: []

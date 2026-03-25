@@ -1,0 +1,145 @@
+# Product Service Taxonomy Journey Pack
+# Explore and maintain the design-time product -> service -> resource taxonomy
+
+id: product-service-taxonomy
+name: Product Service Taxonomy
+version: "1.0"
+description: >
+  Explore the design-time product, service, and servicing-resource taxonomy.
+  Guides catalog discovery so product onboarding and activation can resolve
+  products into services, resources, and attribute dictionaries.
+
+invocation_phrases:
+  - "product service taxonomy"
+  - "product maintenance"
+  - "show me product taxonomy"
+  - "browse product services"
+  - "show service resource map"
+  - "resource dictionary"
+  - "catalog maintenance"
+
+required_context:
+  - client_group_id
+
+optional_context:
+  - product_id
+  - service_id
+  - resource_id
+
+workspaces:
+  - product_maintenance
+
+allowed_verbs:
+  - product.list
+  - product.read
+  - service.list
+  - service.read
+  - service.list-by-product
+  - service-resource.list
+  - service-resource.read
+  - service-resource.list-by-service
+  - service-resource.list-attributes
+  - attribute.list
+  - attribute.read
+
+forbidden_verbs:
+  - service-resource.provision
+  - service-resource.activate
+  - service-resource.set-attr
+  - cbu.create
+
+risk_policy:
+  require_confirm_before_execute: false
+  max_steps_without_confirm: 10
+
+required_questions:
+  - field: exploration_target
+    prompt: "Do you want to start from a product, a service, or a resource dictionary?"
+    answer_kind: enum
+    default: "product"
+
+optional_questions:
+  - field: product_id
+    prompt: "Which product should anchor the taxonomy view?"
+    answer_kind: string
+
+  - field: service_id
+    prompt: "Which service should anchor the taxonomy view?"
+    answer_kind: string
+
+  - field: resource_id
+    prompt: "Which servicing resource should anchor the taxonomy view?"
+    answer_kind: string
+
+stop_rules:
+  - "Requested product taxonomy read"
+  - "Requested service taxonomy read"
+  - "Requested resource dictionary read"
+
+templates:
+  - template_id: product-first-taxonomy
+    when_to_use: "Explore taxonomy starting from a product"
+    steps:
+      - verb: product.read
+        when: "product_id"
+        args:
+          product-id: "{answers.product_id}"
+
+      - verb: service.list-by-product
+        when: "product_id"
+        args:
+          product-id: "{answers.product_id}"
+
+  - template_id: service-first-taxonomy
+    when_to_use: "Explore taxonomy starting from a service"
+    steps:
+      - verb: service.read
+        when: "service_id"
+        args:
+          service-id: "{answers.service_id}"
+
+      - verb: service-resource.list-by-service
+        when: "service_id"
+        args:
+          service-id: "{answers.service_id}"
+
+  - template_id: resource-first-taxonomy
+    when_to_use: "Explore taxonomy starting from a servicing resource"
+    steps:
+      - verb: service-resource.read
+        when: "resource_id"
+        args:
+          resource-id: "{answers.resource_id}"
+
+      - verb: service-resource.list-attributes
+        when: "resource_id"
+        args:
+          resource-id: "{answers.resource_id}"
+
+pack_summary_template: >
+  Product taxonomy exploration for {{answers.exploration_target}}.
+
+section_layout:
+  - title: "Products"
+    verb_prefixes:
+      - "product."
+  - title: "Services"
+    verb_prefixes:
+      - "service."
+  - title: "Resources"
+    verb_prefixes:
+      - "service-resource."
+      - "attribute."
+
+definition_of_done:
+  - "Product to service mapping can be inspected"
+  - "Service to servicing-resource mapping can be inspected"
+  - "Resource attribute dictionary can be inspected"
+
+progress_signals:
+  - signal: product_catalog_loaded
+    description: "Product catalog view has been loaded"
+  - signal: service_map_loaded
+    description: "Product to service mapping has been loaded"
+  - signal: resource_dictionary_loaded
+    description: "Resource requirements and attributes have been loaded"

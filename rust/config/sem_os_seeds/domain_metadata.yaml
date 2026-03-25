@@ -15,7 +15,7 @@ domains:
   # CLIENT GROUP — The Apex
   # ---------------------------------------------------------------------------
   client-group:
-    description: "Client group resolution — apex commercial entities, aliases, anchors, and corporate hierarchy staging"
+    description: "Client group resolution — apex commercial entities, aliases, anchors, ownership/control mapping, and the group-level KYC clearance baseline inherited by controlled CBUs"
     tables:
       client_group:
         description: "Apex client groups (Allianz, BlackRock, Aviva) with discovery status and entity counts"
@@ -68,6 +68,14 @@ domains:
         classification: internal
         pii: false
     verb_data_footprint:
+      client-group.create:
+        reads: []
+        writes: [client_group]
+      client-group.read:
+        reads: [client_group]
+      client-group.update:
+        reads: [client_group]
+        writes: [client_group]
       client-group.entity-add:
         reads: [client_group, entities]
         writes: [client_group_entity]
@@ -502,7 +510,7 @@ domains:
   # DEAL — Commercial Origination Hub
   # ---------------------------------------------------------------------------
   deal:
-    description: "Commercial deal lifecycle — origination, rate card negotiation, onboarding handoff, and revenue tracking"
+    description: "Commercial deal lifecycle — origination, group-cleared contract negotiation, onboarding handoff into existing controlled CBUs, and revenue tracking"
     tables:
       deals:
         description: "Commercial deal record hub with status machine (PROSPECT → ACTIVE → OFFBOARDED)"
@@ -550,7 +558,7 @@ domains:
         classification: confidential
         pii: false
       deal_onboarding_requests:
-        description: "Handoff from deal to CBU creation"
+        description: "Handoff from deal to existing CBU/product onboarding"
         governance_tier: operational
         classification: confidential
         pii: false
@@ -1679,7 +1687,7 @@ domains:
         classification: internal
         pii: false
       onboarding_requests:
-        description: "Legacy onboarding request records (see also deal_onboarding_requests)"
+        description: "Legacy direct onboarding request records (see also deal_onboarding_requests)"
         governance_tier: operational
         classification: internal
         pii: false

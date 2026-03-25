@@ -1,0 +1,15 @@
+{
+  "generated_at": "2026-03-25T13:02:05.719692+00:00",
+  "monotonic_narrowing": true,
+  "reachable_verbs": 1106,
+  "repo_revision": "56b2f9b413f2b5ddc2c6ba269ad8cb610e18c7a4",
+  "slice_id": "S8",
+  "tests": {
+    "exact_5d_count": 309,
+    "fallback_2d_count": 318,
+    "fallback_3d_count": 318,
+    "fallback_4d_count": 318,
+    "legacy_1d_count": 441
+  },
+  "unreachable_verbs": 0
+}

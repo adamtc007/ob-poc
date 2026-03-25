@@ -1,5 +1,5 @@
 constellation: deal.lifecycle
-description: Commercial deal entity topology — the deal as a hub entity linking participants, contracts, products, and onboarding requests. Rate cards and billing attach to the deal but are workflow concerns, not structural positions.
+description: Commercial deal entity topology — the deal as a hub entity linking participants, products, client-group clearance, pre-existing controlled CBUs, contracts, and onboarding requests. Rate cards and billing attach to the deal but are workflow concerns, not structural positions.
 jurisdiction: ALL
 slots:
   deal:
@@ -17,22 +17,70 @@ slots:
       timeline: { verb: deal.read-timeline, when: filled }
       list_documents: { verb: deal.list-documents, when: filled }
       list_slas: { verb: deal.list-slas, when: filled }
-      list_active_rate_cards: { verb: deal.list-active-rate-cards, when: filled }
+      list_active_rate_cards:
+        { verb: deal.list-active-rate-cards, when: filled }
       list_rate_card_lines: { verb: deal.list-rate-card-lines, when: filled }
-      list_rate_card_history: { verb: deal.list-rate-card-history, when: filled }
+      list_rate_card_history:
+        { verb: deal.list-rate-card-history, when: filled }
       update: { verb: deal.update-record, when: filled }
       update_status: { verb: deal.update-status, when: filled }
       add_document: { verb: deal.add-document, when: filled }
-      update_document_status: { verb: deal.update-document-status, when: filled }
+      update_document_status:
+        { verb: deal.update-document-status, when: filled }
       add_sla: { verb: deal.add-sla, when: filled }
       remove_sla: { verb: deal.remove-sla, when: filled }
       add_ubo_assessment: { verb: deal.add-ubo-assessment, when: filled }
       update_ubo_assessment: { verb: deal.update-ubo-assessment, when: filled }
       cancel: { verb: deal.cancel, when: filled }
+  client_group:
+    type: cbu
+    table: client_group
+    pk: group_id
+    join: { via: deals, parent_fk: deal_id, child_fk: primary_client_group_id }
+    cardinality: mandatory
+    depends_on: [deal]
+    state_machine: client_group_lifecycle
+    verbs: {}
+  group_kyc_clearance:
+    type: case
+    table: cases
+    pk: case_id
+    join: { via: cases, parent_fk: client_group_id, child_fk: case_id }
+    cardinality: optional
+    depends_on: [{ slot: client_group, min_state: control_mapped }]
+    state_machine: kyc_case_lifecycle
+    verbs:
+      read: { verb: kyc-case.read, when: filled }
+      state: { verb: kyc-case.state, when: filled }
+  kyc_case:
+    type: case
+    table: cases
+    pk: case_id
+    join: { via: cases, parent_fk: deal_id, child_fk: case_id }
+    cardinality: optional
+    depends_on: [cbu, { slot: group_kyc_clearance, min_state: approved }]
+    state_machine: kyc_case_lifecycle
+    verbs:
+      create: { verb: kyc-case.create, when: empty }
+      read: { verb: kyc-case.read, when: filled }
+      state: { verb: kyc-case.state, when: filled }
+      update_status: { verb: kyc-case.update-status, when: filled }
+      close: { verb: kyc-case.close, when: filled }
+  cbu:
+    type: cbu
+    table: cbus
+    pk: cbu_id
+    join: { via: client_group_entity, parent_fk: group_id, child_fk: cbu_id }
+    cardinality: optional
+    depends_on: [{ slot: client_group, min_state: group_kyc_cleared }]
+    verbs:
+      read: { verb: cbu.read, when: filled }
+      show: { verb: cbu.show, when: filled }
   participant:
     type: entity
     entity_kinds: [person]
-    join: { via: deal_participants, parent_fk: deal_id, child_fk: participant_id }
+    join:
+      { via: deal_participants, parent_fk: deal_id, child_fk: participant_id }
     cardinality: optional
     depends_on: [deal]
     verbs:
@@ -44,7 +92,7 @@ slots:
     entity_kinds: [contract]
     join: { via: deal_contracts, parent_fk: deal_id, child_fk: contract_id }
     cardinality: optional
-    depends_on: [deal]
+    depends_on: [{ slot: group_kyc_clearance, min_state: approved }]
     verbs:
       add: { verb: deal.add-contract, when: [empty, filled] }
       remove: { verb: deal.remove-contract, when: filled }
@@ -52,9 +100,10 @@ slots:
   contract:
     type: entity
     entity_kinds: [contract]
-    join: { via: legal_contracts, parent_fk: contract_id, child_fk: contract_id }
+    join:
+      { via: legal_contracts, parent_fk: contract_id, child_fk: contract_id }
     cardinality: optional
-    depends_on: [deal]
+    depends_on: [{ slot: group_kyc_clearance, min_state: approved }]
     verbs:
       create: { verb: contract.create, when: empty }
       read: { verb: contract.get, when: filled }
@@ -102,18 +151,31 @@ slots:
   onboarding_request:
     type: entity
     entity_kinds: [entity]
-    join: { via: deal_onboarding_requests, parent_fk: deal_id, child_fk: request_id }
+    join:
+      {
+        via: deal_onboarding_requests,
+        parent_fk: deal_id,
+        child_fk: request_id,
+      }
     cardinality: optional
-    depends_on: [{ slot: deal, min_state: contracted }]
+    depends_on:
+      [
+        { slot: deal, min_state: contracted },
+        { slot: deal_contract, min_state: filled },
+        { slot: cbu, min_state: filled },
+        { slot: group_kyc_clearance, min_state: approved },
+      ]
     verbs:
       request: { verb: deal.request-onboarding, when: empty }
-      request_batch: { verb: deal.request-onboarding-batch, when: [empty, filled] }
+      request_batch:
+        { verb: deal.request-onboarding-batch, when: [empty, filled] }
       update: { verb: deal.update-onboarding-status, when: filled }
       list: { verb: deal.list-onboarding-requests, when: filled }
   billing_profile:
     type: entity
     entity_kinds: [entity]
-    join: { via: fee_billing_profiles, parent_fk: deal_id, child_fk: profile_id }
+    join:
+      { via: fee_billing_profiles, parent_fk: deal_id, child_fk: profile_id }
     cardinality: optional
     depends_on: [rate_card]
     verbs:
@@ -141,16 +203,23 @@ slots:
     cardinality: optional
     depends_on: [rate_card]
     verbs:
-      set_valuation: { verb: pricing-config.set-valuation-schedule, when: [empty, filled] }
+      set_valuation:
+        { verb: pricing-config.set-valuation-schedule, when: [empty, filled] }
       set_nav: { verb: pricing-config.set-nav-threshold, when: [empty, filled] }
-      set_settlement: { verb: pricing-config.set-settlement-calendar, when: [empty, filled] }
-      set_holiday: { verb: pricing-config.set-holiday-schedule, when: [empty, filled] }
-      set_reporting: { verb: pricing-config.set-reporting, when: [empty, filled] }
+      set_settlement:
+        { verb: pricing-config.set-settlement-calendar, when: [empty, filled] }
+      set_holiday:
+        { verb: pricing-config.set-holiday-schedule, when: [empty, filled] }
+      set_reporting:
+        { verb: pricing-config.set-reporting, when: [empty, filled] }
       set_tax: { verb: pricing-config.set-tax-status, when: [empty, filled] }
-      set_reclaim: { verb: pricing-config.set-reclaim-config, when: [empty, filled] }
+      set_reclaim:
+        { verb: pricing-config.set-reclaim-config, when: [empty, filled] }
       find: { verb: pricing-config.find-for-instrument, when: filled }
-      list_jurisdictions: { verb: pricing-config.list-jurisdictions, when: filled }
-      list_treaty_rates: { verb: pricing-config.list-treaty-rates, when: filled }
+      list_jurisdictions:
+        { verb: pricing-config.list-jurisdictions, when: filled }
+      list_treaty_rates:
+        { verb: pricing-config.list-treaty-rates, when: filled }
       list_tax_status: { verb: pricing-config.list-tax-status, when: filled }
       list_reclaims: { verb: pricing-config.list-reclaim-configs, when: filled }
   contract_template:

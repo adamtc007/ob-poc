@@ -5,7 +5,7 @@
  * Deal -> Products -> Rate Cards -> Lines
  *      -> Participants
  *      -> Contracts
- *      -> Onboarding Requests
+ *      -> Onboarding Handoff
  */
 
 import { useState, useCallback, useMemo } from "react";
@@ -110,11 +110,11 @@ function buildTree(graph: DealGraphResponse): DealTaxonomyNode {
     data: c,
   }));
 
-  // Build onboarding request nodes
+  // Build onboarding handoff nodes
   const onboardingNodes: DealTaxonomyNode[] = onboarding_requests.map((r) => ({
     id: `onboarding:${r.request_id}`,
     type: "onboarding" as const,
-    label: `${r.request_type} - ${r.status}`,
+    label: `${r.request_type} handoff - ${r.status}`,
     data: r,
   }));
 
@@ -155,7 +155,7 @@ function buildTree(graph: DealGraphResponse): DealTaxonomyNode {
     dealChildren.push({
       id: `onboarding:${deal.deal_id}`,
       type: "onboarding_list",
-      label: `Onboarding Requests (${onboarding_requests.length})`,
+      label: `Onboarding Handoff (${onboarding_requests.length})`,
       children: onboardingNodes,
       childCount: onboarding_requests.length,
     });
@@ -192,7 +192,11 @@ function TreeNode({
   const isExpanded = expandedNodes.has(node.id);
   const isSelected = selectedNodeId === node.id;
   const nodeIcon = useMemo(
-    () => getNodeIcon(node.type)({ size: 14, className: "flex-shrink-0 text-[var(--text-muted)]" }),
+    () =>
+      getNodeIcon(node.type)({
+        size: 14,
+        className: "flex-shrink-0 text-[var(--text-muted)]",
+      }),
     [node.type],
   );
 

@@ -1,0 +1,4457 @@
+{
+  "families": [
+    "cross_border_onboarding",
+    "fund_onboarding",
+    "governance_sla",
+    "manager_onboarding"
+  ],
+  "generated_at": "2026-03-25T13:01:39.893436+00:00",
+  "repo_revision": "56b2f9b413f2b5ddc2c6ba269ad8cb610e18c7a4",
+  "slice_id": "S5",
+  "subject_kinds": [
+    "cbu",
+    "contract",
+    "deal",
+    "document",
+    "kyc-case",
+    "onboarding-request",
+    "requirement",
+    "service-intent",
+    "service-resource"
+  ],
+  "verb_count": 211,
+  "verbs": [
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.add-product",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.assign-control",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.assign-fund-role",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.assign-ownership",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.assign-role",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.assign-service-provider",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.assign-signatory",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.assign-trust-role",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.attach-evidence",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.create",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.create-from-client-group",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.decide",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.delete",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.delete-cascade",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.ensure",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.link-structure",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.list",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.list-evidence",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.list-structure-links",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.list-subscriptions",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.parties",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.read",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.remove-product",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.remove-role",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.rename",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.reopen-validation",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.request-proof-update",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.set-category",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.set-client-type",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.set-commercial-client",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.set-jurisdiction",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.show",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.submit-for-validation",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.unlink-structure",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.update",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.validate-roles",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.verify-evidence",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "contract-pack",
+      "fqn": "contract-pack.add-template",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "contract-pack",
+      "fqn": "contract-pack.create",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "coverage",
+      "fqn": "coverage.compute",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "deal",
+      "fqn": "deal.add-contract",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "deal",
+      "fqn": "deal.add-document",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "deal",
+      "fqn": "deal.add-participant",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "deal",
+      "fqn": "deal.add-product",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "deal",
+      "fqn": "deal.add-rate-card-line",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "deal",
+      "fqn": "deal.add-sla",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "deal",
+      "fqn": "deal.add-ubo-assessment",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "deal",
+      "fqn": "deal.agree-rate-card",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "deal",
+      "fqn": "deal.cancel",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "deal",
+      "fqn": "deal.counter-rate-card",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "deal",
+      "fqn": "deal.create",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "deal",
+      "fqn": "deal.create-rate-card",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "deal",
+      "fqn": "deal.list",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "deal",
+      "fqn": "deal.list-active-rate-cards",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "deal",
+      "fqn": "deal.list-contracts",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "deal",
+      "fqn": "deal.list-documents",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "deal",
+      "fqn": "deal.list-onboarding-requests",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "deal",
+      "fqn": "deal.list-participants",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "deal",
+      "fqn": "deal.list-products",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "deal",
+      "fqn": "deal.list-rate-card-history",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "deal",
+      "fqn": "deal.list-rate-card-lines",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "deal",
+      "fqn": "deal.list-rate-cards",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "deal",
+      "fqn": "deal.list-slas",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "deal",
+      "fqn": "deal.propose-rate-card",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "deal",
+      "fqn": "deal.read-record",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "deal",
+      "fqn": "deal.read-summary",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "deal",
+      "fqn": "deal.read-timeline",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "deal",
+      "fqn": "deal.remove-contract",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "deal",
+      "fqn": "deal.remove-participant",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "deal",
+      "fqn": "deal.remove-product",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "deal",
+      "fqn": "deal.remove-rate-card-line",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "deal",
+      "fqn": "deal.remove-sla",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "deal",
+      "fqn": "deal.request-onboarding",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "deal",
+      "fqn": "deal.request-onboarding-batch",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "deal",
+      "fqn": "deal.search-records",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "deal",
+      "fqn": "deal.update-document-status",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "deal",
+      "fqn": "deal.update-onboarding-status",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "deal",
+      "fqn": "deal.update-product-status",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "deal",
+      "fqn": "deal.update-rate-card-line",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "deal",
+      "fqn": "deal.update-record",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "deal",
+      "fqn": "deal.update-status",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "deal",
+      "fqn": "deal.update-ubo-assessment",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "docs-bundle",
+      "fqn": "docs-bundle.apply",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "docs-bundle",
+      "fqn": "docs-bundle.list-applied",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "docs-bundle",
+      "fqn": "docs-bundle.list-available",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "document",
+      "fqn": "document.catalog",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "document",
+      "fqn": "document.compute-requirements",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "document",
+      "fqn": "document.create",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "document",
+      "fqn": "document.create-request",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "document",
+      "fqn": "document.extract",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "document",
+      "fqn": "document.for-entity",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "document",
+      "fqn": "document.get",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "document",
+      "fqn": "document.list-requests-by-workstream",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "document",
+      "fqn": "document.list-versions",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "document",
+      "fqn": "document.mark-requested",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "document",
+      "fqn": "document.missing-for-entity",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "document",
+      "fqn": "document.receive-request",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "document",
+      "fqn": "document.reject",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "document",
+      "fqn": "document.reject-request",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "document",
+      "fqn": "document.solicit",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "document",
+      "fqn": "document.solicit-set",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "document",
+      "fqn": "document.start-qa",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "document",
+      "fqn": "document.upload-version",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "document",
+      "fqn": "document.verify",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "document",
+      "fqn": "document.verify-request",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "document",
+      "fqn": "document.waive-request",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "fund",
+      "fqn": "fund.add-investment",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "fund",
+      "fqn": "fund.add-share-class",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "fund",
+      "fqn": "fund.add-to-umbrella",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "fund",
+      "fqn": "fund.create",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "fund",
+      "fqn": "fund.delete-compartment",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "fund",
+      "fqn": "fund.delete-vehicle",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "fund",
+      "fqn": "fund.end-investment",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "fund",
+      "fqn": "fund.ensure",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "fund",
+      "fqn": "fund.link-feeder",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "fund",
+      "fqn": "fund.list-by-manager",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "fund",
+      "fqn": "fund.list-by-vehicle-type",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "fund",
+      "fqn": "fund.list-compartments-by-umbrella",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "fund",
+      "fqn": "fund.list-feeders",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "fund",
+      "fqn": "fund.list-investments",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "fund",
+      "fqn": "fund.list-investors",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "fund",
+      "fqn": "fund.list-share-classes",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "fund",
+      "fqn": "fund.list-subfunds",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "fund",
+      "fqn": "fund.read-compartment",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "fund",
+      "fqn": "fund.read-vehicle",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "fund",
+      "fqn": "fund.update-investment",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "fund",
+      "fqn": "fund.upsert-compartment",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "fund",
+      "fqn": "fund.upsert-vehicle",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "kyc-case",
+      "fqn": "kyc-case.assign",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "kyc-case",
+      "fqn": "kyc-case.close",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "kyc-case",
+      "fqn": "kyc-case.create",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "kyc-case",
+      "fqn": "kyc-case.escalate",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "kyc-case",
+      "fqn": "kyc-case.list-by-cbu",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "kyc-case",
+      "fqn": "kyc-case.read",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "kyc-case",
+      "fqn": "kyc-case.reopen",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "kyc-case",
+      "fqn": "kyc-case.set-risk-rating",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "kyc-case",
+      "fqn": "kyc-case.state",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "kyc-case",
+      "fqn": "kyc-case.update-status",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "onboarding",
+      "fqn": "onboarding.auto-complete",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "product",
+      "fqn": "product.list",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "product",
+      "fqn": "product.read",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "provisioning",
+      "fqn": "provisioning.run",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "provisioning",
+      "fqn": "provisioning.status",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "readiness",
+      "fqn": "readiness.compute",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "readiness",
+      "fqn": "readiness.explain",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "request",
+      "fqn": "request.cancel",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "request",
+      "fqn": "request.create",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "request",
+      "fqn": "request.escalate",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "request",
+      "fqn": "request.extend",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "request",
+      "fqn": "request.fulfill",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "request",
+      "fqn": "request.list",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "request",
+      "fqn": "request.overdue",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "request",
+      "fqn": "request.remind",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "request",
+      "fqn": "request.waive",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "requirement",
+      "fqn": "requirement.create",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "requirement",
+      "fqn": "requirement.create-set",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "requirement",
+      "fqn": "requirement.for-entity",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "requirement",
+      "fqn": "requirement.for-workflow",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "requirement",
+      "fqn": "requirement.get",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "requirement",
+      "fqn": "requirement.mark-expired",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "requirement",
+      "fqn": "requirement.reset",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "requirement",
+      "fqn": "requirement.unsatisfied",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "requirement",
+      "fqn": "requirement.waive",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "requirement",
+      "fqn": "requirement.with-status",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "service-availability",
+      "fqn": "service-availability.list",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "service-availability",
+      "fqn": "service-availability.list-by-principal",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "service-availability",
+      "fqn": "service-availability.set",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "service-intent",
+      "fqn": "service-intent.create",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "service-intent",
+      "fqn": "service-intent.list",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "service-intent",
+      "fqn": "service-intent.supersede",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.activate",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.activate-lifecycle",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.analyze-lifecycle-gaps",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.check-lifecycle-readiness",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.decommission",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.decommission-lifecycle",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.discover-lifecycles",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.execute-lifecycle-plan",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.generate-lifecycle-plan",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.list",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.list-attributes",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.list-by-service",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.list-lifecycle-instances",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.list-lifecycle-resource-types",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.list-lifecycles",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.list-lifecycles-by-instrument",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.list-resources-for-lifecycle",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.provision",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.provision-lifecycle",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.read",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.read-lifecycle",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.read-lifecycle-resource-type",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.set-attr",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.suspend",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.suspend-lifecycle",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.validate-attrs",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "service",
+      "fqn": "service.list",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "service",
+      "fqn": "service.list-by-product",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "service",
+      "fqn": "service.read",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "template",
+      "fqn": "template.batch",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "template",
+      "fqn": "template.invoke",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "tollgate",
+      "fqn": "tollgate.evaluate",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "tollgate",
+      "fqn": "tollgate.evaluate-gate",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "tollgate",
+      "fqn": "tollgate.expire-override",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "tollgate",
+      "fqn": "tollgate.get-decision-readiness",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "tollgate",
+      "fqn": "tollgate.get-metrics",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "tollgate",
+      "fqn": "tollgate.list-evaluations",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "tollgate",
+      "fqn": "tollgate.list-overrides",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "tollgate",
+      "fqn": "tollgate.list-thresholds",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "tollgate",
+      "fqn": "tollgate.override",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "cross_border_onboarding",
+        "fund_onboarding",
+        "governance_sla",
+        "manager_onboarding"
+      ],
+      "domain": "tollgate",
+      "fqn": "tollgate.set-threshold",
+      "subject_kinds": [
+        "cbu",
+        "contract",
+        "deal",
+        "document",
+        "kyc-case",
+        "onboarding-request",
+        "requirement",
+        "service-intent",
+        "service-resource"
+      ]
+    }
+  ],
+  "workspace": "OnBoarding"
+}

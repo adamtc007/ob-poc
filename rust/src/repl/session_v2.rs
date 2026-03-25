@@ -14,7 +14,7 @@ use uuid::Uuid;
 use super::decision_log::SessionDecisionLog;
 use super::proposal_engine::ProposalSet;
 use super::runbook::{ArgExtractionAudit, Runbook, SlotSource};
-use super::types_v2::ReplStateV2;
+use super::types_v2::{ReplStateV2, WorkspaceKind};
 use crate::agent::sem_os_context_envelope::SemOsContextEnvelope;
 use crate::journey::handoff::PackHandoff;
 use crate::journey::pack::PackManifest;
@@ -82,6 +82,8 @@ pub struct ReplSessionV2 {
     /// Per-step Sem OS legality re-check evidence captured during execution.
     #[serde(skip)]
     pub pending_execution_rechecks: Vec<serde_json::Value>,
+    #[serde(default)]
+    pub active_workspace: Option<WorkspaceKind>,
     pub created_at: DateTime<Utc>,
     pub last_active_at: DateTime<Utc>,
     /// Monotonic counter for runbook version allocation.
@@ -117,6 +119,7 @@ impl ReplSessionV2 {
             pending_sem_os_envelope: None,
             pending_lookup_result: None,
             pending_execution_rechecks: Vec::new(),
+            active_workspace: None,
             created_at: now,
             last_active_at: now,
             next_runbook_version: 0,
@@ -161,6 +164,12 @@ impl ReplSessionV2 {
     /// Writes to `runbook.client_group_id` — the canonical source of truth.
     pub fn set_client_scope(&mut self, client_group_id: Uuid) {
         self.runbook.client_group_id = Some(client_group_id);
+        self.last_active_at = Utc::now();
+    }
+
+    /// Set the active workspace after scope selection.
+    pub fn set_workspace(&mut self, workspace: WorkspaceKind) {
+        self.active_workspace = Some(workspace);
         self.last_active_at = Utc::now();
     }
 
@@ -292,10 +301,10 @@ mod tests {
 id: onboarding-request
 name: Onboarding Request
 version: "1.0"
-description: Onboard a new client structure
+description: Hand off a contracted deal into onboarding for an existing CBU
 invocation_phrases:
-  - "onboard a client"
-  - "set up onboarding"
+  - "request onboarding for this deal"
+  - "submit onboarding handoff"
 required_context:
   - client_group_id
 "#;
@@ -477,9 +486,9 @@ required_context:
 id: onboarding-request
 name: Onboarding Request
 version: "1.0"
-description: Onboard a new client structure
+description: Hand off a contracted deal into onboarding for an existing CBU
 invocation_phrases:
-  - "onboard a client"
+  - "request onboarding for this deal"
 required_context:
   - client_group_id
 "#

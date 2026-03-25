@@ -12,7 +12,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use crate::journey::pack::{load_packs_from_dir, PackLoadError, PackManifest};
-use crate::repl::types_v2::PackCandidate;
+use crate::repl::types_v2::{PackCandidate, WorkspaceKind};
 
 // ---------------------------------------------------------------------------
 // PackSemanticScorer trait
@@ -74,11 +74,25 @@ impl PackRouter {
     /// 2. Substring match on invocation_phrases.
     /// 3. Fallback — no match.
     pub fn route(&self, input: &str) -> PackRouteOutcome {
+        self.route_inner(input, None)
+    }
+
+    /// Route user input to a pack constrained to a workspace.
+    ///
+    /// # Examples
+    /// ```rust,ignore
+    /// let outcome = router.route_for_workspace("start onboarding", &WorkspaceKind::OnBoarding);
+    /// ```
+    pub fn route_for_workspace(&self, input: &str, workspace: &WorkspaceKind) -> PackRouteOutcome {
+        self.route_inner(input, Some(workspace))
+    }
+
+    fn route_inner(&self, input: &str, workspace: Option<&WorkspaceKind>) -> PackRouteOutcome {
         let input_lower = input.to_lowercase();
 
         // 1. Force-select: explicit pack name/id match.
         //    "use the onboarding journey" or "use onboarding-request"
-        if let Some(outcome) = self.try_force_select(&input_lower) {
+        if let Some(outcome) = self.try_force_select(&input_lower, workspace) {
             return outcome;
         }
 
@@ -86,6 +100,9 @@ impl PackRouter {
         let mut candidates: Vec<(Arc<PackManifest>, String, f32)> = Vec::new();
 
         for (manifest, hash) in &self.packs {
+            if !Self::pack_allowed_in_workspace(manifest, workspace) {
+                continue;
+            }
             let mut best_score: f32 = 0.0;
 
             for phrase in &manifest.invocation_phrases {
@@ -145,6 +162,9 @@ impl PackRouter {
             let existing_ids: Vec<String> =
                 candidates.iter().map(|(m, _, _)| m.id.clone()).collect();
             for (manifest, hash) in &self.packs {
+                if !Self::pack_allowed_in_workspace(manifest, workspace) {
+                    continue;
+                }
                 if existing_ids.contains(&manifest.id) {
                     continue;
                 }
@@ -193,8 +213,23 @@ impl PackRouter {
 
     /// List all available packs.
     pub fn list_packs(&self) -> Vec<PackCandidate> {
+        self.list_packs_inner(None)
+    }
+
+    /// List all packs available in a workspace.
+    ///
+    /// # Examples
+    /// ```rust,ignore
+    /// let packs = router.list_packs_for_workspace(&WorkspaceKind::Kyc);
+    /// ```
+    pub fn list_packs_for_workspace(&self, workspace: &WorkspaceKind) -> Vec<PackCandidate> {
+        self.list_packs_inner(Some(workspace))
+    }
+
+    fn list_packs_inner(&self, workspace: Option<&WorkspaceKind>) -> Vec<PackCandidate> {
         self.packs
             .iter()
+            .filter(|(m, _)| Self::pack_allowed_in_workspace(m, workspace))
             .map(|(m, _)| PackCandidate {
                 pack_id: m.id.clone(),
                 pack_name: m.name.clone(),
@@ -209,6 +244,22 @@ impl PackRouter {
         self.packs.iter().find(|(m, _)| m.id == pack_id)
     }
 
+    /// Get a specific pack by ID, constrained to a workspace.
+    ///
+    /// # Examples
+    /// ```rust,ignore
+    /// let pack = router.get_pack_for_workspace("kyc-case", &WorkspaceKind::Kyc);
+    /// ```
+    pub fn get_pack_for_workspace(
+        &self,
+        pack_id: &str,
+        workspace: &WorkspaceKind,
+    ) -> Option<&(Arc<PackManifest>, String)> {
+        self.packs
+            .iter()
+            .find(|(m, _)| m.id == pack_id && Self::pack_allowed_in_workspace(m, Some(workspace)))
+    }
+
     /// Get a pack by its manifest hash (for session rehydration after DB load).
     pub fn get_pack_by_hash(&self, hash: &str) -> Option<&(Arc<PackManifest>, String)> {
         self.packs.iter().find(|(_, h)| h == hash)
@@ -220,7 +271,11 @@ impl PackRouter {
     /// - "use the onboarding journey"
     /// - "use onboarding-request"
     /// - "start the kyc case pack"
-    fn try_force_select(&self, input_lower: &str) -> Option<PackRouteOutcome> {
+    fn try_force_select(
+        &self,
+        input_lower: &str,
+        workspace: Option<&WorkspaceKind>,
+    ) -> Option<PackRouteOutcome> {
         // Look for "use" or "start" prefix patterns.
         let input_cleaned = input_lower
             .trim_start_matches("use ")
@@ -232,6 +287,9 @@ impl PackRouter {
             .trim();
 
         for (manifest, hash) in &self.packs {
+            if !Self::pack_allowed_in_workspace(manifest, workspace) {
+                continue;
+            }
             // Match pack ID.
             if manifest.id.to_lowercase() == input_cleaned {
                 return Some(PackRouteOutcome::Matched(manifest.clone(), hash.clone()));
@@ -254,6 +312,16 @@ impl PackRouter {
         }
 
         None
+    }
+
+    fn pack_allowed_in_workspace(
+        manifest: &PackManifest,
+        workspace: Option<&WorkspaceKind>,
+    ) -> bool {
+        match workspace {
+            Some(workspace) => manifest.workspaces.contains(workspace),
+            None => true,
+        }
     }
 }
 
@@ -288,12 +356,14 @@ mod tests {
 id: onboarding-request
 name: Onboarding Request
 version: "1.0"
-description: Onboard a new client structure
+description: Hand off a contracted deal into onboarding for an existing CBU
+workspaces:
+  - on_boarding
 invocation_phrases:
-  - "onboard a client"
-  - "set up new client"
+  - "onboarding request"
+  - "request onboarding for this deal"
   - "start onboarding"
-  - "new client setup"
+  - "product onboarding"
 "#
     }
 
@@ -303,6 +373,9 @@ id: book-setup
 name: Book Setup
 version: "1.0"
 description: Set up a fund book with products and trading matrix
+workspaces:
+  - cbu
+  - instrument_matrix
 invocation_phrases:
   - "set up a book"
   - "configure fund book"
@@ -316,6 +389,8 @@ id: kyc-case
 name: KYC Case
 version: "1.0"
 description: Open and manage a KYC case
+workspaces:
+  - kyc
 invocation_phrases:
   - "open kyc case"
   - "start kyc"
@@ -422,6 +497,25 @@ invocation_phrases:
 
         assert!(router.get_pack("onboarding-request").is_some());
         assert!(router.get_pack("nonexistent").is_none());
+    }
+
+    #[test]
+    fn test_list_packs_for_workspace_filters_results() {
+        let router = make_router();
+        let packs = router.list_packs_for_workspace(&WorkspaceKind::Kyc);
+
+        assert_eq!(packs.len(), 1);
+        assert_eq!(packs[0].pack_id, "kyc-case");
+    }
+
+    #[test]
+    fn test_route_for_workspace_filters_candidates() {
+        let router = make_router();
+
+        match router.route_for_workspace("start onboarding", &WorkspaceKind::Kyc) {
+            PackRouteOutcome::NoMatch => {}
+            other => panic!("Expected NoMatch outside workspace, got {:?}", other),
+        }
     }
 
     #[test]

@@ -1,0 +1,235 @@
+id	display_name	category	value_type	domain	uuid	is_required	metadata	triage_category	suggested_fqn
+attr.address.billing_period_end	Billing Period End	address	date	address_proof	a89e5460-8b3a-4d92-8d43-76f5854c31aa	f	{}	A_legitimate	address.billing-period-end
+attr.address.billing_period_start	Billing Period Start	address	date	address_proof	4983d427-95ce-462a-9f13-6ad62a288dfd	f	{}	A_legitimate	address.billing-period-start
+attr.address.city	City / Town	address	string		a0030000-0000-0000-0000-000000000004	f	{}	A_legitimate	address.city
+attr.address.council_tax_band	Council Tax Band	address	string	uk_council_tax	459a9991-02ae-4769-be27-7dac665b5e4e	f	{}	A_legitimate	address.council-tax-band
+attr.address.council_tax_reference	Council Tax Reference	address	string	uk_council_tax	c632687c-646a-42ee-b715-0861cf16056d	f	{}	A_legitimate	address.council-tax-reference
+attr.address.country	Country	address	string		a0030000-0000-0000-0000-000000000007	f	{}	A_legitimate	address.country
+attr.address.landlord_name	Landlord Name	address	string	tenancy	93648d5f-59ba-4651-96b2-33661e05cb14	f	{}	A_legitimate	address.landlord-name
+attr.address.mailing_address	Mailing / Correspondence Address	address	string		a0030000-0000-0000-0000-000000000010	f	{}	A_legitimate	address.mailing-address
+attr.address.monthly_rent	Monthly Rent	address	currency	tenancy	3c7c37e5-6b54-45c4-85e3-fcb2f15b76e8	f	{}	A_legitimate	address.monthly-rent
+attr.address.postal_code	Postal / ZIP Code	address	string		a0030000-0000-0000-0000-000000000006	f	{}	A_legitimate	address.postal-code
+attr.address.previous_address	Previous Address	address	string		a0030000-0000-0000-0000-000000000011	f	{}	A_legitimate	address.previous-address
+attr.address.registered_office	Registered Office Address	address	string		a0030000-0000-0000-0000-000000000008	f	{}	A_legitimate	address.registered-office
+attr.address.residential_full	Full Residential Address	address	string		a0030000-0000-0000-0000-000000000001	f	{}	A_legitimate	address.residential-full
+attr.address.service_address	Service Address	address	address	address_proof	a08705bc-6832-405e-8b57-a6ea1789e86d	f	{}	A_legitimate	address.service-address
+attr.address.state_province	State / Province / Region	address	string		a0030000-0000-0000-0000-000000000005	f	{}	A_legitimate	address.state-province
+attr.address.statement_date	Statement Date	address	date	address_proof	43f6138b-bfc8-494a-8e36-100c733e9580	f	{}	A_legitimate	address.statement-date
+attr.address.street_line_1	Street Address Line 1	address	string		a0030000-0000-0000-0000-000000000002	f	{}	A_legitimate	address.street-line-1
+attr.address.street_line_2	Street Address Line 2	address	string		a0030000-0000-0000-0000-000000000003	f	{}	A_legitimate	address.street-line-2
+attr.address.tenancy_end_date	Tenancy End Date	address	date	tenancy	647789d9-4ab6-462b-9b2a-8dc48d57b51f	f	{}	A_legitimate	address.tenancy-end-date
+attr.address.tenancy_start_date	Tenancy Start Date	address	date	tenancy	abe4bb2c-d38e-40c9-9a87-7f518f11433b	f	{}	A_legitimate	address.tenancy-start-date
+attr.address.time_at_address	Time at Current Address	address	string		a0030000-0000-0000-0000-000000000012	f	{}	A_legitimate	address.time-at-address
+attr.address.trading_address	Trading / Principal Place of Business	address	string		a0030000-0000-0000-0000-000000000009	f	{}	A_legitimate	address.trading-address
+attr.address.utility_account_number	Utility Account Number	address	string	address_proof	8e105846-d017-4cf6-8222-1e6ac283935e	f	{}	A_legitimate	address.utility-account-number
+attr.contact.address_line1	Address Line 1	address	string		7c7cdc82-b261-57c7-aee2-36e17dcd1d5d	f	"{""domain"": ""kyc"", ""rust_type"": ""AddressLine1""}"	A_legitimate	contact.address-line1
+attr.contact.address_line2	Address Line 2	address	string		e90b9045-d0c6-52db-989a-96ad37152e3a	f	"{""domain"": ""kyc"", ""rust_type"": ""AddressLine2""}"	A_legitimate	contact.address-line2
+attr.contact.city	City	address	string		2eca2245-5d14-57b2-9a53-6f90d2b7a9d6	f	"{""domain"": ""kyc"", ""rust_type"": ""City""}"	A_legitimate	contact.city
+attr.contact.country	Country	address	string		24e2072e-db54-547b-9e5d-0762a26261a6	f	"{""domain"": ""kyc"", ""format"": ""ISO-3166-1 alpha-2"", ""rust_type"": ""Country""}"	A_legitimate	contact.country
+attr.contact.postal_code	Postal Code	address	string		36df5ec0-f1b8-50a0-ac50-b510f0cda2fb	f	"{""domain"": ""kyc"", ""rust_type"": ""PostalCode""}"	A_legitimate	contact.postal-code
+attr.compliance.aml_status	AML Status	compliance	string		2cd8f6fa-0c16-5271-870f-8b304bbbd8ee	f	"{""domain"": ""kyc"", ""rust_type"": ""AmlStatus""}"	A_legitimate	compliance.aml-status
+attr.compliance.crs_status	CRS Status	compliance	string		afeab5f1-f1c0-5831-85c4-390ec7c97d1d	f	"{""domain"": ""kyc"", ""rust_type"": ""CrsStatus""}"	A_legitimate	compliance.crs-status
+attr.compliance.fatca_status	FATCA Status	compliance	string		53e4858b-76d7-563d-b6d1-38d34a09aaec	f	"{""domain"": ""kyc"", ""rust_type"": ""FatcaStatus""}"	A_legitimate	compliance.fatca-status
+attr.compliance.sanctions_check	Sanctions Screening Result	compliance	string		80d45eb5-98d2-57a8-a693-4fbb1e3c0ea1	f	"{""domain"": ""kyc"", ""rust_type"": ""SanctionsCheck""}"	A_legitimate	compliance.sanctions-check
+attr.kyc.corporate.business_activity	Primary Business Activity	compliance	string		4f8855ff-3805-5749-98f9-874838129569	f	"{""domain"": ""kyc"", ""rust_type"": ""BusinessActivity"", ""subcategory"": ""corporate""}"	A_legitimate	kyc.corporate.business-activity
+attr.kyc.corporate.regulatory_status	Regulatory Status	compliance	string		8fbf1610-4ca3-5e59-bc48-f2af12c8ea93	f	"{""domain"": ""kyc"", ""rust_type"": ""RegulatoryStatus"", ""subcategory"": ""corporate""}"	A_legitimate	kyc.corporate.regulatory-status
+attr.kyc.proper_person.source_of_funds	Source of Funds	compliance	string		eacb3713-acab-5aee-b9b6-ca95b35cbc1e	f	"{""domain"": ""kyc"", ""rust_type"": ""SourceOfFunds""}"	A_legitimate	kyc.proper-person.source-of-funds
+attr.kyc.proper_person.source_of_wealth	Source of Wealth	compliance	string		b78e5255-1104-5a3f-8ea0-db281b42f632	f	"{""domain"": ""kyc"", ""rust_type"": ""SourceOfWealth""}"	A_legitimate	kyc.proper-person.source-of-wealth
+attr.regulatory.adverse_media_categories	Adverse Media Categories	compliance	json	screening	4c56787f-c45d-41c2-bd26-88eff1f3e028	f	{}	A_legitimate	regulatory.adverse-media-categories
+attr.regulatory.adverse_media_found	Adverse Media Found	compliance	boolean	screening	475b9bd3-93d6-4491-aeac-1855d072378e	f	{}	A_legitimate	regulatory.adverse-media-found
+attr.regulatory.crd_number	CRD Number	compliance	string	us_regulatory	7bc9bafc-bf0d-47c9-9ff1-07380668f2d4	f	{}	A_legitimate	regulatory.crd-number
+attr.regulatory.emir_classification	EMIR Classification	compliance	string		a0090000-0000-0000-0000-000000000012	f	{}	A_legitimate	regulatory.emir-classification
+attr.regulatory.fca_firm_ref	FCA Firm Reference Number	compliance	string	uk_regulatory	d3b9768a-ba8c-42ba-a298-7395b7b0939c	f	{}	A_legitimate	regulatory.fca-firm-ref
+attr.regulatory.fca_permissions	FCA Permissions	compliance	json	uk_regulatory	78d6f4ac-4a51-4cef-99fd-83ec48fdc1f1	f	{}	A_legitimate	regulatory.fca-permissions
+attr.regulatory.lei	Legal Entity Identifier	compliance	string		a0090000-0000-0000-0000-000000000001	f	{}	A_legitimate	regulatory.lei
+attr.regulatory.lei_status	LEI Status	compliance	string	entity_id	6a4b96a6-6255-46e0-a295-a5cccac515d9	f	{}	A_legitimate	regulatory.lei-status
+attr.regulatory.license_number	Regulatory License Number	compliance	string		a0090000-0000-0000-0000-000000000002	f	{}	A_legitimate	regulatory.license-number
+attr.regulatory.mifid_classification	MiFID II Classification	compliance	string		a0090000-0000-0000-0000-000000000011	f	{}	A_legitimate	regulatory.mifid-classification
+attr.regulatory.permitted_activities	Permitted Activities	compliance	json		a0090000-0000-0000-0000-000000000004	f	{}	A_legitimate	regulatory.permitted-activities
+attr.regulatory.regulator	Primary Regulator	compliance	string		a0090000-0000-0000-0000-000000000003	f	{}	A_legitimate	regulatory.regulator
+attr.regulatory.sanctions_match	Sanctions Match Found	compliance	boolean	screening	0bb118bd-c175-41ae-9d93-8f3f0e80db01	f	{}	A_legitimate	regulatory.sanctions-match
+attr.regulatory.screening_date	Screening Date	compliance	date	screening	44706650-bc83-43ef-bf1b-3ed4050e3376	f	{}	A_legitimate	regulatory.screening-date
+attr.regulatory.screening_provider	Screening Provider	compliance	string	screening	cea9ae0c-a2d3-40ee-9dce-9ff4510017f3	f	{}	A_legitimate	regulatory.screening-provider
+attr.regulatory.sec_file_number	SEC File Number	compliance	string	us_regulatory	72e3d379-9b93-4808-84e4-ae5c23374e4f	f	{}	A_legitimate	regulatory.sec-file-number
+attr.contact.email	Email Address	contact	email		3e3126eb-07e4-5c0f-b8f1-c2b1552ad986	f	"{""domain"": ""kyc"", ""rust_type"": ""Email""}"	A_legitimate	contact.email
+attr.contact.fax	Fax Number	contact	phone		a0031000-0000-0000-0000-000000000004	f	{}	A_legitimate	contact.fax
+attr.contact.phone	Phone Number	contact	phone		58144115-fd1b-5395-a530-c5a140a1281e	f	"{""domain"": ""kyc"", ""format"": ""E.164"", ""rust_type"": ""PhoneNumber""}"	A_legitimate	contact.phone
+attr.contact.phone_landline	Landline Phone Number	contact	phone		a0031000-0000-0000-0000-000000000003	f	{}	A_legitimate	contact.phone-landline
+attr.contact.phone_mobile	Mobile Phone Number	contact	phone		a0031000-0000-0000-0000-000000000002	f	{}	A_legitimate	contact.phone-mobile
+attr.contact.website	Website URL	contact	string		a0031000-0000-0000-0000-000000000005	f	{}	A_legitimate	contact.website
+attr.document.drivers_license_number	Driver's License Number	document	string		a0020000-0000-0000-0000-000000000003	f	{}	A_legitimate	document.drivers-license-number
+attr.document.expiry_date	Document Expiry Date	document	date		a0020000-0000-0000-0000-000000000005	f	{}	A_legitimate	document.expiry-date
+attr.document.issue_date	Document Issue Date	document	date		a0020000-0000-0000-0000-000000000004	f	{}	A_legitimate	document.issue-date
+attr.document.issuing_authority	Issuing Authority	document	string		a0020000-0000-0000-0000-000000000006	f	{}	A_legitimate	document.issuing-authority
+attr.document.issuing_country	Issuing Country	document	string		a0020000-0000-0000-0000-000000000007	f	{}	A_legitimate	document.issuing-country
+attr.document.mrz_line_1	MRZ Line 1	document	string		a0020000-0000-0000-0000-000000000008	f	{}	A_legitimate	document.mrz-line-1
+attr.document.mrz_line_2	MRZ Line 2	document	string		a0020000-0000-0000-0000-000000000009	f	{}	A_legitimate	document.mrz-line-2
+attr.document.national_id_number	National ID Number	document	string		a0020000-0000-0000-0000-000000000002	f	{}	A_legitimate	document.national-id-number
+attr.document.passport_number	Passport Number	document	string		a0020000-0000-0000-0000-000000000001	f	{}	A_legitimate	document.passport-number
+attr.document.ssn	Social Security Number	document	string		a0020000-0000-0000-0000-000000000011	f	{}	A_legitimate	document.ssn
+attr.document.visa_number	Visa/Permit Number	document	string		a0020000-0000-0000-0000-000000000010	f	{}	A_legitimate	document.visa-number
+attr.entity.authorized_capital	Authorized Share Capital	entity	currency		a0040000-0000-0000-0000-000000000007	f	{}	A_legitimate	entity.authorized-capital
+attr.entity.business_activity	Principal Business Activity	entity	string		a0040000-0000-0000-0000-000000000010	f	{}	A_legitimate	entity.business-activity
+attr.entity.company_secretary	Company Secretary	entity	string		a0040000-0000-0000-0000-000000000013	f	{}	A_legitimate	entity.company-secretary
+attr.entity.directors	Directors	entity	json		a0040000-0000-0000-0000-000000000012	f	{}	A_legitimate	entity.directors
+attr.entity.domicile	Entity Domicile	entity	string		78883df8-c953-5d6e-90c2-c95ade0243bd	f	"{""domain"": ""kyc"", ""format"": ""ISO-3166-1 alpha-2"", ""rust_type"": ""EntityDomicile""}"	A_legitimate	entity.domicile
+attr.entity.employee_count	Number of Employees	entity	integer		a0040000-0000-0000-0000-000000000019	f	{}	A_legitimate	entity.employee-count
+attr.entity.fiscal_year_end	Fiscal Year End	entity	string		a0040000-0000-0000-0000-000000000016	f	{}	A_legitimate	entity.fiscal-year-end
+attr.entity.incorporation_date	Date of Incorporation	entity	date		a0040000-0000-0000-0000-000000000004	f	{}	A_legitimate	entity.incorporation-date
+attr.entity.issued_capital	Issued Share Capital	entity	currency		a0040000-0000-0000-0000-000000000008	f	{}	A_legitimate	entity.issued-capital
+attr.entity.legal_form	Legal Form / Entity Type	entity	string		a0040000-0000-0000-0000-000000000006	f	{}	A_legitimate	entity.legal-form
+attr.entity.legal_name	Legal Entity Name	entity	string		a0040000-0000-0000-0000-000000000001	f	{}	A_legitimate	entity.legal-name
+attr.entity.officers	Officers (CEO, CFO, etc.)	entity	json		a0040000-0000-0000-0000-000000000014	f	{}	A_legitimate	entity.officers
+attr.entity.paid_up_capital	Paid-Up Capital	entity	currency		a0040000-0000-0000-0000-000000000009	f	{}	A_legitimate	entity.paid-up-capital
+attr.entity.parent_company	Parent Company	entity	string		a0040000-0000-0000-0000-000000000018	f	{}	A_legitimate	entity.parent-company
+attr.entity.registration_number	Company Registration Number	entity	string		a0040000-0000-0000-0000-000000000003	f	{}	A_legitimate	entity.registration-number
+attr.entity.shareholders	Shareholders / Members	entity	json		a0040000-0000-0000-0000-000000000015	f	{}	A_legitimate	entity.shareholders
+attr.entity.sic_code	SIC / NACE / NAICS Code	entity	string		a0040000-0000-0000-0000-000000000011	f	{}	A_legitimate	entity.sic-code
+attr.entity.trading_name	Trading Name / DBA	entity	string		a0040000-0000-0000-0000-000000000002	f	{}	A_legitimate	entity.trading-name
+entity.company.incorporation_date	entity.company.incorporation_date	entity	date	Entity	e0000002-0000-0000-0000-000000000004	f	{}	A_legitimate	entity.incorporation-date
+entity.company.registration_number	entity.company.registration_number	entity	string	Entity	e0000002-0000-0000-0000-000000000002	f	{}	A_legitimate	entity.registration-number
+attr.banking.account_number	Bank Account Number	financial	string		d022d8f1-8ae1-55c8-84b8-e8203e17e369	f	"{""domain"": ""kyc"", ""rust_type"": ""BankAccountNumber""}"	A_legitimate	banking.account-number
+attr.banking.bank_name	Bank Name	financial	string		5fb01b57-e622-53b4-a503-dfced456fae2	f	"{""domain"": ""kyc"", ""rust_type"": ""BankName""}"	A_legitimate	banking.bank-name
+attr.banking.iban	IBAN	financial	string		6fd0e89d-5ce9-5e96-b359-be0867643f27	f	"{""domain"": ""kyc"", ""format"": ""ISO 13616"", ""rust_type"": ""Iban""}"	A_legitimate	banking.iban
+attr.banking.swift_code	SWIFT/BIC Code	financial	string		7a658a7c-6865-5941-a069-277c42e10492	f	"{""domain"": ""kyc"", ""format"": ""ISO 9362"", ""rust_type"": ""SwiftCode""}"	A_legitimate	banking.swift-code
+attr.financial.account_currency	Account Currency	financial	string		a0060000-0000-0000-0000-000000000006	f	{}	A_legitimate	financial.account-currency
+attr.financial.annual_income	Annual Income	financial	currency		a0060000-0000-0000-0000-000000000007	f	{}	A_legitimate	financial.annual-income
+attr.financial.aum	Assets Under Management	financial	currency		a0060000-0000-0000-0000-000000000014	f	{}	A_legitimate	financial.aum
+attr.financial.bank_account_number	Bank Account Number	financial	string		a0060000-0000-0000-0000-000000000001	f	{}	A_legitimate	financial.bank-account-number
+attr.financial.bank_name	Bank Name	financial	string		a0060000-0000-0000-0000-000000000004	f	{}	A_legitimate	financial.bank-name
+attr.financial.bic_swift	BIC / SWIFT Code	financial	string		a0060000-0000-0000-0000-000000000003	f	{}	A_legitimate	financial.bic-swift
+attr.financial.expected_activity	Expected Account Activity	financial	json		a0060000-0000-0000-0000-000000000011	f	{}	A_legitimate	financial.expected-activity
+attr.financial.iban	IBAN	financial	string		a0060000-0000-0000-0000-000000000002	f	{}	A_legitimate	financial.iban
+attr.financial.nav	Net Asset Value	financial	currency		a0060000-0000-0000-0000-000000000015	f	{}	A_legitimate	financial.nav
+attr.financial.net_worth	Net Worth	financial	currency		a0060000-0000-0000-0000-000000000008	f	{}	A_legitimate	financial.net-worth
+attr.financial.revenue	Annual Revenue / Turnover	financial	currency		a0060000-0000-0000-0000-000000000012	f	{}	A_legitimate	financial.revenue
+attr.financial.sort_code	Sort Code / Routing Number	financial	string		a0060000-0000-0000-0000-000000000005	f	{}	A_legitimate	financial.sort-code
+attr.financial.source_of_funds	Source of Funds	financial	string		a0060000-0000-0000-0000-000000000010	f	{}	A_legitimate	financial.source-of-funds
+attr.financial.source_of_wealth	Source of Wealth	financial	string		a0060000-0000-0000-0000-000000000009	f	{}	A_legitimate	financial.source-of-wealth
+attr.financial.total_assets	Total Assets	financial	currency		a0060000-0000-0000-0000-000000000013	f	{}	A_legitimate	financial.total-assets
+attr.investment.subscription_amount	Subscription Amount	financial	currency		e7155a74-b862-5c8b-80aa-e3d5886e375a	f	"{""domain"": ""kyc"", ""rust_type"": ""SubscriptionAmount""}"	A_legitimate	investment.subscription-amount
+attr.investment.subscription_currency	Subscription Currency	financial	string		9fbb97c1-68f6-5944-a4d6-73123b980362	f	"{""domain"": ""kyc"", ""format"": ""ISO-4217"", ""rust_type"": ""SubscriptionCurrency""}"	A_legitimate	investment.subscription-currency
+attr.investment.subscription_date	Subscription Date	financial	date		23cee73e-c689-5678-9e7e-be9176957f5d	f	"{""domain"": ""kyc"", ""rust_type"": ""SubscriptionDate""}"	A_legitimate	investment.subscription-date
+attr.kyc.corporate.aum	Assets Under Management	financial	number		35ca5381-9a27-5726-9354-575a7f9a4b6e	f	"{""domain"": ""kyc"", ""rust_type"": ""AssetsUnderManagement"", ""subcategory"": ""corporate""}"	A_legitimate	kyc.corporate.aum
+attr.kyc.proper_person.annual_income	Annual Income	financial	number		b1e7c730-e58b-5261-94d1-e4e2bbd81066	f	"{""domain"": ""kyc"", ""rust_type"": ""ProperPersonAnnualIncome"", ""subcategory"": ""proper_person""}"	A_legitimate	kyc.proper-person.annual-income
+attr.kyc.proper_person.net_worth	Net Worth	financial	number		2d3a6719-3a6a-5b09-9254-7532f9f9800b	f	"{""domain"": ""kyc"", ""rust_type"": ""ProperPersonNetWorth"", ""subcategory"": ""proper_person""}"	A_legitimate	kyc.proper-person.net-worth
+attr.fund.auditor	Auditor	fund	string		a0081000-0000-0000-0000-000000000008	f	{}	A_legitimate	fund.auditor
+attr.fund.custodian	Custodian	fund	string		a0081000-0000-0000-0000-000000000006	f	{}	A_legitimate	fund.custodian
+attr.fund.fund_administrator	Fund Administrator	fund	string		a0081000-0000-0000-0000-000000000005	f	{}	A_legitimate	fund.fund-administrator
+attr.fund.fund_name	Fund Name	fund	string		a0081000-0000-0000-0000-000000000001	f	{}	A_legitimate	fund.fund-name
+attr.fund.investment_manager	Investment Manager	fund	string		a0081000-0000-0000-0000-000000000004	f	{}	A_legitimate	fund.investment-manager
+attr.fund.investment_strategy	Investment Strategy	fund	string		a0081000-0000-0000-0000-000000000003	f	{}	A_legitimate	fund.investment-strategy
+attr.fund.legal_counsel	Legal Counsel	fund	string		a0081000-0000-0000-0000-000000000009	f	{}	A_legitimate	fund.legal-counsel
+attr.fund.lock_up_period	Lock-Up Period	fund	string		a0081000-0000-0000-0000-000000000012	f	{}	A_legitimate	fund.lock-up-period
+attr.fund.prime_broker	Prime Broker	fund	string		a0081000-0000-0000-0000-000000000007	f	{}	A_legitimate	fund.prime-broker
+attr.fund.redemption_frequency	Redemption Frequency	fund	string		a0081000-0000-0000-0000-000000000011	f	{}	A_legitimate	fund.redemption-frequency
+attr.identity.country_of_birth	Country of Birth	identity	string		a0010000-0000-0000-0000-000000000007	f	{}	A_legitimate	identity.country-of-birth
+attr.identity.date_of_birth	Date of Birth	identity	date		1211e18e-fffe-5e17-9836-fb3cd70452d3	f	"{""domain"": ""kyc"", ""rust_type"": ""DateOfBirth""}"	A_legitimate	identity.date-of-birth
+attr.identity.dual_nationalities	Additional Nationalities	identity	json		a0010000-0000-0000-0000-000000000010	f	{}	A_legitimate	identity.dual-nationalities
+attr.identity.family_name	Family Name / Surname	identity	string		a0010000-0000-0000-0000-000000000003	f	{}	A_legitimate	identity.family-name
+attr.identity.father_name	Father's Name	identity	string		a0010000-0000-0000-0000-000000000017	f	{}	A_legitimate	identity.father-name
+attr.identity.first_name	First Name	identity	string		3020d46f-472c-5437-9647-1b0682c35935	f	"{""domain"": ""kyc"", ""rust_type"": ""FirstName""}"	A_legitimate	identity.first-name
+attr.identity.former_names	Former Names / Aliases	identity	json		a0010000-0000-0000-0000-000000000014	f	{}	A_legitimate	identity.former-names
+attr.identity.full_name	Full Legal Name	identity	string		a0010000-0000-0000-0000-000000000001	f	{}	A_legitimate	identity.full-name
+attr.identity.gender	Gender	identity	string		a0010000-0000-0000-0000-000000000008	f	{}	A_legitimate	identity.gender
+attr.identity.given_name	Given Name(s) / First Name	identity	string		a0010000-0000-0000-0000-000000000002	f	{}	A_legitimate	identity.given-name
+attr.identity.incorporation_date	Date of Incorporation	identity	date		132a5d3c-e809-5978-ab54-ccacfcbeb4aa	f	"{""domain"": ""kyc"", ""rust_type"": ""IncorporationDate""}"	A_legitimate	identity.incorporation-date
+attr.identity.last_name	Last Name	identity	string		0af112fd-ec04-5938-84e8-6e5949db0b52	f	"{""domain"": ""kyc"", ""rust_type"": ""LastName""}"	A_legitimate	identity.last-name
+attr.identity.legal_name	Legal Entity Name	identity	string		d655aadd-3605-5490-80be-20e6202b004b	f	"{""domain"": ""kyc"", ""rust_type"": ""LegalEntityName""}"	A_legitimate	identity.legal-name
+attr.identity.maiden_name	Maiden Name / Birth Name	identity	string		a0010000-0000-0000-0000-000000000013	f	{}	A_legitimate	identity.maiden-name
+attr.identity.marital_status	Marital Status	identity	string		a0010000-0000-0000-0000-000000000015	f	{}	A_legitimate	identity.marital-status
+attr.identity.middle_names	Middle Name(s)	identity	string		a0010000-0000-0000-0000-000000000004	f	{}	A_legitimate	identity.middle-names
+attr.identity.mother_name	Mother's Name	identity	string		a0010000-0000-0000-0000-000000000018	f	{}	A_legitimate	identity.mother-name
+attr.identity.nationality	Nationality / Citizenship	identity	string		33d0752b-a92c-5e20-8559-43ab3668ecf5	f	"{""domain"": ""kyc"", ""format"": ""ISO-3166-1 alpha-2"", ""rust_type"": ""Nationality""}"	A_legitimate	identity.nationality
+attr.identity.passport_number	Passport Number	identity	string		c09501c7-2ea9-5ad7-b330-7d664c678e37	f	"{""domain"": ""kyc"", ""rust_type"": ""PassportNumber""}"	A_legitimate	identity.passport-number
+attr.identity.photo	Photograph	identity	string		a0010000-0000-0000-0000-000000000011	f	{}	A_legitimate	identity.photo
+attr.identity.place_of_birth	Place of Birth	identity	string		a0010000-0000-0000-0000-000000000006	f	{}	A_legitimate	identity.place-of-birth
+attr.identity.registration_number	Company Registration Number	identity	string		57b3ac74-182e-5ca6-b94c-46ee2a05998b	f	"{""domain"": ""kyc"", ""rust_type"": ""RegistrationNumber""}"	A_legitimate	identity.registration-number
+attr.identity.signature	Signature	identity	string		a0010000-0000-0000-0000-000000000012	f	{}	A_legitimate	identity.signature
+attr.identity.spouse_name	Spouse Name	identity	string		a0010000-0000-0000-0000-000000000016	f	{}	A_legitimate	identity.spouse-name
+attr.isda.csa_governing_law	CSA Governing Law	isda	string		a0110000-0000-0000-0000-000000000005	f	{}	A_legitimate	isda.csa-governing-law
+attr.isda.eligible_collateral	Eligible Collateral	isda	json		a0110000-0000-0000-0000-000000000009	f	{}	A_legitimate	isda.eligible-collateral
+attr.isda.master_date	ISDA Master Agreement Date	isda	date		a0110000-0000-0000-0000-000000000001	f	{}	A_legitimate	isda.master-date
+attr.isda.master_version	ISDA Master Version	isda	string		a0110000-0000-0000-0000-000000000002	f	{}	A_legitimate	isda.master-version
+attr.isda.netting_agreement	Cross-Agreement Netting	isda	boolean		a0110000-0000-0000-0000-000000000011	f	{}	A_legitimate	isda.netting-agreement
+attr.isda.rounding	CSA Rounding	isda	currency		a0110000-0000-0000-0000-000000000008	f	{}	A_legitimate	isda.rounding
+attr.isda.threshold_amount	CSA Threshold Amount	isda	currency		a0110000-0000-0000-0000-000000000006	f	{}	A_legitimate	isda.threshold-amount
+attr.isda.valuation_agent	Valuation Agent	isda	string		a0110000-0000-0000-0000-000000000010	f	{}	A_legitimate	isda.valuation-agent
+attr.partnership.commitment_amount	Capital Commitment	partnership	currency		a0120000-0000-0000-0000-000000000003	f	{}	A_legitimate	partnership.commitment-amount
+attr.partnership.contributed_capital	Contributed Capital	partnership	currency		a0120000-0000-0000-0000-000000000004	f	{}	A_legitimate	partnership.contributed-capital
+attr.partnership.general_partner	General Partner	partnership	string		a0120000-0000-0000-0000-000000000002	f	{}	A_legitimate	partnership.general-partner
+attr.partnership.partnership_interest	Partnership Interest %	partnership	percentage		a0120000-0000-0000-0000-000000000006	f	{}	A_legitimate	partnership.partnership-interest
+attr.partnership.partnership_name	Partnership Name	partnership	string		a0120000-0000-0000-0000-000000000001	f	{}	A_legitimate	partnership.partnership-name
+attr.partnership.unfunded_commitment	Unfunded Commitment	partnership	currency		a0120000-0000-0000-0000-000000000005	f	{}	A_legitimate	partnership.unfunded-commitment
+attr.regulatory.pep_position	PEP Position Held	risk	string		a0090000-0000-0000-0000-000000000007	f	{}	A_legitimate	regulatory.pep-position
+attr.regulatory.pep_status	PEP Status	risk	boolean		a0090000-0000-0000-0000-000000000005	f	{}	A_legitimate	regulatory.pep-status
+attr.regulatory.pep_type	PEP Type	risk	string		a0090000-0000-0000-0000-000000000006	f	{}	A_legitimate	regulatory.pep-type
+attr.regulatory.risk_rating	KYC Risk Rating	risk	string		a0090000-0000-0000-0000-000000000010	f	{}	A_legitimate	regulatory.risk-rating
+attr.regulatory.sanctions_lists_checked	Sanctions Lists Checked	risk	json		a0090000-0000-0000-0000-000000000009	f	{}	A_legitimate	regulatory.sanctions-lists-checked
+attr.regulatory.sanctions_status	Sanctions Status	risk	string		a0090000-0000-0000-0000-000000000008	f	{}	A_legitimate	regulatory.sanctions-status
+attr.risk.investment_experience	Years of Investment Experience	risk	integer		9847bf4f-8267-51e8-a8d9-118bc8b3f7d3	f	"{""domain"": ""kyc"", ""rust_type"": ""InvestmentExperience""}"	A_legitimate	risk.investment-experience
+attr.risk.previous_losses	Previous Investment Losses (%)	risk	percentage		4158c41d-5d91-5dce-baee-3ee1a5adfbaa	f	"{""domain"": ""kyc"", ""rust_type"": ""PreviousLosses""}"	A_legitimate	risk.previous-losses
+attr.risk.profile	Risk Profile	risk	string		03fd956a-f49c-5e3d-9be9-b1df4f1ab1b7	f	"{""domain"": ""kyc"", ""rust_type"": ""RiskProfile""}"	A_legitimate	risk.profile
+attr.risk.tolerance	Risk Tolerance Score	risk	integer		ebf1665d-e64f-5d55-b44c-62a486adbfd5	f	"{""domain"": ""kyc"", ""rust_type"": ""RiskTolerance""}"	A_legitimate	risk.tolerance
+attr.tax.additional_tax_residences	Additional Tax Residences	tax	json		a0050000-0000-0000-0000-000000000004	f	{}	A_legitimate	tax.additional-tax-residences
+attr.tax.chapter3_status	Chapter 3 Status	tax	string	us_withholding	0fd8670c-ea60-4f65-b905-ea9aa5f05538	f	{}	A_legitimate	tax.chapter3-status
+attr.tax.chapter4_status	Chapter 4 Status (FATCA)	tax	string	us_withholding	37d7340b-be43-44d4-b355-dfbded89ba8a	f	{}	A_legitimate	tax.chapter4-status
+attr.tax.crs_status	CRS Entity Classification	tax	string		a0050000-0000-0000-0000-000000000007	f	{}	A_legitimate	tax.crs-status
+attr.tax.effectively_connected	Effectively Connected Income	tax	boolean	us_withholding	2315f8b0-0471-4405-8470-5d68eb2d3bb6	f	{}	A_legitimate	tax.effectively-connected
+attr.tax.ein	Employer Identification Number (EIN)	tax	string		a0050000-0000-0000-0000-000000000010	f	{}	A_legitimate	tax.ein
+attr.tax.fatca_status	FATCA Status	tax	string		a0050000-0000-0000-0000-000000000006	f	{}	A_legitimate	tax.fatca-status
+attr.tax.ftin	Foreign Tax ID Number	tax	string	foreign_tax	ddc5b43f-0b29-4f7f-92c1-484914c59004	f	{}	A_legitimate	tax.ftin
+attr.tax.giin	GIIN (FATCA)	tax	string		a0050000-0000-0000-0000-000000000005	f	{}	A_legitimate	tax.giin
+attr.tax.gross_pay_ytd	Gross Pay Year to Date	tax	currency	employment	a5d97454-a509-4074-a2a9-40680955b118	f	{}	A_legitimate	tax.gross-pay-ytd
+attr.tax.jurisdiction	Tax Jurisdiction	tax	string		b2e9228e-8ec7-56a0-9fbc-db5b61f0dd46	f	"{""domain"": ""kyc"", ""format"": ""ISO-3166-1 alpha-2"", ""rust_type"": ""TaxJurisdiction""}"	A_legitimate	tax.jurisdiction
+attr.tax.lob_provision	LOB Provision Met	tax	string	treaty	f88865cc-67fa-4137-96a3-47bf844d02c3	f	{}	A_legitimate	tax.lob-provision
+attr.tax.ni_contributions_ytd	NI Contributions Year to Date	tax	currency	uk_tax	1ccf0e18-a8ef-4cd5-b3df-03fac0679222	f	{}	A_legitimate	tax.ni-contributions-ytd
+attr.tax.ni_number	National Insurance Number	tax	string	uk_tax	2b51535f-a61a-4bb3-a7d8-8ee29fba5980	f	{}	A_legitimate	tax.ni-number
+attr.tax.partner_capital_account	Partner Capital Account	tax	currency	partnership_tax	514543f7-4f42-4980-9740-3209e69d18d1	f	{}	A_legitimate	tax.partner-capital-account
+attr.tax.partner_ownership_pct	Partner Ownership Percentage	tax	percentage	partnership_tax	3d6e8fa5-3b0f-4297-9d18-01b3fa334cd6	f	{}	A_legitimate	tax.partner-ownership-pct
+attr.tax.partner_share_income	Partner Share of Income	tax	currency	partnership_tax	b9ceb50e-094d-4f3d-b9ab-1e926b2ccd13	f	{}	A_legitimate	tax.partner-share-income
+attr.tax.partner_share_loss	Partner Share of Loss	tax	currency	partnership_tax	51908c26-7495-46a9-abc0-5b4e4eff7bd8	f	{}	A_legitimate	tax.partner-share-loss
+attr.tax.paye_reference	PAYE Reference	tax	string	uk_tax	ff92207e-7498-4431-963c-1667d820df42	f	{}	A_legitimate	tax.paye-reference
+attr.tax.tax_code	Tax Code	tax	string	uk_tax	0b525607-9374-4b1e-a334-10ed859d87d7	f	{}	A_legitimate	tax.tax-code
+attr.tax.tax_deducted_ytd	Tax Deducted Year to Date	tax	currency	employment	6c738151-f873-441c-a32e-346c535c4f67	f	{}	A_legitimate	tax.tax-deducted-ytd
+attr.tax.tax_residence	Tax Residence Country	tax	string		a0050000-0000-0000-0000-000000000003	f	{}	A_legitimate	tax.tax-residence
+attr.tax.tin	Tax Identification Number	tax	string		eb142648-38b2-5c63-b1d4-1bbc251f2d50	f	"{""domain"": ""kyc"", ""rust_type"": ""TaxIdentificationNumber""}"	A_legitimate	tax.tin
+attr.tax.treaty_article	Treaty Article	tax	string	treaty	757d96e9-e7a3-40f1-85ac-c5446b233ffe	f	{}	A_legitimate	tax.treaty-article
+attr.tax.treaty_benefits	Tax Treaty Benefits Eligibility	tax	boolean		f1726fda-b3e2-579a-b5ca-c1a63f238b47	f	"{""domain"": ""kyc"", ""rust_type"": ""TaxTreatyBenefits""}"	A_legitimate	tax.treaty-benefits
+attr.tax.treaty_country	Treaty Country	tax	string	treaty	36495baf-daee-44ee-a53f-997d8c1f3cc2	f	{}	A_legitimate	tax.treaty-country
+attr.tax.treaty_withholding_rate	Treaty Withholding Rate	tax	percentage	treaty	f9ec32ee-f05f-4a5d-9292-d05b9b9577de	f	{}	A_legitimate	tax.treaty-withholding-rate
+attr.tax.us_branch	US Branch	tax	boolean	us_withholding	bb7c1cf0-b051-4e64-8fd9-9a16370c6ad7	f	{}	A_legitimate	tax.us-branch
+attr.tax.us_indicia	US Indicia Present	tax	json		a0050000-0000-0000-0000-000000000009	f	{}	A_legitimate	tax.us-indicia
+attr.tax.us_person	US Person Status	tax	boolean		a0050000-0000-0000-0000-000000000008	f	{}	A_legitimate	tax.us-person
+attr.tax.us_tin	US Tax ID (EIN/SSN/ITIN)	tax	string	us_tax	1da481dc-c37c-46d9-9c04-b476395a8aa8	f	{}	A_legitimate	tax.us-tin
+attr.tax.utr	Unique Taxpayer Reference	tax	string	uk_tax	1153560e-46b9-4738-8832-702166c0e0d1	f	{}	A_legitimate	tax.utr
+attr.tax.vat_number	VAT / GST Number	tax	string		a0050000-0000-0000-0000-000000000002	f	{}	A_legitimate	tax.vat-number
+attr.tax.withholding_rate	Withholding Tax Rate	tax	percentage		39d06b7b-5c7b-55e6-80b5-ca78776380d6	f	"{""domain"": ""kyc"", ""rust_type"": ""WithholdingRate""}"	A_legitimate	tax.withholding-rate
+attr.trust.beneficiaries	Beneficiaries	trust	json		a0080000-0000-0000-0000-000000000008	f	{}	A_legitimate	trust.beneficiaries
+attr.trust.establishment_date	Trust Establishment Date	trust	date		a0080000-0000-0000-0000-000000000003	f	{}	A_legitimate	trust.establishment-date
+attr.trust.governing_law	Trust Governing Law	trust	string		a0080000-0000-0000-0000-000000000004	f	{}	A_legitimate	trust.governing-law
+attr.trust.is_revocable	Is Revocable	trust	boolean		a0080000-0000-0000-0000-000000000009	f	{}	A_legitimate	trust.is-revocable
+attr.trust.protector	Trust Protector	trust	string		a0080000-0000-0000-0000-000000000007	f	{}	A_legitimate	trust.protector
+attr.trust.settlor	Settlor / Grantor	trust	string		a0080000-0000-0000-0000-000000000005	f	{}	A_legitimate	trust.settlor
+attr.trust.termination_date	Trust Termination Date	trust	date		a0080000-0000-0000-0000-000000000010	f	{}	A_legitimate	trust.termination-date
+attr.trust.trust_name	Trust Name	trust	string		a0080000-0000-0000-0000-000000000001	f	{}	A_legitimate	trust.trust-name
+attr.trust.trust_type	Trust Type	trust	string		a0080000-0000-0000-0000-000000000002	f	{}	A_legitimate	trust.trust-type
+attr.trust.trustees	Trustees	trust	json		a0080000-0000-0000-0000-000000000006	f	{}	A_legitimate	trust.trustees
+attr.ubo.beneficial_owner_name	Beneficial Owner Name	ubo	string		a0070000-0000-0000-0000-000000000001	f	{}	A_legitimate	ubo.beneficial-owner-name
+attr.ubo.date_became_ubo	Date Became UBO	ubo	date		a0070000-0000-0000-0000-000000000008	f	{}	A_legitimate	ubo.date-became-ubo
+attr.ubo.date_of_birth	UBO Date of Birth	ubo	date		24fcc98b-9bd1-599d-a437-1aa1f5983805	f	"{""domain"": ""kyc"", ""rust_type"": ""UboDateOfBirth""}"	A_legitimate	ubo.date-of-birth
+attr.ubo.full_name	UBO Full Name	ubo	string		a554d5a5-5848-550f-a9bb-bac21b2ab944	f	"{""domain"": ""kyc"", ""rust_type"": ""UboFullName""}"	A_legitimate	ubo.full-name
+attr.ubo.intermediate_entities	Intermediate Entities	ubo	json	beneficial_ownership	a3f9054a-df75-4d50-9580-d6aed3c105b9	f	{}	A_legitimate	ubo.intermediate-entities
+attr.ubo.is_nominee	Is Nominee / Custodian	ubo	boolean		a0070000-0000-0000-0000-000000000006	f	{}	A_legitimate	ubo.is-nominee
+attr.ubo.is_pep	Is Politically Exposed Person	ubo	boolean	pep	e1c39456-605b-43c4-84a9-22caa0290f1f	f	{}	A_legitimate	ubo.is-pep
+attr.ubo.layers_to_ubo	Layers to UBO	ubo	integer	beneficial_ownership	e04a4886-0451-4279-a4fc-3bf512667424	f	{}	A_legitimate	ubo.layers-to-ubo
+attr.ubo.nationality	UBO Nationality	ubo	string		5de8ab61-c941-5ee6-b21a-57706b3b116e	f	"{""domain"": ""kyc"", ""format"": ""ISO-3166-1 alpha-2"", ""rust_type"": ""UboNationality""}"	A_legitimate	ubo.nationality
+attr.ubo.nominator	Nominator / True Owner	ubo	string		a0070000-0000-0000-0000-000000000007	f	{}	A_legitimate	ubo.nominator
+attr.ubo.nominee_arrangement	Nominee Arrangement	ubo	boolean	beneficial_ownership	1e0daa83-9b4c-44dc-9d57-23f27356a66d	f	{}	A_legitimate	ubo.nominee-arrangement
+attr.ubo.nominee_name	Nominee Name	ubo	string	beneficial_ownership	1f5a79c9-acdc-4fcc-acb5-7b1dbe052f90	f	{}	A_legitimate	ubo.nominee-name
+attr.ubo.ownership_chain	Ownership Chain	ubo	json		a0070000-0000-0000-0000-000000000005	f	{}	A_legitimate	ubo.ownership-chain
+attr.ubo.ownership_percentage	Ownership Percentage	ubo	percentage		ff6f6374-f86e-5cb5-9d0f-ad6994022ce7	f	"{""domain"": ""kyc"", ""rust_type"": ""UboOwnershipPercentage""}"	A_legitimate	ubo.ownership-percentage
+attr.ubo.pep_category	PEP Category	ubo	string	pep	b7fc65d3-cda7-4aef-95d3-7b15129823ea	f	{}	A_legitimate	ubo.pep-category
+attr.ubo.psc_nature_of_control	PSC Nature of Control	ubo	json	uk_psc	e1078ce0-9c51-4f6b-8687-d975354b9a3c	f	{}	A_legitimate	ubo.psc-nature-of-control
+attr.ubo.share_class	Share Class	ubo	string		a0070000-0000-0000-0000-000000000009	f	{}	A_legitimate	ubo.share-class
+attr.ubo.voting_percentage	Voting Rights Percentage	ubo	percentage		a0070000-0000-0000-0000-000000000003	f	{}	A_legitimate	ubo.voting-percentage

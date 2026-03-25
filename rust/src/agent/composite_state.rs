@@ -154,9 +154,17 @@ impl GroupCompositeState {
         // ── Layer 2: CBUs exist? ─────────────────────────────────
         if self.cbu_count == 0 {
             self.next_likely_verbs.push(ScoredVerbHint {
-                verb_fqn: "cbu.create".into(),
+                verb_fqn: "cbu.ensure".into(),
                 boost: 0.12,
-                reason: "No CBUs in group — identify revenue units".into(),
+                reason: "No controlled CBU linked yet — confirm or add the target operating unit"
+                    .into(),
+            });
+            self.next_likely_verbs.push(ScoredVerbHint {
+                verb_fqn: "cbu.create".into(),
+                boost: 0.08,
+                reason:
+                    "No controlled CBU linked yet — create one only if it does not already exist"
+                        .into(),
             });
             // Block per-CBU verbs
             for d in &["kyc-case", "screening", "document", "custody"] {
@@ -242,6 +250,11 @@ impl GroupCompositeState {
 
         // Layer 6: All done → status queries
         if cbus_kyc_approved > 0 && cbus_without_case == 0 && cbus_without_screening == 0 {
+            self.next_likely_verbs.push(ScoredVerbHint {
+                verb_fqn: "deal.request-onboarding".into(),
+                boost: 0.08,
+                reason: "Delta KYC cleared — hand off the contracted deal into onboarding".into(),
+            });
             self.next_likely_verbs.push(ScoredVerbHint {
                 verb_fqn: "kyc-case.read".into(),
                 boost: 0.06,

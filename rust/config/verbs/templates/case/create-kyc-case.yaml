@@ -15,7 +15,7 @@ metadata:
     This is typically the first step in the KYC workflow.
 
   when_to_use:
-    - Starting new client onboarding
+    - Starting onboarding for an existing client structure
     - Initiating periodic review
     - Workflow blocker shows "no_kyc_case"
 

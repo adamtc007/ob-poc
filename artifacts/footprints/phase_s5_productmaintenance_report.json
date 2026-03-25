@@ -1,0 +1,629 @@
+{
+  "families": [
+    "product_service_taxonomy"
+  ],
+  "generated_at": "2026-03-25T13:57:12.330348+00:00",
+  "repo_revision": "56b2f9b413f2b5ddc2c6ba269ad8cb610e18c7a4",
+  "slice_id": "S5",
+  "subject_kinds": [
+    "attribute",
+    "product",
+    "service",
+    "service-resource"
+  ],
+  "verb_count": 47,
+  "verbs": [
+    {
+      "constellation_families": [
+        "product_service_taxonomy"
+      ],
+      "domain": "attribute",
+      "fqn": "attribute.check-coverage",
+      "subject_kinds": [
+        "attribute",
+        "product",
+        "service",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "product_service_taxonomy"
+      ],
+      "domain": "attribute",
+      "fqn": "attribute.classify",
+      "subject_kinds": [
+        "attribute",
+        "product",
+        "service",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "product_service_taxonomy"
+      ],
+      "domain": "attribute",
+      "fqn": "attribute.define",
+      "subject_kinds": [
+        "attribute",
+        "product",
+        "service",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "product_service_taxonomy"
+      ],
+      "domain": "attribute",
+      "fqn": "attribute.define-derived",
+      "subject_kinds": [
+        "attribute",
+        "product",
+        "service",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "product_service_taxonomy"
+      ],
+      "domain": "attribute",
+      "fqn": "attribute.deprecate",
+      "subject_kinds": [
+        "attribute",
+        "product",
+        "service",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "product_service_taxonomy"
+      ],
+      "domain": "attribute",
+      "fqn": "attribute.inspect",
+      "subject_kinds": [
+        "attribute",
+        "product",
+        "service",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "product_service_taxonomy"
+      ],
+      "domain": "attribute",
+      "fqn": "attribute.list",
+      "subject_kinds": [
+        "attribute",
+        "product",
+        "service",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "product_service_taxonomy"
+      ],
+      "domain": "attribute",
+      "fqn": "attribute.list-by-document",
+      "subject_kinds": [
+        "attribute",
+        "product",
+        "service",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "product_service_taxonomy"
+      ],
+      "domain": "attribute",
+      "fqn": "attribute.list-sinks",
+      "subject_kinds": [
+        "attribute",
+        "product",
+        "service",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "product_service_taxonomy"
+      ],
+      "domain": "attribute",
+      "fqn": "attribute.list-sources",
+      "subject_kinds": [
+        "attribute",
+        "product",
+        "service",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "product_service_taxonomy"
+      ],
+      "domain": "attribute",
+      "fqn": "attribute.map-to-document",
+      "subject_kinds": [
+        "attribute",
+        "product",
+        "service",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "product_service_taxonomy"
+      ],
+      "domain": "attribute",
+      "fqn": "attribute.read",
+      "subject_kinds": [
+        "attribute",
+        "product",
+        "service",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "product_service_taxonomy"
+      ],
+      "domain": "attribute",
+      "fqn": "attribute.set-evidence-grade",
+      "subject_kinds": [
+        "attribute",
+        "product",
+        "service",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "product_service_taxonomy"
+      ],
+      "domain": "attribute",
+      "fqn": "attribute.trace-lineage",
+      "subject_kinds": [
+        "attribute",
+        "product",
+        "service",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "product_service_taxonomy"
+      ],
+      "domain": "attribute",
+      "fqn": "attribute.unmap-from-document",
+      "subject_kinds": [
+        "attribute",
+        "product",
+        "service",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "product_service_taxonomy"
+      ],
+      "domain": "attribute",
+      "fqn": "attribute.update",
+      "subject_kinds": [
+        "attribute",
+        "product",
+        "service",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "product_service_taxonomy"
+      ],
+      "domain": "product",
+      "fqn": "product.list",
+      "subject_kinds": [
+        "attribute",
+        "product",
+        "service",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "product_service_taxonomy"
+      ],
+      "domain": "product",
+      "fqn": "product.read",
+      "subject_kinds": [
+        "attribute",
+        "product",
+        "service",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "product_service_taxonomy"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.activate",
+      "subject_kinds": [
+        "attribute",
+        "product",
+        "service",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "product_service_taxonomy"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.activate-lifecycle",
+      "subject_kinds": [
+        "attribute",
+        "product",
+        "service",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "product_service_taxonomy"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.analyze-lifecycle-gaps",
+      "subject_kinds": [
+        "attribute",
+        "product",
+        "service",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "product_service_taxonomy"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.check-lifecycle-readiness",
+      "subject_kinds": [
+        "attribute",
+        "product",
+        "service",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "product_service_taxonomy"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.decommission",
+      "subject_kinds": [
+        "attribute",
+        "product",
+        "service",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "product_service_taxonomy"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.decommission-lifecycle",
+      "subject_kinds": [
+        "attribute",
+        "product",
+        "service",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "product_service_taxonomy"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.discover-lifecycles",
+      "subject_kinds": [
+        "attribute",
+        "product",
+        "service",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "product_service_taxonomy"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.execute-lifecycle-plan",
+      "subject_kinds": [
+        "attribute",
+        "product",
+        "service",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "product_service_taxonomy"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.generate-lifecycle-plan",
+      "subject_kinds": [
+        "attribute",
+        "product",
+        "service",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "product_service_taxonomy"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.list",
+      "subject_kinds": [
+        "attribute",
+        "product",
+        "service",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "product_service_taxonomy"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.list-attributes",
+      "subject_kinds": [
+        "attribute",
+        "product",
+        "service",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "product_service_taxonomy"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.list-by-service",
+      "subject_kinds": [
+        "attribute",
+        "product",
+        "service",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "product_service_taxonomy"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.list-lifecycle-instances",
+      "subject_kinds": [
+        "attribute",
+        "product",
+        "service",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "product_service_taxonomy"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.list-lifecycle-resource-types",
+      "subject_kinds": [
+        "attribute",
+        "product",
+        "service",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "product_service_taxonomy"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.list-lifecycles",
+      "subject_kinds": [
+        "attribute",
+        "product",
+        "service",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "product_service_taxonomy"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.list-lifecycles-by-instrument",
+      "subject_kinds": [
+        "attribute",
+        "product",
+        "service",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "product_service_taxonomy"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.list-resources-for-lifecycle",
+      "subject_kinds": [
+        "attribute",
+        "product",
+        "service",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "product_service_taxonomy"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.provision",
+      "subject_kinds": [
+        "attribute",
+        "product",
+        "service",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "product_service_taxonomy"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.provision-lifecycle",
+      "subject_kinds": [
+        "attribute",
+        "product",
+        "service",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "product_service_taxonomy"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.read",
+      "subject_kinds": [
+        "attribute",
+        "product",
+        "service",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "product_service_taxonomy"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.read-lifecycle",
+      "subject_kinds": [
+        "attribute",
+        "product",
+        "service",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "product_service_taxonomy"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.read-lifecycle-resource-type",
+      "subject_kinds": [
+        "attribute",
+        "product",
+        "service",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "product_service_taxonomy"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.set-attr",
+      "subject_kinds": [
+        "attribute",
+        "product",
+        "service",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "product_service_taxonomy"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.suspend",
+      "subject_kinds": [
+        "attribute",
+        "product",
+        "service",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "product_service_taxonomy"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.suspend-lifecycle",
+      "subject_kinds": [
+        "attribute",
+        "product",
+        "service",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "product_service_taxonomy"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.validate-attrs",
+      "subject_kinds": [
+        "attribute",
+        "product",
+        "service",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "product_service_taxonomy"
+      ],
+      "domain": "service",
+      "fqn": "service.list",
+      "subject_kinds": [
+        "attribute",
+        "product",
+        "service",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "product_service_taxonomy"
+      ],
+      "domain": "service",
+      "fqn": "service.list-by-product",
+      "subject_kinds": [
+        "attribute",
+        "product",
+        "service",
+        "service-resource"
+      ]
+    },
+    {
+      "constellation_families": [
+        "product_service_taxonomy"
+      ],
+      "domain": "service",
+      "fqn": "service.read",
+      "subject_kinds": [
+        "attribute",
+        "product",
+        "service",
+        "service-resource"
+      ]
+    }
+  ],
+  "workspace": "ProductMaintenance"
+}

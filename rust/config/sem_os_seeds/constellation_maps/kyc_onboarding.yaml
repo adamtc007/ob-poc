@@ -1,5 +1,5 @@
 constellation: kyc.onboarding
-description: KYC onboarding lifecycle constellation — per-CBU case management, entity workstreams, screening, and tollgate approval. Evidence/documents are a separate constellation (evidence.collection) referenced by dependency.
+description: KYC onboarding lifecycle constellation — per-CBU delta case management, screening, and tollgate approval on top of a previously cleared group UBO/control perimeter. Evidence/documents are a separate constellation (evidence.collection) referenced by dependency.
 jurisdiction: ALL
 slots:
   cbu:
@@ -8,16 +8,36 @@ slots:
     pk: cbu_id
     cardinality: root
     # cbu.read/show are navigation — owned by group.ownership constellation.
-    # KYC reads the CBU but does not create/modify it.
+    # KYC reads the CBU after it has inherited the group's baseline clearance.
     verbs:
       show: { verb: cbu.show, when: filled }
+  client_group:
+    type: cbu
+    table: client_group
+    pk: group_id
+    join: { via: client_group_entity, parent_fk: cbu_id, child_fk: group_id }
+    cardinality: optional
+    depends_on: [cbu]
+    state_machine: client_group_lifecycle
+    verbs: {}
+  group_kyc_clearance:
+    type: case
+    table: cases
+    pk: case_id
+    join: { via: cases, parent_fk: client_group_id, child_fk: case_id }
+    cardinality: optional
+    depends_on: [{ slot: client_group, min_state: group_kyc_cleared }]
+    state_machine: kyc_case_lifecycle
+    verbs:
+      read: { verb: kyc-case.read, when: filled }
+      state: { verb: kyc-case.state, when: filled }
   kyc_case:
     type: case
     table: cases
     pk: case_id
     join: { via: cases, parent_fk: cbu_id, child_fk: case_id }
     cardinality: mandatory
-    depends_on: [cbu]
+    depends_on: [cbu, { slot: group_kyc_clearance, min_state: approved }]
     state_machine: kyc_case_lifecycle
     verbs:
       create: { verb: kyc-case.create, when: empty }

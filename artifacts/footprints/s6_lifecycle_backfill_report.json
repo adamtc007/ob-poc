@@ -1,0 +1,443 @@
+{
+  "derived_entry_count": 20,
+  "entries": [
+    {
+      "domain": "billing",
+      "evidence_source": [
+        "state_machine",
+        "yaml_lifecycle"
+      ],
+      "fqn": "billing.generate-invoice",
+      "node_state_gates": [],
+      "postconditions": [
+        "lifecycle or status state updated"
+      ],
+      "preconditions": [
+        "required args present: period-id"
+      ],
+      "rationale": "Derived from lifecycle/state-machine participation and required arguments",
+      "workspace_affinity": [
+        "Deal"
+      ]
+    },
+    {
+      "domain": "billing",
+      "evidence_source": [
+        "state_machine",
+        "yaml_lifecycle"
+      ],
+      "fqn": "billing.review-period",
+      "node_state_gates": [],
+      "postconditions": [
+        "lifecycle or status state updated"
+      ],
+      "preconditions": [
+        "required args present: period-id, reviewed-by"
+      ],
+      "rationale": "Derived from lifecycle/state-machine participation and required arguments",
+      "workspace_affinity": [
+        "Deal"
+      ]
+    },
+    {
+      "domain": "cbu-custody",
+      "evidence_source": [
+        "state_machine",
+        "yaml_lifecycle"
+      ],
+      "fqn": "cbu-custody.lookup-ssi",
+      "node_state_gates": [],
+      "postconditions": [
+        "lifecycle or status state updated"
+      ],
+      "preconditions": [
+        "required args present: cbu-id, currency, instrument-class",
+        "lookup entities resolve: cbu"
+      ],
+      "rationale": "Derived from lifecycle/state-machine participation and required arguments",
+      "workspace_affinity": [
+        "CBU",
+        "InstrumentMatrix"
+      ]
+    },
+    {
+      "domain": "cbu-custody",
+      "evidence_source": [
+        "state_machine",
+        "yaml_lifecycle"
+      ],
+      "fqn": "cbu-custody.validate-booking-coverage",
+      "node_state_gates": [],
+      "postconditions": [
+        "lifecycle or status state updated"
+      ],
+      "preconditions": [
+        "required args present: cbu-id",
+        "lookup entities resolve: cbu"
+      ],
+      "rationale": "Derived from lifecycle/state-machine participation and required arguments",
+      "workspace_affinity": [
+        "CBU",
+        "InstrumentMatrix"
+      ]
+    },
+    {
+      "domain": "client-principal-relationship",
+      "evidence_source": [
+        "state_machine",
+        "yaml_lifecycle"
+      ],
+      "fqn": "client-principal-relationship.cross-sell-check",
+      "node_state_gates": [],
+      "postconditions": [
+        "lifecycle or status state updated"
+      ],
+      "preconditions": [
+        "required args present: client-group-id",
+        "lookup entities resolve: client_group"
+      ],
+      "rationale": "Derived from lifecycle/state-machine participation and required arguments",
+      "workspace_affinity": [
+        "CBU",
+        "KYC"
+      ]
+    },
+    {
+      "domain": "client-principal-relationship",
+      "evidence_source": [
+        "state_machine",
+        "yaml_lifecycle"
+      ],
+      "fqn": "client-principal-relationship.record",
+      "node_state_gates": [],
+      "postconditions": [
+        "lifecycle or status state updated"
+      ],
+      "preconditions": [
+        "required args present: booking-principal-id, client-group-id, product-offering-id",
+        "lookup entities resolve: client_group"
+      ],
+      "rationale": "Derived from lifecycle/state-machine participation and required arguments",
+      "workspace_affinity": [
+        "CBU",
+        "KYC"
+      ]
+    },
+    {
+      "domain": "contract-pack",
+      "evidence_source": [
+        "state_machine",
+        "yaml_lifecycle"
+      ],
+      "fqn": "contract-pack.add-template",
+      "node_state_gates": [],
+      "postconditions": [
+        "lifecycle or status state updated"
+      ],
+      "preconditions": [
+        "required args present: contract-pack-id, template-type"
+      ],
+      "rationale": "Derived from lifecycle/state-machine participation and required arguments",
+      "workspace_affinity": [
+        "Deal",
+        "OnBoarding"
+      ]
+    },
+    {
+      "domain": "deal",
+      "evidence_source": [
+        "state_machine",
+        "yaml_lifecycle"
+      ],
+      "fqn": "deal.counter-rate-card",
+      "node_state_gates": [],
+      "postconditions": [
+        "lifecycle or status state updated"
+      ],
+      "preconditions": [
+        "required args present: counter-lines, rate-card-id"
+      ],
+      "rationale": "Derived from lifecycle/state-machine participation and required arguments",
+      "workspace_affinity": [
+        "Deal",
+        "OnBoarding"
+      ]
+    },
+    {
+      "domain": "deal",
+      "evidence_source": [
+        "state_machine",
+        "yaml_lifecycle"
+      ],
+      "fqn": "deal.request-onboarding",
+      "node_state_gates": [
+        "contracted"
+      ],
+      "postconditions": [
+        "lifecycle or status state updated"
+      ],
+      "preconditions": [
+        "node state is one of: contracted",
+        "required args present: cbu-id, contract-id, deal-id, product-id",
+        "lookup entities resolve: cbu, product"
+      ],
+      "rationale": "Derived from lifecycle/state-machine participation and required arguments",
+      "workspace_affinity": [
+        "Deal",
+        "OnBoarding"
+      ]
+    },
+    {
+      "domain": "deal",
+      "evidence_source": [
+        "state_machine",
+        "yaml_lifecycle"
+      ],
+      "fqn": "deal.request-onboarding-batch",
+      "node_state_gates": [
+        "contracted"
+      ],
+      "postconditions": [
+        "lifecycle or status state updated"
+      ],
+      "preconditions": [
+        "node state is one of: contracted",
+        "required args present: contract-id, deal-id, requests"
+      ],
+      "rationale": "Derived from lifecycle/state-machine participation and required arguments",
+      "workspace_affinity": [
+        "Deal",
+        "OnBoarding"
+      ]
+    },
+    {
+      "domain": "gleif",
+      "evidence_source": [
+        "state_machine",
+        "yaml_lifecycle"
+      ],
+      "fqn": "gleif.import-to-client-group",
+      "node_state_gates": [
+        "prospect"
+      ],
+      "postconditions": [
+        "lifecycle or status state updated"
+      ],
+      "preconditions": [
+        "node state is one of: prospect",
+        "required args present: group-id, root-lei",
+        "lookup entities resolve: client_group"
+      ],
+      "rationale": "Derived from lifecycle/state-machine participation and required arguments",
+      "workspace_affinity": [
+        "KYC"
+      ]
+    },
+    {
+      "domain": "ownership",
+      "evidence_source": [
+        "state_machine",
+        "yaml_lifecycle"
+      ],
+      "fqn": "ownership.trace-chain",
+      "node_state_gates": [
+        "ubo_mapped"
+      ],
+      "postconditions": [
+        "lifecycle or status state updated"
+      ],
+      "preconditions": [
+        "node state is one of: ubo_mapped",
+        "required args present: from-entity-id, to-entity-id",
+        "lookup entities resolve: entity"
+      ],
+      "rationale": "Derived from lifecycle/state-machine participation and required arguments",
+      "workspace_affinity": [
+        "KYC"
+      ]
+    },
+    {
+      "domain": "pricing-config",
+      "evidence_source": [
+        "state_machine",
+        "yaml_lifecycle"
+      ],
+      "fqn": "pricing-config.find-for-instrument",
+      "node_state_gates": [],
+      "postconditions": [
+        "lifecycle or status state updated"
+      ],
+      "preconditions": [
+        "required args present: cbu-id, instrument-class",
+        "lookup entities resolve: cbu"
+      ],
+      "rationale": "Derived from lifecycle/state-machine participation and required arguments",
+      "workspace_affinity": [
+        "Deal"
+      ]
+    },
+    {
+      "domain": "request",
+      "evidence_source": [
+        "state_machine",
+        "yaml_lifecycle"
+      ],
+      "fqn": "request.cancel",
+      "node_state_gates": [
+        "pending"
+      ],
+      "postconditions": [
+        "lifecycle or status state updated"
+      ],
+      "preconditions": [
+        "node state is one of: pending",
+        "required args present: reason, request-id",
+        "lookup entities resolve: outstanding_request"
+      ],
+      "rationale": "Derived from lifecycle/state-machine participation and required arguments",
+      "workspace_affinity": [
+        "KYC",
+        "OnBoarding"
+      ]
+    },
+    {
+      "domain": "request",
+      "evidence_source": [
+        "state_machine",
+        "yaml_lifecycle"
+      ],
+      "fqn": "request.create",
+      "node_state_gates": [
+        "pending"
+      ],
+      "postconditions": [
+        "lifecycle progresses from the gated state"
+      ],
+      "preconditions": [
+        "node state is one of: pending",
+        "required args present: subject-id, subject-type, subtype, type",
+        "lookup entities resolve: entity"
+      ],
+      "rationale": "Derived from lifecycle/state-machine participation and required arguments",
+      "workspace_affinity": [
+        "KYC",
+        "OnBoarding"
+      ]
+    },
+    {
+      "domain": "request",
+      "evidence_source": [
+        "state_machine",
+        "yaml_lifecycle"
+      ],
+      "fqn": "request.escalate",
+      "node_state_gates": [
+        "received"
+      ],
+      "postconditions": [
+        "lifecycle or status state updated"
+      ],
+      "preconditions": [
+        "node state is one of: received",
+        "required args present: request-id",
+        "lookup entities resolve: outstanding_request"
+      ],
+      "rationale": "Derived from lifecycle/state-machine participation and required arguments",
+      "workspace_affinity": [
+        "KYC",
+        "OnBoarding"
+      ]
+    },
+    {
+      "domain": "trading-profile",
+      "evidence_source": [
+        "state_machine",
+        "yaml_lifecycle"
+      ],
+      "fqn": "trading-profile.approve",
+      "node_state_gates": [
+        "submitted"
+      ],
+      "postconditions": [
+        "lifecycle reaches a terminal or advanced state"
+      ],
+      "preconditions": [
+        "node state is one of: submitted",
+        "required args present: profile-id"
+      ],
+      "rationale": "Derived from lifecycle/state-machine participation and required arguments",
+      "workspace_affinity": [
+        "InstrumentMatrix"
+      ]
+    },
+    {
+      "domain": "trading-profile",
+      "evidence_source": [
+        "state_machine",
+        "yaml_lifecycle"
+      ],
+      "fqn": "trading-profile.archive",
+      "node_state_gates": [
+        "active"
+      ],
+      "postconditions": [
+        "lifecycle or status state updated"
+      ],
+      "preconditions": [
+        "node state is one of: active",
+        "required args present: profile-id"
+      ],
+      "rationale": "Derived from lifecycle/state-machine participation and required arguments",
+      "workspace_affinity": [
+        "InstrumentMatrix"
+      ]
+    },
+    {
+      "domain": "trading-profile",
+      "evidence_source": [
+        "state_machine",
+        "yaml_lifecycle"
+      ],
+      "fqn": "trading-profile.reject",
+      "node_state_gates": [
+        "submitted"
+      ],
+      "postconditions": [
+        "lifecycle reaches a terminal or advanced state"
+      ],
+      "preconditions": [
+        "node state is one of: submitted",
+        "required args present: profile-id, rejection-reason"
+      ],
+      "rationale": "Derived from lifecycle/state-machine participation and required arguments",
+      "workspace_affinity": [
+        "InstrumentMatrix"
+      ]
+    },
+    {
+      "domain": "trading-profile",
+      "evidence_source": [
+        "state_machine",
+        "yaml_lifecycle"
+      ],
+      "fqn": "trading-profile.submit",
+      "node_state_gates": [
+        "draft"
+      ],
+      "postconditions": [
+        "lifecycle or status state updated"
+      ],
+      "preconditions": [
+        "node state is one of: draft",
+        "required args present: profile-id"
+      ],
+      "rationale": "Derived from lifecycle/state-machine participation and required arguments",
+      "workspace_affinity": [
+        "InstrumentMatrix"
+      ]
+    }
+  ],
+  "generated_at": "2026-03-25T13:35:38.970067+00:00",
+  "repo_revision": "56b2f9b413f2b5ddc2c6ba269ad8cb610e18c7a4",
+  "slice_id": "S6.3"
+}

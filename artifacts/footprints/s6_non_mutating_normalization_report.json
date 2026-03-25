@@ -1,0 +1,4577 @@
+{
+  "entries": [
+    {
+      "bucket": "F_system_ui",
+      "domain": "admin.regulators",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "admin.regulators.create",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: code, jurisdiction, name, tier"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "regulators"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "admin.regulators",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "admin.regulators.deactivate",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: code"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "regulators"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "admin.regulators",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "admin.regulators.list",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "regulators"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "admin.regulators",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "admin.regulators.read",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: code"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "regulators"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "admin.regulators",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "admin.regulators.update",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: code"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "regulators"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "admin.regulatory-tiers",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "admin.regulatory-tiers.list",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "regulatory_tiers"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "admin.regulatory-tiers",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "admin.regulatory-tiers.read",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: code"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "regulatory_tiers"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "admin.role-types",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "admin.role-types.create",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: category, code, name"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "role_types"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "admin.role-types",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "admin.role-types.deactivate",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: code"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "role_types"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "admin.role-types",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "admin.role-types.list",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "role_types"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "admin.role-types",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "admin.role-types.read",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: code"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "role_types"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "admin.role-types",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "admin.role-types.update",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: code"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "role_types"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "agent",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "agent.activate-teaching",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "agent",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "agent.confirm-decision",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "agent",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "agent.list-tools",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "agent",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "agent.pause",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "agent",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "agent.read-history",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "agent",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "agent.read-mode",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "agent",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "agent.read-policy",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "agent",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "agent.read-status",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "agent",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "agent.read-teaching-status",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "agent",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "agent.read-telemetry-summary",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "agent",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "agent.reject-decision",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "agent",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "agent.resume",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "agent",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "agent.select-decision-option",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: candidate-index"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "agent",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "agent.set-authoring-mode",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: mode"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "agent",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "agent.set-execution-mode",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: mode"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "agent",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "agent.set-selection-threshold",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "agent",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "agent.start",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: task",
+        "lookup entities resolve: entity"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "entities"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "agent",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "agent.stop",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "attribute",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "attribute.check-coverage",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "required args present: document-type"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [],
+      "workspace_affinity": [
+        "CBU"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "attribute",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "attribute.inspect",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "required args present: id"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [],
+      "workspace_affinity": [
+        "CBU"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "attribute",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "attribute.list-by-document",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "required args present: document-type"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [],
+      "workspace_affinity": [
+        "CBU"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "attribute",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "attribute.list-sinks",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "required args present: attribute"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [],
+      "workspace_affinity": [
+        "CBU"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "attribute",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "attribute.list-sources",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "required args present: attribute"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [],
+      "workspace_affinity": [
+        "CBU"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "attribute",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "attribute.trace-lineage",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "required args present: attribute"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [],
+      "workspace_affinity": [
+        "CBU"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "attributes",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "attributes.gaps",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "required args present: cbu-id"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [
+        "cbus"
+      ],
+      "workspace_affinity": [
+        "CBU"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "batch",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "batch.abort",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "batch",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "batch.add-products",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: cbu-ids, products"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "batch",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "batch.continue",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "batch",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "batch.pause",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "batch",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "batch.resume",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "batch",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "batch.skip",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "batch",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "batch.status",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "billing",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "billing.period-summary",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "required args present: period-id"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [],
+      "workspace_affinity": [
+        "Deal"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "board",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "board.analyze-control",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "required args present: entity-id",
+        "lookup entities resolve: entity"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [
+        "entities"
+      ],
+      "workspace_affinity": [
+        "CBU",
+        "KYC"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "bods",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "bods.discover-ubos",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "required args present: entity-id",
+        "lookup entities resolve: entity"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [
+        "entities"
+      ],
+      "workspace_affinity": [
+        "KYC"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "bods",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "bods.find-by-lei",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "required args present: lei"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [],
+      "workspace_affinity": [
+        "KYC"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "bods",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "bods.get-statement",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "required args present: statement-id"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [],
+      "workspace_affinity": [
+        "KYC"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "bods",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "bods.list-ownership",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "lookup entities resolve: entity"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [
+        "entities"
+      ],
+      "workspace_affinity": [
+        "KYC"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "booking-location",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "booking-location.list",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [],
+      "workspace_affinity": [
+        "CBU",
+        "InstrumentMatrix"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "booking-principal",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "booking-principal.coverage-matrix",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [],
+      "workspace_affinity": [
+        "CBU",
+        "InstrumentMatrix"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "booking-principal",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "booking-principal.gap-report",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [],
+      "workspace_affinity": [
+        "CBU",
+        "InstrumentMatrix"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "bpmn",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "bpmn.compile",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: bpmn-xml"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "capital",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "capital.dilution.get-summary",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "required args present: issuer-entity-id",
+        "lookup entities resolve: entity"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [
+        "entities"
+      ],
+      "workspace_affinity": [
+        "CBU"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "capital",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "capital.dilution.list",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "required args present: issuer-entity-id",
+        "lookup entities resolve: entity"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [
+        "entities"
+      ],
+      "workspace_affinity": [
+        "CBU"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "capital",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "capital.get-ownership-chain",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "required args present: entity-id",
+        "lookup entities resolve: entity"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [
+        "entities"
+      ],
+      "workspace_affinity": [
+        "CBU"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "capital",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "capital.share-class.get-supply",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "required args present: share-class-id"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [
+        "share_classes"
+      ],
+      "workspace_affinity": [
+        "CBU"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "cbu-custody",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "cbu-custody.derive-required-coverage",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "required args present: cbu-id",
+        "lookup entities resolve: cbu"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [
+        "cbus"
+      ],
+      "workspace_affinity": [
+        "CBU",
+        "InstrumentMatrix"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "client-principal-relationship",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "client-principal-relationship.list",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "required args present: client-group-id",
+        "lookup entities resolve: client_group"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [
+        "client_group"
+      ],
+      "workspace_affinity": [
+        "CBU",
+        "KYC"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "constellation",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "constellation.hydrate",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: cbu-id, map-name"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "constellation",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "constellation.summary",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: cbu-id, map-name"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "control",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "control.analyze",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "required args present: entity-id"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [
+        "entities"
+      ],
+      "workspace_affinity": [
+        "KYC"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "control",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "control.show-board-controller",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "required args present: cbu-id"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [
+        "cbus"
+      ],
+      "workspace_affinity": [
+        "KYC"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "control",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "control.trace-chain",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "required args present: from-entity-id, to-entity-id"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [
+        "entities"
+      ],
+      "workspace_affinity": [
+        "KYC"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "deal",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "deal.search-records",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "required args present: query"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [],
+      "workspace_affinity": [
+        "Deal",
+        "OnBoarding"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "discovery",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "discovery.available-actions",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: domain, entity-type"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "discovery",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "discovery.cascade-research",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: query"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "discovery",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "discovery.entity-context",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: entity-id",
+        "lookup entities resolve: entity"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "entities"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "discovery",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "discovery.entity-relationships",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: entity-id",
+        "lookup entities resolve: entity"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "entities"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "discovery",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "discovery.explain",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: cbu-id"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "discovery",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "discovery.graph-walk",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: entity-id"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "discovery",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "discovery.inspect-data",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: domain, entity-id",
+        "lookup entities resolve: entity"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "entities"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "discovery",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "discovery.run",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: cbu-id"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "cbus"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "discovery",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "discovery.search-data",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: domain, entity-id, query",
+        "lookup entities resolve: entity"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "entities"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "discovery",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "discovery.search-entities",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: query"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "discovery",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "discovery.valid-transitions",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: entity-id"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "discovery",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "discovery.verb-detail",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: verb-id"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "docs-bundle",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "docs-bundle.list-applied",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "required args present: cbu-id",
+        "lookup entities resolve: cbu"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [
+        "cbus"
+      ],
+      "workspace_affinity": [
+        "KYC",
+        "OnBoarding"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "docs-bundle",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "docs-bundle.list-available",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [],
+      "workspace_affinity": [
+        "KYC",
+        "OnBoarding"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "document",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "document.compute-requirements",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "required args present: entity-id",
+        "lookup entities resolve: entity"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [
+        "entities"
+      ],
+      "workspace_affinity": [
+        "KYC",
+        "OnBoarding"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "economic-exposure",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "economic-exposure.summary",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "required args present: issuer-entity-id",
+        "lookup entities resolve: entity"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [
+        "entities"
+      ],
+      "workspace_affinity": [
+        "InstrumentMatrix"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "edge",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "edge.upsert",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: from-entity-id, relationship-type, source, to-entity-id",
+        "lookup entities resolve: entity"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "entities"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "entity",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "entity.list-placeholders",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "lookup entities resolve: cbu"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [
+        "cbus"
+      ],
+      "workspace_affinity": [
+        "CBU",
+        "KYC"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "gleif",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "gleif.get-children",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "required args present: lei"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [],
+      "workspace_affinity": [
+        "KYC"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "gleif",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "gleif.get-managed-funds",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "required args present: manager-lei"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [],
+      "workspace_affinity": [
+        "KYC"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "gleif",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "gleif.get-manager",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "lookup entities resolve: entity"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [
+        "entities"
+      ],
+      "workspace_affinity": [
+        "KYC"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "gleif",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "gleif.get-master-fund",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "lookup entities resolve: entity"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [
+        "entities"
+      ],
+      "workspace_affinity": [
+        "KYC"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "gleif",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "gleif.get-parent",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "required args present: lei"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [],
+      "workspace_affinity": [
+        "KYC"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "gleif",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "gleif.get-record",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "required args present: lei"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [],
+      "workspace_affinity": [
+        "KYC"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "gleif",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "gleif.get-umbrella",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "lookup entities resolve: entity"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [
+        "entities"
+      ],
+      "workspace_affinity": [
+        "KYC"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "gleif",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "gleif.lookup-by-isin",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "required args present: isin"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [],
+      "workspace_affinity": [
+        "KYC"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "gleif",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "gleif.search",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [],
+      "workspace_affinity": [
+        "KYC"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "gleif",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "gleif.trace-ownership",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "lookup entities resolve: entity"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [
+        "entities"
+      ],
+      "workspace_affinity": [
+        "KYC"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "graph",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "graph.ancestors",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: entity-id",
+        "lookup entities resolve: entity"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "entities"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "graph",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "graph.compare",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: cbu-id, left-snapshot-id, right-snapshot-id",
+        "lookup entities resolve: cbu"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "cbus"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "graph",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "graph.descendants",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: entity-id",
+        "lookup entities resolve: entity"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "entities"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "graph",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "graph.filter",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: cbu-id",
+        "lookup entities resolve: cbu, jurisdiction, role"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "cbus",
+        "master_jurisdictions",
+        "roles"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "graph",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "graph.find-connected",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: cbu-id, entity-id",
+        "lookup entities resolve: cbu, entity"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "cbus",
+        "entities"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "graph",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "graph.focus",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: cbu-id, entity-id",
+        "lookup entities resolve: cbu, entity"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "cbus",
+        "entities"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "graph",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "graph.group-by",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: cbu-id, group-by",
+        "lookup entities resolve: cbu"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "cbus"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "graph",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "graph.path",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: cbu-id, from-entity-id, to-entity-id",
+        "lookup entities resolve: cbu, entity"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "cbus",
+        "entities"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "graph",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "graph.validate",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "cases"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "graph",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "graph.view",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: cbu-id",
+        "lookup entities resolve: cbu"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "cbus"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "investment-manager",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "investment-manager.find-for-trade",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "required args present: cbu-id, instrument-class"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [],
+      "workspace_affinity": [
+        "CBU"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "investor-role",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "investor-role.read-as-of",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "required args present: as-of-date, holder, issuer",
+        "lookup entities resolve: entity"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [
+        "entities"
+      ],
+      "workspace_affinity": [
+        "CBU"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "investor",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "investor.count-by-state",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "required args present: owning-cbu-id",
+        "lookup entities resolve: cbu"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [
+        "cbus"
+      ],
+      "workspace_affinity": [
+        "CBU"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "legal-entity",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "legal-entity.list",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [],
+      "workspace_affinity": [
+        "CBU",
+        "KYC"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "manco",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "manco.book.summary",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "required args present: manco-entity-id",
+        "lookup entities resolve: entity"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [
+        "entities"
+      ],
+      "workspace_affinity": [
+        "CBU",
+        "KYC"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "matrix-overlay",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "matrix-overlay.unified-gaps",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "required args present: cbu-id",
+        "lookup entities resolve: cbu"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [
+        "cbus"
+      ],
+      "workspace_affinity": [
+        "InstrumentMatrix"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "observation",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "observation.get-current",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "required args present: attribute, entity-id",
+        "lookup entities resolve: entity"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [
+        "entities"
+      ],
+      "workspace_affinity": [
+        "KYC"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "ownership",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "ownership.analyze-gaps",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "required args present: issuer-entity-id",
+        "lookup entities resolve: entity"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [
+        "entities"
+      ],
+      "workspace_affinity": [
+        "KYC"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "ownership",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "ownership.who-controls",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "required args present: issuer-entity-id",
+        "lookup entities resolve: entity"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [
+        "entities"
+      ],
+      "workspace_affinity": [
+        "KYC"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "pack",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "pack.answer",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: field, value"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "pack",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "pack.select",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: pack-id"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "partnership",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "partnership.analyze-control",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "required args present: partnership-entity-id"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [
+        "entities"
+      ],
+      "workspace_affinity": [
+        "CBU"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "pipeline",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "pipeline.full",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: cbu-id"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "cbus"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "provisioning",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "provisioning.status",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "required args present: request-id"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [],
+      "workspace_affinity": [
+        "OnBoarding"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "refdata",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "refdata.list",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "required args present: domain"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [],
+      "workspace_affinity": [
+        "CBU"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "refdata",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "refdata.read",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "required args present: domain"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [],
+      "workspace_affinity": [
+        "CBU"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "regulatory.status",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "regulatory.status.check",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "required args present: entity-id",
+        "lookup entities resolve: entity"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [
+        "entities"
+      ],
+      "workspace_affinity": [
+        "KYC"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "research.companies-house",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "research.companies-house.search",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "required args present: query"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [],
+      "workspace_affinity": [
+        "KYC"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "research.outreach",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "research.outreach.list-overdue",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [],
+      "workspace_affinity": [
+        "KYC"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "research.sec-edgar",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "research.sec-edgar.search",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "required args present: query"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [],
+      "workspace_affinity": [
+        "KYC"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "research.sources",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "research.sources.find-for-jurisdiction",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "required args present: data-type, jurisdiction"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [],
+      "workspace_affinity": [
+        "KYC"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "research.sources",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "research.sources.list",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [],
+      "workspace_affinity": [
+        "KYC"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "research.sources",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "research.sources.search",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "required args present: query, source-id"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [],
+      "workspace_affinity": [
+        "KYC"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "rule-field",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "rule-field.list",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "rule-field",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "rule-field.register",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: field-key, field-type"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "rule",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "rule.add",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: kind, name, ruleset-id, then-effect, when-expr"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "rule",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "rule.disable",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: rule-id"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "rule",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "rule.update",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: rule-id"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "ruleset",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "ruleset.retire",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: ruleset-id"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "semantic",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "semantic.get-state",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: cbu-id",
+        "lookup entities resolve: cbu"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "cbus"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "semantic",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "semantic.list-stages",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "semantic",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "semantic.missing-entities",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: cbu-id",
+        "lookup entities resolve: cbu"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "cbus"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "semantic",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "semantic.next-actions",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: cbu-id",
+        "lookup entities resolve: cbu"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "cbus"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "semantic",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "semantic.prompt-context",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: cbu-id",
+        "lookup entities resolve: cbu"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "cbus"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "semantic",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "semantic.stages-for-product",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: product",
+        "lookup entities resolve: product"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "products"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "service-availability",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "service-availability.list",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "required args present: booking-principal-id"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [],
+      "workspace_affinity": [
+        "OnBoarding"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "service-availability",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "service-availability.list-by-principal",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "required args present: booking-principal-id"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [],
+      "workspace_affinity": [
+        "OnBoarding"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "service-intent",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "service-intent.list",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "required args present: cbu-id"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [
+        "cbus"
+      ],
+      "workspace_affinity": [
+        "OnBoarding"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "service-resource",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "service-resource.analyze-lifecycle-gaps",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "required args present: cbu-id",
+        "lookup entities resolve: cbu"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [
+        "cbus"
+      ],
+      "workspace_affinity": [
+        "CBU",
+        "OnBoarding"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "service-resource",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "service-resource.check-lifecycle-readiness",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "required args present: cbu-id, instrument-class",
+        "lookup entities resolve: cbu, entity, instrument_class, market"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [
+        "cbus",
+        "entities",
+        "instrument_classes",
+        "markets"
+      ],
+      "workspace_affinity": [
+        "CBU",
+        "OnBoarding"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "service-resource",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "service-resource.discover-lifecycles",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "required args present: instrument-class",
+        "lookup entities resolve: instrument_class"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [
+        "instrument_classes"
+      ],
+      "workspace_affinity": [
+        "CBU",
+        "OnBoarding"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "session",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "session.filter-jurisdiction",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: jurisdiction"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "session",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "session.load-deal",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "lookup entities resolve: deal"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "deals"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "session",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "session.load-system",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: cbu-id",
+        "lookup entities resolve: cbu"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "cbus"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "session",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "session.load-universe",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "lookup entities resolve: entity"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "entities"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "session",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "session.set-client",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: client",
+        "lookup entities resolve: client_group"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "client_group"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "session",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "session.set-persona",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: persona"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "session",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "session.unload-deal",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "session",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "session.unload-system",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: cbu-id",
+        "lookup entities resolve: cbu"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "cbus"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "skeleton",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "skeleton.build",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: case-id",
+        "lookup entities resolve: kyc_case"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "cases"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "sla",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "sla.list-open-breaches",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "required args present: cbu-id",
+        "lookup entities resolve: cbu"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [
+        "cbus"
+      ],
+      "workspace_affinity": [
+        "Deal"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "subcustodian",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "subcustodian.lookup",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "required args present: currency, market"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [],
+      "workspace_affinity": [
+        "InstrumentMatrix"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "team",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "team.add-cbu-access",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: cbu, team",
+        "lookup entities resolve: cbu"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "cbus",
+        "team_cbu_access"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "team",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "team.add-governance-member",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: role, team, user",
+        "lookup entities resolve: team, user"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "clients",
+        "memberships",
+        "teams"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "team",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "team.archive",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: reason, team",
+        "lookup entities resolve: team"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "teams"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "team",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "team.grant-service",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: service, team",
+        "lookup entities resolve: team"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "team_entitlements",
+        "teams"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "team",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "team.list-cbus",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: team",
+        "lookup entities resolve: team"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "teams",
+        "v_team_cbu_access"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "team",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "team.list-members",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: team"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "v_effective_memberships"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "team",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "team.read",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: team",
+        "lookup entities resolve: team"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "teams"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "team",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "team.remove-cbu-access",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: cbu, team"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "team_cbu_access"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "team",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "team.revoke-service",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: service, team",
+        "lookup entities resolve: team"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "team_entitlements",
+        "teams"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "team",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "team.transfer-member",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: from-team, new-role, to-team, user",
+        "lookup entities resolve: team, user"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "clients",
+        "teams"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "team",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "team.update-member",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: membership, new-role"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "memberships"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "team",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "team.verify-governance-access",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "v_governance_access"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "temporal",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "temporal.cbu-relationships-as-of",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: cbu-id",
+        "lookup entities resolve: cbu"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "cbus"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "temporal",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "temporal.cbu-roles-as-of",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: cbu-id",
+        "lookup entities resolve: cbu"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "cbus"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "temporal",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "temporal.cbu-state-at-approval",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: cbu-id",
+        "lookup entities resolve: cbu"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "cbus"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "temporal",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "temporal.compare-ownership",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: date-a, date-b, entity-id",
+        "lookup entities resolve: entity"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "entities"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "temporal",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "temporal.entity-history",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: entity-id",
+        "lookup entities resolve: entity"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "entities"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "temporal",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "temporal.ownership-as-of",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: entity-id",
+        "lookup entities resolve: entity"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "entities"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "temporal",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "temporal.relationship-history",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: relationship-id"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "temporal",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "temporal.ubo-chain-as-of",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: entity-id",
+        "lookup entities resolve: entity"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "entities"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "tollgate",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "tollgate.get-decision-readiness",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "required args present: case-id"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [
+        "cases"
+      ],
+      "workspace_affinity": [
+        "KYC",
+        "OnBoarding"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "tollgate",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "tollgate.get-metrics",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "required args present: cbu-id"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [
+        "cbus"
+      ],
+      "workspace_affinity": [
+        "KYC",
+        "OnBoarding"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "trading-profile",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "trading-profile.ca.get-policy",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "required args present: profile-id"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [],
+      "workspace_affinity": [
+        "InstrumentMatrix"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "trading-profile",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "trading-profile.validate-universe-coverage",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "required args present: profile-id"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [],
+      "workspace_affinity": [
+        "InstrumentMatrix"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "trust",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "trust.analyze-control",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "required args present: trust-entity-id",
+        "lookup entities resolve: entity"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [
+        "entities"
+      ],
+      "workspace_affinity": [
+        "CBU"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "ubo",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "ubo.list-owners",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "required args present: entity-id",
+        "lookup entities resolve: entity"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [
+        "entities"
+      ],
+      "workspace_affinity": [
+        "KYC"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "ubo",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "ubo.snapshot.diff",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "required args present: run-id-a, run-id-b"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [],
+      "workspace_affinity": [
+        "KYC"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "ubo",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "ubo.trace-chains",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "lookup entities resolve: cbu, client_group, entity"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [
+        "cbus",
+        "client_group",
+        "entities"
+      ],
+      "workspace_affinity": [
+        "KYC"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "user",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "user.check-access",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: cbu, user",
+        "lookup entities resolve: cbu, user"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "cbus",
+        "clients",
+        "v_user_cbu_access"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "user",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "user.create",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: email, name",
+        "lookup entities resolve: entity"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "clients",
+        "entities"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "user",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "user.list-cbus",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: user",
+        "lookup entities resolve: user"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "clients",
+        "v_user_cbu_access"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "user",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "user.list-teams",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: user"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "v_effective_memberships"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "user",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "user.offboard",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: reason, user",
+        "lookup entities resolve: user"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "clients"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "user",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "user.reactivate",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: user"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "clients"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "user",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "user.suspend",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: user"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "clients"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "E_no_harm_read_research",
+      "domain": "verify",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "verify.get-status",
+      "normalized_mode": "read_only",
+      "postconditions": [
+        "returns context without mutating business state"
+      ],
+      "preconditions": [
+        "required args present: cbu-id",
+        "lookup entities resolve: cbu"
+      ],
+      "rationale": "No-harm/read-research verb should be explicitly classified instead of left missing",
+      "reads": [
+        "cbus"
+      ],
+      "workspace_affinity": [
+        "KYC"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "view",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "view.book",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: client",
+        "lookup entities resolve: entity"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "entities"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "view",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "view.cbu",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: cbu-id",
+        "lookup entities resolve: cbu"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "cbus"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "view",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "view.clear-refinements",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "view",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "view.entity-forest",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "view",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "view.navigate-back-to",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "view",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "view.read-breadcrumbs",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "view",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "view.read-selection-info",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "view",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "view.read-status",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "view",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "view.refine",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "view",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "view.set-layout",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "view",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "view.set-selection",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "view",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "view.universe",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "lookup entities resolve: entity"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [
+        "entities"
+      ],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "view",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "view.zoom-in",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [
+        "required args present: node-id"
+      ],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    },
+    {
+      "bucket": "F_system_ui",
+      "domain": "view",
+      "evidence_source": [
+        "yaml_metadata"
+      ],
+      "fqn": "view.zoom-out",
+      "normalized_mode": "system_only",
+      "postconditions": [
+        "affects session/ui/system context only"
+      ],
+      "preconditions": [],
+      "rationale": "System/session/view/admin verb sits outside business-table mutation scope",
+      "reads": [],
+      "workspace_affinity": [
+        "*"
+      ],
+      "writes": []
+    }
+  ],
+  "generated_at": "2026-03-25T13:34:48.103799+00:00",
+  "mode_counts": {
+    "read_only": 78,
+    "system_only": 128
+  },
+  "normalized_entry_count": 206,
+  "repo_revision": "56b2f9b413f2b5ddc2c6ba269ad8cb610e18c7a4",
+  "slice_id": "S6.4"
+}

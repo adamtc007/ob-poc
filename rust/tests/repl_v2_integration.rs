@@ -217,8 +217,8 @@ fn test_substring_match_before_semantic() {
     let scorer = MockSemanticScorer::for_phrases(vec![], 0.10);
     let router = PackRouter::new(packs).with_scorer(Arc::new(scorer));
 
-    // "onboard a new client" is an exact invocation_phrase on onboarding-request.
-    let result = router.route("onboard a new client");
+    // "onboard this cbu" is an exact invocation_phrase on onboarding-request.
+    let result = router.route("onboard this cbu");
     assert!(
         matches!(result, PackRouteOutcome::Matched(ref m, _) if m.id == "onboarding-request"),
         "Substring match should work even with low semantic scores"

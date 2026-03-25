@@ -737,12 +737,16 @@ fn agreement_state(status: &str) -> String {
 
 #[cfg(feature = "database")]
 fn client_group_state(discovery_status: &str) -> String {
-    if discovery_status.eq_ignore_ascii_case("complete") {
-        "onboarding".to_string()
-    } else if discovery_status.eq_ignore_ascii_case("in_progress") {
-        "researching".to_string()
-    } else {
-        "prospect".to_string()
+    let normalized = discovery_status.trim().to_ascii_lowercase();
+    match normalized.as_str() {
+        "researching" | "in_progress" => "researching".to_string(),
+        "ubo_mapped" => "ubo_mapped".to_string(),
+        "control_mapped" => "control_mapped".to_string(),
+        "group_kyc_cleared" => "group_kyc_cleared".to_string(),
+        "cbus_identified" | "complete" => "cbus_identified".to_string(),
+        "onboarding" => "onboarding".to_string(),
+        "active" => "active".to_string(),
+        _ => "prospect".to_string(),
     }
 }
 

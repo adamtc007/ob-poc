@@ -1,7 +1,7 @@
 fqn: universe.group_onboarding
 universe_id: group_onboarding
 name: Group Onboarding
-description: Discovery universe for end-to-end client group onboarding — from prospect research through KYC approval. Encompasses group identity, UBO/control, CBU identification, KYC case management, screening, evidence collection, and governance.
+description: Discovery universe for end-to-end client group onboarding — from prospect research through group-level UBO/KYC clearance, controlled CBU identification, inherited clearance, and CBU-specific KYC/activation. Encompasses group identity, UBO/control, CBU identification, KYC case management, screening, evidence collection, and governance.
 version: "1.0"
 default_entry_domain: client-group
 domains:
@@ -98,7 +98,7 @@ domains:
 
   - domain_id: kyc
     label: KYC & Screening
-    description: KYC case management, compliance screening, and tollgate approval.
+    description: Group-first KYC clearance, then controlled-CBU delta case management, compliance screening, and tollgate approval.
     objective_tags:
       - kyc
       - screening
@@ -129,6 +129,7 @@ domains:
         pattern: onboarding
         weight: 0.7
     candidate_entity_kinds:
+      - client-group
       - cbu
       - entity
       - person
@@ -136,16 +137,26 @@ domains:
     candidate_family_ids:
       - kyc_lifecycle
     required_grounding_inputs:
-      - key: cbu_id
-        label: CBU
+      - key: group_name
+        label: Client Group
         required: true
+        input_type: string
+      - key: cbu_id
+        label: Controlled CBU
+        required: false
         input_type: uuid
     entry_questions:
-      - question_id: which_cbu_kyc
-        prompt: Which CBU are you managing KYC for?
-        maps_to: cbu_id
+      - question_id: which_group_kyc
+        prompt: Which client group's clearance are you managing?
+        maps_to: group_name
         priority: 1
+      - question_id: which_cbu_kyc
+        prompt: Which controlled CBU, if any, needs a delta review?
+        maps_to: cbu_id
+        priority: 2
     allowed_discovery_actions:
+      - client-group.verify-ownership
+      - ubo.approve
       - kyc-case.create
       - screening.run
       - cbu.list

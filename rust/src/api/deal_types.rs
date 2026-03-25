@@ -167,22 +167,24 @@ pub struct DealContractSummary {
 }
 
 // ============================================================================
-// Onboarding Request Types
+// Onboarding Handoff Types
 // ============================================================================
 
-/// Onboarding request linked via deal products
+/// Onboarding handoff summary linked via deal products and existing CBU targets
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OnboardingRequestSummary {
     pub request_id: Uuid,
+    /// Existing target CBU for this onboarding handoff
     pub cbu_id: Uuid,
     /// Resolved CBU name
     pub cbu_name: Option<String>,
     pub request_state: String,
+    /// Operational phase after the commercial deal handoff
     pub current_phase: Option<String>,
     pub created_by: Option<String>,
     pub created_at: Option<DateTime<Utc>>,
     pub completed_at: Option<DateTime<Utc>>,
-    /// Link back to deal via product
+    /// Link back to the deal's contracted product scope
     pub deal_product_id: Option<Uuid>,
 }
 

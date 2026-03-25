@@ -1,22 +1,27 @@
 state_machine: client_group_lifecycle
-description: Client group lifecycle — from prospect discovery through active management
+description: Client group lifecycle — from prospect discovery through group UBO/KYC clearance, controlled CBU linkage, and active servicing
 states:
   [
     prospect,
     researching,
     ubo_mapped,
     control_mapped,
+    group_kyc_cleared,
     cbus_identified,
     onboarding,
     active,
-    dormant,
-    offboarded,
   ]
 initial: prospect
 transitions:
   - from: prospect
     to: researching
-    verbs: [gleif.import-tree, client-group.research]
+    verbs:
+      [
+        client-group.start-discovery,
+        client-group.discover-entities,
+        gleif.import-tree,
+        gleif.import-to-client-group,
+      ]
   - from: researching
     to: ubo_mapped
     verbs: [ubo.discover, ubo.allege]
@@ -24,30 +29,17 @@ transitions:
     to: control_mapped
     verbs: [control.build-graph, ownership.trace-chain]
   - from: control_mapped
+    to: group_kyc_cleared
+    verbs: [ubo.approve, client-group.verify-ownership, kyc-case.close]
+  - from: group_kyc_cleared
     to: cbus_identified
-    verbs: [cbu.create, cbu.create-from-client-group]
+    verbs: [cbu.create, cbu.create-from-client-group, cbu.ensure]
   - from: cbus_identified
     to: onboarding
     verbs: [kyc-case.create, kyc.open-case]
   - from: onboarding
     to: active
-    verbs: [kyc-case.update-status]
-  - from: active
-    to: dormant
-    verbs: [client-group.suspend]
-  - from: dormant
-    to: active
-    verbs: [client-group.reactivate]
-  - from: active
-    to: offboarded
-    verbs: [client-group.offboard]
-  # Revert paths
-  - from: ubo_mapped
-    to: researching
-    verbs: [ubo.reset]
-  - from: control_mapped
-    to: ubo_mapped
-    verbs: [control.reset]
+    verbs: [kyc-case.close]
 reducer:
   overlay_sources: {}
   conditions:
@@ -57,6 +49,8 @@ reducer:
       expr: "scope.has_ubo_determination = true"
     has_control:
       expr: "scope.has_control_chain = true"
+    has_group_kyc_clearance:
+      expr: "scope.has_group_kyc_clearance = true"
     has_cbus:
       expr: "scope.cbu_count > 0"
     has_active_case:
@@ -64,16 +58,14 @@ reducer:
     all_approved:
       expr: "scope.all_cases_approved = true"
   rules:
-    - state: offboarded
-      requires: []
-    - state: dormant
-      requires: []
     - state: active
-      requires: [all_approved]
+      requires: [has_group_kyc_clearance, all_approved]
     - state: onboarding
-      requires: [has_active_case]
+      requires: [has_group_kyc_clearance, has_active_case]
     - state: cbus_identified
-      requires: [has_cbus]
+      requires: [has_group_kyc_clearance, has_cbus]
+    - state: group_kyc_cleared
+      requires: [has_group_kyc_clearance]
     - state: control_mapped
       requires: [has_control]
     - state: ubo_mapped

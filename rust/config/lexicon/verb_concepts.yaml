@@ -19,20 +19,88 @@ cbu.create:
     - "new fund"
     - "set up fund"
     - "establish fund"
-    - "onboard client"
     - "create client"
     - "spin up a fund"
     - "create business unit"
   invocation_phrases:
     - "create a new cbu"
     - "set up a fund"
-    - "onboard a new client"
     - "spin up a fund"
     - "add a new fund"
   domain: cbu
   target_types: []
   produces_type: cbu
   crud_type: create
+
+deal.request-onboarding:
+  pref_label: "request onboarding"
+  alt_labels:
+    - "onboarding request"
+    - "deal onboarding"
+    - "product onboarding"
+    - "ops handoff"
+    - "start onboarding handoff"
+  invocation_phrases:
+    - "request onboarding for this deal"
+    - "submit the onboarding handoff"
+    - "hand off this deal to ops"
+    - "target an existing cbu for onboarding"
+  domain: deal
+  target_types: [deal, cbu]
+  crud_type: create
+
+deal.request-onboarding-batch:
+  pref_label: "request onboarding batch"
+  alt_labels:
+    - "batch onboarding request"
+    - "bulk onboarding handoff"
+    - "onboard multiple cbus"
+  invocation_phrases:
+    - "submit a batch onboarding request"
+    - "handoff multiple cbus to onboarding"
+    - "request onboarding for multiple cbu product pairs"
+  domain: deal
+  target_types: [deal, cbu]
+  crud_type: create
+
+client-group.create:
+  pref_label: "create client group"
+  alt_labels:
+    - "new client group"
+    - "create group root"
+    - "register client group"
+  invocation_phrases:
+    - "create a client group"
+    - "register a new client group"
+  domain: client-group
+  target_types: []
+  produces_type: client-group
+  crud_type: create
+
+client-group.read:
+  pref_label: "read client group"
+  alt_labels:
+    - "show client group"
+    - "get client group"
+    - "client group details"
+  invocation_phrases:
+    - "show the client group"
+    - "get client group details"
+  domain: client-group
+  target_types: [client-group]
+  crud_type: read
+
+client-group.update:
+  pref_label: "update client group"
+  alt_labels:
+    - "rename client group"
+    - "edit client group"
+  invocation_phrases:
+    - "update the client group"
+    - "rename this client group"
+  domain: client-group
+  target_types: [client-group]
+  crud_type: update
 
 cbu.list:
   pref_label: "list cbus"
@@ -395,6 +463,123 @@ product.read:
     - "show me product details"
     - "get product by code"
   domain: product
+  target_types: []
+  crud_type: read
+
+service.list:
+  pref_label: "list services"
+  alt_labels:
+    - "show services"
+    - "service catalog"
+    - "browse services"
+  invocation_phrases:
+    - "list services"
+    - "show service catalog"
+  domain: service
+  target_types: []
+  crud_type: read
+
+service.read:
+  pref_label: "get service"
+  alt_labels:
+    - "show service"
+    - "service details"
+    - "describe service"
+  invocation_phrases:
+    - "show service details"
+    - "describe this service"
+  domain: service
+  target_types: []
+  crud_type: read
+
+service.list-by-product:
+  pref_label: "list product services"
+  alt_labels:
+    - "show services for product"
+    - "product service mapping"
+    - "services under product"
+  invocation_phrases:
+    - "list services for this product"
+    - "show services under this product"
+  domain: service
+  target_types: [product]
+  crud_type: read
+
+service-resource.list:
+  pref_label: "list service resources"
+  alt_labels:
+    - "show resource types"
+    - "resource catalog"
+    - "browse service resources"
+  invocation_phrases:
+    - "list service resource types"
+    - "show resource type catalog"
+  domain: service-resource
+  target_types: []
+  crud_type: read
+
+service-resource.read:
+  pref_label: "get service resource"
+  alt_labels:
+    - "show resource type"
+    - "resource definition"
+    - "describe resource type"
+  invocation_phrases:
+    - "show service resource definition"
+    - "describe this resource type"
+  domain: service-resource
+  target_types: []
+  crud_type: read
+
+service-resource.list-by-service:
+  pref_label: "list service resources by service"
+  alt_labels:
+    - "show resources for service"
+    - "service resource mapping"
+    - "resources under service"
+  invocation_phrases:
+    - "list resources for this service"
+    - "show resources under this service"
+  domain: service-resource
+  target_types: [service]
+  crud_type: read
+
+service-resource.list-attributes:
+  pref_label: "list resource attributes"
+  alt_labels:
+    - "show resource attributes"
+    - "resource dictionary"
+    - "attribute requirements"
+  invocation_phrases:
+    - "list attributes for this resource"
+    - "show required attributes for this resource"
+  domain: service-resource
+  target_types: [service-resource]
+  crud_type: read
+
+attribute.list:
+  pref_label: "list attributes"
+  alt_labels:
+    - "show attributes"
+    - "attribute catalog"
+    - "resource dictionary"
+  invocation_phrases:
+    - "list attributes"
+    - "show attribute catalog"
+  domain: attribute
+  target_types: []
+  crud_type: read
+
+attribute.read:
+  pref_label: "get attribute"
+  alt_labels:
+    - "show attribute"
+    - "attribute definition"
+    - "describe attribute"
+  invocation_phrases:
+    - "show attribute definition"
+    - "describe this attribute"
+  domain: attribute
   target_types: []
   crud_type: read
 

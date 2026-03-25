@@ -1,0 +1,6704 @@
+{
+  "families": [
+    "fund_administration",
+    "governance_sla"
+  ],
+  "generated_at": "2026-03-25T13:01:39.878099+00:00",
+  "repo_revision": "56b2f9b413f2b5ddc2c6ba269ad8cb610e18c7a4",
+  "slice_id": "S5",
+  "subject_kinds": [
+    "board",
+    "cbu",
+    "company",
+    "entity",
+    "fund",
+    "investor",
+    "legal-entity",
+    "role",
+    "service-intent",
+    "service-resource",
+    "share-class"
+  ],
+  "verb_count": 318,
+  "verbs": [
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "attribute",
+      "fqn": "attribute.check-coverage",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "attribute",
+      "fqn": "attribute.classify",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "attribute",
+      "fqn": "attribute.define",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "attribute",
+      "fqn": "attribute.define-derived",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "attribute",
+      "fqn": "attribute.deprecate",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "attribute",
+      "fqn": "attribute.inspect",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "attribute",
+      "fqn": "attribute.list",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "attribute",
+      "fqn": "attribute.list-by-document",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "attribute",
+      "fqn": "attribute.list-sinks",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "attribute",
+      "fqn": "attribute.list-sources",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "attribute",
+      "fqn": "attribute.map-to-document",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "attribute",
+      "fqn": "attribute.read",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "attribute",
+      "fqn": "attribute.set-evidence-grade",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "attribute",
+      "fqn": "attribute.trace-lineage",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "attribute",
+      "fqn": "attribute.unmap-from-document",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "attribute",
+      "fqn": "attribute.update",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "attributes",
+      "fqn": "attributes.gaps",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "attributes",
+      "fqn": "attributes.populate",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "attributes",
+      "fqn": "attributes.rollup",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "attributes",
+      "fqn": "attributes.set",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "board",
+      "fqn": "board.analyze-control",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "board",
+      "fqn": "board.appoint",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "board",
+      "fqn": "board.grant-appointment-right",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "board",
+      "fqn": "board.list-appointment-rights",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "board",
+      "fqn": "board.list-by-entity",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "board",
+      "fqn": "board.list-by-person",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "board",
+      "fqn": "board.list-rights-held",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "board",
+      "fqn": "board.resign",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "board",
+      "fqn": "board.revoke-appointment-right",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "booking-location",
+      "fqn": "booking-location.create",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "booking-location",
+      "fqn": "booking-location.list",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "booking-location",
+      "fqn": "booking-location.update",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "booking-principal",
+      "fqn": "booking-principal.coverage-matrix",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "booking-principal",
+      "fqn": "booking-principal.create",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "booking-principal",
+      "fqn": "booking-principal.evaluate",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "booking-principal",
+      "fqn": "booking-principal.explain",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "booking-principal",
+      "fqn": "booking-principal.gap-report",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "booking-principal",
+      "fqn": "booking-principal.impact-analysis",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "booking-principal",
+      "fqn": "booking-principal.retire",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "booking-principal",
+      "fqn": "booking-principal.select",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "booking-principal",
+      "fqn": "booking-principal.update",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "capital",
+      "fqn": "capital.allocate",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "capital",
+      "fqn": "capital.buyback",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "capital",
+      "fqn": "capital.cancel",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "capital",
+      "fqn": "capital.cancel-shares",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "capital",
+      "fqn": "capital.cap-table",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "capital",
+      "fqn": "capital.control-config.get",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "capital",
+      "fqn": "capital.control-config.set",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "capital",
+      "fqn": "capital.define-share-class",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "capital",
+      "fqn": "capital.dilution.create-convertible-note",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "capital",
+      "fqn": "capital.dilution.create-safe",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "capital",
+      "fqn": "capital.dilution.exercise",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "capital",
+      "fqn": "capital.dilution.forfeit",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "capital",
+      "fqn": "capital.dilution.get-summary",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "capital",
+      "fqn": "capital.dilution.grant-options",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "capital",
+      "fqn": "capital.dilution.issue-warrant",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "capital",
+      "fqn": "capital.dilution.list",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "capital",
+      "fqn": "capital.get-ownership-chain",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "capital",
+      "fqn": "capital.holders",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "capital",
+      "fqn": "capital.issue-shares",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "capital",
+      "fqn": "capital.issue.initial",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "capital",
+      "fqn": "capital.issue.new",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "capital",
+      "fqn": "capital.list-by-issuer",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "capital",
+      "fqn": "capital.list-shareholders",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "capital",
+      "fqn": "capital.reconcile",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "capital",
+      "fqn": "capital.share-class.add-identifier",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "capital",
+      "fqn": "capital.share-class.create",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "capital",
+      "fqn": "capital.share-class.get-supply",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "capital",
+      "fqn": "capital.share-class.list",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "capital",
+      "fqn": "capital.split",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "capital",
+      "fqn": "capital.transfer",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "cbu-custody",
+      "fqn": "cbu-custody.derive-required-coverage",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "cbu-custody",
+      "fqn": "cbu-custody.list-agent-overrides",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "cbu-custody",
+      "fqn": "cbu-custody.list-booking-rules",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "cbu-custody",
+      "fqn": "cbu-custody.list-ssis",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "cbu-custody",
+      "fqn": "cbu-custody.list-universe",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "cbu-custody",
+      "fqn": "cbu-custody.lookup-ssi",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "cbu-custody",
+      "fqn": "cbu-custody.setup-ssi",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "cbu-custody",
+      "fqn": "cbu-custody.validate-booking-coverage",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.add-product",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.assign-control",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.assign-fund-role",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.assign-ownership",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.assign-role",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.assign-service-provider",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.assign-signatory",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.assign-trust-role",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.attach-evidence",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.create",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.create-from-client-group",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.decide",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.delete",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.delete-cascade",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.ensure",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.link-structure",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.list",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.list-evidence",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.list-structure-links",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.list-subscriptions",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.parties",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.read",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.remove-product",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.remove-role",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.rename",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.reopen-validation",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.request-proof-update",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.set-category",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.set-client-type",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.set-commercial-client",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.set-jurisdiction",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.show",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.submit-for-validation",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.unlink-structure",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.update",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.validate-roles",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "cbu",
+      "fqn": "cbu.verify-evidence",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "client-principal-relationship",
+      "fqn": "client-principal-relationship.cross-sell-check",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "client-principal-relationship",
+      "fqn": "client-principal-relationship.list",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "client-principal-relationship",
+      "fqn": "client-principal-relationship.record",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "client-principal-relationship",
+      "fqn": "client-principal-relationship.terminate",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "corporate-action",
+      "fqn": "corporate-action.define-event-type",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "corporate-action",
+      "fqn": "corporate-action.link-ca-ssi",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "corporate-action",
+      "fqn": "corporate-action.list-ca-ssi-mappings",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "corporate-action",
+      "fqn": "corporate-action.list-event-types",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "corporate-action",
+      "fqn": "corporate-action.list-instruction-windows",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "corporate-action",
+      "fqn": "corporate-action.list-preferences",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "corporate-action",
+      "fqn": "corporate-action.remove-preference",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "corporate-action",
+      "fqn": "corporate-action.set-instruction-window",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "corporate-action",
+      "fqn": "corporate-action.set-preferences",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "delegation",
+      "fqn": "delegation.add",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "delegation",
+      "fqn": "delegation.end",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "delegation",
+      "fqn": "delegation.list-delegates",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "delegation",
+      "fqn": "delegation.list-delegations-received",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "entity-settlement",
+      "fqn": "entity-settlement.add-ssi",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "entity-settlement",
+      "fqn": "entity-settlement.remove-ssi",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "entity-settlement",
+      "fqn": "entity-settlement.set-identity",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "entity",
+      "fqn": "entity.create",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "entity",
+      "fqn": "entity.delete",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "entity",
+      "fqn": "entity.ensure",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "entity",
+      "fqn": "entity.ensure-or-placeholder",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "entity",
+      "fqn": "entity.ghost",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "entity",
+      "fqn": "entity.identify",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "entity",
+      "fqn": "entity.list",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "entity",
+      "fqn": "entity.list-ghosts",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "entity",
+      "fqn": "entity.list-placeholders",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "entity",
+      "fqn": "entity.placeholder-summary",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "entity",
+      "fqn": "entity.query",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "entity",
+      "fqn": "entity.read",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "entity",
+      "fqn": "entity.resolve-placeholder",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "entity",
+      "fqn": "entity.update",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "entity",
+      "fqn": "entity.verify",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "fund",
+      "fqn": "fund.add-investment",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "fund",
+      "fqn": "fund.add-share-class",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "fund",
+      "fqn": "fund.add-to-umbrella",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "fund",
+      "fqn": "fund.create",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "fund",
+      "fqn": "fund.delete-compartment",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "fund",
+      "fqn": "fund.delete-vehicle",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "fund",
+      "fqn": "fund.end-investment",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "fund",
+      "fqn": "fund.ensure",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "fund",
+      "fqn": "fund.link-feeder",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "fund",
+      "fqn": "fund.list-by-manager",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "fund",
+      "fqn": "fund.list-by-vehicle-type",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "fund",
+      "fqn": "fund.list-compartments-by-umbrella",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "fund",
+      "fqn": "fund.list-feeders",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "fund",
+      "fqn": "fund.list-investments",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "fund",
+      "fqn": "fund.list-investors",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "fund",
+      "fqn": "fund.list-share-classes",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "fund",
+      "fqn": "fund.list-subfunds",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "fund",
+      "fqn": "fund.read-compartment",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "fund",
+      "fqn": "fund.read-vehicle",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "fund",
+      "fqn": "fund.update-investment",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "fund",
+      "fqn": "fund.upsert-compartment",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "fund",
+      "fqn": "fund.upsert-vehicle",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "holding",
+      "fqn": "holding.close",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "holding",
+      "fqn": "holding.create",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "holding",
+      "fqn": "holding.create-for-investor",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "holding",
+      "fqn": "holding.ensure",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "holding",
+      "fqn": "holding.list-by-investor",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "holding",
+      "fqn": "holding.list-by-investor-record",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "holding",
+      "fqn": "holding.list-by-share-class",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "holding",
+      "fqn": "holding.read",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "holding",
+      "fqn": "holding.update-status",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "holding",
+      "fqn": "holding.update-units",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "investment-manager",
+      "fqn": "investment-manager.assign",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "investment-manager",
+      "fqn": "investment-manager.find-for-trade",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "investment-manager",
+      "fqn": "investment-manager.link-connectivity",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "investment-manager",
+      "fqn": "investment-manager.list",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "investment-manager",
+      "fqn": "investment-manager.set-scope",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "investment-manager",
+      "fqn": "investment-manager.suspend",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "investment-manager",
+      "fqn": "investment-manager.terminate",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "investor-role",
+      "fqn": "investor-role.history",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "investor-role",
+      "fqn": "investor-role.list-by-holder",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "investor-role",
+      "fqn": "investor-role.list-by-issuer",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "investor-role",
+      "fqn": "investor-role.mark-as-end-investor",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "investor-role",
+      "fqn": "investor-role.mark-as-fof",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "investor-role",
+      "fqn": "investor-role.mark-as-master-pool",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "investor-role",
+      "fqn": "investor-role.mark-as-nominee",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "investor-role",
+      "fqn": "investor-role.read",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "investor-role",
+      "fqn": "investor-role.read-as-of",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "investor-role",
+      "fqn": "investor-role.set",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "investor",
+      "fqn": "investor.activate",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "investor",
+      "fqn": "investor.approve-kyc",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "investor",
+      "fqn": "investor.complete-redemption",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "investor",
+      "fqn": "investor.count-by-state",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "investor",
+      "fqn": "investor.create",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "investor",
+      "fqn": "investor.ensure",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "investor",
+      "fqn": "investor.get-lifecycle-history",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "investor",
+      "fqn": "investor.list-by-cbu",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "investor",
+      "fqn": "investor.list-by-entity",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "investor",
+      "fqn": "investor.mark-eligible",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "investor",
+      "fqn": "investor.offboard",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "investor",
+      "fqn": "investor.read",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "investor",
+      "fqn": "investor.record-subscription",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "investor",
+      "fqn": "investor.reinstate",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "investor",
+      "fqn": "investor.reject-kyc",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "investor",
+      "fqn": "investor.request-documents",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "investor",
+      "fqn": "investor.schedule-review",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "investor",
+      "fqn": "investor.start-kyc",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "investor",
+      "fqn": "investor.start-redemption",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "investor",
+      "fqn": "investor.suspend",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "legal-entity",
+      "fqn": "legal-entity.create",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "legal-entity",
+      "fqn": "legal-entity.list",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "legal-entity",
+      "fqn": "legal-entity.update",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "maintenance",
+      "fqn": "maintenance.bootstrap-seeds",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "maintenance",
+      "fqn": "maintenance.cleanup",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "maintenance",
+      "fqn": "maintenance.drain-outbox",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "maintenance",
+      "fqn": "maintenance.health-pending",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "maintenance",
+      "fqn": "maintenance.health-stale-dryruns",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "maintenance",
+      "fqn": "maintenance.reindex-embeddings",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "maintenance",
+      "fqn": "maintenance.validate-schema-sync",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "manco",
+      "fqn": "manco.book.summary",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "manco",
+      "fqn": "manco.control-chain",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "manco",
+      "fqn": "manco.group.add-member",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "manco",
+      "fqn": "manco.group.cbus",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "manco",
+      "fqn": "manco.group.create",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "manco",
+      "fqn": "manco.group.derive",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "manco",
+      "fqn": "manco.group.for-cbu",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "manco",
+      "fqn": "manco.group.list",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "manco",
+      "fqn": "manco.group.remove-member",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "manco",
+      "fqn": "manco.primary-controller",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "partnership",
+      "fqn": "partnership.add-partner",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "partnership",
+      "fqn": "partnership.analyze-control",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "partnership",
+      "fqn": "partnership.list-partners",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "partnership",
+      "fqn": "partnership.reconcile",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "partnership",
+      "fqn": "partnership.record-contribution",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "partnership",
+      "fqn": "partnership.record-distribution",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "partnership",
+      "fqn": "partnership.withdraw-partner",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "refdata",
+      "fqn": "refdata.deactivate",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "refdata",
+      "fqn": "refdata.ensure",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "refdata",
+      "fqn": "refdata.list",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "refdata",
+      "fqn": "refdata.load-all",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "refdata",
+      "fqn": "refdata.load-instrument-classes",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "refdata",
+      "fqn": "refdata.load-markets",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "refdata",
+      "fqn": "refdata.load-sla-templates",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "refdata",
+      "fqn": "refdata.load-subcustodians",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "refdata",
+      "fqn": "refdata.read",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "role",
+      "fqn": "role.delete",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "role",
+      "fqn": "role.ensure",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "role",
+      "fqn": "role.list",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "role",
+      "fqn": "role.read",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.activate",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.activate-lifecycle",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.analyze-lifecycle-gaps",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.check-lifecycle-readiness",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.decommission",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.decommission-lifecycle",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.discover-lifecycles",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.execute-lifecycle-plan",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.generate-lifecycle-plan",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.list",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.list-attributes",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.list-by-service",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.list-lifecycle-instances",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.list-lifecycle-resource-types",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.list-lifecycles",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.list-lifecycles-by-instrument",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.list-resources-for-lifecycle",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.provision",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.provision-lifecycle",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.read",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.read-lifecycle",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.read-lifecycle-resource-type",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.set-attr",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.suspend",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.suspend-lifecycle",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "service-resource",
+      "fqn": "service-resource.validate-attrs",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "service",
+      "fqn": "service.list",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "service",
+      "fqn": "service.list-by-product",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "service",
+      "fqn": "service.read",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "share-class",
+      "fqn": "share-class.close",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "share-class",
+      "fqn": "share-class.create",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "share-class",
+      "fqn": "share-class.ensure",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "share-class",
+      "fqn": "share-class.link-to-compartment",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "share-class",
+      "fqn": "share-class.list",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "share-class",
+      "fqn": "share-class.list-by-compartment",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "share-class",
+      "fqn": "share-class.read",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "share-class",
+      "fqn": "share-class.set-instrument-type",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "share-class",
+      "fqn": "share-class.unlink-from-compartment",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "share-class",
+      "fqn": "share-class.update-nav",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "tax-config",
+      "fqn": "tax-config.deactivate-reclaim",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "tax-config",
+      "fqn": "tax-config.define-jurisdiction",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "tax-config",
+      "fqn": "tax-config.list-jurisdictions",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "tax-config",
+      "fqn": "tax-config.list-reclaim-configs",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "tax-config",
+      "fqn": "tax-config.list-reporting",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "tax-config",
+      "fqn": "tax-config.list-tax-status",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "tax-config",
+      "fqn": "tax-config.list-treaty-rates",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "tax-config",
+      "fqn": "tax-config.set-reclaim-config",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "tax-config",
+      "fqn": "tax-config.set-reporting",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "tax-config",
+      "fqn": "tax-config.set-tax-status",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "tax-config",
+      "fqn": "tax-config.set-treaty-rate",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "trust",
+      "fqn": "trust.analyze-control",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "trust",
+      "fqn": "trust.classify",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "trust",
+      "fqn": "trust.end-provision",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "trust",
+      "fqn": "trust.identify-ubos",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "trust",
+      "fqn": "trust.list-by-holder",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "trust",
+      "fqn": "trust.list-provisions",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "trust",
+      "fqn": "trust.record-provision",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    },
+    {
+      "constellation_families": [
+        "fund_administration",
+        "governance_sla"
+      ],
+      "domain": "trust",
+      "fqn": "trust.update-provision",
+      "subject_kinds": [
+        "board",
+        "cbu",
+        "company",
+        "entity",
+        "fund",
+        "investor",
+        "legal-entity",
+        "role",
+        "service-intent",
+        "service-resource",
+        "share-class"
+      ]
+    }
+  ],
+  "workspace": "CBU"
+}

@@ -66,13 +66,26 @@ intents:
     patterns:
       - "create client"
       - "new cbu"
-      - "onboard client"
       - "create business unit"
       - "add new client"
     verbs:
       - cbu.create
       - cbu.ensure
     priority: 100
+
+  request_onboarding:
+    patterns:
+      - "onboarding request"
+      - "request onboarding for this deal"
+      - "submit onboarding handoff"
+      - "handoff this deal to ops"
+      - "product onboarding"
+      - "deal onboarding"
+      - "batch onboarding request"
+    verbs:
+      - deal.request-onboarding
+      - deal.request-onboarding-batch
+    priority: 99
 
   assign_role:
     patterns:
@@ -196,6 +209,8 @@ intents:
       - "new case"
       - "initiate review"
       - "open case"
+      - "open delta kyc case"
+      - "start cbu delta review"
     verbs:
       - kyc-case.create
     priority: 100
@@ -221,11 +236,13 @@ intents:
       - "case status"
       - "escalate case"
       - "approve case"
+      - "reject case"
+      - "withdraw case"
       - "close case"
     verbs:
+      - kyc-case.close
       - kyc-case.update-status
       - kyc-case.escalate
-      - kyc-case.close
     priority: 85
 
   # ---------------------------------------------------------------------------
@@ -605,6 +622,9 @@ intents:
   add_product:
     patterns:
       - "add product"
+      - "subscribe product"
+      - "onboard to product"
+      - "attach product"
       - "enable service"
       - "subscribe to"
       - "provision"
@@ -612,6 +632,31 @@ intents:
       - cbu.add-product
       - service-resource.provision
     priority: 85
+
+  product_catalog:
+    patterns:
+      - "product catalog"
+      - "show products"
+      - "list products"
+      - "show services for product"
+      - "list services for product"
+      - "show resources for service"
+      - "list resource types"
+      - "show resource dictionary"
+      - "list attributes for resource"
+    verbs:
+      - product.read
+      - product.list
+      - service.read
+      - service.list
+      - service.list-by-product
+      - service-resource.read
+      - service-resource.list
+      - service-resource.list-by-service
+      - service-resource.list-attributes
+      - attribute.read
+      - attribute.list
+    priority: 82
 
   configure_service:
     patterns:
@@ -752,9 +797,25 @@ categories:
       - isda.add-csa
       - isda.add-coverage
 
-  products_services:
-    label: "Products & Services"
-    description: "Product assignment and service resource management"
+  product_maintenance:
+    label: "Product Maintenance"
+    description: "Design-time product, service, servicing-resource, and resource-dictionary taxonomy"
+    verbs:
+      - product.read
+      - product.list
+      - service.read
+      - service.list
+      - service.list-by-product
+      - service-resource.read
+      - service-resource.list
+      - service-resource.list-by-service
+      - service-resource.list-attributes
+      - attribute.read
+      - attribute.list
+
+  service_activation:
+    label: "Service Activation"
+    description: "Runtime activation of service resources for an onboarded CBU"
     verbs:
       - cbu.add-product
       - cbu.remove-product
@@ -886,9 +947,10 @@ graph_context:
   # When cursor is on a product node
   cursor_on_product:
     verbs:
-      - service-resource.provision
+      - product.read
+      - service.list-by-product
       - cbu.remove-product
-      - delivery.record
+      - cbu.add-product
     priority: 80
 
   # When viewing UBO layer
@@ -914,10 +976,10 @@ graph_context:
   # When viewing service layer
   layer_services:
     verbs:
+      - service.list-by-product
+      - service-resource.list-by-service
       - service-resource.provision
       - service-resource.activate
-      - delivery.record
-      - cbu.add-product
     priority: 85
 
   # When viewing custody layer
@@ -1073,6 +1135,22 @@ examples:
     short: "Catalog a passport document"
     dsl: '(document.catalog :cbu-id @fund :entity-id @john :doc-type "PASSPORT" :title "John Smith Passport")'
 
+  "product.list":
+    short: "List governed products in the catalog"
+    dsl: '(product.list :is-active true)'
+
+  "service.list-by-product":
+    short: "List services attached to a product"
+    dsl: '(service.list-by-product :product-id @product)'
+
+  "service-resource.list-by-service":
+    short: "List servicing resources required by a service"
+    dsl: '(service-resource.list-by-service :service-id @service)'
+
+  "attribute.list":
+    short: "List resource dictionary attributes"
+    dsl: '(attribute.list :category "resource")'
+
   "kyc-case.create":
     short: "Create new client KYC case"
     dsl: '(kyc-case.create :cbu-id @fund :case-type "NEW_CLIENT" :as @case)'
@@ -1090,7 +1168,7 @@ examples:
     dsl: '(cbu-custody.add-universe :cbu-id @fund :instrument-class "EQUITY" :market "XNYS" :currencies ["USD"] :settlement-types ["DVP"])'
 
   "service-resource.provision":
-    short: "Provision custody account"
+    short: "Provision a runtime resource instance for a CBU"
     dsl: '(service-resource.provision :cbu-id @fund :resource-type "CUSTODY_ACCT" :instance-url "https://custody.bank.com/12345")'
 
   # ---------------------------------------------------------------------------

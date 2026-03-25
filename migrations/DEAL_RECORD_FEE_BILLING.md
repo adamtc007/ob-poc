@@ -17,7 +17,7 @@ In custody/fund-services origination the commercial journey from initial sales c
 1. **Sales** — Deal pipeline tracking, client qualification
 2. **Contracting** — Legal agreements, product scheduling
 3. **Pricing** — Rate card negotiation with counter-offer cycles
-4. **Onboarding** — CBU creation, KYC clearance, go-live
+4. **Onboarding** — existing CBU activation, KYC clearance, go-live
 5. **Billing** — Fee calculation, invoice generation, dispute management
 
 Without a hub entity linking them, each silo operates independently. A rate card agreed by Sales may not match what Ops bills. An onboarding request may reference a product not covered by any contract. Revenue reporting requires manual reconciliation across disconnected systems.

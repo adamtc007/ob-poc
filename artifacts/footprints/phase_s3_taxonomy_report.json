@@ -1,0 +1,136 @@
+{
+  "allowed_workspaces": [
+    "ProductMaintenance",
+    "Deal",
+    "CBU",
+    "KYC",
+    "InstrumentMatrix",
+    "OnBoarding",
+    "*"
+  ],
+  "generated_at": "2026-03-25T13:57:12.268929+00:00",
+  "known_constellation_family_count": 15,
+  "live_domain_count": 121,
+  "mapped_domain_count": 121,
+  "node_state_aliases": [
+    "agreement",
+    "cbu",
+    "client_group",
+    "deal",
+    "document",
+    "document_request",
+    "entity_kyc",
+    "entity_workstream",
+    "fund",
+    "identifier",
+    "kyc_case",
+    "screening",
+    "trading_profile",
+    "ubo_epistemic"
+  ],
+  "repo_revision": "56b2f9b413f2b5ddc2c6ba269ad8cb610e18c7a4",
+  "slice_id": "S3",
+  "state_machine_count": 13,
+  "unknown_constellation_families": [],
+  "unknown_workspaces": [],
+  "unmapped_domains": [],
+  "workspace_constellation_families": {
+    "*": [],
+    "CBU": [
+      "fund_administration",
+      "governance_sla"
+    ],
+    "Deal": [
+      "billing_operations",
+      "contract_lifecycle",
+      "deal_commercial",
+      "deal_lifecycle"
+    ],
+    "InstrumentMatrix": [
+      "trading_mandate",
+      "trading_streetside"
+    ],
+    "KYC": [
+      "client_group_ownership",
+      "kyc_extended",
+      "kyc_lifecycle"
+    ],
+    "OnBoarding": [
+      "cross_border_onboarding",
+      "fund_onboarding",
+      "governance_sla",
+      "manager_onboarding"
+    ],
+    "ProductMaintenance": [
+      "product_service_taxonomy"
+    ]
+  },
+  "workspace_count": 7,
+  "workspace_subject_kinds": {
+    "*": [
+      "session"
+    ],
+    "CBU": [
+      "board",
+      "cbu",
+      "company",
+      "entity",
+      "fund",
+      "investor",
+      "legal-entity",
+      "role",
+      "service-intent",
+      "service-resource",
+      "share-class"
+    ],
+    "Deal": [
+      "client-group",
+      "contract",
+      "deal",
+      "onboarding-request",
+      "pricing-config",
+      "sla"
+    ],
+    "InstrumentMatrix": [
+      "instruction-profile",
+      "instrument",
+      "mandate",
+      "product",
+      "security-type",
+      "settlement-chain",
+      "trading-profile"
+    ],
+    "KYC": [
+      "allegation",
+      "client-group",
+      "company",
+      "document",
+      "entity",
+      "entity-workstream",
+      "evidence",
+      "fund",
+      "kyc-case",
+      "person",
+      "requirement",
+      "screening",
+      "ubo"
+    ],
+    "OnBoarding": [
+      "cbu",
+      "contract",
+      "deal",
+      "document",
+      "kyc-case",
+      "onboarding-request",
+      "requirement",
+      "service-intent",
+      "service-resource"
+    ],
+    "ProductMaintenance": [
+      "attribute",
+      "product",
+      "service",
+      "service-resource"
+    ]
+  }
+}

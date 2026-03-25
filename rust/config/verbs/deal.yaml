@@ -185,6 +185,7 @@ domains:
                 PROSPECT,
                 QUALIFYING,
                 NEGOTIATING,
+                KYC_CLEARANCE,
                 CONTRACTED,
                 ONBOARDING,
                 ACTIVE,
@@ -264,7 +265,7 @@ domains:
           type: affected
 
       update-status:
-        description: "Transition deal status with lifecycle validation"
+        description: "Transition deal status with lifecycle validation, including pre-contract KYC clearance"
         behavior: plugin
         metadata:
           tier: intent
@@ -314,6 +315,7 @@ domains:
                 PROSPECT,
                 QUALIFYING,
                 NEGOTIATING,
+                KYC_CLEARANCE,
                 CONTRACTED,
                 ONBOARDING,
                 ACTIVE,
@@ -1528,11 +1530,12 @@ domains:
       # =========================================================================
 
       request-onboarding:
-        description: "Create onboarding request - handoff from Sales to Ops"
+        description: "Create onboarding request for an existing CBU - handoff from Sales to Ops after KYC clearance and contracting"
         behavior: plugin
         lifecycle:
           precondition_checks:
             - "requires_prior:deal.create"
+            - "requires_prior:kyc-case.create"
             - "requires_prior:deal.agree-rate-card"
             - "requires_prior:deal.add-contract"
         metadata:
@@ -1556,7 +1559,7 @@ domains:
           - "trigger onboarding"
           - "hand over to the onboarding team"
           - "begin product setup for this deal"
-          - "trigger CBU creation from this deal"
+          - "target an existing cbu for onboarding"
           - "start the onboarding process"
           - "kick off product onboarding"
           - "send deal products to onboarding"
@@ -1576,6 +1579,7 @@ domains:
             type: uuid
             required: true
             maps_to: cbu_id
+            description: "Existing CBU to onboard to the contracted product"
             lookup:
               table: cbus
               entity_type: cbu
@@ -1615,8 +1619,14 @@ domains:
           capture: true
 
       request-onboarding-batch:
-        description: "Batch onboarding request - multiple CBUs to multiple products"
+        description: "Batch onboarding request - multiple existing CBUs to multiple products after KYC clearance and contracting"
         behavior: plugin
+        lifecycle:
+          precondition_checks:
+            - "requires_prior:deal.create"
+            - "requires_prior:kyc-case.create"
+            - "requires_prior:deal.agree-rate-card"
+            - "requires_prior:deal.add-contract"
         metadata:
           tier: intent
           source_of_truth: operational
@@ -1642,7 +1652,7 @@ domains:
           - name: requests
             type: json
             required: true
-            description: "Array of {cbu-id, product-id, target-live-date}"
+            description: "Array of {cbu-id, product-id, target-live-date} for existing CBUs"
           - name: requires-kyc
             type: boolean
             required: false

@@ -1,0 +1,8693 @@
+{
+  "families": [
+    "client_group_ownership",
+    "kyc_extended",
+    "kyc_lifecycle"
+  ],
+  "generated_at": "2026-03-25T13:01:39.880086+00:00",
+  "repo_revision": "56b2f9b413f2b5ddc2c6ba269ad8cb610e18c7a4",
+  "slice_id": "S5",
+  "subject_kinds": [
+    "allegation",
+    "client-group",
+    "company",
+    "document",
+    "entity",
+    "entity-workstream",
+    "evidence",
+    "fund",
+    "kyc-case",
+    "person",
+    "requirement",
+    "screening",
+    "ubo"
+  ],
+  "verb_count": 361,
+  "verbs": [
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "access-review",
+      "fqn": "access-review.attest",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "access-review",
+      "fqn": "access-review.audit-report",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "access-review",
+      "fqn": "access-review.bulk-confirm",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "access-review",
+      "fqn": "access-review.campaign-status",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "access-review",
+      "fqn": "access-review.confirm-access",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "access-review",
+      "fqn": "access-review.confirm-all-clean",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "access-review",
+      "fqn": "access-review.create-campaign",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "access-review",
+      "fqn": "access-review.escalate-item",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "access-review",
+      "fqn": "access-review.extend-access",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "access-review",
+      "fqn": "access-review.launch-campaign",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "access-review",
+      "fqn": "access-review.list-flagged",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "access-review",
+      "fqn": "access-review.list-items",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "access-review",
+      "fqn": "access-review.my-pending",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "access-review",
+      "fqn": "access-review.populate-campaign",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "access-review",
+      "fqn": "access-review.process-deadline",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "access-review",
+      "fqn": "access-review.revoke-access",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "access-review",
+      "fqn": "access-review.send-reminders",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "allegation",
+      "fqn": "allegation.contradict",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "allegation",
+      "fqn": "allegation.list-by-entity",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "allegation",
+      "fqn": "allegation.list-pending",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "allegation",
+      "fqn": "allegation.mark-partial",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "allegation",
+      "fqn": "allegation.record",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "allegation",
+      "fqn": "allegation.verify",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "board",
+      "fqn": "board.analyze-control",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "board",
+      "fqn": "board.appoint",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "board",
+      "fqn": "board.grant-appointment-right",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "board",
+      "fqn": "board.list-appointment-rights",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "board",
+      "fqn": "board.list-by-entity",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "board",
+      "fqn": "board.list-by-person",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "board",
+      "fqn": "board.list-rights-held",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "board",
+      "fqn": "board.resign",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "board",
+      "fqn": "board.revoke-appointment-right",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "bods",
+      "fqn": "bods.discover-ubos",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "bods",
+      "fqn": "bods.find-by-lei",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "bods",
+      "fqn": "bods.get-statement",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "bods",
+      "fqn": "bods.import",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "bods",
+      "fqn": "bods.link-entity",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "bods",
+      "fqn": "bods.list-by-entity",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "bods",
+      "fqn": "bods.list-ownership",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "bods",
+      "fqn": "bods.list-persons",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "bods",
+      "fqn": "bods.sync-from-gleif",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "case-event",
+      "fqn": "case-event.list-by-case",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "case-event",
+      "fqn": "case-event.log",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "client-group",
+      "fqn": "client-group.add-ownership-source",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "client-group",
+      "fqn": "client-group.add-relationship",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "client-group",
+      "fqn": "client-group.assign-role",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "client-group",
+      "fqn": "client-group.complete-discovery",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "client-group",
+      "fqn": "client-group.confirm-entity",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "client-group",
+      "fqn": "client-group.create",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "client-group",
+      "fqn": "client-group.discover-entities",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "client-group",
+      "fqn": "client-group.entity-add",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "client-group",
+      "fqn": "client-group.entity-remove",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "client-group",
+      "fqn": "client-group.list-discrepancies",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "client-group",
+      "fqn": "client-group.list-entities",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "client-group",
+      "fqn": "client-group.list-parties",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "client-group",
+      "fqn": "client-group.list-relationships",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "client-group",
+      "fqn": "client-group.list-roles",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "client-group",
+      "fqn": "client-group.list-tags",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "client-group",
+      "fqn": "client-group.list-unverified",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "client-group",
+      "fqn": "client-group.read",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "client-group",
+      "fqn": "client-group.reject-entity",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "client-group",
+      "fqn": "client-group.remove-role",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "client-group",
+      "fqn": "client-group.search-entities",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "client-group",
+      "fqn": "client-group.set-canonical",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "client-group",
+      "fqn": "client-group.start-discovery",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "client-group",
+      "fqn": "client-group.tag-add",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "client-group",
+      "fqn": "client-group.tag-remove",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "client-group",
+      "fqn": "client-group.update",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "client-group",
+      "fqn": "client-group.verify-ownership",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "client-principal-relationship",
+      "fqn": "client-principal-relationship.cross-sell-check",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "client-principal-relationship",
+      "fqn": "client-principal-relationship.list",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "client-principal-relationship",
+      "fqn": "client-principal-relationship.record",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "client-principal-relationship",
+      "fqn": "client-principal-relationship.terminate",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "control",
+      "fqn": "control.add",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "control",
+      "fqn": "control.analyze",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "control",
+      "fqn": "control.build-graph",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "control",
+      "fqn": "control.clear-board-controller-override",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "control",
+      "fqn": "control.compute-controllers",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "control",
+      "fqn": "control.end",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "control",
+      "fqn": "control.identify-ubos",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "control",
+      "fqn": "control.import-gleif-control",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "control",
+      "fqn": "control.import-psc-register",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "control",
+      "fqn": "control.list-controlled",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "control",
+      "fqn": "control.list-controllers",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "control",
+      "fqn": "control.recompute-board-controller",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "control",
+      "fqn": "control.reconcile-ownership",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "control",
+      "fqn": "control.set-board-controller",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "control",
+      "fqn": "control.show-board-controller",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "control",
+      "fqn": "control.trace-chain",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "discrepancy",
+      "fqn": "discrepancy.escalate",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "discrepancy",
+      "fqn": "discrepancy.list-open",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "discrepancy",
+      "fqn": "discrepancy.record",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "discrepancy",
+      "fqn": "discrepancy.resolve",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "docs-bundle",
+      "fqn": "docs-bundle.apply",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "docs-bundle",
+      "fqn": "docs-bundle.list-applied",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "docs-bundle",
+      "fqn": "docs-bundle.list-available",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "document",
+      "fqn": "document.catalog",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "document",
+      "fqn": "document.compute-requirements",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "document",
+      "fqn": "document.create",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "document",
+      "fqn": "document.create-request",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "document",
+      "fqn": "document.extract",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "document",
+      "fqn": "document.for-entity",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "document",
+      "fqn": "document.get",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "document",
+      "fqn": "document.list-requests-by-workstream",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "document",
+      "fqn": "document.list-versions",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "document",
+      "fqn": "document.mark-requested",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "document",
+      "fqn": "document.missing-for-entity",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "document",
+      "fqn": "document.receive-request",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "document",
+      "fqn": "document.reject",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "document",
+      "fqn": "document.reject-request",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "document",
+      "fqn": "document.solicit",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "document",
+      "fqn": "document.solicit-set",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "document",
+      "fqn": "document.start-qa",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "document",
+      "fqn": "document.upload-version",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "document",
+      "fqn": "document.verify",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "document",
+      "fqn": "document.verify-request",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "document",
+      "fqn": "document.waive-request",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "entity-workstream",
+      "fqn": "entity-workstream.block",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "entity-workstream",
+      "fqn": "entity-workstream.complete",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "entity-workstream",
+      "fqn": "entity-workstream.create",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "entity-workstream",
+      "fqn": "entity-workstream.list-by-case",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "entity-workstream",
+      "fqn": "entity-workstream.read",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "entity-workstream",
+      "fqn": "entity-workstream.set-enhanced-dd",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "entity-workstream",
+      "fqn": "entity-workstream.set-ubo",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "entity-workstream",
+      "fqn": "entity-workstream.state",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "entity-workstream",
+      "fqn": "entity-workstream.update-status",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "entity",
+      "fqn": "entity.create",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "entity",
+      "fqn": "entity.delete",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "entity",
+      "fqn": "entity.ensure",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "entity",
+      "fqn": "entity.ensure-or-placeholder",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "entity",
+      "fqn": "entity.ghost",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "entity",
+      "fqn": "entity.identify",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "entity",
+      "fqn": "entity.list",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "entity",
+      "fqn": "entity.list-ghosts",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "entity",
+      "fqn": "entity.list-placeholders",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "entity",
+      "fqn": "entity.placeholder-summary",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "entity",
+      "fqn": "entity.query",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "entity",
+      "fqn": "entity.read",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "entity",
+      "fqn": "entity.resolve-placeholder",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "entity",
+      "fqn": "entity.update",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "entity",
+      "fqn": "entity.verify",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "evidence",
+      "fqn": "evidence.attach-document",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "evidence",
+      "fqn": "evidence.create-requirement",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "evidence",
+      "fqn": "evidence.mark-rejected",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "evidence",
+      "fqn": "evidence.mark-verified",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "evidence",
+      "fqn": "evidence.mark-waived",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "gleif",
+      "fqn": "gleif.enrich",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "gleif",
+      "fqn": "gleif.get-children",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "gleif",
+      "fqn": "gleif.get-managed-funds",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "gleif",
+      "fqn": "gleif.get-manager",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "gleif",
+      "fqn": "gleif.get-master-fund",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "gleif",
+      "fqn": "gleif.get-parent",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "gleif",
+      "fqn": "gleif.get-record",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "gleif",
+      "fqn": "gleif.get-umbrella",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "gleif",
+      "fqn": "gleif.import-managed-funds",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "gleif",
+      "fqn": "gleif.import-to-client-group",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "gleif",
+      "fqn": "gleif.import-tree",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "gleif",
+      "fqn": "gleif.lookup-by-isin",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "gleif",
+      "fqn": "gleif.refresh",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "gleif",
+      "fqn": "gleif.resolve-successor",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "gleif",
+      "fqn": "gleif.search",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "gleif",
+      "fqn": "gleif.trace-ownership",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "identifier",
+      "fqn": "identifier.attach",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "identifier",
+      "fqn": "identifier.attach-clearstream",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "identifier",
+      "fqn": "identifier.attach-lei",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "identifier",
+      "fqn": "identifier.find-by-clearstream",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "identifier",
+      "fqn": "identifier.find-by-isin",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "identifier",
+      "fqn": "identifier.find-by-lei",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "identifier",
+      "fqn": "identifier.invalidate",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "identifier",
+      "fqn": "identifier.list-by-entity",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "identifier",
+      "fqn": "identifier.remove",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "identifier",
+      "fqn": "identifier.update-lei-status",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "identifier",
+      "fqn": "identifier.validate",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "kyc-agreement",
+      "fqn": "kyc-agreement.create",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "kyc-agreement",
+      "fqn": "kyc-agreement.list",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "kyc-agreement",
+      "fqn": "kyc-agreement.read",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "kyc-agreement",
+      "fqn": "kyc-agreement.update-status",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "kyc-case",
+      "fqn": "kyc-case.assign",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "kyc-case",
+      "fqn": "kyc-case.close",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "kyc-case",
+      "fqn": "kyc-case.create",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "kyc-case",
+      "fqn": "kyc-case.escalate",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "kyc-case",
+      "fqn": "kyc-case.list-by-cbu",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "kyc-case",
+      "fqn": "kyc-case.read",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "kyc-case",
+      "fqn": "kyc-case.reopen",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "kyc-case",
+      "fqn": "kyc-case.set-risk-rating",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "kyc-case",
+      "fqn": "kyc-case.state",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "kyc-case",
+      "fqn": "kyc-case.update-status",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "kyc",
+      "fqn": "kyc.open-case",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "legal-entity",
+      "fqn": "legal-entity.create",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "legal-entity",
+      "fqn": "legal-entity.list",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "legal-entity",
+      "fqn": "legal-entity.update",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "manco",
+      "fqn": "manco.book.summary",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "manco",
+      "fqn": "manco.control-chain",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "manco",
+      "fqn": "manco.group.add-member",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "manco",
+      "fqn": "manco.group.cbus",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "manco",
+      "fqn": "manco.group.create",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "manco",
+      "fqn": "manco.group.derive",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "manco",
+      "fqn": "manco.group.for-cbu",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "manco",
+      "fqn": "manco.group.list",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "manco",
+      "fqn": "manco.group.remove-member",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "manco",
+      "fqn": "manco.primary-controller",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "observation",
+      "fqn": "observation.get-current",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "observation",
+      "fqn": "observation.list-for-attribute",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "observation",
+      "fqn": "observation.list-for-entity",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "observation",
+      "fqn": "observation.reconcile",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "observation",
+      "fqn": "observation.record",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "observation",
+      "fqn": "observation.record-from-document",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "observation",
+      "fqn": "observation.supersede",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "observation",
+      "fqn": "observation.verify-allegations",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "ownership",
+      "fqn": "ownership.analyze-gaps",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "ownership",
+      "fqn": "ownership.bridge.bods-ownership",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "ownership",
+      "fqn": "ownership.bridge.gleif-fund-managers",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "ownership",
+      "fqn": "ownership.bridge.manco-roles",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "ownership",
+      "fqn": "ownership.compute",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "ownership",
+      "fqn": "ownership.control-links.compute",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "ownership",
+      "fqn": "ownership.control-links.list",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "ownership",
+      "fqn": "ownership.control-positions",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "ownership",
+      "fqn": "ownership.reconcile",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "ownership",
+      "fqn": "ownership.reconcile.findings",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "ownership",
+      "fqn": "ownership.reconcile.list-runs",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "ownership",
+      "fqn": "ownership.reconcile.resolve-finding",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "ownership",
+      "fqn": "ownership.refresh",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "ownership",
+      "fqn": "ownership.right.add-to-class",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "ownership",
+      "fqn": "ownership.right.add-to-holder",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "ownership",
+      "fqn": "ownership.right.end",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "ownership",
+      "fqn": "ownership.right.list-for-holder",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "ownership",
+      "fqn": "ownership.right.list-for-issuer",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "ownership",
+      "fqn": "ownership.snapshot.get",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "ownership",
+      "fqn": "ownership.snapshot.list",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "ownership",
+      "fqn": "ownership.trace-chain",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "ownership",
+      "fqn": "ownership.who-controls",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "red-flag",
+      "fqn": "red-flag.close",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "red-flag",
+      "fqn": "red-flag.dismiss",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "red-flag",
+      "fqn": "red-flag.list-by-case",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "red-flag",
+      "fqn": "red-flag.list-by-workstream",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "red-flag",
+      "fqn": "red-flag.mitigate",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "red-flag",
+      "fqn": "red-flag.raise",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "red-flag",
+      "fqn": "red-flag.set-blocking",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "red-flag",
+      "fqn": "red-flag.waive",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "regulatory.registration",
+      "fqn": "regulatory.registration.add",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "regulatory.registration",
+      "fqn": "regulatory.registration.list",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "regulatory.registration",
+      "fqn": "regulatory.registration.remove",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "regulatory.registration",
+      "fqn": "regulatory.registration.verify",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "regulatory.status",
+      "fqn": "regulatory.status.check",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "request",
+      "fqn": "request.cancel",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "request",
+      "fqn": "request.create",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "request",
+      "fqn": "request.escalate",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "request",
+      "fqn": "request.extend",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "request",
+      "fqn": "request.fulfill",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "request",
+      "fqn": "request.list",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "request",
+      "fqn": "request.overdue",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "request",
+      "fqn": "request.remind",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "request",
+      "fqn": "request.waive",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "requirement",
+      "fqn": "requirement.create",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "requirement",
+      "fqn": "requirement.create-set",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "requirement",
+      "fqn": "requirement.for-entity",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "requirement",
+      "fqn": "requirement.for-workflow",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "requirement",
+      "fqn": "requirement.get",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "requirement",
+      "fqn": "requirement.mark-expired",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "requirement",
+      "fqn": "requirement.reset",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "requirement",
+      "fqn": "requirement.unsatisfied",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "requirement",
+      "fqn": "requirement.waive",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "requirement",
+      "fqn": "requirement.with-status",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "research.companies-house",
+      "fqn": "research.companies-house.fetch-company",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "research.companies-house",
+      "fqn": "research.companies-house.fetch-officers",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "research.companies-house",
+      "fqn": "research.companies-house.fetch-psc",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "research.companies-house",
+      "fqn": "research.companies-house.import-company",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "research.companies-house",
+      "fqn": "research.companies-house.search",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "research.generic",
+      "fqn": "research.generic.normalize",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "research.import-run",
+      "fqn": "research.import-run.begin",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "research.import-run",
+      "fqn": "research.import-run.complete",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "research.import-run",
+      "fqn": "research.import-run.supersede",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "research.outreach",
+      "fqn": "research.outreach.close-request",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "research.outreach",
+      "fqn": "research.outreach.create-request",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "research.outreach",
+      "fqn": "research.outreach.get-request",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "research.outreach",
+      "fqn": "research.outreach.list-overdue",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "research.outreach",
+      "fqn": "research.outreach.list-pending",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "research.outreach",
+      "fqn": "research.outreach.mark-sent",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "research.outreach",
+      "fqn": "research.outreach.plan-generate",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "research.outreach",
+      "fqn": "research.outreach.record-response",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "research.outreach",
+      "fqn": "research.outreach.send-reminder",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "research.sec-edgar",
+      "fqn": "research.sec-edgar.fetch-beneficial-owners",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "research.sec-edgar",
+      "fqn": "research.sec-edgar.fetch-company",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "research.sec-edgar",
+      "fqn": "research.sec-edgar.fetch-filings",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "research.sec-edgar",
+      "fqn": "research.sec-edgar.import-company",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "research.sec-edgar",
+      "fqn": "research.sec-edgar.search",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "research.sources",
+      "fqn": "research.sources.fetch",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "research.sources",
+      "fqn": "research.sources.find-for-jurisdiction",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "research.sources",
+      "fqn": "research.sources.info",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "research.sources",
+      "fqn": "research.sources.list",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "research.sources",
+      "fqn": "research.sources.search",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "research.workflow",
+      "fqn": "research.workflow.audit-trail",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "research.workflow",
+      "fqn": "research.workflow.confirm-decision",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "research.workflow",
+      "fqn": "research.workflow.pending-decisions",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "research.workflow",
+      "fqn": "research.workflow.record-action",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "research.workflow",
+      "fqn": "research.workflow.record-anomaly",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "research.workflow",
+      "fqn": "research.workflow.record-correction",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "research.workflow",
+      "fqn": "research.workflow.record-decision",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "research.workflow",
+      "fqn": "research.workflow.reject-decision",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "research.workflow",
+      "fqn": "research.workflow.resolve-anomaly",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "research.workflow",
+      "fqn": "research.workflow.supersession-trail",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "screening",
+      "fqn": "screening.adverse-media",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "screening",
+      "fqn": "screening.bulk-refresh",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "screening",
+      "fqn": "screening.complete",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "screening",
+      "fqn": "screening.list-by-workstream",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "screening",
+      "fqn": "screening.pep",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "screening",
+      "fqn": "screening.review-hit",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "screening",
+      "fqn": "screening.run",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "screening",
+      "fqn": "screening.sanctions",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "tollgate",
+      "fqn": "tollgate.evaluate",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "tollgate",
+      "fqn": "tollgate.evaluate-gate",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "tollgate",
+      "fqn": "tollgate.expire-override",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "tollgate",
+      "fqn": "tollgate.get-decision-readiness",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "tollgate",
+      "fqn": "tollgate.get-metrics",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "tollgate",
+      "fqn": "tollgate.list-evaluations",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "tollgate",
+      "fqn": "tollgate.list-overrides",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "tollgate",
+      "fqn": "tollgate.list-thresholds",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "tollgate",
+      "fqn": "tollgate.override",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "tollgate",
+      "fqn": "tollgate.set-threshold",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "ubo",
+      "fqn": "ubo.add-control",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "ubo",
+      "fqn": "ubo.add-ownership",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "ubo",
+      "fqn": "ubo.add-trust-role",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "ubo",
+      "fqn": "ubo.calculate",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "ubo",
+      "fqn": "ubo.compute-chains",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "ubo",
+      "fqn": "ubo.convergence-supersede",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "ubo",
+      "fqn": "ubo.delete-relationship",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "ubo",
+      "fqn": "ubo.end-relationship",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "ubo",
+      "fqn": "ubo.list-by-subject",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "ubo",
+      "fqn": "ubo.list-owned",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "ubo",
+      "fqn": "ubo.list-owners",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "ubo",
+      "fqn": "ubo.list-ubos",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "ubo",
+      "fqn": "ubo.mark-deceased",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "ubo",
+      "fqn": "ubo.mark-terminus",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "ubo.registry",
+      "fqn": "ubo.registry.advance",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "ubo.registry",
+      "fqn": "ubo.registry.create",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "ubo.registry",
+      "fqn": "ubo.registry.expire",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "ubo.registry",
+      "fqn": "ubo.registry.promote",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "ubo.registry",
+      "fqn": "ubo.registry.reject",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "ubo.registry",
+      "fqn": "ubo.registry.waive",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "ubo",
+      "fqn": "ubo.snapshot.capture",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "ubo",
+      "fqn": "ubo.snapshot.diff",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "ubo",
+      "fqn": "ubo.trace-chains",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "ubo",
+      "fqn": "ubo.transfer-control",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "ubo",
+      "fqn": "ubo.update-ownership",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "ubo",
+      "fqn": "ubo.waive-verification",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "verify",
+      "fqn": "verify.assert",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "verify",
+      "fqn": "verify.calculate-confidence",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "verify",
+      "fqn": "verify.challenge",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "verify",
+      "fqn": "verify.detect-evasion",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "verify",
+      "fqn": "verify.detect-patterns",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "verify",
+      "fqn": "verify.escalate",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "verify",
+      "fqn": "verify.get-status",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "verify",
+      "fqn": "verify.list-challenges",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "verify",
+      "fqn": "verify.list-escalations",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "verify",
+      "fqn": "verify.list-patterns",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "verify",
+      "fqn": "verify.record-pattern",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "verify",
+      "fqn": "verify.resolve-challenge",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "verify",
+      "fqn": "verify.resolve-escalation",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "verify",
+      "fqn": "verify.resolve-pattern",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "verify",
+      "fqn": "verify.respond-to-challenge",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    },
+    {
+      "constellation_families": [
+        "client_group_ownership",
+        "kyc_extended",
+        "kyc_lifecycle"
+      ],
+      "domain": "verify",
+      "fqn": "verify.verify-against-registry",
+      "subject_kinds": [
+        "allegation",
+        "client-group",
+        "company",
+        "document",
+        "entity",
+        "entity-workstream",
+        "evidence",
+        "fund",
+        "kyc-case",
+        "person",
+        "requirement",
+        "screening",
+        "ubo"
+      ]
+    }
+  ],
+  "workspace": "KYC"
+}

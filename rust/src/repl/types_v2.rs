@@ -1,7 +1,7 @@
 //! V2 State Machine Types — 7-State REPL
 //!
-//! Defines the new 7-state machine from spec §8.3:
-//! ScopeGate → JourneySelection → InPack → Clarifying →
+//! Defines the new state machine:
+//! ScopeGate → WorkspaceSelection → JourneySelection → InPack → Clarifying →
 //! SentencePlayback → RunbookEditing → Executing
 //!
 //! Also defines `UserInputV2` — the conversational input model.
@@ -27,6 +27,9 @@ pub enum ReplStateV2 {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         candidates: Option<Vec<super::bootstrap::BootstrapCandidate>>,
     },
+
+    /// User has selected a client scope and must now choose a workspace.
+    WorkspaceSelection { workspaces: Vec<WorkspaceOption> },
 
     /// User has scope, now choosing a journey pack.
     JourneySelection {
@@ -76,6 +79,39 @@ pub struct PackCandidate {
     pub pack_name: String,
     pub description: String,
     pub score: f32,
+}
+
+/// A top-level workspace available after scope selection.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum WorkspaceKind {
+    ProductMaintenance,
+    Deal,
+    Cbu,
+    Kyc,
+    InstrumentMatrix,
+    OnBoarding,
+}
+
+impl WorkspaceKind {
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::ProductMaintenance => "Product Maintenance",
+            Self::Deal => "Deal",
+            Self::Cbu => "CBU",
+            Self::Kyc => "KYC",
+            Self::InstrumentMatrix => "Instrument Matrix",
+            Self::OnBoarding => "OnBoarding",
+        }
+    }
+}
+
+/// A selectable workspace option.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorkspaceOption {
+    pub workspace: WorkspaceKind,
+    pub label: String,
+    pub description: String,
 }
 
 /// A candidate verb for clarification.
@@ -162,6 +198,9 @@ pub enum UserInputV2 {
 
     /// User selected a scope (client group / CBU set).
     SelectScope { group_id: Uuid, group_name: String },
+
+    /// User selected a workspace after scope resolution.
+    SelectWorkspace { workspace: WorkspaceKind },
 
     /// User approves a human-gated entry.
     Approve {

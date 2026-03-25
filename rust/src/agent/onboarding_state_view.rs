@@ -112,7 +112,7 @@ fn build_group_identity_layer(c: &GroupCompositeState) -> OnboardingLayer {
     }
 }
 
-// ── Layer 1: CBU Identification ─────────────────────────────────────
+// ── Layer 1: Controlled CBU Linkage ─────────────────────────────────
 
 fn build_cbu_identification_layer(c: &GroupCompositeState) -> OnboardingLayer {
     let (state, progress) = if c.cbu_count == 0 {
@@ -127,7 +127,7 @@ fn build_cbu_identification_layer(c: &GroupCompositeState) -> OnboardingLayer {
 
     let forward = filter_hints(
         &c.next_likely_verbs,
-        &["cbu.create"],
+        &["cbu.ensure", "cbu.create"],
         VerbDirection::Forward,
     );
     let blocked = filter_blocked(
@@ -137,11 +137,13 @@ fn build_cbu_identification_layer(c: &GroupCompositeState) -> OnboardingLayer {
 
     OnboardingLayer {
         index: 1,
-        name: "CBU Identification".into(),
-        description: "Identify revenue-generating Client Business Units within the group".into(),
+        name: "Controlled CBU Linkage".into(),
+        description:
+            "Confirm or add the existing controlled CBUs that inherit the group clearance baseline"
+                .into(),
         state,
         progress_pct: progress,
-        summary: Some(format!("{} CBU(s) in scope", c.cbu_count)),
+        summary: Some(format!("{} linked CBU(s) in scope", c.cbu_count)),
         forward_verbs: forward,
         revert_verbs: vec![], // CBUs are entities — delete/archive, not "undo"
         blocked_verbs: blocked,
@@ -149,15 +151,15 @@ fn build_cbu_identification_layer(c: &GroupCompositeState) -> OnboardingLayer {
     }
 }
 
-// ── Layer 2: KYC Case Opening ───────────────────────────────────────
+// ── Layer 2: CBU Delta KYC ──────────────────────────────────────────
 
 fn build_kyc_case_layer(c: &GroupCompositeState) -> OnboardingLayer {
     if c.cbu_count == 0 {
         return blocked_layer(
             2,
-            "KYC Case",
-            "Open KYC cases for each CBU",
-            "No CBUs identified",
+            "CBU Delta KYC",
+            "Open delta KYC cases for linked CBUs after group clearance",
+            "No controlled CBUs linked",
         );
     }
 
@@ -198,11 +200,15 @@ fn build_kyc_case_layer(c: &GroupCompositeState) -> OnboardingLayer {
 
     OnboardingLayer {
         index: 2,
-        name: "KYC Case".into(),
-        description: "Open KYC cases for each CBU requiring onboarding review".into(),
+        name: "CBU Delta KYC".into(),
+        description:
+            "Open delta KYC cases only for the linked CBUs that need local review beyond the group baseline"
+                .into(),
         state,
         progress_pct: progress,
-        summary: Some(format!("{with_case} of {total} CBU(s) have KYC cases")),
+        summary: Some(format!(
+            "{with_case} of {total} linked CBU(s) have delta KYC cases"
+        )),
         forward_verbs: forward,
         revert_verbs: revert,
         blocked_verbs: vec![],
@@ -217,8 +223,8 @@ fn build_screening_layer(c: &GroupCompositeState) -> OnboardingLayer {
         return blocked_layer(
             3,
             "Screening",
-            "Run compliance screening checks",
-            "No CBUs identified",
+            "Run delta screening checks",
+            "No controlled CBUs linked",
         );
     }
 
@@ -228,8 +234,8 @@ fn build_screening_layer(c: &GroupCompositeState) -> OnboardingLayer {
         return blocked_layer(
             3,
             "Screening",
-            "Run compliance screening checks",
-            "No KYC cases opened",
+            "Run delta screening checks",
+            "No delta KYC cases opened",
         );
     }
 
@@ -267,10 +273,13 @@ fn build_screening_layer(c: &GroupCompositeState) -> OnboardingLayer {
     OnboardingLayer {
         index: 3,
         name: "Screening".into(),
-        description: "Run sanctions, PEP, and adverse media checks for all entities".into(),
+        description: "Run sanctions, PEP, and adverse media checks for the delta KYC perimeter"
+            .into(),
         state,
         progress_pct: progress,
-        summary: Some(format!("{screened} of {total} CBU(s) screened")),
+        summary: Some(format!(
+            "{screened} of {total} linked CBU(s) screened for delta KYC"
+        )),
         forward_verbs: forward,
         revert_verbs: revert,
         blocked_verbs: vec![],
@@ -285,8 +294,8 @@ fn build_document_layer(c: &GroupCompositeState) -> OnboardingLayer {
         return blocked_layer(
             4,
             "Documents",
-            "Collect required documents",
-            "No CBUs identified",
+            "Collect delta KYC documents",
+            "No controlled CBUs linked",
         );
     }
 
@@ -300,7 +309,7 @@ fn build_document_layer(c: &GroupCompositeState) -> OnboardingLayer {
         return blocked_layer(
             4,
             "Documents",
-            "Collect required documents",
+            "Collect delta KYC documents",
             "Screening not complete",
         );
     }
@@ -327,11 +336,12 @@ fn build_document_layer(c: &GroupCompositeState) -> OnboardingLayer {
     OnboardingLayer {
         index: 4,
         name: "Documents".into(),
-        description: "Collect required identity and corporate documents".into(),
+        description:
+            "Collect only the local identity and corporate documents required for delta KYC".into(),
         state,
         progress_pct: progress,
         summary: Some(format!(
-            "{complete} of {total} CBU(s) have complete documentation"
+            "{complete} of {total} linked CBU(s) have complete delta-KYC documentation"
         )),
         forward_verbs: forward,
         revert_verbs: vec![], // Document solicitation isn't "undoable" — it's a request
@@ -340,7 +350,7 @@ fn build_document_layer(c: &GroupCompositeState) -> OnboardingLayer {
     }
 }
 
-// ── Layer 5: Approval / Tollgate ────────────────────────────────────
+// ── Layer 5: Clearance & Handoff ────────────────────────────────────
 
 fn build_approval_layer(c: &GroupCompositeState) -> OnboardingLayer {
     let approved = c
@@ -367,11 +377,36 @@ fn build_approval_layer(c: &GroupCompositeState) -> OnboardingLayer {
         _ => LayerState::InProgress,
     };
 
-    let forward = filter_hints(
+    let mut forward = filter_hints(
         &c.next_likely_verbs,
-        &["kyc-case.read", "deal.read-record"],
+        &[
+            "deal.request-onboarding",
+            "kyc-case.read",
+            "deal.read-record",
+        ],
         VerbDirection::Query,
     );
+
+    if approved == total
+        && total > 0
+        && !forward
+            .iter()
+            .any(|v| v.verb_fqn == "deal.request-onboarding")
+    {
+        forward.insert(
+            0,
+            SuggestedVerb {
+                verb_fqn: "deal.request-onboarding".into(),
+                label: "Request Onboarding Handoff".into(),
+                suggested_utterance: "request onboarding for this deal".into(),
+                reason: "Delta KYC is cleared — hand off the contracted deal into onboarding"
+                    .into(),
+                boost: 0.08,
+                direction: VerbDirection::Forward,
+                governance_tier: Some("governed".into()),
+            },
+        );
+    }
 
     // Revert: reopen approved case for review
     let revert = if approved > 0 {
@@ -390,12 +425,15 @@ fn build_approval_layer(c: &GroupCompositeState) -> OnboardingLayer {
 
     OnboardingLayer {
         index: 5,
-        name: "Approval".into(),
-        description: "Final KYC approval tollgate — all screening and documentation complete"
-            .into(),
+        name: "Clearance & Handoff".into(),
+        description:
+            "Final delta-KYC clearance followed by the commercial handoff from deal into onboarding"
+                .into(),
         state,
         progress_pct: progress,
-        summary: Some(format!("{approved} of {total} CBU(s) approved")),
+        summary: Some(format!(
+            "{approved} of {total} linked CBU(s) cleared and ready for onboarding handoff"
+        )),
         forward_verbs: forward,
         revert_verbs: revert,
         blocked_verbs: vec![],
@@ -469,7 +507,15 @@ fn compute_cbu_next_action(cbu: &CbuStateSummary) -> Option<SuggestedVerb> {
     }
 
     if cbu.kyc_case_status.as_deref() == Some("APPROVED") {
-        return None; // Done
+        return Some(SuggestedVerb {
+            verb_fqn: "deal.request-onboarding".into(),
+            label: "Request Onboarding Handoff".into(),
+            suggested_utterance: "request onboarding for this deal".into(),
+            reason: "Delta KYC cleared — this CBU is ready for deal handoff".into(),
+            boost: 0.08,
+            direction: VerbDirection::Forward,
+            governance_tier: Some("governed".into()),
+        });
     }
 
     if !cbu.has_screening {
@@ -609,6 +655,7 @@ fn verb_fqn_to_label(fqn: &str) -> String {
         "ownership.trace-chain" => "Trace Ownership Chain".into(),
         "gleif.import-tree" => "Import GLEIF Hierarchy".into(),
         "control.build-graph" => "Build Control Graph".into(),
+        "cbu.ensure" => "Confirm CBU".into(),
         "cbu.create" => "Create CBU".into(),
         "kyc-case.create" | "kyc.open-case" => "Open KYC Case".into(),
         "kyc-case.reopen" => "Reopen Case".into(),
@@ -618,6 +665,7 @@ fn verb_fqn_to_label(fqn: &str) -> String {
         "screening.pep" => "Run PEP Check".into(),
         "document.solicit" => "Request Documents".into(),
         "document.solicit-set" => "Request Document Set".into(),
+        "deal.request-onboarding" => "Request Onboarding Handoff".into(),
         "kyc-case.read" => "Check Case Status".into(),
         "deal.read-record" => "Review Deal".into(),
         _ => {
@@ -645,6 +693,7 @@ fn verb_fqn_to_utterance(fqn: &str) -> String {
         "ownership.trace-chain" => "Trace the ownership chain".into(),
         "gleif.import-tree" => "Import the corporate hierarchy from GLEIF".into(),
         "control.build-graph" => "Build the control graph".into(),
+        "cbu.ensure" => "ensure CBU exists".into(),
         "cbu.create" => "Create a new CBU".into(),
         "kyc-case.create" | "kyc.open-case" => "Open a new KYC case".into(),
         "kyc-case.reopen" => "Reopen the case for review".into(),
@@ -653,6 +702,7 @@ fn verb_fqn_to_utterance(fqn: &str) -> String {
         "screening.pep" => "Run a PEP check".into(),
         "document.solicit" => "Request a document".into(),
         "document.solicit-set" => "Request the full document set".into(),
+        "deal.request-onboarding" => "request onboarding for this deal".into(),
         "kyc-case.read" => "Check the KYC case status".into(),
         "deal.read-record" => "Review the deal record".into(),
         _ => fqn.replace(['.', '-'], " "),

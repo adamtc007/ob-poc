@@ -23,6 +23,124 @@ domains:
 
     verbs:
       # ============================================================================
+      # CLIENT GROUP ROOT - CRUD over the apex group record
+      # ============================================================================
+
+      create:
+        description: "Create a new client group root record"
+        behavior: crud
+        crud:
+          operation: insert
+          table: client_group
+          schema: ob-poc
+        invocation_phrases:
+          - "create client group"
+          - "new client group"
+          - "create group root"
+          - "register client group"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          internal: false
+          noun: client_group
+          subject_kinds: [client-group]
+          tags: [root, crud]
+          phase_tags: [onboarding]
+          side_effects: state_write
+        args:
+          - name: canonical-name
+            type: string
+            required: true
+            maps_to: canonical_name
+            description: "Canonical group name"
+          - name: short-code
+            type: string
+            required: false
+            maps_to: short_code
+          - name: description
+            type: string
+            required: false
+            maps_to: description
+        returns:
+          type: uuid
+          name: id
+      read:
+        description: "Read the root client group record"
+        behavior: crud
+        crud:
+          operation: select
+          table: client_group
+          schema: ob-poc
+        invocation_phrases:
+          - "read client group"
+          - "show client group"
+          - "get client group"
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          internal: false
+          noun: client_group
+          subject_kinds: [client-group]
+          tags: [root, read]
+          phase_tags: [onboarding]
+          side_effects: facts_only
+        args:
+          - name: group-id
+            type: uuid
+            required: true
+            maps_to: id
+            lookup:
+              table: client_group
+              schema: ob-poc
+              search_key: canonical_name
+              primary_key: id
+        returns:
+          type: record
+      update:
+        description: "Update the root client group record"
+        behavior: crud
+        crud:
+          operation: update
+          table: client_group
+          schema: ob-poc
+          key: id
+        invocation_phrases:
+          - "update client group"
+          - "rename client group"
+          - "edit client group"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          internal: false
+          noun: client_group
+          subject_kinds: [client-group]
+          tags: [root, crud]
+          phase_tags: [onboarding]
+          side_effects: state_write
+        args:
+          - name: group-id
+            type: uuid
+            required: true
+            maps_to: id
+            lookup:
+              table: client_group
+              schema: ob-poc
+              search_key: canonical_name
+              primary_key: id
+          - name: canonical-name
+            type: string
+            required: false
+            maps_to: canonical_name
+          - name: short-code
+            type: string
+            required: false
+            maps_to: short_code
+          - name: description
+            type: string
+            required: false
+            maps_to: description
+
+      # ============================================================================
       # ENTITY MEMBERSHIP - Track which entities belong to client groups
       # ============================================================================
 

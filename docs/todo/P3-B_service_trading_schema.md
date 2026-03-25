@@ -651,7 +651,7 @@ The schema has clean FK chains across domains:
 deals → deal_rate_cards → deal_rate_card_lines
      → deal_contracts → legal_contracts → contract_products
      → deal_products → products
-     → deal_onboarding_requests → (links to CBU creation)
+     → deal_onboarding_requests → (links to existing CBU onboarding)
      → fee_billing_profiles → fee_billing_account_targets → cbus
                              → fee_billing_periods → fee_billing_period_lines
 ```

@@ -1,0 +1,72 @@
+{
+  "derived_entry_count": 3,
+  "entries": [
+    {
+      "domain": "kyc",
+      "downstream_hint": [
+        "kyc-case.create"
+      ],
+      "evidence_source": [
+        "yaml_behavior",
+        "manual_classification"
+      ],
+      "fqn": "kyc.open-case",
+      "postconditions": [
+        "delegates execution to downstream verbs or template expansion"
+      ],
+      "preconditions": [
+        "required args present: cbu-id",
+        "lookup entities resolve: cbu, entity"
+      ],
+      "rationale": "Composite or durable verb should be marked delegated instead of treated as a direct table-footprint gap",
+      "workspace_affinity": [
+        "KYC"
+      ]
+    },
+    {
+      "domain": "template",
+      "downstream_hint": [
+        "template.invoke"
+      ],
+      "evidence_source": [
+        "yaml_behavior",
+        "manual_classification"
+      ],
+      "fqn": "template.batch",
+      "postconditions": [
+        "delegates execution to downstream verbs or template expansion"
+      ],
+      "preconditions": [
+        "required args present: bind-as, id, source"
+      ],
+      "rationale": "Composite or durable verb should be marked delegated instead of treated as a direct table-footprint gap",
+      "workspace_affinity": [
+        "OnBoarding"
+      ]
+    },
+    {
+      "domain": "template",
+      "downstream_hint": [
+        "macro/template expansion"
+      ],
+      "evidence_source": [
+        "yaml_behavior",
+        "manual_classification"
+      ],
+      "fqn": "template.invoke",
+      "postconditions": [
+        "delegates execution to downstream verbs or template expansion"
+      ],
+      "preconditions": [
+        "required args present: id"
+      ],
+      "rationale": "Composite or durable verb should be marked delegated instead of treated as a direct table-footprint gap",
+      "workspace_affinity": [
+        "OnBoarding"
+      ]
+    }
+  ],
+  "generated_at": "2026-03-25T13:37:08.326928+00:00",
+  "repo_revision": "56b2f9b413f2b5ddc2c6ba269ad8cb610e18c7a4",
+  "slice_id": "S6.6"
+}

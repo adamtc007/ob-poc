@@ -1,0 +1,31 @@
+workspaces:
+  ProductMaintenance:
+    families:
+      - product_service_taxonomy
+  Deal:
+    families:
+      - deal_commercial
+      - deal_lifecycle
+      - contract_lifecycle
+      - billing_operations
+  CBU:
+    families:
+      - fund_administration
+      - governance_sla
+  KYC:
+    families:
+      - client_group_ownership
+      - kyc_lifecycle
+      - kyc_extended
+  InstrumentMatrix:
+    families:
+      - trading_mandate
+      - trading_streetside
+  OnBoarding:
+    families:
+      - cross_border_onboarding
+      - fund_onboarding
+      - manager_onboarding
+      - governance_sla
+  "*":
+    families: []

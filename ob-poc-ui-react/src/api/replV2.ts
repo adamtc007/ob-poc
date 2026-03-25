@@ -21,6 +21,7 @@ import { api } from "./client";
 /** V2 REPL 7-state machine */
 export type ReplStateV2 =
   | { state: "scope_gate"; pending_input?: string }
+  | { state: "workspace_selection"; workspaces: WorkspaceOption[] }
   | { state: "journey_selection"; candidates?: PackCandidate[] }
   | {
       state: "in_pack";
@@ -61,6 +62,20 @@ export interface VerbCandidate {
   score: number;
 }
 
+export type WorkspaceKind =
+  | "product_maintenance"
+  | "deal"
+  | "cbu"
+  | "kyc"
+  | "instrument_matrix"
+  | "on_boarding";
+
+export interface WorkspaceOption {
+  workspace: WorkspaceKind;
+  label: string;
+  description: string;
+}
+
 export interface ExecutionProgress {
   total_steps: number;
   completed_steps: number;
@@ -80,6 +95,7 @@ export interface ReplResponseV2 {
 /** Response kind — determines UI rendering */
 export type ReplResponseKindV2 =
   | { kind: "scope_required"; prompt: string }
+  | { kind: "workspace_options"; workspaces: WorkspaceOption[] }
   | { kind: "journey_options"; packs: PackCandidate[] }
   | { kind: "question"; field: string; prompt: string; answer_kind: string }
   | {
@@ -170,6 +186,10 @@ export type InputRequestV2 =
       type: "select_scope";
       group_id: string;
       group_name: string;
+    }
+  | {
+      type: "select_workspace";
+      workspace: WorkspaceKind;
     };
 
 /** Response for session creation */
@@ -316,6 +336,17 @@ export const replV2Api = {
       type: "select_scope",
       group_id: groupId,
       group_name: groupName,
+    });
+  },
+
+  /** Select a workspace after scope resolution */
+  async selectWorkspace(
+    sessionId: string,
+    workspace: WorkspaceKind,
+  ): Promise<ReplResponseV2> {
+    return this.sendInput(sessionId, {
+      type: "select_workspace",
+      workspace,
     });
   },
 

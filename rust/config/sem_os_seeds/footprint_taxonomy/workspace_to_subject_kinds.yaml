@@ -1,0 +1,66 @@
+workspaces:
+  ProductMaintenance:
+    subject_kinds:
+      - product
+      - service
+      - service-resource
+      - attribute
+  Deal:
+    subject_kinds:
+      - deal
+      - contract
+      - client-group
+      - pricing-config
+      - sla
+      - onboarding-request
+  CBU:
+    subject_kinds:
+      - cbu
+      - fund
+      - entity
+      - company
+      - legal-entity
+      - board
+      - role
+      - investor
+      - share-class
+      - service-resource
+      - service-intent
+  KYC:
+    subject_kinds:
+      - client-group
+      - kyc-case
+      - ubo
+      - entity
+      - company
+      - person
+      - fund
+      - allegation
+      - evidence
+      - screening
+      - document
+      - requirement
+      - entity-workstream
+  InstrumentMatrix:
+    subject_kinds:
+      - trading-profile
+      - instruction-profile
+      - settlement-chain
+      - instrument
+      - security-type
+      - product
+      - mandate
+  OnBoarding:
+    subject_kinds:
+      - onboarding-request
+      - cbu
+      - deal
+      - contract
+      - kyc-case
+      - document
+      - requirement
+      - service-resource
+      - service-intent
+  "*":
+    subject_kinds:
+      - session

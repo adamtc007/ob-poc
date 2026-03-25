@@ -1,0 +1,2589 @@
+{
+  "families": [
+    "trading_mandate",
+    "trading_streetside"
+  ],
+  "generated_at": "2026-03-25T13:01:39.893242+00:00",
+  "repo_revision": "56b2f9b413f2b5ddc2c6ba269ad8cb610e18c7a4",
+  "slice_id": "S5",
+  "subject_kinds": [
+    "instruction-profile",
+    "instrument",
+    "mandate",
+    "product",
+    "security-type",
+    "settlement-chain",
+    "trading-profile"
+  ],
+  "verb_count": 151,
+  "verbs": [
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "booking-location",
+      "fqn": "booking-location.create",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "booking-location",
+      "fqn": "booking-location.list",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "booking-location",
+      "fqn": "booking-location.update",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "booking-principal",
+      "fqn": "booking-principal.coverage-matrix",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "booking-principal",
+      "fqn": "booking-principal.create",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "booking-principal",
+      "fqn": "booking-principal.evaluate",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "booking-principal",
+      "fqn": "booking-principal.explain",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "booking-principal",
+      "fqn": "booking-principal.gap-report",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "booking-principal",
+      "fqn": "booking-principal.impact-analysis",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "booking-principal",
+      "fqn": "booking-principal.retire",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "booking-principal",
+      "fqn": "booking-principal.select",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "booking-principal",
+      "fqn": "booking-principal.update",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "cash-sweep",
+      "fqn": "cash-sweep.change-vehicle",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "cash-sweep",
+      "fqn": "cash-sweep.configure",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "cash-sweep",
+      "fqn": "cash-sweep.link-resource",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "cash-sweep",
+      "fqn": "cash-sweep.list",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "cash-sweep",
+      "fqn": "cash-sweep.reactivate",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "cash-sweep",
+      "fqn": "cash-sweep.remove",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "cash-sweep",
+      "fqn": "cash-sweep.suspend",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "cash-sweep",
+      "fqn": "cash-sweep.update-threshold",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "cash-sweep",
+      "fqn": "cash-sweep.update-timing",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "cbu-custody",
+      "fqn": "cbu-custody.derive-required-coverage",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "cbu-custody",
+      "fqn": "cbu-custody.list-agent-overrides",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "cbu-custody",
+      "fqn": "cbu-custody.list-booking-rules",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "cbu-custody",
+      "fqn": "cbu-custody.list-ssis",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "cbu-custody",
+      "fqn": "cbu-custody.list-universe",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "cbu-custody",
+      "fqn": "cbu-custody.lookup-ssi",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "cbu-custody",
+      "fqn": "cbu-custody.setup-ssi",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "cbu-custody",
+      "fqn": "cbu-custody.validate-booking-coverage",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "corporate-action",
+      "fqn": "corporate-action.define-event-type",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "corporate-action",
+      "fqn": "corporate-action.link-ca-ssi",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "corporate-action",
+      "fqn": "corporate-action.list-ca-ssi-mappings",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "corporate-action",
+      "fqn": "corporate-action.list-event-types",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "corporate-action",
+      "fqn": "corporate-action.list-instruction-windows",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "corporate-action",
+      "fqn": "corporate-action.list-preferences",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "corporate-action",
+      "fqn": "corporate-action.remove-preference",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "corporate-action",
+      "fqn": "corporate-action.set-instruction-window",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "corporate-action",
+      "fqn": "corporate-action.set-preferences",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "delivery",
+      "fqn": "delivery.complete",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "delivery",
+      "fqn": "delivery.fail",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "delivery",
+      "fqn": "delivery.record",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "economic-exposure",
+      "fqn": "economic-exposure.compute",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "economic-exposure",
+      "fqn": "economic-exposure.summary",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "entity-settlement",
+      "fqn": "entity-settlement.add-ssi",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "entity-settlement",
+      "fqn": "entity-settlement.remove-ssi",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "entity-settlement",
+      "fqn": "entity-settlement.set-identity",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "instruction-profile",
+      "fqn": "instruction-profile.create-template",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "instruction-profile",
+      "fqn": "instruction-profile.define-message-type",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "instruction-profile",
+      "fqn": "instruction-profile.list-assignments",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "instruction-profile",
+      "fqn": "instruction-profile.list-field-overrides",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "instruction-profile",
+      "fqn": "instruction-profile.list-message-types",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "instruction-profile",
+      "fqn": "instruction-profile.list-templates",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "instruction-profile",
+      "fqn": "instruction-profile.read-template",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "instrument-class",
+      "fqn": "instrument-class.ensure",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "instrument-class",
+      "fqn": "instrument-class.list",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "instrument-class",
+      "fqn": "instrument-class.read",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "isda",
+      "fqn": "isda.add-coverage",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "isda",
+      "fqn": "isda.add-csa",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "isda",
+      "fqn": "isda.create",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "isda",
+      "fqn": "isda.list",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "isda",
+      "fqn": "isda.remove-coverage",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "isda",
+      "fqn": "isda.remove-csa",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "issuer-control-config",
+      "fqn": "issuer-control-config.read",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "issuer-control-config",
+      "fqn": "issuer-control-config.upsert",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "matrix-overlay",
+      "fqn": "matrix-overlay.activate",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "matrix-overlay",
+      "fqn": "matrix-overlay.add",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "matrix-overlay",
+      "fqn": "matrix-overlay.compare-products",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "matrix-overlay",
+      "fqn": "matrix-overlay.effective-matrix",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "matrix-overlay",
+      "fqn": "matrix-overlay.list",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "matrix-overlay",
+      "fqn": "matrix-overlay.list-by-subscription",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "matrix-overlay",
+      "fqn": "matrix-overlay.remove",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "matrix-overlay",
+      "fqn": "matrix-overlay.suspend",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "matrix-overlay",
+      "fqn": "matrix-overlay.unified-gaps",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "movement",
+      "fqn": "movement.cancel",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "movement",
+      "fqn": "movement.capital-call",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "movement",
+      "fqn": "movement.commitment",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "movement",
+      "fqn": "movement.confirm",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "movement",
+      "fqn": "movement.distribution",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "movement",
+      "fqn": "movement.fail",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "movement",
+      "fqn": "movement.list-by-holding",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "movement",
+      "fqn": "movement.read",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "movement",
+      "fqn": "movement.recallable-distribution",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "movement",
+      "fqn": "movement.redeem",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "movement",
+      "fqn": "movement.settle",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "movement",
+      "fqn": "movement.subscribe",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "movement",
+      "fqn": "movement.transfer-in",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "movement",
+      "fqn": "movement.transfer-out",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "product",
+      "fqn": "product.list",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "product",
+      "fqn": "product.read",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "security-type",
+      "fqn": "security-type.ensure",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "security-type",
+      "fqn": "security-type.list",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "settlement-chain",
+      "fqn": "settlement-chain.add-hop",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "settlement-chain",
+      "fqn": "settlement-chain.create-chain",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "settlement-chain",
+      "fqn": "settlement-chain.deactivate-chain",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "settlement-chain",
+      "fqn": "settlement-chain.deactivate-cross-border",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "settlement-chain",
+      "fqn": "settlement-chain.define-location",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "settlement-chain",
+      "fqn": "settlement-chain.list-chains",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "settlement-chain",
+      "fqn": "settlement-chain.list-cross-border",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "settlement-chain",
+      "fqn": "settlement-chain.list-hops",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "settlement-chain",
+      "fqn": "settlement-chain.list-location-preferences",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "settlement-chain",
+      "fqn": "settlement-chain.list-locations",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "settlement-chain",
+      "fqn": "settlement-chain.remove-hop",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "settlement-chain",
+      "fqn": "settlement-chain.set-cross-border",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "settlement-chain",
+      "fqn": "settlement-chain.set-location-preference",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "subcustodian",
+      "fqn": "subcustodian.ensure",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "subcustodian",
+      "fqn": "subcustodian.list-by-market",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "subcustodian",
+      "fqn": "subcustodian.lookup",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "trade-gateway",
+      "fqn": "trade-gateway.activate-gateway",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "trade-gateway",
+      "fqn": "trade-gateway.add-routing-rule",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "trade-gateway",
+      "fqn": "trade-gateway.define-gateway",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "trade-gateway",
+      "fqn": "trade-gateway.enable-gateway",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "trade-gateway",
+      "fqn": "trade-gateway.list-cbu-gateways",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "trade-gateway",
+      "fqn": "trade-gateway.list-fallbacks",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "trade-gateway",
+      "fqn": "trade-gateway.list-gateways",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "trade-gateway",
+      "fqn": "trade-gateway.list-routing-rules",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "trade-gateway",
+      "fqn": "trade-gateway.read-gateway",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "trade-gateway",
+      "fqn": "trade-gateway.remove-routing-rule",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "trade-gateway",
+      "fqn": "trade-gateway.set-fallback",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "trade-gateway",
+      "fqn": "trade-gateway.suspend-gateway",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "trading-profile",
+      "fqn": "trading-profile.activate",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "trading-profile",
+      "fqn": "trading-profile.add-component",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "trading-profile",
+      "fqn": "trading-profile.approve",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "trading-profile",
+      "fqn": "trading-profile.archive",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "trading-profile",
+      "fqn": "trading-profile.ca.add-cutoff-rule",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "trading-profile",
+      "fqn": "trading-profile.ca.disable-event-types",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "trading-profile",
+      "fqn": "trading-profile.ca.enable-event-types",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "trading-profile",
+      "fqn": "trading-profile.ca.get-policy",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "trading-profile",
+      "fqn": "trading-profile.ca.link-proceeds-ssi",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "trading-profile",
+      "fqn": "trading-profile.ca.remove-cutoff-rule",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "trading-profile",
+      "fqn": "trading-profile.ca.remove-default-option",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "trading-profile",
+      "fqn": "trading-profile.ca.remove-proceeds-ssi",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "trading-profile",
+      "fqn": "trading-profile.ca.set-default-option",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "trading-profile",
+      "fqn": "trading-profile.ca.set-election-policy",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "trading-profile",
+      "fqn": "trading-profile.ca.set-notification-policy",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "trading-profile",
+      "fqn": "trading-profile.clone-to",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "trading-profile",
+      "fqn": "trading-profile.create-draft",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "trading-profile",
+      "fqn": "trading-profile.create-new-version",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "trading-profile",
+      "fqn": "trading-profile.diff",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "trading-profile",
+      "fqn": "trading-profile.get-active",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "trading-profile",
+      "fqn": "trading-profile.import",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "trading-profile",
+      "fqn": "trading-profile.link-csa-ssi",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "trading-profile",
+      "fqn": "trading-profile.list-versions",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "trading-profile",
+      "fqn": "trading-profile.materialize",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "trading-profile",
+      "fqn": "trading-profile.read",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "trading-profile",
+      "fqn": "trading-profile.reject",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "trading-profile",
+      "fqn": "trading-profile.remove-component",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "trading-profile",
+      "fqn": "trading-profile.set-base-currency",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "trading-profile",
+      "fqn": "trading-profile.submit",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "trading-profile",
+      "fqn": "trading-profile.update-im-scope",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "trading-profile",
+      "fqn": "trading-profile.validate-go-live-ready",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    },
+    {
+      "constellation_families": [
+        "trading_mandate",
+        "trading_streetside"
+      ],
+      "domain": "trading-profile",
+      "fqn": "trading-profile.validate-universe-coverage",
+      "subject_kinds": [
+        "instruction-profile",
+        "instrument",
+        "mandate",
+        "product",
+        "security-type",
+        "settlement-chain",
+        "trading-profile"
+      ]
+    }
+  ],
+  "workspace": "InstrumentMatrix"
+}

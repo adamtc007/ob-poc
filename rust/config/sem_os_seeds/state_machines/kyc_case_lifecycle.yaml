@@ -19,24 +19,48 @@ transitions:
   - from: intake
     to: discovery
     verbs: [kyc-case.update-status]
+  - from: intake
+    to: withdrawn
+    verbs: [kyc-case.close]
   - from: discovery
     to: assessment
+    verbs: [kyc-case.update-status]
+  - from: discovery
+    to: blocked
     verbs: [kyc-case.update-status]
   - from: assessment
     to: review
     verbs: [kyc-case.update-status, kyc-case.set-risk-rating]
+  - from: assessment
+    to: blocked
+    verbs: [kyc-case.update-status]
   - from: review
     to: approved
-    verbs: [kyc-case.update-status]
+    verbs: [kyc-case.close]
   - from: review
     to: rejected
     verbs: [kyc-case.close]
   - from: review
+    to: blocked
+    verbs: [kyc-case.update-status]
+  - from: review
     to: refer_to_regulator
-    verbs: [kyc-case.escalate]
+    verbs: [kyc-case.close]
+  - from: review
+    to: do_not_onboard
+    verbs: [kyc-case.close]
+  - from: review
+    to: expired
+    verbs: [kyc-case.close]
   - from: blocked
     to: discovery
     verbs: [kyc-case.reopen]
+  - from: blocked
+    to: assessment
+    verbs: [kyc-case.update-status]
+  - from: blocked
+    to: review
+    verbs: [kyc-case.update-status]
   - from: blocked
     to: withdrawn
     verbs: [kyc-case.close]

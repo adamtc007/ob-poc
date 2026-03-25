@@ -1,7 +1,7 @@
 fqn: family.kyc_lifecycle
 family_id: kyc_lifecycle
 label: KYC Lifecycle
-description: Family governing KYC case management, screening, evidence collection, and tollgate approval. Depends on a grounded group with identified CBUs.
+description: Family governing KYC case management, screening, evidence collection, and tollgate approval. Depends on a grounded group with group-level UBO/control clearance and identified controlled CBUs.
 domain_id: kyc
 selection_rules:
   - condition: "true"
@@ -27,6 +27,7 @@ constellation_refs:
 candidate_jurisdictions:
   - ALL
 candidate_entity_kinds:
+  - client-group
   - cbu
   - entity
   - person

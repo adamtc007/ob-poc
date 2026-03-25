@@ -941,7 +941,7 @@ We provide **custody and fund administration services** to investment funds. To 
 │                                                                              │
 │                         DEAL LIFECYCLE                                       │
 │                                                                              │
-│   PROSPECT → QUALIFYING → NEGOTIATING → CONTRACTED → ONBOARDING → ACTIVE    │
+│ PROSPECT → QUALIFYING → NEGOTIATING → KYC_CLEARANCE → CONTRACTED → ONBOARDING → ACTIVE │
 │                                                          │                   │
 │                                                          ▼                   │
 │                                                    ┌──────────┐              │
@@ -1051,7 +1051,7 @@ We provide **custody and fund administration services** to investment funds. To 
 | `deal_contracts` | Links to legal_contracts |
 | `deal_rate_cards` | Pricing proposals per product/contract (only ONE AGREED per combo) |
 | `deal_rate_card_lines` | Individual fee schedules |
-| `deal_onboarding_requests` | Handoff to onboarding → CBU creation |
+| `deal_onboarding_requests` | Handoff to onboarding for an existing CBU + product |
 | `fee_billing_profiles` | Billing configuration per CBU + Product |
 | `fee_billing_periods` | Monthly/quarterly billing cycles |
 | `fee_billing_period_lines` | Calculated fees linked back to agreed rates |
@@ -1207,9 +1207,9 @@ We provide **custody and fund administration services** to investment funds. To 
 | **Fee Billing Period** | A billing cycle (monthly/quarterly) for generating invoices |
 | **Fee Billing Profile** | Billing configuration for a CBU under a contract/product combination |
 | **ISDA** | International Swaps and Derivatives Association master agreement |
-| **KYC** | Know Your Customer - due diligence requirements |
+| **KYC** | Know Your Customer - due diligence requirements, with group-level UBO/control clearance first and CBU-specific deltas second |
 | **ManCo** | Management Company - the entity that manages the fund |
-| **Onboarding Request** | A request to create a CBU from a deal, triggers handoff to operations |
+| **Onboarding Request** | A request to onboard an existing, control-linked CBU to a contracted product, after it inherits the client group's clearance baseline |
 | **Product** | A commercial service we sell (Custody, Fund Admin, Transfer Agency) - appears on contracts |
 | **Rate Card** | A set of fee schedules for a deal (DRAFT → PROPOSED → AGREED → SUPERSEDED) |
 | **Rate Card Line** | A single fee schedule (e.g., "Custody at 5 bps on AUM") - flows through to billing |

@@ -25,7 +25,7 @@ use uuid::Uuid;
 use crate::repl::orchestrator_v2::ReplOrchestratorV2;
 use crate::repl::response_v2::ReplResponseV2;
 use crate::repl::session_v2::ReplSessionV2;
-use crate::repl::types_v2::{ReplCommandV2, ReplStateV2, UserInputV2};
+use crate::repl::types_v2::{ReplCommandV2, ReplStateV2, UserInputV2, WorkspaceKind};
 
 // ============================================================================
 // Route State
@@ -88,6 +88,9 @@ pub enum InputRequestV2 {
 
     /// User selected a scope (client group / CBU set).
     SelectScope { group_id: Uuid, group_name: String },
+
+    /// User selected a workspace.
+    SelectWorkspace { workspace: WorkspaceKind },
 
     /// User approves a human-gated runbook entry.
     Approve {
@@ -174,6 +177,9 @@ impl From<InputRequestV2> for UserInputV2 {
                 group_id,
                 group_name,
             },
+            InputRequestV2::SelectWorkspace { workspace } => {
+                UserInputV2::SelectWorkspace { workspace }
+            }
             InputRequestV2::Approve {
                 entry_id,
                 approved_by,
