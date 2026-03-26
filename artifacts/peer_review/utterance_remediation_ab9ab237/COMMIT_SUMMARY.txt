@@ -1,0 +1,26 @@
+commit ab9ab237ce99b2bee2485529ec9d964ec3a2b03c
+Author: adamtc007 <adamtc007@gmail.com>
+Date:   Wed Mar 25 18:29:31 2026 +0000
+
+    Implement utterance remediation navigation refactor
+
+ ...SSION_SCOPED_NAVIGATION_REFACTOR_v0.5_SLICES.md | 634 ++++++++++++++++++++
+ ob-poc-ui-react/src/api/chat.ts                    |   5 +
+ ob-poc-ui-react/src/api/constellation.ts           |  54 ++
+ ob-poc-ui-react/src/api/replV2.ts                  | 156 +++++
+ ob-poc-ui-react/src/features/chat/ChatPage.tsx     |  15 +-
+ .../chat/components/ConstellationPanel.tsx         |  87 +++
+ ob-poc-ui-react/src/types/chat.ts                  |   3 +
+ rust/crates/ob-poc-web/src/main.rs                 |   7 +-
+ rust/src/api/agent_state.rs                        |  15 +-
+ rust/src/api/constellation_routes.rs               | 373 +++++++++++-
+ rust/src/api/mod.rs                                |   5 +-
+ rust/src/api/repl_routes_v2.rs                     | 208 ++++++-
+ rust/src/repl/orchestrator_v2.rs                   | 208 ++++++-
+ rust/src/repl/response_v2.rs                       |  12 +-
+ rust/src/repl/session_repository.rs                |   4 +
+ rust/src/repl/session_v2.rs                        | 635 +++++++++++++--------
+ rust/src/repl/types_v2.rs                          | 572 ++++++++++++++++++-
+ rust/src/traceability/phase5.rs                    |   3 +
+ 18 files changed, 2730 insertions(+), 266 deletions(-)
+ create mode 100644 docs/todo/SESSION_SCOPED_NAVIGATION_REFACTOR_v0.5_SLICES.md

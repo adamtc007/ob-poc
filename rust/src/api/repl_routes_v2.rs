@@ -220,6 +220,8 @@ pub struct SessionStateResponseV2 {
 #[derive(Debug, Clone, Deserialize)]
 pub struct SessionPushRequest {
     pub context: ConstellationContextRef,
+    #[serde(default)]
+    pub peek: bool,
 }
 
 /// Request for stack commit/pop operations.
@@ -258,6 +260,234 @@ impl From<ReplSessionV2> for SessionStateResponseV2 {
 pub struct ErrorResponseV2 {
     pub error: String,
     pub recoverable: bool,
+}
+
+fn resolved_plan_subject_id(
+    plan: &crate::runbook::plan_types::RunbookPlan,
+    step_index: usize,
+) -> Option<Uuid> {
+    let step = plan.steps.get(step_index)?;
+    match &step.subject_binding {
+        crate::runbook::plan_types::EntityBinding::Literal { id } if *id != Uuid::nil() => {
+            Some(*id)
+        }
+        crate::runbook::plan_types::EntityBinding::Literal { .. } => None,
+        crate::runbook::plan_types::EntityBinding::ForwardRef { output_field, .. } => {
+            plan.bindings.resolved.get(output_field).copied()
+        }
+    }
+}
+
+fn plan_step_context(
+    session: &ReplSessionV2,
+    plan: &crate::runbook::plan_types::RunbookPlan,
+    step_index: usize,
+) -> anyhow::Result<Option<ConstellationContextRef>> {
+    let scope = session
+        .session_scope()
+        .ok_or_else(|| anyhow::anyhow!("Session has no client scope for runbook execution"))?;
+    let step = plan
+        .steps
+        .get(step_index)
+        .ok_or_else(|| anyhow::anyhow!("Runbook step {step_index} not found"))?;
+    let subject_id = resolved_plan_subject_id(plan, step_index);
+    let needs_transition = session.tos_frame().is_none_or(|tos| {
+        tos.workspace != step.workspace
+            || tos.constellation_map != step.constellation_map
+            || tos.subject_id != subject_id
+    });
+
+    if !needs_transition {
+        return Ok(None);
+    }
+
+    Ok(Some(ConstellationContextRef {
+        session_id: session.id,
+        client_group_id: scope.client_group_id,
+        workspace: step.workspace.clone(),
+        constellation_family: None,
+        constellation_map: Some(step.constellation_map.clone()),
+        subject_kind: Some(step.subject_kind.clone()),
+        subject_id,
+        handoff_context: None,
+    }))
+}
+
+fn persist_completed_step_outputs(
+    plan: &mut crate::runbook::plan_types::RunbookPlan,
+    step_index: usize,
+    result: &crate::runbook::executor::RunbookExecutionResult,
+) {
+    let completed = result
+        .step_results
+        .iter()
+        .find_map(|step| match &step.outcome {
+            crate::runbook::executor::StepOutcome::Completed { result } => Some(result),
+            _ => None,
+        });
+    let Some(completed) = completed else {
+        return;
+    };
+
+    let output_fields: Vec<String> = plan
+        .bindings
+        .entries
+        .values()
+        .filter_map(|binding| match binding {
+            crate::runbook::plan_types::EntityBinding::ForwardRef {
+                source_step,
+                output_field,
+            } if *source_step == step_index => Some(output_field.clone()),
+            _ => None,
+        })
+        .collect();
+
+    for output_field in output_fields {
+        let maybe_uuid = completed
+            .get(&output_field)
+            .and_then(|value| value.as_str())
+            .and_then(|value| Uuid::parse_str(value).ok());
+        if let Some(id) = maybe_uuid {
+            crate::runbook::plan_executor::record_step_output(
+                &mut plan.bindings,
+                step_index,
+                &output_field,
+                id,
+            );
+        }
+    }
+}
+
+fn normalize_output_entity_kind(produced_type: &str) -> String {
+    match produced_type {
+        "kyc_case" => "case".to_string(),
+        other => other.replace('-', "_"),
+    }
+}
+
+fn output_field_name_for(produced_type: &str) -> String {
+    match produced_type {
+        "kyc_case" => "created_case_id".to_string(),
+        other => format!("created_{}_id", other.replace('-', "_")),
+    }
+}
+
+fn load_plan_verb_outputs(
+) -> anyhow::Result<std::collections::BTreeMap<String, Vec<sem_os_core::verb_contract::VerbOutput>>>
+{
+    let verbs_config = dsl_core::config::loader::ConfigLoader::from_env().load_verbs()?;
+    let mut outputs =
+        std::collections::BTreeMap::<String, Vec<sem_os_core::verb_contract::VerbOutput>>::new();
+    for verb in crate::sem_reg::onboarding::verb_extract::extract_verbs(&verbs_config) {
+        let Some(output) = verb.output else {
+            continue;
+        };
+        outputs
+            .entry(verb.fqn)
+            .or_default()
+            .push(sem_os_core::verb_contract::VerbOutput {
+                field_name: output_field_name_for(&output.produced_type),
+                output_type: "uuid".into(),
+                entity_kind: Some(normalize_output_entity_kind(&output.produced_type)),
+                description: Some(format!("Created {}", output.produced_type)),
+            });
+    }
+    Ok(outputs)
+}
+
+async fn ensure_runbook_step_workspace_ready(
+    state: &ReplV2RouteState,
+    session_id: Uuid,
+) -> Result<(), (StatusCode, Json<ErrorResponseV2>)> {
+    let session = state
+        .orchestrator
+        .get_session(session_id)
+        .await
+        .ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                Json(ErrorResponseV2 {
+                    error: format!("Unknown session {session_id}"),
+                    recoverable: false,
+                }),
+            )
+        })?;
+
+    let Some(plan) = session.runbook_plan.as_ref() else {
+        return Ok(());
+    };
+    let cursor = session.runbook_plan_cursor.unwrap_or(0);
+    if cursor >= plan.steps.len() {
+        let sessions = state.orchestrator.sessions_for_test();
+        if let Some(session) = sessions.write().await.get_mut(&session_id) {
+            session.enter_sage_mode();
+        }
+        return Ok(());
+    }
+
+    let Some(context) = plan_step_context(&session, plan, cursor).map_err(anyhow_json_error)?
+    else {
+        let sessions = state.orchestrator.sessions_for_test();
+        if let Some(session) = sessions.write().await.get_mut(&session_id) {
+            session.enter_repl_mode();
+        }
+        return Ok(());
+    };
+
+    let resolved = resolve_context(state.orchestrator_pool()?, &context)
+        .await
+        .map_err(as_json_error)?;
+    let hydrated = hydrate_workspace_state(state.orchestrator_pool()?, &resolved)
+        .await
+        .map_err(as_json_error)?;
+
+    let sessions = state.orchestrator.sessions_for_test();
+    let mut sessions_write = sessions.write().await;
+    let session = sessions_write.get_mut(&session_id).ok_or_else(|| {
+        (
+            StatusCode::NOT_FOUND,
+            Json(ErrorResponseV2 {
+                error: format!("Unknown session {session_id}"),
+                recoverable: false,
+            }),
+        )
+    })?;
+
+    session.enter_sage_mode();
+
+    if session.workspace_stack.is_empty() {
+        session.set_client_scope(resolved.client_group_id);
+        session.set_workspace_root(resolved.workspace.clone());
+        if let Some(tos) = session.tos_frame_mut() {
+            tos.constellation_family = resolved.constellation_family.clone();
+            tos.constellation_map = resolved.constellation_map.clone();
+            tos.subject_kind = resolved.subject_kind.clone();
+            tos.subject_id = resolved.subject_id;
+            tos.is_peek = false;
+        }
+    } else {
+        let same_tos = session.tos_frame().is_some_and(|tos| {
+            tos.workspace == resolved.workspace
+                && tos.constellation_map == resolved.constellation_map
+                && tos.subject_id == resolved.subject_id
+        });
+        if !same_tos {
+            let mut frame =
+                WorkspaceFrame::new(resolved.workspace.clone(), resolved.session_scope.clone());
+            frame.constellation_family = resolved.constellation_family.clone();
+            frame.constellation_map = resolved.constellation_map.clone();
+            frame.subject_kind = resolved.subject_kind.clone();
+            frame.subject_id = resolved.subject_id;
+            frame.is_peek = false;
+            session
+                .push_workspace_frame(frame)
+                .map_err(anyhow_json_error)?;
+        }
+    }
+
+    session.hydrate_tos(hydrated);
+    session.enter_repl_mode();
+    Ok(())
 }
 
 /// Request body for the signal endpoint (webhook for external systems).
@@ -449,6 +679,7 @@ async fn push_session_context(
         frame.constellation_map = resolved.constellation_map.clone();
         frame.subject_kind = resolved.subject_kind.clone();
         frame.subject_id = resolved.subject_id;
+        frame.is_peek = request.peek;
         state
             .orchestrator
             .push_workspace_frame(request.context.session_id, frame)
@@ -465,6 +696,11 @@ async fn push_session_context(
     let feedback = state
         .orchestrator
         .session_feedback(request.context.session_id)
+        .await
+        .map_err(anyhow_json_error)?;
+    state
+        .orchestrator
+        .persist_session_checkpoint(request.context.session_id)
         .await
         .map_err(anyhow_json_error)?;
 
@@ -497,6 +733,11 @@ async fn commit_session_context(
         .session_feedback(request.session_id)
         .await
         .map_err(anyhow_json_error)?;
+    state
+        .orchestrator
+        .persist_session_checkpoint(request.session_id)
+        .await
+        .map_err(anyhow_json_error)?;
     Ok(Json(feedback))
 }
 
@@ -524,6 +765,11 @@ async fn pop_session_context(
     let feedback = state
         .orchestrator
         .session_feedback(request.session_id)
+        .await
+        .map_err(anyhow_json_error)?;
+    state
+        .orchestrator
+        .persist_session_checkpoint(request.session_id)
         .await
         .map_err(anyhow_json_error)?;
     Ok(Json(feedback))
@@ -614,10 +860,19 @@ pub fn navigation_router() -> Router<ReplV2RouteState> {
         .route("/api/session/commit", post(commit_session_context))
         .route("/api/session/pop", post(pop_session_context))
         // Runbook plan routes (R5-R7)
-        .route("/api/session/:id/runbook/compile", post(compile_runbook_plan))
+        .route(
+            "/api/session/:id/runbook/compile",
+            post(compile_runbook_plan),
+        )
         .route("/api/session/:id/runbook/plan", get(get_runbook_plan))
-        .route("/api/session/:id/runbook/approve", post(approve_runbook_plan))
-        .route("/api/session/:id/runbook/execute", post(execute_runbook_plan))
+        .route(
+            "/api/session/:id/runbook/approve",
+            post(approve_runbook_plan),
+        )
+        .route(
+            "/api/session/:id/runbook/execute",
+            post(execute_runbook_plan),
+        )
         .route("/api/session/:id/runbook/cancel", post(cancel_runbook_plan))
         .route("/api/session/:id/runbook/status", get(get_runbook_status))
         // Session trace routes (R9)
@@ -658,6 +913,8 @@ async fn compile_runbook_plan(
         ));
     }
 
+    let verb_outputs = load_plan_verb_outputs().map_err(anyhow_json_error)?;
+
     // Build workspace inputs from the current stack.
     // When hydrated constellation is available, use DAG discovery to find
     // non-terminal slots and their advancing verbs automatically.
@@ -679,7 +936,7 @@ async fn compile_runbook_plan(
                         subject_kind,
                         f.subject_id,
                         hydrated,
-                        &std::collections::BTreeMap::new(),
+                        &verb_outputs,
                     );
                 }
             }
@@ -695,7 +952,7 @@ async fn compile_runbook_plan(
                     .as_ref()
                     .map(|h| h.scoped_verb_surface.clone())
                     .unwrap_or_default(),
-                verb_outputs: std::collections::BTreeMap::new(),
+                verb_outputs: verb_outputs.clone(),
             }
         })
         .collect();
@@ -710,12 +967,13 @@ async fn compile_runbook_plan(
         ));
     }
 
-    let plan = crate::runbook::plan_compiler::compile_runbook_plan(
+    let mut plan = crate::runbook::plan_compiler::compile_runbook_plan(
         session_id,
         &inputs,
         vec![], // source_research trace refs
     )
     .map_err(anyhow_json_error)?;
+    plan.status = crate::runbook::plan_types::RunbookPlanStatus::AwaitingApproval;
 
     let plan_id = plan.id.0.clone();
     let step_count = plan.steps.len();
@@ -724,8 +982,15 @@ async fn compile_runbook_plan(
     session.append_trace(crate::repl::session_trace::TraceOp::RunbookCompiled {
         runbook_id: plan_id.clone(),
     });
+    session.enter_sage_mode();
     session.runbook_plan = Some(plan);
     session.runbook_plan_cursor = Some(0);
+    drop(sessions_write);
+    state
+        .orchestrator
+        .persist_session_checkpoint(session_id)
+        .await
+        .map_err(anyhow_json_error)?;
 
     Ok(Json(serde_json::json!({
         "status": "compiled",
@@ -796,9 +1061,7 @@ async fn approve_runbook_plan(
             )
         })?;
         match &plan.status {
-            RunbookPlanStatus::Compiled | RunbookPlanStatus::AwaitingApproval => {
-                plan.id.0.clone()
-            }
+            RunbookPlanStatus::Compiled | RunbookPlanStatus::AwaitingApproval => plan.id.0.clone(),
             other => {
                 return Err((
                     StatusCode::CONFLICT,
@@ -820,10 +1083,19 @@ async fn approve_runbook_plan(
         });
         plan.status = RunbookPlanStatus::Approved;
     }
+    session.enter_repl_mode();
     session.append_trace(crate::repl::session_trace::TraceOp::RunbookApproved {
         runbook_id: plan_id.clone(),
     });
-    Ok(Json(serde_json::json!({ "status": "approved", "plan_id": plan_id })))
+    drop(sessions_write);
+    state
+        .orchestrator
+        .persist_session_checkpoint(session_id)
+        .await
+        .map_err(anyhow_json_error)?;
+    Ok(Json(
+        serde_json::json!({ "status": "approved", "plan_id": plan_id }),
+    ))
 }
 
 /// POST /api/session/:id/runbook/execute — start or resume execution.
@@ -831,6 +1103,8 @@ async fn execute_runbook_plan(
     State(state): State<ReplV2RouteState>,
     Path(session_id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponseV2>)> {
+    ensure_runbook_step_workspace_ready(&state, session_id).await?;
+
     // Phase 1: Read session data under a brief read lock, then release before async work.
     // RwLockWriteGuard is !Send so we cannot hold it across .await points.
     let (_step_verb, _step_sentence, _step_args, step_id, cursor, compiled, compiled_id) = {
@@ -846,7 +1120,6 @@ async fn execute_runbook_plan(
             )
         })?;
 
-        // AgentMode gate: execution requires Repl mode
         if !session.agent_mode.can_execute() {
             return Err((
                 StatusCode::FORBIDDEN,
@@ -899,26 +1172,9 @@ async fn execute_runbook_plan(
             return Ok(Json(serde_json::to_value(&narration).unwrap_or_default()));
         }
 
-        // Check for workspace transition
-        if let Some(next_ws) = crate::runbook::plan_executor::needs_workspace_transition(
-            plan,
-            cursor.saturating_sub(1),
-        ) {
-            // In a real implementation this would push workspace and hydrate.
-            // For now, record the transition need.
-            if cursor > 0 {
-                return Ok(Json(serde_json::json!({
-                    "status": "workspace_transition_needed",
-                    "target_workspace": next_ws,
-                    "cursor": cursor,
-                })));
-            }
-        }
-
         // Resolve forward references for this step
-        let resolved_subject =
-            crate::runbook::plan_executor::resolve_step_bindings(plan, cursor)
-                .map_err(anyhow_json_error)?;
+        let resolved_subject = crate::runbook::plan_executor::resolve_step_bindings(plan, cursor)
+            .map_err(anyhow_json_error)?;
 
         if resolved_subject.is_none() {
             // Forward ref not yet resolved — dependency not fulfilled
@@ -932,6 +1188,13 @@ async fn execute_runbook_plan(
                     recoverable: false,
                 }),
             ));
+        }
+
+        if let Some(plan_mut) = session.runbook_plan.as_mut() {
+            plan_mut.status = RunbookPlanStatus::Executing { cursor };
+            if let Some(step) = plan_mut.steps.get_mut(cursor) {
+                step.status = crate::runbook::plan_types::PlanStepStatus::Executing;
+            }
         }
 
         // Extract step data for async execution outside the lock
@@ -994,23 +1257,13 @@ async fn execute_runbook_plan(
         .map_err(|e| anyhow_json_error(anyhow::anyhow!("{}", e)))?;
 
     // Build step executor bridge and run through execute_runbook
-    let bridge = crate::runbook::step_executor_bridge::DslStepExecutor::new(
-        state.orchestrator.executor(),
-    );
-    let execution_outcome = match crate::runbook::execute_runbook(
-        &*store,
-        compiled_id,
-        None,
-        &bridge,
-    )
-    .await
-    {
-        Ok(result) => {
-            let output_json = serde_json::to_value(&result).unwrap_or_default();
-            Ok(output_json)
-        }
-        Err(e) => Err(anyhow::anyhow!("{}", e)),
-    };
+    let bridge =
+        crate::runbook::step_executor_bridge::DslStepExecutor::new(state.orchestrator.executor());
+    let execution_outcome =
+        match crate::runbook::execute_runbook(&*store, compiled_id, None, &bridge).await {
+            Ok(result) => Ok(result),
+            Err(e) => Err(anyhow::anyhow!("{}", e)),
+        };
 
     // Phase 3: Re-acquire write lock to store results back
     {
@@ -1039,9 +1292,16 @@ async fn execute_runbook_plan(
         let step_result = crate::runbook::plan_executor::advance_plan_step(
             plan_mut,
             cursor,
-            execution_outcome,
+            execution_outcome
+                .as_ref()
+                .map(|result| serde_json::to_value(result).unwrap_or_default())
+                .map_err(|e| anyhow::anyhow!(e.to_string())),
         )
         .map_err(anyhow_json_error)?;
+
+        if let Ok(result) = &execution_outcome {
+            persist_completed_step_outputs(plan_mut, cursor, result);
+        }
 
         // Record enriched verb execution in trace
         let verb_fqn = step_result.verb_fqn.clone();
@@ -1054,14 +1314,26 @@ async fn execute_runbook_plan(
             Some(verb_fqn.clone()),
             exec_result_json,
         );
-        session.increment_tos_writes();
+        if step_result.status == crate::runbook::plan_types::PlanStepStatus::Succeeded {
+            session.increment_tos_writes();
+        }
         session.execution_log.push(step_result.clone());
         session.runbook_plan_cursor = Some(cursor + 1);
 
         // Check if plan is complete
-        crate::runbook::plan_executor::update_plan_status(
-            session.runbook_plan.as_mut().unwrap(),
-        );
+        crate::runbook::plan_executor::update_plan_status(session.runbook_plan.as_mut().unwrap());
+
+        let next_cursor = cursor + 1;
+        let plan_after = session.runbook_plan.as_ref().unwrap();
+        let has_next = next_cursor < plan_after.steps.len();
+        let next_needs_transition = has_next
+            && crate::runbook::plan_executor::needs_workspace_transition(plan_after, cursor)
+                .is_some();
+        if has_next && !next_needs_transition {
+            session.enter_repl_mode();
+        } else {
+            session.enter_sage_mode();
+        }
 
         // Generate narration
         let narration = crate::runbook::narration::narrate_step(
@@ -1069,12 +1341,19 @@ async fn execute_runbook_plan(
             &step_result,
         );
 
-        Ok(Json(serde_json::json!({
+        let response = Json(serde_json::json!({
             "status": "step_executed",
             "cursor": cursor + 1,
             "step_narration": narration,
             "plan_status": session.runbook_plan.as_ref().unwrap().status,
-        })))
+        }));
+        drop(sessions_write);
+        state
+            .orchestrator
+            .persist_session_checkpoint(session_id)
+            .await
+            .map_err(anyhow_json_error)?;
+        Ok(response)
     }
 }
 
@@ -1106,6 +1385,13 @@ async fn cancel_runbook_plan(
     })?;
 
     let cancelled = crate::runbook::plan_executor::cancel_plan(plan);
+    session.enter_sage_mode();
+    drop(sessions_write);
+    state
+        .orchestrator
+        .persist_session_checkpoint(session_id)
+        .await
+        .map_err(anyhow_json_error)?;
     Ok(Json(serde_json::json!({
         "status": "cancelled",
         "steps_cancelled": cancelled.len()
@@ -1151,6 +1437,16 @@ async fn get_session_trace(
     State(state): State<ReplV2RouteState>,
     Path(session_id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponseV2>)> {
+    if let Ok(pool) = state.orchestrator_pool() {
+        let trace =
+            crate::repl::trace_repository::SessionTraceRepository::load_trace(pool, session_id)
+                .await
+                .map_err(anyhow_json_error)?;
+        if !trace.is_empty() {
+            return Ok(Json(serde_json::to_value(trace).unwrap_or_default()));
+        }
+    }
+
     let session = state
         .orchestrator
         .get_session(session_id)
@@ -1165,7 +1461,9 @@ async fn get_session_trace(
             )
         })?;
 
-    Ok(Json(serde_json::to_value(&session.trace).unwrap_or_default()))
+    Ok(Json(
+        serde_json::to_value(session.trace).unwrap_or_default(),
+    ))
 }
 
 /// GET /api/session/:id/trace/:seq — retrieve a single trace entry.
@@ -1173,6 +1471,16 @@ async fn get_trace_entry(
     State(state): State<ReplV2RouteState>,
     Path((session_id, seq)): Path<(Uuid, u64)>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponseV2>)> {
+    if let Ok(pool) = state.orchestrator_pool() {
+        if let Some(entry) =
+            crate::repl::trace_repository::SessionTraceRepository::load_entry(pool, session_id, seq)
+                .await
+                .map_err(anyhow_json_error)?
+        {
+            return Ok(Json(serde_json::to_value(entry).unwrap_or_default()));
+        }
+    }
+
     let session = state
         .orchestrator
         .get_session(session_id)
@@ -1207,19 +1515,31 @@ async fn replay_session_trace(
     Path(session_id): Path<Uuid>,
     Json(body): Json<serde_json::Value>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponseV2>)> {
-    let session = state
-        .orchestrator
-        .get_session(session_id)
-        .await
-        .ok_or_else(|| {
-            (
-                StatusCode::NOT_FOUND,
-                Json(ErrorResponseV2 {
-                    error: format!("Unknown session {session_id}"),
-                    recoverable: false,
-                }),
-            )
-        })?;
+    let persisted_trace = if let Ok(pool) = state.orchestrator_pool() {
+        crate::repl::trace_repository::SessionTraceRepository::load_trace(pool, session_id)
+            .await
+            .map_err(anyhow_json_error)?
+    } else {
+        Vec::new()
+    };
+    let trace = if persisted_trace.is_empty() {
+        let session = state
+            .orchestrator
+            .get_session(session_id)
+            .await
+            .ok_or_else(|| {
+                (
+                    StatusCode::NOT_FOUND,
+                    Json(ErrorResponseV2 {
+                        error: format!("Unknown session {session_id}"),
+                        recoverable: false,
+                    }),
+                )
+            })?;
+        session.trace
+    } else {
+        persisted_trace
+    };
 
     let mode_str = body
         .get("mode")
@@ -1231,7 +1551,7 @@ async fn replay_session_trace(
         _ => crate::repl::session_replay::ReplayMode::Relaxed,
     };
 
-    let result = crate::repl::session_replay::replay_trace(&session.trace, mode);
+    let result = crate::repl::session_replay::replay_trace(&trace, mode);
     Ok(Json(serde_json::to_value(&result).unwrap_or_default()))
 }
 

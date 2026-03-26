@@ -454,6 +454,7 @@ mod invariants {
             description: "Test operational auto-approval".into(),
             domain: "inv_test".into(),
             data_type: AttributeDataType::String,
+            evidence_grade: sem_os_core::types::EvidenceGrade::None,
             source: None,
             constraints: None,
             sinks: vec![],

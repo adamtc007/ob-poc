@@ -367,18 +367,6 @@ impl ReplOrchestratorV2 {
         self.sessions.read().await.get(&session_id).cloned()
     }
 
-    /// Persist the current snapshot of a session, if persistence is configured.
-    pub async fn persist_session_checkpoint(&self, session_id: Uuid) -> anyhow::Result<()> {
-        let Some(session) = self.get_session(session_id).await else {
-            anyhow::bail!("session {session_id} not found for persistence");
-        };
-        #[cfg(feature = "database")]
-        if let Some(ref repo) = self.session_repository {
-            repo.save_session(&session, 0).await?;
-        }
-        Ok(())
-    }
-
     /// Push a new workspace frame onto the session stack.
     ///
     /// # Examples
@@ -501,16 +489,6 @@ impl ReplOrchestratorV2 {
     #[doc(hidden)]
     pub fn sessions_for_test(&self) -> &Arc<RwLock<HashMap<Uuid, ReplSessionV2>>> {
         &self.sessions
-    }
-
-    /// Expose the runbook store for plan execution.
-    pub fn runbook_store(&self) -> Option<Arc<RunbookStore>> {
-        self.runbook_store.clone()
-    }
-
-    /// Expose the DSL executor for plan step execution.
-    pub fn executor(&self) -> Arc<dyn DslExecutor> {
-        self.executor.clone()
     }
 
     /// Signal that an external task completed (or failed) for a parked entry.

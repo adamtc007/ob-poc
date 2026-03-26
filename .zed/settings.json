@@ -12,6 +12,7 @@
             "enable": true,
           },
           "unsetTest": ["dsl_types"],
+          "targetDir": "target/rust-analyzer",
         },
         "check": {
           "command": "clippy",

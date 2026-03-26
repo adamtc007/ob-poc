@@ -137,16 +137,23 @@ export interface TraceEntry {
   agent_mode: string;
   op: Record<string, unknown>;
   stack_snapshot?: unknown[];
+  snapshot?: unknown;
+  session_feedback?: unknown;
+  verb_resolved?: string;
+  execution_result?: unknown;
 }
 
 // --- Replay types ---
 
 export interface ReplayResult {
   mode: string;
-  total_entries: number;
-  replayed: number;
-  skipped: number;
-  errors: string[];
+  entries_replayed: number;
+  divergences: Array<{
+    sequence: number;
+    expected: string;
+    actual: string;
+  }>;
+  final_state?: unknown;
 }
 
 // ============================================================================
@@ -209,8 +216,12 @@ export const runbookPlanApi = {
    * Execute the next step in the approved plan.
    * POST /api/session/:id/runbook/execute
    */
-  async executeRunbookPlanStep(sessionId: string): Promise<Record<string, unknown>> {
-    return api.post<Record<string, unknown>>(`/session/${sessionId}/runbook/execute`);
+  async executeRunbookPlanStep(
+    sessionId: string,
+  ): Promise<Record<string, unknown>> {
+    return api.post<Record<string, unknown>>(
+      `/session/${sessionId}/runbook/execute`,
+    );
   },
 
   /**

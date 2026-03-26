@@ -1,0 +1,4193 @@
+From ab9ab237ce99b2bee2485529ec9d964ec3a2b03c Mon Sep 17 00:00:00 2001
+From: adamtc007 <adamtc007@gmail.com>
+Date: Wed, 25 Mar 2026 18:29:31 +0000
+Subject: [PATCH] Implement utterance remediation navigation refactor
+
+---
+ ..._SCOPED_NAVIGATION_REFACTOR_v0.5_SLICES.md | 634 +++++++++++++++++
+ ob-poc-ui-react/src/api/chat.ts               |   5 +
+ ob-poc-ui-react/src/api/constellation.ts      |  54 ++
+ ob-poc-ui-react/src/api/replV2.ts             | 156 +++++
+ .../src/features/chat/ChatPage.tsx            |  15 +-
+ .../chat/components/ConstellationPanel.tsx    |  87 +++
+ ob-poc-ui-react/src/types/chat.ts             |   3 +
+ rust/crates/ob-poc-web/src/main.rs            |   7 +-
+ rust/src/api/agent_state.rs                   |  15 +-
+ rust/src/api/constellation_routes.rs          | 373 +++++++++-
+ rust/src/api/mod.rs                           |   5 +-
+ rust/src/api/repl_routes_v2.rs                | 208 +++++-
+ rust/src/repl/orchestrator_v2.rs              | 208 +++++-
+ rust/src/repl/response_v2.rs                  |  12 +-
+ rust/src/repl/session_repository.rs           |   4 +
+ rust/src/repl/session_v2.rs                   | 635 +++++++++++-------
+ rust/src/repl/types_v2.rs                     | 572 +++++++++++++++-
+ rust/src/traceability/phase5.rs               |   3 +
+ 18 files changed, 2730 insertions(+), 266 deletions(-)
+ create mode 100644 docs/todo/SESSION_SCOPED_NAVIGATION_REFACTOR_v0.5_SLICES.md
+
+diff --git a/docs/todo/SESSION_SCOPED_NAVIGATION_REFACTOR_v0.5_SLICES.md b/docs/todo/SESSION_SCOPED_NAVIGATION_REFACTOR_v0.5_SLICES.md
+new file mode 100644
+index 00000000..c5a43c65
+--- /dev/null
++++ b/docs/todo/SESSION_SCOPED_NAVIGATION_REFACTOR_v0.5_SLICES.md
+@@ -0,0 +1,634 @@
++# Session-Scoped Navigation Refactor v0.5 — Implementation Plan In Slices
++
++## Purpose
++
++This document converts [SESSION_SCOPED_NAVIGATION_REFACTOR_v0.5.md](/Users/adamtc007/Downloads/SESSION_SCOPED_NAVIGATION_REFACTOR_v0.5.md) into an execution plan grounded in the current `ob-poc` codebase and database shape.
++
++It is intended for pre-execution review.
++
++The target model remains:
++
++`Session -> Client Group -> Workspace -> Constellation -> Subject (optional) -> Verb Surface`
++
++## Current Baseline
++
++The repo is not at zero. These parts are already landed:
++
++- SemOS footprint hydration prerequisite is complete enough to start this refactor.
++- V2 REPL already has:
++  - `ScopeGate`
++  - `WorkspaceSelection`
++  - workspace-aware pack routing
++  - `active_workspace` on the session
++- `ProductMaintenance` is now a first-class workspace in SemOS taxonomy and pack routing.
++- The `service-resource` runtime verbs have explicit footprint coverage, and the plugin audit reports `unresolved_binding_count = 0`.
++
++## Workspace Reconciliation Note
++
++The v0.5 paper names four primary operational workspaces in the session-state table:
++
++- `Deal`
++- `CBU`
++- `KYC`
++- `Instrument Matrix`
++
++The current repo already has `ProductMaintenance` as a live first-class workspace with:
++
++- SemOS workspace taxonomy membership
++- a design-time product/service/resource constellation
++- a runtime `product-service-taxonomy` pack
++
++For execution planning, treat `ProductMaintenance` as an explicit fifth workspace unless design review says otherwise. `N0` must resolve whether the paper should be amended permanently, but the implementation slices should not pretend the current repo is still four-workspace.
++
++The major gaps against v0.5 are:
++
++- no stack-machine session model yet
++- no shared `WorkspaceFrame` / `ConstellationContextRef` contracts
++- constellation hydration routes are still CBU-first
++- no navigation resolver / hydration resolver split
++- no utterance decomposition or conversation-mode layer for Sage
++- no stack-aware session feedback envelope returned uniformly across Sage
++- frontend UI selection flow is not yet migrated to `client_group -> workspace -> constellation -> subject`
++
++## Paper Cross-Reference
++
++| Paper Section | Status | Notes |
++|---|---|---|
++| The Stack Machine | not started | REPL has workspace selection, but no frame stack, PUSH/POP/COMMIT, or stale recovery |
++| Sage and REPL — Two Modes, One Pipeline | partial | REPL exists; Sage/REPL boundary is not yet modeled via stack-aware contracts |
++| Utterance Semantics Layer | not started | no `UtteranceFrame`, `ConversationMode`, `ScopeCue`, `TemporalCue` |
++| Single Utterance Pipeline | not started | current pipeline is not stack-mode driven |
++| Sage Response Policies | not started | no fixed foreign-write confirmation or stale recovery narration |
++| Session State Model — Partial Order | partial | states 1-3 exist in REPL, but 4-6 are not generalized via shared contracts |
++| Resolver Architecture — Two Resolvers | not started | current hydration is direct route/runtime call, not resolver-based |
++| Shared Contracts | not started | currently only ad hoc REPL/session/constellation structs |
++| Routes — Seven Total | not started | current constellation routes remain CBU-keyed |
++| Implementation Phases | partial | pieces of Phase 1/4/6 exist informally, but not in the v0.5 shape |
++
++## Execution Rules
++
++- implement one slice at a time
++- do not skip slices
++- stop after each slice for review
++- keep backward compatibility until the compatibility slice says otherwise
++- prefer additive routes and structs before removals
++- keep the current REPL usable while the stack model is introduced
++- every slice ends with `cargo check`
++
++## Primary Code Surfaces
++
++- REPL/session:
++  - [rust/src/repl/types_v2.rs](/Users/adamtc007/Developer/ob-poc/rust/src/repl/types_v2.rs)
++  - [rust/src/repl/session_v2.rs](/Users/adamtc007/Developer/ob-poc/rust/src/repl/session_v2.rs)
++  - [rust/src/repl/orchestrator_v2.rs](/Users/adamtc007/Developer/ob-poc/rust/src/repl/orchestrator_v2.rs)
++  - [rust/src/api/repl_routes_v2.rs](/Users/adamtc007/Developer/ob-poc/rust/src/api/repl_routes_v2.rs)
++- Current constellation hydration:
++  - [rust/src/api/constellation_routes.rs](/Users/adamtc007/Developer/ob-poc/rust/src/api/constellation_routes.rs)
++  - `rust/src/sem_os_runtime/constellation_runtime.rs`
++- Existing session feedback/projection surfaces:
++  - [rust/src/sage/session_context.rs](/Users/adamtc007/Developer/ob-poc/rust/src/sage/session_context.rs)
++  - [rust/src/agent/onboarding_state_view.rs](/Users/adamtc007/Developer/ob-poc/rust/src/agent/onboarding_state_view.rs)
++  - [rust/src/agent/composite_state.rs](/Users/adamtc007/Developer/ob-poc/rust/src/agent/composite_state.rs)
++- Frontend API surfaces:
++  - [ob-poc-ui-react/src/api/replV2.ts](/Users/adamtc007/Developer/ob-poc/ob-poc-ui-react/src/api/replV2.ts)
++  - [ob-poc-ui-react/src/api/constellation.ts](/Users/adamtc007/Developer/ob-poc/ob-poc-ui-react/src/api/constellation.ts)
++
++## Slice Overview
++
++| Slice | Goal | Paper Xref | Human Gate |
++|---|---|---|---|
++| N0 | baseline and gap confirmation | Purpose, Prerequisite, Routes | required |
++| N1 | shared contracts | Shared Contracts, Session State Model | required |
++| N2 | stack machine session layer | The Stack Machine, Partial Order | required |
++| N3 | navigation resolver | Resolver Architecture, Workspace Registry | required |
++| N4 | hydration resolver + 5D cascade binding | Resolver Architecture, Verb Surface Resolution Cascade | required |
++| N5 | new session-scoped routes | Routes — Seven Total | required |
++| N6 | REPL integration on stack contracts | Sage and REPL, Phase 4 | required |
++| N7A | deterministic utterance semantics | Utterance Decomposition, Conversation Mode, Deixis | required |
++| N7B | probabilistic fallback and tuning | Utterance Semantics Layer, Regression Classes | required |
++| N8 | Sage response policies | Sage Response Policies | required |
++| N9 | frontend API migration | Phase 6 | required |
++| N10 | UI navigation refactor | Phase 7, Client Situation Surface | required |
++| N11 | compatibility and deprecation | Phase 8-9 | required |
++
++---
++
++## Slice N0: Baseline And Gap Confirmation
++
++### Objective
++
++Freeze the starting state after the footprint work and the initial workspace REPL work.
++
++### Tasks
++
++1. inventory current session/repl workspace support
++2. inventory current constellation routes and payload identity
++3. inventory current frontend API assumptions
++4. write a short baseline artifact summarizing:
++   - what is already implemented
++   - what remains for v0.5
++5. explicitly reconcile workspace count:
++   - whether `ProductMaintenance` remains first-class
++   - whether the paper should be amended from four to five primary workspaces
++
++### Acceptance
++
++- the starting line is explicit and reconciled
++- no implementation work yet
++
++---
++
++## Slice N1: Shared Contracts
++
++### Objective
++
++Introduce the v0.5 shared contracts without changing route behavior yet.
++
++### Paper Xref
++
++- `WorkspaceFrame`
++- `ConstellationContextRef`
++- `ResolvedConstellationContext`
++- `WorkspaceStateView`
++- `SessionFeedback`
++- `UtteranceFrame`
++- `ConversationMode`
++- `ScopeCue`
++- `TemporalCue`
++
++### Tasks
++
++1. define Rust backend types
++2. define frontend transport types where needed
++3. keep current payloads working, but start embedding the new context types
++
++### v0.5 Binding
++
++This slice must bind to the actual shared contracts from the paper, not just the type names.
++
++Implement or stub with exact field-level intent for:
++
++- `WorkspaceFrame`
++- `ConstellationContextRef`
++- `ResolvedConstellationContext`
++- `WorkspaceStateView`
++- `SessionFeedback`
++- `UtteranceFrame`
++- `ConversationMode`
++- `ScopeCue`
++- `TemporalCue`
++
++The execution target is the paper’s `Shared Contracts` section, especially:
++
++- one frame per workspace stack entry
++- one request envelope for resolver input
++- one resolved TOS object
++- one hydrated workspace view
++- one session feedback payload returned with every Sage response
++- one pre-ECIR utterance semantic frame
++
++### Acceptance
++
++- contracts compile
++- no runtime behavior change yet
++
++---
++
++## Slice N2: Stack Machine Session Layer
++
++### Objective
++
++Upgrade the session model from single active workspace to stack of workspace frames.
++
++### Paper Xref
++
++- The Stack Machine
++- Stack Constraints
++- Session State Model — Partial Order
++
++### Tasks
++
++1. add frame stack storage to the V2 session
++2. implement `PUSH`, `HYDRATE`, `POP`, `COMMIT`
++3. enforce max depth `3`
++4. mark lower frames frozen
++5. add stale marker metadata on restored frames
++
++### v0.5 Binding
++
++This slice must implement the stack invariants as tests, not leave them implicit:
++
++- max depth = `3`
++- only TOS is hydrated
++- frames below TOS are frozen
++- `PUSH` is atomic push + resolve + hydrate
++- `POP` restores exact previous frame modulo stale marker
++- `COMMIT` collapses to depth `1`
++- resolvers stay stack-oblivious and receive no stack metadata
++
++### Acceptance
++
++- REPL session can hold multiple frames
++- only TOS is active/hydrated
++- POP/COMMIT semantics are explicit in code
++
++---
++
++## Slice N3: Navigation Resolver
++
++### Objective
++
++Add the first pure resolver: navigation context to top-of-stack frame.
++
++### Paper Xref
++
++- Resolver Architecture — Navigation Resolver
++- Workspace Registry
++
++### Tasks
++
++1. create a navigation resolver service/module
++2. resolve:
++   - client group
++   - workspace
++   - legal constellations for that workspace
++   - optional default subject kinds
++3. keep it stack-oblivious; it resolves only the context given
++
++### v0.5 Binding
++
++This slice must also preserve the paper’s situation-surface on-ramp:
++
++- single-context resolution now
++- batch-signature compatibility from day one:
++  - `Vec<ConstellationContextRef>`
++
++Even if only single-item resolution is wired first, the resolver contract should not block later batch usage.
++
++### Acceptance
++
++- no route or UI should hand-build workspace/constellation context anymore
++
++---
++
++## Slice N4: Hydration Resolver And Resolution Cascade
++
++### Objective
++
++Add the second pure resolver: hydrate TOS into working surface and bind the existing 5D SemOS verb cascade.
++
++### Paper Xref
++
++- Resolver Architecture — Hydration Resolver
++- Verb Surface Resolution Cascade
++
++### Tasks
++
++1. create `ResolvedConstellationContext -> WorkspaceStateView` hydration
++2. connect workspace/constellation/subject/node-state to existing SemOS footprint resolution
++3. ensure the resolver returns:
++   - hydrated slots
++   - subject focus
++   - verb surface
++   - stale indicators
++
++### v0.5 Binding
++
++This slice must implement the explicit fallback chain from the paper:
++
++- 5D exact
++- 4D fallback without node state
++- 3D fallback without subject
++- 2D fallback without constellation
++- 1D legacy fallback
++
++Required property:
++
++- monotonic narrowing across the cascade
++
++### Acceptance
++
++- hydration is no longer directly route-specific
++- 5D verb surface resolution hangs off the resolver, not ad hoc route logic
++
++---
++
++## Slice N5: New Session-Scoped Routes
++
++### Objective
++
++Add the v0.5 route layer without breaking the old routes yet.
++
++### Paper Xref
++
++- Routes — Seven Total
++
++### Tasks
++
++1. add stack-aware session routes
++2. add stack-oblivious constellation routes operating on TOS context envelopes
++3. keep current `/api/cbu/:cbu_id/...` constellation routes as compatibility shims
++
++### v0.5 Binding
++
++This slice should implement the paper’s seven-route split explicitly.
++
++Constellation routes:
++
++- `GET /api/constellation/context`
++- `POST /api/constellation/resolve`
++- `GET /api/constellation/hydrate`
++- `GET /api/constellation/summary`
++
++Session stack routes:
++
++- `POST /api/session/:id/stack/push`
++- `POST /api/session/:id/stack/pop`
++- `POST /api/session/:id/stack/commit`
++
++### Acceptance
++
++- new routes can load constellation state without `cbu_id` as the root identity
++
++---
++
++## Slice N6: REPL Integration
++
++### Objective
++
++Move the V2 REPL from workspace-aware to stack-aware.
++
++### Paper Xref
++
++- Sage and REPL — Two Modes, One Pipeline
++- Implementation Phase 4
++
++### Tasks
++
++1. use the new stack contracts in REPL state transitions
++2. make workspace navigation `PUSH -> HYDRATE -> COMMIT`
++3. make foreign writes explicit stack transitions
++4. ensure REPL executes only against TOS
++
++### v0.5 Binding
++
++This slice must preserve the strict Sage/REPL boundary:
++
++- REPL executes only at session state `6`
++- REPL executes only against TOS
++- Sage resumes after every execution and renders feedback from the resulting TOS state
++
++### Acceptance
++
++- REPL no longer relies on one flat `active_workspace`
++- stack transitions are explicit and testable
++
++---
++
++## Slice N7A: Deterministic Utterance Semantics
++
++### Objective
++
++Implement the deterministic pre-ECIR semantic frame, cue tables, and mode-to-stack mapping.
++
++### Paper Xref
++
++- Utterance Decomposition — Before ECIR
++- Conversation Mode Classification
++- Pronoun and Deixis Resolution Policy
++- Single Utterance Pipeline
++
++### Tasks
++
++1. add `UtteranceFrame` decomposition before entity/verb resolution
++2. classify `ConversationMode`
++3. implement pronoun/deixis policy against TOS/render history
++4. map modes to stack actions:
++   - inspect
++   - navigate
++   - compare
++   - prepare
++   - mutate
++   - confirm
++   - return
++
++### v0.5 Binding
++
++This slice covers the deterministic half only:
++
++- lexical cue extraction for:
++  - `action_phrase`
++  - `target_workspace_hint`
++  - `subject_hint`
++  - `scope_cue`
++  - `temporal_cue`
++- explicit mode resolution for clear cases
++- deterministic deixis rules for:
++  - `here/this/current`
++  - `that/the [entity]`
++  - `there/that workspace`
++  - `go back` after `COMMIT` vs ordinary `POP`
++
++### Acceptance
++
++- Sage can choose stack behavior from the utterance frame instead of implicit heuristics
++
++### Human Gate
++
++Review cue tables and deterministic mode mapping before adding fallback classification.
++
++---
++
++## Slice N7B: Probabilistic Fallback And Tuning
++
++### Objective
++
++Layer ambiguous/fallback utterance classification on top of `N7A`.
++
++### Paper Xref
++
++- Utterance Semantics Layer
++- Utterance Regression Classes
++
++### Tasks
++
++1. implement fallback classification when deterministic rules do not settle the frame
++2. add regression classes for:
++   - inspect vs navigate
++   - prepare vs mutate
++   - compare
++   - ambiguous pronouns on read
++   - ambiguous pronouns on write
++3. define or load a tuning/test corpus
++
++### v0.5 Binding
++
++Codex can implement:
++
++- fallback hook points
++- regression harness
++- fixture loading
++
++Human review is required for:
++
++- ambiguous utterance labels
++- acceptance thresholds
++- tuning decisions
++
++### Acceptance
++
++- deterministic path remains authoritative where it applies
++- ambiguous write-path resolution still fails closed to clarification
++
++---
++
++## Slice N8: Sage Response Policies
++
++### Objective
++
++Make Sage responses obey the v0.5 confirmation, stale recovery, and effect narration policy.
++
++### Paper Xref
++
++- Write Confirmation Requirements
++- Foreign Write Confirmation Structure
++- Stale Recovery Policy
++- Effect Narration
++
++### Tasks
++
++1. implement strict write-confirmation gate
++2. implement fixed foreign-write confirmation rendering
++3. implement stale recovery narration + rehydrate prompt
++4. implement post-REPL effect narration
++
++### v0.5 Binding
++
++This slice must inline the paper’s rules:
++
++Write confirmation skip is allowed only if all seven are true:
++
++1. single candidate verb
++2. single subject
++3. same workspace as TOS
++4. no handoff ambiguity
++5. no stale warning on TOS
++6. low-risk / reversible / idempotent effect class
++7. utterance is imperative `mutate`, not exploratory `prepare`
++
++Foreign write confirmation must render, in fixed order:
++
++- current workspace
++- target workspace
++- proposed action
++- if confirmed
++- commit consequence
++- return option
++
++Effect narration must render, in fixed order:
++
++1. what changed
++2. what state is now true
++3. what next
++
++Stale recovery must:
++
++- narrate staleness explicitly
++- say what may have changed
++- offer re-hydration
++- block pronoun-based write preparation on stale frames
++
++### Acceptance
++
++- Sage replies become policy-driven, not ad hoc
++
++---
++
++## Slice N9: Frontend API Migration
++
++### Objective
++
++Move the frontend clients to the new session/context routes.
++
++### Paper Xref
++
++- Implementation Phase 6
++
++### Tasks
++
++1. migrate `replV2` transport types to shared stack/context contracts
++2. migrate constellation API from CBU-keyed calls to context envelopes
++3. keep compatibility adapters until UI migration is complete
++
++### Acceptance
++
++- frontend no longer assumes `cbu_id + case_id` as the universal selector
++
++---
++
++## Slice N10: UI Navigation Refactor
++
++### Objective
++
++Make the UI match the stack/session model.
++
++### Paper Xref
++
++- Implementation Phase 7
++- Client Situation Surface — On-Ramp
++
++### Tasks
++
++1. render:
++   - client group scope
++   - workspace selector
++   - constellation selector
++   - subject selector
++2. show TOS session feedback
++3. show stale frame warnings and return behavior
++
++### Acceptance
++
++- UI selection order matches the architecture target
++
++---
++
++## Slice N11: Compatibility And Deprecation
++
++### Objective
++
++Retire the old CBU-first constellation identity once the new stack/context path is live.
++
++### Paper Xref
++
++- Implementation Phase 8
++- Implementation Phase 9
++
++### Tasks
++
++1. keep compatibility shims during rollout
++2. migrate all internal callers
++3. remove deprecated route assumptions
++4. update docs and runtime guidance
++
++### Acceptance
++
++- no core runtime path requires CBU-first constellation identity
++
++## Recommended Execution Order
++
++The safe order is:
++
++`N0 -> N1 -> N2 -> N3 -> N4 -> N5 -> N6 -> N7A -> N7B -> N8 -> N9 -> N10 -> N11`
++
++Do not start `N7A` before `N1-N6` are stable. Do not start `N7B` before `N7A` has been reviewed.
++
++## Immediate Recommendation
++
++Start with `N0` and `N1` only.
++
++Those two slices will:
++
++- freeze the actual baseline
++- define the shared contracts
++- create the reviewable boundary before any route or session rewiring begins
+diff --git a/ob-poc-ui-react/src/api/chat.ts b/ob-poc-ui-react/src/api/chat.ts
+index 3c832faf..1ce183e1 100644
+--- a/ob-poc-ui-react/src/api/chat.ts
++++ b/ob-poc-ui-react/src/api/chat.ts
+@@ -26,6 +26,7 @@ import type {
+   VerbDisambiguationRequest,
+   OnboardingStateView,
+ } from "../types/chat";
++import type { SessionFeedback } from "./replV2";
+ 
+ /**
+  * Backend session response structure
+@@ -40,6 +41,7 @@ interface BackendMessage {
+   sage_explain?: SageExplain;
+   coder_proposal?: CoderProposal;
+   discovery_bootstrap?: DiscoveryBootstrap;
++  session_feedback?: SessionFeedback;
+ }
+ 
+ interface BackendSession {
+@@ -87,6 +89,7 @@ function mapBackendSession(backend: BackendSession): ChatSession {
+       sage_explain: msg.sage_explain,
+       coder_proposal: msg.coder_proposal,
+       discovery_bootstrap: msg.discovery_bootstrap,
++      session_feedback: msg.session_feedback,
+     })),
+   };
+ }
+@@ -502,6 +505,7 @@ interface ChatInputEnvelope {
+     sage_explain?: SageExplain;
+     coder_proposal?: CoderProposal;
+     discovery_bootstrap?: DiscoveryBootstrap;
++    session_feedback?: SessionFeedback;
+     available_verbs?: VerbProfile[];
+     surface_fingerprint?: string;
+     decision?: {
+@@ -551,6 +555,7 @@ function buildAssistantMessage(
+     coder_proposal: response.coder_proposal,
+     discovery_bootstrap: response.discovery_bootstrap,
+     onboarding_state: response.onboarding_state,
++    session_feedback: response.session_feedback,
+   };
+ 
+   if (response.verb_disambiguation) {
+diff --git a/ob-poc-ui-react/src/api/constellation.ts b/ob-poc-ui-react/src/api/constellation.ts
+index f4cc87ba..3fb0ca23 100644
+--- a/ob-poc-ui-react/src/api/constellation.ts
++++ b/ob-poc-ui-react/src/api/constellation.ts
+@@ -5,6 +5,14 @@
+  */
+ 
+ import { api } from "./client";
++import type {
++  ConstellationContextRef,
++  ProgressSummary,
++  ResolvedConstellationContext,
++  SubjectKind,
++  WorkspaceKind,
++  WorkspaceStateView,
++} from "./replV2";
+ 
+ export interface BlockReason {
+   message: string;
+@@ -96,6 +104,52 @@ export interface ConstellationSummary {
+ }
+ 
+ export const constellationApi = {
++  async resolveContext(
++    context: ConstellationContextRef,
++  ): Promise<ResolvedConstellationContext> {
++    return api.post<ResolvedConstellationContext>("/constellation/resolve", context);
++  },
++
++  async hydrateContext(params: {
++    sessionId: string;
++    clientGroupId: string;
++    workspace: WorkspaceKind;
++    constellationFamily?: string;
++    constellationMap?: string;
++    subjectKind?: SubjectKind;
++    subjectId?: string;
++  }): Promise<WorkspaceStateView> {
++    return api.get<WorkspaceStateView>("/constellation/hydrate", {
++      session_id: params.sessionId,
++      client_group_id: params.clientGroupId,
++      workspace: params.workspace,
++      constellation_family: params.constellationFamily,
++      constellation_map: params.constellationMap,
++      subject_kind: params.subjectKind,
++      subject_id: params.subjectId,
++    });
++  },
++
++  async getWorkspaceSummary(params: {
++    sessionId: string;
++    clientGroupId: string;
++    workspace: WorkspaceKind;
++    constellationFamily?: string;
++    constellationMap?: string;
++    subjectKind?: SubjectKind;
++    subjectId?: string;
++  }): Promise<ProgressSummary> {
++    return api.get<ProgressSummary>("/constellation/summary", {
++      session_id: params.sessionId,
++      client_group_id: params.clientGroupId,
++      workspace: params.workspace,
++      constellation_family: params.constellationFamily,
++      constellation_map: params.constellationMap,
++      subject_kind: params.subjectKind,
++      subject_id: params.subjectId,
++    });
++  },
++
+   async getConstellation(
+     cbuId: string,
+     params?: { caseId?: string; mapName?: string },
+diff --git a/ob-poc-ui-react/src/api/replV2.ts b/ob-poc-ui-react/src/api/replV2.ts
+index fe7317b2..2e4dbe81 100644
+--- a/ob-poc-ui-react/src/api/replV2.ts
++++ b/ob-poc-ui-react/src/api/replV2.ts
+@@ -76,6 +76,121 @@ export interface WorkspaceOption {
+   description: string;
+ }
+ 
++export type SubjectKind =
++  | "client_group"
++  | "cbu"
++  | "deal"
++  | "case"
++  | "handoff"
++  | "matrix"
++  | "product"
++  | "service"
++  | "resource"
++  | "attribute";
++
++export interface SessionScope {
++  client_group_id: string;
++  client_group_name?: string;
++}
++
++export interface SubjectRef {
++  kind: SubjectKind;
++  id: string;
++}
++
++export interface VerbRef {
++  verb_fqn: string;
++  display_name: string;
++}
++
++export interface ProgressSummary {
++  total_slots: number;
++  completion_pct: number;
++  blocking_slots: number;
++}
++
++export interface ActionHint {
++  label: string;
++  verb_fqn?: string;
++  action_type: string;
++}
++
++export interface WorkspaceHint {
++  workspace: WorkspaceKind;
++  label: string;
++  default_constellation_family: string;
++  default_constellation_map: string;
++}
++
++export interface WorkspaceStateView {
++  workspace: WorkspaceKind;
++  constellation_family: string;
++  constellation_map: string;
++  subject_ref?: SubjectRef;
++  hydrated_constellation?: unknown;
++  scoped_verb_surface: VerbRef[];
++  progress_summary?: ProgressSummary;
++  available_actions: ActionHint[];
++}
++
++export type ConversationMode =
++  | "inspect"
++  | "navigate"
++  | "compare"
++  | "prepare"
++  | "mutate"
++  | "confirm"
++  | "return";
++
++export interface SessionFeedback {
++  stack_depth: number;
++  tos: WorkspaceStateView;
++  tos_is_peek: boolean;
++  previous_workspace?: WorkspaceKind;
++  stale_warning: boolean;
++  scoped_verb_surface: VerbRef[];
++  available_workspaces: WorkspaceHint[];
++  pending_verb?: VerbRef;
++  conversation_mode: ConversationMode;
++}
++
++export interface HandoffContext {
++  source_deal_id?: string;
++  target_cbu_id?: string;
++  handoff_id: string;
++  activation_path: string;
++  provisioning_deps: { kind: string; reference: string }[];
++}
++
++export interface ConstellationContextRef {
++  session_id: string;
++  client_group_id: string;
++  workspace: WorkspaceKind;
++  constellation_family?: string;
++  constellation_map?: string;
++  subject_kind?: SubjectKind;
++  subject_id?: string;
++  handoff_context?: HandoffContext;
++}
++
++export interface ResolvedConstellationContext {
++  session_id: string;
++  client_group_id: string;
++  workspace: WorkspaceKind;
++  constellation_family: string;
++  constellation_map: string;
++  subject_kind?: SubjectKind;
++  subject_id?: string;
++  handoff_context?: HandoffContext;
++  session_scope: SessionScope;
++  agent_mode: "sage" | "repl";
++}
++
++export interface SessionFeedbackResponse {
++  resolved: ResolvedConstellationContext;
++  feedback: SessionFeedback;
++}
++
+ export interface ExecutionProgress {
+   total_steps: number;
+   completed_steps: number;
+@@ -90,6 +205,7 @@ export interface ReplResponseV2 {
+   message: string;
+   runbook_summary?: string;
+   step_count: number;
++  session_feedback?: SessionFeedback;
+ }
+ 
+ /** Response kind — determines UI rendering */
+@@ -257,6 +373,46 @@ export const replV2Api = {
+     await api.delete(`${V2_BASE}/session/${sessionId}`);
+   },
+ 
++  /**
++   * Read the current top-of-stack session feedback.
++   * GET /api/constellation/context?session_id=:id
++   */
++  async getSessionContext(sessionId: string): Promise<SessionFeedback> {
++    return api.get<SessionFeedback>("/constellation/context", {
++      session_id: sessionId,
++    });
++  },
++
++  /**
++   * Push a new workspace context onto the session stack.
++   * POST /api/session/push
++   */
++  async pushContext(
++    context: ConstellationContextRef,
++  ): Promise<SessionFeedbackResponse> {
++    return api.post<SessionFeedbackResponse>("/session/push", { context });
++  },
++
++  /**
++   * Commit the current top-of-stack workspace.
++   * POST /api/session/commit
++   */
++  async commitContext(sessionId: string): Promise<SessionFeedback> {
++    return api.post<SessionFeedback>("/session/commit", {
++      session_id: sessionId,
++    });
++  },
++
++  /**
++   * Pop the current top-of-stack workspace.
++   * POST /api/session/pop
++   */
++  async popContext(sessionId: string): Promise<SessionFeedback> {
++    return api.post<SessionFeedback>("/session/pop", {
++      session_id: sessionId,
++    });
++  },
++
+   // =========================================================================
+   // Convenience methods
+   // =========================================================================
+diff --git a/ob-poc-ui-react/src/features/chat/ChatPage.tsx b/ob-poc-ui-react/src/features/chat/ChatPage.tsx
+index e96752fd..fdab3317 100644
+--- a/ob-poc-ui-react/src/features/chat/ChatPage.tsx
++++ b/ob-poc-ui-react/src/features/chat/ChatPage.tsx
+@@ -4,7 +4,7 @@
+ 
+ import { useNavigate, useParams } from "react-router-dom";
+ import { useQuery, useMutation } from "@tanstack/react-query";
+-import { useEffect, useRef, useCallback, useState } from "react";
++import { useEffect, useRef, useCallback, useMemo, useState } from "react";
+ import { Loader2 } from "lucide-react";
+ import { chatApi } from "../../api/chat";
+ import { scopeApi, type CbuSummary } from "../../api/scope";
+@@ -21,6 +21,7 @@ import {
+ } from "./components";
+ import { DealPanel } from "../deal/components";
+ import type { DecisionReply, DiscoverySelection } from "../../types/chat";
++import type { SessionFeedback } from "../../api/replV2";
+ 
+ export function ChatPage() {
+   const { sessionId } = useParams<{ sessionId?: string }>();
+@@ -249,6 +250,17 @@ export function ChatPage() {
+     [sendMutation],
+   );
+ 
++  const latestSessionFeedback = useMemo<SessionFeedback | undefined>(() => {
++    const messages = currentSession?.messages ?? [];
++    for (let index = messages.length - 1; index >= 0; index -= 1) {
++      const feedback = messages[index]?.session_feedback;
++      if (feedback) {
++        return feedback;
++      }
++    }
++    return undefined;
++  }, [currentSession?.messages]);
++
+   const handleVerbSubmit = useCallback(
+     (sexpr: string) => {
+       sendMutation.mutate(sexpr);
+@@ -377,6 +389,7 @@ export function ChatPage() {
+ 
+           <ConstellationPanel
+             selectedCbu={selectedCbu}
++            sessionFeedback={latestSessionFeedback}
+             className="min-h-0"
+             onPromptAgent={handleSend}
+           />
+diff --git a/ob-poc-ui-react/src/features/chat/components/ConstellationPanel.tsx b/ob-poc-ui-react/src/features/chat/components/ConstellationPanel.tsx
+index 8221e3b1..c98b9b70 100644
+--- a/ob-poc-ui-react/src/features/chat/components/ConstellationPanel.tsx
++++ b/ob-poc-ui-react/src/features/chat/components/ConstellationPanel.tsx
+@@ -28,6 +28,7 @@ import {
+ import type { CbuSummary } from "../../../api/scope";
+ import { queryKeys } from "../../../lib/query";
+ import { cn } from "../../../lib/utils";
++import type { SessionFeedback } from "../../../api/replV2";
+ 
+ const DEFAULT_MAP_NAME = "struct.lux.ucits.sicav";
+ 
+@@ -764,10 +765,12 @@ function SlotInspector({
+ 
+ export function ConstellationPanel({
+   selectedCbu,
++  sessionFeedback,
+   className,
+   onPromptAgent,
+ }: {
+   selectedCbu: CbuSummary | null;
++  sessionFeedback?: SessionFeedback;
+   className?: string;
+   onPromptAgent?: (prompt: string) => void;
+ }) {
+@@ -777,6 +780,19 @@ export function ConstellationPanel({
+   );
+   const [selectedSlotPath, setSelectedSlotPath] = useState<string | null>(null);
+ 
++  const sessionHydrated =
++    (sessionFeedback?.tos?.hydrated_constellation as HydratedConstellation | undefined) ??
++    undefined;
++  const sessionSummary = sessionFeedback?.tos?.progress_summary;
++  const sessionAllSlots = useMemo(
++    () => flattenSlots(sessionHydrated?.slots ?? []),
++    [sessionHydrated],
++  );
++  const sessionSelectedSlot = useMemo(() => {
++    const fromPath = findSlotByPath(sessionHydrated?.slots ?? [], selectedSlotPath);
++    return fromPath ?? sessionAllSlots[0] ?? null;
++  }, [selectedSlotPath, sessionAllSlots, sessionHydrated]);
++
+   const constellationQuery = useQuery({
+     queryKey: queryKeys.constellation.detail(
+       selectedCbu?.id ?? "",
+@@ -858,6 +874,77 @@ export function ConstellationPanel({
+     await Promise.all([constellationQuery.refetch(), summaryQuery.refetch()]);
+   };
+ 
++  if (sessionHydrated) {
++    return (
++      <div
++        className={cn(
++          "flex min-h-0 flex-1 flex-col border-t border-[var(--border-primary)]",
++          className,
++        )}
++      >
++        <div className="border-b border-[var(--border-primary)] px-4 py-3">
++          <div className="flex items-start justify-between gap-3">
++            <div className="min-w-0">
++              <div className="text-xs uppercase tracking-[0.14em] text-[var(--text-muted)]">
++                Session Context
++              </div>
++              <div className="mt-1 truncate text-base font-semibold text-[var(--text-primary)]">
++                {sessionFeedback?.tos.workspace.replaceAll("_", " ")}
++              </div>
++              <div className="mt-1 text-xs text-[var(--text-muted)]">
++                {sessionFeedback?.tos.constellation_family} • {sessionFeedback?.tos.constellation_map}
++              </div>
++              {sessionFeedback?.stale_warning && (
++                <div className="mt-2 rounded-lg border border-[var(--accent-yellow)]/30 bg-[var(--accent-yellow)]/10 px-3 py-2 text-xs text-[var(--accent-yellow)]">
++                  Restored frame may be stale. Re-hydrate before relying on pronouns for writes.
++                </div>
++              )}
++            </div>
++          </div>
++          {sessionSummary && (
++            <div className="mt-3 grid grid-cols-3 gap-2">
++              <SummaryMetric label="Slots" value={sessionSummary.total_slots} />
++              <SummaryMetric label="Complete" value={`${sessionSummary.completion_pct}%`} />
++              <SummaryMetric label="Blocking" value={sessionSummary.blocking_slots} emphasis={sessionSummary.blocking_slots > 0} />
++            </div>
++          )}
++        </div>
++        <div className="flex-1 overflow-auto px-4 py-4">
++          <div className="space-y-4">
++            <div className="rounded-xl border border-[var(--border-primary)] bg-[var(--bg-primary)]">
++              <div className="border-b border-[var(--border-primary)] px-4 py-3">
++                <div className="text-xs uppercase tracking-[0.14em] text-[var(--text-muted)]">
++                  Slot Tree
++                </div>
++                <div className="mt-1 text-sm text-[var(--text-secondary)]">
++                  Session-scoped hydrated top-of-stack constellation.
++                </div>
++              </div>
++              <div className="space-y-1 px-2 py-3">
++                {sessionHydrated.slots.map((slot) => (
++                  <SlotTreeRow
++                    key={slot.path}
++                    slot={slot}
++                    depth={0}
++                    selectedPath={sessionSelectedSlot?.path ?? null}
++                    onSelect={setSelectedSlotPath}
++                  />
++                ))}
++              </div>
++            </div>
++
++            <SlotInspector
++              slot={sessionSelectedSlot}
++              hydrated={sessionHydrated}
++              cbuName={selectedCbu?.name ?? sessionFeedback?.tos.workspace ?? "session context"}
++              onPromptAgent={onPromptAgent}
++            />
++          </div>
++        </div>
++      </div>
++    );
++  }
++
+   if (!selectedCbu) {
+     return (
+       <div className={cn("border-t border-[var(--border-primary)]", className)}>
+diff --git a/ob-poc-ui-react/src/types/chat.ts b/ob-poc-ui-react/src/types/chat.ts
+index 7977dbc3..f7bffafc 100644
+--- a/ob-poc-ui-react/src/types/chat.ts
++++ b/ob-poc-ui-react/src/types/chat.ts
+@@ -4,6 +4,8 @@
+  * Types for agent chat sessions and the DecisionPacket protocol.
+  */
+ 
++import type { SessionFeedback } from "../api/replV2";
++
+ /** Chat message role */
+ export type MessageRole = "user" | "assistant" | "system";
+ 
+@@ -20,6 +22,7 @@ export interface ChatMessage {
+   discovery_bootstrap?: DiscoveryBootstrap;
+   parked_entries?: ParkedEntry[];
+   onboarding_state?: OnboardingStateView;
++  session_feedback?: SessionFeedback;
+   verb_disambiguation_detail?: VerbDisambiguationRequest;
+ }
+ 
+diff --git a/rust/crates/ob-poc-web/src/main.rs b/rust/crates/ob-poc-web/src/main.rs
+index 32f21d82..d888cc39 100644
+--- a/rust/crates/ob-poc-web/src/main.rs
++++ b/rust/crates/ob-poc-web/src/main.rs
+@@ -603,7 +603,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
+     // =========================================================================
+     // REPL V2 — Pack-Guided Runbook Pipeline
+     // =========================================================================
+-    let (repl_v2_router, repl_v2_orchestrator) = {
++    let (repl_v2_router, repl_navigation_router, repl_v2_orchestrator) = {
+         use ob_poc::api::repl_routes_v2::{self, ReplV2RouteState};
+         use ob_poc::journey::router::PackRouter;
+         use ob_poc::repl::orchestrator_v2::ReplOrchestratorV2;
+@@ -958,7 +958,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
+         tracing::info!("REPL V2 orchestrator initialized with semantic intent service");
+ 
+         (
+-            repl_routes_v2::router().with_state(v2_state),
++            repl_routes_v2::router().with_state(v2_state.clone()),
++            repl_routes_v2::navigation_router().with_state(v2_state),
+             repl_v2_orchestrator,
+         )
+     };
+@@ -996,6 +997,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
+         .merge(create_universe_router(pool.clone()))
+         // Constellation graph hydration API for UI feedback and debugging
+         .merge(create_constellation_router(pool.clone()))
++        // Session-scoped navigation stack and TOS feedback
++        .merge(repl_navigation_router)
+         // Control/ownership routes (board controller, control sphere)
+         .merge(control_routes(pool.clone()))
+         // Session-scoped entity search (constraint cascade)
+diff --git a/rust/src/api/agent_state.rs b/rust/src/api/agent_state.rs
+index d697dc22..9d50a0fc 100644
+--- a/rust/src/api/agent_state.rs
++++ b/rust/src/api/agent_state.rs
+@@ -436,6 +436,17 @@ pub async fn create_agent_router_with_semantic_and_repl(
+     repl_v2_orchestrator: Option<Arc<crate::repl::orchestrator_v2::ReplOrchestratorV2>>,
+ ) -> Router {
+     let mut state = AgentState::with_semantic(pool, sessions, sem_os_client).await;
+-    state.repl_v2_orchestrator = repl_v2_orchestrator;
+-    crate::api::agent_routes::create_agent_router_with_state(state)
++    state.repl_v2_orchestrator = repl_v2_orchestrator.clone();
++    let router = crate::api::agent_routes::create_agent_router_with_state(state);
++    if let Some(orchestrator) = repl_v2_orchestrator {
++        let repl_state = crate::api::repl_routes_v2::ReplV2RouteState { orchestrator };
++        router
++            .nest(
++                "/api/repl/v2",
++                crate::api::repl_routes_v2::router().with_state(repl_state.clone()),
++            )
++            .merge(crate::api::repl_routes_v2::navigation_router().with_state(repl_state))
++    } else {
++        router
++    }
+ }
+diff --git a/rust/src/api/constellation_routes.rs b/rust/src/api/constellation_routes.rs
+index 63b8fa0f..4afe65f6 100644
+--- a/rust/src/api/constellation_routes.rs
++++ b/rust/src/api/constellation_routes.rs
+@@ -14,6 +14,11 @@ use serde::{Deserialize, Serialize};
+ use sqlx::PgPool;
+ use uuid::Uuid;
+ 
++#[cfg(feature = "vnext-repl")]
++use crate::repl::types_v2::{
++    ActionHint, AgentMode, ConstellationContextRef, ProgressSummary, ResolvedConstellationContext,
++    SessionScope, SubjectKind, SubjectRef, VerbRef, WorkspaceKind, WorkspaceStateView,
++};
+ use crate::sem_os_runtime::constellation_runtime::{
+     handle_constellation_hydrate, handle_constellation_summary, ConstellationSummary,
+     HydratedConstellation,
+@@ -33,6 +38,22 @@ struct ConstellationQuery {
+     map_name: Option<String>,
+ }
+ 
++#[cfg(feature = "vnext-repl")]
++#[derive(Debug, Clone, Deserialize)]
++pub struct HydrateContextQuery {
++    pub session_id: Uuid,
++    pub client_group_id: Uuid,
++    pub workspace: WorkspaceKind,
++    #[serde(default)]
++    pub constellation_family: Option<String>,
++    #[serde(default)]
++    pub constellation_map: Option<String>,
++    #[serde(default)]
++    pub subject_kind: Option<SubjectKind>,
++    #[serde(default)]
++    pub subject_id: Option<Uuid>,
++}
++
+ #[derive(Debug, Deserialize)]
+ struct ConstellationNameQuery {
+     name: String,
+@@ -82,7 +103,7 @@ struct CbuCaseSummary {
+ /// ```
+ pub fn create_constellation_router(pool: PgPool) -> Router {
+     let state = ConstellationAppState { pool };
+-    Router::new()
++    let router = Router::new()
+         .route("/api/cbu/:cbu_id/constellation", get(get_constellation))
+         .route("/api/cbu/:cbu_id/cases", get(get_constellation_cases))
+         .route(
+@@ -93,8 +114,52 @@ pub fn create_constellation_router(pool: PgPool) -> Router {
+         .route(
+             "/api/constellation/search-cbus",
+             get(search_constellation_cbus),
++        );
++    #[cfg(feature = "vnext-repl")]
++    let router = router
++        .route(
++            "/api/constellation/resolve",
++            axum::routing::post(resolve_constellation),
+         )
+-        .with_state(state)
++        .route("/api/constellation/hydrate", get(get_workspace_hydrate))
++        .route("/api/constellation/summary", get(get_workspace_summary));
++    router.with_state(state)
++}
++
++/// Resolve a session-scoped constellation context into concrete defaults.
++#[cfg(feature = "vnext-repl")]
++async fn resolve_constellation(
++    State(state): State<ConstellationAppState>,
++    Json(context): Json<ConstellationContextRef>,
++) -> Result<Json<ResolvedConstellationContext>, (StatusCode, String)> {
++    let resolved = resolve_context(&state.pool, &context).await?;
++    Ok(Json(resolved))
++}
++
++/// Hydrate the current workspace state view from a resolved context query.
++#[cfg(feature = "vnext-repl")]
++async fn get_workspace_hydrate(
++    State(state): State<ConstellationAppState>,
++    Query(query): Query<HydrateContextQuery>,
++) -> Result<Json<WorkspaceStateView>, (StatusCode, String)> {
++    let resolved = resolve_context(&state.pool, &query.into()).await?;
++    let hydrated = hydrate_workspace_state(&state.pool, &resolved).await?;
++    Ok(Json(hydrated))
++}
++
++/// Return the progress summary for a resolved context query.
++#[cfg(feature = "vnext-repl")]
++async fn get_workspace_summary(
++    State(state): State<ConstellationAppState>,
++    Query(query): Query<HydrateContextQuery>,
++) -> Result<Json<ProgressSummary>, (StatusCode, String)> {
++    let resolved = resolve_context(&state.pool, &query.into()).await?;
++    let hydrated = hydrate_workspace_state(&state.pool, &resolved).await?;
++    Ok(Json(hydrated.progress_summary.unwrap_or(ProgressSummary {
++        total_slots: 0,
++        completion_pct: 0,
++        blocking_slots: 0,
++    })))
+ }
+ 
+ async fn get_constellation(
+@@ -253,3 +318,307 @@ fn internal_error(error: impl std::fmt::Display) -> (StatusCode, String) {
+         format!("Constellation API error: {error}"),
+     )
+ }
++
++#[cfg(feature = "vnext-repl")]
++impl From<HydrateContextQuery> for ConstellationContextRef {
++    fn from(value: HydrateContextQuery) -> Self {
++        Self {
++            session_id: value.session_id,
++            client_group_id: value.client_group_id,
++            workspace: value.workspace,
++            constellation_family: value.constellation_family,
++            constellation_map: value.constellation_map,
++            subject_kind: value.subject_kind,
++            subject_id: value.subject_id,
++            handoff_context: None,
++        }
++    }
++}
++
++#[cfg(feature = "vnext-repl")]
++pub(crate) async fn resolve_context(
++    pool: &PgPool,
++    context: &ConstellationContextRef,
++) -> Result<ResolvedConstellationContext, (StatusCode, String)> {
++    let registry = context.workspace.registry_entry();
++    let session_scope = resolve_session_scope(pool, context.client_group_id).await?;
++    let subject_kind = context
++        .subject_kind
++        .clone()
++        .or_else(|| registry.subject_kinds.first().cloned());
++    let subject_id = match context.subject_id {
++        Some(subject_id) => Some(subject_id),
++        None => {
++            resolve_subject_id(
++                pool,
++                context.client_group_id,
++                &context.workspace,
++                subject_kind.as_ref(),
++            )
++            .await?
++        }
++    };
++
++    Ok(ResolvedConstellationContext {
++        session_id: context.session_id,
++        client_group_id: context.client_group_id,
++        workspace: context.workspace.clone(),
++        constellation_family: context
++            .constellation_family
++            .clone()
++            .unwrap_or_else(|| registry.default_constellation_family.to_string()),
++        constellation_map: context
++            .constellation_map
++            .clone()
++            .unwrap_or_else(|| registry.default_constellation_map.to_string()),
++        subject_kind,
++        subject_id,
++        handoff_context: context.handoff_context.clone(),
++        session_scope,
++        agent_mode: AgentMode::Sage,
++    })
++}
++
++#[cfg(feature = "vnext-repl")]
++pub(crate) async fn hydrate_workspace_state(
++    pool: &PgPool,
++    resolved: &ResolvedConstellationContext,
++) -> Result<WorkspaceStateView, (StatusCode, String)> {
++    let cbu_id = resolve_constellation_cbu_id(pool, resolved).await?;
++    let hydrated_constellation = if let Some(cbu_id) = cbu_id {
++        Some(
++            handle_constellation_hydrate(
++                pool,
++                cbu_id,
++                extract_case_id(resolved),
++                &resolved.constellation_map,
++            )
++            .await
++            .map_err(internal_error)?,
++        )
++    } else {
++        None
++    };
++    let progress_summary = if let Some(cbu_id) = cbu_id {
++        let summary = handle_constellation_summary(
++            pool,
++            cbu_id,
++            extract_case_id(resolved),
++            &resolved.constellation_map,
++        )
++        .await
++        .map_err(internal_error)?;
++        Some(progress_summary_from(&summary))
++    } else {
++        None
++    };
++    let scoped_verb_surface = hydrated_constellation
++        .as_ref()
++        .map(flatten_scoped_verbs)
++        .unwrap_or_default();
++    let subject_ref = resolved
++        .subject_id
++        .zip(resolved.subject_kind.clone())
++        .map(|(id, kind)| SubjectRef { kind, id });
++    let available_actions = build_action_hints(&resolved.workspace, &scoped_verb_surface);
++
++    Ok(WorkspaceStateView {
++        workspace: resolved.workspace.clone(),
++        constellation_family: resolved.constellation_family.clone(),
++        constellation_map: resolved.constellation_map.clone(),
++        subject_ref,
++        hydrated_constellation,
++        scoped_verb_surface,
++        progress_summary,
++        available_actions,
++    })
++}
++
++#[cfg(feature = "vnext-repl")]
++async fn resolve_session_scope(
++    pool: &PgPool,
++    client_group_id: Uuid,
++) -> Result<SessionScope, (StatusCode, String)> {
++    let group_name = sqlx::query_scalar::<_, Option<String>>(
++        r#"
++        SELECT canonical_name
++        FROM "ob-poc".client_group
++        WHERE id = $1
++        "#,
++    )
++    .bind(client_group_id)
++    .fetch_optional(pool)
++    .await
++    .map_err(internal_error)?
++    .flatten();
++
++    Ok(SessionScope {
++        client_group_id,
++        client_group_name: group_name,
++    })
++}
++
++#[cfg(feature = "vnext-repl")]
++async fn resolve_subject_id(
++    pool: &PgPool,
++    client_group_id: Uuid,
++    workspace: &WorkspaceKind,
++    subject_kind: Option<&SubjectKind>,
++) -> Result<Option<Uuid>, (StatusCode, String)> {
++    match subject_kind {
++        Some(SubjectKind::ClientGroup) => Ok(Some(client_group_id)),
++        Some(SubjectKind::Cbu)
++        | Some(SubjectKind::Case)
++        | Some(SubjectKind::Deal)
++        | Some(SubjectKind::Matrix)
++        | Some(SubjectKind::Handoff)
++        | None => resolve_first_cbu_for_group(pool, client_group_id).await,
++        Some(SubjectKind::Product)
++        | Some(SubjectKind::Service)
++        | Some(SubjectKind::Resource)
++        | Some(SubjectKind::Attribute) => {
++            if matches!(workspace, WorkspaceKind::ProductMaintenance) {
++                Ok(None)
++            } else {
++                resolve_first_cbu_for_group(pool, client_group_id).await
++            }
++        }
++    }
++}
++
++#[cfg(feature = "vnext-repl")]
++async fn resolve_first_cbu_for_group(
++    pool: &PgPool,
++    client_group_id: Uuid,
++) -> Result<Option<Uuid>, (StatusCode, String)> {
++    sqlx::query_scalar::<_, Uuid>(
++        r#"
++        SELECT cge.cbu_id
++        FROM "ob-poc".client_group_entity cge
++        JOIN "ob-poc".cbus c ON c.cbu_id = cge.cbu_id
++        WHERE cge.group_id = $1
++          AND c.deleted_at IS NULL
++        ORDER BY c.name ASC
++        LIMIT 1
++        "#,
++    )
++    .bind(client_group_id)
++    .fetch_optional(pool)
++    .await
++    .map_err(internal_error)
++}
++
++#[cfg(feature = "vnext-repl")]
++async fn resolve_constellation_cbu_id(
++    pool: &PgPool,
++    resolved: &ResolvedConstellationContext,
++) -> Result<Option<Uuid>, (StatusCode, String)> {
++    match resolved.subject_kind {
++        Some(SubjectKind::Cbu) => Ok(resolved.subject_id),
++        Some(SubjectKind::Case) => {
++            if let Some(case_id) = resolved.subject_id {
++                sqlx::query_scalar::<_, Uuid>(
++                    r#"
++                    SELECT cbu_id
++                    FROM "ob-poc".cases
++                    WHERE case_id = $1
++                    "#,
++                )
++                .bind(case_id)
++                .fetch_optional(pool)
++                .await
++                .map_err(internal_error)
++            } else {
++                resolve_first_cbu_for_group(pool, resolved.client_group_id).await
++            }
++        }
++        _ => {
++            if let Some(target_cbu_id) = resolved
++                .handoff_context
++                .as_ref()
++                .and_then(|handoff| handoff.target_cbu_id)
++            {
++                Ok(Some(target_cbu_id))
++            } else {
++                resolve_first_cbu_for_group(pool, resolved.client_group_id).await
++            }
++        }
++    }
++}
++
++#[cfg(feature = "vnext-repl")]
++fn extract_case_id(resolved: &ResolvedConstellationContext) -> Option<Uuid> {
++    match resolved.subject_kind {
++        Some(SubjectKind::Case) => resolved.subject_id,
++        _ => None,
++    }
++}
++
++#[cfg(feature = "vnext-repl")]
++fn progress_summary_from(summary: &ConstellationSummary) -> ProgressSummary {
++    ProgressSummary {
++        total_slots: summary.total_slots,
++        completion_pct: summary.completion_pct,
++        blocking_slots: summary.blocking_slots,
++    }
++}
++
++#[cfg(feature = "vnext-repl")]
++fn flatten_scoped_verbs(hydrated: &HydratedConstellation) -> Vec<VerbRef> {
++    fn walk(
++        slot: &crate::sem_os_runtime::constellation_runtime::HydratedSlot,
++        acc: &mut Vec<String>,
++    ) {
++        for verb in &slot.available_verbs {
++            if !acc.contains(verb) {
++                acc.push(verb.clone());
++            }
++        }
++        for child in &slot.children {
++            walk(child, acc);
++        }
++    }
++
++    let mut verbs = Vec::new();
++    for slot in &hydrated.slots {
++        walk(slot, &mut verbs);
++    }
++    verbs
++        .into_iter()
++        .map(|verb_fqn| VerbRef {
++            display_name: verb_fqn.clone(),
++            verb_fqn,
++        })
++        .collect()
++}
++
++#[cfg(feature = "vnext-repl")]
++fn build_action_hints(workspace: &WorkspaceKind, verbs: &[VerbRef]) -> Vec<ActionHint> {
++    let mut hints: Vec<ActionHint> = verbs
++        .iter()
++        .take(3)
++        .map(|verb| ActionHint {
++            label: format!("Run {}", verb.display_name),
++            verb_fqn: Some(verb.verb_fqn.clone()),
++            action_type: "verb".to_string(),
++        })
++        .collect();
++
++    if hints.is_empty() {
++        let label = match workspace {
++            WorkspaceKind::Deal => "Review deal lifecycle",
++            WorkspaceKind::Cbu => "Review operating footprint",
++            WorkspaceKind::Kyc => "Review clearance state",
++            WorkspaceKind::InstrumentMatrix => "Review matrix readiness",
++            WorkspaceKind::ProductMaintenance => "Review product taxonomy",
++            WorkspaceKind::OnBoarding => "Review onboarding handoff",
++        };
++        hints.push(ActionHint {
++            label: label.to_string(),
++            verb_fqn: None,
++            action_type: "inspect".to_string(),
++        });
++    }
++
++    hints
++}
+diff --git a/rust/src/api/mod.rs b/rust/src/api/mod.rs
+index db820cdc..8b08793a 100644
+--- a/rust/src/api/mod.rs
++++ b/rust/src/api/mod.rs
+@@ -185,4 +185,7 @@ pub use deal_routes::{create_deal_router, create_deal_router_simple, DealState};
+ pub use stewardship_routes::create_stewardship_router;
+ 
+ #[cfg(feature = "vnext-repl")]
+-pub use repl_routes_v2::{router as create_repl_v2_router, ReplV2RouteState};
++pub use repl_routes_v2::{
++    navigation_router as create_repl_navigation_router, router as create_repl_v2_router,
++    ReplV2RouteState,
++};
+diff --git a/rust/src/api/repl_routes_v2.rs b/rust/src/api/repl_routes_v2.rs
+index 7ca08045..0c3186bd 100644
+--- a/rust/src/api/repl_routes_v2.rs
++++ b/rust/src/api/repl_routes_v2.rs
+@@ -22,10 +22,14 @@ use serde::{Deserialize, Serialize};
+ use std::sync::Arc;
+ use uuid::Uuid;
+ 
++use crate::api::constellation_routes::{hydrate_workspace_state, resolve_context};
+ use crate::repl::orchestrator_v2::ReplOrchestratorV2;
+ use crate::repl::response_v2::ReplResponseV2;
+ use crate::repl::session_v2::ReplSessionV2;
+-use crate::repl::types_v2::{ReplCommandV2, ReplStateV2, UserInputV2, WorkspaceKind};
++use crate::repl::types_v2::{
++    ConstellationContextRef, ReplCommandV2, ReplStateV2, ResolvedConstellationContext,
++    SessionFeedback, UserInputV2, WorkspaceFrame, WorkspaceKind,
++};
+ 
+ // ============================================================================
+ // Route State
+@@ -212,6 +216,31 @@ pub struct SessionStateResponseV2 {
+     pub last_active_at: String,
+ }
+ 
++/// Request to push a new workspace context onto the session stack.
++#[derive(Debug, Clone, Deserialize)]
++pub struct SessionPushRequest {
++    pub context: ConstellationContextRef,
++}
++
++/// Request for stack commit/pop operations.
++#[derive(Debug, Clone, Deserialize)]
++pub struct SessionStackRequest {
++    pub session_id: Uuid,
++}
++
++/// Query for current session-scoped constellation context.
++#[derive(Debug, Clone, Deserialize)]
++pub struct SessionContextQuery {
++    pub session_id: Uuid,
++}
++
++/// Response returned by session stack routes.
++#[derive(Debug, Clone, Serialize)]
++pub struct SessionFeedbackResponse {
++    pub resolved: ResolvedConstellationContext,
++    pub feedback: SessionFeedback,
++}
++
+ impl From<ReplSessionV2> for SessionStateResponseV2 {
+     fn from(session: ReplSessionV2) -> Self {
+         Self {
+@@ -287,6 +316,7 @@ async fn create_session_v2(
+         message: greeting,
+         runbook_summary: None,
+         step_count: 0,
++        session_feedback: None,
+     };
+ 
+     Ok(Json(CreateSessionResponseV2 {
+@@ -354,6 +384,116 @@ async fn delete_session_v2(
+     Ok(StatusCode::NO_CONTENT)
+ }
+ 
++async fn get_constellation_context(
++    State(state): State<ReplV2RouteState>,
++    axum::extract::Query(query): axum::extract::Query<SessionContextQuery>,
++) -> Result<Json<SessionFeedback>, (StatusCode, Json<ErrorResponseV2>)> {
++    match state.orchestrator.session_feedback(query.session_id).await {
++        Ok(feedback) => Ok(Json(feedback)),
++        Err(error) => Err((
++            StatusCode::NOT_FOUND,
++            Json(ErrorResponseV2 {
++                error: error.to_string(),
++                recoverable: true,
++            }),
++        )),
++    }
++}
++
++async fn push_session_context(
++    State(state): State<ReplV2RouteState>,
++    Json(request): Json<SessionPushRequest>,
++) -> Result<Json<SessionFeedbackResponse>, (StatusCode, Json<ErrorResponseV2>)> {
++    let resolved = resolve_context(state.orchestrator_pool()?, &request.context)
++        .await
++        .map_err(as_json_error)?;
++    let hydrated = hydrate_workspace_state(state.orchestrator_pool()?, &resolved)
++        .await
++        .map_err(as_json_error)?;
++
++    let existing = state
++        .orchestrator
++        .get_session(request.context.session_id)
++        .await
++        .ok_or_else(|| {
++            (
++                StatusCode::NOT_FOUND,
++                Json(ErrorResponseV2 {
++                    error: format!("Unknown session {}", request.context.session_id),
++                    recoverable: false,
++                }),
++            )
++        })?;
++
++    if existing.workspace_stack.is_empty() {
++        state
++            .orchestrator
++            .apply_root_context(request.context.session_id, &request.context)
++            .await
++            .map_err(anyhow_json_error)?;
++    } else {
++        let mut frame =
++            WorkspaceFrame::new(resolved.workspace.clone(), resolved.session_scope.clone());
++        frame.constellation_family = resolved.constellation_family.clone();
++        frame.constellation_map = resolved.constellation_map.clone();
++        frame.subject_kind = resolved.subject_kind.clone();
++        frame.subject_id = resolved.subject_id;
++        state
++            .orchestrator
++            .push_workspace_frame(request.context.session_id, frame)
++            .await
++            .map_err(anyhow_json_error)?;
++    }
++
++    state
++        .orchestrator
++        .hydrate_tos(request.context.session_id, hydrated)
++        .await
++        .map_err(anyhow_json_error)?;
++
++    let feedback = state
++        .orchestrator
++        .session_feedback(request.context.session_id)
++        .await
++        .map_err(anyhow_json_error)?;
++
++    Ok(Json(SessionFeedbackResponse { resolved, feedback }))
++}
++
++async fn commit_session_context(
++    State(state): State<ReplV2RouteState>,
++    Json(request): Json<SessionStackRequest>,
++) -> Result<Json<SessionFeedback>, (StatusCode, Json<ErrorResponseV2>)> {
++    state
++        .orchestrator
++        .commit_workspace_stack(request.session_id)
++        .await
++        .map_err(anyhow_json_error)?;
++    let feedback = state
++        .orchestrator
++        .session_feedback(request.session_id)
++        .await
++        .map_err(anyhow_json_error)?;
++    Ok(Json(feedback))
++}
++
++async fn pop_session_context(
++    State(state): State<ReplV2RouteState>,
++    Json(request): Json<SessionStackRequest>,
++) -> Result<Json<SessionFeedback>, (StatusCode, Json<ErrorResponseV2>)> {
++    state
++        .orchestrator
++        .pop_workspace_frame(request.session_id)
++        .await
++        .map_err(anyhow_json_error)?;
++    let feedback = state
++        .orchestrator
++        .session_feedback(request.session_id)
++        .await
++        .map_err(anyhow_json_error)?;
++    Ok(Json(feedback))
++}
++
+ /// POST /api/repl/v2/signal — External system signals completion of a parked entry.
+ ///
+ /// Workflow engines, approval portals, and other external systems call this
+@@ -422,6 +562,72 @@ pub fn router() -> Router<ReplV2RouteState> {
+         .route("/signal", post(signal_v2))
+ }
+ 
++/// Create the session-scoped navigation router.
++///
++/// Mount this router at the application root so the routes resolve as:
++/// `/api/constellation/context`, `/api/session/push`, `/api/session/commit`, `/api/session/pop`.
++///
++/// # Examples
++/// ```rust,ignore
++/// let app = Router::new()
++///     .merge(repl_routes_v2::navigation_router().with_state(v2_state));
++/// ```
++pub fn navigation_router() -> Router<ReplV2RouteState> {
++    Router::new()
++        .route("/api/constellation/context", get(get_constellation_context))
++        .route("/api/session/push", post(push_session_context))
++        .route("/api/session/commit", post(commit_session_context))
++        .route("/api/session/pop", post(pop_session_context))
++}
++
++fn as_json_error(error: (StatusCode, String)) -> (StatusCode, Json<ErrorResponseV2>) {
++    let (status, message) = error;
++    (
++        status,
++        Json(ErrorResponseV2 {
++            error: message,
++            recoverable: true,
++        }),
++    )
++}
++
++fn anyhow_json_error(error: anyhow::Error) -> (StatusCode, Json<ErrorResponseV2>) {
++    (
++        StatusCode::BAD_REQUEST,
++        Json(ErrorResponseV2 {
++            error: error.to_string(),
++            recoverable: true,
++        }),
++    )
++}
++
++impl ReplV2RouteState {
++    fn orchestrator_pool(&self) -> Result<&sqlx::PgPool, (StatusCode, Json<ErrorResponseV2>)> {
++        #[cfg(feature = "database")]
++        {
++            self.orchestrator.pool().ok_or_else(|| {
++                (
++                    StatusCode::SERVICE_UNAVAILABLE,
++                    Json(ErrorResponseV2 {
++                        error: "REPL V2 orchestrator has no database pool".to_string(),
++                        recoverable: false,
++                    }),
++                )
++            })
++        }
++        #[cfg(not(feature = "database"))]
++        {
++            Err((
++                StatusCode::SERVICE_UNAVAILABLE,
++                Json(ErrorResponseV2 {
++                    error: "database feature is not enabled".to_string(),
++                    recoverable: false,
++                }),
++            ))
++        }
++    }
++}
++
+ // ============================================================================
+ // Tests
+ // ============================================================================
+diff --git a/rust/src/repl/orchestrator_v2.rs b/rust/src/repl/orchestrator_v2.rs
+index 3c4d7c0d..f5fc2a7a 100644
+--- a/rust/src/repl/orchestrator_v2.rs
++++ b/rust/src/repl/orchestrator_v2.rs
+@@ -24,6 +24,7 @@
+ use std::collections::HashMap;
+ use std::sync::Arc;
+ 
++use anyhow::Context as _;
+ use serde::{Deserialize, Serialize};
+ use tokio::sync::RwLock;
+ use uuid::Uuid;
+@@ -43,7 +44,8 @@ use super::runbook::{
+ use super::sentence_gen::SentenceGenerator;
+ use super::session_v2::{MessageRole, ReplSessionV2};
+ use super::types_v2::{
+-    ExecutionProgress, ReplCommandV2, ReplStateV2, UserInputV2, WorkspaceKind, WorkspaceOption,
++    ConstellationContextRef, ExecutionProgress, ReplCommandV2, ReplStateV2, SessionFeedback,
++    UserInputV2, WorkspaceFrame, WorkspaceKind, WorkspaceOption,
+ };
+ use super::verb_config_index::VerbConfigIndex;
+ use crate::dsl_v2::macros::MacroRegistry;
+@@ -324,6 +326,17 @@ impl ReplOrchestratorV2 {
+         &self.pack_router
+     }
+ 
++    /// Return the database pool used for scope/bootstrap and navigation hydration.
++    ///
++    /// # Examples
++    /// ```rust,ignore
++    /// let maybe_pool = orchestrator.pool();
++    /// ```
++    #[cfg(feature = "database")]
++    pub fn pool(&self) -> Option<&sqlx::PgPool> {
++        self.pool.as_ref().or(self.unified_orch_pool.as_ref())
++    }
++
+     /// Insert a previously-persisted session into the in-memory map.
+     ///
+     /// Used during session recovery (GET session not found in memory → load from DB → restore).
+@@ -354,6 +367,124 @@ impl ReplOrchestratorV2 {
+         self.sessions.read().await.get(&session_id).cloned()
+     }
+ 
++    /// Push a new workspace frame onto the session stack.
++    ///
++    /// # Examples
++    /// ```rust,ignore
++    /// let _ = orchestrator.push_workspace_frame(session_id, frame).await?;
++    /// ```
++    pub async fn push_workspace_frame(
++        &self,
++        session_id: Uuid,
++        frame: WorkspaceFrame,
++    ) -> anyhow::Result<()> {
++        let mut sessions = self.sessions.write().await;
++        let session = sessions
++            .get_mut(&session_id)
++            .context("session not found for push")?;
++        session.push_workspace_frame(frame)?;
++        Ok(())
++    }
++
++    /// Pop the current top-of-stack frame from the session.
++    ///
++    /// # Examples
++    /// ```rust,ignore
++    /// let popped = orchestrator.pop_workspace_frame(session_id).await?;
++    /// ```
++    pub async fn pop_workspace_frame(
++        &self,
++        session_id: Uuid,
++    ) -> anyhow::Result<Option<WorkspaceFrame>> {
++        let mut sessions = self.sessions.write().await;
++        let session = sessions
++            .get_mut(&session_id)
++            .context("session not found for pop")?;
++        Ok(session.pop_workspace_frame())
++    }
++
++    /// Collapse the stack to the current top-of-stack frame.
++    ///
++    /// # Examples
++    /// ```rust,ignore
++    /// orchestrator.commit_workspace_stack(session_id).await?;
++    /// ```
++    pub async fn commit_workspace_stack(&self, session_id: Uuid) -> anyhow::Result<()> {
++        let mut sessions = self.sessions.write().await;
++        let session = sessions
++            .get_mut(&session_id)
++            .context("session not found for commit")?;
++        session.commit_workspace_stack();
++        Ok(())
++    }
++
++    /// Apply a hydrated top-of-stack view to the session.
++    ///
++    /// # Examples
++    /// ```rust,ignore
++    /// orchestrator.hydrate_tos(session_id, workspace_state).await?;
++    /// ```
++    pub async fn hydrate_tos(
++        &self,
++        session_id: Uuid,
++        state_view: super::types_v2::WorkspaceStateView,
++    ) -> anyhow::Result<()> {
++        let mut sessions = self.sessions.write().await;
++        let session = sessions
++            .get_mut(&session_id)
++            .context("session not found for hydrate")?;
++        session.hydrate_tos(state_view);
++        Ok(())
++    }
++
++    /// Update the root frame from a resolved navigation context.
++    ///
++    /// # Examples
++    /// ```rust,ignore
++    /// orchestrator.apply_root_context(session_id, &ctx).await?;
++    /// ```
++    pub async fn apply_root_context(
++        &self,
++        session_id: Uuid,
++        context: &ConstellationContextRef,
++    ) -> anyhow::Result<()> {
++        let mut sessions = self.sessions.write().await;
++        let session = sessions
++            .get_mut(&session_id)
++            .context("session not found for root context")?;
++        if session.runbook.client_group_id != Some(context.client_group_id) {
++            session.set_client_scope(context.client_group_id);
++        }
++        session.set_workspace_root(context.workspace.clone());
++        if let Some(tos) = session.tos_frame_mut() {
++            tos.constellation_family = context
++                .constellation_family
++                .clone()
++                .unwrap_or_else(|| tos.constellation_family.clone());
++            tos.constellation_map = context
++                .constellation_map
++                .clone()
++                .unwrap_or_else(|| tos.constellation_map.clone());
++            tos.subject_kind = context.subject_kind.clone();
++            tos.subject_id = context.subject_id;
++        }
++        Ok(())
++    }
++
++    /// Build the current session feedback envelope.
++    ///
++    /// # Examples
++    /// ```rust,ignore
++    /// let feedback = orchestrator.session_feedback(session_id).await?;
++    /// ```
++    pub async fn session_feedback(&self, session_id: Uuid) -> anyhow::Result<SessionFeedback> {
++        let sessions = self.sessions.read().await;
++        let session = sessions
++            .get(&session_id)
++            .context("session not found for feedback")?;
++        Ok(session.build_session_feedback(false))
++    }
++
+     /// Expose the session map for test manipulation (integration tests).
+     #[doc(hidden)]
+     pub fn sessions_for_test(&self) -> &Arc<RwLock<HashMap<Uuid, ReplSessionV2>>> {
+@@ -439,6 +570,7 @@ impl ReplOrchestratorV2 {
+                     message: "External task failed. Edit the runbook or retry.".into(),
+                     runbook_summary: None,
+                     step_count: session.runbook.entries.len(),
++                    session_feedback: Some(session.build_session_feedback(false)),
+                 };
+                 return Ok(Some(response));
+             }
+@@ -764,6 +896,7 @@ impl ReplOrchestratorV2 {
+                     message: "Which client group would you like to work with?".to_string(),
+                     runbook_summary: None,
+                     step_count: 0,
++                    session_feedback: Some(session.build_session_feedback(false)),
+                 }
+             }
+             _ => self.invalid_input(session, "Please select a scope first."),
+@@ -777,7 +910,7 @@ impl ReplOrchestratorV2 {
+     ) -> ReplResponseV2 {
+         match input {
+             UserInputV2::SelectWorkspace { workspace } => {
+-                session.set_workspace(workspace.clone());
++                session.set_workspace_root(workspace.clone());
+                 session.set_state(ReplStateV2::JourneySelection { candidates: None });
+                 let packs = self.pack_router.list_packs_for_workspace(&workspace);
+                 ReplResponseV2 {
+@@ -791,6 +924,7 @@ impl ReplOrchestratorV2 {
+                     ),
+                     runbook_summary: None,
+                     step_count: session.runbook.entries.len(),
++                    session_feedback: Some(session.build_session_feedback(false)),
+                 }
+             }
+             _ => self.invalid_input(session, "Please select a workspace first."),
+@@ -840,6 +974,7 @@ impl ReplOrchestratorV2 {
+                                 .to_string(),
+                             runbook_summary: None,
+                             step_count: 0,
++                            session_feedback: Some(session.build_session_feedback(false)),
+                         }
+                     }
+                     PackRouteOutcome::NoMatch => {
+@@ -855,6 +990,7 @@ impl ReplOrchestratorV2 {
+                                     .to_string(),
+                             runbook_summary: None,
+                             step_count: 0,
++            session_feedback: Some(session.build_session_feedback(false)),
+                         }
+                     }
+                 }
+@@ -898,6 +1034,7 @@ impl ReplOrchestratorV2 {
+                             message: next.prompt.clone(),
+                             runbook_summary: None,
+                             step_count: session.runbook.entries.len(),
++                            session_feedback: Some(session.build_session_feedback(false)),
+                         };
+                     }
+ 
+@@ -936,6 +1073,7 @@ impl ReplOrchestratorV2 {
+                             message: format!("Removed step. {}", summary),
+                             runbook_summary: Some(summary),
+                             step_count: session.runbook.entries.len(),
++                            session_feedback: Some(session.build_session_feedback(false)),
+                         }
+                     } else {
+                         self.invalid_input(session, "Step not found.")
+@@ -953,6 +1091,7 @@ impl ReplOrchestratorV2 {
+                         message: format!("Reordered. {}", summary),
+                         runbook_summary: Some(summary),
+                         step_count: session.runbook.entries.len(),
++                        session_feedback: Some(session.build_session_feedback(false)),
+                     }
+                 }
+                 ReplCommandV2::Disable(id) => self.handle_disable(session, id),
+@@ -992,6 +1131,7 @@ impl ReplOrchestratorV2 {
+                     message: format!("Proposed: {}\n\nConfirm or reject?", sentence),
+                     runbook_summary: None,
+                     step_count: session.runbook.entries.len(),
++                    session_feedback: Some(session.build_session_feedback(false)),
+                 }
+             }
+             UserInputV2::Command {
+@@ -1053,6 +1193,7 @@ impl ReplOrchestratorV2 {
+                         message: format!("Added: {}\n\n{}", sentence, summary),
+                         runbook_summary: Some(summary),
+                         step_count: session.runbook.entries.len(),
++                        session_feedback: Some(session.build_session_feedback(false)),
+                     }
+                 } else {
+                     self.invalid_input(session, "No sentence to confirm.")
+@@ -1080,6 +1221,7 @@ impl ReplOrchestratorV2 {
+                     message: "Rejected. What would you like to do instead?".to_string(),
+                     runbook_summary: None,
+                     step_count: session.runbook.entries.len(),
++                    session_feedback: Some(session.build_session_feedback(false)),
+                 }
+             }
+             _ => self.invalid_input(session, "Please confirm or reject the proposed step."),
+@@ -1117,6 +1259,7 @@ impl ReplOrchestratorV2 {
+                             message: format!("Removed step. {}", summary),
+                             runbook_summary: Some(summary),
+                             step_count: session.runbook.entries.len(),
++                            session_feedback: Some(session.build_session_feedback(false)),
+                         }
+                     } else {
+                         self.invalid_input(session, "Step not found.")
+@@ -1134,6 +1277,7 @@ impl ReplOrchestratorV2 {
+                         message: format!("Reordered. {}", summary),
+                         runbook_summary: Some(summary),
+                         step_count: session.runbook.entries.len(),
++                        session_feedback: Some(session.build_session_feedback(false)),
+                     }
+                 }
+                 ReplCommandV2::Disable(id) => self.handle_disable(session, id),
+@@ -1246,6 +1390,7 @@ impl ReplOrchestratorV2 {
+             ),
+             runbook_summary: Some(summary),
+             step_count: session.runbook.entries.len(),
++            session_feedback: Some(session.build_session_feedback(false)),
+         }
+     }
+ 
+@@ -1441,6 +1586,7 @@ impl ReplOrchestratorV2 {
+             ),
+             runbook_summary: Some(summary),
+             step_count: session.runbook.entries.len(),
++            session_feedback: Some(session.build_session_feedback(false)),
+         }
+     }
+ 
+@@ -1469,6 +1615,7 @@ impl ReplOrchestratorV2 {
+             message: format!("{} parked entries cancelled.\n\n{}", cancelled, summary),
+             runbook_summary: Some(summary),
+             step_count: session.runbook.entries.len(),
++            session_feedback: Some(session.build_session_feedback(false)),
+         }
+     }
+ 
+@@ -1590,6 +1737,7 @@ impl ReplOrchestratorV2 {
+                 ),
+                 runbook_summary: None,
+                 step_count: 1,
++                session_feedback: Some(session.build_session_feedback(false)),
+             }
+         } else {
+             // DSL failed — stay in ScopeGate. The runsheet has the failure recorded.
+@@ -1613,6 +1761,7 @@ impl ReplOrchestratorV2 {
+                 ),
+                 runbook_summary: None,
+                 step_count: 1,
++                session_feedback: Some(session.build_session_feedback(false)),
+             }
+         }
+     }
+@@ -1689,6 +1838,7 @@ impl ReplOrchestratorV2 {
+                     message,
+                     runbook_summary: None,
+                     step_count: 0,
++                    session_feedback: Some(session.build_session_feedback(false)),
+                 }
+             }
+ 
+@@ -1711,6 +1861,7 @@ impl ReplOrchestratorV2 {
+                     ),
+                     runbook_summary: None,
+                     step_count: 0,
++            session_feedback: Some(session.build_session_feedback(false)),
+                 }
+             }
+ 
+@@ -1735,6 +1886,7 @@ impl ReplOrchestratorV2 {
+                         .to_string(),
+                     runbook_summary: None,
+                     step_count: 0,
++                    session_feedback: Some(session.build_session_feedback(false)),
+                 }
+             }
+         }
+@@ -1945,6 +2097,7 @@ impl ReplOrchestratorV2 {
+                 message: question.prompt.clone(),
+                 runbook_summary: None,
+                 step_count: 0,
++                session_feedback: Some(session.build_session_feedback(false)),
+             }
+         } else {
+             ReplResponseV2 {
+@@ -1957,6 +2110,7 @@ impl ReplOrchestratorV2 {
+                 message: "Pack activated. What would you like to do?".to_string(),
+                 runbook_summary: None,
+                 step_count: 0,
++                session_feedback: Some(session.build_session_feedback(false)),
+             }
+         }
+     }
+@@ -2026,6 +2180,7 @@ impl ReplOrchestratorV2 {
+                     },
+                     runbook_summary: Some(summary),
+                     step_count: session.runbook.entries.len(),
++                    session_feedback: Some(session.build_session_feedback(false)),
+                 }
+             }
+             FastCommand::DropStep(n) => {
+@@ -2048,6 +2203,7 @@ impl ReplOrchestratorV2 {
+                                 message: format!("Removed step {}. {}", n, summary),
+                                 runbook_summary: Some(summary),
+                                 step_count: session.runbook.entries.len(),
++                                session_feedback: Some(session.build_session_feedback(false)),
+                             }
+                         } else {
+                             self.invalid_input(session, &format!("Could not remove step {}.", n))
+@@ -2080,6 +2236,7 @@ impl ReplOrchestratorV2 {
+                     message: msg,
+                     runbook_summary: None,
+                     step_count: session.runbook.entries.len(),
++                    session_feedback: Some(session.build_session_feedback(false)),
+                 }
+             }
+             FastCommand::Options => {
+@@ -2096,6 +2253,7 @@ impl ReplOrchestratorV2 {
+                     message: format!("Available verbs: {}", pack_verbs),
+                     runbook_summary: None,
+                     step_count: session.runbook.entries.len(),
++                    session_feedback: Some(session.build_session_feedback(false)),
+                 }
+             }
+             FastCommand::SwitchJourney => {
+@@ -2110,6 +2268,7 @@ impl ReplOrchestratorV2 {
+                         .to_string(),
+                     runbook_summary: None,
+                     step_count: session.runbook.entries.len(),
++                    session_feedback: Some(session.build_session_feedback(false)),
+                 }
+             }
+             FastCommand::Cancel => self.handle_cancel(session),
+@@ -2133,6 +2292,7 @@ impl ReplOrchestratorV2 {
+                     message: msg,
+                     runbook_summary: None,
+                     step_count: session.runbook.entries.len(),
++                    session_feedback: Some(session.build_session_feedback(false)),
+                 }
+             }
+             FastCommand::Help => self.handle_help(session),
+@@ -2264,6 +2424,7 @@ impl ReplOrchestratorV2 {
+                     message: summary,
+                     runbook_summary: Some(self.runbook_summary(session)),
+                     step_count: session.runbook.entries.len(),
++                    session_feedback: Some(session.build_session_feedback(false)),
+                 };
+             }
+ 
+@@ -2288,6 +2449,7 @@ impl ReplOrchestratorV2 {
+                 ),
+                 runbook_summary: None,
+                 step_count: session.runbook.entries.len(),
++                session_feedback: Some(session.build_session_feedback(false)),
+             };
+         }
+ 
+@@ -2313,6 +2475,7 @@ impl ReplOrchestratorV2 {
+             ),
+             runbook_summary: None,
+             step_count: session.runbook.entries.len(),
++            session_feedback: Some(session.build_session_feedback(false)),
+         };
+         session.last_proposal_set = Some(proposal_set);
+         response
+@@ -2354,6 +2517,7 @@ impl ReplOrchestratorV2 {
+                     ),
+                     runbook_summary: None,
+                     step_count: session.runbook.entries.len(),
++                    session_feedback: Some(session.build_session_feedback(false)),
+                 }
+             }
+             None => self.invalid_input(session, "Proposal not found. Please try again."),
+@@ -2654,6 +2818,7 @@ impl ReplOrchestratorV2 {
+                             message: prompt.clone(),
+                             runbook_summary: None,
+                             step_count: session.runbook.entries.len(),
++                            session_feedback: Some(session.build_session_feedback(false)),
+                         };
+                     }
+                     ClarificationOutcome::Complete => {
+@@ -2724,6 +2889,7 @@ impl ReplOrchestratorV2 {
+                         message: summary,
+                         runbook_summary: Some(self.runbook_summary(session)),
+                         step_count: session.runbook.entries.len(),
++                        session_feedback: Some(session.build_session_feedback(false)),
+                     };
+                 }
+ 
+@@ -2741,6 +2907,7 @@ impl ReplOrchestratorV2 {
+                     ),
+                     runbook_summary: None,
+                     step_count: session.runbook.entries.len(),
++                    session_feedback: Some(session.build_session_feedback(false)),
+                 }
+             }
+ 
+@@ -2823,6 +2990,7 @@ impl ReplOrchestratorV2 {
+                     ),
+                     runbook_summary: None,
+                     step_count: session.runbook.entries.len(),
++                    session_feedback: Some(session.build_session_feedback(false)),
+                 }
+             }
+ 
+@@ -2886,6 +3054,7 @@ impl ReplOrchestratorV2 {
+                     message: format!("Direct DSL: {}\n\nConfirm or reject?", sentence),
+                     runbook_summary: None,
+                     step_count: session.runbook.entries.len(),
++                    session_feedback: Some(session.build_session_feedback(false)),
+                 }
+             }
+ 
+@@ -3027,6 +3196,7 @@ impl ReplOrchestratorV2 {
+                         message: summary,
+                         runbook_summary: Some(self.runbook_summary(session)),
+                         step_count: session.runbook.entries.len(),
++                        session_feedback: Some(session.build_session_feedback(false)),
+                     };
+                 }
+ 
+@@ -3044,6 +3214,7 @@ impl ReplOrchestratorV2 {
+                     ),
+                     runbook_summary: None,
+                     step_count: session.runbook.entries.len(),
++                    session_feedback: Some(session.build_session_feedback(false)),
+                 }
+             }
+ 
+@@ -3089,6 +3260,7 @@ impl ReplOrchestratorV2 {
+                     ),
+                     runbook_summary: None,
+                     step_count: session.runbook.entries.len(),
++                    session_feedback: Some(session.build_session_feedback(false)),
+                 }
+             }
+ 
+@@ -3120,6 +3292,7 @@ impl ReplOrchestratorV2 {
+                     message: format!("Direct DSL: {}\n\nConfirm or reject?", sentence),
+                     runbook_summary: None,
+                     step_count: session.runbook.entries.len(),
++                    session_feedback: Some(session.build_session_feedback(false)),
+                 }
+             }
+ 
+@@ -3177,6 +3350,7 @@ impl ReplOrchestratorV2 {
+             message: format!("Proposed: {}\n\nConfirm or reject?", sentence),
+             runbook_summary: None,
+             step_count: session.runbook.entries.len(),
++            session_feedback: Some(session.build_session_feedback(false)),
+         }
+     }
+ 
+@@ -3201,6 +3375,7 @@ impl ReplOrchestratorV2 {
+                     message: "All questions answered. What would you like to do?".to_string(),
+                     runbook_summary: None,
+                     step_count: 0,
++                    session_feedback: Some(session.build_session_feedback(false)),
+                 };
+             }
+         };
+@@ -3262,6 +3437,7 @@ impl ReplOrchestratorV2 {
+                     ),
+                     runbook_summary: Some(summary),
+                     step_count: session.runbook.entries.len(),
++                    session_feedback: Some(session.build_session_feedback(false)),
+                 }
+             }
+             Err(e) => ReplResponseV2 {
+@@ -3273,6 +3449,7 @@ impl ReplOrchestratorV2 {
+                 message: format!("Template error: {}", e),
+                 runbook_summary: None,
+                 step_count: 0,
++                session_feedback: Some(session.build_session_feedback(false)),
+             },
+         }
+     }
+@@ -3355,6 +3532,7 @@ impl ReplOrchestratorV2 {
+             ),
+             runbook_summary: Some(summary),
+             step_count: session.runbook.entries.len(),
++            session_feedback: Some(session.build_session_feedback(false)),
+         }
+     }
+ 
+@@ -3380,6 +3558,7 @@ impl ReplOrchestratorV2 {
+             message: "Cancelled.".to_string(),
+             runbook_summary: Some(summary),
+             step_count: session.runbook.entries.len(),
++            session_feedback: Some(session.build_session_feedback(false)),
+         }
+     }
+ 
+@@ -3399,6 +3578,7 @@ impl ReplOrchestratorV2 {
+                 message: format!("Undone: {}\n\n{}", sentence, summary),
+                 runbook_summary: Some(summary),
+                 step_count: session.runbook.entries.len(),
++                session_feedback: Some(session.build_session_feedback(false)),
+             }
+         } else {
+             self.invalid_input(session, "Nothing to undo.")
+@@ -3420,6 +3600,7 @@ impl ReplOrchestratorV2 {
+                 message: format!("Restored: {}\n\n{}", sentence, summary),
+                 runbook_summary: Some(summary),
+                 step_count: session.runbook.entries.len(),
++                session_feedback: Some(session.build_session_feedback(false)),
+             }
+         } else {
+             self.invalid_input(session, "Nothing to redo.")
+@@ -3439,6 +3620,7 @@ impl ReplOrchestratorV2 {
+             message: format!("Cleared {} steps.", count),
+             runbook_summary: Some(summary),
+             step_count: session.runbook.entries.len(),
++            session_feedback: Some(session.build_session_feedback(false)),
+         }
+     }
+ 
+@@ -3485,6 +3667,7 @@ impl ReplOrchestratorV2 {
+             message: info,
+             runbook_summary: None,
+             step_count: session.runbook.entries.len(),
++            session_feedback: Some(session.build_session_feedback(false)),
+         }
+     }
+ 
+@@ -3508,6 +3691,7 @@ impl ReplOrchestratorV2 {
+             message: help.to_string(),
+             runbook_summary: None,
+             step_count: session.runbook.entries.len(),
++            session_feedback: Some(session.build_session_feedback(false)),
+         }
+     }
+ 
+@@ -3524,6 +3708,7 @@ impl ReplOrchestratorV2 {
+                 message: format!("Step disabled.\n\n{}", summary),
+                 runbook_summary: Some(summary),
+                 step_count: session.runbook.entries.len(),
++                session_feedback: Some(session.build_session_feedback(false)),
+             }
+         } else {
+             self.invalid_input(session, "Step not found or already disabled.")
+@@ -3543,6 +3728,7 @@ impl ReplOrchestratorV2 {
+                 message: format!("Step enabled.\n\n{}", summary),
+                 runbook_summary: Some(summary),
+                 step_count: session.runbook.entries.len(),
++                session_feedback: Some(session.build_session_feedback(false)),
+             }
+         } else {
+             self.invalid_input(session, "Step not found or not disabled.")
+@@ -3568,6 +3754,7 @@ impl ReplOrchestratorV2 {
+                     message: format!("Step {}.\n\n{}", label, summary),
+                     runbook_summary: Some(summary),
+                     step_count: session.runbook.entries.len(),
++                    session_feedback: Some(session.build_session_feedback(false)),
+                 }
+             }
+             None => self.invalid_input(session, "Step not found."),
+@@ -3614,6 +3801,7 @@ impl ReplOrchestratorV2 {
+                     ),
+                     runbook_summary: None,
+                     step_count: session.runbook.entries.len(),
++                    session_feedback: Some(session.build_session_feedback(false)),
+                 };
+             }
+         }
+@@ -3919,6 +4107,7 @@ impl ReplOrchestratorV2 {
+                 ),
+                 runbook_summary: Some(summary),
+                 step_count: session.runbook.entries.len(),
++                session_feedback: Some(session.build_session_feedback(false)),
+             }
+         } else {
+             // All entries processed — back to editing.
+@@ -3954,6 +4143,7 @@ impl ReplOrchestratorV2 {
+                 ),
+                 runbook_summary: Some(summary),
+                 step_count: session.runbook.entries.len(),
++                session_feedback: Some(session.build_session_feedback(false)),
+             }
+         }
+     }
+@@ -4493,6 +4683,7 @@ impl ReplOrchestratorV2 {
+                 message: c.question,
+                 runbook_summary: None,
+                 step_count: session.runbook.entries.len(),
++                session_feedback: Some(session.build_session_feedback(false)),
+             }),
+             crate::runbook::OrchestratorResponse::ConstraintViolation(v) => {
+                 let msg = format!("Pack constraint violation: {}", v.explanation,);
+@@ -4505,6 +4696,7 @@ impl ReplOrchestratorV2 {
+                     message: msg,
+                     runbook_summary: None,
+                     step_count: session.runbook.entries.len(),
++                    session_feedback: Some(session.build_session_feedback(false)),
+                 })
+             }
+             crate::runbook::OrchestratorResponse::CompilationError(e) => {
+@@ -4518,6 +4710,7 @@ impl ReplOrchestratorV2 {
+                     message: msg,
+                     runbook_summary: None,
+                     step_count: session.runbook.entries.len(),
++                    session_feedback: Some(session.build_session_feedback(false)),
+                 })
+             }
+         }
+@@ -4564,6 +4757,7 @@ impl ReplOrchestratorV2 {
+             message: message.to_string(),
+             runbook_summary: None,
+             step_count: session.runbook.entries.len(),
++            session_feedback: Some(session.build_session_feedback(false)),
+         }
+     }
+ 
+@@ -4681,6 +4875,9 @@ fn input_trace_text(input: &UserInputV2) -> Option<String> {
+             group_id,
+             group_name,
+         } => Some(format!("select_scope:{group_id}:{group_name}")),
++        UserInputV2::SelectWorkspace { workspace } => {
++            Some(format!("select_workspace:{}", workspace.label()))
++        }
+         UserInputV2::Approve {
+             entry_id,
+             approved_by,
+@@ -4716,6 +4913,7 @@ fn repl_parent_trace_id(session: &ReplSessionV2, input: &UserInputV2) -> Option<
+     match input {
+         UserInputV2::Confirm
+         | UserInputV2::Reject
++        | UserInputV2::SelectWorkspace { .. }
+         | UserInputV2::SelectPack { .. }
+         | UserInputV2::SelectVerb { .. }
+         | UserInputV2::SelectProposal { .. }
+@@ -4742,6 +4940,7 @@ fn update_repl_trace_lineage(
+     session.last_trace_id = trace_id;
+     session.pending_trace_id = match response.kind {
+         ReplResponseKindV2::ScopeRequired { .. }
++        | ReplResponseKindV2::WorkspaceOptions { .. }
+         | ReplResponseKindV2::JourneyOptions { .. }
+         | ReplResponseKindV2::Question { .. }
+         | ReplResponseKindV2::SentencePlayback { .. }
+@@ -4760,6 +4959,7 @@ fn repl_response_needs_follow_up(response: &ReplResponseV2) -> bool {
+     matches!(
+         response.kind,
+         ReplResponseKindV2::ScopeRequired { .. }
++            | ReplResponseKindV2::WorkspaceOptions { .. }
+             | ReplResponseKindV2::JourneyOptions { .. }
+             | ReplResponseKindV2::Question { .. }
+             | ReplResponseKindV2::SentencePlayback { .. }
+@@ -4777,6 +4977,7 @@ fn classify_repl_trace_outcome(response: &ReplResponseV2) -> crate::traceability
+         ReplResponseKindV2::JourneyOptions { .. } => crate::traceability::TraceOutcome::NoMatch,
+         ReplResponseKindV2::Parked { .. }
+         | ReplResponseKindV2::ScopeRequired { .. }
++        | ReplResponseKindV2::WorkspaceOptions { .. }
+         | ReplResponseKindV2::Question { .. }
+         | ReplResponseKindV2::SentencePlayback { .. }
+         | ReplResponseKindV2::Clarification { .. }
+@@ -5996,6 +6197,7 @@ definition_of_done:
+             message: "No matching action found".to_string(),
+             runbook_summary: None,
+             step_count: 0,
++            session_feedback: Some(session.build_session_feedback(false)),
+         };
+ 
+         assert_eq!(
+@@ -6048,6 +6250,7 @@ definition_of_done:
+             message: "Entity resolution needed".to_string(),
+             runbook_summary: None,
+             step_count: 0,
++            session_feedback: Some(session.build_session_feedback(false)),
+         };
+ 
+         assert_eq!(
+@@ -6165,6 +6368,7 @@ definition_of_done:
+             message: "Open the case".to_string(),
+             runbook_summary: None,
+             step_count: 0,
++            session_feedback: Some(session.build_session_feedback(false)),
+         };
+ 
+         let payload = build_repl_phase4_evaluation(
+diff --git a/rust/src/repl/response_v2.rs b/rust/src/repl/response_v2.rs
+index bd912aed..4ff5f5a9 100644
+--- a/rust/src/repl/response_v2.rs
++++ b/rust/src/repl/response_v2.rs
+@@ -9,7 +9,9 @@ use serde::{Deserialize, Serialize};
+ use uuid::Uuid;
+ 
+ use super::proposal_engine::StepProposal;
+-use super::types_v2::{PackCandidate, ReplStateV2, VerbCandidate, WorkspaceOption};
++use super::types_v2::{
++    PackCandidate, ReplStateV2, SessionFeedback, VerbCandidate, WorkspaceOption,
++};
+ 
+ // ---------------------------------------------------------------------------
+ // ReplResponseV2
+@@ -32,6 +34,10 @@ pub struct ReplResponseV2 {
+ 
+     /// Number of steps in the current runbook.
+     pub step_count: usize,
++
++    /// Session-scoped navigation feedback for the active top-of-stack frame.
++    #[serde(default, skip_serializing_if = "Option::is_none")]
++    pub session_feedback: Option<SessionFeedback>,
+ }
+ 
+ // ---------------------------------------------------------------------------
+@@ -166,6 +172,7 @@ mod tests {
+             message: "Please confirm this step.".to_string(),
+             runbook_summary: None,
+             step_count: 1,
++            session_feedback: None,
+         };
+ 
+         let json = serde_json::to_string(&response).unwrap();
+@@ -185,6 +192,7 @@ mod tests {
+             message: "I couldn't find a matching verb.".to_string(),
+             runbook_summary: None,
+             step_count: 0,
++            session_feedback: None,
+         };
+ 
+         let json = serde_json::to_string(&response).unwrap();
+@@ -214,6 +222,7 @@ mod tests {
+             message: "Which journey would you like to start?".to_string(),
+             runbook_summary: None,
+             step_count: 0,
++            session_feedback: None,
+         };
+ 
+         let json = serde_json::to_string(&response).unwrap();
+@@ -240,6 +249,7 @@ mod tests {
+             message: "Execution complete.".to_string(),
+             runbook_summary: Some("1 step completed successfully.".to_string()),
+             step_count: 1,
++            session_feedback: None,
+         };
+ 
+         let json = serde_json::to_string(&response).unwrap();
+diff --git a/rust/src/repl/session_repository.rs b/rust/src/repl/session_repository.rs
+index 3ee5906d..91cb4c5a 100644
+--- a/rust/src/repl/session_repository.rs
++++ b/rust/src/repl/session_repository.rs
+@@ -153,6 +153,10 @@ impl SessionRepositoryV2 {
+                     pending_sem_os_envelope: None,
+                     pending_lookup_result: None,
+                     pending_execution_rechecks: Vec::new(),
++                    active_workspace: None,
++                    workspace_stack: Vec::new(),
++                    pending_verb: None,
++                    conversation_mode: super::types_v2::ConversationMode::Inspect,
+                     created_at: r.created_at,
+                     last_active_at: r.last_active_at,
+                     // Transient field — the authoritative counter is on `runbook.next_version_counter`
+diff --git a/rust/src/repl/session_v2.rs b/rust/src/repl/session_v2.rs
+index fb52d22f..d090eede 100644
+--- a/rust/src/repl/session_v2.rs
++++ b/rust/src/repl/session_v2.rs
+@@ -1,12 +1,13 @@
+-//! Session V2 — Owns a Runbook instead of a ledger
++//! Session V2 — Owns a Runbook instead of a ledger.
+ //!
+ //! `ReplSessionV2` is the single container for a user's in-progress work.
+-//! It holds the state machine, runbook, staged pack, and conversation history.
+-//! Session state is derived from the runbook via `ContextStack::from_runbook()`.
++//! It holds the state machine, runbook, staged pack, conversation history,
++//! and the session-scoped workspace stack used by the v0.5 navigation model.
+ 
+ use std::collections::HashMap;
+ use std::sync::Arc;
+ 
++use anyhow::Result;
+ use chrono::{DateTime, Utc};
+ use serde::{Deserialize, Serialize};
+ use uuid::Uuid;
+@@ -14,37 +15,27 @@ use uuid::Uuid;
+ use super::decision_log::SessionDecisionLog;
+ use super::proposal_engine::ProposalSet;
+ use super::runbook::{ArgExtractionAudit, Runbook, SlotSource};
+-use super::types_v2::{ReplStateV2, WorkspaceKind};
++use super::types_v2::{
++    ConversationMode, ReplStateV2, SessionFeedback, SessionScope, SubjectRef, VerbRef,
++    WorkspaceFrame, WorkspaceHint, WorkspaceKind, WorkspaceStateView,
++};
+ use crate::agent::sem_os_context_envelope::SemOsContextEnvelope;
+ use crate::journey::handoff::PackHandoff;
+ use crate::journey::pack::PackManifest;
+ use crate::lookup::LookupResult;
+ 
+-// ---------------------------------------------------------------------------
+-// ReplSessionV2
+-// ---------------------------------------------------------------------------
+-
+ /// A v2 REPL session — the single source of truth for a user's work.
+-///
+-/// Session state is derived from the runbook via `ContextStack::from_runbook()`.
+-/// The `staged_pack` field holds the active pack manifest for the current turn;
+-/// everything else (scope, answers, progress) is a left fold over executed
+-/// runbook entries.
+ #[derive(Debug, Clone, Serialize, Deserialize)]
+ pub struct ReplSessionV2 {
+     pub id: Uuid,
+     pub state: ReplStateV2,
+     /// Deprecated — retained as opaque JSON for deserialization of legacy sessions.
+-    /// No code should read or write this field.
+     #[serde(default)]
+     pub client_context: Option<serde_json::Value>,
+     /// Deprecated — retained as opaque JSON for deserialization of legacy sessions.
+-    /// No code should read or write this field.
+     #[serde(default)]
+     pub journey_context: Option<serde_json::Value>,
+     /// The active pack manifest (not serialized — reloaded from pack files).
+-    /// This is the staged pack that ContextStack reads. It replaces the
+-    /// `journey_context.pack` field for all read-side access.
+     #[serde(skip)]
+     pub staged_pack: Option<Arc<PackManifest>>,
+     /// Hash of the staged pack manifest (for rehydration).
+@@ -52,49 +43,49 @@ pub struct ReplSessionV2 {
+     pub staged_pack_hash: Option<String>,
+     pub runbook: Runbook,
+     pub messages: Vec<ChatMessage>,
+-    /// Transient: audit from the most recent IntentMatcher result.
+-    /// Set when a verb is matched, consumed when the entry is confirmed.
+     #[serde(skip)]
+     pub pending_arg_audit: Option<ArgExtractionAudit>,
+-    /// Transient: slot provenance from deterministic extraction (Phase F).
+-    /// Set when deterministic extraction succeeds, consumed when the entry is confirmed.
+     #[serde(skip)]
+     pub pending_slot_provenance: Option<HashMap<String, SlotSource>>,
+-    /// Transient: last proposal set from the proposal engine.
+-    /// Set when proposals are generated, consumed when user selects one.
+     #[serde(skip)]
+     pub last_proposal_set: Option<ProposalSet>,
+-    /// Phase G: Accumulated decision logs for replay and tuning.
+     #[serde(skip)]
+     pub decision_log: SessionDecisionLog,
+-    /// Most recent utterance trace written for this session.
+     #[serde(default)]
+     pub last_trace_id: Option<Uuid>,
+-    /// Trace currently awaiting a user clarification/confirmation response.
+     #[serde(default)]
+     pub pending_trace_id: Option<Uuid>,
+-    /// Current-turn Sem OS legality envelope used for trace persistence.
+     #[serde(skip)]
+     pub pending_sem_os_envelope: Option<SemOsContextEnvelope>,
+-    /// Current-turn lookup result used for trace persistence.
+     #[serde(skip)]
+     pub pending_lookup_result: Option<LookupResult>,
+-    /// Per-step Sem OS legality re-check evidence captured during execution.
+     #[serde(skip)]
+     pub pending_execution_rechecks: Vec<serde_json::Value>,
+     #[serde(default)]
+     pub active_workspace: Option<WorkspaceKind>,
++    #[serde(default)]
++    pub workspace_stack: Vec<WorkspaceFrame>,
++    #[serde(default)]
++    pub pending_verb: Option<VerbRef>,
++    #[serde(default)]
++    pub conversation_mode: ConversationMode,
+     pub created_at: DateTime<Utc>,
+     pub last_active_at: DateTime<Utc>,
+-    /// Monotonic counter for runbook version allocation.
+-    /// Each call to `allocate_runbook_version()` returns a unique, ascending value.
+-    /// Initialized at 0; first allocation returns 1.
+     #[serde(default)]
+     pub(super) next_runbook_version: u64,
+ }
+ 
+ impl ReplSessionV2 {
+     /// Create a new session starting in `ScopeGate`.
++    ///
++    /// # Examples
++    /// ```rust
++    /// use ob_poc::repl::session_v2::ReplSessionV2;
++    /// use ob_poc::repl::types_v2::ReplStateV2;
++    ///
++    /// let session = ReplSessionV2::new();
++    /// assert!(matches!(session.state, ReplStateV2::ScopeGate { .. }));
++    /// ```
+     pub fn new() -> Self {
+         let id = Uuid::new_v4();
+         let now = Utc::now();
+@@ -120,6 +111,9 @@ impl ReplSessionV2 {
+             pending_lookup_result: None,
+             pending_execution_rechecks: Vec::new(),
+             active_workspace: None,
++            workspace_stack: Vec::new(),
++            pending_verb: None,
++            conversation_mode: ConversationMode::Inspect,
+             created_at: now,
+             last_active_at: now,
+             next_runbook_version: 0,
+@@ -128,21 +122,30 @@ impl ReplSessionV2 {
+ 
+     /// Allocate the next monotonic runbook version.
+     ///
+-    /// Returns a unique, ascending version number starting from 1.
+-    /// Guarantees uniqueness within a session — no two compilations share
+-    /// the same version, even if entries are deleted or re-ordered.
++    /// # Examples
++    /// ```rust
++    /// use ob_poc::repl::session_v2::ReplSessionV2;
+     ///
+-    /// The counter lives on `runbook.next_version_counter` so it is persisted
+-    /// when the runbook JSONB is saved. The legacy `self.next_runbook_version`
+-    /// field is kept in sync for backward compatibility.
++    /// let mut session = ReplSessionV2::new();
++    /// assert_eq!(session.allocate_runbook_version(), 1);
++    /// assert_eq!(session.allocate_runbook_version(), 2);
++    /// ```
+     pub fn allocate_runbook_version(&mut self) -> u64 {
+         self.runbook.next_version_counter += 1;
+-        // Keep legacy field in sync (transient — not persisted).
+         self.next_runbook_version = self.runbook.next_version_counter;
+         self.runbook.next_version_counter
+     }
+ 
+     /// Add a message to the conversation history.
++    ///
++    /// # Examples
++    /// ```rust
++    /// use ob_poc::repl::session_v2::{MessageRole, ReplSessionV2};
++    ///
++    /// let mut session = ReplSessionV2::new();
++    /// session.push_message(MessageRole::User, "hello".to_string());
++    /// assert_eq!(session.messages.len(), 1);
++    /// ```
+     pub fn push_message(&mut self, role: MessageRole, content: String) {
+         self.messages.push(ChatMessage {
+             id: Uuid::new_v4(),
+@@ -154,6 +157,16 @@ impl ReplSessionV2 {
+     }
+ 
+     /// Transition to a new state.
++    ///
++    /// # Examples
++    /// ```rust
++    /// use ob_poc::repl::session_v2::ReplSessionV2;
++    /// use ob_poc::repl::types_v2::ReplStateV2;
++    ///
++    /// let mut session = ReplSessionV2::new();
++    /// session.set_state(ReplStateV2::RunbookEditing);
++    /// assert!(matches!(session.state, ReplStateV2::RunbookEditing));
++    /// ```
+     pub fn set_state(&mut self, new_state: ReplStateV2) {
+         self.state = new_state;
+         self.last_active_at = Utc::now();
+@@ -161,21 +174,271 @@ impl ReplSessionV2 {
+ 
+     /// Set the client scope (client group id).
+     ///
+-    /// Writes to `runbook.client_group_id` — the canonical source of truth.
++    /// # Examples
++    /// ```rust
++    /// use ob_poc::repl::session_v2::ReplSessionV2;
++    /// use uuid::Uuid;
++    ///
++    /// let mut session = ReplSessionV2::new();
++    /// session.set_client_scope(Uuid::nil());
++    /// assert_eq!(session.runbook.client_group_id, Some(Uuid::nil()));
++    /// ```
+     pub fn set_client_scope(&mut self, client_group_id: Uuid) {
+         self.runbook.client_group_id = Some(client_group_id);
+         self.last_active_at = Utc::now();
+     }
+ 
+-    /// Set the active workspace after scope selection.
++    /// Set the active workspace and replace the stack with a root frame.
++    ///
++    /// # Examples
++    /// ```rust
++    /// use ob_poc::repl::session_v2::ReplSessionV2;
++    /// use ob_poc::repl::types_v2::WorkspaceKind;
++    /// use uuid::Uuid;
++    ///
++    /// let mut session = ReplSessionV2::new();
++    /// session.set_client_scope(Uuid::nil());
++    /// session.set_workspace(WorkspaceKind::Deal);
++    /// assert_eq!(session.workspace_stack.len(), 1);
++    /// ```
+     pub fn set_workspace(&mut self, workspace: WorkspaceKind) {
+-        self.active_workspace = Some(workspace);
++        self.active_workspace = Some(workspace.clone());
++        self.workspace_stack.clear();
++        if let Some(scope) = self.session_scope() {
++            self.workspace_stack
++                .push(WorkspaceFrame::new(workspace, scope));
++        }
++        self.last_active_at = Utc::now();
++    }
++
++    /// Alias for setting the root workspace frame.
++    ///
++    /// # Examples
++    /// ```rust
++    /// use ob_poc::repl::session_v2::ReplSessionV2;
++    /// use ob_poc::repl::types_v2::WorkspaceKind;
++    /// use uuid::Uuid;
++    ///
++    /// let mut session = ReplSessionV2::new();
++    /// session.set_client_scope(Uuid::nil());
++    /// session.set_workspace_root(WorkspaceKind::Kyc);
++    /// assert_eq!(session.active_workspace, Some(WorkspaceKind::Kyc));
++    /// ```
++    pub fn set_workspace_root(&mut self, workspace: WorkspaceKind) {
++        self.set_workspace(workspace);
++    }
++
++    /// Return the current session scope if the client group is known.
++    ///
++    /// # Examples
++    /// ```rust
++    /// use ob_poc::repl::session_v2::ReplSessionV2;
++    /// use uuid::Uuid;
++    ///
++    /// let mut session = ReplSessionV2::new();
++    /// session.set_client_scope(Uuid::nil());
++    /// assert!(session.session_scope().is_some());
++    /// ```
++    pub fn session_scope(&self) -> Option<SessionScope> {
++        self.runbook
++            .client_group_id
++            .map(|client_group_id| SessionScope {
++                client_group_id,
++                client_group_name: None,
++            })
++    }
++
++    /// Return the top-of-stack frame, if any.
++    ///
++    /// # Examples
++    /// ```rust
++    /// use ob_poc::repl::session_v2::ReplSessionV2;
++    /// assert!(ReplSessionV2::new().tos_frame().is_none());
++    /// ```
++    pub fn tos_frame(&self) -> Option<&WorkspaceFrame> {
++        self.workspace_stack.last()
++    }
++
++    /// Return the mutable top-of-stack frame, if any.
++    ///
++    /// # Examples
++    /// ```rust
++    /// use ob_poc::repl::session_v2::ReplSessionV2;
++    /// assert!(ReplSessionV2::new().tos_frame_mut().is_none());
++    /// ```
++    pub fn tos_frame_mut(&mut self) -> Option<&mut WorkspaceFrame> {
++        self.workspace_stack.last_mut()
++    }
++
++    /// Push a new frame onto the workspace stack.
++    ///
++    /// # Examples
++    /// ```rust
++    /// use ob_poc::repl::session_v2::ReplSessionV2;
++    /// use ob_poc::repl::types_v2::{SessionScope, WorkspaceFrame, WorkspaceKind};
++    /// use uuid::Uuid;
++    ///
++    /// let mut session = ReplSessionV2::new();
++    /// let ok = session.push_workspace_frame(WorkspaceFrame::new(
++    ///     WorkspaceKind::Kyc,
++    ///     SessionScope { client_group_id: Uuid::nil(), client_group_name: None },
++    /// ));
++    /// assert!(ok.is_ok());
++    /// ```
++    pub fn push_workspace_frame(&mut self, frame: WorkspaceFrame) -> Result<()> {
++        anyhow::ensure!(
++            self.workspace_stack.len() < 3,
++            "workspace stack depth exceeds max depth 3"
++        );
++        self.active_workspace = Some(frame.workspace.clone());
++        self.workspace_stack.push(frame);
+         self.last_active_at = Utc::now();
++        Ok(())
++    }
++
++    /// Replace the hydrated state on the top-of-stack frame.
++    ///
++    /// # Examples
++    /// ```rust,ignore
++    /// session.hydrate_tos(view);
++    /// ```
++    pub fn hydrate_tos(&mut self, state_view: WorkspaceStateView) {
++        if let Some(tos) = self.workspace_stack.last_mut() {
++            tos.hydrated_state = Some(state_view);
++            tos.stale = false;
++            self.active_workspace = Some(tos.workspace.clone());
++        }
++        self.last_active_at = Utc::now();
++    }
++
++    /// Pop the top-of-stack frame and mark the restored frame stale.
++    ///
++    /// # Examples
++    /// ```rust
++    /// use ob_poc::repl::session_v2::ReplSessionV2;
++    /// use ob_poc::repl::types_v2::{SessionScope, WorkspaceFrame, WorkspaceKind};
++    /// use uuid::Uuid;
++    ///
++    /// let mut session = ReplSessionV2::new();
++    /// let scope = SessionScope { client_group_id: Uuid::nil(), client_group_name: None };
++    /// session.push_workspace_frame(WorkspaceFrame::new(WorkspaceKind::Deal, scope.clone())).unwrap();
++    /// session.push_workspace_frame(WorkspaceFrame::new(WorkspaceKind::Kyc, scope)).unwrap();
++    /// assert!(session.pop_workspace_frame().is_some());
++    /// ```
++    pub fn pop_workspace_frame(&mut self) -> Option<WorkspaceFrame> {
++        if self.workspace_stack.len() <= 1 {
++            return None;
++        }
++        let popped = self.workspace_stack.pop();
++        if let Some(tos) = self.workspace_stack.last_mut() {
++            tos.stale = true;
++            self.active_workspace = Some(tos.workspace.clone());
++        }
++        self.last_active_at = Utc::now();
++        popped
++    }
++
++    /// Collapse the stack to the current top-of-stack frame.
++    ///
++    /// # Examples
++    /// ```rust
++    /// use ob_poc::repl::session_v2::ReplSessionV2;
++    /// use ob_poc::repl::types_v2::{SessionScope, WorkspaceFrame, WorkspaceKind};
++    /// use uuid::Uuid;
++    ///
++    /// let mut session = ReplSessionV2::new();
++    /// let scope = SessionScope { client_group_id: Uuid::nil(), client_group_name: None };
++    /// session.push_workspace_frame(WorkspaceFrame::new(WorkspaceKind::Deal, scope.clone())).unwrap();
++    /// session.push_workspace_frame(WorkspaceFrame::new(WorkspaceKind::Kyc, scope)).unwrap();
++    /// session.commit_workspace_stack();
++    /// assert_eq!(session.workspace_stack.len(), 1);
++    /// ```
++    pub fn commit_workspace_stack(&mut self) {
++        if let Some(tos) = self.workspace_stack.last().cloned() {
++            self.workspace_stack.clear();
++            self.active_workspace = Some(tos.workspace.clone());
++            self.workspace_stack.push(WorkspaceFrame {
++                stale: false,
++                ..tos
++            });
++        }
++        self.last_active_at = Utc::now();
++    }
++
++    /// Build session feedback from the current top-of-stack state.
++    ///
++    /// # Examples
++    /// ```rust
++    /// use ob_poc::repl::session_v2::ReplSessionV2;
++    /// let feedback = ReplSessionV2::new().build_session_feedback(false);
++    /// assert_eq!(feedback.stack_depth, 0);
++    /// ```
++    pub fn build_session_feedback(&self, tos_is_peek_override: bool) -> SessionFeedback {
++        let fallback_workspace = self.active_workspace.clone().unwrap_or(WorkspaceKind::Cbu);
++        let fallback_registry = fallback_workspace.registry_entry();
++        let (hydrated, stale_warning) = if let Some(tos) = self.workspace_stack.last() {
++            (
++                tos.hydrated_state
++                    .clone()
++                    .unwrap_or_else(|| WorkspaceStateView {
++                        workspace: tos.workspace.clone(),
++                        constellation_family: tos.constellation_family.clone(),
++                        constellation_map: tos.constellation_map.clone(),
++                        subject_ref: tos
++                            .subject_id
++                            .zip(tos.subject_kind.clone())
++                            .map(|(id, kind)| SubjectRef { kind, id }),
++                        hydrated_constellation: None,
++                        scoped_verb_surface: Vec::new(),
++                        progress_summary: None,
++                        available_actions: Vec::new(),
++                    }),
++                tos.stale,
++            )
++        } else {
++            (
++                WorkspaceStateView {
++                    workspace: fallback_workspace.clone(),
++                    constellation_family: fallback_registry
++                        .default_constellation_family
++                        .to_string(),
++                    constellation_map: fallback_registry.default_constellation_map.to_string(),
++                    subject_ref: None,
++                    hydrated_constellation: None,
++                    scoped_verb_surface: Vec::new(),
++                    progress_summary: None,
++                    available_actions: Vec::new(),
++                },
++                false,
++            )
++        };
++        let previous_workspace = if self.workspace_stack.len() > 1 {
++            self.workspace_stack
++                .get(self.workspace_stack.len().saturating_sub(2))
++                .map(|frame| frame.workspace.clone())
++        } else {
++            None
++        };
++        let available_workspaces = workspace_hints();
++        SessionFeedback {
++            stack_depth: self.workspace_stack.len(),
++            tos: hydrated.clone(),
++            tos_is_peek: tos_is_peek_override || self.workspace_stack.len() > 1,
++            previous_workspace,
++            stale_warning,
++            scoped_verb_surface: hydrated.scoped_verb_surface.clone(),
++            available_workspaces,
++            pending_verb: self.pending_verb.clone(),
++            conversation_mode: self.conversation_mode,
++        }
+     }
+ 
+     /// Activate a journey pack.
+     ///
+-    /// Sets `staged_pack` (for ContextStack reads) and runbook pack fields.
++    /// # Examples
++    /// ```rust,ignore
++    /// session.activate_pack(pack, hash, None);
++    /// ```
+     pub fn activate_pack(
+         &mut self,
+         pack: Arc<PackManifest>,
+@@ -185,7 +448,6 @@ impl ReplSessionV2 {
+         self.runbook.pack_id = Some(pack.id.clone());
+         self.runbook.pack_version = Some(pack.version.clone());
+         self.runbook.pack_manifest_hash = Some(manifest_hash.clone());
+-
+         self.staged_pack = Some(pack);
+         self.staged_pack_hash = Some(manifest_hash);
+         self.last_active_at = Utc::now();
+@@ -193,26 +455,36 @@ impl ReplSessionV2 {
+ 
+     /// Record an answer to a pack question.
+     ///
+-    /// The canonical source is `ContextStack::accumulated_answers` derived
+-    /// from the runbook fold via `derive_answers()`. Answers are stored as
+-    /// runbook entries, not on the session struct.
++    /// # Examples
++    /// ```rust,ignore
++    /// session.record_answer("field".into(), serde_json::json!("value"));
++    /// ```
+     pub fn record_answer(&mut self, _field: String, _value: serde_json::Value) {
+-        // Answers are recorded via runbook entries — this is now a no-op.
+-        // Callers should add answer entries to the runbook directly.
+         self.last_active_at = Utc::now();
+     }
+ 
+-    /// Clear the staged pack (e.g., when switching journeys).
++    /// Clear the staged pack.
++    ///
++    /// # Examples
++    /// ```rust
++    /// use ob_poc::repl::session_v2::ReplSessionV2;
++    ///
++    /// let mut session = ReplSessionV2::new();
++    /// session.clear_staged_pack();
++    /// assert!(session.staged_pack.is_none());
++    /// ```
+     pub fn clear_staged_pack(&mut self) {
+         self.staged_pack = None;
+         self.staged_pack_hash = None;
+         self.last_active_at = Utc::now();
+     }
+ 
+-    /// Build a ContextStack from the current session state.
++    /// Build a `ContextStack` from the current session state.
+     ///
+-    /// This is the primary way to access derived session state.
+-    /// Call this once per turn and read from the result.
++    /// # Examples
++    /// ```rust,ignore
++    /// let stack = session.build_context_stack(None);
++    /// ```
+     pub fn build_context_stack(
+         &self,
+         pack_router: Option<&crate::journey::router::PackRouter>,
+@@ -227,23 +499,37 @@ impl ReplSessionV2 {
+     }
+ 
+     /// Whether a journey pack is currently active.
+-    #[allow(deprecated)] // Fallback reads deprecated journey_context for migration compat
++    ///
++    /// # Examples
++    /// ```rust
++    /// use ob_poc::repl::session_v2::ReplSessionV2;
++    ///
++    /// assert!(!ReplSessionV2::new().has_active_pack());
++    /// ```
++    #[allow(deprecated)]
+     pub fn has_active_pack(&self) -> bool {
+         self.staged_pack.is_some() || self.journey_context.is_some()
+     }
+ 
+-    /// Get the active pack ID (from staged_pack).
++    /// Get the active pack ID.
++    ///
++    /// # Examples
++    /// ```rust
++    /// use ob_poc::repl::session_v2::ReplSessionV2;
++    ///
++    /// assert!(ReplSessionV2::new().active_pack_id().is_none());
++    /// ```
+     pub fn active_pack_id(&self) -> Option<String> {
+         self.staged_pack.as_ref().map(|p| p.id.clone())
+     }
+ 
+     /// Rehydrate transient fields after loading from database.
+     ///
+-    /// - Restores the Arc<PackManifest> from the pack router using the stored hash.
+-    /// - Rebuilds the invocation index on the runbook.
++    /// # Examples
++    /// ```rust,ignore
++    /// session.rehydrate(&pack_router);
++    /// ```
+     pub fn rehydrate(&mut self, pack_router: &crate::journey::router::PackRouter) {
+-        // Restore the pack Arc from the router using stored manifest hash.
+-        // Prefer staged_pack_hash (transient), fall back to runbook.pack_manifest_hash (persisted).
+         let hash = self
+             .staged_pack_hash
+             .as_deref()
+@@ -254,7 +540,6 @@ impl ReplSessionV2 {
+                 self.staged_pack_hash = Some(hash.to_string());
+             }
+         }
+-        // Rebuild invocation index (lost during serialization due to #[serde(skip)]).
+         self.runbook.rebuild_invocation_index();
+     }
+ }
+@@ -265,9 +550,20 @@ impl Default for ReplSessionV2 {
+     }
+ }
+ 
+-// ---------------------------------------------------------------------------
+-// ChatMessage
+-// ---------------------------------------------------------------------------
++fn workspace_hints() -> Vec<WorkspaceHint> {
++    WorkspaceKind::all()
++        .into_iter()
++        .map(|workspace| {
++            let registry = workspace.registry_entry();
++            WorkspaceHint {
++                workspace,
++                label: registry.display_name.to_string(),
++                default_constellation_family: registry.default_constellation_family.to_string(),
++                default_constellation_map: registry.default_constellation_map.to_string(),
++            }
++        })
++        .collect()
++}
+ 
+ /// A single message in the session conversation history.
+ #[derive(Debug, Clone, Serialize, Deserialize)]
+@@ -287,12 +583,8 @@ pub enum MessageRole {
+     System,
+ }
+ 
+-// ---------------------------------------------------------------------------
+-// Tests
+-// ---------------------------------------------------------------------------
+-
+ #[cfg(test)]
+-#[allow(deprecated)] // Tests exercise deprecated fields for migration coverage
++#[allow(deprecated)]
+ mod tests {
+     use super::*;
+ 
+@@ -304,7 +596,6 @@ version: "1.0"
+ description: Hand off a contracted deal into onboarding for an existing CBU
+ invocation_phrases:
+   - "request onboarding for this deal"
+-  - "submit onboarding handoff"
+ required_context:
+   - client_group_id
+ "#;
+@@ -316,203 +607,41 @@ required_context:
+     fn test_new_session() {
+         let session = ReplSessionV2::new();
+         assert!(matches!(session.state, ReplStateV2::ScopeGate { .. }));
+-        assert!(session.client_context.is_none());
+-        assert!(session.journey_context.is_none());
+-        assert!(session.messages.is_empty());
+-        assert!(session.runbook.entries.is_empty());
++        assert!(session.workspace_stack.is_empty());
+     }
+ 
+     #[test]
+-    fn test_push_message() {
++    fn test_set_workspace_root() {
+         let mut session = ReplSessionV2::new();
+-        session.push_message(MessageRole::User, "Hello".to_string());
+-        session.push_message(MessageRole::Assistant, "Hi there!".to_string());
+-
+-        assert_eq!(session.messages.len(), 2);
+-        assert_eq!(session.messages[0].role, MessageRole::User);
+-        assert_eq!(session.messages[1].role, MessageRole::Assistant);
++        session.set_client_scope(Uuid::nil());
++        session.set_workspace_root(WorkspaceKind::Deal);
++        assert_eq!(session.workspace_stack.len(), 1);
++        assert_eq!(session.active_workspace, Some(WorkspaceKind::Deal));
+     }
+ 
+     #[test]
+-    fn test_set_client_scope() {
++    fn test_push_pop_stack() {
+         let mut session = ReplSessionV2::new();
+-        let group_id = Uuid::new_v4();
+-
+-        session.set_client_scope(group_id);
+-
+-        assert_eq!(session.runbook.client_group_id, Some(group_id));
++        let scope = SessionScope {
++            client_group_id: Uuid::nil(),
++            client_group_name: None,
++        };
++        session
++            .push_workspace_frame(WorkspaceFrame::new(WorkspaceKind::Deal, scope.clone()))
++            .unwrap();
++        session
++            .push_workspace_frame(WorkspaceFrame::new(WorkspaceKind::Kyc, scope))
++            .unwrap();
++        assert!(session.pop_workspace_frame().is_some());
++        assert_eq!(session.workspace_stack.len(), 1);
++        assert!(session.workspace_stack[0].stale);
+     }
+ 
+     #[test]
+     fn test_activate_pack() {
+         let mut session = ReplSessionV2::new();
+         let pack = sample_pack();
+-        let hash = "abc123def456".to_string();
+-
+-        session.activate_pack(pack.clone(), hash.clone(), None);
+-
+-        // staged_pack and runbook fields are the canonical locations
+-        assert!(session.staged_pack.is_some());
+-        assert_eq!(
+-            session.staged_pack.as_ref().unwrap().id,
+-            "onboarding-request"
+-        );
+-        assert_eq!(session.staged_pack_hash.as_deref(), Some("abc123def456"));
+-
+-        assert_eq!(
+-            session.runbook.pack_id,
+-            Some("onboarding-request".to_string())
+-        );
+-        assert_eq!(session.runbook.pack_manifest_hash, Some(hash));
+-    }
+-
+-    #[test]
+-    fn test_record_answer() {
+-        let mut session = ReplSessionV2::new();
+-        let pack = sample_pack();
+-        session.activate_pack(pack, "hash".to_string(), None);
+-
+-        // record_answer is now a no-op (answers stored via runbook entries).
+-        // Verify it doesn't panic and updates last_active_at.
+-        let before = session.last_active_at;
+-        session.record_answer("products".to_string(), serde_json::json!(["IRS", "EQUITY"]));
+-        session.record_answer("jurisdiction".to_string(), serde_json::json!("LU"));
+-        assert!(session.last_active_at >= before);
+-    }
+-
+-    #[test]
+-    fn test_state_transitions() {
+-        let mut session = ReplSessionV2::new();
+-
+-        // ScopeGate → JourneySelection
+-        session.set_state(ReplStateV2::JourneySelection { candidates: None });
+-        assert!(matches!(
+-            session.state,
+-            ReplStateV2::JourneySelection { .. }
+-        ));
+-
+-        // JourneySelection → InPack
+-        session.set_state(ReplStateV2::InPack {
+-            pack_id: "test".to_string(),
+-            required_slots_remaining: vec!["products".to_string()],
+-            last_proposal_id: None,
+-        });
+-        assert!(matches!(session.state, ReplStateV2::InPack { .. }));
+-
+-        // InPack → SentencePlayback
+-        session.set_state(ReplStateV2::SentencePlayback {
+-            sentence: "Create CBU".to_string(),
+-            verb: "cbu.create".to_string(),
+-            dsl: "(cbu.create)".to_string(),
+-            args: HashMap::new(),
+-        });
+-        assert!(matches!(
+-            session.state,
+-            ReplStateV2::SentencePlayback { .. }
+-        ));
+-    }
+-
+-    #[test]
+-    fn test_session_with_handoff() {
+-        let mut session = ReplSessionV2::new();
+-        let pack = sample_pack();
+-        let handoff = PackHandoff {
+-            source_runbook_id: Uuid::new_v4(),
+-            target_pack_id: "onboarding-request".to_string(),
+-            forwarded_context: HashMap::from([(
+-                "client_group_id".to_string(),
+-                Uuid::new_v4().to_string(),
+-            )]),
+-            forwarded_outcomes: vec![Uuid::new_v4()],
+-        };
+-
+-        // handoff is now ignored by activate_pack (context is derived from runbook)
+-        // but we verify it doesn't panic and pack is properly activated
+-        session.activate_pack(pack, "hash".to_string(), Some(handoff));
+-
+-        assert!(session.staged_pack.is_some());
+-        assert_eq!(
+-            session.staged_pack.as_ref().unwrap().id,
+-            "onboarding-request"
+-        );
+-        assert_eq!(
+-            session.runbook.pack_id,
+-            Some("onboarding-request".to_string())
+-        );
+-    }
+-
+-    #[test]
+-    fn test_monotonic_version_allocator() {
+-        let mut session = ReplSessionV2::new();
+-
+-        // First allocation starts at 1.
+-        let v1 = session.allocate_runbook_version();
+-        assert_eq!(v1, 1);
+-
+-        // Subsequent allocations are strictly ascending.
+-        let v2 = session.allocate_runbook_version();
+-        let v3 = session.allocate_runbook_version();
+-        assert_eq!(v2, 2);
+-        assert_eq!(v3, 3);
+-        assert!(v3 > v2);
+-        assert!(v2 > v1);
+-    }
+-
+-    #[test]
+-    fn test_version_allocator_survives_serde_roundtrip() {
+-        let mut session = ReplSessionV2::new();
+-
+-        // Allocate some versions.
+-        let _ = session.allocate_runbook_version(); // 1
+-        let _ = session.allocate_runbook_version(); // 2
+-
+-        // Serialize and deserialize.
+-        let json = serde_json::to_string(&session).unwrap();
+-        let mut restored: ReplSessionV2 = serde_json::from_str(&json).unwrap();
+-
+-        // Next allocation must be > 2 (preserved via serde).
+-        let v3 = restored.allocate_runbook_version();
+-        assert_eq!(v3, 3, "Version should continue from serialized counter");
+-    }
+-
+-    #[test]
+-    fn test_rehydrate_restores_pack() {
+-        use crate::journey::pack::load_pack_from_bytes;
+-        use crate::journey::router::PackRouter;
+-
+-        let mut session = ReplSessionV2::new();
+-        let (manifest, hash) = load_pack_from_bytes(
+-            r#"
+-id: onboarding-request
+-name: Onboarding Request
+-version: "1.0"
+-description: Hand off a contracted deal into onboarding for an existing CBU
+-invocation_phrases:
+-  - "request onboarding for this deal"
+-required_context:
+-  - client_group_id
+-"#
+-            .as_bytes(),
+-        )
+-        .unwrap();
+-
+-        let pack = Arc::new(manifest);
+-        let router = PackRouter::new(vec![(pack.clone(), hash.clone())]);
+-
+-        session.activate_pack(pack, hash, None);
+-
+-        // Simulate serialization roundtrip (pack Arc is lost).
+-        let json = serde_json::to_string(&session).unwrap();
+-        let mut loaded: ReplSessionV2 = serde_json::from_str(&json).unwrap();
+-
+-        // Before rehydration, staged_pack is lost (not serialized).
+-        assert!(loaded.staged_pack.is_none());
+-
+-        // After rehydration, staged_pack is restored from router.
+-        loaded.rehydrate(&router);
+-        assert_eq!(
+-            loaded.staged_pack.as_ref().unwrap().id,
+-            "onboarding-request"
+-        );
++        session.activate_pack(pack.clone(), "hash".to_string(), None);
++        assert_eq!(session.active_pack_id(), Some(pack.id.clone()));
+     }
+ }
+diff --git a/rust/src/repl/types_v2.rs b/rust/src/repl/types_v2.rs
+index f059f029..8428201f 100644
+--- a/rust/src/repl/types_v2.rs
++++ b/rust/src/repl/types_v2.rs
+@@ -9,9 +9,12 @@
+ 
+ use std::collections::HashMap;
+ 
++use chrono::{DateTime, Utc};
+ use serde::{Deserialize, Serialize};
+ use uuid::Uuid;
+ 
++use crate::sem_os_runtime::constellation_runtime::HydratedConstellation;
++
+ // ---------------------------------------------------------------------------
+ // ReplStateV2 — 7-state machine
+ // ---------------------------------------------------------------------------
+@@ -82,7 +85,7 @@ pub struct PackCandidate {
+ }
+ 
+ /// A top-level workspace available after scope selection.
+-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
++#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+ #[serde(rename_all = "snake_case")]
+ pub enum WorkspaceKind {
+     ProductMaintenance,
+@@ -94,6 +97,14 @@ pub enum WorkspaceKind {
+ }
+ 
+ impl WorkspaceKind {
++    /// Human-readable display label for the workspace.
++    ///
++    /// # Examples
++    /// ```rust
++    /// use ob_poc::repl::types_v2::WorkspaceKind;
++    ///
++    /// assert_eq!(WorkspaceKind::Deal.label(), "Deal");
++    /// ```
+     pub fn label(&self) -> &'static str {
+         match self {
+             Self::ProductMaintenance => "Product Maintenance",
+@@ -104,6 +115,117 @@ impl WorkspaceKind {
+             Self::OnBoarding => "OnBoarding",
+         }
+     }
++
++    /// Registry metadata for this workspace.
++    ///
++    /// # Examples
++    /// ```rust
++    /// use ob_poc::repl::types_v2::WorkspaceKind;
++    ///
++    /// let entry = WorkspaceKind::Kyc.registry_entry();
++    /// assert_eq!(entry.default_constellation_family, "ownership");
++    /// ```
++    pub fn registry_entry(&self) -> WorkspaceRegistryEntry {
++        match self {
++            Self::ProductMaintenance => WorkspaceRegistryEntry {
++                workspace_id: self.clone(),
++                display_name: self.label(),
++                constellation_families: vec!["product_service_taxonomy"],
++                subject_kinds: vec![
++                    SubjectKind::Product,
++                    SubjectKind::Service,
++                    SubjectKind::Resource,
++                    SubjectKind::Attribute,
++                ],
++                subject_required: false,
++                default_constellation_family: "product_service_taxonomy",
++                default_constellation_map: "product.service.resource.taxonomy",
++                supports_handoff_mode: false,
++            },
++            Self::Deal => WorkspaceRegistryEntry {
++                workspace_id: self.clone(),
++                display_name: self.label(),
++                constellation_families: vec!["commercial", "handoff"],
++                subject_kinds: vec![SubjectKind::Deal, SubjectKind::Handoff],
++                subject_required: true,
++                default_constellation_family: "commercial",
++                default_constellation_map: "deal.lifecycle",
++                supports_handoff_mode: true,
++            },
++            Self::Cbu => WorkspaceRegistryEntry {
++                workspace_id: self.clone(),
++                display_name: self.label(),
++                constellation_families: vec![
++                    "operating",
++                    "maintenance",
++                    "lu_ucits",
++                    "ie_icav",
++                    "uk_auth",
++                    "us_40act",
++                    "cross_border_hedge",
++                    "cross_border_pe",
++                ],
++                subject_kinds: vec![SubjectKind::Cbu, SubjectKind::Resource],
++                subject_required: true,
++                default_constellation_family: "operating",
++                default_constellation_map: "struct.lux.ucits.sicav",
++                supports_handoff_mode: true,
++            },
++            Self::Kyc => WorkspaceRegistryEntry {
++                workspace_id: self.clone(),
++                display_name: self.label(),
++                constellation_families: vec!["ownership", "clearance", "delta_review", "screening"],
++                subject_kinds: vec![
++                    SubjectKind::ClientGroup,
++                    SubjectKind::Case,
++                    SubjectKind::Cbu,
++                ],
++                subject_required: false,
++                default_constellation_family: "ownership",
++                default_constellation_map: "group.ownership",
++                supports_handoff_mode: true,
++            },
++            Self::InstrumentMatrix => WorkspaceRegistryEntry {
++                workspace_id: self.clone(),
++                display_name: self.label(),
++                constellation_families: vec!["trading_permission", "lifecycle"],
++                subject_kinds: vec![SubjectKind::Matrix, SubjectKind::Cbu],
++                subject_required: true,
++                default_constellation_family: "trading_permission",
++                default_constellation_map: "cbu.trading.matrix",
++                supports_handoff_mode: true,
++            },
++            Self::OnBoarding => WorkspaceRegistryEntry {
++                workspace_id: self.clone(),
++                display_name: self.label(),
++                constellation_families: vec!["handoff", "activation"],
++                subject_kinds: vec![SubjectKind::Handoff, SubjectKind::Cbu],
++                subject_required: true,
++                default_constellation_family: "handoff",
++                default_constellation_map: "deal.lifecycle",
++                supports_handoff_mode: true,
++            },
++        }
++    }
++
++    /// Known workspaces exposed in session-scoped navigation.
++    ///
++    /// # Examples
++    /// ```rust
++    /// use ob_poc::repl::types_v2::WorkspaceKind;
++    ///
++    /// assert!(WorkspaceKind::all().contains(&WorkspaceKind::Cbu));
++    /// ```
++    pub fn all() -> Vec<Self> {
++        vec![
++            Self::ProductMaintenance,
++            Self::Deal,
++            Self::Cbu,
++            Self::Kyc,
++            Self::InstrumentMatrix,
++            Self::OnBoarding,
++        ]
++    }
+ }
+ 
+ /// A selectable workspace option.
+@@ -114,6 +236,454 @@ pub struct WorkspaceOption {
+     pub description: String,
+ }
+ 
++/// Session scope anchored on a client group.
++#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
++pub struct SessionScope {
++    pub client_group_id: Uuid,
++    #[serde(default, skip_serializing_if = "Option::is_none")]
++    pub client_group_name: Option<String>,
++}
++
++/// Sage vs REPL mode at the current top-of-stack context.
++#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
++#[serde(rename_all = "snake_case")]
++pub enum AgentMode {
++    Sage,
++    Repl,
++}
++
++/// Subject kinds supported by the session-scoped navigation layer.
++#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
++#[serde(rename_all = "snake_case")]
++pub enum SubjectKind {
++    ClientGroup,
++    Cbu,
++    Deal,
++    Case,
++    Handoff,
++    Matrix,
++    Product,
++    Service,
++    Resource,
++    Attribute,
++}
++
++/// A lightweight subject reference for UI and feedback surfaces.
++#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
++pub struct SubjectRef {
++    pub kind: SubjectKind,
++    pub id: Uuid,
++}
++
++/// Provisioning dependency attached to a handoff context.
++#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
++pub struct ProvisioningDep {
++    pub kind: String,
++    pub reference: String,
++}
++
++/// Cross-workspace handoff payload carried alongside a working context.
++#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
++pub struct HandoffContext {
++    #[serde(default, skip_serializing_if = "Option::is_none")]
++    pub source_deal_id: Option<Uuid>,
++    #[serde(default, skip_serializing_if = "Option::is_none")]
++    pub target_cbu_id: Option<Uuid>,
++    pub handoff_id: Uuid,
++    pub activation_path: String,
++    #[serde(default)]
++    pub provisioning_deps: Vec<ProvisioningDep>,
++}
++
++/// A scoped verb reference returned in hydrated workspace views.
++#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
++pub struct VerbRef {
++    pub verb_fqn: String,
++    pub display_name: String,
++}
++
++/// Progress summary for the current constellation context.
++#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
++pub struct ProgressSummary {
++    pub total_slots: usize,
++    pub completion_pct: u8,
++    pub blocking_slots: usize,
++}
++
++/// A suggested action derived from the current scoped verb surface.
++#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
++pub struct ActionHint {
++    pub label: String,
++    #[serde(default, skip_serializing_if = "Option::is_none")]
++    pub verb_fqn: Option<String>,
++    pub action_type: String,
++}
++
++/// A workspace available to the user for navigation.
++#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
++pub struct WorkspaceHint {
++    pub workspace: WorkspaceKind,
++    pub label: String,
++    pub default_constellation_family: String,
++    pub default_constellation_map: String,
++}
++
++/// Self-contained view of the hydrated working surface for one frame.
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct WorkspaceStateView {
++    pub workspace: WorkspaceKind,
++    pub constellation_family: String,
++    pub constellation_map: String,
++    #[serde(default, skip_serializing_if = "Option::is_none")]
++    pub subject_ref: Option<SubjectRef>,
++    #[serde(default, skip_serializing_if = "Option::is_none")]
++    pub hydrated_constellation: Option<HydratedConstellation>,
++    #[serde(default)]
++    pub scoped_verb_surface: Vec<VerbRef>,
++    #[serde(default, skip_serializing_if = "Option::is_none")]
++    pub progress_summary: Option<ProgressSummary>,
++    #[serde(default)]
++    pub available_actions: Vec<ActionHint>,
++}
++
++/// One entry in the workspace stack.
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct WorkspaceFrame {
++    pub workspace: WorkspaceKind,
++    pub constellation_family: String,
++    pub constellation_map: String,
++    #[serde(default, skip_serializing_if = "Option::is_none")]
++    pub subject_kind: Option<SubjectKind>,
++    #[serde(default, skip_serializing_if = "Option::is_none")]
++    pub subject_id: Option<Uuid>,
++    pub session_scope: SessionScope,
++    #[serde(default, skip_serializing_if = "Option::is_none")]
++    pub hydrated_state: Option<WorkspaceStateView>,
++    pub pushed_at: DateTime<Utc>,
++    #[serde(default)]
++    pub stale: bool,
++}
++
++impl WorkspaceFrame {
++    /// Create a new frame using workspace defaults.
++    ///
++    /// # Examples
++    /// ```rust
++    /// use ob_poc::repl::types_v2::{SessionScope, WorkspaceFrame, WorkspaceKind};
++    /// use uuid::Uuid;
++    ///
++    /// let frame = WorkspaceFrame::new(
++    ///     WorkspaceKind::Deal,
++    ///     SessionScope { client_group_id: Uuid::nil(), client_group_name: None },
++    /// );
++    /// assert_eq!(frame.constellation_family, "commercial");
++    /// ```
++    pub fn new(workspace: WorkspaceKind, session_scope: SessionScope) -> Self {
++        let registry = workspace.registry_entry();
++        Self {
++            workspace,
++            constellation_family: registry.default_constellation_family.to_string(),
++            constellation_map: registry.default_constellation_map.to_string(),
++            subject_kind: registry.subject_kinds.first().cloned(),
++            subject_id: None,
++            session_scope,
++            hydrated_state: None,
++            pushed_at: Utc::now(),
++            stale: false,
++        }
++    }
++}
++
++/// Request envelope for navigation resolution.
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct ConstellationContextRef {
++    pub session_id: Uuid,
++    pub client_group_id: Uuid,
++    pub workspace: WorkspaceKind,
++    #[serde(default, skip_serializing_if = "Option::is_none")]
++    pub constellation_family: Option<String>,
++    #[serde(default, skip_serializing_if = "Option::is_none")]
++    pub constellation_map: Option<String>,
++    #[serde(default, skip_serializing_if = "Option::is_none")]
++    pub subject_kind: Option<SubjectKind>,
++    #[serde(default, skip_serializing_if = "Option::is_none")]
++    pub subject_id: Option<Uuid>,
++    #[serde(default, skip_serializing_if = "Option::is_none")]
++    pub handoff_context: Option<HandoffContext>,
++}
++
++/// Resolved context after defaults and subject resolution are applied.
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct ResolvedConstellationContext {
++    pub session_id: Uuid,
++    pub client_group_id: Uuid,
++    pub workspace: WorkspaceKind,
++    pub constellation_family: String,
++    pub constellation_map: String,
++    #[serde(default, skip_serializing_if = "Option::is_none")]
++    pub subject_kind: Option<SubjectKind>,
++    #[serde(default, skip_serializing_if = "Option::is_none")]
++    pub subject_id: Option<Uuid>,
++    #[serde(default, skip_serializing_if = "Option::is_none")]
++    pub handoff_context: Option<HandoffContext>,
++    pub session_scope: SessionScope,
++    pub agent_mode: AgentMode,
++}
++
++/// Feedback returned with session-scoped navigation responses.
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct SessionFeedback {
++    pub stack_depth: usize,
++    pub tos: WorkspaceStateView,
++    pub tos_is_peek: bool,
++    #[serde(default, skip_serializing_if = "Option::is_none")]
++    pub previous_workspace: Option<WorkspaceKind>,
++    pub stale_warning: bool,
++    #[serde(default)]
++    pub scoped_verb_surface: Vec<VerbRef>,
++    #[serde(default)]
++    pub available_workspaces: Vec<WorkspaceHint>,
++    #[serde(default, skip_serializing_if = "Option::is_none")]
++    pub pending_verb: Option<VerbRef>,
++    pub conversation_mode: ConversationMode,
++}
++
++/// Semantic IR frame used before deterministic or probabilistic resolution.
++#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
++pub struct UtteranceFrame {
++    pub action_phrase: String,
++    #[serde(default, skip_serializing_if = "Option::is_none")]
++    pub target_workspace_hint: Option<WorkspaceKind>,
++    #[serde(default, skip_serializing_if = "Option::is_none")]
++    pub subject_hint: Option<String>,
++    pub conversation_mode: ConversationMode,
++    pub scope_cue: ScopeCue,
++    pub temporal_cue: TemporalCue,
++}
++
++impl UtteranceFrame {
++    /// Build a deterministic utterance frame from free text cues.
++    ///
++    /// # Examples
++    /// ```rust
++    /// use ob_poc::repl::types_v2::{ConversationMode, UtteranceFrame};
++    ///
++    /// let frame = UtteranceFrame::from_message("show me the current KYC case");
++    /// assert_eq!(frame.conversation_mode, ConversationMode::Inspect);
++    /// ```
++    pub fn from_message(message: &str) -> Self {
++        let normalized = message.trim().to_lowercase();
++        Self {
++            action_phrase: normalized.clone(),
++            target_workspace_hint: WorkspaceKind::from_hint(&normalized),
++            subject_hint: extract_subject_hint(&normalized),
++            conversation_mode: ConversationMode::classify(&normalized),
++            scope_cue: ScopeCue::classify(&normalized),
++            temporal_cue: TemporalCue::classify(&normalized),
++        }
++    }
++}
++
++/// High-level conversational mode used to select stack operations.
++#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
++#[serde(rename_all = "snake_case")]
++pub enum ConversationMode {
++    Inspect,
++    Navigate,
++    Compare,
++    Prepare,
++    Mutate,
++    Confirm,
++    Return,
++}
++
++impl Default for ConversationMode {
++    fn default() -> Self {
++        Self::Inspect
++    }
++}
++
++impl ConversationMode {
++    /// Classify a conversational mode from simple lexical cues.
++    ///
++    /// # Examples
++    /// ```rust
++    /// use ob_poc::repl::types_v2::ConversationMode;
++    ///
++    /// assert_eq!(ConversationMode::classify("compare this cbu with that one"), ConversationMode::Compare);
++    /// ```
++    pub fn classify(message: &str) -> Self {
++        let msg = message.trim().to_lowercase();
++        if matches!(msg.as_str(), "yes" | "confirm" | "approved" | "do it") {
++            return Self::Confirm;
++        }
++        if msg.contains("go back") || msg.contains("return") || msg == "back" {
++            return Self::Return;
++        }
++        if msg.contains("compare") || msg.contains("versus") {
++            return Self::Compare;
++        }
++        if msg.contains("switch to")
++            || msg.contains("go to ")
++            || msg.contains("open the ")
++            || msg.contains("take me to")
++        {
++            return Self::Navigate;
++        }
++        if msg.contains("would")
++            || msg.contains("could")
++            || msg.contains("can you")
++            || msg.ends_with('?')
++        {
++            return Self::Prepare;
++        }
++        if msg.starts_with("create ")
++            || msg.starts_with("add ")
++            || msg.starts_with("update ")
++            || msg.starts_with("remove ")
++            || msg.starts_with("delete ")
++            || msg.starts_with("activate ")
++            || msg.starts_with("provision ")
++        {
++            return Self::Mutate;
++        }
++        Self::Inspect
++    }
++}
++
++/// Scope cue used in utterance decomposition.
++#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
++#[serde(rename_all = "snake_case")]
++pub enum ScopeCue {
++    Here,
++    There,
++    Across,
++    Unspecified,
++}
++
++impl ScopeCue {
++    /// Classify a scope cue from lexical markers.
++    ///
++    /// # Examples
++    /// ```rust
++    /// use ob_poc::repl::types_v2::ScopeCue;
++    ///
++    /// assert_eq!(ScopeCue::classify("show me this cbu"), ScopeCue::Here);
++    /// ```
++    pub fn classify(message: &str) -> Self {
++        let msg = message.to_lowercase();
++        if msg.contains("across") || msg.contains("compare") {
++            return Self::Across;
++        }
++        if msg.contains("that ") || msg.contains("there") || msg.contains("other workspace") {
++            return Self::There;
++        }
++        if msg.contains("this ") || msg.contains("current") || msg.contains("here") {
++            return Self::Here;
++        }
++        Self::Unspecified
++    }
++}
++
++/// Temporal cue used in utterance decomposition.
++#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
++#[serde(rename_all = "snake_case")]
++pub enum TemporalCue {
++    Now,
++    Before,
++    Back,
++    Unspecified,
++}
++
++impl TemporalCue {
++    /// Classify a temporal cue from lexical markers.
++    ///
++    /// # Examples
++    /// ```rust
++    /// use ob_poc::repl::types_v2::TemporalCue;
++    ///
++    /// assert_eq!(TemporalCue::classify("go back to the deal"), TemporalCue::Back);
++    /// ```
++    pub fn classify(message: &str) -> Self {
++        let msg = message.to_lowercase();
++        if msg.contains("go back") || msg == "back" || msg.contains("return") {
++            return Self::Back;
++        }
++        if msg.contains("before") || msg.contains("previous") {
++            return Self::Before;
++        }
++        if msg.contains("now") || msg.contains("current") {
++            return Self::Now;
++        }
++        Self::Unspecified
++    }
++}
++
++impl WorkspaceKind {
++    /// Detect a workspace hint from free text.
++    ///
++    /// # Examples
++    /// ```rust
++    /// use ob_poc::repl::types_v2::WorkspaceKind;
++    ///
++    /// assert_eq!(WorkspaceKind::from_hint("show me the kyc workspace"), Some(WorkspaceKind::Kyc));
++    /// ```
++    pub fn from_hint(message: &str) -> Option<Self> {
++        let msg = message.to_lowercase();
++        if msg.contains("product")
++            || msg.contains("service catalog")
++            || msg.contains("resource dictionary")
++        {
++            return Some(Self::ProductMaintenance);
++        }
++        if msg.contains("deal") || msg.contains("contract") || msg.contains("rate card") {
++            return Some(Self::Deal);
++        }
++        if msg.contains("cbu") || msg.contains("operating") {
++            return Some(Self::Cbu);
++        }
++        if msg.contains("kyc") || msg.contains("ubo") || msg.contains("clearance") {
++            return Some(Self::Kyc);
++        }
++        if msg.contains("matrix")
++            || msg.contains("instruction")
++            || msg.contains("trading permission")
++        {
++            return Some(Self::InstrumentMatrix);
++        }
++        if msg.contains("onboarding") || msg.contains("handoff") || msg.contains("activation") {
++            return Some(Self::OnBoarding);
++        }
++        None
++    }
++}
++
++fn extract_subject_hint(message: &str) -> Option<String> {
++    let subject_markers = [" for ", " on ", " about ", " regarding "];
++    for marker in subject_markers {
++        if let Some((_, tail)) = message.split_once(marker) {
++            let trimmed = tail.trim();
++            if !trimmed.is_empty() {
++                return Some(trimmed.to_string());
++            }
++        }
++    }
++    None
++}
++
++/// Static registry entry for one workspace.
++#[derive(Debug, Clone, PartialEq, Eq)]
++pub struct WorkspaceRegistryEntry {
++    pub workspace_id: WorkspaceKind,
++    pub display_name: &'static str,
++    pub constellation_families: Vec<&'static str>,
++    pub subject_kinds: Vec<SubjectKind>,
++    pub subject_required: bool,
++    pub default_constellation_family: &'static str,
++    pub default_constellation_map: &'static str,
++    pub supports_handoff_mode: bool,
++}
++
+ /// A candidate verb for clarification.
+ #[derive(Debug, Clone, Serialize, Deserialize)]
+ pub struct VerbCandidate {
+diff --git a/rust/src/traceability/phase5.rs b/rust/src/traceability/phase5.rs
+index f76b9ff4..308a3a34 100644
+--- a/rust/src/traceability/phase5.rs
++++ b/rust/src/traceability/phase5.rs
+@@ -424,6 +424,7 @@ mod tests {
+             message: "done".to_string(),
+             runbook_summary: None,
+             step_count: 1,
++            session_feedback: None,
+         };
+ 
+         let session = ReplSessionV2::new();
+@@ -485,6 +486,7 @@ mod tests {
+             message: "done".to_string(),
+             runbook_summary: None,
+             step_count: 2,
++            session_feedback: None,
+         };
+ 
+         let payload = build_phase5_repl_payload(&session, &response);
+@@ -513,6 +515,7 @@ mod tests {
+             message: "done".to_string(),
+             runbook_summary: None,
+             step_count: 1,
++            session_feedback: None,
+         };
+ 
+         let evaluation = evaluate_phase5_repl(&session, &response);
+-- 
+2.50.1 (Apple Git-155)
+

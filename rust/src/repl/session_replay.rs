@@ -52,10 +52,7 @@ pub struct ReplayResult {
 /// Replay a trace tape against a fresh session.
 ///
 /// Returns the replay result with any divergences detected.
-pub fn replay_trace(
-    entries: &[TraceEntry],
-    mode: ReplayMode,
-) -> ReplayResult {
+pub fn replay_trace(entries: &[TraceEntry], mode: ReplayMode) -> ReplayResult {
     let mut session = ReplSessionV2::new();
     session.tracing_suppressed = true; // Replay doesn't generate new trace entries
     let mut divergences = Vec::new();
@@ -75,18 +72,29 @@ pub fn replay_trace(
             }
         }
 
-        // Verify stack depth snapshot if in strict mode.
-        // Note: the trace snapshot captures state *after* the op was applied,
-        // so we compare post-replay state against the recorded snapshot.
+        // Verify the recorded stack snapshot after the op was applied.
         if mode == ReplayMode::Strict && !entry.stack_snapshot.is_empty() {
             let actual_snapshot = session.stack_snapshot();
-            let actual_len = actual_snapshot.len();
-            let expected_len = entry.stack_snapshot.len();
-            if expected_len != actual_len {
+            if actual_snapshot != entry.stack_snapshot {
                 divergences.push(ReplayDivergence {
                     sequence: entry.sequence,
-                    expected: format!("stack depth {}", expected_len),
-                    actual: format!("stack depth {}", actual_len),
+                    expected: format!("stack snapshot {:?}", entry.stack_snapshot),
+                    actual: format!("stack snapshot {:?}", actual_snapshot),
+                });
+                break;
+            }
+        }
+
+        if mode == ReplayMode::Strict && entry.snapshot.is_some() {
+            let actual_snapshot = session
+                .tos_frame()
+                .and_then(|tos| tos.hydrated_state.as_ref())
+                .and_then(|state| serde_json::to_value(state).ok());
+            if actual_snapshot != entry.snapshot {
+                divergences.push(ReplayDivergence {
+                    sequence: entry.sequence,
+                    expected: format!("hydrated snapshot {:?}", entry.snapshot),
+                    actual: format!("hydrated snapshot {:?}", actual_snapshot),
                 });
                 break;
             }
@@ -113,12 +121,10 @@ fn apply_trace_op(
 ) -> Result<(), String> {
     match op {
         TraceOp::StackPush { workspace } => {
-            let scope = session
-                .session_scope()
-                .unwrap_or(SessionScope {
-                    client_group_id: uuid::Uuid::nil(),
-                    client_group_name: None,
-                });
+            let scope = session.session_scope().unwrap_or(SessionScope {
+                client_group_id: uuid::Uuid::nil(),
+                client_group_name: None,
+            });
             session
                 .push_workspace_frame(WorkspaceFrame::new(workspace.clone(), scope))
                 .map_err(|e| e.to_string())?;
@@ -134,7 +140,10 @@ fn apply_trace_op(
             session.commit_workspace_stack();
             Ok(())
         }
-        TraceOp::VerbExecuted { verb_fqn: _, step_id: _ } => {
+        TraceOp::VerbExecuted {
+            verb_fqn: _,
+            step_id: _,
+        } => {
             if mode == ReplayMode::DryRun {
                 return Ok(()); // Skip execution in dry-run mode
             }
@@ -158,7 +167,6 @@ fn apply_trace_op(
         }
     }
 }
-
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -255,7 +263,10 @@ mod tests {
         );
         let result = replay_trace(&entries, ReplayMode::Relaxed);
         // Relaxed mode should log the pop divergence but continue
-        assert!(!result.divergences.is_empty(), "Should have logged divergences");
+        assert!(
+            !result.divergences.is_empty(),
+            "Should have logged divergences"
+        );
         assert!(
             result.entries_replayed > 1,
             "Relaxed mode should continue past divergences"
@@ -332,7 +343,11 @@ mod tests {
             ),
         ];
         let result = replay_trace(&entries, ReplayMode::Strict);
-        assert_eq!(result.divergences.len(), 1, "Strict stops after first divergence");
+        assert_eq!(
+            result.divergences.len(),
+            1,
+            "Strict stops after first divergence"
+        );
         assert_eq!(result.entries_replayed, 0);
     }
 }
