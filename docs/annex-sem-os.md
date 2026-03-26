@@ -721,3 +721,20 @@ SEM_OS_DATABASE_URL="postgresql:///data_designer" SEM_OS_JWT_SECRET=dev-secret \
 | `rust/crates/sem_os_obpoc_adapter/src/scanner.rs` | Pure conversion functions |
 | `rust/crates/sem_os_obpoc_adapter/src/metadata.rs` | `DomainMetadata` loader |
 | `rust/config/sem_os_seeds/` | Universes, constellations, state machines, metadata |
+
+---
+
+### Unified Session Pipeline Integration
+
+All user input now routes through `ReplOrchestratorV2.process()` with mandatory tollgates. SemOS governance is enforced at every gate:
+
+1. **ScopeGate** — Bootstrap resolver checks `client_group_alias` table first, then substring/fuzzy match. `session.load-cluster` DSL executes via INV-3 gate. Empty groups (no CBUs) pass through.
+2. **WorkspaceSelection** — 6 workspaces (CBU, Deal, KYC, OnBoarding, ProductMaintenance, InstrumentMatrix). Each has at least one journey pack.
+3. **JourneySelection** — Pack routing via `PackRouter`. Empty `workspaces` list = allowed everywhere.
+4. **InPack** — Verb matching via `IntentService` (HybridVerbSearcher), gated by `SemOsContextEnvelope`. SentencePlayback for user confirmation.
+
+**Response adapter** (`rust/src/api/response_adapter.rs`) converts `ReplResponseV2` → `ChatResponse` for frontend compatibility. Each gate response maps to a `DecisionPacket` with `ClarifyGroup`/`ClarifyWorkspace`/`ClarifyJourney` kind.
+
+**Session persistence:** `persist_session_checkpoint()` runs after every `process()` call. Trace entries (`TraceOp::Input`, `VerbExecuted`, `StateTransition`) flushed to `session_traces` table. Full audit trail.
+
+**Dead code removed:** `cbu_session_routes.rs` (-917), `agent_dsl_routes.rs` (-2,437), `agent_learning_routes.rs` (-952), `vnext-repl` gates (-101), legacy fallback (-73). Total: -4,480 lines.

@@ -224,9 +224,9 @@ npm run build && npm run typecheck && npm run lint
 
 ## Feature Status
 
-**Complete (✅):** React Migration (077), V2 REPL (7-state, 320 tests), Runbook Compilation, Candle Semantic Pipeline, Agent Pipeline + PolicyGate, Solar Navigation (038), Promotion Pipeline (043), Teaching (044), Client Group Resolver (048), Workflow Task Queue (049), Transactional Execution (050), CustomOp Auto-Registration (051), Client Group Research (055), REPL Viewport Feedback (056), Verb Disambiguation UI (057), Unified Architecture (058), Playbook System (059), LSP (060/063), CBU Structure Macros (064), Unified Lookup (074), Lexicon (072), Entity Linking (073), Clarification UX (075), Inspector-First (076), Deal Record & Fee Billing (067), BPMN-Lite (all phases incl. Phase 4 PostgresProcessStore + Phase 5A Inclusive Gateway), BPMN-Lite Integration (Phase B), BPMN-Lite Authoring (Phases B-D), KYC/UBO Skeleton (S1-S2), Semantic OS (Phases 0-9 + Standalone v1.1 + Stewardship Phase 0-1), Governed Registry Authoring (v0.4, migrations 099-102), CCIR + SessionVerbSurface, Loopback Calibration (v0.3), Onboarding State View, Verb Disambiguation UX, Constellation Orphan Remediation, SemOS Grounded Action Surface, Pipeline Leak Remediation, Sage Intent Skeleton (Phase 1), Entity-First Utterance Parsing, Coder Rewrite (Phase 2), Sage-Primary Chat Narration, SemTaxonomy Three-Step, NLCI CBU Cutover, CBU Role Surface Reconciliation, Phase 0 Vocabulary Rationalization (Batches 1-3), Schema Consolidation (115-121), Domain Metadata Coverage (306/306 tables), Scenario-Based Intent Resolution (Phases 0.5-5), AffinityGraph & Diagram Generation, Discovery Pipeline (Phase 2), Utterance API Coverage Harness, Unified Session Input Cutover, Workspace-Scoped REPL Navigation, SemOS Attribute DSL + Schema Cleanup, SemOS Footprint Hydration S6, SemOS Document Governance Bootstrap (122-123), StateGraph Pipeline (Phase 0-3 substrate), Session Stack Machine Runbook Architecture (R1-R9, migrations 125-128)
+**Complete (✅):** React Migration (077), V2 REPL (7-state, 320 tests), Runbook Compilation, Candle Semantic Pipeline, Agent Pipeline + PolicyGate, Solar Navigation (038), Promotion Pipeline (043), Teaching (044), Client Group Resolver (048), Workflow Task Queue (049), Transactional Execution (050), CustomOp Auto-Registration (051), Client Group Research (055), REPL Viewport Feedback (056), Verb Disambiguation UI (057), Unified Architecture (058), Playbook System (059), LSP (060/063), CBU Structure Macros (064), Unified Lookup (074), Lexicon (072), Entity Linking (073), Clarification UX (075), Inspector-First (076), Deal Record & Fee Billing (067), BPMN-Lite (all phases incl. Phase 4 PostgresProcessStore + Phase 5A Inclusive Gateway), BPMN-Lite Integration (Phase B), BPMN-Lite Authoring (Phases B-D), KYC/UBO Skeleton (S1-S2), Semantic OS (Phases 0-9 + Standalone v1.1 + Stewardship Phase 0-1), Governed Registry Authoring (v0.4, migrations 099-102), CCIR + SessionVerbSurface, Loopback Calibration (v0.3), Onboarding State View, Verb Disambiguation UX, Constellation Orphan Remediation, SemOS Grounded Action Surface, Pipeline Leak Remediation, Sage Intent Skeleton (Phase 1), Entity-First Utterance Parsing, Coder Rewrite (Phase 2), Sage-Primary Chat Narration, SemTaxonomy Three-Step, NLCI CBU Cutover, CBU Role Surface Reconciliation, Phase 0 Vocabulary Rationalization (Batches 1-3), Schema Consolidation (115-121), Domain Metadata Coverage (306/306 tables), Scenario-Based Intent Resolution (Phases 0.5-5), AffinityGraph & Diagram Generation, Discovery Pipeline (Phase 2), Utterance API Coverage Harness, Unified Session Input Cutover, Workspace-Scoped REPL Navigation, SemOS Attribute DSL + Schema Cleanup, SemOS Footprint Hydration S6, SemOS Document Governance Bootstrap (122-123), StateGraph Pipeline (Phase 0-3 substrate), Session Stack Machine Runbook Architecture (R1-R9, migrations 125-128), Unified Session Pipeline (ADR 040 — tollgates enforced, 149/149 tests, response adapter, dead code removal -4,480 lines)
 
-**In Progress / Parked (⚠️):** Unified Session Pipeline (tollgates enforced, legacy fallback removed, dead code cleanup in progress — ADR 040), Sage/Coder GATE 5 (existing 43%, Sage+Coder 5% — vocabulary/routing work needed), Three-Step Harness (7.95% exact / 71% grounded — metadata quality is limiter), SemOS Attribute Live-DB (migration applied, 0/310 bridged — dataset reconciliation pending), StateGraph Phase 1 reconciliation (parked pending external correction table)
+**In Progress / Parked (⚠️):** Sage/Coder GATE 5 (existing 43%, Sage+Coder 5% — vocabulary/routing work needed), Three-Step Harness (7.95% exact / 71% grounded — metadata quality is limiter), SemOS Attribute Live-DB (migration applied, 0/310 bridged — dataset reconciliation pending), StateGraph Phase 1 reconciliation (parked pending external correction table)
 
 **Removed (❌):** V1 Staged Runbook (054), ESPER Navigation Crates (065 — retained for reference)
 
@@ -301,7 +301,7 @@ ob-poc/
 │   └── dist/                   # Production build (served by Rust)
 ├── rust/
 │   ├── config/verbs/           # 103 YAML verb definitions
-│   ├── config/packs/           # 4 V2 REPL journey packs
+│   ├── config/packs/           # 5 V2 REPL journey packs (onboarding, book-setup, kyc-case, deal-lifecycle, product-service-taxonomy)
 │   ├── config/sem_os_seeds/    # Domain metadata, constellation maps, state machines
 │   ├── config/noun_index.yaml  # 99-noun ECIR taxonomy
 │   ├── config/scenario_index.yaml  # 16 journey scenario definitions
@@ -320,7 +320,7 @@ ob-poc/
 │   │   └── sem_os_obpoc_adapter/ # Verb YAML → seed bundles
 │   ├── src/
 │   │   ├── agent/              # Orchestrator, verb surface, onboarding state, context envelope
-│   │   ├── repl/               # V2 REPL (30 files, vnext-repl feature) + session_trace, trace_repository, session_replay
+│   │   ├── repl/               # V2 REPL (30 files, always enabled) + session_trace, trace_repository, session_replay
 │   │   ├── journey/            # Pack system (router, manifests, handoff)
 │   │   ├── domain_ops/         # CustomOperation implementations (~300+ ops)
 │   │   ├── sem_reg/            # Semantic Registry + stewardship (39 files)
@@ -534,3 +534,8 @@ When you see these in a task, read the corresponding annex first:
 | `IntentPipeline` (V1 agent chat) | `ReplOrchestratorV2.process()` |
 | V1 Staged Runbook (054) | V2 REPL pack-guided runbook |
 | `manco` domain name | Renamed to `ownership` domain |
+| `CbuSession` / `cbu_session_routes.rs` | Unified pipeline (`session_scoped_router`) |
+| `agent_dsl_routes.rs` (DSL parse/resolve/generate) | Unified REPL pipeline |
+| `agent_learning_routes.rs` (corrections/disambiguation) | Unified REPL pipeline |
+| `vnext-repl` feature flag | Always enabled (flag deprecated) |
+| Legacy `chat_session()` fallback in `session_input` | `try_route_through_repl()` |
