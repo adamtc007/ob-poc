@@ -22,7 +22,6 @@
 //! 13. E1: Runbook editing regression
 //! 14. G1: Durable park+resume regression
 //! 15. H1: Force-select verb regression
-#![cfg(feature = "vnext-repl")]
 
 use std::collections::HashMap;
 use std::sync::Arc;

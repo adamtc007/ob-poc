@@ -6,7 +6,6 @@
 //! 3. Pack hash stability — same YAML = same hash; modify → different hash
 //! 4. Sentence generator coverage — 20+ verb/arg combos produce reasonable English
 //! 5. Force-select — "use the onboarding journey" activates pack
-#![cfg(feature = "vnext-repl")]
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -20,7 +19,7 @@ use ob_poc::repl::orchestrator_v2::{ReplOrchestratorV2, StubExecutor};
 use ob_poc::repl::response_v2::ReplResponseKindV2;
 use ob_poc::repl::runbook::{EntryStatus, RunbookStatus, SlotSource};
 use ob_poc::repl::sentence_gen::SentenceGenerator;
-use ob_poc::repl::types_v2::{ReplCommandV2, ReplStateV2, UserInputV2};
+use ob_poc::repl::types_v2::{ReplCommandV2, ReplStateV2, UserInputV2, WorkspaceKind};
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -60,10 +59,33 @@ fn make_orchestrator_with_onboarding() -> ReplOrchestratorV2 {
     ReplOrchestratorV2::new(router, Arc::new(StubExecutor))
 }
 
+/// Helper: create session, pass scope gate and workspace selection.
+async fn scope_and_workspace(orch: &ReplOrchestratorV2, group_name: &str) -> Uuid {
+    let id = orch.create_session().await;
+    orch.process(
+        id,
+        UserInputV2::SelectScope {
+            group_id: Uuid::new_v4(),
+            group_name: group_name.to_string(),
+        },
+    )
+    .await
+    .unwrap();
+    orch.process(
+        id,
+        UserInputV2::SelectWorkspace {
+            workspace: WorkspaceKind::OnBoarding,
+        },
+    )
+    .await
+    .unwrap();
+    id
+}
+
 async fn scope_and_select_pack(orch: &ReplOrchestratorV2, pack_id: &str) -> Uuid {
     let id = orch.create_session().await;
 
-    // Set scope.
+    // Set scope → WorkspaceSelection.
     orch.process(
         id,
         UserInputV2::SelectScope {
@@ -74,7 +96,17 @@ async fn scope_and_select_pack(orch: &ReplOrchestratorV2, pack_id: &str) -> Uuid
     .await
     .unwrap();
 
-    // Select pack.
+    // Select workspace → JourneySelection.
+    orch.process(
+        id,
+        UserInputV2::SelectWorkspace {
+            workspace: WorkspaceKind::OnBoarding,
+        },
+    )
+    .await
+    .unwrap();
+
+    // Select pack → InPack.
     orch.process(
         id,
         UserInputV2::SelectPack {
@@ -100,13 +132,28 @@ async fn test_golden_loop_full() {
     let session = orch.get_session(session_id).await.unwrap();
     assert!(matches!(session.state, ReplStateV2::ScopeGate { .. }));
 
-    // Step 2: Set scope → JourneySelection.
+    // Step 2: Set scope → WorkspaceSelection.
     let resp = orch
         .process(
             session_id,
             UserInputV2::SelectScope {
                 group_id: Uuid::new_v4(),
                 group_name: "Allianz".to_string(),
+            },
+        )
+        .await
+        .unwrap();
+    assert!(matches!(
+        resp.kind,
+        ReplResponseKindV2::WorkspaceOptions { .. }
+    ));
+
+    // Step 2b: Select workspace → JourneySelection.
+    let resp = orch
+        .process(
+            session_id,
+            UserInputV2::SelectWorkspace {
+                workspace: WorkspaceKind::OnBoarding,
             },
         )
         .await
@@ -128,7 +175,7 @@ async fn test_golden_loop_full() {
         .unwrap();
     assert!(matches!(resp.kind, ReplResponseKindV2::Question { .. }));
     if let ReplResponseKindV2::Question { ref field, .. } = resp.kind {
-        assert_eq!(field, "cbu_name");
+        assert_eq!(field, "deal_id");
     }
 
     // Step 4: Answer Q1 (cbu_name).
@@ -575,6 +622,16 @@ async fn test_force_select_onboarding() {
     .await
     .unwrap();
 
+    // Select workspace → JourneySelection.
+    orch.process(
+        session_id,
+        UserInputV2::SelectWorkspace {
+            workspace: WorkspaceKind::OnBoarding,
+        },
+    )
+    .await
+    .unwrap();
+
     // Force-select: "use the onboarding request journey".
     let resp = orch
         .process(
@@ -617,6 +674,16 @@ async fn test_force_select_book_setup() {
     .await
     .unwrap();
 
+    // Select workspace → JourneySelection.
+    orch.process(
+        session_id,
+        UserInputV2::SelectWorkspace {
+            workspace: WorkspaceKind::OnBoarding,
+        },
+    )
+    .await
+    .unwrap();
+
     // Force-select by ID.
     let resp = orch
         .process(
@@ -644,6 +711,16 @@ async fn test_force_select_kyc_case() {
         UserInputV2::SelectScope {
             group_id: Uuid::new_v4(),
             group_name: "Aberdeen".to_string(),
+        },
+    )
+    .await
+    .unwrap();
+
+    // Select workspace → JourneySelection.
+    orch.process(
+        session_id,
+        UserInputV2::SelectWorkspace {
+            workspace: WorkspaceKind::OnBoarding,
         },
     )
     .await
@@ -923,6 +1000,16 @@ async fn test_no_match_shows_journey_options() {
         UserInputV2::SelectScope {
             group_id: Uuid::new_v4(),
             group_name: "Test Corp".to_string(),
+        },
+    )
+    .await
+    .unwrap();
+
+    // Select workspace → JourneySelection.
+    orch.process(
+        session_id,
+        UserInputV2::SelectWorkspace {
+            workspace: WorkspaceKind::OnBoarding,
         },
     )
     .await

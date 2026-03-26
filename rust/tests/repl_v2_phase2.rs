@@ -9,7 +9,6 @@
 //! 6. confirm_policy from YAML overrides hardcoded
 //! 7. Orchestrator uses IntentService when available
 //! 8. NeedsClarification never returns raw arg names
-#![cfg(feature = "vnext-repl")]
 
 use std::collections::HashMap;
 use std::sync::Arc;

@@ -41,7 +41,6 @@
 //! 26. Golden loop with durable
 //! 27. Golden loop with human gate
 //! 28. Golden loop mixed modes
-#![cfg(feature = "vnext-repl")]
 
 use std::collections::HashMap;
 use std::sync::Arc;

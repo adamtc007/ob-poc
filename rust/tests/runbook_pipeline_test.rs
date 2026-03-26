@@ -17,7 +17,6 @@
 //! | `constraint_violation_remediation` | §11.3                  |
 //! | `runbook_immutability`            | §1, INV-1a             |
 
-#![cfg(feature = "vnext-repl")]
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 use uuid::Uuid;

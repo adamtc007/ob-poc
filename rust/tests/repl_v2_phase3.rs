@@ -17,7 +17,6 @@
 //! 14. Multiple proposals returned as StepProposals response
 //! 15. SelectProposal transitions to SentencePlayback
 //! 16. SelectProposal with invalid ID returns error
-#![cfg(feature = "vnext-repl")]
 
 use std::collections::HashMap;
 use std::sync::Arc;

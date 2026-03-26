@@ -8,7 +8,6 @@
 //! 5. Sentence templates — pack verbs use templates, not search_phrases
 //! 6. Confirm policy — QuickConfirm for navigation verbs
 //! 7. Scenario D — "Onboard Allianz Lux" → full pipeline
-#![cfg(feature = "vnext-repl")]
 
 use std::collections::HashMap;
 use std::sync::Arc;

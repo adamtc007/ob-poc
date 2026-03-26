@@ -17,7 +17,6 @@
 //! | 9 | `test_concurrent_lock_contention`           | INV-10           |
 //! | 10| `test_no_execution_without_compiled_id`     | INV-1, INV-11    |
 
-#![cfg(feature = "vnext-repl")]
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 use uuid::Uuid;

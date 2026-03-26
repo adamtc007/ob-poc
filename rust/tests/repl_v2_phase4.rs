@@ -44,7 +44,6 @@
 //!
 //! Golden Loop (29):
 //! 29. Full golden loop with editing
-#![cfg(feature = "vnext-repl")]
 
 use std::collections::HashMap;
 use std::sync::Arc;
