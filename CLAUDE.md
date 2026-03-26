@@ -129,14 +129,22 @@ Session = Set<CBU>
 - **GraphScope:** `Empty | SingleCbu | Book | Jurisdiction | EntityNeighborhood | Custom`
 - **Session = Run Sheet = Viewport Scope:** Session is single source of truth. `entity_scope.cbu_ids` drives the viewport. Run sheet tracks per-statement `DslStatus`: Draft → Ready → Executing → Executed → Failed → Cancelled.
 
-### Two Session Models (Intentionally Separate)
+### Unified Session Pipeline
 
-| Model | API | Purpose |
-|-------|-----|---------|
-| `AgentSession` | `/api/session/*` | Full agent workflow (chat, DSL, execution) |
-| `CbuSession` | `/api/cbu-session/*` | Standalone scope navigation (load/undo/redo) |
+All user input routes through `POST /api/session/:id/input` → `ReplOrchestratorV2.process()`.
 
-> **Warning:** Don't mix the two models. Pick one per client integration.
+**Mandatory tollgate sequence:**
+1. **ScopeGate** → Client group selection (non-negotiable)
+2. **WorkspaceSelection** → KYC | OnBoard | CBU | Deal | Product Maint | Instrument Matrix
+3. **JourneySelection** → Pack selection within workspace
+4. **InPack** → Verb matching + sentence generation
+5. **SentencePlayback** → Confirm/reject proposed DSL
+6. **RunbookEditing** → Review runsheet
+7. **Executing** → Step-by-step execution with narration
+
+`ReplSessionV2` is the canonical session. `UnifiedSession` retained for execution context only. `CbuSession` removed. Response adapter converts `ReplResponseV2` → `ChatResponse` for frontend compatibility.
+
+> **Key files:** `rust/src/repl/orchestrator_v2.rs` (orchestrator), `rust/src/api/response_adapter.rs` (adapter), `rust/src/api/agent_enrichment.rs` (onboarding state enrichment)
 
 ---
 
@@ -218,7 +226,7 @@ npm run build && npm run typecheck && npm run lint
 
 **Complete (✅):** React Migration (077), V2 REPL (7-state, 320 tests), Runbook Compilation, Candle Semantic Pipeline, Agent Pipeline + PolicyGate, Solar Navigation (038), Promotion Pipeline (043), Teaching (044), Client Group Resolver (048), Workflow Task Queue (049), Transactional Execution (050), CustomOp Auto-Registration (051), Client Group Research (055), REPL Viewport Feedback (056), Verb Disambiguation UI (057), Unified Architecture (058), Playbook System (059), LSP (060/063), CBU Structure Macros (064), Unified Lookup (074), Lexicon (072), Entity Linking (073), Clarification UX (075), Inspector-First (076), Deal Record & Fee Billing (067), BPMN-Lite (all phases incl. Phase 4 PostgresProcessStore + Phase 5A Inclusive Gateway), BPMN-Lite Integration (Phase B), BPMN-Lite Authoring (Phases B-D), KYC/UBO Skeleton (S1-S2), Semantic OS (Phases 0-9 + Standalone v1.1 + Stewardship Phase 0-1), Governed Registry Authoring (v0.4, migrations 099-102), CCIR + SessionVerbSurface, Loopback Calibration (v0.3), Onboarding State View, Verb Disambiguation UX, Constellation Orphan Remediation, SemOS Grounded Action Surface, Pipeline Leak Remediation, Sage Intent Skeleton (Phase 1), Entity-First Utterance Parsing, Coder Rewrite (Phase 2), Sage-Primary Chat Narration, SemTaxonomy Three-Step, NLCI CBU Cutover, CBU Role Surface Reconciliation, Phase 0 Vocabulary Rationalization (Batches 1-3), Schema Consolidation (115-121), Domain Metadata Coverage (306/306 tables), Scenario-Based Intent Resolution (Phases 0.5-5), AffinityGraph & Diagram Generation, Discovery Pipeline (Phase 2), Utterance API Coverage Harness, Unified Session Input Cutover, Workspace-Scoped REPL Navigation, SemOS Attribute DSL + Schema Cleanup, SemOS Footprint Hydration S6, SemOS Document Governance Bootstrap (122-123), StateGraph Pipeline (Phase 0-3 substrate), Session Stack Machine Runbook Architecture (R1-R9, migrations 125-128)
 
-**In Progress / Parked (⚠️):** Sage/Coder GATE 5 (existing 43%, Sage+Coder 5% — vocabulary/routing work needed), Three-Step Harness (7.95% exact / 71% grounded — metadata quality is limiter), SemOS Attribute Live-DB (migration applied, 0/310 bridged — dataset reconciliation pending), StateGraph Phase 1 reconciliation (parked pending external correction table)
+**In Progress / Parked (⚠️):** Unified Session Pipeline (tollgates enforced, legacy fallback removed, dead code cleanup in progress — ADR 040), Sage/Coder GATE 5 (existing 43%, Sage+Coder 5% — vocabulary/routing work needed), Three-Step Harness (7.95% exact / 71% grounded — metadata quality is limiter), SemOS Attribute Live-DB (migration applied, 0/310 bridged — dataset reconciliation pending), StateGraph Phase 1 reconciliation (parked pending external correction table)
 
 **Removed (❌):** V1 Staged Runbook (054), ESPER Navigation Crates (065 — retained for reference)
 
