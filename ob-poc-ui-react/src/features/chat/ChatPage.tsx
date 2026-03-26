@@ -5,7 +5,7 @@
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useEffect, useRef, useCallback, useMemo, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, BookOpen } from "lucide-react";
 import { chatApi } from "../../api/chat";
 import { scopeApi, type CbuSummary } from "../../api/scope";
 import { isSessionMissingError } from "../../api/sessionStorage";
@@ -19,6 +19,8 @@ import {
   ScopePanel,
   VerbBrowser,
 } from "./components";
+import { RunbookPlanReview } from "./RunbookPlanReview";
+import { runbookPlanApi } from "../../api/runbookPlan";
 import { DealPanel } from "../deal/components";
 import type { DecisionReply, DiscoverySelection } from "../../types/chat";
 import type { SessionFeedback } from "../../api/replV2";
@@ -28,6 +30,7 @@ export function ChatPage() {
   const navigate = useNavigate();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [selectedCbu, setSelectedCbu] = useState<CbuSummary | null>(null);
+  const [showRunbookPlan, setShowRunbookPlan] = useState(false);
   const {
     setCurrentSession,
     currentSession,
@@ -273,6 +276,18 @@ export function ChatPage() {
     setStreaming(false);
   }, [setStreaming]);
 
+  const handleCompileRunbook = useCallback(async () => {
+    if (!sessionId) return;
+    try {
+      await runbookPlanApi.compileRunbookPlan(sessionId);
+      setShowRunbookPlan(true);
+    } catch (e) {
+      console.warn("[ChatPage] compileRunbookPlan failed:", e);
+      // Still show the panel so the user can see the error
+      setShowRunbookPlan(true);
+    }
+  }, [sessionId]);
+
   const handleDecisionReply = useCallback(
     (packetId: string, reply: unknown) => {
       replyMutation.mutate({
@@ -393,6 +408,42 @@ export function ChatPage() {
             className="min-h-0"
             onPromptAgent={handleSend}
           />
+
+          {/* Runbook plan controls */}
+          {sessionId && (
+            <div className="flex items-center gap-2 border-t border-[var(--border-primary)] px-3 py-2">
+              <button
+                onClick={showRunbookPlan ? () => setShowRunbookPlan(false) : handleCompileRunbook}
+                className="flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] border border-[var(--border-secondary)]"
+              >
+                <BookOpen size={14} />
+                {showRunbookPlan ? "Hide Plan" : "Compile Plan"}
+              </button>
+            </div>
+          )}
+
+          {/* Runbook plan review panel */}
+          {sessionId && showRunbookPlan && (
+            <div className="border-t border-[var(--border-primary)] overflow-auto max-h-[40vh] p-3">
+              <RunbookPlanReview
+                sessionId={sessionId}
+                onApproved={() => {
+                  if (sessionId) {
+                    queryClient.invalidateQueries({ queryKey: queryKeys.chat.session(sessionId) });
+                    queryClient.invalidateQueries({ queryKey: queryKeys.constellation.all });
+                  }
+                }}
+                onCancelled={() => setShowRunbookPlan(false)}
+                onCompleted={() => {
+                  if (sessionId) {
+                    queryClient.invalidateQueries({ queryKey: queryKeys.chat.session(sessionId) });
+                    queryClient.invalidateQueries({ queryKey: queryKeys.constellation.all });
+                    queryClient.invalidateQueries({ queryKey: queryKeys.scope(sessionId) });
+                  }
+                }}
+              />
+            </div>
+          )}
 
           {/* Available commands / verb browser */}
           <VerbBrowser

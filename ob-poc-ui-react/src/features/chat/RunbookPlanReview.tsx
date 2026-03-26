@@ -201,9 +201,9 @@ function StepNarrationCard({ result }: { result: Record<string, unknown> }) {
         )}
       >
         Step {String(result.step_seq ?? "?")} — {success ? "Succeeded" : "Failed"}
-        {result.error && (
+        {result.error ? (
           <span className="block text-xs mt-1">{String(result.error)}</span>
-        )}
+        ) : null}
       </div>
     );
   }

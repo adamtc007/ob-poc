@@ -24,6 +24,8 @@ export interface ChatMessage {
   onboarding_state?: OnboardingStateView;
   session_feedback?: SessionFeedback;
   verb_disambiguation_detail?: VerbDisambiguationRequest;
+  /** Present when a compiled runbook plan exists on the session. */
+  runbook_plan?: import("../api/runbookPlan").RunbookPlan;
 }
 
 export interface SageExplain {

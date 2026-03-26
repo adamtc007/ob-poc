@@ -2887,6 +2887,7 @@ async fn chat_session(
                 discovery_bootstrap: None,
                 parked_entries: None,
                 onboarding_state: None,
+                runbook_plan: None,
             }));
         }
         #[cfg(not(feature = "database"))]
@@ -2914,6 +2915,7 @@ async fn chat_session(
                 discovery_bootstrap: None,
                 parked_entries: None,
                 onboarding_state: None,
+                runbook_plan: None,
             }));
         }
     }
@@ -2953,6 +2955,7 @@ async fn chat_session(
                 discovery_bootstrap: None,
                 parked_entries: None,
                 onboarding_state: None,
+                runbook_plan: None,
             }));
         }
     };
@@ -3103,6 +3106,7 @@ async fn chat_session(
         discovery_bootstrap: response.discovery_bootstrap,
         parked_entries: response.parked_entries,
         onboarding_state: response.onboarding_state,
+        runbook_plan: None, // Fetched via dedicated /runbook/plan endpoint
     }))
 }
 

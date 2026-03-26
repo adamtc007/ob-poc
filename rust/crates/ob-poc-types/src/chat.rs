@@ -359,6 +359,12 @@ pub struct ChatResponse {
     /// showing current position and available next steps.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub onboarding_state: Option<crate::onboarding_state::OnboardingStateView>,
+
+    /// Compiled runbook plan for multi-workspace execution.
+    /// When present, UI should render the RunbookPlanReview component
+    /// showing plan steps, approval controls, and step-by-step execution.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub runbook_plan: Option<serde_json::Value>,
 }
 
 /// User-facing Sage explanation payload.
