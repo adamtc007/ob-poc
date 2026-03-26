@@ -426,82 +426,10 @@ pub(crate) fn create_agent_router_with_state(state: AgentState) -> Router {
             "/api/session/:id/subsession/:child_id/cancel",
             post(cancel_subsession),
         )
-        // DSL parsing and entity reference resolution
-        .route(
-            "/api/dsl/parse",
-            post(crate::api::agent_dsl_routes::parse_dsl),
-        )
-        .route(
-            "/api/dsl/resolve-ref",
-            post(crate::api::agent_dsl_routes::resolve_entity_ref),
-        )
-        .route(
-            "/api/dsl/resolve-by-ref-id",
-            post(crate::api::agent_dsl_routes::resolve_by_ref_id),
-        )
-        // Discriminator parsing for resolution
-        .route(
-            "/api/resolution/parse-discriminators",
-            post(crate::api::agent_dsl_routes::parse_discriminators),
-        )
-        // Vocabulary and metadata
-        .route(
-            "/api/agent/generate",
-            post(crate::api::agent_dsl_routes::generate_dsl),
-        )
-        .route(
-            "/api/agent/validate",
-            post(crate::api::agent_dsl_routes::validate_dsl),
-        )
-        .route(
-            "/api/agent/domains",
-            get(crate::api::agent_dsl_routes::list_domains),
-        )
-        .route(
-            "/api/agent/vocabulary",
-            get(crate::api::agent_dsl_routes::get_vocabulary),
-        )
-        .route(
-            "/api/agent/health",
-            get(crate::api::agent_dsl_routes::health_check),
-        )
-        // Completions (LSP-style lookup via EntityGateway)
-        .route(
-            "/api/agent/complete",
-            post(crate::api::agent_dsl_routes::complete_entity),
-        )
-        // Entity mention extraction (in-memory, no DB)
-        .route(
-            "/api/agent/extract-entities",
-            post(crate::api::agent_dsl_routes::extract_entity_mentions),
-        )
-        // Onboarding
-        .route(
-            "/api/agent/onboard",
-            post(crate::api::agent_dsl_routes::generate_onboarding_dsl),
-        )
-        // Enhanced generation with tool use
-        .route(
-            "/api/agent/generate-with-tools",
-            post(crate::api::agent_dsl_routes::generate_dsl_with_tools),
-        )
-        // Batch operations (server-side DSL generation, no LLM)
-        .route(
-            "/api/batch/add-products",
-            post(crate::api::agent_dsl_routes::batch_add_products),
-        )
+        // DSL routes removed — all DSL generation through unified REPL pipeline
+        // Learning routes removed — verb selection signals through REPL pipeline
         // Semantic OS context
         .route("/api/sem-os/context", get(get_semos_context))
-        // Learning/feedback (captures user corrections for continuous improvement)
-        .route(
-            "/api/agent/correction",
-            post(crate::api::agent_learning_routes::report_correction),
-        )
-        // Verb disambiguation selection (closes the learning loop)
-        .route(
-            "/api/session/:id/select-verb",
-            post(crate::api::agent_learning_routes::select_verb_disambiguation),
-        )
         // Unified decision reply (NEW - handles all clarification responses)
         .route(
             "/api/session/:id/decision/reply",

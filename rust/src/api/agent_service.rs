@@ -3296,17 +3296,8 @@ impl AgentService {
         // Record learning signal (gold-standard training data)
         // Convert candidates to verb strings for the recording function
         let candidate_verbs: Vec<String> = all_candidates.iter().map(|c| c.verb.clone()).collect();
-        if let Err(e) = crate::api::agent_learning_routes::record_verb_selection_signal(
-            &self.pool,
-            original_input,
-            selected_verb,
-            &candidate_verbs,
-        )
-        .await
-        {
-            tracing::warn!("Failed to record verb selection signal: {}", e);
-            // Continue anyway - don't block the user
-        }
+        // Verb selection signal recording removed — learning routes deleted
+        let _ = (&candidate_verbs, original_input, selected_verb);
 
         // Binding disambiguation: use forced-verb to ensure user's selection is honoured
         let orch_ctx = self.build_orchestrator_context(
@@ -3542,19 +3533,8 @@ impl AgentService {
                             })
                             .collect();
 
-                        for verb_fqn in &executed_verbs {
-                            if let Err(e) =
-                                crate::api::agent_learning_routes::record_verb_selection_signal(
-                                    &self.pool,
-                                    &utterance,
-                                    verb_fqn,
-                                    &executed_verbs,
-                                )
-                                .await
-                            {
-                                tracing::debug!("Failed to record execution learning signal: {e}");
-                            }
-                        }
+        // Verb selection signal recording removed — learning routes deleted
+        let _ = (&executed_verbs, &utterance);
                     }
                 }
 
@@ -3869,17 +3849,9 @@ impl AgentService {
                     })
                     .collect();
 
-                for verb_fqn in &executed_verbs {
-                    if let Err(e) = crate::api::agent_learning_routes::record_verb_selection_signal(
-                        &self.pool,
-                        &utterance,
-                        verb_fqn,
-                        &executed_verbs,
-                    )
-                    .await
-                    {
-                        tracing::debug!("Failed to record execution learning signal: {e}");
-                    }
+                // Verb selection signal recording removed — learning routes deleted
+                let _ = (&executed_verbs, &utterance);
+                {
                 }
             }
         }
