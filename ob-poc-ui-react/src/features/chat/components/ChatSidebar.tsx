@@ -26,7 +26,7 @@ export function ChatSidebar({ className }: ChatSidebarProps) {
 
   // Create session mutation
   const createMutation = useMutation({
-    mutationFn: () => chatApi.createSession(undefined, "semantic-os"),
+    mutationFn: () => chatApi.createSession(),
     onSuccess: (newSession) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.chat.sessions() });
       navigate(`/chat/${newSession.id}`);

@@ -291,10 +291,10 @@ export function ScopePanel({
             </div>
           ) : cbus.length === 0 ? (
             <div className="text-sm text-[var(--text-muted)] p-2 text-center">
-              No CBUs loaded.
+              No client group selected.
               <br />
               <span className="text-xs">
-                Try: "load the allianz book" or "session.load-cluster"
+                Select a client group in the chat to get started.
               </span>
             </div>
           ) : (
