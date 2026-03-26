@@ -295,7 +295,13 @@ async fn setup_in_pack(orch: &ReplOrchestratorV2) -> Uuid {
 
 #[tokio::test]
 async fn test_direct_dsl_produces_single_proposal() {
-    let engine = build_engine(MockIntentMatcher::no_match());
+    // DSL-shaped input now routes through verb matching (no bypass path).
+    // With a matcher that returns cbu.create, it should produce a single proposal.
+    let engine = build_engine(MockIntentMatcher::matched(
+        "cbu.create",
+        0.95,
+        Some("(cbu.create :name \"Test\")"),
+    ));
     let runbook = ob_poc::repl::runbook::Runbook::new(Uuid::new_v4());
     let match_ctx = MatchContext::default();
 
@@ -314,9 +320,9 @@ async fn test_direct_dsl_produces_single_proposal() {
     assert_eq!(result.proposals.len(), 1);
     assert_eq!(
         result.proposals[0].evidence.source,
-        ProposalSource::DirectDsl
+        ProposalSource::VerbMatch
     );
-    assert_eq!(result.proposals[0].evidence.confidence, 1.0);
+    assert!(result.proposals[0].evidence.confidence >= 0.90);
     assert!(result.proposals[0].dsl.contains("cbu.create"));
 }
 
@@ -454,13 +460,16 @@ async fn test_verb_match_fallback_no_pack() {
 
 #[tokio::test]
 async fn test_ambiguous_produces_multiple_proposals() {
+    // Use scores below STRONG_THRESHOLD (0.70) so the re-evaluation after
+    // precondition filter preserves ambiguity. Use only verbs that are in
+    // the verb config index (cbu.* and session.*).
     let engine = build_engine(MockIntentMatcher::ambiguous(
         vec![
-            ("cbu.create", 0.85),
-            ("cbu.list", 0.82),
-            ("entity.create", 0.80),
+            ("cbu.create", 0.65),
+            ("cbu.list", 0.63),
+            ("session.info", 0.60),
         ],
-        0.03,
+        0.02,
     ));
     let runbook = ob_poc::repl::runbook::Runbook::new(Uuid::new_v4());
     let match_ctx = MatchContext::default();
@@ -764,11 +773,11 @@ async fn test_single_high_confidence_auto_advances() {
 async fn test_multiple_proposals_returns_step_proposals() {
     let matcher = MockIntentMatcher::ambiguous(
         vec![
-            ("cbu.create", 0.82),
-            ("cbu.list", 0.79),
-            ("entity.create", 0.77),
+            ("cbu.create", 0.65),
+            ("cbu.list", 0.63),
+            ("session.info", 0.60),
         ],
-        0.03,
+        0.02,
     );
     let orch = build_orchestrator_with_engine(matcher);
     let session_id = setup_in_pack(&orch).await;

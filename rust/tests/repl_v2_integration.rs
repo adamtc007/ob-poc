@@ -20,7 +20,7 @@ use ob_poc::repl::orchestrator_v2::{DslExecutor, ReplOrchestratorV2, StubExecuto
 use ob_poc::repl::response_v2::ReplResponseKindV2;
 use ob_poc::repl::runbook::{ConfirmPolicy, EntryStatus, RunbookEntry};
 use ob_poc::repl::sentence_gen::SentenceGenerator;
-use ob_poc::repl::types_v2::{ReplCommandV2, UserInputV2};
+use ob_poc::repl::types_v2::{ReplCommandV2, UserInputV2, WorkspaceKind};
 use ob_poc::repl::verb_config_index::VerbConfigIndex;
 
 // ---------------------------------------------------------------------------
@@ -138,6 +138,14 @@ async fn scope_session(orch: &ReplOrchestratorV2, group_name: &str) -> Uuid {
     )
     .await
     .unwrap();
+    orch.process(
+        id,
+        UserInputV2::SelectWorkspace {
+            workspace: WorkspaceKind::OnBoarding,
+        },
+    )
+    .await
+    .unwrap();
     id
 }
 
@@ -216,8 +224,8 @@ fn test_substring_match_before_semantic() {
     let scorer = MockSemanticScorer::for_phrases(vec![], 0.10);
     let router = PackRouter::new(packs).with_scorer(Arc::new(scorer));
 
-    // "onboard this cbu" is an exact invocation_phrase on onboarding-request.
-    let result = router.route("onboard this cbu");
+    // "start onboarding" is an exact invocation_phrase on onboarding-request.
+    let result = router.route("start onboarding");
     assert!(
         matches!(result, PackRouteOutcome::Matched(ref m, _) if m.id == "onboarding-request"),
         "Substring match should work even with low semantic scores"
@@ -237,11 +245,27 @@ async fn test_execution_bridge_records_dsl() {
 
     let session_id = scope_and_select_pack(&orch, "onboarding-request").await;
 
-    // Answer questions to build runbook.
+    // Answer all 4 required questions: deal_id, contract_id, cbu_id, product_id.
     orch.process(
         session_id,
         UserInputV2::Message {
-            content: "Allianz Lux Fund".to_string(),
+            content: "deal-001".to_string(),
+        },
+    )
+    .await
+    .unwrap();
+    orch.process(
+        session_id,
+        UserInputV2::Message {
+            content: "contract-001".to_string(),
+        },
+    )
+    .await
+    .unwrap();
+    orch.process(
+        session_id,
+        UserInputV2::Message {
+            content: "cbu-001".to_string(),
         },
     )
     .await
@@ -250,14 +274,6 @@ async fn test_execution_bridge_records_dsl() {
         session_id,
         UserInputV2::Message {
             content: "CUSTODY".to_string(),
-        },
-    )
-    .await
-    .unwrap();
-    orch.process(
-        session_id,
-        UserInputV2::Message {
-            content: "LU".to_string(),
         },
     )
     .await
@@ -423,11 +439,27 @@ async fn test_golden_loop_template_entries_no_audit() {
     );
     let session_id = scope_and_select_pack(&orch, "onboarding-request").await;
 
-    // Answer all questions.
+    // Answer all 4 required questions: deal_id, contract_id, cbu_id, product_id.
     orch.process(
         session_id,
         UserInputV2::Message {
-            content: "Fund A".to_string(),
+            content: "deal-A".to_string(),
+        },
+    )
+    .await
+    .unwrap();
+    orch.process(
+        session_id,
+        UserInputV2::Message {
+            content: "contract-A".to_string(),
+        },
+    )
+    .await
+    .unwrap();
+    orch.process(
+        session_id,
+        UserInputV2::Message {
+            content: "cbu-A".to_string(),
         },
     )
     .await
@@ -436,14 +468,6 @@ async fn test_golden_loop_template_entries_no_audit() {
         session_id,
         UserInputV2::Message {
             content: "CUSTODY".to_string(),
-        },
-    )
-    .await
-    .unwrap();
-    orch.process(
-        session_id,
-        UserInputV2::Message {
-            content: "LU".to_string(),
         },
     )
     .await
@@ -553,12 +577,22 @@ async fn test_scenario_d_onboard_allianz_lux() {
     .await
     .unwrap();
 
-    // "Onboard Allianz Lux" should route to onboarding pack.
+    // Select workspace → JourneySelection.
+    orch.process(
+        session_id,
+        UserInputV2::SelectWorkspace {
+            workspace: WorkspaceKind::OnBoarding,
+        },
+    )
+    .await
+    .unwrap();
+
+    // Select onboarding-request pack directly.
     let resp = orch
         .process(
             session_id,
-            UserInputV2::Message {
-                content: "Onboard Allianz Lux".to_string(),
+            UserInputV2::SelectPack {
+                pack_id: "onboarding-request".to_string(),
             },
         )
         .await
@@ -567,7 +601,7 @@ async fn test_scenario_d_onboard_allianz_lux() {
     // Should activate the onboarding pack (first question).
     assert!(
         matches!(resp.kind, ReplResponseKindV2::Question { .. }),
-        "Expected Question after pack routing, got {:?}",
+        "Expected Question after pack selection, got {:?}",
         resp.kind
     );
 
@@ -577,11 +611,11 @@ async fn test_scenario_d_onboard_allianz_lux() {
         Some("onboarding-request")
     );
 
-    // Answer questions → build runbook → execute.
+    // Answer all 4 required questions: deal_id, contract_id, cbu_id, product_id.
     orch.process(
         session_id,
         UserInputV2::Message {
-            content: "Allianz Lux SICAV".to_string(),
+            content: "deal-001".to_string(),
         },
     )
     .await
@@ -589,7 +623,15 @@ async fn test_scenario_d_onboard_allianz_lux() {
     orch.process(
         session_id,
         UserInputV2::Message {
-            content: "CUSTODY, TA".to_string(),
+            content: "contract-001".to_string(),
+        },
+    )
+    .await
+    .unwrap();
+    orch.process(
+        session_id,
+        UserInputV2::Message {
+            content: "cbu-001".to_string(),
         },
     )
     .await
@@ -598,7 +640,7 @@ async fn test_scenario_d_onboard_allianz_lux() {
         .process(
             session_id,
             UserInputV2::Message {
-                content: "LU".to_string(),
+                content: "CUSTODY".to_string(),
             },
         )
         .await
@@ -686,11 +728,27 @@ async fn test_executed_dsl_is_valid_sexpr() {
     );
     let session_id = scope_and_select_pack(&orch, "onboarding-request").await;
 
-    // Build and execute runbook.
+    // Answer all 4 required questions: deal_id, contract_id, cbu_id, product_id.
     orch.process(
         session_id,
         UserInputV2::Message {
-            content: "Test Fund".to_string(),
+            content: "deal-001".to_string(),
+        },
+    )
+    .await
+    .unwrap();
+    orch.process(
+        session_id,
+        UserInputV2::Message {
+            content: "contract-001".to_string(),
+        },
+    )
+    .await
+    .unwrap();
+    orch.process(
+        session_id,
+        UserInputV2::Message {
+            content: "cbu-001".to_string(),
         },
     )
     .await
@@ -699,14 +757,6 @@ async fn test_executed_dsl_is_valid_sexpr() {
         session_id,
         UserInputV2::Message {
             content: "CUSTODY".to_string(),
-        },
-    )
-    .await
-    .unwrap();
-    orch.process(
-        session_id,
-        UserInputV2::Message {
-            content: "LU".to_string(),
         },
     )
     .await

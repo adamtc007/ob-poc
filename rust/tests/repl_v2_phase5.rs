@@ -63,7 +63,7 @@ use ob_poc::repl::runbook::{
     RunbookEntry, RunbookEvent,
 };
 use ob_poc::repl::types::{IntentMatchResult, MatchContext, MatchOutcome};
-use ob_poc::repl::types_v2::{ReplCommandV2, ReplStateV2, UserInputV2};
+use ob_poc::repl::types_v2::{ReplCommandV2, ReplStateV2, UserInputV2, WorkspaceKind};
 use ob_poc::repl::verb_config_index::VerbConfigIndex;
 
 // ===========================================================================
@@ -258,6 +258,16 @@ async fn setup_in_pack(orch: &ReplOrchestratorV2) -> Uuid {
         UserInputV2::SelectScope {
             group_id: Uuid::new_v4(),
             group_name: "Allianz".to_string(),
+        },
+    )
+    .await
+    .unwrap();
+
+    // Select workspace → JourneySelection
+    orch.process(
+        session_id,
+        UserInputV2::SelectWorkspace {
+            workspace: WorkspaceKind::OnBoarding,
         },
     )
     .await
@@ -1566,6 +1576,16 @@ async fn test_golden_loop_all_sync_regression() {
     .await
     .unwrap();
 
+    // 2b. Select workspace → JourneySelection
+    orch.process(
+        session_id,
+        UserInputV2::SelectWorkspace {
+            workspace: WorkspaceKind::OnBoarding,
+        },
+    )
+    .await
+    .unwrap();
+
     // 3. Select pack
     orch.process(
         session_id,
@@ -1642,13 +1662,21 @@ async fn test_golden_loop_with_durable() {
     );
     let orch = build_orchestrator_with_parkable_executor(matcher);
 
-    // 1. Create session + scope + pack
+    // 1. Create session + scope + workspace + pack
     let session_id = orch.create_session().await;
     orch.process(
         session_id,
         UserInputV2::SelectScope {
             group_id: Uuid::new_v4(),
             group_name: "Allianz".to_string(),
+        },
+    )
+    .await
+    .unwrap();
+    orch.process(
+        session_id,
+        UserInputV2::SelectWorkspace {
+            workspace: WorkspaceKind::OnBoarding,
         },
     )
     .await
@@ -1768,13 +1796,21 @@ async fn test_golden_loop_with_human_gate() {
     );
     let orch = build_orchestrator_with_parkable_executor(matcher);
 
-    // 1. Create session + scope + pack
+    // 1. Create session + scope + workspace + pack
     let session_id = orch.create_session().await;
     orch.process(
         session_id,
         UserInputV2::SelectScope {
             group_id: Uuid::new_v4(),
             group_name: "Allianz".to_string(),
+        },
+    )
+    .await
+    .unwrap();
+    orch.process(
+        session_id,
+        UserInputV2::SelectWorkspace {
+            workspace: WorkspaceKind::OnBoarding,
         },
     )
     .await
@@ -1868,13 +1904,21 @@ async fn test_golden_loop_mixed_modes() {
     );
     let orch = build_orchestrator_with_parkable_executor(matcher);
 
-    // 1. Create session + scope + pack
+    // 1. Create session + scope + workspace + pack
     let session_id = orch.create_session().await;
     orch.process(
         session_id,
         UserInputV2::SelectScope {
             group_id: Uuid::new_v4(),
             group_name: "Allianz".to_string(),
+        },
+    )
+    .await
+    .unwrap();
+    orch.process(
+        session_id,
+        UserInputV2::SelectWorkspace {
+            workspace: WorkspaceKind::OnBoarding,
         },
     )
     .await

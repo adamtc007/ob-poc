@@ -178,42 +178,57 @@ async fn test_golden_loop_full() {
         assert_eq!(field, "deal_id");
     }
 
-    // Step 4: Answer Q1 (cbu_name).
+    // Step 4: Answer Q1 (deal_id).
     let resp = orch
         .process(
             session_id,
             UserInputV2::Message {
-                content: "Allianz Lux SICAV".to_string(),
+                content: "deal-001".to_string(),
             },
         )
         .await
         .unwrap();
     assert!(matches!(resp.kind, ReplResponseKindV2::Question { .. }));
     if let ReplResponseKindV2::Question { ref field, .. } = resp.kind {
-        assert_eq!(field, "products");
+        assert_eq!(field, "contract_id");
     }
 
-    // Step 5: Answer Q2 (products).
+    // Step 5: Answer Q2 (contract_id).
     let resp = orch
         .process(
             session_id,
             UserInputV2::Message {
-                content: "CUSTODY, FUND_ADMIN".to_string(),
+                content: "contract-001".to_string(),
             },
         )
         .await
         .unwrap();
     assert!(matches!(resp.kind, ReplResponseKindV2::Question { .. }));
     if let ReplResponseKindV2::Question { ref field, .. } = resp.kind {
-        assert_eq!(field, "jurisdiction");
+        assert_eq!(field, "cbu_id");
     }
 
-    // Step 6: Answer Q3 (jurisdiction) → template instantiation → RunbookSummary.
+    // Step 6: Answer Q3 (cbu_id).
     let resp = orch
         .process(
             session_id,
             UserInputV2::Message {
-                content: "LU".to_string(),
+                content: "cbu-001".to_string(),
+            },
+        )
+        .await
+        .unwrap();
+    assert!(matches!(resp.kind, ReplResponseKindV2::Question { .. }));
+    if let ReplResponseKindV2::Question { ref field, .. } = resp.kind {
+        assert_eq!(field, "product_id");
+    }
+
+    // Step 7: Answer Q4 (product_id) → template instantiation → RunbookSummary.
+    let resp = orch
+        .process(
+            session_id,
+            UserInputV2::Message {
+                content: "CUSTODY".to_string(),
             },
         )
         .await
@@ -265,8 +280,8 @@ async fn test_golden_loop_full() {
 
 #[tokio::test]
 async fn test_template_provenance() {
-    let (manifest, _hash) = load_onboarding_pack();
-    let template = &manifest.templates[0]; // standard-onboarding
+    let (manifest, _hash) = load_book_setup_pack();
+    let template = &manifest.templates[0]; // lux-sicav-book
 
     let context_vars = HashMap::from([
         ("client_name".to_string(), "Allianz".to_string()),
@@ -279,16 +294,16 @@ async fn test_template_provenance() {
             serde_json::Value::String("Allianz Lux Fund".to_string()),
         ),
         (
-            "products".to_string(),
-            serde_json::json!(["CUSTODY", "FUND_ADMIN"]),
+            "fund_names".to_string(),
+            serde_json::json!(["Allianz Lux Fund", "Allianz Lux Bond"]),
         ),
         (
             "jurisdiction".to_string(),
             serde_json::Value::String("LU".to_string()),
         ),
         (
-            "trading_instruments".to_string(),
-            serde_json::json!(["EQUITY", "FIXED_INCOME"]),
+            "book_name".to_string(),
+            serde_json::Value::String("Allianz Luxembourg".to_string()),
         ),
     ]);
 
@@ -351,11 +366,11 @@ async fn test_template_provenance() {
         "cbu_name should be UserProvided"
     );
 
-    // "jurisdiction" comes from answers → UserProvided
+    // "jurisdiction" is hardcoded in the template as "LU" → TemplateDefault
     assert_eq!(
         prov.slots.get("jurisdiction"),
-        Some(&SlotSource::UserProvided),
-        "jurisdiction should be UserProvided"
+        Some(&SlotSource::TemplateDefault),
+        "jurisdiction should be TemplateDefault (hardcoded in template)"
     );
 
     // repeat_for entries should each have provenance.
@@ -801,11 +816,11 @@ async fn test_playback_after_golden_loop() {
     let orch = make_orchestrator_with_onboarding();
     let session_id = scope_and_select_pack(&orch, "onboarding-request").await;
 
-    // Answer all questions.
+    // Answer all 4 required questions: deal_id, contract_id, cbu_id, product_id.
     orch.process(
         session_id,
         UserInputV2::Message {
-            content: "Allianz Lux Fund".to_string(),
+            content: "deal-001".to_string(),
         },
     )
     .await
@@ -814,7 +829,16 @@ async fn test_playback_after_golden_loop() {
     orch.process(
         session_id,
         UserInputV2::Message {
-            content: "CUSTODY, FUND_ADMIN".to_string(),
+            content: "contract-001".to_string(),
+        },
+    )
+    .await
+    .unwrap();
+
+    orch.process(
+        session_id,
+        UserInputV2::Message {
+            content: "cbu-001".to_string(),
         },
     )
     .await
@@ -824,7 +848,7 @@ async fn test_playback_after_golden_loop() {
         .process(
             session_id,
             UserInputV2::Message {
-                content: "LU".to_string(),
+                content: "CUSTODY".to_string(),
             },
         )
         .await
@@ -860,11 +884,27 @@ async fn test_runbook_editing_remove_step() {
     let orch = make_orchestrator_with_onboarding();
     let session_id = scope_and_select_pack(&orch, "onboarding-request").await;
 
-    // Answer all questions to build runbook.
+    // Answer all 4 required questions: deal_id, contract_id, cbu_id, product_id.
     orch.process(
         session_id,
         UserInputV2::Message {
-            content: "Fund A".to_string(),
+            content: "deal-A".to_string(),
+        },
+    )
+    .await
+    .unwrap();
+    orch.process(
+        session_id,
+        UserInputV2::Message {
+            content: "contract-A".to_string(),
+        },
+    )
+    .await
+    .unwrap();
+    orch.process(
+        session_id,
+        UserInputV2::Message {
+            content: "cbu-A".to_string(),
         },
     )
     .await
@@ -873,14 +913,6 @@ async fn test_runbook_editing_remove_step() {
         session_id,
         UserInputV2::Message {
             content: "CUSTODY".to_string(),
-        },
-    )
-    .await
-    .unwrap();
-    orch.process(
-        session_id,
-        UserInputV2::Message {
-            content: "LU".to_string(),
         },
     )
     .await
@@ -919,11 +951,11 @@ async fn test_reject_then_re_add() {
     let orch = make_orchestrator_with_onboarding();
     let session_id = scope_and_select_pack(&orch, "onboarding-request").await;
 
-    // Answer all questions.
+    // Answer all 4 required questions: deal_id, contract_id, cbu_id, product_id.
     orch.process(
         session_id,
         UserInputV2::Message {
-            content: "Fund X".to_string(),
+            content: "deal-X".to_string(),
         },
     )
     .await
@@ -931,7 +963,15 @@ async fn test_reject_then_re_add() {
     orch.process(
         session_id,
         UserInputV2::Message {
-            content: "CUSTODY".to_string(),
+            content: "contract-X".to_string(),
+        },
+    )
+    .await
+    .unwrap();
+    orch.process(
+        session_id,
+        UserInputV2::Message {
+            content: "cbu-X".to_string(),
         },
     )
     .await
@@ -940,7 +980,7 @@ async fn test_reject_then_re_add() {
         .process(
             session_id,
             UserInputV2::Message {
-                content: "IE".to_string(),
+                content: "CUSTODY".to_string(),
             },
         )
         .await

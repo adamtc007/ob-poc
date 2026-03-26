@@ -23,7 +23,7 @@ use ob_poc::repl::intent_service::{ClarificationOutcome, IntentService};
 use ob_poc::repl::orchestrator_v2::{ReplOrchestratorV2, StubExecutor};
 use ob_poc::repl::runbook::ConfirmPolicy;
 use ob_poc::repl::types::{IntentMatchResult, MatchContext, MatchOutcome};
-use ob_poc::repl::types_v2::UserInputV2;
+use ob_poc::repl::types_v2::{UserInputV2, WorkspaceKind};
 use ob_poc::repl::verb_config_index::VerbConfigIndex;
 
 // ---------------------------------------------------------------------------
@@ -415,6 +415,16 @@ async fn test_orchestrator_with_intent_service() {
         UserInputV2::SelectScope {
             group_id: Uuid::new_v4(),
             group_name: "Allianz".to_string(),
+        },
+    )
+    .await
+    .unwrap();
+
+    // Select workspace → JourneySelection.
+    orch.process(
+        session_id,
+        UserInputV2::SelectWorkspace {
+            workspace: WorkspaceKind::OnBoarding,
         },
     )
     .await

@@ -39,7 +39,7 @@ use ob_poc::repl::proposal_engine::ProposalEngine;
 use ob_poc::repl::response_v2::ReplResponseKindV2;
 use ob_poc::repl::runbook::{EntryStatus, ExecutionMode, RunbookEvent};
 use ob_poc::repl::types::{IntentMatchResult, MatchContext, MatchOutcome};
-use ob_poc::repl::types_v2::{ReplCommandV2, ReplStateV2, UserInputV2};
+use ob_poc::repl::types_v2::{ReplCommandV2, ReplStateV2, UserInputV2, WorkspaceKind};
 use ob_poc::repl::verb_config_index::VerbConfigIndex;
 
 // ===========================================================================
@@ -119,6 +119,7 @@ required_context: []
 optional_context: []
 allowed_verbs:
   - "session.load-cbu"
+  - "cbu.create"
 forbidden_verbs: []
 risk_policy:
   max_risk_score: 5
@@ -459,6 +460,16 @@ async fn setup_in_pack_with_id(orch: &ReplOrchestratorV2, pack_id: &str) -> Uuid
     .await
     .unwrap();
 
+    // Select workspace → JourneySelection
+    orch.process(
+        session_id,
+        UserInputV2::SelectWorkspace {
+            workspace: WorkspaceKind::OnBoarding,
+        },
+    )
+    .await
+    .unwrap();
+
     // Select pack
     orch.process(
         session_id,
@@ -635,32 +646,30 @@ async fn setup_with_n_entries_in_pack(
 
 #[tokio::test]
 async fn test_b1_direct_dsl_transitions_to_sentence_playback() {
-    let dsl_input = "(cbu.create :name \"test\")";
-    let matcher = MockIntentMatcher::direct_dsl(dsl_input);
+    // DSL-shaped input now routes through verb matching (no bypass path).
+    // A matched verb with high confidence auto-advances to SentencePlayback.
+    let matcher = MockIntentMatcher::matched(
+        "cbu.create",
+        0.92,
+        Some("(cbu.create :name \"test\")"),
+    );
     let orch = build_orchestrator_with_engine(matcher);
     let session_id = setup_in_pack(&orch).await;
 
-    // Send the direct DSL as a message
     let resp = orch
         .process(
             session_id,
             UserInputV2::Message {
-                content: dsl_input.to_string(),
+                content: "(cbu.create :name \"test\")".to_string(),
             },
         )
         .await
         .unwrap();
 
-    // Should be SentencePlayback
+    // Should be SentencePlayback (auto-advanced from high confidence match)
     match &resp.kind {
-        ReplResponseKindV2::SentencePlayback { sentence, verb, .. } => {
-            assert!(
-                sentence.contains("Execute"),
-                "Sentence should contain 'Execute', got: {}",
-                sentence
-            );
-            // DirectDsl uses "direct.dsl" as the verb marker
-            assert_eq!(verb, "direct.dsl");
+        ReplResponseKindV2::SentencePlayback { verb, .. } => {
+            assert_eq!(verb, "cbu.create");
         }
         other => panic!(
             "Expected SentencePlayback, got: {:?}",
@@ -683,16 +692,19 @@ async fn test_b1_direct_dsl_transitions_to_sentence_playback() {
 
 #[tokio::test]
 async fn test_b2_direct_dsl_confirm_adds_entry() {
-    let dsl_input = "(cbu.create :name \"test\")";
-    let matcher = MockIntentMatcher::direct_dsl(dsl_input);
+    let matcher = MockIntentMatcher::matched(
+        "cbu.create",
+        0.92,
+        Some("(cbu.create :name \"test\")"),
+    );
     let orch = build_orchestrator_with_engine(matcher);
     let session_id = setup_in_pack(&orch).await;
 
-    // Send direct DSL
+    // Send DSL-shaped input (routes through verb matching now)
     orch.process(
         session_id,
         UserInputV2::Message {
-            content: dsl_input.to_string(),
+            content: "(cbu.create :name \"test\")".to_string(),
         },
     )
     .await
@@ -729,16 +741,19 @@ async fn test_b2_direct_dsl_confirm_adds_entry() {
 
 #[tokio::test]
 async fn test_b3_direct_dsl_reject_returns_to_in_pack() {
-    let dsl_input = "(cbu.create :name \"test\")";
-    let matcher = MockIntentMatcher::direct_dsl(dsl_input);
+    let matcher = MockIntentMatcher::matched(
+        "cbu.create",
+        0.92,
+        Some("(cbu.create :name \"test\")"),
+    );
     let orch = build_orchestrator_with_engine(matcher);
     let session_id = setup_in_pack(&orch).await;
 
-    // Send direct DSL
+    // Send DSL-shaped input
     orch.process(
         session_id,
         UserInputV2::Message {
-            content: dsl_input.to_string(),
+            content: "(cbu.create :name \"test\")".to_string(),
         },
     )
     .await
@@ -764,12 +779,13 @@ async fn test_b3_direct_dsl_reject_returns_to_in_pack() {
         user_entry_list.len()
     );
 
-    // Response should indicate rejection
+    // Response should indicate rejection or return to input
     assert!(
         resp.message.to_lowercase().contains("reject")
             || resp.message.to_lowercase().contains("discard")
-            || resp.message.to_lowercase().contains("cancel"),
-        "Response should mention rejection, got: {}",
+            || resp.message.to_lowercase().contains("cancel")
+            || resp.message.to_lowercase().contains("message"),
+        "Response should mention rejection or prompt for input, got: {}",
         resp.message
     );
 }
@@ -779,38 +795,34 @@ async fn test_b3_direct_dsl_reject_returns_to_in_pack() {
 // ===========================================================================
 
 #[tokio::test]
-async fn test_b4_direct_dsl_bypasses_pack_verb_filter() {
-    // The restricted pack only allows session.load-cbu.
-    // DirectDsl with cbu.create should still reach SentencePlayback.
-    let dsl_input = "(cbu.create :name \"test\")";
-    let matcher = MockIntentMatcher::direct_dsl(dsl_input);
+async fn test_b4_verb_match_within_allowed_verbs_works() {
+    // The restricted pack allows cbu.create (added for test).
+    // A verb match for cbu.create should reach SentencePlayback.
+    let matcher = MockIntentMatcher::matched(
+        "cbu.create",
+        0.92,
+        Some("(cbu.create :name \"Allianz Lux\")"),
+    );
     let orch = build_orchestrator_restricted(matcher);
     let session_id = setup_in_pack_with_id(&orch, "restricted-test").await;
 
-    // Send direct DSL for a verb NOT in allowed_verbs
     let resp = orch
         .process(
             session_id,
             UserInputV2::Message {
-                content: dsl_input.to_string(),
+                content: "create allianz lux cbu".to_string(),
             },
         )
         .await
         .unwrap();
 
-    // Should still reach SentencePlayback because DirectDsl bypasses filter
+    // Should reach SentencePlayback because cbu.create is in allowed_verbs
     match &resp.kind {
-        ReplResponseKindV2::SentencePlayback { sentence, verb, .. } => {
-            assert!(
-                sentence.contains("Execute"),
-                "Sentence should contain 'Execute', got: {}",
-                sentence
-            );
-            // DirectDsl uses "direct.dsl" as the verb marker
-            assert_eq!(verb, "direct.dsl");
+        ReplResponseKindV2::SentencePlayback { verb, .. } => {
+            assert_eq!(verb, "cbu.create");
         }
         other => panic!(
-            "Expected SentencePlayback (bypass filter), got: {:?}",
+            "Expected SentencePlayback for allowed verb, got: {:?}",
             std::mem::discriminant(other)
         ),
     }
@@ -887,6 +899,16 @@ async fn test_f2_handoff_carries_forwarded_context() {
         UserInputV2::SelectScope {
             group_id: client_group_id,
             group_name: "Allianz".to_string(),
+        },
+    )
+    .await
+    .unwrap();
+
+    // Select workspace → JourneySelection
+    orch.process(
+        session_id,
+        UserInputV2::SelectWorkspace {
+            workspace: WorkspaceKind::OnBoarding,
         },
     )
     .await
@@ -1205,6 +1227,16 @@ async fn test_a1_golden_loop_regression() {
     .await
     .unwrap();
 
+    // Workspace
+    orch.process(
+        session_id,
+        UserInputV2::SelectWorkspace {
+            workspace: WorkspaceKind::OnBoarding,
+        },
+    )
+    .await
+    .unwrap();
+
     // Pack
     orch.process(
         session_id,
@@ -1328,6 +1360,16 @@ async fn test_d1_pack_shorthand_regression() {
         UserInputV2::SelectScope {
             group_id: Uuid::new_v4(),
             group_name: "Allianz".to_string(),
+        },
+    )
+    .await
+    .unwrap();
+
+    // Select workspace → JourneySelection
+    orch.process(
+        session_id,
+        UserInputV2::SelectWorkspace {
+            workspace: WorkspaceKind::OnBoarding,
         },
     )
     .await

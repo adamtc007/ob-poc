@@ -61,7 +61,7 @@ use ob_poc::repl::proposal_engine::ProposalEngine;
 use ob_poc::repl::response_v2::ReplResponseKindV2;
 use ob_poc::repl::runbook::{EntryStatus, Runbook, RunbookEntry, RunbookEvent, SlotSource};
 use ob_poc::repl::types::{IntentMatchResult, MatchContext, MatchOutcome};
-use ob_poc::repl::types_v2::{ReplCommandV2, ReplStateV2, UserInputV2};
+use ob_poc::repl::types_v2::{ReplCommandV2, ReplStateV2, UserInputV2, WorkspaceKind};
 use ob_poc::repl::verb_config_index::VerbConfigIndex;
 
 // ===========================================================================
@@ -236,6 +236,16 @@ async fn setup_in_pack(orch: &ReplOrchestratorV2) -> Uuid {
         UserInputV2::SelectScope {
             group_id: Uuid::new_v4(),
             group_name: "Allianz".to_string(),
+        },
+    )
+    .await
+    .unwrap();
+
+    // Select workspace → JourneySelection
+    orch.process(
+        session_id,
+        UserInputV2::SelectWorkspace {
+            workspace: WorkspaceKind::OnBoarding,
         },
     )
     .await
@@ -1607,6 +1617,16 @@ async fn test_golden_loop_with_editing() {
         UserInputV2::SelectScope {
             group_id: Uuid::new_v4(),
             group_name: "Allianz".to_string(),
+        },
+    )
+    .await
+    .unwrap();
+
+    // 2b. Select workspace → JourneySelection
+    orch.process(
+        session_id,
+        UserInputV2::SelectWorkspace {
+            workspace: WorkspaceKind::OnBoarding,
         },
     )
     .await
