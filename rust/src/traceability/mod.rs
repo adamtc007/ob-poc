@@ -39,7 +39,7 @@ pub use phase4::{
 pub use phase5::build_phase5_unavailable_payload;
 #[cfg(feature = "database")]
 pub use phase5::{build_phase5_agent_payload, evaluate_phase5_agent, Phase5Evaluation};
-#[cfg(all(feature = "database", feature = "vnext-repl"))]
+#[cfg(feature = "database")]
 pub use phase5::{
     build_phase5_repl_payload, build_repl_execution_shape_kind, evaluate_phase5_repl,
 };

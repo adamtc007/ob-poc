@@ -9,14 +9,11 @@
 use anyhow::Result;
 use async_trait::async_trait;
 
-#[cfg(feature = "vnext-repl")]
 use super::types::MatchOutcome;
 use super::types::{IntentMatchResult, MatchContext};
 
-#[cfg(feature = "vnext-repl")]
 use super::context_stack::ContextStack;
 
-#[cfg(feature = "vnext-repl")]
 use super::scoring::{apply_ambiguity_policy, apply_pack_scoring, AmbiguityOutcome};
 
 /// Pure service for intent matching
@@ -49,7 +46,6 @@ pub trait IntentMatcher: Send + Sync {
     ///
     /// This is a default method — implementations that want custom
     /// context-aware search can override it.
-    #[cfg(feature = "vnext-repl")]
     async fn search_with_context(
         &self,
         utterance: &str,

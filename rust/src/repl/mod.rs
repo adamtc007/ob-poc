@@ -28,67 +28,47 @@ pub use types::{
 // REPL v2 — Pack-Guided Runbook Architecture (vnext-repl feature)
 // ============================================================================
 
-#[cfg(feature = "vnext-repl")]
 pub mod runbook;
 
-#[cfg(feature = "vnext-repl")]
 pub mod verb_config_index;
 
-#[cfg(feature = "vnext-repl")]
 pub mod executor_bridge;
 
-#[cfg(feature = "vnext-repl")]
 pub mod sentence_gen;
 
-#[cfg(feature = "vnext-repl")]
 pub mod types_v2;
 
-#[cfg(feature = "vnext-repl")]
 pub mod session_v2;
 
-#[cfg(feature = "vnext-repl")]
 pub mod response_v2;
 
-#[cfg(feature = "vnext-repl")]
 pub mod intent_service;
 
-#[cfg(feature = "vnext-repl")]
 pub mod proposal_engine;
 
-#[cfg(feature = "vnext-repl")]
 pub mod orchestrator_v2;
 
-#[cfg(feature = "vnext-repl")]
 #[cfg(feature = "database")]
 pub mod session_repository;
 
-#[cfg(feature = "vnext-repl")]
 pub mod bootstrap;
 
-#[cfg(feature = "vnext-repl")]
 pub mod context_stack;
 
-#[cfg(feature = "vnext-repl")]
 pub mod scoring;
 
-#[cfg(all(feature = "vnext-repl", test))]
+#[cfg(test)]
 pub mod entity_resolution;
 
-#[cfg(feature = "vnext-repl")]
 pub mod deterministic_extraction;
 
-#[cfg(feature = "vnext-repl")]
 pub mod decision_log;
 
-#[cfg(feature = "vnext-repl")]
 pub mod preconditions;
 
-#[cfg(feature = "vnext-repl")]
 pub mod session_trace;
 
-#[cfg(feature = "vnext-repl")]
 #[cfg(feature = "database")]
 pub mod trace_repository;
 
-#[cfg(feature = "vnext-repl")]
 pub mod session_replay;

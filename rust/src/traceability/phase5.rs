@@ -222,7 +222,6 @@ pub fn evaluate_phase5_agent(
 /// let runbook = Runbook::new(Uuid::nil());
 /// assert_eq!(build_repl_execution_shape_kind(&runbook), Some("singleton"));
 /// ```
-#[cfg(feature = "vnext-repl")]
 pub fn build_repl_execution_shape_kind(
     runbook: &crate::repl::runbook::Runbook,
 ) -> Option<&'static str> {
@@ -251,7 +250,6 @@ pub fn build_repl_execution_shape_kind(
 /// ```rust,ignore
 /// // Built from a real REPL response at runtime.
 /// ```
-#[cfg(feature = "vnext-repl")]
 pub fn build_phase5_repl_payload(
     session: &crate::repl::session_v2::ReplSessionV2,
     response: &crate::repl::response_v2::ReplResponseV2,
@@ -265,7 +263,6 @@ pub fn build_phase5_repl_payload(
 /// ```rust,ignore
 /// // Built from a real REPL response at runtime.
 /// ```
-#[cfg(feature = "vnext-repl")]
 pub fn evaluate_phase5_repl(
     session: &crate::repl::session_v2::ReplSessionV2,
     response: &crate::repl::response_v2::ReplResponseV2,
@@ -320,7 +317,6 @@ pub fn evaluate_phase5_repl(
     Phase5Evaluation::new(payload, execution_shape.map(ToString::to_string))
 }
 
-#[cfg(feature = "vnext-repl")]
 fn repl_runtime_plan(runbook: &crate::repl::runbook::Runbook) -> serde_json::Value {
     let nodes = runbook
         .entries
@@ -364,7 +360,6 @@ fn repl_runtime_plan(runbook: &crate::repl::runbook::Runbook) -> serde_json::Val
     })
 }
 
-#[cfg(feature = "vnext-repl")]
 fn repl_side_effects(results: &[crate::repl::response_v2::StepResult]) -> Vec<serde_json::Value> {
     results
         .iter()
@@ -385,17 +380,12 @@ fn repl_side_effects(results: &[crate::repl::response_v2::StepResult]) -> Vec<se
 mod tests {
     #[cfg(feature = "database")]
     use super::{build_phase5_agent_payload, evaluate_phase5_agent};
-    #[cfg(feature = "vnext-repl")]
     use super::{build_phase5_repl_payload, build_repl_execution_shape_kind, evaluate_phase5_repl};
     #[cfg(feature = "database")]
     use crate::api::agent_service::AgentChatResponse;
-    #[cfg(feature = "vnext-repl")]
     use crate::repl::response_v2::{ReplResponseKindV2, ReplResponseV2, StepResult};
-    #[cfg(feature = "vnext-repl")]
     use crate::repl::runbook::RunbookEntry;
-    #[cfg(feature = "vnext-repl")]
     use crate::repl::session_v2::ReplSessionV2;
-    #[cfg(feature = "vnext-repl")]
     use crate::repl::types_v2::{ExecutionProgress, ReplStateV2};
     #[cfg(feature = "database")]
     use crate::session::{SessionState, UnifiedSession};
@@ -403,7 +393,6 @@ mod tests {
     use serde_json::json;
     use uuid::Uuid;
 
-    #[cfg(feature = "vnext-repl")]
     #[test]
     fn test_phase5_repl_payload_for_executed_response() {
         let response = ReplResponseV2 {
@@ -432,7 +421,6 @@ mod tests {
         assert_eq!(payload["outcome"]["kind"], "success");
     }
 
-    #[cfg(feature = "vnext-repl")]
     #[test]
     fn test_execution_shape_kind_prefers_cross_entity_plan_when_dependencies_exist() {
         let mut runbook = crate::repl::runbook::Runbook::new(Uuid::new_v4());
@@ -457,7 +445,6 @@ mod tests {
         );
     }
 
-    #[cfg(feature = "vnext-repl")]
     #[test]
     fn test_phase5_payload_includes_runtime_plan() {
         let mut session = ReplSessionV2::new();
@@ -496,7 +483,6 @@ mod tests {
         assert_eq!(payload["runtime_plan"]["edge_count"], 1);
     }
 
-    #[cfg(feature = "vnext-repl")]
     #[test]
     fn test_phase5_repl_evaluation_exposes_execution_shape() {
         let mut session = ReplSessionV2::new();

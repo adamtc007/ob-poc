@@ -14,7 +14,6 @@ use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use uuid::Uuid;
 
-#[cfg(feature = "vnext-repl")]
 use crate::repl::types_v2::{
     ActionHint, AgentMode, ConstellationContextRef, ProgressSummary, ResolvedConstellationContext,
     SessionScope, SubjectKind, SubjectRef, VerbRef, WorkspaceKind, WorkspaceStateView,
@@ -38,7 +37,6 @@ struct ConstellationQuery {
     map_name: Option<String>,
 }
 
-#[cfg(feature = "vnext-repl")]
 #[derive(Debug, Clone, Deserialize)]
 pub struct HydrateContextQuery {
     pub session_id: Uuid,
@@ -115,7 +113,6 @@ pub fn create_constellation_router(pool: PgPool) -> Router {
             "/api/constellation/search-cbus",
             get(search_constellation_cbus),
         );
-    #[cfg(feature = "vnext-repl")]
     let router = router
         .route(
             "/api/constellation/resolve",
@@ -127,7 +124,6 @@ pub fn create_constellation_router(pool: PgPool) -> Router {
 }
 
 /// Resolve a session-scoped constellation context into concrete defaults.
-#[cfg(feature = "vnext-repl")]
 async fn resolve_constellation(
     State(state): State<ConstellationAppState>,
     Json(context): Json<ConstellationContextRef>,
@@ -137,7 +133,6 @@ async fn resolve_constellation(
 }
 
 /// Hydrate the current workspace state view from a resolved context query.
-#[cfg(feature = "vnext-repl")]
 async fn get_workspace_hydrate(
     State(state): State<ConstellationAppState>,
     Query(query): Query<HydrateContextQuery>,
@@ -148,7 +143,6 @@ async fn get_workspace_hydrate(
 }
 
 /// Return the progress summary for a resolved context query.
-#[cfg(feature = "vnext-repl")]
 async fn get_workspace_summary(
     State(state): State<ConstellationAppState>,
     Query(query): Query<HydrateContextQuery>,
@@ -319,7 +313,6 @@ fn internal_error(error: impl std::fmt::Display) -> (StatusCode, String) {
     )
 }
 
-#[cfg(feature = "vnext-repl")]
 impl From<HydrateContextQuery> for ConstellationContextRef {
     fn from(value: HydrateContextQuery) -> Self {
         Self {
@@ -335,7 +328,6 @@ impl From<HydrateContextQuery> for ConstellationContextRef {
     }
 }
 
-#[cfg(feature = "vnext-repl")]
 pub(crate) async fn resolve_context(
     pool: &PgPool,
     context: &ConstellationContextRef,
@@ -379,7 +371,6 @@ pub(crate) async fn resolve_context(
     })
 }
 
-#[cfg(feature = "vnext-repl")]
 pub(crate) async fn hydrate_workspace_state(
     pool: &PgPool,
     resolved: &ResolvedConstellationContext,
@@ -434,7 +425,6 @@ pub(crate) async fn hydrate_workspace_state(
     })
 }
 
-#[cfg(feature = "vnext-repl")]
 async fn resolve_session_scope(
     pool: &PgPool,
     client_group_id: Uuid,
@@ -458,7 +448,6 @@ async fn resolve_session_scope(
     })
 }
 
-#[cfg(feature = "vnext-repl")]
 async fn resolve_subject_id(
     pool: &PgPool,
     client_group_id: Uuid,
@@ -486,7 +475,6 @@ async fn resolve_subject_id(
     }
 }
 
-#[cfg(feature = "vnext-repl")]
 async fn resolve_first_cbu_for_group(
     pool: &PgPool,
     client_group_id: Uuid,
@@ -508,7 +496,6 @@ async fn resolve_first_cbu_for_group(
     .map_err(internal_error)
 }
 
-#[cfg(feature = "vnext-repl")]
 async fn resolve_constellation_cbu_id(
     pool: &PgPool,
     resolved: &ResolvedConstellationContext,
@@ -546,7 +533,6 @@ async fn resolve_constellation_cbu_id(
     }
 }
 
-#[cfg(feature = "vnext-repl")]
 fn extract_case_id(resolved: &ResolvedConstellationContext) -> Option<Uuid> {
     match resolved.subject_kind {
         Some(SubjectKind::Case) => resolved.subject_id,
@@ -554,7 +540,6 @@ fn extract_case_id(resolved: &ResolvedConstellationContext) -> Option<Uuid> {
     }
 }
 
-#[cfg(feature = "vnext-repl")]
 fn progress_summary_from(summary: &ConstellationSummary) -> ProgressSummary {
     ProgressSummary {
         total_slots: summary.total_slots,
@@ -563,7 +548,6 @@ fn progress_summary_from(summary: &ConstellationSummary) -> ProgressSummary {
     }
 }
 
-#[cfg(feature = "vnext-repl")]
 fn flatten_scoped_verbs(hydrated: &HydratedConstellation) -> Vec<VerbRef> {
     fn walk(
         slot: &crate::sem_os_runtime::constellation_runtime::HydratedSlot,
@@ -592,7 +576,6 @@ fn flatten_scoped_verbs(hydrated: &HydratedConstellation) -> Vec<VerbRef> {
         .collect()
 }
 
-#[cfg(feature = "vnext-repl")]
 fn build_action_hints(workspace: &WorkspaceKind, verbs: &[VerbRef]) -> Vec<ActionHint> {
     let mut hints: Vec<ActionHint> = verbs
         .iter()

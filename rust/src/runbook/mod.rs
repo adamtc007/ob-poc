@@ -29,30 +29,20 @@
 //! is wired in Phases 1-3.
 
 pub mod canonical;
-#[cfg(feature = "vnext-repl")]
 pub mod compiler;
-#[cfg(feature = "vnext-repl")]
 pub mod constraint_gate;
 pub mod envelope;
 pub mod errors;
 pub mod executor;
-#[cfg(feature = "vnext-repl")]
 pub mod narration;
-#[cfg(feature = "vnext-repl")]
 pub mod plan_compiler;
-#[cfg(feature = "vnext-repl")]
 pub mod plan_executor;
-#[cfg(feature = "vnext-repl")]
 pub mod plan_types;
 pub mod response;
-#[cfg(feature = "vnext-repl")]
 pub mod sem_os_filter;
-#[cfg(feature = "vnext-repl")]
 pub mod step_executor_bridge;
 pub mod types;
-#[cfg(feature = "vnext-repl")]
 pub mod verb_classifier;
-#[cfg(feature = "vnext-repl")]
 pub mod write_set;
 
 // Re-export key types at module boundary
@@ -60,9 +50,7 @@ pub use canonical::{
     canonical_bytes_for_envelope, canonical_bytes_for_envelope_core, canonical_bytes_for_step,
     canonical_bytes_for_steps, content_addressed_id, full_sha256,
 };
-#[cfg(feature = "vnext-repl")]
 pub use compiler::compile_verb;
-#[cfg(feature = "vnext-repl")]
 pub use constraint_gate::check_pack_constraints;
 pub use envelope::{EnvelopeCore, ReplayEnvelope};
 pub use errors::{CompilationError, CompilationErrorKind};
@@ -76,13 +64,11 @@ pub use response::{
     ClarificationContext, ClarificationRequest, CompiledRunbookSummary, ConstraintViolationDetail,
     MissingField, OrchestratorResponse, Remediation, StepPreview,
 };
-#[cfg(feature = "vnext-repl")]
 pub use sem_os_filter::{filter_verbs_against_allowed_set, SemOsDeniedVerb, SemOsFilterResult};
 pub use types::{
     CompiledRunbook, CompiledRunbookId, CompiledRunbookStatus, CompiledStep, ExecutionMode,
     ParkReason, StepCursor,
 };
-#[cfg(feature = "vnext-repl")]
 pub use verb_classifier::{classify_verb, VerbClassification};
 
 // Re-export compile_invocation (defined below)
@@ -115,7 +101,6 @@ pub use verb_classifier::{classify_verb, VerbClassification};
 /// * `verb_config_index` — for verb classification (primitive lookup)
 /// * `constraints` — effective constraints from active pack
 /// * `runbook_version` — monotonic version within the session
-#[cfg(feature = "vnext-repl")]
 #[allow(clippy::too_many_arguments)]
 pub fn compile_invocation(
     session_id: uuid::Uuid,
@@ -151,7 +136,6 @@ pub fn compile_invocation(
 mod tests {
     use super::*;
 
-    #[cfg(feature = "vnext-repl")]
     #[test]
     fn compile_invocation_unknown_verb_returns_clarification() {
         use crate::dsl_v2::macros::MacroRegistry;
@@ -183,7 +167,6 @@ mod tests {
         );
     }
 
-    #[cfg(feature = "vnext-repl")]
     #[test]
     fn compile_invocation_delegates_classify_then_compile() {
         // Verify the real pipeline: classify → compile round-trip.

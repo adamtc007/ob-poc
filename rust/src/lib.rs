@@ -154,11 +154,9 @@ pub mod repl;
 pub mod bpmn_integration;
 
 // Journey module - Pack-guided REPL v2 (Journey Packs, sentence templates, unified runbook)
-#[cfg(feature = "vnext-repl")]
 pub mod journey;
 
 // Plan Builder — compilation pipeline decomposition (verb classifier, constraint gate, plan assembler)
-#[cfg(feature = "vnext-repl")]
 pub mod plan_builder;
 
 // Document Bundles - Versioned document requirement sets for structure macros

@@ -98,11 +98,8 @@ pub mod deal_routes;
 #[cfg(feature = "server")]
 pub mod stewardship_routes;
 
-#[cfg(feature = "vnext-repl")]
 pub mod repl_routes_v2;
-#[cfg(feature = "vnext-repl")]
 pub mod response_adapter;
-#[cfg(feature = "vnext-repl")]
 pub mod agent_enrichment;
 
 #[cfg(feature = "server")]
@@ -114,7 +111,7 @@ pub use entity_routes::{create_entity_router, create_scoped_entity_router};
 #[cfg(feature = "server")]
 pub use agent_state::{create_agent_router_with_semantic, AgentState};
 
-#[cfg(all(feature = "server", feature = "vnext-repl"))]
+#[cfg(feature = "server")]
 pub use agent_state::create_agent_router_with_semantic_and_repl;
 
 #[cfg(feature = "server")]
@@ -184,7 +181,6 @@ pub use deal_routes::{create_deal_router, create_deal_router_simple, DealState};
 #[cfg(feature = "server")]
 pub use stewardship_routes::create_stewardship_router;
 
-#[cfg(feature = "vnext-repl")]
 pub use repl_routes_v2::{
     navigation_router as create_repl_navigation_router, router as create_repl_v2_router,
     ReplV2RouteState,

@@ -1476,7 +1476,6 @@ mod tests {
 
     /// Regression (Fix 4): Fallback write_set derivation extracts UUIDs from args.
     #[test]
-    #[cfg(feature = "vnext-repl")]
     fn test_derive_write_set_extracts_uuids() {
         use crate::runbook::write_set::derive_write_set;
 
@@ -1499,7 +1498,6 @@ mod tests {
 
     /// Regression (Fix 4): derive_write_set returns empty for non-UUID args.
     #[test]
-    #[cfg(feature = "vnext-repl")]
     fn test_derive_write_set_ignores_non_uuids() {
         use crate::runbook::write_set::derive_write_set;
 

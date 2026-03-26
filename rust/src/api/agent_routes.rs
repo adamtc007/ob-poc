@@ -542,7 +542,6 @@ async fn session_input(
     Json(req): Json<SessionInputRequest>,
 ) -> Result<Json<SessionInputResponse>, StatusCode> {
     // Try routing through REPL V2 orchestrator first (unified pipeline).
-    #[cfg(feature = "vnext-repl")]
     if let Some(ref orchestrator) = state.repl_v2_orchestrator {
         if let Some(repl_response) =
             try_route_through_repl(&req, orchestrator, session_id).await
@@ -613,7 +612,6 @@ async fn session_input(
             Ok(Json(SessionInputResponse::Decision { response }))
         }
         SessionInputRequest::ReplV2 { input } => {
-            #[cfg(feature = "vnext-repl")]
             {
                 let repl_req: crate::api::repl_routes_v2::InputRequestV2 =
                     serde_json::from_value(input).map_err(|e| {
@@ -640,11 +638,7 @@ async fn session_input(
                     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
                 Ok(Json(SessionInputResponse::ReplV2 { response }))
             }
-            #[cfg(not(feature = "vnext-repl"))]
-            {
-                let _ = input;
-                Err(StatusCode::NOT_IMPLEMENTED)
-            }
+            // not(vnext-repl) dead path removed — REPL V2 always enabled
         }
     }
 }
@@ -654,7 +648,6 @@ async fn session_input(
 /// Returns `Some(ReplResponseV2)` if the REPL session exists and is in a gate state
 /// (ScopeGate, WorkspaceSelection, JourneySelection) or any later REPL state.
 /// Returns `None` if no REPL session exists for this ID (legacy agent session).
-#[cfg(feature = "vnext-repl")]
 async fn try_route_through_repl(
     req: &SessionInputRequest,
     orchestrator: &std::sync::Arc<crate::repl::orchestrator_v2::ReplOrchestratorV2>,
@@ -970,7 +963,6 @@ async fn create_session(
 
     // Also create a REPL V2 session with the same ID (for unified pipeline routing).
     // The REPL session starts in ScopeGate — enforcing client group selection.
-    #[cfg(feature = "vnext-repl")]
     if let Some(ref orchestrator) = state.repl_v2_orchestrator {
         orchestrator.create_session_with_id(session_id).await;
         tracing::info!("REPL V2 session created for unified routing: {session_id}");

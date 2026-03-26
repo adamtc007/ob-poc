@@ -24,17 +24,12 @@ pub mod canonical;
 pub mod client;
 pub mod config;
 pub mod correlation;
-#[cfg(feature = "vnext-repl")]
 pub mod dispatcher;
-#[cfg(feature = "vnext-repl")]
 pub mod event_bridge;
 pub mod job_frames;
 pub mod parked_tokens;
-#[cfg(feature = "vnext-repl")]
 pub mod pending_dispatch_worker;
 pub mod pending_dispatches;
-#[cfg(feature = "vnext-repl")]
 pub mod signal_relay;
 pub mod types;
-#[cfg(feature = "vnext-repl")]
 pub mod worker;
