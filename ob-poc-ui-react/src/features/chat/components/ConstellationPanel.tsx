@@ -2,13 +2,16 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   AlertTriangle,
+  ArrowLeftFromLine,
   Briefcase,
   Building2,
   ChevronDown,
   ChevronRight,
   Circle,
+  Eye,
   FileText,
   GitBranch,
+  Layers,
   Loader2,
   Network,
   RefreshCw,
@@ -897,6 +900,27 @@ export function ConstellationPanel({
               {sessionFeedback?.stale_warning && (
                 <div className="mt-2 rounded-lg border border-[var(--accent-yellow)]/30 bg-[var(--accent-yellow)]/10 px-3 py-2 text-xs text-[var(--accent-yellow)]">
                   Restored frame may be stale. Re-hydrate before relying on pronouns for writes.
+                </div>
+              )}
+              {/* Stack navigation indicator */}
+              {sessionFeedback && (sessionFeedback.stack_depth > 1 || sessionFeedback.tos_is_peek) && (
+                <div className="mt-2 flex items-center gap-2 text-xs text-[var(--text-muted)]">
+                  <Layers size={12} />
+                  <span>Stack depth: {sessionFeedback.stack_depth}</span>
+                  {sessionFeedback.tos_is_peek && (
+                    <span className="inline-flex items-center gap-0.5 rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700 border border-indigo-200">
+                      <Eye size={10} /> PEEK
+                    </span>
+                  )}
+                  {sessionFeedback.stack_depth > 1 && (
+                    <button
+                      onClick={() => onPromptAgent?.("session.pop")}
+                      className="ml-auto flex items-center gap-1 rounded border border-[var(--border-secondary)] px-1.5 py-0.5 text-[10px] hover:bg-[var(--bg-hover)]"
+                    >
+                      <ArrowLeftFromLine size={10} />
+                      Pop
+                    </button>
+                  )}
                 </div>
               )}
             </div>
