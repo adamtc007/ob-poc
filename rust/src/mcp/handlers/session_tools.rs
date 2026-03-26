@@ -19,6 +19,7 @@ impl ToolHandlers {
         Err(anyhow!("session.load-cbu: Use the unified session pipeline (POST /api/session/:id/input) instead"))
     }
 
+    #[allow(dead_code)]
     pub(super) async fn session_load_cluster(&self, _args: Value) -> Result<Value> {
         Err(anyhow!("session.load-cluster: Use the unified session pipeline instead"))
     }

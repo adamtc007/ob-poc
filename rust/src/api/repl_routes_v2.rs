@@ -569,7 +569,8 @@ async fn get_session_v2(
     Ok(Json(SessionStateResponseV2::from(session)))
 }
 
-/// Internal REPL V2 input adapter used by unified `/api/session/:id/input`.
+/// Internal REPL V2 input adapter — retained for direct REPL access.
+#[allow(dead_code)]
 pub(crate) async fn input_v2(
     State(state): State<ReplV2RouteState>,
     Path(session_id): Path<Uuid>,

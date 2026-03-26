@@ -15,12 +15,15 @@ pub mod agent_types;
 pub mod agent_dsl_routes;
 
 #[cfg(feature = "server")]
+#[allow(dead_code)] // Decision reply handling migrated to unified pipeline
 pub mod agent_learning_routes;
 
 #[cfg(feature = "server")]
+#[allow(dead_code)] // Legacy conversion helpers pending Phase 4 cleanup
 pub mod agent_routes;
 
 #[cfg(feature = "server")]
+#[allow(dead_code)]
 pub mod agent_state;
 
 #[cfg(feature = "server")]

@@ -538,7 +538,7 @@ async fn decision_reply_legacy_blocked() -> (StatusCode, Json<serde_json::Value>
 async fn session_input(
     State(state): State<AgentState>,
     Path(session_id): Path<Uuid>,
-    headers: axum::http::HeaderMap,
+    _headers: axum::http::HeaderMap,
     Json(req): Json<SessionInputRequest>,
 ) -> Result<Json<SessionInputResponse>, StatusCode> {
     // Try routing through REPL V2 orchestrator first (unified pipeline).
@@ -570,77 +570,13 @@ async fn session_input(
         }
     }
 
-    // Fallback: route through legacy agent pipeline
-    match req {
-        SessionInputRequest::Utterance { message } => {
-            let chat_req = ChatRequest {
-                message,
-                cbu_id: None,
-                disambiguation_response: None,
-            };
-            let response = chat_session(State(state), Path(session_id), headers, Json(chat_req))
-                .await?
-                .0;
-            Ok(Json(SessionInputResponse::Chat {
-                response: Box::new(response),
-            }))
-        }
-        SessionInputRequest::DiscoverySelection { selection } => {
-            let message = apply_discovery_selection(&state, session_id, &selection).await?;
-            let chat_req = ChatRequest {
-                message,
-                cbu_id: None,
-                disambiguation_response: None,
-            };
-            let response = chat_session(State(state), Path(session_id), headers, Json(chat_req))
-                .await?
-                .0;
-            Ok(Json(SessionInputResponse::Chat {
-                response: Box::new(response),
-            }))
-        }
-        SessionInputRequest::DecisionReply { packet_id, reply } => {
-            let decision_req = ob_poc_types::DecisionReplyRequest { packet_id, reply };
-            let response = crate::api::agent_learning_routes::handle_decision_reply(
-                State(state),
-                Path(session_id),
-                headers,
-                Json(decision_req),
-            )
-            .await?
-            .0;
-            Ok(Json(SessionInputResponse::Decision { response }))
-        }
-        SessionInputRequest::ReplV2 { input } => {
-            {
-                let repl_req: crate::api::repl_routes_v2::InputRequestV2 =
-                    serde_json::from_value(input).map_err(|e| {
-                        tracing::warn!(error = %e, "Invalid repl_v2 input payload");
-                        StatusCode::BAD_REQUEST
-                    })?;
-
-                let orchestrator = state
-                    .repl_v2_orchestrator
-                    .clone()
-                    .ok_or(StatusCode::SERVICE_UNAVAILABLE)?;
-                let repl_state = crate::api::repl_routes_v2::ReplV2RouteState { orchestrator };
-
-                let repl_response = crate::api::repl_routes_v2::input_v2(
-                    State(repl_state),
-                    Path(session_id),
-                    Json(repl_req),
-                )
-                .await
-                .map_err(|(status, _)| status)?
-                .0;
-
-                let response = serde_json::to_value(repl_response)
-                    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-                Ok(Json(SessionInputResponse::ReplV2 { response }))
-            }
-            // not(vnext-repl) dead path removed — REPL V2 always enabled
-        }
-    }
+    // No REPL V2 session found — this is a pre-migration session or an error.
+    // Log and return a helpful error rather than silently routing to the legacy pipeline.
+    tracing::warn!(
+        session_id = %session_id,
+        "No REPL V2 session found — session may have been created before pipeline unification"
+    );
+    Err(StatusCode::NOT_FOUND)
 }
 
 /// Try to route input through the REPL V2 orchestrator.
