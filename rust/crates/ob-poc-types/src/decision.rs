@@ -29,6 +29,10 @@ pub enum DecisionKind {
     ClarifyScope,
     /// Ambiguous entity — multiple candidates, none dominant
     ClarifyEntity,
+    /// Workspace selection gate (CBU, KYC, Deal, etc.)
+    ClarifyWorkspace,
+    /// Journey/pack selection gate within a workspace
+    ClarifyJourney,
     /// Cannot safely proceed
     Refuse,
 }

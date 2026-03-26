@@ -3230,6 +3230,8 @@ impl AgentService {
             }
             DecisionKind::ClarifyVerb => format!("Selected verb: {}", choice.label),
             DecisionKind::ClarifyEntity => format!("Selected entity: {}", choice.label),
+            DecisionKind::ClarifyWorkspace => format!("Selected workspace: {}", choice.label),
+            DecisionKind::ClarifyJourney => format!("Selected journey: {}", choice.label),
             DecisionKind::Refuse => format!("Selected: {}", choice.label),
         };
 

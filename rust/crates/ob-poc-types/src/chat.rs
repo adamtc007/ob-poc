@@ -365,6 +365,11 @@ pub struct ChatResponse {
     /// showing plan steps, approval controls, and step-by-step execution.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub runbook_plan: Option<serde_json::Value>,
+
+    /// Session-scoped navigation feedback (workspace stack, verb surface, constellation state).
+    /// Populated on every response when routed through the REPL V2 orchestrator.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub session_feedback: Option<serde_json::Value>,
 }
 
 /// User-facing Sage explanation payload.
