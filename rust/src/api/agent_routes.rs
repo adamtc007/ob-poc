@@ -541,6 +541,21 @@ async fn session_input(
     headers: axum::http::HeaderMap,
     Json(req): Json<SessionInputRequest>,
 ) -> Result<Json<SessionInputResponse>, StatusCode> {
+    // Try routing through REPL V2 orchestrator first (unified pipeline).
+    #[cfg(feature = "vnext-repl")]
+    if let Some(ref orchestrator) = state.repl_v2_orchestrator {
+        if let Some(repl_response) =
+            try_route_through_repl(&req, orchestrator, session_id).await
+        {
+            let chat_response =
+                crate::api::response_adapter::repl_to_chat_response(repl_response, session_id);
+            return Ok(Json(SessionInputResponse::Chat {
+                response: Box::new(chat_response),
+            }));
+        }
+    }
+
+    // Fallback: route through legacy agent pipeline
     match req {
         SessionInputRequest::Utterance { message } => {
             let chat_req = ChatRequest {
@@ -614,6 +629,67 @@ async fn session_input(
                 let _ = input;
                 Err(StatusCode::NOT_IMPLEMENTED)
             }
+        }
+    }
+}
+
+/// Try to route input through the REPL V2 orchestrator.
+///
+/// Returns `Some(ReplResponseV2)` if the REPL session exists and is in a gate state
+/// (ScopeGate, WorkspaceSelection, JourneySelection) or any later REPL state.
+/// Returns `None` if no REPL session exists for this ID (legacy agent session).
+#[cfg(feature = "vnext-repl")]
+async fn try_route_through_repl(
+    req: &SessionInputRequest,
+    orchestrator: &std::sync::Arc<crate::repl::orchestrator_v2::ReplOrchestratorV2>,
+    session_id: Uuid,
+) -> Option<crate::repl::response_v2::ReplResponseV2> {
+    use crate::repl::types_v2::UserInputV2;
+
+    // Check if a REPL V2 session exists for this ID
+    let session_exists = orchestrator.get_session(session_id).await.is_some();
+    if !session_exists {
+        return None; // No REPL session — fall through to legacy agent pipeline
+    }
+
+    let input = match req {
+        SessionInputRequest::Utterance { message } => {
+            UserInputV2::Message {
+                content: message.clone(),
+            }
+        }
+        SessionInputRequest::DecisionReply { reply, .. } => {
+            // Convert decision reply to a REPL message.
+            // The REPL orchestrator handles numeric/name resolution.
+            match reply {
+                ob_poc_types::UserReply::Select { index } => {
+                    UserInputV2::Message {
+                        content: format!("{}", index + 1), // 1-indexed for REPL
+                    }
+                }
+                ob_poc_types::UserReply::TypeExact { text } => {
+                    UserInputV2::Message {
+                        content: text.clone(),
+                    }
+                }
+                ob_poc_types::UserReply::Confirm { .. } => {
+                    UserInputV2::Confirm
+                }
+                _ => return None, // Narrow/More/Reject — fall through to legacy
+            }
+        }
+        _ => return None, // DiscoverySelection / ReplV2 — not handled here
+    };
+
+    match orchestrator.process(session_id, input).await {
+        Ok(response) => Some(response),
+        Err(e) => {
+            tracing::warn!(
+                session_id = %session_id,
+                error = %e,
+                "REPL V2 orchestrator failed, falling through to legacy pipeline"
+            );
+            None
         }
     }
 }
@@ -874,6 +950,14 @@ async fn create_session(
             "Session stored in memory, total sessions: {}",
             sessions.len()
         );
+    }
+
+    // Also create a REPL V2 session with the same ID (for unified pipeline routing).
+    // The REPL session starts in ScopeGate — enforcing client group selection.
+    #[cfg(feature = "vnext-repl")]
+    if let Some(ref orchestrator) = state.repl_v2_orchestrator {
+        orchestrator.create_session_with_id(session_id).await;
+        tracing::info!("REPL V2 session created for unified routing: {session_id}");
     }
 
     // Persist to database asynchronously (simple insert, ~1-5ms)

@@ -362,6 +362,13 @@ impl ReplOrchestratorV2 {
         id
     }
 
+    /// Create a session with a specific ID (for unified pipeline routing).
+    pub async fn create_session_with_id(&self, id: Uuid) {
+        let mut session = ReplSessionV2::new();
+        session.id = id;
+        self.sessions.write().await.insert(id, session);
+    }
+
     /// Get a snapshot of session state (for API responses).
     pub async fn get_session(&self, session_id: Uuid) -> Option<ReplSessionV2> {
         self.sessions.read().await.get(&session_id).cloned()
