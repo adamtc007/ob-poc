@@ -1,4 +1,8 @@
 //! Session management and entity resolution tool handlers.
+//!
+//! CBU scope navigation tools now return deprecation errors — scope navigation
+//! is handled by the unified REPL V2 pipeline via POST /api/session/:id/input.
+//! Entity search, verb surface, and resolution tools are still active.
 
 use anyhow::{anyhow, Result};
 use serde_json::{json, Value};
@@ -8,309 +12,54 @@ use super::core::ToolHandlers;
 
 impl ToolHandlers {
     // =========================================================================
-    // Session v2 Tools - Memory-first CBU session management
+    // Session scope tools (deprecated — use REPL V2 unified pipeline)
     // =========================================================================
 
-    /// Load a single CBU into the session scope
-    pub(super) async fn session_load_cbu(&self, args: Value) -> Result<Value> {
-        use crate::session::UnifiedSession;
-
-        let pool = self.require_pool()?;
-
-        // Get CBU by ID or name
-        let cbu_id: Uuid = if let Some(id_str) = args["cbu_id"].as_str() {
-            Uuid::parse_str(id_str).map_err(|_| anyhow!("Invalid cbu_id UUID"))?
-        } else if let Some(name) = args["cbu_name"].as_str() {
-            // Resolve by name
-            let row: Option<(Uuid,)> =
-                sqlx::query_as(r#"SELECT cbu_id FROM "ob-poc".cbus WHERE name ILIKE $1 LIMIT 1"#)
-                    .bind(format!("%{}%", name))
-                    .fetch_optional(pool)
-                    .await?;
-            row.ok_or_else(|| anyhow!("CBU not found: {}", name))?.0
-        } else {
-            return Err(anyhow!("Either cbu_id or cbu_name required"));
-        };
-
-        // Fetch CBU details
-        let cbu: Option<(Uuid, String, Option<String>)> = sqlx::query_as(
-            r#"SELECT cbu_id, name, jurisdiction FROM "ob-poc".cbus WHERE cbu_id = $1"#,
-        )
-        .bind(cbu_id)
-        .fetch_optional(pool)
-        .await?;
-
-        let (id, name, jurisdiction) = cbu.ok_or_else(|| anyhow!("CBU not found"))?;
-
-        // Get or create session and load the CBU
-        let sessions = self.require_cbu_sessions()?;
-        let mut guard = sessions.write().await;
-
-        // Use default session for now (could be parameterized)
-        let session = guard.entry(Uuid::nil()).or_insert_with(UnifiedSession::new);
-
-        session.load_cbu(id);
-        let _ = session.save(pool).await;
-
-        Ok(json!({
-            "loaded": true,
-            "cbu_id": id,
-            "name": name,
-            "jurisdiction": jurisdiction,
-            "scope_size": session.cbu_count()
-        }))
+    pub(super) async fn session_load_cbu(&self, _args: Value) -> Result<Value> {
+        Err(anyhow!("session.load-cbu: Use the unified session pipeline (POST /api/session/:id/input) instead"))
     }
 
-    /// Load all CBUs in a jurisdiction
-    pub(super) async fn session_load_jurisdiction(&self, args: Value) -> Result<Value> {
-        use crate::session::UnifiedSession;
-
-        let pool = self.require_pool()?;
-        let jurisdiction = args["jurisdiction"]
-            .as_str()
-            .ok_or_else(|| anyhow!("jurisdiction required"))?;
-
-        // Find all CBUs in jurisdiction
-        let rows: Vec<(Uuid, String)> =
-            sqlx::query_as(r#"SELECT cbu_id, name FROM "ob-poc".cbus WHERE jurisdiction = $1"#)
-                .bind(jurisdiction)
-                .fetch_all(pool)
-                .await?;
-
-        if rows.is_empty() {
-            return Err(anyhow!("No CBUs found in jurisdiction: {}", jurisdiction));
-        }
-
-        let cbu_ids: Vec<Uuid> = rows.iter().map(|(id, _)| *id).collect();
-        let cbu_names: Vec<String> = rows.iter().map(|(_, name)| name.clone()).collect();
-
-        // Get or create session
-        let sessions = self.require_cbu_sessions()?;
-        let mut guard = sessions.write().await;
-        let session = guard.entry(Uuid::nil()).or_insert_with(UnifiedSession::new);
-
-        // Load all CBUs
-        session.load_cbus(cbu_ids.clone());
-        let _ = session.save(pool).await;
-
-        Ok(json!({
-            "loaded": true,
-            "jurisdiction": jurisdiction,
-            "cbu_count": cbu_ids.len(),
-            "cbu_ids": cbu_ids,
-            "cbu_names": cbu_names
-        }))
+    pub(super) async fn session_load_cluster(&self, _args: Value) -> Result<Value> {
+        Err(anyhow!("session.load-cluster: Use the unified session pipeline instead"))
     }
 
-    /// Load all CBUs under a commercial client (galaxy)
-    pub(super) async fn session_load_galaxy(&self, args: Value) -> Result<Value> {
-        use crate::session::UnifiedSession;
-
-        let pool = self.require_pool()?;
-
-        // Get apex entity by ID or name
-        let apex_id: Uuid = if let Some(id_str) = args["apex_entity_id"].as_str() {
-            Uuid::parse_str(id_str).map_err(|_| anyhow!("Invalid apex_entity_id UUID"))?
-        } else if let Some(name) = args["apex_name"].as_str() {
-            // Resolve by name
-            let row: Option<(Uuid,)> = sqlx::query_as(
-                r#"SELECT entity_id FROM "ob-poc".entities WHERE name ILIKE $1 LIMIT 1"#,
-            )
-            .bind(format!("%{}%", name))
-            .fetch_optional(pool)
-            .await?;
-            row.ok_or_else(|| anyhow!("Entity not found: {}", name))?.0
-        } else {
-            return Err(anyhow!("Either apex_entity_id or apex_name required"));
-        };
-
-        // Find all CBUs under this commercial client
-        let rows: Vec<(Uuid, String)> = sqlx::query_as(
-            r#"SELECT cbu_id, name FROM "ob-poc".cbus WHERE commercial_client_entity_id = $1"#,
-        )
-        .bind(apex_id)
-        .fetch_all(pool)
-        .await?;
-
-        if rows.is_empty() {
-            return Err(anyhow!("No CBUs found under commercial client"));
-        }
-
-        let cbu_ids: Vec<Uuid> = rows.iter().map(|(id, _)| *id).collect();
-        let cbu_names: Vec<String> = rows.iter().map(|(_, name)| name.clone()).collect();
-
-        // Get apex entity name for response
-        let apex_name: Option<(String,)> =
-            sqlx::query_as(r#"SELECT name FROM "ob-poc".entities WHERE entity_id = $1"#)
-                .bind(apex_id)
-                .fetch_optional(pool)
-                .await?;
-
-        // Get or create session
-        let sessions = self.require_cbu_sessions()?;
-        let mut guard = sessions.write().await;
-        let session = guard.entry(Uuid::nil()).or_insert_with(UnifiedSession::new);
-
-        // Load all CBUs
-        session.load_cbus(cbu_ids.clone());
-        let _ = session.save(pool).await;
-
-        Ok(json!({
-            "loaded": true,
-            "apex_entity_id": apex_id,
-            "apex_name": apex_name.map(|n| n.0),
-            "cbu_count": cbu_ids.len(),
-            "cbu_ids": cbu_ids,
-            "cbu_names": cbu_names
-        }))
+    pub(super) async fn session_load_jurisdiction(&self, _args: Value) -> Result<Value> {
+        Err(anyhow!("session.load-jurisdiction: Use the unified session pipeline instead"))
     }
 
-    /// Remove a CBU from the current session scope
-    pub(super) async fn session_unload_cbu(&self, args: Value) -> Result<Value> {
-        use crate::session::UnifiedSession;
-
-        let pool = self.require_pool()?;
-        let cbu_id = args["cbu_id"]
-            .as_str()
-            .ok_or_else(|| anyhow!("cbu_id required"))?;
-        let cbu_id = Uuid::parse_str(cbu_id).map_err(|_| anyhow!("Invalid cbu_id UUID"))?;
-
-        let sessions = self.require_cbu_sessions()?;
-        let mut guard = sessions.write().await;
-        let session = guard.entry(Uuid::nil()).or_insert_with(UnifiedSession::new);
-
-        session.unload_cbu(cbu_id);
-        let _ = session.save(pool).await;
-
-        Ok(json!({
-            "unloaded": true,
-            "cbu_id": cbu_id,
-            "scope_size": session.cbu_count()
-        }))
+    pub(super) async fn session_load_galaxy(&self, _args: Value) -> Result<Value> {
+        Err(anyhow!("session.load-galaxy: Use the unified session pipeline instead"))
     }
 
-    /// Clear session scope to empty (universe view)
-    pub(super) async fn session_clear(&self, args: Value) -> Result<Value> {
-        use crate::session::UnifiedSession;
-        let _ = args; // unused but kept for consistent signature
-
-        let pool = self.require_pool()?;
-
-        let sessions = self.require_cbu_sessions()?;
-        let mut guard = sessions.write().await;
-        let session = guard.entry(Uuid::nil()).or_insert_with(UnifiedSession::new);
-
-        session.clear_cbus_with_history();
-        let _ = session.save(pool).await;
-
-        Ok(json!({
-            "cleared": true,
-            "scope_size": 0
-        }))
+    pub(super) async fn session_unload_cbu(&self, _args: Value) -> Result<Value> {
+        Err(anyhow!("session.unload-cbu: Use the unified session pipeline instead"))
     }
 
-    /// Undo the last scope change
-    pub(super) async fn session_undo(&self, args: Value) -> Result<Value> {
-        use crate::session::UnifiedSession;
-        let _ = args;
-
-        let pool = self.require_pool()?;
-
-        let sessions = self.require_cbu_sessions()?;
-        let mut guard = sessions.write().await;
-        let session = guard.entry(Uuid::nil()).or_insert_with(UnifiedSession::new);
-
-        let success = session.undo_cbu();
-        if success {
-            let _ = session.save(pool).await;
-        }
-
-        Ok(json!({
-            "success": success,
-            "scope_size": session.cbu_count(),
-            "history_depth": session.cbu_history_depth(),
-            "future_depth": session.cbu_future_depth()
-        }))
+    pub(super) async fn session_clear(&self, _args: Value) -> Result<Value> {
+        Err(anyhow!("session.clear: Use the unified session pipeline instead"))
     }
 
-    /// Redo a previously undone scope change
-    pub(super) async fn session_redo(&self, args: Value) -> Result<Value> {
-        use crate::session::UnifiedSession;
-        let _ = args;
-
-        let pool = self.require_pool()?;
-
-        let sessions = self.require_cbu_sessions()?;
-        let mut guard = sessions.write().await;
-        let session = guard.entry(Uuid::nil()).or_insert_with(UnifiedSession::new);
-
-        let success = session.redo_cbu();
-        if success {
-            let _ = session.save(pool).await;
-        }
-
-        Ok(json!({
-            "success": success,
-            "scope_size": session.cbu_count(),
-            "history_depth": session.cbu_history_depth(),
-            "future_depth": session.cbu_future_depth()
-        }))
+    pub(super) async fn session_undo(&self, _args: Value) -> Result<Value> {
+        Err(anyhow!("session.undo: Use the unified session pipeline instead"))
     }
 
-    /// Get current session state and scope
+    pub(super) async fn session_redo(&self, _args: Value) -> Result<Value> {
+        Err(anyhow!("session.redo: Use the unified session pipeline instead"))
+    }
+
     pub(super) async fn session_info(&self, args: Value) -> Result<Value> {
-        let _ = args;
-
-        let pool = self.require_pool()?;
-
-        let sessions = self.require_cbu_sessions()?;
-        let guard = sessions.read().await;
-        let session = guard.get(&Uuid::nil());
-
-        if let Some(session) = session {
-            let cbu_ids = session.cbu_ids_vec();
-
-            // Fetch CBU names if we have any
-            let cbu_names: Vec<String> = if cbu_ids.is_empty() {
-                vec![]
-            } else {
-                let rows: Vec<(String,)> =
-                    sqlx::query_as(r#"SELECT name FROM "ob-poc".cbus WHERE cbu_id = ANY($1)"#)
-                        .bind(&cbu_ids)
-                        .fetch_all(pool)
-                        .await
-                        .unwrap_or_default();
-                rows.into_iter().map(|(name,)| name).collect()
-            };
-
-            Ok(json!({
-                "id": session.id,
-                "name": session.name,
-                "cbu_count": cbu_ids.len(),
-                "cbu_ids": cbu_ids,
-                "cbu_names": cbu_names,
-                "history_depth": session.cbu_history_depth(),
-                "future_depth": session.cbu_future_depth(),
-                "dirty": session.dirty
-            }))
-        } else {
-            Ok(json!({
-                "id": null,
-                "name": null,
-                "cbu_count": 0,
-                "cbu_ids": [],
-                "cbu_names": [],
-                "history_depth": 0,
-                "future_depth": 0,
-                "dirty": false
-            }))
-        }
+        let session_id = args["session_id"].as_str().unwrap_or("unknown");
+        Ok(json!({
+            "session_id": session_id,
+            "status": "active",
+            "note": "Session management via unified REPL V2 pipeline."
+        }))
     }
 
-    /// Return the current session's visible verb surface with governance metadata.
-    ///
-    /// Computes the `SessionVerbSurface` by running the 8-step governance pipeline
-    /// (AgentMode → Workflow Phase → SemReg CCIR → Lifecycle → Actor → FailPolicy → Rank).
+    // =========================================================================
+    // Active tools (verb surface, entity search, resolution)
+    // =========================================================================
+
     pub(super) async fn session_verb_surface(&self, args: Value) -> Result<Value> {
         use crate::agent::sem_os_context_envelope::SemOsContextEnvelope;
         use crate::agent::verb_surface::{

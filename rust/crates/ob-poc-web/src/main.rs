@@ -25,7 +25,7 @@ use crate::state::AppState;
 // Import API routers from main ob-poc crate
 use ob_poc::api::{
     control_routes, create_agent_router_with_semantic_and_repl, create_attribute_router,
-    create_cbu_session_router_with_pool, create_client_router, create_constellation_router,
+    create_client_router, create_constellation_router,
     create_deal_router, create_dsl_viewer_router, create_entity_router, create_graph_router,
     create_resolution_router, create_scoped_entity_router, create_session_graph_router,
     create_session_store, create_stewardship_router, create_taxonomy_router,
@@ -995,11 +995,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .merge(create_scoped_entity_router(sessions.clone()))
         // Service resource pipeline (intents, discovery, readiness)
         .merge(service_resource_router(pool.clone()))
-        // CBU session management (load/unload CBUs, undo/redo)
-        .nest(
-            "/api/cbu-session",
-            create_cbu_session_router_with_pool(pool.clone()),
-        )
+        // CBU session management superseded by REPL V2 unified pipeline
         // Stewardship routes (focus, show loop, SSE, manifests)
         .merge(create_stewardship_router(pool.clone()));
 

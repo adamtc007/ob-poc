@@ -17,7 +17,6 @@ use uuid::Uuid;
 
 use crate::agent::learning::embedder::SharedEmbedder;
 use crate::agent::learning::warmup::SharedLearnedData;
-use crate::api::cbu_session_routes::CbuSessionStore;
 use crate::api::session::SessionStore;
 use crate::database::generation_log_repository::{
     CompileResult, GenerationAttempt, GenerationLogRepository, LintResult, ParseResult,
@@ -191,8 +190,7 @@ pub struct ToolHandlers {
     pub(super) gateway_client: Arc<Mutex<Option<EntityGatewayClient<Channel>>>>,
     /// UI session store - shared with web server for template batch operations
     pub(super) sessions: Option<SessionStore>,
-    /// CBU session store for load/unload operations
-    pub(super) cbu_sessions: Option<CbuSessionStore>,
+    // CBU session store removed — scope navigation superseded by REPL V2 pipeline
     /// Hybrid verb searcher (lazy-initialized)
     pub(super) verb_searcher: Arc<Mutex<Option<HybridVerbSearcher>>>,
     /// Learned data from agent learning system (shared reference)
@@ -231,7 +229,6 @@ impl ToolHandlers {
             pool,
             gateway_client: Arc::new(Mutex::new(None)),
             sessions: None,
-            cbu_sessions: None,
             verb_searcher: Arc::new(Mutex::new(None)),
             learned_data: None,
             embedder,
@@ -305,12 +302,7 @@ impl ToolHandlers {
         })
     }
 
-    /// Get the CBU session store, or error if not configured
-    pub(super) fn require_cbu_sessions(&self) -> Result<&CbuSessionStore> {
-        self.cbu_sessions.as_ref().ok_or_else(|| {
-            anyhow!("CBU session store not configured. CBU operations require integrated mode.")
-        })
-    }
+    // require_cbu_sessions removed — scope navigation via REPL V2 pipeline
 
     /// Get the database pool
     pub(super) fn require_pool(&self) -> Result<&PgPool> {
