@@ -547,8 +547,24 @@ async fn session_input(
         if let Some(repl_response) =
             try_route_through_repl(&req, orchestrator, session_id).await
         {
-            let chat_response =
+            let mut chat_response =
                 crate::api::response_adapter::repl_to_chat_response(repl_response, session_id);
+
+            // Enrich with onboarding state if past scope gate
+            #[cfg(feature = "database")]
+            if chat_response.decision.is_none() {
+                // Only enrich when not in a gate state (scope/workspace/journey)
+                if let Some(osv) = crate::api::agent_enrichment::compute_onboarding_state(
+                    &state.pool,
+                    session_id,
+                    None,
+                )
+                .await
+                {
+                    chat_response.onboarding_state = Some(osv);
+                }
+            }
+
             return Ok(Json(SessionInputResponse::Chat {
                 response: Box::new(chat_response),
             }));

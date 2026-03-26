@@ -102,6 +102,8 @@ pub mod stewardship_routes;
 pub mod repl_routes_v2;
 #[cfg(feature = "vnext-repl")]
 pub mod response_adapter;
+#[cfg(feature = "vnext-repl")]
+pub mod agent_enrichment;
 
 #[cfg(feature = "server")]
 pub use attribute_routes::create_attribute_router;
