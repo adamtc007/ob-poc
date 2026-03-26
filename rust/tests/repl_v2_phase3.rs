@@ -34,7 +34,7 @@ use ob_poc::repl::orchestrator_v2::{ReplOrchestratorV2, StubExecutor};
 use ob_poc::repl::proposal_engine::{ProposalEngine, ProposalSource, StepProposal};
 use ob_poc::repl::response_v2::ReplResponseKindV2;
 use ob_poc::repl::types::{IntentMatchResult, MatchContext, MatchOutcome};
-use ob_poc::repl::types_v2::{ReplStateV2, UserInputV2};
+use ob_poc::repl::types_v2::{ReplStateV2, UserInputV2, WorkspaceKind};
 use ob_poc::repl::verb_config_index::VerbConfigIndex;
 
 // ===========================================================================
@@ -247,12 +247,22 @@ fn build_orchestrator_without_engine(matcher: MockIntentMatcher) -> ReplOrchestr
 async fn setup_in_pack(orch: &ReplOrchestratorV2) -> Uuid {
     let session_id = orch.create_session().await;
 
-    // Set scope
+    // Set scope → WorkspaceSelection
     orch.process(
         session_id,
         UserInputV2::SelectScope {
             group_id: Uuid::new_v4(),
             group_name: "Allianz".to_string(),
+        },
+    )
+    .await
+    .unwrap();
+
+    // Select workspace → JourneySelection
+    orch.process(
+        session_id,
+        UserInputV2::SelectWorkspace {
+            workspace: WorkspaceKind::OnBoarding,
         },
     )
     .await

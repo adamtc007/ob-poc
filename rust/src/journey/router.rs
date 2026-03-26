@@ -319,7 +319,10 @@ impl PackRouter {
         workspace: Option<&WorkspaceKind>,
     ) -> bool {
         match workspace {
-            Some(workspace) => manifest.workspaces.contains(workspace),
+            // Empty workspaces list = allowed in all workspaces
+            Some(workspace) => {
+                manifest.workspaces.is_empty() || manifest.workspaces.contains(workspace)
+            }
             None => true,
         }
     }
