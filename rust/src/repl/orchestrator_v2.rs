@@ -680,6 +680,14 @@ impl ReplOrchestratorV2 {
         };
         update_repl_trace_lineage(session, lineage_trace_id, &response);
 
+        // Release the write lock before async persistence
+        drop(sessions);
+
+        // Persist session state + trace entries to database (audit trail).
+        if let Err(e) = self.persist_session_checkpoint(session_id).await {
+            tracing::warn!(session_id = %session_id, error = %e, "Session checkpoint after process() failed");
+        }
+
         Ok(response)
     }
 
