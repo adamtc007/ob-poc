@@ -944,5 +944,6 @@ fn minimal_pack() -> PackManifest {
         definition_of_done: vec![],
         progress_signals: vec![],
         handoff_target: None,
+        workspaces: vec![],
     }
 }

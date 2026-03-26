@@ -96,7 +96,12 @@ pub fn compile_runbook_plan(
         }
     }
 
-    Ok(RunbookPlan::new(session_id, steps, bindings, source_research))
+    Ok(RunbookPlan::new(
+        session_id,
+        steps,
+        bindings,
+        source_research,
+    ))
 }
 
 /// Find a forward reference for a subject kind from prior steps.
@@ -122,7 +127,10 @@ fn compute_dependencies(current_seq: usize, prior_steps: &[RunbookPlanStep]) -> 
     }
     // A step depends on the immediately preceding step if it's in a different workspace
     if let Some(prev) = prior_steps.last() {
-        if prior_steps.first().is_some_and(|first| first.workspace != prev.workspace) {
+        if prior_steps
+            .first()
+            .is_some_and(|first| first.workspace != prev.workspace)
+        {
             return vec![prev.seq];
         }
         // Within same workspace, depend on prev for ordering
@@ -145,10 +153,7 @@ pub fn inputs_from_frames(
             constellation_map: f.constellation_map.clone(),
             subject_kind: f.subject_kind.clone().unwrap_or(SubjectKind::Cbu),
             subject_id: f.subject_id,
-            advancing_verbs: verb_surfaces
-                .get(&f.workspace)
-                .cloned()
-                .unwrap_or_default(),
+            advancing_verbs: verb_surfaces.get(&f.workspace).cloned().unwrap_or_default(),
             verb_outputs: verb_outputs.clone(),
         })
         .collect()
@@ -271,10 +276,7 @@ pub fn input_from_hydrated_constellation(
 mod tests {
     use super::*;
 
-    fn make_input(
-        workspace: WorkspaceKind,
-        verbs: Vec<(&str, &str)>,
-    ) -> WorkspaceInput {
+    fn make_input(workspace: WorkspaceKind, verbs: Vec<(&str, &str)>) -> WorkspaceInput {
         WorkspaceInput {
             workspace,
             constellation_map: "test-map".into(),
@@ -309,10 +311,7 @@ mod tests {
     fn dag_ordering_has_dependencies() {
         let inputs = vec![
             make_input(WorkspaceKind::Cbu, vec![("cbu.create", "Create CBU")]),
-            make_input(
-                WorkspaceKind::Kyc,
-                vec![("kyc.open-case", "Open KYC Case")],
-            ),
+            make_input(WorkspaceKind::Kyc, vec![("kyc.open-case", "Open KYC Case")]),
         ];
         let plan = compile_runbook_plan(Uuid::nil(), &inputs, vec![]).unwrap();
         // Step 1 depends on step 0

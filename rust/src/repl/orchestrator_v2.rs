@@ -627,9 +627,16 @@ impl ReplOrchestratorV2 {
 
         let trace_scaffold = self.persist_trace_scaffold(session, &input).await;
 
-        // Record user input as a message.
+        // Record user input as a message and trace entry.
         if let UserInputV2::Message { ref content } = input {
             session.push_message(MessageRole::User, content.clone());
+            let hash = {
+                use sha2::{Digest, Sha256};
+                format!("sha256:{:x}", Sha256::digest(content.as_bytes()))
+            };
+            session.append_trace(super::session_trace::TraceOp::Input {
+                utterance_hash: hash,
+            });
         }
 
         // Dispatch based on current state.
@@ -3939,9 +3946,21 @@ impl ReplOrchestratorV2 {
 
                     match gate_outcome {
                         StepOutcome::Completed { result } => {
-                            let entry = &mut session.runbook.entries[idx];
-                            entry.status = EntryStatus::Completed;
-                            entry.result = Some(result.clone());
+                            let result_json = serde_json::to_value(&result).ok();
+                            {
+                                let entry = &mut session.runbook.entries[idx];
+                                entry.status = EntryStatus::Completed;
+                                entry.result = Some(result.clone());
+                            }
+                            session.increment_tos_writes();
+                            session.append_trace_enriched(
+                                super::session_trace::TraceOp::VerbExecuted {
+                                    verb_fqn: entry_dsl.clone(),
+                                    step_id: entry_id,
+                                },
+                                Some(entry_dsl.clone()),
+                                result_json,
+                            );
                             results.push(StepResult {
                                 entry_id,
                                 sequence: entry_sequence,
@@ -4023,9 +4042,21 @@ impl ReplOrchestratorV2 {
 
                     match gate_outcome {
                         StepOutcome::Completed { result } => {
-                            let entry = &mut session.runbook.entries[idx];
-                            entry.status = EntryStatus::Completed;
-                            entry.result = Some(result.clone());
+                            let result_json = serde_json::to_value(&result).ok();
+                            {
+                                let entry = &mut session.runbook.entries[idx];
+                                entry.status = EntryStatus::Completed;
+                                entry.result = Some(result.clone());
+                            }
+                            session.increment_tos_writes();
+                            session.append_trace_enriched(
+                                super::session_trace::TraceOp::VerbExecuted {
+                                    verb_fqn: entry_dsl.clone(),
+                                    step_id: entry_id,
+                                },
+                                Some(entry_dsl.clone()),
+                                result_json,
+                            );
                             results.push(StepResult {
                                 entry_id,
                                 sequence: entry_sequence,

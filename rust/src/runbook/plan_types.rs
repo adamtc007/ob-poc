@@ -146,9 +146,16 @@ pub enum RunbookPlanStatus {
     Compiled,
     AwaitingApproval,
     Approved,
-    Executing { cursor: usize },
-    Completed { completed_at: DateTime<Utc> },
-    Failed { error: String, failed_step: Option<usize> },
+    Executing {
+        cursor: usize,
+    },
+    Completed {
+        completed_at: DateTime<Utc>,
+    },
+    Failed {
+        error: String,
+        failed_step: Option<usize>,
+    },
     Cancelled,
 }
 

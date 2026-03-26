@@ -1158,9 +1158,10 @@ async fn execute_runbook_plan(
         }
 
         let cursor = session.runbook_plan_cursor.unwrap_or(0);
-        let plan = session.runbook_plan.as_ref().unwrap();
 
-        if cursor >= plan.steps.len() {
+        // Check step count and resolve forward refs in limited scopes.
+        let step_count = session.runbook_plan.as_ref().unwrap().steps.len();
+        if cursor >= step_count {
             // All steps done
             crate::runbook::plan_executor::update_plan_status(
                 session.runbook_plan.as_mut().unwrap(),
@@ -1172,9 +1173,11 @@ async fn execute_runbook_plan(
             return Ok(Json(serde_json::to_value(&narration).unwrap_or_default()));
         }
 
-        // Resolve forward references for this step
-        let resolved_subject = crate::runbook::plan_executor::resolve_step_bindings(plan, cursor)
-            .map_err(anyhow_json_error)?;
+        let resolved_subject = {
+            let plan = session.runbook_plan.as_ref().unwrap();
+            crate::runbook::plan_executor::resolve_step_bindings(plan, cursor)
+                .map_err(anyhow_json_error)?
+        };
 
         if resolved_subject.is_none() {
             // Forward ref not yet resolved — dependency not fulfilled
@@ -1198,7 +1201,7 @@ async fn execute_runbook_plan(
         }
 
         // Extract step data for async execution outside the lock
-        let step = &plan.steps[cursor];
+        let step = &session.runbook_plan.as_ref().unwrap().steps[cursor];
         let step_verb = step.verb.verb_fqn.clone();
         let step_sentence = step.sentence.clone();
         let step_args = step.args.clone();

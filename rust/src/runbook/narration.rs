@@ -59,10 +59,7 @@ pub struct PlanNarration {
 // ---------------------------------------------------------------------------
 
 /// Generate narration for a single step result.
-pub fn narrate_step(
-    plan: &RunbookPlan,
-    result: &StepResult,
-) -> StepNarration {
+pub fn narrate_step(plan: &RunbookPlan, result: &StepResult) -> StepNarration {
     let step = plan.steps.get(result.step_seq);
     let sentence = step
         .map(|s| s.sentence.clone())
@@ -139,10 +136,7 @@ pub fn narrate_plan(plan: &RunbookPlan, results: &[StepResult]) -> PlanNarration
         .count();
 
     let aggregate_summary = if failed == 0 && skipped == 0 {
-        format!(
-            "All {} steps completed successfully",
-            plan.steps.len()
-        )
+        format!("All {} steps completed successfully", plan.steps.len())
     } else {
         format!(
             "{} of {} steps completed, {} failed, {} skipped",
@@ -171,8 +165,8 @@ pub fn narrate_plan(plan: &RunbookPlan, results: &[StepResult]) -> PlanNarration
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::runbook::plan_types::*;
     use crate::repl::types_v2::{SubjectKind, VerbRef};
+    use crate::runbook::plan_types::*;
     use chrono::Utc;
     use std::collections::BTreeMap;
     use uuid::Uuid;
@@ -236,7 +230,10 @@ mod tests {
             executed_at: Utc::now(),
         };
         let narration = narrate_step(&plan, &result);
-        assert!(matches!(narration.outcome, NarrationOutcome::Success { .. }));
+        assert!(matches!(
+            narration.outcome,
+            NarrationOutcome::Success { .. }
+        ));
         assert_eq!(narration.workspace, WorkspaceKind::Cbu);
     }
 

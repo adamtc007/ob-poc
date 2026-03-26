@@ -21,8 +21,9 @@ impl SessionTraceRepository {
             sqlx::query(
                 r#"
                 INSERT INTO "ob-poc".session_traces
-                    (session_id, sequence, agent_mode, op, stack_snapshot, hydrated_snap, created_at)
-                VALUES ($1, $2, $3, $4, $5, $6, $7)
+                    (session_id, sequence, agent_mode, op, stack_snapshot, hydrated_snap, created_at,
+                     verb_resolved, execution_result)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
                 ON CONFLICT (session_id, sequence) DO NOTHING
                 "#,
             )
@@ -36,6 +37,8 @@ impl SessionTraceRepository {
             .bind(&stack_json)
             .bind(&entry.snapshot)
             .bind(entry.timestamp)
+            .bind(&entry.verb_resolved)
+            .bind(&entry.execution_result)
             .execute(pool)
             .await?;
         }
@@ -47,7 +50,8 @@ impl SessionTraceRepository {
     pub async fn load_trace(pool: &sqlx::PgPool, session_id: Uuid) -> Result<Vec<TraceEntry>> {
         let rows = sqlx::query_as::<_, TraceRow>(
             r#"
-            SELECT session_id, sequence, agent_mode, op, stack_snapshot, hydrated_snap, created_at
+            SELECT session_id, sequence, agent_mode, op, stack_snapshot, hydrated_snap, created_at,
+                   verb_resolved, execution_result
             FROM "ob-poc".session_traces
             WHERE session_id = $1
             ORDER BY sequence ASC
@@ -69,7 +73,8 @@ impl SessionTraceRepository {
     ) -> Result<Option<TraceEntry>> {
         let row = sqlx::query_as::<_, TraceRow>(
             r#"
-            SELECT session_id, sequence, agent_mode, op, stack_snapshot, hydrated_snap, created_at
+            SELECT session_id, sequence, agent_mode, op, stack_snapshot, hydrated_snap, created_at,
+                   verb_resolved, execution_result
             FROM "ob-poc".session_traces
             WHERE session_id = $1 AND sequence = $2
             "#,
@@ -93,6 +98,8 @@ struct TraceRow {
     stack_snapshot: Option<serde_json::Value>,
     hydrated_snap: Option<serde_json::Value>,
     created_at: chrono::DateTime<chrono::Utc>,
+    verb_resolved: Option<String>,
+    execution_result: Option<serde_json::Value>,
 }
 
 #[cfg(feature = "database")]
@@ -122,12 +129,9 @@ impl TraceRow {
             op,
             stack_snapshot,
             snapshot: self.hydrated_snap,
-            // Enrichment fields — not stored in separate DB columns,
-            // they round-trip through the `op` JSONB or are populated
-            // at query time from the hydrated_snap.
-            session_feedback: None,
-            verb_resolved: None,
-            execution_result: None,
+            session_feedback: None, // Not persisted — reconstructible from session state
+            verb_resolved: self.verb_resolved,
+            execution_result: self.execution_result,
         })
     }
 }

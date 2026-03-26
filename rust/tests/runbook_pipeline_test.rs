@@ -483,6 +483,7 @@ async fn pack_completion_widening() {
         definition_of_done: vec![],
         progress_signals: vec![],
         handoff_target: None,
+        workspaces: vec![],
     };
     manager.register_pack(manifest);
     manager.activate_pack(pack_id).unwrap();

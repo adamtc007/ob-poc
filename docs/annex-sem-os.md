@@ -493,6 +493,31 @@ pub fn enrich_entity_types(bodies: &mut [EntityTypeDefBody], meta: &DomainMetada
 
 Entry point: `rust/crates/sem_os_obpoc_adapter/src/lib.rs` — `build_seed_bundle_with_metadata()`
 
+### Verb Output Declarations
+
+**File:** `rust/crates/sem_os_core/src/verb_contract.rs`
+
+Entity-creating verbs declare their outputs via `VerbOutput`. These declarations enable forward-reference binding in multi-workspace runbook plans (R5).
+
+```rust
+pub struct VerbOutput {
+    pub field_name: String,           // e.g. "created_cbu_id"
+    pub output_type: String,          // e.g. "uuid", "record"
+    pub entity_kind: Option<String>,  // e.g. "cbu", "entity"
+    pub description: Option<String>,
+}
+```
+
+Outputs are declared in verb YAML under `outputs:` and compiled into `VerbContractBody.outputs`. The plan compiler (`rust/src/runbook/plan_compiler.rs`) uses them to detect forward references between steps.
+
+### Session Trace Enrichment
+
+**Migration 128** adds `verb_resolved TEXT` and `execution_result JSONB` columns to `session_traces`, enabling trace entries to survive DB round-trips with full execution context. The trace repository (`rust/src/repl/trace_repository.rs`) persists and restores these fields.
+
+Trace entries are now generated from the orchestrator execution path (not just structural stack ops):
+- `TraceOp::Input` — generated at `process()` entry for every user utterance
+- `TraceOp::VerbExecuted` — generated after both Durable and Sync completion in `execute_runbook_from()`
+
 ### Domain Metadata
 
 **File:** `rust/config/sem_os_seeds/domain_metadata.yaml`

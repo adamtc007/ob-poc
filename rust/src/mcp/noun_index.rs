@@ -1458,8 +1458,10 @@ nouns:
         let idx = test_noun_index();
         let nouns = idx.extract("who controls this entity");
         if let Some(ctrl_match) = nouns.iter().find(|m| m.noun.key == "control") {
-            let resolution =
-                NounIndex::resolve_compound("who controls this entity", std::slice::from_ref(ctrl_match));
+            let resolution = NounIndex::resolve_compound(
+                "who controls this entity",
+                std::slice::from_ref(ctrl_match),
+            );
             assert!(resolution.is_some());
             assert_eq!(
                 resolution.unwrap().candidates,

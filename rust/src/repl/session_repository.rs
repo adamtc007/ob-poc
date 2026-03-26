@@ -211,7 +211,9 @@ impl SessionRepositoryV2 {
                     pending_arg_audit: None,
                     pending_slot_provenance: None,
                     last_proposal_set: None,
-                    decision_log: super::decision_log::SessionDecisionLog::new(r.session_id),
+                    decision_log: super::decision_log::SessionDecisionLog::new(
+                        r.try_get("session_id")?,
+                    ),
                     last_trace_id: None,
                     pending_trace_id: None,
                     pending_sem_os_envelope: None,

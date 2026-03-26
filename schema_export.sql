@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 4FCbK67w5koUWaOINteJqUGXSlSY9vOO4ZKxAicJNrMIWWKCY4wRn1g8OTbdHdO
+\restrict p1AeskK6tstrOVqHlKQQ3taiz0z2G43VX14tNqMiMkzMA5MnPK9Swi8AucGbtF5
 
 -- Dumped from database version 18.1 (Homebrew)
 -- Dumped by pg_dump version 18.1 (Homebrew)
@@ -6862,18 +6862,18 @@ CREATE TABLE "ob-poc".attribute_registry (
     updated_at timestamp with time zone DEFAULT (now() AT TIME ZONE 'utc'::text),
     uuid uuid NOT NULL,
     applicability jsonb DEFAULT '{}'::jsonb,
-    embedding public.vector(1536),
-    embedding_model character varying(100),
-    embedding_updated_at timestamp with time zone,
     domain character varying(100),
     is_required boolean DEFAULT false,
     default_value text,
     group_id character varying(100),
-    reconciliation_rules jsonb DEFAULT '{}'::jsonb,
-    acceptable_variation_threshold numeric(3,2),
-    requires_authoritative_source boolean DEFAULT false,
+    sem_reg_snapshot_id uuid,
+    is_derived boolean DEFAULT false NOT NULL,
+    derivation_spec_fqn text,
+    evidence_grade text DEFAULT 'none'::text NOT NULL,
     CONSTRAINT check_category CHECK ((category = ANY (ARRAY['identity'::text, 'financial'::text, 'compliance'::text, 'document'::text, 'risk'::text, 'contact'::text, 'address'::text, 'tax'::text, 'employment'::text, 'product'::text, 'entity'::text, 'ubo'::text, 'isda'::text, 'resource'::text, 'cbu'::text, 'trust'::text, 'fund'::text, 'partnership'::text]))),
-    CONSTRAINT check_value_type CHECK ((value_type = ANY (ARRAY['string'::text, 'integer'::text, 'number'::text, 'boolean'::text, 'date'::text, 'datetime'::text, 'email'::text, 'phone'::text, 'address'::text, 'currency'::text, 'percentage'::text, 'tax_id'::text, 'json'::text])))
+    CONSTRAINT check_value_type CHECK ((value_type = ANY (ARRAY['string'::text, 'integer'::text, 'number'::text, 'decimal'::text, 'boolean'::text, 'date'::text, 'datetime'::text, 'timestamp'::text, 'uuid'::text, 'email'::text, 'phone'::text, 'address'::text, 'currency'::text, 'percentage'::text, 'tax_id'::text, 'json'::text, 'enum'::text]))),
+    CONSTRAINT chk_derived_has_spec CHECK ((((NOT is_derived) AND (derivation_spec_fqn IS NULL)) OR (is_derived AND (derivation_spec_fqn IS NOT NULL)))),
+    CONSTRAINT chk_evidence_grade CHECK ((evidence_grade = ANY (ARRAY['none'::text, 'prohibited'::text, 'allowed_with_constraints'::text, 'regulatory_evidence'::text])))
 );
 
 
@@ -6903,27 +6903,6 @@ COMMENT ON COLUMN "ob-poc".attribute_registry.validation_rules IS 'JSON object c
 --
 
 COMMENT ON COLUMN "ob-poc".attribute_registry.applicability IS 'CSG applicability rules: entity_types[], required_for[], source_documents[], depends_on[]';
-
-
---
--- Name: COLUMN attribute_registry.reconciliation_rules; Type: COMMENT; Schema: ob-poc; Owner: -
---
-
-COMMENT ON COLUMN "ob-poc".attribute_registry.reconciliation_rules IS 'Rules for comparing observations: {"allow_spelling_variation": true, "date_tolerance_days": 0}';
-
-
---
--- Name: COLUMN attribute_registry.acceptable_variation_threshold; Type: COMMENT; Schema: ob-poc; Owner: -
---
-
-COMMENT ON COLUMN "ob-poc".attribute_registry.acceptable_variation_threshold IS 'Similarity threshold (0-1) for acceptable string variations';
-
-
---
--- Name: COLUMN attribute_registry.requires_authoritative_source; Type: COMMENT; Schema: ob-poc; Owner: -
---
-
-COMMENT ON COLUMN "ob-poc".attribute_registry.requires_authoritative_source IS 'If true, at least one observation must be from an authoritative source';
 
 
 --
@@ -14699,7 +14678,8 @@ CREATE TABLE "ob-poc".repl_sessions_v2 (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     last_active_at timestamp with time zone DEFAULT now() NOT NULL,
     park_expires_at timestamp with time zone,
-    version bigint DEFAULT 0 NOT NULL
+    version bigint DEFAULT 0 NOT NULL,
+    extended_state jsonb DEFAULT '{}'::jsonb NOT NULL
 );
 
 
@@ -17221,6 +17201,128 @@ CREATE VIEW "ob-poc".v_attribute_current AS
 --
 
 COMMENT ON VIEW "ob-poc".v_attribute_current IS 'Current best value for each attribute - prioritizes authoritative sources, then confidence, then recency';
+
+
+--
+-- Name: v_attribute_lineage_summary; Type: VIEW; Schema: ob-poc; Owner: -
+--
+
+CREATE VIEW "ob-poc".v_attribute_lineage_summary AS
+ SELECT ar.id AS attribute_id,
+    ar.display_name,
+    ar.category,
+    count(DISTINCT
+        CASE
+            WHEN ((dal.direction)::text = ANY ((ARRAY['SOURCE'::character varying, 'BOTH'::character varying])::text[])) THEN dal.document_type_id
+            ELSE NULL::uuid
+        END) AS source_count,
+    count(DISTINCT
+        CASE
+            WHEN ((dal.direction)::text = ANY ((ARRAY['SINK'::character varying, 'BOTH'::character varying])::text[])) THEN dal.document_type_id
+            ELSE NULL::uuid
+        END) AS sink_count,
+    count(DISTINCT rar.resource_id) AS resource_count,
+    bool_or(COALESCE(dal.is_authoritative, false)) AS has_authoritative_source
+   FROM (("ob-poc".attribute_registry ar
+     LEFT JOIN "ob-poc".document_attribute_links dal ON ((dal.attribute_id = ar.uuid)))
+     LEFT JOIN "ob-poc".resource_attribute_requirements rar ON ((rar.attribute_id = ar.uuid)))
+  GROUP BY ar.id, ar.display_name, ar.category;
+
+
+--
+-- Name: v_attribute_reconciliation_summary; Type: VIEW; Schema: ob-poc; Owner: -
+--
+
+CREATE VIEW "ob-poc".v_attribute_reconciliation_summary AS
+ SELECT count(*) AS total_attributes,
+    count(*) FILTER (WHERE (sem_reg_snapshot_id IS NOT NULL)) AS reconciled,
+    count(*) FILTER (WHERE ((sem_reg_snapshot_id IS NULL) AND ((metadata #>> '{sem_os,reconciliation_status}'::text[]) = 'out_of_scope'::text))) AS out_of_scope,
+    count(*) FILTER (WHERE ((sem_reg_snapshot_id IS NULL) AND (COALESCE((metadata #>> '{sem_os,reconciliation_status}'::text[]), ''::text) <> 'out_of_scope'::text))) AS pending_manual,
+    count(*) FILTER (WHERE is_derived) AS derived,
+    count(*) FILTER (WHERE (NOT is_derived)) AS primary_attributes,
+    count(*) FILTER (WHERE (evidence_grade <> 'none'::text)) AS evidence_graded,
+    round(((100.0 * (count(*) FILTER (WHERE (sem_reg_snapshot_id IS NOT NULL)))::numeric) / (NULLIF((count(*) - count(*) FILTER (WHERE ((metadata #>> '{sem_os,reconciliation_status}'::text[]) = 'out_of_scope'::text))), 0))::numeric), 1) AS pct_reconciled
+   FROM "ob-poc".attribute_registry;
+
+
+--
+-- Name: VIEW v_attribute_reconciliation_summary; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON VIEW "ob-poc".v_attribute_reconciliation_summary IS 'Dashboard: attribute reconciliation progress. pct_reconciled excludes out_of_scope from denominator.';
+
+
+--
+-- Name: v_attribute_registry_reconciled; Type: VIEW; Schema: ob-poc; Owner: -
+--
+
+CREATE VIEW "ob-poc".v_attribute_registry_reconciled AS
+ WITH active_attr_snapshots AS (
+         SELECT DISTINCT ON ((snapshots.definition ->> 'fqn'::text)) (snapshots.definition ->> 'fqn'::text) AS fqn,
+            snapshots.snapshot_id,
+            snapshots.version_major,
+            snapshots.version_minor,
+            snapshots.status,
+            snapshots.governance_tier,
+            snapshots.definition
+           FROM sem_reg.snapshots
+          WHERE ((snapshots.object_type = 'attribute_def'::sem_reg.object_type) AND (snapshots.status = 'active'::sem_reg.snapshot_status) AND (snapshots.effective_until IS NULL) AND (snapshots.definition ? 'fqn'::text))
+          ORDER BY (snapshots.definition ->> 'fqn'::text), snapshots.effective_from DESC, snapshots.created_at DESC
+        ), active_derivation_snapshots AS (
+         SELECT DISTINCT ON ((snapshots.definition ->> 'fqn'::text)) (snapshots.definition ->> 'fqn'::text) AS fqn,
+            snapshots.snapshot_id,
+            snapshots.definition
+           FROM sem_reg.snapshots
+          WHERE ((snapshots.object_type = 'derivation_spec'::sem_reg.object_type) AND (snapshots.status = 'active'::sem_reg.snapshot_status) AND (snapshots.effective_until IS NULL) AND (snapshots.definition ? 'fqn'::text))
+          ORDER BY (snapshots.definition ->> 'fqn'::text), snapshots.effective_from DESC, snapshots.created_at DESC
+        ), observation_counts AS (
+         SELECT attribute_observations.attribute_id,
+            count(*) AS active_observations
+           FROM "ob-poc".attribute_observations
+          WHERE ((attribute_observations.status)::text = 'ACTIVE'::text)
+          GROUP BY attribute_observations.attribute_id
+        ), cbu_value_counts AS (
+         SELECT cbu_attr_values.attr_id AS attribute_id,
+            count(*) AS cbu_values
+           FROM "ob-poc".cbu_attr_values
+          GROUP BY cbu_attr_values.attr_id
+        ), document_source_counts AS (
+         SELECT document_attribute_links.attribute_id,
+            count(*) AS document_sources
+           FROM "ob-poc".document_attribute_links
+          WHERE ((document_attribute_links.direction)::text = ANY ((ARRAY['SOURCE'::character varying, 'BOTH'::character varying])::text[]))
+          GROUP BY document_attribute_links.attribute_id
+        )
+ SELECT ar.id AS registry_id,
+    COALESCE((ar.metadata #>> '{sem_os,attribute_fqn}'::text[]), aas.fqn, ar.id) AS fqn,
+    ar.uuid,
+    ar.display_name,
+    ar.category,
+    ar.value_type,
+    ar.domain,
+    ar.sem_reg_snapshot_id,
+    ar.is_derived,
+    ar.derivation_spec_fqn,
+    ar.evidence_grade,
+    ar.metadata,
+    aas.snapshot_id AS attribute_snapshot_id,
+    (((aas.version_major)::text || '.'::text) || (aas.version_minor)::text) AS attribute_snapshot_version,
+    (aas.status)::text AS attribute_snapshot_status,
+    (aas.governance_tier)::text AS governance_tier,
+    aas.definition AS attribute_definition,
+    (aas.definition -> 'source'::text) AS attribute_source,
+    (aas.definition -> 'constraints'::text) AS attribute_constraints,
+    ads.snapshot_id AS derivation_snapshot_id,
+    ads.definition AS derivation_definition,
+    COALESCE(oc.active_observations, (0)::bigint) AS active_observations,
+    COALESCE(cv.cbu_values, (0)::bigint) AS cbu_values,
+    COALESCE(ds.document_sources, (0)::bigint) AS document_sources
+   FROM ((((("ob-poc".attribute_registry ar
+     LEFT JOIN active_attr_snapshots aas ON ((aas.fqn = COALESCE((ar.metadata #>> '{sem_os,attribute_fqn}'::text[]), ar.id))))
+     LEFT JOIN active_derivation_snapshots ads ON ((ads.fqn = COALESCE(ar.derivation_spec_fqn, (ar.metadata #>> '{sem_os,derivation_spec_fqn}'::text[])))))
+     LEFT JOIN observation_counts oc ON ((oc.attribute_id = ar.uuid)))
+     LEFT JOIN cbu_value_counts cv ON ((cv.attribute_id = ar.uuid)))
+     LEFT JOIN document_source_counts ds ON ((ds.attribute_id = ar.uuid)));
 
 
 --
@@ -25473,13 +25575,6 @@ CREATE INDEX idx_attribute_registry_applicability ON "ob-poc".attribute_registry
 --
 
 CREATE INDEX idx_attribute_registry_category ON "ob-poc".attribute_registry USING btree (category);
-
-
---
--- Name: idx_attribute_registry_embedding; Type: INDEX; Schema: ob-poc; Owner: -
---
-
-CREATE INDEX idx_attribute_registry_embedding ON "ob-poc".attribute_registry USING ivfflat (embedding public.vector_cosine_ops) WITH (lists='100');
 
 
 --
@@ -35767,5 +35862,5 @@ ALTER TABLE ONLY sem_reg_authoring.validation_reports
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 4FCbK67w5koUWaOINteJqUGXSlSY9vOO4ZKxAicJNrMIWWKCY4wRn1g8OTbdHdO
+\unrestrict p1AeskK6tstrOVqHlKQQ3taiz0z2G43VX14tNqMiMkzMA5MnPK9Swi8AucGbtF5
 

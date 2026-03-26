@@ -25,10 +25,13 @@ pub fn advance_plan_step(
     execution_result: Result<serde_json::Value>,
 ) -> Result<StepResult> {
     let step_count = plan.steps.len();
-    let step = plan
-        .steps
-        .get_mut(cursor)
-        .ok_or_else(|| anyhow!("Step {} out of range (plan has {} steps)", cursor, step_count))?;
+    let step = plan.steps.get_mut(cursor).ok_or_else(|| {
+        anyhow!(
+            "Step {} out of range (plan has {} steps)",
+            cursor,
+            step_count
+        )
+    })?;
 
     let (status, output, error) = match execution_result {
         Ok(value) => {
@@ -56,10 +59,7 @@ pub fn advance_plan_step(
 /// Resolve forward references for a step from the binding table.
 ///
 /// Returns the resolved subject UUID if the step uses a forward ref.
-pub fn resolve_step_bindings(
-    plan: &RunbookPlan,
-    step_seq: usize,
-) -> Result<Option<Uuid>> {
+pub fn resolve_step_bindings(plan: &RunbookPlan, step_seq: usize) -> Result<Option<Uuid>> {
     let step = plan
         .steps
         .get(step_seq)
@@ -87,10 +87,7 @@ pub fn record_step_output(
 }
 
 /// Skip all steps that depend (directly or transitively) on a failed step.
-pub fn skip_dependent_steps(
-    plan: &mut RunbookPlan,
-    failed_step: usize,
-) -> Vec<StepResult> {
+pub fn skip_dependent_steps(plan: &mut RunbookPlan, failed_step: usize) -> Vec<StepResult> {
     let mut skipped_seqs = std::collections::HashSet::new();
     skipped_seqs.insert(failed_step);
 
@@ -168,16 +165,21 @@ pub fn cancel_plan(plan: &mut RunbookPlan) -> Vec<StepResult> {
 
 /// Update plan status based on step results.
 pub fn update_plan_status(plan: &mut RunbookPlan) {
-    let all_done = plan
-        .steps
-        .iter()
-        .all(|s| matches!(s.status, PlanStepStatus::Succeeded | PlanStepStatus::Skipped | PlanStepStatus::Failed));
+    let all_done = plan.steps.iter().all(|s| {
+        matches!(
+            s.status,
+            PlanStepStatus::Succeeded | PlanStepStatus::Skipped | PlanStepStatus::Failed
+        )
+    });
 
     if !all_done {
         return;
     }
 
-    let any_failed = plan.steps.iter().any(|s| s.status == PlanStepStatus::Failed);
+    let any_failed = plan
+        .steps
+        .iter()
+        .any(|s| s.status == PlanStepStatus::Failed);
     if any_failed {
         let failed_step = plan
             .steps
@@ -202,8 +204,8 @@ pub fn update_plan_status(plan: &mut RunbookPlan) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::runbook::plan_types::*;
     use crate::repl::types_v2::{SubjectKind, VerbRef, WorkspaceKind};
+    use crate::runbook::plan_types::*;
     use std::collections::BTreeMap;
 
     fn two_step_plan() -> RunbookPlan {
@@ -269,8 +271,7 @@ mod tests {
     #[test]
     fn advance_step_failure() {
         let mut plan = two_step_plan();
-        let result =
-            advance_plan_step(&mut plan, 0, Err(anyhow!("DB error"))).unwrap();
+        let result = advance_plan_step(&mut plan, 0, Err(anyhow!("DB error"))).unwrap();
         assert_eq!(result.status, PlanStepStatus::Failed);
     }
 

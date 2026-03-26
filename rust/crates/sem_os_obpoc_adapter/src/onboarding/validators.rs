@@ -206,6 +206,7 @@ mod tests {
             source: None,
             constraints: None,
             sinks: vec![],
+            evidence_grade: sem_os_core::types::EvidenceGrade::None,
         };
         let mut req = minimal_request();
         req.attributes = vec![attr.clone(), attr];
@@ -224,6 +225,7 @@ mod tests {
             source: None,
             constraints: None,
             sinks: vec![],
+            evidence_grade: sem_os_core::types::EvidenceGrade::None,
         };
         let mut req = minimal_request();
         req.attributes = vec![attr];
