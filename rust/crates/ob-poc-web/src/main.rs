@@ -603,8 +603,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // =========================================================================
     // REPL V2 — Pack-Guided Runbook Pipeline
     // =========================================================================
-    let (repl_v2_router, repl_navigation_router, repl_v2_orchestrator) = {
-        use ob_poc::api::repl_routes_v2::{self, ReplV2RouteState};
+    let repl_v2_orchestrator = {
         use ob_poc::journey::router::PackRouter;
         use ob_poc::repl::orchestrator_v2::ReplOrchestratorV2;
 
@@ -951,17 +950,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
 
         let repl_v2_orchestrator = Arc::new(orchestrator);
-        let v2_state = ReplV2RouteState {
-            orchestrator: repl_v2_orchestrator.clone(),
-        };
-
         tracing::info!("REPL V2 orchestrator initialized with semantic intent service");
-
-        (
-            repl_routes_v2::router().with_state(v2_state.clone()),
-            repl_routes_v2::navigation_router().with_state(v2_state),
-            repl_v2_orchestrator,
-        )
+        repl_v2_orchestrator
     };
 
     // Build stateless API router (from main ob-poc crate) with SHARED session store.
@@ -975,6 +965,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     .await;
 
     let api_router: Router<()> = Router::new()
+        // Agent router includes REPL V2 session-scoped routes (navigation + runbook + trace)
+        // merged via agent_state.rs to share the /api/session namespace
         .merge(agent_router)
         .merge(create_attribute_router(pool.clone()))
         .merge(create_entity_router())
@@ -997,8 +989,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .merge(create_universe_router(pool.clone()))
         // Constellation graph hydration API for UI feedback and debugging
         .merge(create_constellation_router(pool.clone()))
-        // Session-scoped navigation stack and TOS feedback
-        .merge(repl_navigation_router)
         // Control/ownership routes (board controller, control sphere)
         .merge(control_routes(pool.clone()))
         // Session-scoped entity search (constraint cascade)
@@ -1075,8 +1065,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .merge(api_router)
         // Voice matching routes (semantic ML + phonetic) - stateless router
         .merge(voice_router)
-        // REPL V2 — Pack-guided runbook pipeline with bootstrap resolution
-        .nest("/api/repl/v2", repl_v2_router)
+        // Note: REPL V2 router is nested inside api_router via agent_state.rs
         // Layers
         .layer(TraceLayer::new_for_http())
         .layer(cors);

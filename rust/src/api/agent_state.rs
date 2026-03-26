@@ -445,7 +445,7 @@ pub async fn create_agent_router_with_semantic_and_repl(
                 "/api/repl/v2",
                 crate::api::repl_routes_v2::router().with_state(repl_state.clone()),
             )
-            .merge(crate::api::repl_routes_v2::navigation_router().with_state(repl_state))
+            .merge(crate::api::repl_routes_v2::session_scoped_router().with_state(repl_state))
     } else {
         router
     }

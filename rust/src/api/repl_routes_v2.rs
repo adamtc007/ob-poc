@@ -614,6 +614,7 @@ async fn delete_session_v2(
     Ok(StatusCode::NO_CONTENT)
 }
 
+#[allow(dead_code)] // Route provided by create_constellation_router; retained for reference
 async fn get_constellation_context(
     State(state): State<ReplV2RouteState>,
     axum::extract::Query(query): axum::extract::Query<SessionContextQuery>,
@@ -854,8 +855,18 @@ pub fn router() -> Router<ReplV2RouteState> {
 ///     .merge(repl_routes_v2::navigation_router().with_state(v2_state));
 /// ```
 pub fn navigation_router() -> Router<ReplV2RouteState> {
+    // Note: /api/constellation/context is registered by create_constellation_router().
+    // This router is now empty but retained for API compatibility.
     Router::new()
-        .route("/api/constellation/context", get(get_constellation_context))
+}
+
+/// Session-scoped routes that share the `/api/session/...` namespace with agent routes.
+///
+/// These MUST be merged into the same router as agent routes to avoid
+/// axum 0.7 overlapping-route panics (`:id` wildcard vs literal segments).
+pub fn session_scoped_router() -> Router<ReplV2RouteState> {
+    Router::new()
+        // Navigation stack ops
         .route("/api/session/push", post(push_session_context))
         .route("/api/session/commit", post(commit_session_context))
         .route("/api/session/pop", post(pop_session_context))
