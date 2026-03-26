@@ -80,7 +80,10 @@ pub async fn resolve_client_input(input: &str, pool: &PgPool) -> BootstrapOutcom
     use crate::database::deal_repository::DealRepository;
 
     let groups = match DealRepository::get_all_client_groups(pool).await {
-        Ok(g) => g,
+        Ok(g) => g
+            .into_iter()
+            .filter(|g| !g.canonical_name.starts_with("SeedCap-"))
+            .collect::<Vec<_>>(),
         Err(e) => {
             tracing::warn!("Failed to fetch client groups: {}", e);
             return BootstrapOutcome::NoMatch {
