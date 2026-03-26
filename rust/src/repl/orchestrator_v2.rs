@@ -1762,51 +1762,42 @@ impl ReplOrchestratorV2 {
             }
         }
 
-        // 5. Only set context and transition if the DSL actually succeeded.
-        if succeeded {
-            session.set_client_scope(group_id);
-            let workspaces = self.workspace_options();
-            session.set_state(ReplStateV2::WorkspaceSelection {
-                workspaces: workspaces.clone(),
-            });
+        // 5. Set scope and always transition to workspace selection.
+        // Even if session.load-cluster failed (e.g., no CBUs yet for this group),
+        // the group is valid — the user can create CBUs in the CBU workspace.
+        session.set_client_scope(group_id);
 
-            ReplResponseV2 {
-                state: session.state.clone(),
-                kind: ReplResponseKindV2::WorkspaceOptions {
-                    workspaces: workspaces.clone(),
-                },
-                message: format!(
+        if !succeeded {
+            tracing::info!(
+                "session.load-cluster had no CBUs for group {} — proceeding with empty scope",
+                group_name
+            );
+        }
+
+        let workspaces = self.workspace_options();
+        session.set_state(ReplStateV2::WorkspaceSelection {
+            workspaces: workspaces.clone(),
+        });
+
+        ReplResponseV2 {
+            state: session.state.clone(),
+            kind: ReplResponseKindV2::WorkspaceOptions {
+                workspaces: workspaces.clone(),
+            },
+            message: if succeeded {
+                format!(
                     "Scope set to {}. Which workspace would you like to enter?",
                     group_name
-                ),
-                runbook_summary: None,
-                step_count: 1,
-                session_feedback: Some(session.build_session_feedback(false)),
-            }
-        } else {
-            // DSL failed — stay in ScopeGate. The runsheet has the failure recorded.
-            session.set_state(ReplStateV2::ScopeGate {
-                pending_input: None,
-                candidates: None,
-            });
-
-            ReplResponseV2 {
-                state: session.state.clone(),
-                kind: ReplResponseKindV2::ScopeRequired {
-                    prompt: format!(
-                        "Failed to load scope for '{}'. Please try again.",
-                        group_name
-                    ),
-                },
-                message: format!(
-                    "Scope load failed for '{}'. The error is recorded on the runsheet. \
-                     Please try again or choose a different client group.",
+                )
+            } else {
+                format!(
+                    "Scope set to {} (no CBUs yet — you can create them). Which workspace?",
                     group_name
-                ),
-                runbook_summary: None,
-                step_count: 1,
-                session_feedback: Some(session.build_session_feedback(false)),
-            }
+                )
+            },
+            runbook_summary: None,
+            step_count: if succeeded { 1 } else { 0 },
+            session_feedback: Some(session.build_session_feedback(false)),
         }
     }
 

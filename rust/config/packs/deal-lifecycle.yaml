@@ -1,0 +1,106 @@
+# Deal Lifecycle Journey Pack
+# Create, negotiate, and manage commercial deals
+
+id: deal-lifecycle
+name: Deal Lifecycle
+version: "1.0"
+description: >
+  Create and manage commercial deals including rate card negotiation,
+  contract generation, fee billing setup, and deal activation.
+  Supports new deal creation and deal amendment workflows.
+
+invocation_phrases:
+  - "create a deal"
+  - "new deal"
+  - "deal setup"
+  - "start a deal"
+  - "negotiate deal"
+  - "deal lifecycle"
+  - "commercial agreement"
+
+required_context:
+  - client_group_id
+
+optional_context:
+  - default_cbu
+  - target_entity
+
+workspaces:
+  - deal
+  - on_boarding
+
+allowed_verbs:
+  - deal.create
+  - deal.read-record
+  - deal.list-contracts
+  - deal.assign-rate-card
+  - deal.activate
+  - deal.amend
+  - contract.create
+  - contract.negotiate
+  - billing.create-profile
+  - billing.assign-period
+
+forbidden_verbs:
+  - deal.delete
+
+risk_policy:
+  require_confirm_before_execute: true
+  max_steps_without_confirm: 3
+
+required_questions:
+  - field: deal_name
+    prompt: "What is the deal name?"
+    answer_kind: text
+
+  - field: counterparty
+    prompt: "Who is the counterparty?"
+    answer_kind: entity_ref
+
+optional_questions:
+  - field: deal_type
+    prompt: "Deal type? (advisory / custody / trading / fund_admin)"
+    answer_kind: enum
+    default: "custody"
+
+  - field: effective_date
+    prompt: "Effective date? (YYYY-MM-DD)"
+    answer_kind: date
+
+stop_rules:
+  - "Deal created"
+  - "Rate card assigned"
+  - "Contract generated"
+
+templates:
+  - template_id: new-deal
+    when_to_use: "New deal with rate card and contract"
+    steps:
+      - verb: deal.create
+        args:
+          deal_name: "{answers.deal_name}"
+          counterparty: "{answers.counterparty}"
+      - verb: deal.assign-rate-card
+        args:
+          deal_ref: "$prev"
+      - verb: contract.create
+        args:
+          deal_ref: "$prev"
+
+section_layout:
+  - "Deal Creation"
+  - "Rate Card & Pricing"
+  - "Contracts"
+
+definition_of_done:
+  - "Deal record exists in system"
+  - "Rate card assigned"
+  - "At least one contract created"
+
+progress_signals:
+  - "Deal created"
+  - "Rate card assigned"
+  - "Contract generated"
+  - "Billing profile created"
+
+handoff_target: null

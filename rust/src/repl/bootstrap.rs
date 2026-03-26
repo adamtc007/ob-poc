@@ -99,6 +99,54 @@ pub async fn resolve_client_input(input: &str, pool: &PgPool) -> BootstrapOutcom
     let input_lower = input.trim().to_lowercase();
     let significant_words = extract_significant_words(input);
 
+    // Phase 0: Alias match — check client_group_alias table for exact alias hit.
+    // This catches "Allianz" → "Allianz Global Investors" via stored aliases.
+    if let Ok(alias_hit) = sqlx::query_as::<_, (Uuid, String)>(
+        r#"SELECT cg.id, cg.canonical_name
+           FROM "ob-poc".client_group_alias cga
+           JOIN "ob-poc".client_group cg ON cg.id = cga.group_id
+           WHERE LOWER(cga.alias) = $1
+             AND NOT cg.canonical_name LIKE 'SeedCap-%'
+           LIMIT 1"#,
+    )
+    .bind(&input_lower)
+    .fetch_optional(pool)
+    .await
+    {
+        if let Some((group_id, group_name)) = alias_hit {
+            return BootstrapOutcome::Resolved {
+                group_id,
+                group_name,
+            };
+        }
+    }
+
+    // Phase 0b: Fuzzy alias match — significant words against aliases
+    if !significant_words.is_empty() {
+        for word in &significant_words {
+            if word.len() < 3 {
+                continue;
+            }
+            if let Ok(Some((group_id, group_name))) = sqlx::query_as::<_, (Uuid, String)>(
+                r#"SELECT cg.id, cg.canonical_name
+                   FROM "ob-poc".client_group_alias cga
+                   JOIN "ob-poc".client_group cg ON cg.id = cga.group_id
+                   WHERE LOWER(cga.alias) = $1
+                     AND NOT cg.canonical_name LIKE 'SeedCap-%'
+                   LIMIT 1"#,
+            )
+            .bind(word.as_str())
+            .fetch_optional(pool)
+            .await
+            {
+                return BootstrapOutcome::Resolved {
+                    group_id,
+                    group_name,
+                };
+            }
+        }
+    }
+
     // Phase 1: Exact match on canonical_name
     for group in &groups {
         if group.canonical_name.to_lowercase() == input_lower {
