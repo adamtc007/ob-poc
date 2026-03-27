@@ -456,7 +456,8 @@ invocation_phrases:
     fn test_substring_match_on_phrases() {
         let router = make_router();
 
-        match router.route("I want to onboard a client") {
+        // "submit onboarding handoff" is an exact invocation phrase
+        match router.route("submit onboarding handoff for this deal") {
             PackRouteOutcome::Matched(m, _) => assert_eq!(m.id, "onboarding-request"),
             other => panic!("Expected Matched, got {:?}", other),
         }
@@ -515,7 +516,9 @@ invocation_phrases:
     fn test_route_for_workspace_filters_candidates() {
         let router = make_router();
 
-        match router.route_for_workspace("start onboarding", &WorkspaceKind::Kyc) {
+        // "onboard a new client" only matches onboarding-request pack,
+        // which is restricted to on_boarding workspace — should NoMatch in KYC
+        match router.route_for_workspace("onboard a new client", &WorkspaceKind::Kyc) {
             PackRouteOutcome::NoMatch => {}
             other => panic!("Expected NoMatch outside workspace, got {:?}", other),
         }
