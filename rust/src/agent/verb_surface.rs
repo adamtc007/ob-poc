@@ -295,6 +295,9 @@ pub struct VerbSurfaceContext<'a> {
     /// When `false`, only bootstrap/onboarding verbs are available.
     /// When `true`, full domain verbs cascade from the group.
     pub has_group_scope: bool,
+    /// Whether the session is in infrastructure scope (SemOS maintenance).
+    /// When `true`, all domains are available without a client group.
+    pub is_infrastructure_scope: bool,
     /// Group composite state for state-to-intent bias.
     /// When present, verb candidates receive score boosts/penalties
     /// based on the "as-is → to-be" gap analysis.
@@ -350,7 +353,10 @@ pub fn compute_session_verb_surface(ctx: &VerbSurfaceContext<'_>) -> SessionVerb
     //   1. No group → only bootstrap domains (session, view, agent, gleif, etc.)
     //   2. Group set + workflow focus → workflow-specific domains
     //   3. Group set + no workflow → all domains pass through
-    let scope_domains: Option<HashSet<&str>> = if !ctx.has_group_scope {
+    let scope_domains: Option<HashSet<&str>> = if ctx.is_infrastructure_scope {
+        // Infrastructure scope → all domains available (SemOS maintenance)
+        None
+    } else if !ctx.has_group_scope {
         // No group → bootstrap domains only
         Some(NO_GROUP_ALLOWED_DOMAINS.iter().copied().collect())
     } else {
@@ -830,6 +836,7 @@ mod tests {
             fail_policy: VerbSurfaceFailPolicy::FailClosed,
             entity_state: None,
             has_group_scope: true,
+            is_infrastructure_scope: false,
             composite_state: None,
         };
 
@@ -857,6 +864,7 @@ mod tests {
             fail_policy: VerbSurfaceFailPolicy::FailOpen,
             entity_state: None,
             has_group_scope: true,
+            is_infrastructure_scope: false,
             composite_state: None,
         };
 
@@ -885,6 +893,7 @@ mod tests {
             fail_policy: VerbSurfaceFailPolicy::FailClosed,
             entity_state: None,
             has_group_scope: true,
+            is_infrastructure_scope: false,
             composite_state: None,
         };
 
@@ -921,6 +930,7 @@ mod tests {
             fail_policy: VerbSurfaceFailPolicy::FailOpen, // Don't restrict further
             entity_state: None,
             has_group_scope: true,
+            is_infrastructure_scope: false,
             composite_state: None,
         };
 
@@ -950,6 +960,7 @@ mod tests {
             fail_policy: VerbSurfaceFailPolicy::FailOpen,
             entity_state: None,
             has_group_scope: true,
+            is_infrastructure_scope: false,
             composite_state: None,
         };
 
@@ -960,6 +971,7 @@ mod tests {
             fail_policy: VerbSurfaceFailPolicy::FailOpen,
             entity_state: None,
             has_group_scope: true,
+            is_infrastructure_scope: false,
             composite_state: None,
         };
 
@@ -996,6 +1008,7 @@ mod tests {
             fail_policy: VerbSurfaceFailPolicy::FailOpen,
             entity_state: None,
             has_group_scope: true,
+            is_infrastructure_scope: false,
             composite_state: None,
         };
 
@@ -1023,6 +1036,7 @@ mod tests {
             fail_policy: VerbSurfaceFailPolicy::FailClosed,
             entity_state: None,
             has_group_scope: true,
+            is_infrastructure_scope: false,
             composite_state: None,
         };
 
@@ -1049,6 +1063,7 @@ mod tests {
             fail_policy: VerbSurfaceFailPolicy::FailOpen,
             entity_state: None,
             has_group_scope: true,
+            is_infrastructure_scope: false,
             composite_state: None,
         };
 
@@ -1082,6 +1097,7 @@ mod tests {
             fail_policy: VerbSurfaceFailPolicy::FailOpen,
             entity_state: None,
             has_group_scope: true,
+            is_infrastructure_scope: false,
             composite_state: None,
         };
 
@@ -1092,6 +1108,7 @@ mod tests {
             fail_policy: VerbSurfaceFailPolicy::FailOpen,
             entity_state: None,
             has_group_scope: true,
+            is_infrastructure_scope: false,
             composite_state: None,
         };
 
@@ -1117,6 +1134,7 @@ mod tests {
             fail_policy: VerbSurfaceFailPolicy::FailClosed,
             entity_state: None,
             has_group_scope: true,
+            is_infrastructure_scope: false,
             composite_state: None,
         };
 

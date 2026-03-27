@@ -96,6 +96,7 @@ impl ToolHandlers {
             fail_policy: VerbSurfaceFailPolicy::default(),
             entity_state: None,
             has_group_scope: true,
+            is_infrastructure_scope: false,
             composite_state: None,
         };
         let surface = compute_session_verb_surface(&ctx);

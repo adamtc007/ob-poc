@@ -276,6 +276,7 @@ fn compute_live_session_surface(
         fail_policy: VerbSurfaceFailPolicy::FailClosed,
         entity_state: Some(target_entity_state),
         has_group_scope: true,
+        is_infrastructure_scope: false,
         composite_state: None,
     };
     compute_session_verb_surface(&surface_ctx)
