@@ -1064,11 +1064,15 @@ domains:
           side_effects: facts_only
         invocation_phrases:
         - "check attribute gaps for service resources"
+        - "check attribute gaps"
+        - "attribute gaps"
         - "what attributes are missing from service resource definitions"
         - "show SRDEF attribute coverage"
         - "which attributes do SRDEFs need that are not defined"
         - "service resource attribute gap analysis"
         - "audit SRDEF attribute requirements"
+        - "show missing attributes"
+        - "gap analysis"
         behavior: plugin
         handler: service_resource_check_attribute_gaps
         args: []
