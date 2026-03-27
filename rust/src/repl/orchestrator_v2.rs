@@ -2010,7 +2010,7 @@ impl ReplOrchestratorV2 {
             kind: ReplResponseKindV2::JourneyOptions {
                 packs: packs.clone(),
             },
-            message: "SemOS Infrastructure session — no client group required.\n\
+            message: "SemOS Infrastructure session - no client group required.\n\
                       Which journey would you like to start?"
                 .to_string(),
             runbook_summary: None,
