@@ -431,3 +431,131 @@ async fn session_state_is_deterministic() {
 
     assert_eq!(states[0], states[1], "Same inputs must produce same state");
 }
+
+// ---------------------------------------------------------------------------
+// Test 14: Natural language workspace selection
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn natural_language_workspace_selection() {
+    let orch = make_orchestrator();
+    let id = orch.create_session().await;
+
+    // Pass scope gate
+    orch.process(id, UserInputV2::SelectScope {
+        group_id: Uuid::new_v4(),
+        group_name: "Test".to_string(),
+    }).await.unwrap();
+
+    // Select workspace via natural language
+    let resp = orch
+        .process(id, UserInputV2::Message {
+            content: "I need to do KYC".to_string(),
+        })
+        .await
+        .unwrap();
+
+    assert!(
+        matches!(resp.state, ReplStateV2::JourneySelection { .. }),
+        "Natural language 'KYC' should resolve to KYC workspace, got: {:?}",
+        resp.state
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Test 15: Numeric workspace selection
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn numeric_workspace_selection() {
+    let orch = make_orchestrator();
+    let id = orch.create_session().await;
+
+    // Pass scope gate
+    orch.process(id, UserInputV2::SelectScope {
+        group_id: Uuid::new_v4(),
+        group_name: "Test".to_string(),
+    }).await.unwrap();
+
+    // Select workspace by number (3 = CBU based on workspace_options order)
+    let resp = orch
+        .process(id, UserInputV2::Message {
+            content: "3".to_string(),
+        })
+        .await
+        .unwrap();
+
+    assert!(
+        matches!(resp.state, ReplStateV2::JourneySelection { .. }),
+        "Numeric '3' should select a workspace, got: {:?}",
+        resp.state
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Test 16: Unrecognised workspace utterance gives helpful error
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn unrecognised_workspace_utterance() {
+    let orch = make_orchestrator();
+    let id = orch.create_session().await;
+
+    // Pass scope gate
+    orch.process(id, UserInputV2::SelectScope {
+        group_id: Uuid::new_v4(),
+        group_name: "Test".to_string(),
+    }).await.unwrap();
+
+    // Send gibberish
+    let resp = orch
+        .process(id, UserInputV2::Message {
+            content: "xyzzy".to_string(),
+        })
+        .await
+        .unwrap();
+
+    // Should stay in WorkspaceSelection with helpful message
+    assert!(
+        matches!(resp.state, ReplStateV2::WorkspaceSelection { .. }),
+        "Unrecognised input should stay in WorkspaceSelection, got: {:?}",
+        resp.state
+    );
+    assert!(resp.message.contains("CBU"), "Error message should list valid workspaces");
+}
+
+// ---------------------------------------------------------------------------
+// Test 17: Numeric journey selection
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn numeric_journey_selection() {
+    let orch = make_orchestrator();
+    let id = orch.create_session().await;
+
+    // Pass scope + workspace gates
+    orch.process(id, UserInputV2::SelectScope {
+        group_id: Uuid::new_v4(),
+        group_name: "Test".to_string(),
+    }).await.unwrap();
+    orch.process(id, UserInputV2::SelectWorkspace {
+        workspace: WorkspaceKind::OnBoarding,
+    }).await.unwrap();
+
+    // Select journey by number
+    let resp = orch
+        .process(id, UserInputV2::Message {
+            content: "1".to_string(),
+        })
+        .await
+        .unwrap();
+
+    // Should be in InPack or asking first question
+    let in_pack = matches!(resp.state, ReplStateV2::InPack { .. })
+        || matches!(resp.kind, ReplResponseKindV2::Question { .. });
+    assert!(
+        in_pack,
+        "Numeric '1' should select first pack, got state: {:?}",
+        resp.state
+    );
+}

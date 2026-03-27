@@ -1018,26 +1018,90 @@ impl ReplOrchestratorV2 {
         session: &mut ReplSessionV2,
         input: UserInputV2,
     ) -> ReplResponseV2 {
-        match input {
-            UserInputV2::SelectWorkspace { workspace } => {
-                session.set_workspace_root(workspace.clone());
-                session.set_state(ReplStateV2::JourneySelection { candidates: None });
-                let packs = self.pack_router.list_packs_for_workspace(&workspace);
-                ReplResponseV2 {
-                    state: session.state.clone(),
-                    kind: ReplResponseKindV2::JourneyOptions {
-                        packs: packs.clone(),
-                    },
-                    message: format!(
-                        "{} workspace selected. Which journey would you like to start?",
-                        workspace.label()
-                    ),
-                    runbook_summary: None,
-                    step_count: session.runbook.entries.len(),
-                    session_feedback: Some(session.build_session_feedback(false)),
+        let workspace = match input {
+            UserInputV2::SelectWorkspace { workspace } => workspace,
+            UserInputV2::Message { ref content } => {
+                // Try to resolve workspace from natural language
+                match Self::resolve_workspace_from_utterance(content) {
+                    Some(ws) => ws,
+                    None => {
+                        // Try numeric selection (1-6)
+                        if let Some(ws) = Self::resolve_workspace_from_number(content, session) {
+                            ws
+                        } else {
+                            return self.invalid_input(
+                                session,
+                                "I didn't recognise that workspace. Try: CBU, KYC, Deal, OnBoarding, Product Maintenance, or Instrument Matrix.",
+                            );
+                        }
+                    }
                 }
             }
-            _ => self.invalid_input(session, "Please select a workspace first."),
+            _ => {
+                return self.invalid_input(
+                    session,
+                    "Please select a workspace: CBU, KYC, Deal, OnBoarding, Product Maintenance, or Instrument Matrix.",
+                );
+            }
+        };
+
+        session.set_workspace_root(workspace.clone());
+        session.set_state(ReplStateV2::JourneySelection { candidates: None });
+        let packs = self.pack_router.list_packs_for_workspace(&workspace);
+        ReplResponseV2 {
+            state: session.state.clone(),
+            kind: ReplResponseKindV2::JourneyOptions {
+                packs: packs.clone(),
+            },
+            message: format!(
+                "{} workspace selected. Which journey would you like to start?",
+                workspace.label()
+            ),
+            runbook_summary: None,
+            step_count: session.runbook.entries.len(),
+            session_feedback: Some(session.build_session_feedback(false)),
+        }
+    }
+
+    /// Resolve workspace from natural language utterance.
+    /// Simple keyword matching — there are only 6 workspaces.
+    fn resolve_workspace_from_utterance(input: &str) -> Option<WorkspaceKind> {
+        let lower = input.to_lowercase();
+
+        // Exact workspace name matches
+        if lower.contains("kyc") || lower.contains("know your customer") || lower.contains("compliance") {
+            return Some(WorkspaceKind::Kyc);
+        }
+        if lower.contains("onboard") || lower.contains("on-board") || lower.contains("on board") {
+            return Some(WorkspaceKind::OnBoarding);
+        }
+        if lower.contains("deal") || lower.contains("commercial") || lower.contains("contract") || lower.contains("pricing") {
+            return Some(WorkspaceKind::Deal);
+        }
+        if lower.contains("product") || lower.contains("service") || lower.contains("taxonomy") {
+            return Some(WorkspaceKind::ProductMaintenance);
+        }
+        if lower.contains("instrument") || lower.contains("matrix") || lower.contains("trading") {
+            return Some(WorkspaceKind::InstrumentMatrix);
+        }
+        if lower.contains("cbu") || lower.contains("client business") || lower.contains("structure") || lower.contains("maintenance") {
+            return Some(WorkspaceKind::Cbu);
+        }
+        None
+    }
+
+    /// Resolve workspace from numeric selection (1-6).
+    fn resolve_workspace_from_number(input: &str, session: &ReplSessionV2) -> Option<WorkspaceKind> {
+        let trimmed = input.trim();
+        let index: usize = trimmed.parse().ok()?;
+        if index == 0 || index > 6 {
+            return None;
+        }
+        // Match against the workspace options stored in the state
+        if let ReplStateV2::WorkspaceSelection { ref workspaces } = session.state {
+            workspaces.get(index - 1).map(|opt| opt.workspace.clone())
+        } else {
+            None
         }
     }
 
@@ -1053,7 +1117,26 @@ impl ReplOrchestratorV2 {
                     return self
                         .invalid_input(session, "Select a workspace before choosing a journey.");
                 };
-                // Route via PackRouter.
+
+                // Try numeric selection first (1, 2, 3, ...)
+                if let Ok(idx) = content.trim().parse::<usize>() {
+                    if idx > 0 {
+                        let pack_id = if let ReplStateV2::JourneySelection { candidates: Some(ref packs) } = session.state {
+                            packs.get(idx - 1).map(|p| p.pack_id.clone())
+                        } else {
+                            None
+                        };
+                        let pack_id = pack_id.or_else(|| {
+                            let packs = self.pack_router.list_packs_for_workspace(workspace);
+                            packs.get(idx - 1).map(|p| p.pack_id.clone())
+                        });
+                        if let Some(pid) = pack_id {
+                            return self.activate_pack_by_id(session, &pid);
+                        }
+                    }
+                }
+
+                // Route via PackRouter (phrase matching).
                 match self.pack_router.route_for_workspace(&content, workspace) {
                     PackRouteOutcome::Matched(manifest, hash) => {
                         let pack_id = manifest.id.clone();
