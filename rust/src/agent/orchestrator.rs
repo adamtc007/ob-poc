@@ -189,6 +189,7 @@ fn route(intent: &crate::sage::OutcomeIntent) -> UtteranceDisposition {
     }
 }
 
+#[allow(dead_code)] // Used in tests; will be needed when REPL confirmation handling is expanded
 pub(crate) fn is_confirmation(utterance: &str) -> bool {
     matches!(
         utterance.trim().to_ascii_lowercase().as_str(),

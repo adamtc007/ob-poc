@@ -15,7 +15,6 @@ pub mod agent_types;
 // agent_learning_routes: deleted — verb selection through unified REPL pipeline
 
 #[cfg(feature = "server")]
-#[allow(dead_code)] // Legacy conversion helpers pending Phase 4 cleanup
 pub mod agent_routes;
 
 #[cfg(feature = "server")]

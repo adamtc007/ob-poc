@@ -339,32 +339,16 @@ fn matches_subject_kind(subject_kinds: &[String], entity_type: &str) -> bool {
 /// # }
 /// ```
 pub async fn execute_calibration_utterance(
-    service: &AgentService,
-    fixtures: &mut CalibrationFixtures,
-    actor: &ActorContext,
-    utterance_text: &str,
-    pool: &PgPool,
+    _service: &AgentService,
+    _fixtures: &mut CalibrationFixtures,
+    _actor: &ActorContext,
+    _utterance_text: &str,
+    _pool: &PgPool,
 ) -> Result<Uuid> {
-    let request = ob_poc_types::ChatRequest {
-        message: utterance_text.to_string(),
-        cbu_id: None,
-        disambiguation_response: None,
-    };
-    service
-        .process_chat(&mut fixtures.session, &request, actor.clone())
-        .await
-        .map_err(|error| anyhow!(error))
-        .context("execute calibration utterance through live chat pipeline")?;
-    let trace_id = fixtures
-        .session
-        .last_trace_id
-        .ok_or_else(|| anyhow!("chat pipeline completed without a trace_id"))?;
-    let repository = UtteranceTraceRepository::new(pool.clone());
-    repository
-        .set_synthetic(trace_id, true)
-        .await
-        .context("mark calibration trace synthetic")?;
-    Ok(trace_id)
+    // TODO: Re-wire through REPL V2 orchestrator pipeline (process_chat removed)
+    Err(anyhow!(
+        "calibration harness not yet wired to REPL V2 pipeline"
+    ))
 }
 
 /// Load a persisted trace record by trace ID.
