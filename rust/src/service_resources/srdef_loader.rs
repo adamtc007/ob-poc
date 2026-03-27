@@ -442,15 +442,21 @@ impl SrdefLoader {
         for (idx, attr) in attributes.iter().enumerate() {
             // Look up attribute UUID by name/id
             let attr_uuid: Option<(Uuid,)> =
-                sqlx::query_as(r#"SELECT uuid FROM "ob-poc".attribute_registry WHERE id = $1"#)
+                sqlx::query_as(r#"
+                    SELECT COALESCE(
+                        (SELECT object_id FROM sem_reg.v_active_attribute_defs WHERE fqn = $1 LIMIT 1),
+                        (SELECT uuid FROM "ob-poc".attribute_registry WHERE id = $1)
+                    ) AS uuid
+                "#)
                     .bind(&attr.attr_id)
                     .fetch_optional(pool)
                     .await?;
 
             let Some((attr_uuid,)) = attr_uuid else {
-                debug!(
-                    "Attribute {} not found in registry, skipping for {}",
-                    attr.attr_id, srdef_id
+                warn!(
+                    attribute_id = %attr.attr_id,
+                    srdef_id = %srdef_id,
+                    "Attribute not found in SemOS or registry, skipping",
                 );
                 continue;
             };

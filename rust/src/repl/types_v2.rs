@@ -94,6 +94,7 @@ pub enum WorkspaceKind {
     Kyc,
     InstrumentMatrix,
     OnBoarding,
+    SemOsMaintenance,
 }
 
 impl WorkspaceKind {
@@ -113,6 +114,7 @@ impl WorkspaceKind {
             Self::Kyc => "KYC",
             Self::InstrumentMatrix => "Instrument Matrix",
             Self::OnBoarding => "OnBoarding",
+            Self::SemOsMaintenance => "SemOS Maintenance",
         }
     }
 
@@ -205,6 +207,16 @@ impl WorkspaceKind {
                 default_constellation_map: "deal.lifecycle",
                 supports_handoff_mode: true,
             },
+            Self::SemOsMaintenance => WorkspaceRegistryEntry {
+                workspace_id: self.clone(),
+                display_name: self.label(),
+                constellation_families: vec!["registry_governance"],
+                subject_kinds: vec![],
+                subject_required: false,
+                default_constellation_family: "registry_governance",
+                default_constellation_map: "registry.stewardship",
+                supports_handoff_mode: false,
+            },
         }
     }
 
@@ -224,6 +236,7 @@ impl WorkspaceKind {
             Self::Kyc,
             Self::InstrumentMatrix,
             Self::OnBoarding,
+            Self::SemOsMaintenance,
         ]
     }
 }
@@ -676,6 +689,14 @@ impl WorkspaceKind {
         }
         if msg.contains("onboarding") || msg.contains("handoff") || msg.contains("activation") {
             return Some(Self::OnBoarding);
+        }
+        if msg.contains("semos")
+            || msg.contains("sem os")
+            || msg.contains("semantic os")
+            || msg.contains("registry governance")
+            || msg.contains("stewardship")
+        {
+            return Some(Self::SemOsMaintenance);
         }
         None
     }

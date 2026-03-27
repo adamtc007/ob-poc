@@ -76,6 +76,14 @@ mod invariants {
                 source: None,
                 constraints: None,
                 sinks: vec![],
+                category: None,
+                validation_rules: None,
+                applicability: None,
+                is_required: None,
+                default_value: None,
+                group_id: None,
+                is_derived: None,
+                derivation_spec_fqn: None,
             };
             let sid =
                 RegistryService::publish_attribute_def(&self.pool, &meta, &body, None).await?;
@@ -458,6 +466,14 @@ mod invariants {
             source: None,
             constraints: None,
             sinks: vec![],
+            category: None,
+            validation_rules: None,
+            applicability: None,
+            is_required: None,
+            default_value: None,
+            group_id: None,
+            is_derived: None,
+            derivation_spec_fqn: None,
         };
         let sid = RegistryService::publish_attribute_def(&db.pool, &meta, &body, None).await?;
         assert_ne!(sid, Uuid::nil(), "Should get a valid snapshot_id");

@@ -9,6 +9,11 @@ fn default_attribute_evidence_grade() -> EvidenceGrade {
 }
 
 /// Body of an `attribute_def` registry snapshot.
+///
+/// This is the canonical definition for an attribute in SemOS — the single
+/// source of truth.  Every field that the operational store
+/// (`attribute_registry`) exposes **must** have a corresponding field here so
+/// that the store remains a pure, switchable projection of SemOS.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AttributeDefBody {
     pub fqn: String,
@@ -24,6 +29,32 @@ pub struct AttributeDefBody {
     pub constraints: Option<AttributeConstraints>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub sinks: Vec<AttributeSink>,
+
+    // ── Fields required for full store projection ──────────────────────
+    /// Classification category (identity, financial, compliance, etc.).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub category: Option<String>,
+    /// Business-level validation rules (JSONB in the store).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub validation_rules: Option<serde_json::Value>,
+    /// Conditional applicability rules (JSONB in the store).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub applicability: Option<serde_json::Value>,
+    /// Whether this attribute is required by default.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub is_required: Option<bool>,
+    /// Default value (serialized as text).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default_value: Option<String>,
+    /// Logical grouping identifier.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group_id: Option<String>,
+    /// Whether this is a below-the-line derived attribute.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub is_derived: Option<bool>,
+    /// FQN of the governing derivation spec (required when `is_derived = true`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub derivation_spec_fqn: Option<String>,
 }
 
 /// Supported attribute data types.
@@ -195,6 +226,14 @@ mod tests {
                 consuming_verb: "session.load-jurisdiction".into(),
                 arg_name: "code".into(),
             }],
+            category: Some("entity".into()),
+            validation_rules: Some(serde_json::json!({"min_length": 2})),
+            applicability: Some(serde_json::json!({"entity_types": ["cbu"]})),
+            is_required: Some(true),
+            default_value: None,
+            group_id: Some("jurisdiction".into()),
+            is_derived: Some(false),
+            derivation_spec_fqn: None,
         };
         let json = serde_json::to_value(&val).unwrap();
         // Check Enum variant serialization

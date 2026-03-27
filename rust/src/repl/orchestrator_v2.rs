@@ -1091,6 +1091,14 @@ impl ReplOrchestratorV2 {
         if lower.contains("instrument") || lower.contains("matrix") || lower.contains("trading") {
             return Some(WorkspaceKind::InstrumentMatrix);
         }
+        if lower.contains("semos")
+            || lower.contains("sem os")
+            || lower.contains("semantic os")
+            || lower.contains("registry governance")
+            || lower.contains("stewardship")
+        {
+            return Some(WorkspaceKind::SemOsMaintenance);
+        }
         if lower.contains("cbu")
             || lower.contains("client business")
             || lower.contains("structure")
@@ -1108,7 +1116,7 @@ impl ReplOrchestratorV2 {
     ) -> Option<WorkspaceKind> {
         let trimmed = input.trim();
         let index: usize = trimmed.parse().ok()?;
-        if index == 0 || index > 6 {
+        if index == 0 || index > 7 {
             return None;
         }
         // Match against the workspace options stored in the state
@@ -2002,6 +2010,12 @@ impl ReplOrchestratorV2 {
                 workspace: WorkspaceKind::OnBoarding,
                 label: WorkspaceKind::OnBoarding.label().to_string(),
                 description: "Onboarding activation, handoff progress, and runtime provisioning"
+                    .to_string(),
+            },
+            WorkspaceOption {
+                workspace: WorkspaceKind::SemOsMaintenance,
+                label: WorkspaceKind::SemOsMaintenance.label().to_string(),
+                description: "Manage SemOS registry governance — changesets, attributes, verbs, schemas"
                     .to_string(),
             },
         ]

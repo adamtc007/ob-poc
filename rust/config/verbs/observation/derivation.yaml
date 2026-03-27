@@ -1,0 +1,30 @@
+domains:
+  derivation:
+    description: Derived attribute recomputation and lifecycle management
+    verbs:
+      recompute-stale:
+        description: Recompute stale derived values from the canonical queue in dependency-depth order
+        metadata:
+          tier: intent
+          source_of_truth: sem_reg
+          scope: global
+          noun: derivation
+          phase_tags: [stewardship]
+          side_effects: state_write
+        invocation_phrases:
+        - "recompute stale derived values"
+        - "process the derivation recompute queue"
+        - "refresh stale derived attributes"
+        - "run the stale derivation batch"
+        - "recompute below the line values"
+        - "update derived attributes"
+        behavior: plugin
+        handler: derivation_recompute_stale
+        args:
+        - name: limit
+          type: integer
+          required: false
+          default: "100"
+        returns:
+          type: record
+          description: Batch recompute result with counts (picked, recomputed, skipped, still_stale, failed)

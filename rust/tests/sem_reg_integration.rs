@@ -96,6 +96,14 @@ mod integration {
                 source: None,
                 constraints: None,
                 sinks: vec![],
+                category: None,
+                validation_rules: None,
+                applicability: None,
+                is_required: None,
+                default_value: None,
+                group_id: None,
+                is_derived: None,
+                derivation_spec_fqn: None,
             };
             let sid =
                 RegistryService::publish_attribute_def(&self.pool, &meta, &body, None).await?;
@@ -611,6 +619,14 @@ mod integration {
             source: None,
             constraints: None,
             sinks: vec![],
+            category: None,
+            validation_rules: None,
+            applicability: None,
+            is_required: None,
+            default_value: None,
+            group_id: None,
+            is_derived: None,
+            derivation_spec_fqn: None,
         };
         let v2_sid =
             RegistryService::publish_attribute_def(&db.pool, &meta_v2, &body_v2, None).await?;
@@ -1055,6 +1071,14 @@ mod integration {
             source: None,
             constraints: None,
             sinks: vec![],
+            category: None,
+            validation_rules: None,
+            applicability: None,
+            is_required: None,
+            default_value: None,
+            group_id: None,
+            is_derived: None,
+            derivation_spec_fqn: None,
         };
 
         // Build a synthetic SnapshotRow for extended gate evaluation
@@ -1121,6 +1145,14 @@ mod integration {
             source: None,
             constraints: None,
             sinks: vec![],
+            category: None,
+            validation_rules: None,
+            applicability: None,
+            is_required: None,
+            default_value: None,
+            group_id: None,
+            is_derived: None,
+            derivation_spec_fqn: None,
         };
 
         let row_b = SnapshotRow {

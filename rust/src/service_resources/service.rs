@@ -30,7 +30,7 @@ impl ServiceResourcePipelineService {
     // =========================================================================
 
     /// Create a new service intent
-    pub async fn create_service_intent(&self, input: &NewServiceIntent) -> Result<Uuid> {
+    pub(crate) async fn create_service_intent(&self, input: &NewServiceIntent) -> Result<Uuid> {
         let intent_id = Uuid::new_v4();
         let options = input.options.clone().unwrap_or(json!({}));
 
@@ -97,7 +97,8 @@ impl ServiceResourcePipelineService {
     }
 
     /// Cancel a service intent
-    pub async fn cancel_service_intent(&self, intent_id: Uuid) -> Result<bool> {
+    #[allow(dead_code)]
+    pub(crate) async fn cancel_service_intent(&self, intent_id: Uuid) -> Result<bool> {
         let result = sqlx::query(
             r#"
             UPDATE "ob-poc".service_intents
@@ -118,7 +119,7 @@ impl ServiceResourcePipelineService {
     // =========================================================================
 
     /// Record a discovery reason
-    pub async fn record_discovery(&self, input: &NewSrdefDiscovery) -> Result<Uuid> {
+    pub(crate) async fn record_discovery(&self, input: &NewSrdefDiscovery) -> Result<Uuid> {
         let discovery_id = Uuid::new_v4();
         let triggered_by = json!(input.triggered_by_intents);
         let parameters = input.parameters.clone().unwrap_or(json!({}));
@@ -188,7 +189,7 @@ impl ServiceResourcePipelineService {
 
     /// Upsert a unified attribute requirement
     #[allow(clippy::too_many_arguments)]
-    pub async fn upsert_unified_attr_requirement(
+    pub(crate) async fn upsert_unified_attr_requirement(
         &self,
         cbu_id: Uuid,
         attr_id: Uuid,
@@ -250,7 +251,7 @@ impl ServiceResourcePipelineService {
     }
 
     /// Clear unified attr requirements for a CBU (before rebuild)
-    pub async fn clear_unified_attr_requirements(&self, cbu_id: Uuid) -> Result<u64> {
+    pub(crate) async fn clear_unified_attr_requirements(&self, cbu_id: Uuid) -> Result<u64> {
         let result =
             sqlx::query(r#"DELETE FROM "ob-poc".cbu_unified_attr_requirements WHERE cbu_id = $1"#)
                 .bind(cbu_id)
@@ -269,7 +270,7 @@ impl ServiceResourcePipelineService {
     ///
     /// Derived values are persisted in the canonical `derived_attribute_values`
     /// table by the derivation engine — they must never be written here.
-    pub async fn set_cbu_attr_value(&self, input: &SetCbuAttrValue) -> Result<()> {
+    pub(crate) async fn set_cbu_attr_value(&self, input: &SetCbuAttrValue) -> Result<()> {
         if input.source == AttributeSource::Derived {
             anyhow::bail!(
                 "Derived values must not be written to cbu_attr_values — \
@@ -387,7 +388,7 @@ impl ServiceResourcePipelineService {
     // =========================================================================
 
     /// Create a provisioning request
-    pub async fn create_provisioning_request(
+    pub(crate) async fn create_provisioning_request(
         &self,
         input: &NewProvisioningRequest,
     ) -> Result<Uuid> {
@@ -460,7 +461,8 @@ impl ServiceResourcePipelineService {
     }
 
     /// Update provisioning request status
-    pub async fn update_request_status(
+    #[allow(dead_code)]
+    pub(crate) async fn update_request_status(
         &self,
         request_id: Uuid,
         status: ProvisioningStatus,
@@ -488,7 +490,7 @@ impl ServiceResourcePipelineService {
     // =========================================================================
 
     /// Record a provisioning event
-    pub async fn record_provisioning_event(
+    pub(crate) async fn record_provisioning_event(
         &self,
         request_id: Uuid,
         direction: EventDirection,
@@ -559,7 +561,7 @@ impl ServiceResourcePipelineService {
 
     /// Upsert service readiness
     #[allow(clippy::too_many_arguments)]
-    pub async fn upsert_service_readiness(
+    pub(crate) async fn upsert_service_readiness(
         &self,
         cbu_id: Uuid,
         product_id: Uuid,
@@ -639,7 +641,8 @@ impl ServiceResourcePipelineService {
     }
 
     /// Clear readiness for a CBU (before rebuild)
-    pub async fn clear_service_readiness(&self, cbu_id: Uuid) -> Result<u64> {
+    #[allow(dead_code)]
+    pub(crate) async fn clear_service_readiness(&self, cbu_id: Uuid) -> Result<u64> {
         let result = sqlx::query(r#"DELETE FROM "ob-poc".cbu_service_readiness WHERE cbu_id = $1"#)
             .bind(cbu_id)
             .execute(&self.pool)

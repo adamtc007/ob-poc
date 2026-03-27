@@ -812,6 +812,7 @@ impl CustomOperation for DocumentCheckExtractionCoverageOp {
 
 #[cfg(feature = "database")]
 #[derive(Debug, Clone)]
+#[allow(dead_code)] // Retained for callers outside the define handlers
 struct RegistryAttributeRow {
     uuid: Uuid,
 }
@@ -906,7 +907,7 @@ fn effective_description(display_name: &str, semos_description: Option<String>) 
 }
 
 #[cfg(feature = "database")]
-#[cfg(feature = "database")]
+#[allow(clippy::too_many_arguments)]
 fn build_attribute_def_body(
     semantic_id: &str,
     display_name: &str,
@@ -915,6 +916,10 @@ fn build_attribute_def_body(
     value_type: &str,
     evidence_grade: EvidenceGrade,
     derived: bool,
+    category: Option<String>,
+    validation_rules: Option<serde_json::Value>,
+    applicability: Option<serde_json::Value>,
+    derivation_spec_fqn: Option<String>,
 ) -> Result<AttributeDefBody> {
     Ok(AttributeDefBody {
         fqn: semantic_id.to_string(),
@@ -932,6 +937,14 @@ fn build_attribute_def_body(
         }),
         constraints: None,
         sinks: Vec::new(),
+        category,
+        validation_rules,
+        applicability,
+        is_required: None,
+        default_value: None,
+        group_id: None,
+        is_derived: Some(derived),
+        derivation_spec_fqn,
     })
 }
 
@@ -975,6 +988,7 @@ fn build_derivation_spec_body(
 
 #[cfg(feature = "database")]
 #[allow(clippy::too_many_arguments)]
+#[allow(dead_code)] // Retained for callers outside the define handlers
 async fn upsert_attribute_registry(
     tx: &mut Transaction<'_, Postgres>,
     semantic_id: &str,
@@ -1106,6 +1120,109 @@ async fn sync_attribute_registry_governance(
     .execute(&mut **tx)
     .await?;
     Ok(())
+}
+
+/// Materialize an AttributeDef snapshot definition into the operational attribute_registry.
+///
+/// This is the SemOS-first write path: the snapshot is the source of truth and
+/// the store row is a projection of it. Replaces the previous three-function
+/// pattern (`upsert_attribute_registry` + `patch_attribute_semos_metadata` +
+/// `sync_attribute_registry_governance`) for the define handlers.
+#[cfg(feature = "database")]
+#[allow(clippy::too_many_arguments)]
+async fn materialize_to_store(
+    tx: &mut Transaction<'_, Postgres>,
+    semantic_id: &str,
+    uuid: Uuid,
+    snapshot_id: Uuid,
+    definition: &serde_json::Value,
+    is_derived: bool,
+    derivation_spec_fqn: Option<&str>,
+) -> Result<Uuid> {
+    // Extract fields from the snapshot definition (source of truth)
+    let name = definition
+        .get("name")
+        .and_then(|v| v.as_str())
+        .unwrap_or(semantic_id);
+    let domain = definition
+        .get("domain")
+        .and_then(|v| v.as_str());
+    let data_type = definition
+        .get("data_type")
+        .and_then(|v| v.as_str())
+        .unwrap_or("text");
+    let evidence_grade = definition
+        .get("evidence_grade")
+        .and_then(|v| v.as_str())
+        .unwrap_or("none");
+    let category = definition
+        .get("category")
+        .and_then(|v| v.as_str());
+    let validation_rules = definition.get("validation_rules").cloned();
+    let applicability = definition.get("applicability").cloned();
+
+    let semos_metadata = json!({
+        "snapshot_id": snapshot_id,
+        "object_id": uuid,
+        "attribute_fqn": semantic_id,
+    });
+
+    let row = sqlx::query(
+        r#"
+        INSERT INTO "ob-poc".attribute_registry (
+            id, uuid, display_name, category, value_type, domain,
+            validation_rules, applicability, evidence_grade,
+            is_derived, derivation_spec_fqn, sem_reg_snapshot_id,
+            metadata
+        )
+        VALUES (
+            $1, $2, $3, $4, $5, $6,
+            COALESCE($7, '{}'::jsonb),
+            COALESCE($8, '{}'::jsonb),
+            $9,
+            $10,
+            $11,
+            $12,
+            jsonb_build_object('sem_os', $13::jsonb)
+        )
+        ON CONFLICT (id) DO UPDATE SET
+            display_name = EXCLUDED.display_name,
+            category = EXCLUDED.category,
+            value_type = EXCLUDED.value_type,
+            domain = EXCLUDED.domain,
+            validation_rules = COALESCE(EXCLUDED.validation_rules, "ob-poc".attribute_registry.validation_rules),
+            applicability = COALESCE(EXCLUDED.applicability, "ob-poc".attribute_registry.applicability),
+            evidence_grade = EXCLUDED.evidence_grade,
+            is_derived = EXCLUDED.is_derived,
+            derivation_spec_fqn = EXCLUDED.derivation_spec_fqn,
+            sem_reg_snapshot_id = EXCLUDED.sem_reg_snapshot_id,
+            metadata = jsonb_set(
+                COALESCE("ob-poc".attribute_registry.metadata, '{}'::jsonb),
+                '{sem_os}',
+                COALESCE("ob-poc".attribute_registry.metadata->'sem_os', '{}'::jsonb) || $13::jsonb,
+                true
+            ),
+            updated_at = NOW()
+        RETURNING uuid
+        "#,
+    )
+    .bind(semantic_id)        // $1
+    .bind(uuid)               // $2
+    .bind(name)               // $3
+    .bind(category)           // $4
+    .bind(data_type)          // $5
+    .bind(domain)             // $6
+    .bind(validation_rules)   // $7
+    .bind(applicability)      // $8
+    .bind(evidence_grade)     // $9
+    .bind(is_derived)         // $10
+    .bind(derivation_spec_fqn) // $11
+    .bind(snapshot_id)        // $12
+    .bind(semos_metadata)     // $13
+    .fetch_one(&mut **tx)
+    .await?;
+
+    Ok(row.get("uuid"))
 }
 
 #[cfg(feature = "database")]
@@ -1308,23 +1425,11 @@ impl CustomOperation for AttributeDefineGovernedOp {
         let validation_rules = parse_json_arg(verb_call, "validation-rules")?;
         let applicability = parse_json_arg(verb_call, "applicability")?;
 
-        let mut tx = pool.begin().await?;
-        let registry = upsert_attribute_registry(
-            &mut tx,
-            &semantic_id,
-            &display_name,
-            &category,
-            &value_type,
-            domain.as_deref(),
-            validation_rules,
-            applicability,
-            evidence_grade,
-            false,
-            None,
-            None,
-        )
-        .await?;
+        // ── Step 1: Generate deterministic UUID (used as both registry uuid and SemOS object_id) ──
+        let object_id =
+            crate::sem_reg::ids::object_id_for(ObjectType::AttributeDef, &semantic_id);
 
+        // ── Step 2: Build the full AttributeDef body with ALL fields populated ──
         let body = build_attribute_def_body(
             &semantic_id,
             &display_name,
@@ -1339,10 +1444,20 @@ impl CustomOperation for AttributeDefineGovernedOp {
             &value_type,
             evidence_grade,
             false,
+            Some(category),
+            validation_rules,
+            applicability,
+            None, // not derived
         )?;
         let definition = serde_json::to_value(&body)?;
+
+        // ── Step 3: Check predecessor via SnapshotStore::resolve_active() ──
         let predecessor =
-            SnapshotStore::resolve_active(pool, ObjectType::AttributeDef, registry.uuid).await?;
+            SnapshotStore::resolve_active(pool, ObjectType::AttributeDef, object_id).await?;
+
+        let mut tx = pool.begin().await?;
+
+        // ── Step 4: Publish snapshot — SemOS FIRST ──
         let snapshot_id = if hashes_match(predecessor.as_ref(), &definition) {
             predecessor
                 .as_ref()
@@ -1357,7 +1472,7 @@ impl CustomOperation for AttributeDefineGovernedOp {
             let meta = next_meta_from_predecessor(
                 predecessor.as_ref(),
                 ObjectType::AttributeDef,
-                registry.uuid,
+                object_id,
                 ctx.audit_user.as_deref().unwrap_or("attribute.define"),
                 if predecessor.is_some() {
                     ChangeType::NonBreaking
@@ -1370,29 +1485,21 @@ impl CustomOperation for AttributeDefineGovernedOp {
             publish_snapshot_in_tx(&mut tx, &meta, &definition).await?
         };
 
-        patch_attribute_semos_metadata(
+        // ── Step 5: Project snapshot to store ──
+        let registry_uuid = materialize_to_store(
             &mut tx,
             &semantic_id,
-            json!({
-                "snapshot_id": snapshot_id,
-                "object_id": registry.uuid,
-                "attribute_fqn": semantic_id,
-            }),
-        )
-        .await?;
-        sync_attribute_registry_governance(
-            &mut tx,
-            &semantic_id,
-            Some(snapshot_id),
+            object_id,
+            snapshot_id,
+            &definition,
             false,
             None,
-            evidence_grade,
         )
         .await?;
 
         tx.commit().await?;
-        ctx.bind("attribute", registry.uuid);
-        Ok(ExecutionResult::Uuid(registry.uuid))
+        ctx.bind("attribute", registry_uuid);
+        Ok(ExecutionResult::Uuid(registry_uuid))
     }
 
     #[cfg(not(feature = "database"))]
@@ -1451,23 +1558,13 @@ impl CustomOperation for AttributeDefineDerivedOp {
             parse_null_semantics(optional_string_arg(verb_call, "null-semantics"))?;
         let freshness_seconds = optional_int_arg(verb_call, "freshness-seconds");
 
-        let mut tx = pool.begin().await?;
-        let registry = upsert_attribute_registry(
-            &mut tx,
-            &semantic_id,
-            &display_name,
-            &category,
-            &value_type,
-            domain.as_deref(),
-            None,
-            None,
-            evidence_grade,
-            true,
-            Some(&semantic_id),
-            Some(json!({"lineage_plane": "below_line"})),
-        )
-        .await?;
+        // ── Step 1: Generate deterministic UUIDs ──
+        let object_id =
+            crate::sem_reg::ids::object_id_for(ObjectType::AttributeDef, &semantic_id);
+        let derivation_object_id =
+            crate::sem_reg::ids::object_id_for(ObjectType::DerivationSpec, &semantic_id);
 
+        // ── Step 2: Build full AttributeDef + DerivationSpec bodies with ALL fields ──
         let attr_body = build_attribute_def_body(
             &semantic_id,
             &display_name,
@@ -1476,6 +1573,10 @@ impl CustomOperation for AttributeDefineDerivedOp {
             &value_type,
             evidence_grade,
             true,
+            Some(category),
+            None, // no validation_rules for derived
+            None, // no applicability for derived
+            Some(semantic_id.clone()), // derivation_spec_fqn
         )?;
         let derivation_body = build_derivation_spec_body(
             &semantic_id,
@@ -1490,14 +1591,16 @@ impl CustomOperation for AttributeDefineDerivedOp {
         let attr_definition = serde_json::to_value(&attr_body)?;
         let derivation_definition = serde_json::to_value(&derivation_body)?;
 
+        // ── Step 3: Check predecessors via SnapshotStore::resolve_active() ──
         let attr_predecessor =
-            SnapshotStore::resolve_active(pool, ObjectType::AttributeDef, registry.uuid).await?;
-        let derivation_object_id =
-            crate::sem_reg::ids::object_id_for(ObjectType::DerivationSpec, &semantic_id);
+            SnapshotStore::resolve_active(pool, ObjectType::AttributeDef, object_id).await?;
         let derivation_predecessor =
             SnapshotStore::resolve_active(pool, ObjectType::DerivationSpec, derivation_object_id)
                 .await?;
 
+        let mut tx = pool.begin().await?;
+
+        // ── Step 4: Publish snapshots — SemOS FIRST ──
         let attr_snapshot_id = if hashes_match(attr_predecessor.as_ref(), &attr_definition)
             && hashes_match(derivation_predecessor.as_ref(), &derivation_definition)
         {
@@ -1511,7 +1614,7 @@ impl CustomOperation for AttributeDefineDerivedOp {
             let attr_meta = next_meta_from_predecessor(
                 attr_predecessor.as_ref(),
                 ObjectType::AttributeDef,
-                registry.uuid,
+                object_id,
                 ctx.audit_user
                     .as_deref()
                     .unwrap_or("attribute.define-derived"),
@@ -1567,33 +1670,21 @@ impl CustomOperation for AttributeDefineDerivedOp {
             let _ = previous.snapshot_id;
         }
 
-        patch_attribute_semos_metadata(
+        // ── Step 5: Project snapshot to store ──
+        let registry_uuid = materialize_to_store(
             &mut tx,
             &semantic_id,
-            json!({
-                "snapshot_id": attr_snapshot_id,
-                "object_id": registry.uuid,
-                "attribute_fqn": semantic_id,
-                "derivation_snapshot_id": derivation_snapshot_id,
-                "derivation_object_id": derivation_object_id,
-                "lineage_plane": "below_line",
-                "derived": true,
-            }),
-        )
-        .await?;
-        sync_attribute_registry_governance(
-            &mut tx,
-            &semantic_id,
-            Some(attr_snapshot_id),
+            object_id,
+            attr_snapshot_id,
+            &attr_definition,
             true,
             Some(&semantic_id),
-            evidence_grade,
         )
         .await?;
 
         tx.commit().await?;
-        ctx.bind("attribute", registry.uuid);
-        Ok(ExecutionResult::Uuid(registry.uuid))
+        ctx.bind("attribute", registry_uuid);
+        Ok(ExecutionResult::Uuid(registry_uuid))
     }
 
     #[cfg(not(feature = "database"))]
@@ -1959,5 +2050,175 @@ impl CustomOperation for AttributeInspectOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow!("attribute.inspect requires database"))
+    }
+}
+
+/// Recompute stale derived values from the canonical queue.
+#[register_custom_op]
+pub struct DerivationRecomputeStaleOp;
+
+#[async_trait]
+impl CustomOperation for DerivationRecomputeStaleOp {
+    fn domain(&self) -> &'static str {
+        "derivation"
+    }
+    fn verb(&self) -> &'static str {
+        "recompute-stale"
+    }
+    fn rationale(&self) -> &'static str {
+        "Triggers batch recomputation of stale derived values"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let limit = optional_int_arg(verb_call, "limit").unwrap_or(100);
+        let engine = crate::service_resources::PopulationEngine::new(pool);
+        let result = engine.recompute_stale_batch(limit).await?;
+        Ok(ExecutionResult::Record(json!({
+            "picked": result.picked,
+            "recomputed": result.recomputed,
+            "skipped_already_current": result.skipped_already_current,
+            "still_stale": result.still_stale,
+            "failed": result.failed
+        })))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow!("derivation.recompute-stale requires database"))
+    }
+}
+
+/// Publish SemOS AttributeDef snapshots for store attributes lacking governance.
+#[register_custom_op]
+pub struct AttributeBridgeToSemosOp;
+
+#[async_trait]
+impl CustomOperation for AttributeBridgeToSemosOp {
+    fn domain(&self) -> &'static str {
+        "attribute"
+    }
+    fn verb(&self) -> &'static str {
+        "bridge-to-semos"
+    }
+    fn rationale(&self) -> &'static str {
+        "Bulk-publishes SemOS snapshots for ungoverned store attributes"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let limit = optional_int_arg(verb_call, "limit").unwrap_or(100);
+
+        // Find store attributes without SemOS snapshots
+        let rows: Vec<(String, Uuid, String, String, String, Option<String>, Option<serde_json::Value>, Option<serde_json::Value>, String)> = sqlx::query_as(
+            r#"
+            SELECT id, uuid, display_name, category, value_type, domain,
+                   validation_rules, applicability, evidence_grade
+            FROM "ob-poc".attribute_registry
+            WHERE sem_reg_snapshot_id IS NULL
+            ORDER BY id
+            LIMIT $1
+            "#,
+        )
+        .bind(limit)
+        .fetch_all(pool)
+        .await?;
+
+        let mut bridged = 0u64;
+        let mut failed = 0u64;
+        let total = rows.len();
+
+        for (semantic_id, _uuid, display_name, category, value_type, domain, validation_rules, applicability, evidence_grade_str) in &rows {
+            let evidence_grade = evidence_grade_str
+                .parse::<EvidenceGrade>()
+                .unwrap_or(EvidenceGrade::None);
+            let domain_str = domain
+                .clone()
+                .unwrap_or_else(|| semantic_id.split('.').next().unwrap_or("attribute").to_string());
+
+            let body = build_attribute_def_body(
+                semantic_id,
+                display_name,
+                display_name.clone(),
+                domain_str,
+                value_type,
+                evidence_grade,
+                false,
+                Some(category.clone()),
+                validation_rules.clone(),
+                applicability.clone(),
+                None,
+            )?;
+            let definition = serde_json::to_value(&body)?;
+
+            let object_id =
+                crate::sem_reg::ids::object_id_for(ObjectType::AttributeDef, semantic_id);
+            // Skip if SemOS already has this
+            if SnapshotStore::resolve_active(pool, ObjectType::AttributeDef, object_id)
+                .await?
+                .is_some()
+            {
+                continue;
+            }
+
+            let mut tx = pool.begin().await?;
+            let meta = next_meta_from_predecessor(
+                None,
+                ObjectType::AttributeDef,
+                object_id,
+                ctx.audit_user.as_deref().unwrap_or("attribute.bridge-to-semos"),
+                ChangeType::Created,
+                None,
+                SnapshotStatus::Active,
+            );
+            match publish_snapshot_in_tx(&mut tx, &meta, &definition).await {
+                Ok(snapshot_id) => {
+                    sqlx::query(
+                        r#"UPDATE "ob-poc".attribute_registry SET sem_reg_snapshot_id = $1, updated_at = NOW() WHERE id = $2"#,
+                    )
+                    .bind(snapshot_id)
+                    .bind(semantic_id)
+                    .execute(&mut *tx)
+                    .await?;
+                    tx.commit().await?;
+                    bridged += 1;
+                }
+                Err(e) => {
+                    tx.rollback().await?;
+                    tracing::warn!(semantic_id = %semantic_id, error = %e, "Failed to bridge attribute to SemOS");
+                    failed += 1;
+                }
+            }
+        }
+
+        Ok(ExecutionResult::Record(json!({
+            "total_candidates": total,
+            "bridged": bridged,
+            "already_governed": total as u64 - bridged - failed,
+            "failed": failed
+        })))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow!("attribute.bridge-to-semos requires database"))
     }
 }

@@ -1051,3 +1051,49 @@ domains:
           default: false
         returns:
           type: record
+
+      # === SemOS Gap Discovery ===
+      check-attribute-gaps:
+        description: Cross-reference SRDEF attribute requirements against SemOS active AttributeDefs
+        metadata:
+          tier: diagnostics
+          source_of_truth: sem_reg
+          scope: global
+          noun: service_resource
+          phase_tags: [stewardship]
+          side_effects: facts_only
+        invocation_phrases:
+        - "check attribute gaps for service resources"
+        - "what attributes are missing from service resource definitions"
+        - "show SRDEF attribute coverage"
+        - "which attributes do SRDEFs need that are not defined"
+        - "service resource attribute gap analysis"
+        - "audit SRDEF attribute requirements"
+        behavior: plugin
+        handler: service_resource_check_attribute_gaps
+        args: []
+        returns:
+          type: record_set
+          description: List of {srdef_id, attribute_fqn, status} where status is missing/ungoverned/ok
+
+      sync-definitions:
+        description: Re-sync service resource definitions from YAML config to database
+        metadata:
+          tier: intent
+          source_of_truth: config
+          scope: global
+          noun: service_resource
+          phase_tags: [stewardship]
+          side_effects: state_write
+        invocation_phrases:
+        - "sync service resource definitions"
+        - "reload SRDEF configuration"
+        - "re-sync service resource types from config"
+        - "refresh service resource definitions"
+        - "update service resource types"
+        behavior: plugin
+        handler: service_resource_sync_definitions
+        args: []
+        returns:
+          type: record
+          description: Sync report with counts of synced SRDEFs, attribute requirements, and skipped attributes

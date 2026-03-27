@@ -731,3 +731,31 @@ domains:
             type: string
             required: true
             description: "Document type code"
+
+      bridge-to-semos:
+        description: Publish SemOS AttributeDef snapshots for store attributes that lack governance
+        metadata:
+          tier: intent
+          source_of_truth: sem_reg
+          scope: global
+          noun: attribute
+          phase_tags: [stewardship]
+          side_effects: state_write
+        invocation_phrases:
+        - "bridge attributes to semos"
+        - "publish ungoverned attributes to semantic os"
+        - "create semos snapshots for store-only attributes"
+        - "govern existing attributes in semantic os"
+        - "reconcile attribute registry with semos"
+        - "bulk define attributes into semos"
+        behavior: plugin
+        handler: attribute_bridge_to_semos
+        args:
+        - name: limit
+          type: integer
+          required: false
+          default: "100"
+          description: "Maximum number of attributes to bridge in one batch"
+        returns:
+          type: record
+          description: Bridge result with counts (bridged, already_governed, failed)

@@ -77,7 +77,7 @@ impl AttributeIdentityService {
                     NULL::jsonb AS source_config,
                     NULL::jsonb AS sink_config,
                     NULL::varchar AS group_id,
-                    2 AS precedence
+                    0 AS precedence
                 FROM sem_reg.v_active_attribute_defs sad
                 WHERE sad.fqn = $1
 
@@ -97,16 +97,16 @@ impl AttributeIdentityService {
                     d.sink AS sink_config,
                     COALESCE(ar.group_id, d.group_id) AS group_id,
                     CASE
-                        WHEN ar.uuid::text = $1 OR d.attribute_id::text = $1 THEN 0
-                        WHEN ar.id = $1 THEN 1
-                        WHEN ar.metadata #>> '{sem_os,attribute_fqn}' = $1 THEN 2
+                        WHEN ar.uuid::text = $1 OR d.attribute_id::text = $1 THEN 1
+                        WHEN ar.id = $1 THEN 2
+                        WHEN ar.metadata #>> '{sem_os,attribute_fqn}' = $1 THEN 3
                         WHEN EXISTS (
                             SELECT 1
                             FROM jsonb_array_elements_text(COALESCE(ar.metadata #> '{sem_os,aliases}', '[]'::jsonb)) alias(value)
                             WHERE alias.value = $1
-                        ) THEN 2
-                        WHEN LOWER(ar.display_name) = LOWER($1) THEN 3
-                        WHEN d.name = $1 THEN 4
+                        ) THEN 3
+                        WHEN LOWER(ar.display_name) = LOWER($1) THEN 4
+                        WHEN d.name = $1 THEN 5
                         ELSE 10
                     END AS precedence
                 FROM "ob-poc".attribute_registry ar

@@ -1120,3 +1120,129 @@ impl CustomOperation for PipelineFullOp {
         Err(anyhow::anyhow!("Database feature required"))
     }
 }
+
+// =============================================================================
+// Service Resource Definition Management
+// =============================================================================
+
+/// Check attribute gaps across SRDEF requirements vs SemOS governance and attribute registry.
+#[register_custom_op]
+pub struct ServiceResourceCheckAttributeGapsOp;
+
+#[async_trait]
+impl CustomOperation for ServiceResourceCheckAttributeGapsOp {
+    fn domain(&self) -> &'static str {
+        "service-resource"
+    }
+    fn verb(&self) -> &'static str {
+        "check-attribute-gaps"
+    }
+    fn rationale(&self) -> &'static str {
+        "Cross-references SRDEF attribute requirements against SemOS and attribute registry"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        use crate::service_resources::load_srdefs_from_config;
+
+        let registry = load_srdefs_from_config().unwrap_or_default();
+
+        let mut gap_rows: Vec<serde_json::Value> = Vec::new();
+
+        for (srdef_id, srdef) in &registry.srdefs {
+            for attr in &srdef.attributes {
+                // Check attribute_registry
+                let in_registry: bool = sqlx::query_scalar(
+                    r#"SELECT EXISTS(SELECT 1 FROM "ob-poc".attribute_registry WHERE id = $1)"#,
+                )
+                .bind(&attr.attr_id)
+                .fetch_one(pool)
+                .await
+                .unwrap_or(false);
+
+                // Check SemOS active attribute defs
+                let in_semos: bool = sqlx::query_scalar(
+                    r#"SELECT EXISTS(
+                        SELECT 1 FROM sem_reg.v_active_attribute_defs WHERE semantic_id = $1
+                    )"#,
+                )
+                .bind(&attr.attr_id)
+                .fetch_one(pool)
+                .await
+                .unwrap_or(false);
+
+                let status = match (in_registry, in_semos) {
+                    (true, true) => "ok",
+                    (true, false) => "ungoverned",
+                    (false, _) => "missing",
+                };
+
+                gap_rows.push(json!({
+                    "srdef_id": srdef_id,
+                    "attribute_fqn": attr.attr_id,
+                    "status": status
+                }));
+            }
+        }
+
+        Ok(ExecutionResult::RecordSet(gap_rows))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow::anyhow!("Database feature required"))
+    }
+}
+
+/// Sync SRDEF definitions from config files to the database.
+#[register_custom_op]
+pub struct ServiceResourceSyncDefinitionsOp;
+
+#[async_trait]
+impl CustomOperation for ServiceResourceSyncDefinitionsOp {
+    fn domain(&self) -> &'static str {
+        "service-resource"
+    }
+    fn verb(&self) -> &'static str {
+        "sync-definitions"
+    }
+    fn rationale(&self) -> &'static str {
+        "Loads SRDEF configs from disk and syncs them to the database"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        use crate::service_resources::load_and_sync_srdefs;
+
+        let (_registry, sync_result) = load_and_sync_srdefs(pool).await?;
+
+        Ok(ExecutionResult::Record(json!({
+            "inserted": sync_result.inserted,
+            "updated": sync_result.updated,
+            "errors": sync_result.errors
+        })))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow::anyhow!("Database feature required"))
+    }
+}

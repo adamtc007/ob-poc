@@ -207,6 +207,14 @@ mod tests {
             constraints: None,
             sinks: vec![],
             evidence_grade: sem_os_core::types::EvidenceGrade::None,
+            category: None,
+            validation_rules: None,
+            applicability: None,
+            is_required: None,
+            default_value: None,
+            group_id: None,
+            is_derived: None,
+            derivation_spec_fqn: None,
         };
         let mut req = minimal_request();
         req.attributes = vec![attr.clone(), attr];
@@ -226,6 +234,14 @@ mod tests {
             constraints: None,
             sinks: vec![],
             evidence_grade: sem_os_core::types::EvidenceGrade::None,
+            category: None,
+            validation_rules: None,
+            applicability: None,
+            is_required: None,
+            default_value: None,
+            group_id: None,
+            is_derived: None,
+            derivation_spec_fqn: None,
         };
         let mut req = minimal_request();
         req.attributes = vec![attr];

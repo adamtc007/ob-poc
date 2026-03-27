@@ -1,0 +1,104 @@
+id: semos-maintenance
+name: SemOS Maintenance
+version: "1.0"
+description: >
+  Govern the SemOS registry. Author changesets for attributes, verbs,
+  schemas, and constellations. Submit for review, validate, dry-run,
+  and publish. Bridge ungoverned attributes. Recompute derived values.
+
+invocation_phrases:
+  - "semos maintenance"
+  - "registry governance"
+  - "manage the registry"
+  - "semantic os maintenance"
+  - "attribute governance"
+  - "stewardship workspace"
+
+required_context: []
+optional_context:
+  - changeset_id
+
+workspaces:
+  - sem_os_maintenance
+
+allowed_verbs:
+  - changeset.compose
+  - changeset.add-item
+  - changeset.remove-item
+  - changeset.refine-item
+  - changeset.suggest
+  - changeset.apply-template
+  - changeset.attach-basis
+  - changeset.validate-edit
+  - changeset.cross-reference
+  - changeset.impact-analysis
+  - changeset.resolve-conflict
+  - changeset.list
+  - changeset.get
+  - changeset.diff
+  - governance.gate-precheck
+  - governance.submit-for-review
+  - governance.record-review
+  - governance.validate
+  - governance.dry-run
+  - governance.plan-publish
+  - governance.publish
+  - governance.publish-batch
+  - governance.rollback
+  - registry.describe-object
+  - registry.search
+  - attribute.define
+  - attribute.define-derived
+  - attribute.inspect
+  - attribute.classify
+  - attribute.set-evidence-grade
+  - attribute.deprecate
+  - attribute.bridge-to-semos
+  - attribute.read
+  - attribute.list
+  - typed-attribute.record
+  - typed-attribute.get
+  - typed-attribute.list-for-entity
+  - derivation.recompute-stale
+  - service-resource.check-attribute-gaps
+  - service-resource.sync-definitions
+
+forbidden_verbs: []
+
+risk_policy:
+  require_confirm_before_execute: true
+  max_steps_without_confirm: 3
+
+section_layout:
+  - title: "Attribute Lifecycle"
+    verb_prefixes:
+      - "attribute."
+      - "typed-attribute."
+      - "derivation."
+  - title: "Service Resources"
+    verb_prefixes:
+      - "service-resource."
+  - title: "Changeset Authoring"
+    verb_prefixes:
+      - "changeset."
+  - title: "Governance"
+    verb_prefixes:
+      - "governance."
+  - title: "Registry"
+    verb_prefixes:
+      - "registry."
+
+definition_of_done:
+  - "All required attributes defined in SemOS"
+  - "Service resource definitions synced"
+  - "Attribute gaps resolved"
+
+progress_signals:
+  - signal: attributes_defined
+    description: "Required attributes defined in SemOS"
+  - signal: gaps_resolved
+    description: "SRDEF attribute gaps resolved"
+  - signal: derivations_current
+    description: "Stale derived values recomputed"
+
+handoff_target: null

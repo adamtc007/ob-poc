@@ -1,15 +1,15 @@
-//! Sink execution service for persisting attribute values to various destinations
+//! Sink execution service — DEPRECATED.
 //!
-//! Actual schema for attribute_values_typed:
-//! - entity_id (UUID, NOT NULL)
-//! - attribute_id (text, NOT NULL) - references attribute_registry.id
-//! - value_text, value_number, value_integer, value_boolean, value_date, value_datetime, value_json
+//! Typed attribute values are now persisted through the canonical DSL verb
+//! `typed-attribute.record` (CRUD insert into `attribute_values_typed`).
+//!
+//! This module is retained only for backward-compatible re-exports.
+//! No raw INSERT statements remain here.
 
 use crate::data_dictionary::{AttributeId, DbAttributeDefinition};
 use async_trait::async_trait;
 use serde_json::Value;
 use sqlx::PgPool;
-use std::str::FromStr;
 use uuid::Uuid;
 
 #[async_trait]
@@ -23,133 +23,29 @@ pub trait SinkExecutor: Send + Sync {
     ) -> Result<(), String>;
 }
 
+/// Composite sink executor — routes to the canonical DSL verb pipeline.
+///
+/// Direct database writes have been removed. Use `typed-attribute.record`
+/// verb instead.
 pub struct CompositeSinkExecutor {
-    database_sink: Box<dyn SinkExecutor>,
+    _pool: PgPool,
 }
 
 impl CompositeSinkExecutor {
     pub fn new(pool: PgPool) -> Self {
-        Self {
-            database_sink: Box::new(DatabaseSink::new(pool)),
-        }
+        Self { _pool: pool }
     }
 
     pub async fn persist_to_all_sinks(
         &self,
-        attribute_id: &AttributeId,
-        value: &Value,
-        definition: &DbAttributeDefinition,
-        entity_id: Uuid,
-    ) -> Result<(), String> {
-        // Always persist to database
-        self.database_sink
-            .persist_value(attribute_id, value, definition, entity_id)
-            .await?;
-
-        // Additional sinks can be added here based on sink_config
-        if let Some(sink_config) = &definition.sink_config {
-            for _destination in &sink_config.destinations {
-                // Future: implement webhook, cache, API sinks
-            }
-        }
-
-        Ok(())
-    }
-}
-
-// Database sink implementation
-struct DatabaseSink {
-    pool: PgPool,
-}
-
-impl DatabaseSink {
-    fn new(pool: PgPool) -> Self {
-        Self { pool }
-    }
-}
-
-#[async_trait]
-impl SinkExecutor for DatabaseSink {
-    async fn persist_value(
-        &self,
-        attribute_id: &AttributeId,
-        value: &Value,
+        _attribute_id: &AttributeId,
+        _value: &Value,
         _definition: &DbAttributeDefinition,
-        entity_id: Uuid,
+        _entity_id: Uuid,
     ) -> Result<(), String> {
-        // Persist to attribute_values_typed based on value type
-        // Schema: entity_id, attribute_id (text), value_text/value_number/value_boolean/value_json
-
-        let attr_id_str = attribute_id.to_string();
-
-        match value {
-            Value::String(s) => {
-                sqlx::query!(
-                    r#"
-                    INSERT INTO "ob-poc".attribute_values_typed (
-                        entity_id, attribute_id, value_text
-                    ) VALUES ($1, $2, $3)
-                    "#,
-                    entity_id,
-                    attr_id_str,
-                    s
-                )
-                .execute(&self.pool)
-                .await
-                .map_err(|e| format!("Failed to persist string value: {}", e))?;
-            }
-            Value::Number(n) => {
-                let decimal = bigdecimal::BigDecimal::from_str(&n.to_string())
-                    .map_err(|e| format!("Failed to parse number: {}", e))?;
-                sqlx::query!(
-                    r#"
-                    INSERT INTO "ob-poc".attribute_values_typed (
-                        entity_id, attribute_id, value_number
-                    ) VALUES ($1, $2, $3)
-                    "#,
-                    entity_id,
-                    attr_id_str,
-                    decimal
-                )
-                .execute(&self.pool)
-                .await
-                .map_err(|e| format!("Failed to persist number value: {}", e))?;
-            }
-            Value::Bool(b) => {
-                sqlx::query!(
-                    r#"
-                    INSERT INTO "ob-poc".attribute_values_typed (
-                        entity_id, attribute_id, value_boolean
-                    ) VALUES ($1, $2, $3)
-                    "#,
-                    entity_id,
-                    attr_id_str,
-                    b
-                )
-                .execute(&self.pool)
-                .await
-                .map_err(|e| format!("Failed to persist boolean value: {}", e))?;
-            }
-            Value::Object(_) | Value::Array(_) => {
-                sqlx::query!(
-                    r#"
-                    INSERT INTO "ob-poc".attribute_values_typed (
-                        entity_id, attribute_id, value_json
-                    ) VALUES ($1, $2, $3)
-                    "#,
-                    entity_id,
-                    attr_id_str,
-                    value
-                )
-                .execute(&self.pool)
-                .await
-                .map_err(|e| format!("Failed to persist JSON value: {}", e))?;
-            }
-            Value::Null => {
-                // Skip null values
-            }
-        }
-
-        Ok(())
+        Err(
+            "Direct sink writes are deprecated. Use the typed-attribute.record DSL verb instead."
+                .into(),
+        )
     }
 }

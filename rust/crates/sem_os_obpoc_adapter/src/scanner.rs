@@ -458,6 +458,14 @@ pub fn infer_attributes_from_verbs(
                     }),
                     constraints: None,
                     sinks: vec![],
+                    category: None,
+                    validation_rules: None,
+                    applicability: None,
+                    is_required: None,
+                    default_value: None,
+                    group_id: None,
+                    is_derived: None,
+                    derivation_spec_fqn: None,
                 });
             }
         }

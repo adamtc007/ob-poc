@@ -27,5 +27,8 @@ workspaces:
       - fund_onboarding
       - manager_onboarding
       - governance_sla
+  SemOsMaintenance:
+    families:
+      - registry_governance
   "*":
     families: []

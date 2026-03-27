@@ -204,6 +204,14 @@ async fn seed_attribute_def(pool: &PgPool, candidate: &AttributeCandidate) -> Re
             valid_values: None,
         }),
         sinks: vec![],
+        category: None,
+        validation_rules: None,
+        applicability: None,
+        is_required: None,
+        default_value: None,
+        group_id: None,
+        is_derived: None,
+        derivation_spec_fqn: None,
     };
 
     publish_idempotent(pool, ObjectType::AttributeDef, &fqn, &body).await
