@@ -474,6 +474,10 @@ pub enum SourceOfTruth {
     Register,
     /// Document catalog - document artifacts and metadata
     Document,
+    /// SemOS semantic registry - governed snapshots are canonical
+    SemReg,
+    /// Configuration files - YAML/TOML seed data
+    Config,
 }
 
 /// Scope of a verb

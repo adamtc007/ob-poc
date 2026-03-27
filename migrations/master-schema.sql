@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict bYWSMDcalNcaRwVDBWfQBwXMcizwidlxx4Uq5PLlYHsw1ljwfchnNp2KLTexMBX
+\restrict DVmTrOHMsNqBItW7lxNUVNgSHUgz0DoIV3PMkl5pQpPUzihL0acDvr2gAL4c5pp
 
 -- Dumped from database version 18.1 (Homebrew)
 -- Dumped by pg_dump version 18.1 (Homebrew)
@@ -6611,6 +6611,110 @@ CREATE FUNCTION sem_reg.count_active(p_object_type sem_reg.object_type DEFAULT N
       AND (p_object_type IS NULL OR s.object_type = p_object_type)
     GROUP BY s.object_type
     ORDER BY s.object_type;
+$$;
+
+
+--
+-- Name: materialize_attribute_def_to_registry(); Type: FUNCTION; Schema: sem_reg; Owner: -
+--
+
+CREATE FUNCTION sem_reg.materialize_attribute_def_to_registry() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_fqn          text;
+    v_uuid         uuid;
+    v_name         text;
+    v_domain       text;
+    v_data_type    text;
+    v_category     text;
+    v_evidence     text;
+    v_is_derived   boolean;
+    v_deriv_fqn    text;
+    v_val_rules    jsonb;
+    v_applicability jsonb;
+BEGIN
+    -- Only fire for active attribute_def snapshots that are not yet superseded
+    IF NEW.object_type::text <> 'attribute_def'
+       OR NEW.status::text <> 'active'
+       OR NEW.effective_until IS NOT NULL
+    THEN
+        RETURN NEW;
+    END IF;
+
+    -- Extract fields from the snapshot definition
+    v_fqn          := NEW.definition ->> 'fqn';
+    v_name         := NEW.definition ->> 'name';
+    v_domain       := NEW.definition ->> 'domain';
+    v_data_type    := NEW.definition ->> 'data_type';
+    v_category     := NEW.definition ->> 'category';
+    v_evidence     := COALESCE(NEW.definition ->> 'evidence_grade', 'none');
+    v_is_derived   := COALESCE((NEW.definition ->> 'is_derived')::boolean, false);
+    v_deriv_fqn    := NEW.definition ->> 'derivation_spec_fqn';
+    v_val_rules    := NEW.definition -> 'validation_rules';
+    v_applicability := NEW.definition -> 'applicability';
+
+    -- Cannot materialize without an FQN
+    IF v_fqn IS NULL THEN
+        RETURN NEW;
+    END IF;
+
+    -- Deterministic UUID from the object_id (same logic as Rust object_id_for)
+    v_uuid := NEW.object_id;
+
+    INSERT INTO "ob-poc".attribute_registry (
+        id, uuid, display_name, category, value_type, domain,
+        validation_rules, applicability, evidence_grade,
+        is_derived, derivation_spec_fqn, sem_reg_snapshot_id,
+        metadata, created_at, updated_at
+    )
+    VALUES (
+        v_fqn,
+        v_uuid,
+        COALESCE(v_name, v_fqn),
+        COALESCE(v_category, 'entity'),
+        COALESCE(v_data_type, 'string'),
+        v_domain,
+        COALESCE(v_val_rules, '{}'::jsonb),
+        COALESCE(v_applicability, '{}'::jsonb),
+        v_evidence,
+        v_is_derived,
+        v_deriv_fqn,
+        NEW.snapshot_id,
+        jsonb_build_object('sem_os', jsonb_build_object(
+            'snapshot_id', NEW.snapshot_id,
+            'object_id', NEW.object_id,
+            'attribute_fqn', v_fqn
+        )),
+        NOW(),
+        NOW()
+    )
+    ON CONFLICT (id) DO UPDATE SET
+        display_name        = EXCLUDED.display_name,
+        category            = EXCLUDED.category,
+        value_type          = EXCLUDED.value_type,
+        domain              = EXCLUDED.domain,
+        validation_rules    = COALESCE(EXCLUDED.validation_rules, "ob-poc".attribute_registry.validation_rules),
+        applicability       = COALESCE(EXCLUDED.applicability, "ob-poc".attribute_registry.applicability),
+        evidence_grade      = EXCLUDED.evidence_grade,
+        is_derived          = EXCLUDED.is_derived,
+        derivation_spec_fqn = EXCLUDED.derivation_spec_fqn,
+        sem_reg_snapshot_id = EXCLUDED.sem_reg_snapshot_id,
+        metadata            = jsonb_set(
+            COALESCE("ob-poc".attribute_registry.metadata, '{}'::jsonb),
+            '{sem_os}',
+            COALESCE("ob-poc".attribute_registry.metadata -> 'sem_os', '{}'::jsonb)
+                || jsonb_build_object(
+                    'snapshot_id', NEW.snapshot_id,
+                    'object_id', NEW.object_id,
+                    'attribute_fqn', v_fqn
+                ),
+            true
+        ),
+        updated_at = NOW();
+
+    RETURN NEW;
+END;
 $$;
 
 
@@ -31927,6 +32031,13 @@ CREATE TRIGGER trigger_update_attribute_registry_timestamp BEFORE UPDATE ON "ob-
 
 
 --
+-- Name: snapshots trg_materialize_attribute_def; Type: TRIGGER; Schema: sem_reg; Owner: -
+--
+
+CREATE TRIGGER trg_materialize_attribute_def AFTER INSERT ON sem_reg.snapshots FOR EACH ROW EXECUTE FUNCTION sem_reg.materialize_attribute_def_to_registry();
+
+
+--
 -- Name: access_attestations access_attestations_campaign_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -36258,5 +36369,5 @@ ALTER TABLE ONLY sem_reg_authoring.validation_reports
 -- PostgreSQL database dump complete
 --
 
-\unrestrict bYWSMDcalNcaRwVDBWfQBwXMcizwidlxx4Uq5PLlYHsw1ljwfchnNp2KLTexMBX
+\unrestrict DVmTrOHMsNqBItW7lxNUVNgSHUgz0DoIV3PMkl5pQpPUzihL0acDvr2gAL4c5pp
 

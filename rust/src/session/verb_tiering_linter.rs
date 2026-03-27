@@ -308,7 +308,7 @@ fn check_minimal_rules(
             codes::M003_MISSING_SOURCE,
             &format!("{} missing metadata.source_of_truth", full_name),
             Some("metadata.source_of_truth"),
-            Some("Add source_of_truth: matrix|catalog|operational|session|entity|workflow|external|register|document"),
+            Some("Add source_of_truth: matrix|catalog|operational|session|entity|workflow|external|register|document|sem_reg|config"),
         );
     }
 

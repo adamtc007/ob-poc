@@ -1,8 +1,8 @@
 # Semantic OS — Vision & Scope v3.0
 
-> **Version:** 3.0
-> **Date:** 2026-03-24
-> **Status:** Living document — consolidation of 9 prior specs, updated for the 2026-03-08 runtime schema consolidation, the 2026-03-12 document-governance bootstrap, the 2026-03-13 NLCI/CBU surface reconciliation, the 2026-03-15 reducer/constellation runtime cutover, the 2026-03-16 DB harness/runtime verification pass, the 2026-03-16 CODEX data-integrity/parser/serialization remediation, the 2026-03-17 discovery-universe + single-pipeline cutover, the 2026-03-21 SemOS reconciliation remediation verification pass, the 2026-03-24 attribute identity + derivation reconciliation pass, the 2026-03-24 taxonomy/evidence unification pass, and the 2026-03-24 attribute DSL + Phase 4 schema cleanup pass
+> **Version:** 3.1
+> **Date:** 2026-03-28
+> **Status:** Living document — consolidation of 9 prior specs, updated for the 2026-03-08 runtime schema consolidation, the 2026-03-12 document-governance bootstrap, the 2026-03-13 NLCI/CBU surface reconciliation, the 2026-03-15 reducer/constellation runtime cutover, the 2026-03-16 DB harness/runtime verification pass, the 2026-03-16 CODEX data-integrity/parser/serialization remediation, the 2026-03-17 discovery-universe + single-pipeline cutover, the 2026-03-21 SemOS reconciliation remediation verification pass, the 2026-03-24 attribute identity + derivation reconciliation pass, the 2026-03-24 taxonomy/evidence unification pass, the 2026-03-24 attribute DSL + Phase 4 schema cleanup pass, the 2026-03-27 derived attribute canonical persistence (D0-D12), and the 2026-03-28 SemOS-first hub implementation (Phases 1-7)
 > **Audience:** Engineering, governance, architecture review
 
 ---
@@ -104,17 +104,22 @@ The refinement pass then removed the main hot-path inefficiencies without changi
 
 This leaves the attribute plane in the intended architectural shape:
 
-- SemOS governs attribute meaning, derivation intent, and cross-object identity
-- `"ob-poc".attribute_registry` remains the operational backbone for runtime UUIDs and persisted values
-- `"ob-poc".cbu_attr_values` now remains the direct/manual/non-derived CBU value plane, while governed derivations persist canonically in `"ob-poc".derived_attribute_values`
+- **SemOS is the hub for all things.** All paths lead to SemOS — nowhere else.
+- `AttributeDefBody` carries ALL metadata (category, validation_rules, applicability, is_derived, derivation_spec_fqn, etc.) — nothing lives only in the store
+- `attribute.define` publishes SemOS snapshot FIRST, then materializes to store via `materialize_to_store()`
+- Materialization trigger on `sem_reg.snapshots` (`trg_materialize_attribute_def`) auto-projects active AttributeDef snapshots to `"ob-poc".attribute_registry`
+- `"ob-poc".attribute_registry` is a switchable store projection — not the source of truth
+- Identity resolution prioritizes SemOS FQNs (precedence 0) over store UUIDs (precedence 1)
+- SRDEF loader resolves attributes via SemOS first, with store fallback
+- `"ob-poc".cbu_attr_values` remains the direct/manual/non-derived CBU value plane; derived values persist canonically in `"ob-poc".derived_attribute_values`
 - CBU read consumers see an effective merged surface through `"ob-poc".v_cbu_derived_values`, `"ob-poc".v_cbu_attr_gaps`, and `"ob-poc".v_cbu_attr_summary`
-- the legacy `data_dictionary/` module remains only as a compatibility layer, not the primary runtime definition source
+- Store write functions restricted to `pub(crate)` — verb handlers are the only callers
+- CI lint (`scripts/lint_write_paths.sh`) enforces no new raw SQL writes outside allowlisted paths
 
-Remaining work in this plane is now mostly additive and coordinated:
-
-- taxonomy/evidence vocabulary unification
-- DSL authoring surface for governed attribute management
-- later coordinated schema tightening for derived-attribute invariants and stronger lineage columns
+SemOS Maintenance workspace (2026-03-28):
+- `WorkspaceKind::SemOsMaintenance` — first-class agentic workspace for registry governance
+- New verbs: `service-resource.check-attribute-gaps`, `service-resource.sync-definitions`, `typed-attribute.record/get/list-for-entity`, `derivation.recompute-stale`, `attribute.bridge-to-semos`
+- Pack: `semos-maintenance` with 40+ allowed verbs (changeset, governance, registry, attribute, typed-attribute, derivation, service-resource)
 
 ### Attribute DSL + Phase 4 Schema State (2026-03-24)
 

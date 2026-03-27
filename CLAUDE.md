@@ -1,12 +1,13 @@
 # CLAUDE.md
 
-> **Last reviewed:** 2026-03-27
+> **Last reviewed:** 2026-03-28
 > **Frontend:** React/TypeScript (`ob-poc-ui-react/`) — Chat UI with scope panel, Inspector, Semantic OS Tab
 > **Backend:** Rust/Axum (`rust/crates/ob-poc-web/`) — Serves React + REST API
 > **Crates:** 22 active Rust crates (16 ob-poc + 6 sem_os_*)
-> **Verbs:** 1,263 canonical verbs, 15,940 intent patterns (DB-sourced)
+> **Verbs:** 1,270+ canonical verbs, 15,940 intent patterns (DB-sourced)
 > **MCP Tools:** ~102 tools (DSL, verbs, learning, session, batch, research, taxonomy, sem_reg, stewardship, db_introspect, session_verb_surface)
-> **Latest schema addition:** `rust/migrations/20260327_derived_attribute_persistence.sql`
+> **Latest schema addition:** `rust/migrations/20260328_semos_attribute_materialization.sql`
+> **Workspaces:** 7 (CBU, KYC, Deal, OnBoarding, ProductMaintenance, InstrumentMatrix, SemOsMaintenance)
 > **Schema Overview:** `migrations/OB_POC_SCHEMA_ENTITY_OVERVIEW.md`
 > **Embeddings:** Candle local (384-dim, BGE-small-en-v1.5) — 15,940 patterns vectorized
 
@@ -76,15 +77,29 @@ SEM_OS_DATABASE_URL="postgresql:///data_designer" SEM_OS_JWT_SECRET=dev-secret c
 
 Current schema export target: `migrations/master-schema.sql` (canonical), `schema_export.sql` (convenience copy)
 
-Derived attribute persistence is now cut over to the canonical below-the-line plane:
+**SemOS is the hub for all things.** All paths lead to SemOS — nowhere else. The PostgreSQL schema is a supplementary store, a materialized projection, switchable if needed.
+
+SemOS-first attribute lifecycle (2026-03-28):
+- `AttributeDefBody` carries ALL metadata (category, validation_rules, applicability, is_derived, derivation_spec_fqn, etc.)
+- `attribute.define` publishes SemOS snapshot FIRST, then materializes to `attribute_registry` via `materialize_to_store()`
+- Materialization trigger on `sem_reg.snapshots` auto-projects active AttributeDef snapshots to `attribute_registry`
+- Identity resolution prioritizes SemOS FQNs (precedence 0) over store UUIDs (precedence 1)
+- SRDEF loader resolves attributes via SemOS first, with store fallback
+- Store write functions restricted to `pub(crate)` — verb handlers are the only callers
+- CI lint: `rust/scripts/lint_write_paths.sh` enforces no new raw SQL writes outside allowlisted paths
+
+Derived attribute persistence (2026-03-27):
 - runtime derived values persist in `"ob-poc".derived_attribute_values`
 - dependency lineage persists in `"ob-poc".derived_attribute_dependencies`
 - CBU consumers read canonical derived rows through `"ob-poc".v_cbu_derived_values`
 - legacy `"ob-poc".cbu_attr_values` remains the direct/manual/non-derived observation plane
+- `set_cbu_attr_value()` rejects `source = 'derived'` — derived values go canonical only
 
-Verification snapshot for this cutover on 2026-03-27:
-- `env RUSTC_WRAPPER= cargo check`
-- `env RUSTC_WRAPPER= cargo test --features database --test derived_attribute_persistence_integration -- --ignored --nocapture`
+SemOS Maintenance workspace (2026-03-28):
+- `WorkspaceKind::SemOsMaintenance` — first-class agentic workspace
+- Constellation family: `registry_governance`
+- Pack: `semos-maintenance` with 40+ allowed verbs (changeset, governance, registry, attribute, typed-attribute, derivation, service-resource)
+- New verbs: `service-resource.check-attribute-gaps`, `service-resource.sync-definitions`, `typed-attribute.record/get/list-for-entity`, `derivation.recompute-stale`, `attribute.bridge-to-semos`
 
 ---
 
@@ -247,9 +262,9 @@ npm run build && npm run typecheck && npm run lint
 
 ## Feature Status
 
-**Complete (✅):** React Migration (077), V2 REPL (7-state, 320 tests), Runbook Compilation, Candle Semantic Pipeline, Agent Pipeline + PolicyGate, Solar Navigation (038), Promotion Pipeline (043), Teaching (044), Client Group Resolver (048), Workflow Task Queue (049), Transactional Execution (050), CustomOp Auto-Registration (051), Client Group Research (055), REPL Viewport Feedback (056), Verb Disambiguation UI (057), Unified Architecture (058), Playbook System (059), LSP (060/063), CBU Structure Macros (064), Unified Lookup (074), Lexicon (072), Entity Linking (073), Clarification UX (075), Inspector-First (076), Deal Record & Fee Billing (067), BPMN-Lite (all phases incl. Phase 4 PostgresProcessStore + Phase 5A Inclusive Gateway), BPMN-Lite Integration (Phase B), BPMN-Lite Authoring (Phases B-D), KYC/UBO Skeleton (S1-S2), Semantic OS (Phases 0-9 + Standalone v1.1 + Stewardship Phase 0-1), Governed Registry Authoring (v0.4, migrations 099-102), CCIR + SessionVerbSurface, Loopback Calibration (v0.3), Onboarding State View, Verb Disambiguation UX, Constellation Orphan Remediation, SemOS Grounded Action Surface, Pipeline Leak Remediation, Sage Intent Skeleton (Phase 1), Entity-First Utterance Parsing, Coder Rewrite (Phase 2), Sage-Primary Chat Narration, SemTaxonomy Three-Step, NLCI CBU Cutover, CBU Role Surface Reconciliation, Phase 0 Vocabulary Rationalization (Batches 1-3), Schema Consolidation (115-121), Domain Metadata Coverage (306/306 tables), Scenario-Based Intent Resolution (Phases 0.5-5), AffinityGraph & Diagram Generation, Discovery Pipeline (Phase 2), Utterance API Coverage Harness, Unified Session Input Cutover, Workspace-Scoped REPL Navigation, SemOS Attribute DSL + Schema Cleanup, SemOS Footprint Hydration S6, SemOS Document Governance Bootstrap (122-123), StateGraph Pipeline (Phase 0-3 substrate), Session Stack Machine Runbook Architecture (R1-R9, migrations 125-128), Unified Session Pipeline (ADR 040 — tollgates enforced, 149/149 tests, response adapter, dead code removal -4,480 lines)
+**Complete (✅):** React Migration (077), V2 REPL (7-state, 320 tests), Runbook Compilation, Candle Semantic Pipeline, Agent Pipeline + PolicyGate, Solar Navigation (038), Promotion Pipeline (043), Teaching (044), Client Group Resolver (048), Workflow Task Queue (049), Transactional Execution (050), CustomOp Auto-Registration (051), Client Group Research (055), REPL Viewport Feedback (056), Verb Disambiguation UI (057), Unified Architecture (058), Playbook System (059), LSP (060/063), CBU Structure Macros (064), Unified Lookup (074), Lexicon (072), Entity Linking (073), Clarification UX (075), Inspector-First (076), Deal Record & Fee Billing (067), BPMN-Lite (all phases incl. Phase 4 PostgresProcessStore + Phase 5A Inclusive Gateway), BPMN-Lite Integration (Phase B), BPMN-Lite Authoring (Phases B-D), KYC/UBO Skeleton (S1-S2), Semantic OS (Phases 0-9 + Standalone v1.1 + Stewardship Phase 0-1), Governed Registry Authoring (v0.4, migrations 099-102), CCIR + SessionVerbSurface, Loopback Calibration (v0.3), Onboarding State View, Verb Disambiguation UX, Constellation Orphan Remediation, SemOS Grounded Action Surface, Pipeline Leak Remediation, Sage Intent Skeleton (Phase 1), Entity-First Utterance Parsing, Coder Rewrite (Phase 2), Sage-Primary Chat Narration, SemTaxonomy Three-Step, NLCI CBU Cutover, CBU Role Surface Reconciliation, Phase 0 Vocabulary Rationalization (Batches 1-3), Schema Consolidation (115-121), Domain Metadata Coverage (306/306 tables), Scenario-Based Intent Resolution (Phases 0.5-5), AffinityGraph & Diagram Generation, Discovery Pipeline (Phase 2), Utterance API Coverage Harness, Unified Session Input Cutover, Workspace-Scoped REPL Navigation, SemOS Attribute DSL + Schema Cleanup, SemOS Footprint Hydration S6, SemOS Document Governance Bootstrap (122-123), StateGraph Pipeline (Phase 0-3 substrate), Session Stack Machine Runbook Architecture (R1-R9, migrations 125-128), Unified Session Pipeline (ADR 040 — tollgates enforced, 149/149 tests, response adapter, dead code removal -4,480 lines), Derived Attribute Persistence (D0-D12 — canonical two-table model, staleness propagation, CBU projection view), SemOS-First Hub Implementation (Phases 1-7 — AttributeDefBody complete, SemOS-first write path, materialization trigger, identity resolution inverted, 7 new verbs, SemOS Maintenance workspace)
 
-**In Progress / Parked (⚠️):** Sage/Coder GATE 5 (existing 43%, Sage+Coder 5% — vocabulary/routing work needed), Three-Step Harness (7.95% exact / 71% grounded — metadata quality is limiter), SemOS Attribute Live-DB (migration applied, 0/310 bridged — dataset reconciliation pending), StateGraph Phase 1 reconciliation (parked pending external correction table)
+**In Progress / Parked (⚠️):** Sage/Coder GATE 5 (existing 43%, Sage+Coder 5% — vocabulary/routing work needed), Three-Step Harness (7.95% exact / 71% grounded — metadata quality is limiter), StateGraph Phase 1 reconciliation (parked pending external correction table)
 
 **Removed (❌):** V1 Staged Runbook (054), ESPER Navigation Crates (065 — retained for reference)
 
