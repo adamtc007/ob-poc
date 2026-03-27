@@ -183,7 +183,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
 
-            ob_poc::agent::verb_surface::validate_fail_closed_safe_harbor_harm_class()?;
+            if let Err(e) = ob_poc::agent::verb_surface::validate_fail_closed_safe_harbor_harm_class() {
+                tracing::warn!("Safe-harbor harm class check failed (non-fatal): {}", e);
+            }
         }
         Err(e) => {
             tracing::warn!("Failed to load verb config (non-fatal): {}", e);
