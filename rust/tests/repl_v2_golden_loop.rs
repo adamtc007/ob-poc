@@ -60,6 +60,7 @@ fn make_orchestrator_with_onboarding() -> ReplOrchestratorV2 {
 }
 
 /// Helper: create session, pass scope gate and workspace selection.
+#[allow(dead_code)]
 async fn scope_and_workspace(orch: &ReplOrchestratorV2, group_name: &str) -> Uuid {
     let id = orch.create_session().await;
     orch.process(

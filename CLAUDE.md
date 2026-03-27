@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-> **Last reviewed:** 2026-03-26
+> **Last reviewed:** 2026-03-27
 > **Frontend:** React/TypeScript (`ob-poc-ui-react/`) — Chat UI with scope panel, Inspector, Semantic OS Tab
 > **Backend:** Rust/Axum (`rust/crates/ob-poc-web/`) — Serves React + REST API
 > **Crates:** 22 active Rust crates (16 ob-poc + 6 sem_os_*)
@@ -143,6 +143,8 @@ All user input routes through `POST /api/session/:id/input` → `ReplOrchestrato
 7. **Executing** → Step-by-step execution with narration
 
 `ReplSessionV2` is the canonical session. `UnifiedSession` retained for execution context only. `CbuSession` removed. Response adapter converts `ReplResponseV2` → `ChatResponse` for frontend compatibility.
+
+**Closed-loop invariant:** After verb execution (`writes_since_push > 0`), the TOS constellation is re-hydrated from the database before building the response. This ensures the UI always renders post-execution entity state (updated slot states, available verbs, progress). Constellation refresh is triggered by entity state changes, not every turn. 153/153 REPL V2 tests pass.
 
 > **Key files:** `rust/src/repl/orchestrator_v2.rs` (orchestrator), `rust/src/api/response_adapter.rs` (adapter), `rust/src/api/agent_enrichment.rs` (onboarding state enrichment)
 

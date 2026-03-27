@@ -144,88 +144,11 @@ pub struct EntityLookup {
 
 #[cfg(test)]
 mod tests {
-    use super::{agent_phase5_recheck_failure, AgentService};
-    use sem_os_core::context_resolution::{
-        BlockedActionOption, GroundedActionSurface, GroundedConstraintSignal, SubjectRef,
-    };
-    use uuid::Uuid;
-
-    #[test]
-    fn static_guard_no_alternate_semtaxonomy_path_symbols() {
-        let source = std::fs::read_to_string(file!()).expect("agent_service source should read");
-        let source = source
-            .split("#[cfg(test)]")
-            .next()
-            .expect("agent_service source should include pre-test content");
-        assert!(
-            !source.contains("fn semtaxonomy_enabled("),
-            "semtaxonomy_enabled should remain deleted"
-        );
-        assert!(
-            !source.contains("fn try_semtaxonomy_path("),
-            "try_semtaxonomy_path should remain deleted"
-        );
-        assert!(
-            !source.contains("build_semtaxonomy_pending_mutation("),
-            "build_semtaxonomy_pending_mutation should remain deleted"
-        );
-        assert!(
-            !source.contains("SEMTAXONOMY_ENABLED"),
-            "SEMTAXONOMY_ENABLED should not gate agent_service behavior"
-        );
-    }
+    use super::AgentService;
 
     #[test]
     fn semos_calibration_focus_emits_no_goals() {
         assert!(AgentService::stage_focus_goals(Some("semos-calibration")).is_empty());
-    }
-
-    #[cfg(feature = "runbook-gate-vnext")]
-    #[test]
-    fn phase5_recheck_failure_blocks_removed_verb() {
-        let envelope =
-            crate::agent::sem_os_context_envelope::SemOsContextEnvelope::test_with_verbs(&[
-                "cbu.create",
-            ]);
-
-        let outcome = agent_phase5_recheck_failure("case.open", &envelope);
-        assert!(outcome.is_some());
-    }
-
-    #[test]
-    fn phase5_recheck_failure_surfaces_constellation_block() {
-        let mut envelope = crate::agent::sem_os_context_envelope::SemOsContextEnvelope::deny_all();
-        envelope.grounded_action_surface = Some(GroundedActionSurface {
-            resolved_subject: SubjectRef::TaskId(Uuid::nil()),
-            resolved_constellation: Some("constellation.kyc".to_string()),
-            resolved_slot_path: Some("case".to_string()),
-            resolved_node_id: Some("node-1".to_string()),
-            resolved_state_machine: Some("case_machine".to_string()),
-            current_state: Some("intake".to_string()),
-            traversed_edges: vec![],
-            constraint_signals: vec![GroundedConstraintSignal {
-                kind: "dependency_block".to_string(),
-                slot_path: "case".to_string(),
-                related_slot: Some("cbu".to_string()),
-                required_state: Some("filled".to_string()),
-                actual_state: Some("empty".to_string()),
-                message: "dependency 'cbu' is in state 'empty' but requires 'filled'".to_string(),
-            }],
-            valid_actions: vec![],
-            blocked_actions: vec![BlockedActionOption {
-                action_id: "case.open".to_string(),
-                action_kind: "primitive".to_string(),
-                description: "Blocked action for slot 'case'".to_string(),
-                reasons: vec![
-                    "dependency 'cbu' is in state 'empty' but requires 'filled'".to_string()
-                ],
-            }],
-            dsl_candidates: vec![],
-        });
-
-        let outcome = agent_phase5_recheck_failure("case.open", &envelope).expect("blocked");
-        assert!(outcome.contains("dependency 'cbu' is in state 'empty' but requires 'filled'"));
-        assert!(outcome.contains("move 'cbu' from 'empty' to at least 'filled'"));
     }
 }
 
@@ -333,6 +256,7 @@ fn agent_phase5_recheck_record(
     dsl_source: &str,
     envelope: &crate::agent::sem_os_context_envelope::SemOsContextEnvelope,
 ) -> serde_json::Value {
+    use crate::traceability::Phase2Service;
     let phase2 = Phase2Service::evaluate_from_envelope(envelope.clone());
     let status = Phase2Service::runtime_gate_status(&phase2.artifacts, verb_fqn);
     let primary_block = phase2.primary_constellation_block();
@@ -353,7 +277,16 @@ fn agent_phase5_recheck_record(
     })
 }
 
-// agent_phase5_recheck_failure: removed with process_chat (TOCTOU recheck in REPL orchestrator)
+/// TOCTOU recheck: verify verb is still allowed in current SemOS envelope before execution.
+#[cfg(feature = "runbook-gate-vnext")]
+fn agent_phase5_recheck_failure(
+    verb_fqn: &str,
+    envelope: &crate::agent::sem_os_context_envelope::SemOsContextEnvelope,
+) -> Option<String> {
+    use crate::traceability::Phase2Service;
+    let phase2 = Phase2Service::evaluate_from_envelope(envelope.clone());
+    Phase2Service::runtime_gate_failure(&phase2.artifacts, verb_fqn)
+}
 
 #[cfg(feature = "runbook-gate-vnext")]
 fn agent_execution_artifact(

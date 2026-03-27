@@ -320,6 +320,7 @@ impl MockIntentMatcher {
     }
 
     /// Returns DirectDsl outcome for input that looks like raw DSL.
+    #[allow(dead_code)]
     fn direct_dsl(source: &str) -> Self {
         Self {
             result: IntentMatchResult {

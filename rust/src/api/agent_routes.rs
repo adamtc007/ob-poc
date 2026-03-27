@@ -3216,14 +3216,7 @@ mod tests {
         assert!(result.is_ok());
     }
 
-    #[test]
-    fn test_domain_list() {
-        let reg = registry();
-        let domains = reg.domains();
-        assert!(!domains.is_empty());
-        assert!(domains.iter().any(|d| d == "cbu"));
-        assert!(domains.iter().any(|d| d == "entity"));
-    }
+    // test_domain_list: removed — registry() was in deleted code
 
     #[test]
     fn test_execute_route_rejects_normal_session_flow_requests() {

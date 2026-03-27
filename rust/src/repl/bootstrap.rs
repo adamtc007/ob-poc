@@ -101,7 +101,7 @@ pub async fn resolve_client_input(input: &str, pool: &PgPool) -> BootstrapOutcom
 
     // Phase 0: Alias match — check client_group_alias table for exact alias hit.
     // This catches "Allianz" → "Allianz Global Investors" via stored aliases.
-    if let Ok(alias_hit) = sqlx::query_as::<_, (Uuid, String)>(
+    if let Ok(Some((group_id, group_name))) = sqlx::query_as::<_, (Uuid, String)>(
         r#"SELECT cg.id, cg.canonical_name
            FROM "ob-poc".client_group_alias cga
            JOIN "ob-poc".client_group cg ON cg.id = cga.group_id
@@ -113,12 +113,10 @@ pub async fn resolve_client_input(input: &str, pool: &PgPool) -> BootstrapOutcom
     .fetch_optional(pool)
     .await
     {
-        if let Some((group_id, group_name)) = alias_hit {
-            return BootstrapOutcome::Resolved {
-                group_id,
-                group_name,
-            };
-        }
+        return BootstrapOutcome::Resolved {
+            group_id,
+            group_name,
+        };
     }
 
     // Phase 0b: Fuzzy alias match — significant words against aliases

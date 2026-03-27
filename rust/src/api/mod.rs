@@ -72,7 +72,6 @@ pub mod control_routes;
 #[cfg(feature = "server")]
 pub mod constellation_routes;
 
-#[cfg(feature = "server")]
 // cbu_session_routes removed — superseded by REPL V2 unified pipeline
 
 #[cfg(feature = "server")]
