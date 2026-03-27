@@ -515,6 +515,7 @@ impl HybridVerbSearcher {
                 Ok(emb) => {
                     tracing::debug!(
                         embedding_len = emb.len(),
+                        first_3 = ?&emb[..3.min(emb.len())],
                         "VerbSearch: embedding computed successfully"
                     );
                     Some(emb)
@@ -938,42 +939,42 @@ impl HybridVerbSearcher {
         // 2.5 Exact pattern match from dsl_verbs arrays (yaml_intent_patterns + intent_patterns).
         // This enables deterministic phrase matching immediately after YAML sync,
         // without requiring a populate_embeddings run.
-        if results.is_empty() {
-            if let Some(ref verb_service) = self.verb_service {
-                let allowed_vec =
-                    allowed_verbs.map(|verbs| verbs.iter().cloned().collect::<Vec<String>>());
-                match verb_service
-                    .find_exact_verb_patterns(&normalized, allowed_vec.as_deref(), limit)
-                    .await
-                {
-                    Ok(exact_matches) => {
-                        tracing::debug!(
-                            query = %normalized,
-                            matches = exact_matches.len(),
-                            "VerbSearch: exact dsl_verbs pattern lookup"
-                        );
-                        for matched in exact_matches {
-                            if !self.matches_domain(&matched.verb, domain_filter)
-                                || !self.matches_entity_kind(&matched.verb, entity_kind)
-                                || seen_verbs.contains(&matched.verb)
-                            {
-                                continue;
-                            }
-                            let description = self.get_verb_description(&matched.verb).await;
-                            seen_verbs.insert(matched.verb.clone());
-                            results.push(VerbSearchResult {
-                                verb: matched.verb,
-                                score: 1.0,
-                                source: VerbSearchSource::GlobalLearned,
-                                matched_phrase: matched.phrase,
-                                description,
-                                journey: None,
-                            });
+        // Always runs — ECIR results from a different domain must not suppress
+        // exact matches for the user's actual intent.
+        if let Some(ref verb_service) = self.verb_service {
+            let allowed_vec =
+                allowed_verbs.map(|verbs| verbs.iter().cloned().collect::<Vec<String>>());
+            match verb_service
+                .find_exact_verb_patterns(&normalized, allowed_vec.as_deref(), limit)
+                .await
+            {
+                Ok(exact_matches) => {
+                    tracing::debug!(
+                        query = %normalized,
+                        matches = exact_matches.len(),
+                        "VerbSearch: exact dsl_verbs pattern lookup"
+                    );
+                    for matched in exact_matches {
+                        // Exact invocation phrase matches bypass domain_filter —
+                        // the user typed exactly what the verb expects, so domain
+                        // hints from ECIR/pack context must not suppress it.
+                        if seen_verbs.contains(&matched.verb) {
+                            continue;
                         }
+                        let description = self.get_verb_description(&matched.verb).await;
+                        seen_verbs.insert(matched.verb.clone());
+                        results.push(VerbSearchResult {
+                            verb: matched.verb,
+                            score: 1.0,
+                            source: VerbSearchSource::GlobalLearned,
+                            matched_phrase: matched.phrase,
+                            description,
+                            journey: None,
+                        });
                     }
-                    Err(e) => {
-                        tracing::warn!(error = %e, "VerbSearch: exact dsl_verbs pattern lookup failed");
-                    }
+                }
+                Err(e) => {
+                    tracing::warn!(error = %e, "VerbSearch: exact dsl_verbs pattern lookup failed");
                 }
             }
         }

@@ -362,6 +362,50 @@ mod tests {
         assert!(diff > 0.1, "Query and target embeddings should differ");
     }
 
+    fn cosine_sim(a: &[f32], b: &[f32]) -> f32 {
+        let dot: f32 = a.iter().zip(b).map(|(x, y)| x * y).sum();
+        let norm_a: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
+        let norm_b: f32 = b.iter().map(|x| x * x).sum::<f32>().sqrt();
+        dot / (norm_a * norm_b)
+    }
+
+    #[test]
+    #[ignore] // Requires model download
+    fn test_query_target_cosine_similarity() {
+        let embedder = Embedder::new().expect("Failed to load embedder");
+
+        let cases = [
+            ("check attribute gaps", "check attribute gaps for service resources"),
+            ("bootstrap attribute registry", "bootstrap attribute registry"),
+            ("reconcile semos", "reconcile the registry"),
+            ("bridge attributes", "bridge ungoverned attributes to semos"),
+            ("load the cbu", "session.load-cbu"),
+        ];
+
+        for (query, target) in &cases {
+            let q = embedder.embed_query(query).unwrap();
+            let t = embedder.embed_target(target).unwrap();
+            let sim = cosine_sim(&q, &t);
+            eprintln!("query={:40} target={:50} sim={:.4}", query, target, sim);
+            assert!(
+                sim > 0.40,
+                "Query '{}' should have > 0.40 similarity with target '{}', got {}",
+                query, target, sim
+            );
+        }
+
+        // Determinism: same input twice must produce identical embeddings
+        let t1 = embedder.embed_target("check attribute gaps for service resources").unwrap();
+        let t2 = embedder.embed_target("check attribute gaps for service resources").unwrap();
+        let det_sim = cosine_sim(&t1, &t2);
+        eprintln!("determinism (target-target same text): {:.6}", det_sim);
+        assert!((det_sim - 1.0).abs() < 0.0001, "Same text must produce identical embeddings");
+
+        // Print first 5 values for comparison with DB
+        eprintln!("first 5 target values: {:?}", &t1[..5]);
+        // DB has: [-0.0760501,-0.04121938,0.021460311,-0.069761164,0.06453907]
+    }
+
     #[test]
     #[ignore] // Requires model download
     fn test_embed_batch() {
