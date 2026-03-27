@@ -97,9 +97,14 @@ Derived attribute persistence (2026-03-27):
 
 SemOS Maintenance workspace (2026-03-28):
 - `WorkspaceKind::SemOsMaintenance` — first-class agentic workspace
-- Constellation family: `registry_governance`
+- ScopeGate fork: "infrastructure" bypasses client group selection, routes directly to SemOS workspace
+- Constellation family: `registry_governance`, map: `registry.stewardship` (7 slots)
+- 4 state machines: `changeset_lifecycle`, `attribute_def_lifecycle`, `derivation_spec_lifecycle`, `service_resource_def_lifecycle`
 - Pack: `semos-maintenance` with 40+ allowed verbs (changeset, governance, registry, attribute, typed-attribute, derivation, service-resource)
+- 4 governance macros (Tier -2B): `governance.bootstrap-attribute-registry`, `governance.define-service-dictionary`, `governance.full-publish-pipeline`, `governance.reconcile-registry`
+- 4 governance scenarios (Tier -2A): compound intent resolution for SemOS maintenance utterances
 - New verbs: `service-resource.check-attribute-gaps`, `service-resource.sync-definitions`, `typed-attribute.record/get/list-for-entity`, `derivation.recompute-stale`, `attribute.bridge-to-semos`
+- Verb search fix: exact invocation phrase matches bypass domain_filter and always run (not suppressed by ECIR)
 
 ---
 

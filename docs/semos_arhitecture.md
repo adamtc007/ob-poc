@@ -116,10 +116,17 @@ This leaves the attribute plane in the intended architectural shape:
 - Store write functions restricted to `pub(crate)` — verb handlers are the only callers
 - CI lint (`scripts/lint_write_paths.sh`) enforces no new raw SQL writes outside allowlisted paths
 
-SemOS Maintenance workspace (2026-03-28):
+SemOS Maintenance workspace + session lifecycle (2026-03-28):
 - `WorkspaceKind::SemOsMaintenance` — first-class agentic workspace for registry governance
+- ScopeGate fork: user selects "infrastructure" at the scope gate, bypassing client group selection; routes directly to SemOS Maintenance workspace with nil-UUID infrastructure scope
+- Constellation model: `registry.stewardship` map with 7 slots (changeset, governance, attribute_def, derivation_spec, typed_attribute, service_resource_def, registry), each with state machine and verb gates — same workspace/constellation/state-machine model as operational domains
+- 4 state machines: `changeset_lifecycle` (6 states), `attribute_def_lifecycle` (5 states), `derivation_spec_lifecycle` (4 states), `service_resource_def_lifecycle` (4 states)
+- 4 governance macros (Tier -2B, score 0.96): `governance.bootstrap-attribute-registry`, `governance.define-service-dictionary`, `governance.full-publish-pipeline`, `governance.reconcile-registry`
+- 4 governance scenarios (Tier -2A, score 0.97): compound intent resolution for SemOS maintenance utterances
 - New verbs: `service-resource.check-attribute-gaps`, `service-resource.sync-definitions`, `typed-attribute.record/get/list-for-entity`, `derivation.recompute-stale`, `attribute.bridge-to-semos`
 - Pack: `semos-maintenance` with 40+ allowed verbs (changeset, governance, registry, attribute, typed-attribute, derivation, service-resource)
+- Verb search fix: exact invocation phrase matches bypass domain_filter and always run — ECIR candidates from a different domain no longer suppress exact matches for the user's actual intent
+- Infrastructure scope bypass in verb surface domain filter: all domains available without client group restriction
 
 ### Attribute DSL + Phase 4 Schema State (2026-03-24)
 
