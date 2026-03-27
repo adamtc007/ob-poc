@@ -112,6 +112,8 @@ version: "1.0"
 description: "Test pack with no templates or required questions"
 invocation_phrases:
   - "freeform test"
+workspaces:
+  - on_boarding
 required_context: []
 optional_context: []
 allowed_verbs: []

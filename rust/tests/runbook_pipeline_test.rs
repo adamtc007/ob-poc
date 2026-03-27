@@ -482,7 +482,7 @@ async fn pack_completion_widening() {
         definition_of_done: vec![],
         progress_signals: vec![],
         handoff_target: None,
-        workspaces: vec![],
+        workspaces: vec![ob_poc::repl::types_v2::WorkspaceKind::OnBoarding],
     };
     manager.register_pack(manifest);
     manager.activate_pack(pack_id).unwrap();

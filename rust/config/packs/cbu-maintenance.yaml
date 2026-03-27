@@ -1,0 +1,133 @@
+# CBU Maintenance Journey Pack
+# Core CBU lifecycle — create, configure, and manage Client Business Units
+
+id: cbu-maintenance
+name: CBU Maintenance
+version: "1.0"
+description: >
+  Create and manage Client Business Units. Add entities and assign roles
+  (depositary, transfer agent, auditor), attach products and services,
+  configure instruction matrix rules, and manage CBU lifecycle state.
+
+invocation_phrases:
+  - "create a CBU"
+  - "new CBU"
+  - "manage CBU"
+  - "CBU maintenance"
+  - "add entity to CBU"
+  - "assign role"
+  - "attach product"
+  - "configure CBU"
+  - "CBU setup"
+
+required_context:
+  - client_group_id
+
+optional_context:
+  - default_cbu
+  - target_entity
+
+workspaces:
+  - cbu
+
+allowed_verbs:
+  - cbu.create
+  - cbu.read
+  - cbu.list
+  - cbu.update
+  - cbu.suspend
+  - cbu.activate
+  - cbu.assign-role
+  - cbu.remove-role
+  - cbu.assign-product
+  - cbu.remove-product
+  - entity.create
+  - entity.read
+  - entity.list
+  - entity.update
+  - entity.link
+  - trading-profile.read
+  - trading-profile.update
+
+forbidden_verbs:
+  - cbu.delete
+
+risk_policy:
+  require_confirm_before_execute: true
+  max_steps_without_confirm: 3
+
+required_questions:
+  - field: cbu_name
+    prompt: "What is the name of the CBU?"
+    answer_kind: string
+
+optional_questions:
+  - field: jurisdiction
+    prompt: "Which jurisdiction? (e.g. LU, UK, IE, DE)"
+    answer_kind: string
+    default: "LU"
+
+  - field: entity_name
+    prompt: "Which entity to add? (name or LEI)"
+    answer_kind: entity_ref
+
+  - field: role
+    prompt: "What role? (depositary, transfer_agent, auditor, custodian, manco)"
+    answer_kind: enum
+    default: "depositary"
+
+stop_rules:
+  - "CBU created"
+  - "Entity added"
+  - "Role assigned"
+
+templates:
+  - template_id: create-cbu
+    when_to_use: "Create a new CBU with jurisdiction"
+    steps:
+      - verb: cbu.create
+        args:
+          name: "{answers.cbu_name}"
+          jurisdiction: "{answers.jurisdiction}"
+
+  - template_id: add-entity-and-role
+    when_to_use: "Add an entity to a CBU with a role"
+    steps:
+      - verb: entity.link
+        args:
+          cbu_ref: "$prev"
+          entity_ref: "{answers.entity_name}"
+      - verb: cbu.assign-role
+        args:
+          cbu_ref: "$prev"
+          entity_ref: "{answers.entity_name}"
+          role: "{answers.role}"
+
+section_layout:
+  - title: "CBU Creation"
+    verb_prefixes:
+      - "cbu.create"
+  - title: "Entity & Roles"
+    verb_prefixes:
+      - "entity."
+      - "cbu.assign"
+      - "cbu.remove"
+  - title: "Products & Trading"
+    verb_prefixes:
+      - "trading-profile."
+      - "cbu.assign-product"
+
+definition_of_done:
+  - "CBU created with correct jurisdiction"
+  - "Required entities linked"
+  - "Roles assigned"
+
+progress_signals:
+  - signal: cbu_created
+    description: "CBU record created in system"
+  - signal: entity_linked
+    description: "At least one entity linked to CBU"
+  - signal: role_assigned
+    description: "At least one role assigned"
+
+handoff_target: null

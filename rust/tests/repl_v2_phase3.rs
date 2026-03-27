@@ -96,6 +96,8 @@ version: "1.0"
 description: "Test pack with no templates or required questions"
 invocation_phrases:
   - "freeform test"
+workspaces:
+  - on_boarding
 required_context: []
 optional_context: []
 allowed_verbs: []
@@ -962,6 +964,6 @@ fn minimal_pack() -> PackManifest {
         definition_of_done: vec![],
         progress_signals: vec![],
         handoff_target: None,
-        workspaces: vec![],
+        workspaces: vec![WorkspaceKind::OnBoarding],
     }
 }

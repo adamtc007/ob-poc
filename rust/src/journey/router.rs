@@ -324,10 +324,9 @@ impl PackRouter {
         workspace: Option<&WorkspaceKind>,
     ) -> bool {
         match workspace {
-            // Empty workspaces list = allowed in all workspaces
-            Some(workspace) => {
-                manifest.workspaces.is_empty() || manifest.workspaces.contains(workspace)
-            }
+            // When filtering by workspace: pack must explicitly declare that workspace.
+            // Empty workspaces = internal pack (e.g. session-bootstrap), hidden from listings.
+            Some(workspace) => manifest.workspaces.contains(workspace),
             None => true,
         }
     }
