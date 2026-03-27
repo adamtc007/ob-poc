@@ -34,6 +34,17 @@ cargo x check --db          # Include database integration tests
 
 # Deploy (Full stack: React frontend + Rust backend)
 cargo x deploy              # Build React + server + start
+
+# Chrome DevTools MCP — Automated UI Testing
+# Requires: Chrome with remote debugging (chrome://inspect/#remote-debugging)
+# Add to .mcp.json: { "chrome": { "command": "npx", "args": ["-y", "chrome-devtools-mcp", "--autoConnect"] } }
+# Available tools: navigate_page, take_screenshot, take_snapshot, click, type_text,
+#   press_key, list_console_messages, list_network_requests, get_network_request
+# Test fixture: tests/fixtures/ui_smoke_test.toml (tollgate flow + demo sequences)
+# Usage in Claude Code session:
+#   @chrome navigate to http://localhost:3000 and run the scope gate flow
+#   @chrome take a screenshot after each tollgate transition
+#   @chrome check for console errors after the full flow
 cargo x deploy --skip-frontend  # Skip React rebuild (backend only)
 
 # Run server directly (serves React from ob-poc-ui-react/dist/)
@@ -384,6 +395,48 @@ cargo build  # Catches type mismatches
 ## Error Handling
 
 Never `.unwrap()` in production. Use `?`, `.ok_or_else(|| anyhow!(...))`, `let Some(x) = ... else { continue }`, `match` / `if let`.
+
+---
+
+## Testing
+
+### Backend Test Suites
+
+```bash
+# Unified pipeline tollgate tests (9 tests — gates + trace + adapter)
+cargo test --test unified_pipeline_tollgates
+
+# Full REPL V2 suite (149 tests across 8 files)
+cargo test --test repl_v2_golden_loop --test repl_v2_phase2 --test repl_v2_phase3 \
+  --test repl_v2_phase4 --test repl_v2_phase5 --test repl_v2_phase6 --test repl_v2_integration
+
+# Intent hit rate (needs DATABASE_URL)
+DATABASE_URL="postgresql:///data_designer" cargo test --features database --test intent_hit_rate -- --ignored --nocapture
+```
+
+### Chrome DevTools MCP — Live UI Testing
+
+Automated browser testing via Chrome DevTools MCP. Claude Code can navigate, type, click, screenshot, inspect DOM, and verify console errors against the live UI.
+
+**Setup:** Chrome with remote debugging enabled + `chrome-devtools-mcp` in `.mcp.json`.
+
+**Capabilities:**
+- **Smoke tests:** Automated tollgate flow (scope → workspace → journey → pack → verb)
+- **Screenshot regression:** Capture expected states, compare on changes
+- **Demo animations:** Scripted user flows at human-readable pace for presentations
+- **Bulk phrase testing:** Fire 100+ utterances through the live UI, verify each gate renders
+- **Console error detection:** Zero-error verification after every flow step
+- **Network inspection:** Verify API response shapes match frontend expectations
+
+**Test fixture:** `tests/fixtures/ui_smoke_test.toml` — 12 test cases + 1 demo sequence covering all 3 tollgates.
+
+**Usage in Claude Code:**
+```
+@chrome navigate to http://localhost:3000 and create a new session
+@chrome type "Allianz" and press Enter, then screenshot
+@chrome click the CBU workspace button and verify journey options appear
+@chrome check for console errors
+```
 
 ---
 

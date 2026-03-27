@@ -1,0 +1,213 @@
+# UI Smoke Test Pack — Chrome DevTools MCP
+#
+# Automated end-to-end tests that exercise the full tollgate flow
+# through the live UI via Chrome DevTools MCP integration.
+#
+# Run via: Chrome DevTools MCP agent commands in Claude Code session
+# Requires: ob-poc-web running on localhost:3000, Chrome with remote debugging
+#
+# Each test case defines a sequence of user actions and expected UI states.
+# The test runner types text, clicks buttons, and verifies DOM state + screenshots.
+
+[meta]
+name = "UI Smoke Test Pack"
+version = "1.0"
+description = "End-to-end tollgate flow tests via Chrome DevTools MCP"
+requires = ["chrome-devtools-mcp", "ob-poc-web on localhost:3000"]
+
+# =============================================================================
+# Gate 1: ScopeGate — Client Group Selection
+# =============================================================================
+
+[[tests]]
+id = "scope-gate-initial-prompt"
+description = "New session shows 'Which client would you like to work with today?'"
+actions = [
+    { type = "click", target = "New session button" },
+    { type = "wait", ms = 3000 },
+]
+expect = [
+    { type = "text_present", text = "Which client would you like to work with today?" },
+    { type = "element_present", role = "textbox", placeholder = "Type a message..." },
+]
+
+[[tests]]
+id = "scope-gate-allianz-resolve"
+description = "Typing 'Allianz' resolves to Allianz Global Investors and shows workspace options"
+actions = [
+    { type = "type", text = "Allianz" },
+    { type = "press_key", key = "Enter" },
+    { type = "wait", ms = 5000 },
+]
+expect = [
+    { type = "text_present", text = "Scope set to Allianz Global Investors" },
+    { type = "button_present", label = "CBU" },
+    { type = "button_present", label = "KYC" },
+    { type = "button_present", label = "Deal" },
+    { type = "button_present", label = "OnBoarding" },
+    { type = "button_present", label = "Instrument Matrix" },
+    { type = "button_present", label = "Product Maintenance" },
+    { type = "button_count", min = 6 },
+]
+
+[[tests]]
+id = "scope-gate-typo-rejection"
+description = "Misspelled 'Alianz' is rejected with helpful error"
+actions = [
+    { type = "type", text = "Alianz" },
+    { type = "press_key", key = "Enter" },
+    { type = "wait", ms = 3000 },
+]
+expect = [
+    { type = "text_present", text = "couldn't find" },
+    { type = "state", state = "ScopeGate" },
+]
+
+[[tests]]
+id = "scope-gate-blackrock-resolve"
+description = "Typing 'BlackRock' resolves correctly"
+actions = [
+    { type = "type", text = "BlackRock" },
+    { type = "press_key", key = "Enter" },
+    { type = "wait", ms = 5000 },
+]
+expect = [
+    { type = "text_present", text = "BlackRock" },
+    { type = "button_present", label = "CBU" },
+]
+
+[[tests]]
+id = "scope-gate-numeric-reject"
+description = "Typing a number in ScopeGate is rejected (no numeric selection)"
+actions = [
+    { type = "type", text = "3" },
+    { type = "press_key", key = "Enter" },
+    { type = "wait", ms = 3000 },
+]
+expect = [
+    { type = "text_present", text = "couldn't find" },
+]
+
+# =============================================================================
+# Gate 2: WorkspaceSelection — Workspace Choice
+# =============================================================================
+
+[[tests]]
+id = "workspace-cbu-click"
+description = "Clicking CBU workspace button transitions to JourneySelection"
+depends_on = "scope-gate-allianz-resolve"
+actions = [
+    { type = "click_button", label = "CBU" },
+    { type = "wait", ms = 5000 },
+]
+expect = [
+    { type = "text_present", text = "CBU workspace selected" },
+    { type = "text_present", text = "Which journey" },
+    { type = "button_present", label = "Book Setup" },
+]
+
+[[tests]]
+id = "workspace-kyc-click"
+description = "Clicking KYC workspace shows KYC journey packs"
+depends_on = "scope-gate-allianz-resolve"
+actions = [
+    { type = "click_button", label = "KYC" },
+    { type = "wait", ms = 5000 },
+]
+expect = [
+    { type = "text_present", text = "KYC workspace selected" },
+    { type = "button_present", label = "KYC Case" },
+]
+
+[[tests]]
+id = "workspace-deal-click"
+description = "Clicking Deal workspace shows Deal journey packs"
+depends_on = "scope-gate-allianz-resolve"
+actions = [
+    { type = "click_button", label = "Deal" },
+    { type = "wait", ms = 5000 },
+]
+expect = [
+    { type = "text_present", text = "Deal workspace selected" },
+    { type = "button_present", label = "Deal Lifecycle" },
+]
+
+# =============================================================================
+# Gate 3: JourneySelection — Pack Activation
+# =============================================================================
+
+[[tests]]
+id = "journey-book-setup-click"
+description = "Clicking Book Setup activates the pack and asks first question"
+depends_on = "workspace-cbu-click"
+actions = [
+    { type = "click_button", label = "Book Setup" },
+    { type = "wait", ms = 5000 },
+]
+expect = [
+    { type = "text_present", text = "name of the client book" },
+    { type = "state", state = "InPack" },
+]
+
+# =============================================================================
+# InPack — Verb Matching and Sentence Generation
+# =============================================================================
+
+[[tests]]
+id = "in-pack-answer-question"
+description = "Answering the first pack question advances to next question"
+depends_on = "journey-book-setup-click"
+actions = [
+    { type = "type", text = "Allianz Luxembourg SICAV" },
+    { type = "press_key", key = "Enter" },
+    { type = "wait", ms = 5000 },
+]
+expect = [
+    { type = "text_present", text = "jurisdiction" },
+]
+
+# =============================================================================
+# Session State Verification
+# =============================================================================
+
+[[tests]]
+id = "session-feedback-present"
+description = "Session feedback is included in responses after scope gate"
+depends_on = "workspace-cbu-click"
+expect = [
+    { type = "element_present", text = "Constellation" },
+    { type = "no_console_errors" },
+]
+
+[[tests]]
+id = "no-console-errors-throughout"
+description = "Zero console errors throughout the entire flow"
+expect = [
+    { type = "no_console_errors" },
+]
+
+# =============================================================================
+# Demo Animation Sequences
+# =============================================================================
+
+[[demos]]
+id = "full-onboarding-flow"
+description = "Complete onboarding flow from empty session to first CBU creation"
+speed = "human"  # human-readable pace (1-2s between actions)
+steps = [
+    { action = "navigate", url = "http://localhost:3000" },
+    { action = "click", target = "New session", pause_after = 2000 },
+    { action = "type", text = "Allianz", pause_after = 1000 },
+    { action = "press_key", key = "Enter", pause_after = 4000 },
+    { action = "screenshot", name = "01-workspace-options" },
+    { action = "click_button", label = "CBU", pause_after = 4000 },
+    { action = "screenshot", name = "02-journey-options" },
+    { action = "click_button", label = "Book Setup", pause_after = 4000 },
+    { action = "screenshot", name = "03-first-question" },
+    { action = "type", text = "Allianz Luxembourg SICAV", pause_after = 1000 },
+    { action = "press_key", key = "Enter", pause_after = 4000 },
+    { action = "screenshot", name = "04-second-question" },
+    { action = "type", text = "LU", pause_after = 1000 },
+    { action = "press_key", key = "Enter", pause_after = 4000 },
+    { action = "screenshot", name = "05-sentence-playback" },
+]
