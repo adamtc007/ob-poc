@@ -611,7 +611,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let pack_router = {
             let config_dir =
                 std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../config/packs");
-            PackRouter::load(&config_dir).unwrap_or_else(|_| PackRouter::new(vec![]))
+            match PackRouter::load(&config_dir) {
+                Ok(router) => {
+                    tracing::info!(
+                        "Loaded {} journey packs from {}",
+                        router.pack_count(),
+                        config_dir.display()
+                    );
+                    router
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to load journey packs from {}: {e}", config_dir.display());
+                    PackRouter::new(vec![])
+                }
+            }
         };
 
         // Legacy DslExecutor for the constructor (fallback path — never parks)

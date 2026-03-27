@@ -51,7 +51,7 @@ risk_policy:
 required_questions:
   - field: deal_name
     prompt: "What is the deal name?"
-    answer_kind: text
+    answer_kind: string
 
   - field: counterparty
     prompt: "Who is the counterparty?"
@@ -65,7 +65,7 @@ optional_questions:
 
   - field: effective_date
     prompt: "Effective date? (YYYY-MM-DD)"
-    answer_kind: date
+    answer_kind: string
 
 stop_rules:
   - "Deal created"
@@ -88,9 +88,16 @@ templates:
           deal_ref: "$prev"
 
 section_layout:
-  - "Deal Creation"
-  - "Rate Card & Pricing"
-  - "Contracts"
+  - title: "Deal Creation"
+    verb_prefixes:
+      - "deal."
+  - title: "Rate Card & Pricing"
+    verb_prefixes:
+      - "deal.assign"
+  - title: "Contracts"
+    verb_prefixes:
+      - "contract."
+      - "billing."
 
 definition_of_done:
   - "Deal record exists in system"
@@ -98,9 +105,13 @@ definition_of_done:
   - "At least one contract created"
 
 progress_signals:
-  - "Deal created"
-  - "Rate card assigned"
-  - "Contract generated"
-  - "Billing profile created"
+  - signal: deal_created
+    description: "Deal record created in system"
+  - signal: rate_card_assigned
+    description: "Rate card assigned to deal"
+  - signal: contract_generated
+    description: "At least one contract created"
+  - signal: billing_configured
+    description: "Billing profile created"
 
 handoff_target: null

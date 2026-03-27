@@ -51,6 +51,11 @@ impl PackRouter {
         }
     }
 
+    /// Number of loaded packs.
+    pub fn pack_count(&self) -> usize {
+        self.packs.len()
+    }
+
     /// Load packs from a directory and create a router.
     pub fn load(config_dir: &Path) -> Result<Self, PackLoadError> {
         let loaded = load_packs_from_dir(config_dir)?;
