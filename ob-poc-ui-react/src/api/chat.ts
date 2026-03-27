@@ -394,8 +394,31 @@ export const chatApi = {
       }
       throw error;
     }
-    const response = envelope.response;
+    // The unified pipeline returns kind: "chat" with a full ChatResponse.
+    // Handle both legacy "decision" and new "chat" response shapes.
+    const raw = envelope as Record<string, unknown>;
+    if (raw.kind === "chat" && raw.response) {
+      // Unified pipeline response — use buildAssistantMessage for full mapping
+      const chatResp = raw.response as Record<string, unknown>;
+      const msg = buildAssistantMessage(sessionId, chatResp);
+      const verbs: VerbProfile[] = ((chatResp.available_verbs as VerbProfile[]) || []).map((v) => ({
+        fqn: v.fqn,
+        domain: v.domain,
+        description: v.description,
+        sexpr: `(${v.fqn})`,
+        args: v.args || [],
+        preconditions_met: v.preconditions_met ?? true,
+        governance_tier: v.governance_tier || "operational",
+      }));
+      return {
+        message: msg,
+        available_verbs: verbs.length > 0 ? verbs : undefined,
+        surface_fingerprint: chatResp.surface_fingerprint as string | undefined,
+      };
+    }
 
+    // Legacy decision response
+    const response = envelope.response;
     const verbs: VerbProfile[] = (response.available_verbs || []).map((v) => ({
       fqn: v.fqn,
       domain: v.domain,
