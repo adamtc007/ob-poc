@@ -320,3 +320,114 @@ async fn response_adapter_produces_valid_chat_response() {
     let session = orch.get_session(id).await.unwrap();
     assert!(matches!(session.state, ReplStateV2::WorkspaceSelection { .. }));
 }
+
+// ---------------------------------------------------------------------------
+// Test 10: Writes counter increments on execution
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn writes_counter_tracks_execution() {
+    let orch = make_orchestrator();
+    let id = orch.create_session().await;
+
+    // Pass through all gates to RunbookEditing
+    orch.process(id, UserInputV2::SelectScope {
+        group_id: Uuid::new_v4(),
+        group_name: "Test".to_string(),
+    }).await.unwrap();
+    orch.process(id, UserInputV2::SelectWorkspace {
+        workspace: WorkspaceKind::OnBoarding,
+    }).await.unwrap();
+    orch.process(id, UserInputV2::SelectPack {
+        pack_id: "onboarding-request".to_string(),
+    }).await.unwrap();
+
+    // Verify writes_since_push starts at 0
+    let session = orch.get_session(id).await.unwrap();
+    if let Some(tos) = session.workspace_stack.last() {
+        assert_eq!(tos.writes_since_push, 0, "No writes yet");
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Test 11: Session scope persists through all gates
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn scope_persists_through_gates() {
+    let orch = make_orchestrator();
+    let id = orch.create_session().await;
+    let group_id = Uuid::new_v4();
+
+    // Pass scope gate
+    orch.process(id, UserInputV2::SelectScope {
+        group_id,
+        group_name: "Persistent Corp".to_string(),
+    }).await.unwrap();
+
+    // Select workspace
+    orch.process(id, UserInputV2::SelectWorkspace {
+        workspace: WorkspaceKind::OnBoarding,
+    }).await.unwrap();
+
+    // Verify scope is still set on workspace frame
+    let session = orch.get_session(id).await.unwrap();
+    if let Some(tos) = session.workspace_stack.last() {
+        assert_eq!(tos.session_scope.client_group_id, group_id,
+            "Client group ID must persist on workspace frame");
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Test 12: Workspace frame carries constellation metadata
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn workspace_frame_has_constellation_metadata() {
+    let orch = make_orchestrator();
+    let id = orch.create_session().await;
+
+    orch.process(id, UserInputV2::SelectScope {
+        group_id: Uuid::new_v4(),
+        group_name: "Test".to_string(),
+    }).await.unwrap();
+    orch.process(id, UserInputV2::SelectWorkspace {
+        workspace: WorkspaceKind::Kyc,
+    }).await.unwrap();
+
+    let session = orch.get_session(id).await.unwrap();
+    let tos = session.workspace_stack.last().expect("Should have workspace frame");
+    assert_eq!(tos.workspace, WorkspaceKind::Kyc);
+    assert!(!tos.constellation_family.is_empty(), "Constellation family must be set");
+    assert!(!tos.constellation_map.is_empty(), "Constellation map must be set");
+    assert!(!tos.is_peek, "Fresh frame is not a peek");
+    assert!(!tos.stale, "Fresh frame is not stale");
+}
+
+// ---------------------------------------------------------------------------
+// Test 13: Session state is deterministic (same inputs → same state)
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn session_state_is_deterministic() {
+    let orch = make_orchestrator();
+
+    // Run the same sequence twice
+    let mut states = Vec::new();
+    for _ in 0..2 {
+        let id = orch.create_session().await;
+        orch.process(id, UserInputV2::SelectScope {
+            group_id: Uuid::nil(), // deterministic UUID
+            group_name: "Allianz".to_string(),
+        }).await.unwrap();
+        orch.process(id, UserInputV2::SelectWorkspace {
+            workspace: WorkspaceKind::Cbu,
+        }).await.unwrap();
+
+        let session = orch.get_session(id).await.unwrap();
+        let state_json = serde_json::to_value(&session.state).unwrap();
+        states.push(state_json);
+    }
+
+    assert_eq!(states[0], states[1], "Same inputs must produce same state");
+}

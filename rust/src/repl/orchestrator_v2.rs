@@ -44,8 +44,9 @@ use super::runbook::{
 use super::sentence_gen::SentenceGenerator;
 use super::session_v2::{MessageRole, ReplSessionV2};
 use super::types_v2::{
-    ConstellationContextRef, ExecutionProgress, ReplCommandV2, ReplStateV2, SessionFeedback,
-    UserInputV2, WorkspaceFrame, WorkspaceKind, WorkspaceOption,
+    ConstellationContextRef, ExecutionProgress, ReplCommandV2, ReplStateV2,
+    ResolvedConstellationContext, SessionFeedback, UserInputV2, WorkspaceFrame, WorkspaceKind,
+    WorkspaceOption, WorkspaceStateView,
 };
 use super::verb_config_index::VerbConfigIndex;
 use crate::dsl_v2::macros::MacroRegistry;
@@ -666,6 +667,19 @@ impl ReplOrchestratorV2 {
             }
         };
 
+        // Re-hydrate constellation on TOS if writes occurred during this turn.
+        // This ensures the response's session_feedback carries the post-execution
+        // constellation state (updated slot states, available verbs, progress).
+        if let Some(tos) = session.workspace_stack.last() {
+            if tos.writes_since_push > 0 {
+                if let Some(ref pool) = self.pool {
+                    if let Ok(hydrated) = self.rehydrate_tos(pool, session).await {
+                        session.hydrate_tos(hydrated);
+                    }
+                }
+            }
+        }
+
         // Record assistant response message.
         session.push_message(MessageRole::Assistant, response.message.clone());
         let finalized_trace_id = self
@@ -689,6 +703,58 @@ impl ReplOrchestratorV2 {
         }
 
         Ok(response)
+    }
+
+    /// Re-hydrate the top-of-stack workspace constellation from the database.
+    ///
+    /// Called after verb execution changes entity state, so the session feedback
+    /// reflects the post-execution constellation (updated slot states, available
+    /// verbs, progress). This is the key step that closes the
+    /// utterance → execute → updated-state → UI-render loop.
+    #[cfg(feature = "database")]
+    async fn rehydrate_tos(
+        &self,
+        pool: &sqlx::PgPool,
+        session: &ReplSessionV2,
+    ) -> anyhow::Result<WorkspaceStateView> {
+        use crate::api::constellation_routes::hydrate_workspace_state;
+
+        let tos = session
+            .workspace_stack
+            .last()
+            .ok_or_else(|| anyhow::anyhow!("No workspace frame to hydrate"))?;
+
+        let resolved = ResolvedConstellationContext {
+            session_id: session.id,
+            client_group_id: tos.session_scope.client_group_id,
+            workspace: tos.workspace.clone(),
+            constellation_family: tos.constellation_family.clone(),
+            constellation_map: tos.constellation_map.clone(),
+            subject_kind: tos.subject_kind.clone(),
+            subject_id: tos.subject_id,
+            handoff_context: None,
+            session_scope: tos.session_scope.clone(),
+            agent_mode: session.agent_mode,
+        };
+
+        let hydrated = hydrate_workspace_state(pool, &resolved)
+            .await
+            .map_err(|(_, msg)| anyhow::anyhow!("Hydration failed: {msg}"))?;
+
+        tracing::debug!(
+            workspace = ?tos.workspace,
+            "Re-hydrated TOS constellation after execution"
+        );
+        Ok(hydrated)
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn rehydrate_tos(
+        &self,
+        _pool: &sqlx::PgPool,
+        _session: &ReplSessionV2,
+    ) -> anyhow::Result<WorkspaceStateView> {
+        anyhow::bail!("Constellation hydration requires database feature")
     }
 
     async fn persist_trace_scaffold(
