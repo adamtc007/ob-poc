@@ -208,9 +208,7 @@ fn build_decision(
             ..Default::default()
         },
         utterance: String::new(),
-        payload: ClarificationPayload::Group(GroupClarificationPayload {
-            options: vec![],
-        }),
+        payload: ClarificationPayload::Group(GroupClarificationPayload { options: vec![] }),
         prompt: prompt.to_string(),
         choices,
         best_plan: None,
@@ -265,9 +263,7 @@ mod tests {
     #[test]
     fn workspace_options_maps_to_decision() {
         let resp = ReplResponseV2 {
-            state: ReplStateV2::WorkspaceSelection {
-                workspaces: vec![],
-            },
+            state: ReplStateV2::WorkspaceSelection { workspaces: vec![] },
             kind: ReplResponseKindV2::WorkspaceOptions {
                 workspaces: vec![
                     WorkspaceOption {

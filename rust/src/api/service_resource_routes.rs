@@ -69,6 +69,14 @@ pub fn service_resource_router(pool: PgPool) -> Router {
         .route("/cbu/:cbu_id/attributes/rollup", post(run_rollup))
         .route("/cbu/:cbu_id/attributes/populate", post(run_population))
         .route(
+            "/cbu/:cbu_id/attributes/:attr_id/recompute",
+            post(recompute_attribute),
+        )
+        .route(
+            "/cbu/:cbu_id/attributes/recompute-stale",
+            post(recompute_stale_attributes),
+        )
+        .route(
             "/cbu/:cbu_id/attributes/requirements",
             get(get_attr_requirements),
         )
@@ -285,6 +293,63 @@ async fn run_population(
     }
 }
 
+async fn recompute_attribute(
+    State(state): State<Arc<ServiceResourceState>>,
+    Path((cbu_id, attr_id)): Path<(Uuid, Uuid)>,
+) -> impl IntoResponse {
+    let engine = PopulationEngine::new(&state.pool);
+
+    match engine.recompute_derived("cbu", cbu_id, attr_id).await {
+        Ok(outcome) => (
+            StatusCode::OK,
+            Json(json!({
+                "cbu_id": cbu_id,
+                "attr_id": attr_id,
+                "outcome": format!("{outcome:?}")
+            })),
+        ),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        ),
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct RecomputeStaleRequest {
+    pub limit: Option<i64>,
+}
+
+async fn recompute_stale_attributes(
+    State(state): State<Arc<ServiceResourceState>>,
+    Path(_cbu_id): Path<Uuid>,
+    payload: Option<Json<RecomputeStaleRequest>>,
+) -> impl IntoResponse {
+    let engine = PopulationEngine::new(&state.pool);
+    let limit = payload
+        .as_ref()
+        .and_then(|json| json.limit)
+        .unwrap_or(100)
+        .max(1);
+
+    match engine.recompute_stale_batch(limit).await {
+        Ok(result) => (
+            StatusCode::OK,
+            Json(json!({
+                "picked": result.picked,
+                "recomputed": result.recomputed,
+                "skipped_already_current": result.skipped_already_current,
+                "still_stale": result.still_stale,
+                "failed": result.failed
+            })),
+        ),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        ),
+    }
+}
+
 async fn get_attr_requirements(
     State(state): State<Arc<ServiceResourceState>>,
     Path(cbu_id): Path<Uuid>,
@@ -334,7 +399,14 @@ async fn set_attr_value(
     let service = ServiceResourcePipelineService::new(state.pool.clone());
 
     let source = match req.source.as_deref() {
-        Some("derived") => AttributeSource::Derived,
+        Some("derived") => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({
+                    "error": "Derived values are persisted by the canonical derivation engine, not via this endpoint"
+                })),
+            );
+        }
         Some("entity") => AttributeSource::Entity,
         Some("cbu") => AttributeSource::Cbu,
         Some("document") => AttributeSource::Document,
@@ -898,9 +970,20 @@ async fn get_service_taxonomy(
     // Get attribute values (what's been satisfied)
     let attr_values: Vec<AttrValueRow> = match sqlx::query_as(
         r#"
+        WITH effective_values AS (
+            SELECT attr_id, source
+            FROM "ob-poc".cbu_attr_values
+            WHERE cbu_id = $1
+              AND source <> 'derived'
+
+            UNION ALL
+
+            SELECT attr_id, source
+            FROM "ob-poc".v_cbu_derived_values
+            WHERE cbu_id = $1
+        )
         SELECT attr_id, source
-        FROM "ob-poc".cbu_attr_values
-        WHERE cbu_id = $1
+        FROM effective_values
         "#,
     )
     .bind(cbu_id)

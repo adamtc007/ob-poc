@@ -1141,7 +1141,10 @@ async fn get_session_scope_graph(
             cbu_ids: vec![],
             cbu_count: 0,
             affected_entity_ids: vec![],
-            error: Some("No client group selected. Start by choosing a client group to work with.".to_string()),
+            error: Some(
+                "No client group selected. Start by choosing a client group to work with."
+                    .to_string(),
+            ),
         }));
     }
 

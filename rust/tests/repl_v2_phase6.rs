@@ -659,11 +659,8 @@ async fn setup_with_n_entries_in_pack(
 async fn test_b1_direct_dsl_transitions_to_sentence_playback() {
     // DSL-shaped input now routes through verb matching (no bypass path).
     // A matched verb with high confidence auto-advances to SentencePlayback.
-    let matcher = MockIntentMatcher::matched(
-        "cbu.create",
-        0.92,
-        Some("(cbu.create :name \"test\")"),
-    );
+    let matcher =
+        MockIntentMatcher::matched("cbu.create", 0.92, Some("(cbu.create :name \"test\")"));
     let orch = build_orchestrator_with_engine(matcher);
     let session_id = setup_in_pack(&orch).await;
 
@@ -703,11 +700,8 @@ async fn test_b1_direct_dsl_transitions_to_sentence_playback() {
 
 #[tokio::test]
 async fn test_b2_direct_dsl_confirm_adds_entry() {
-    let matcher = MockIntentMatcher::matched(
-        "cbu.create",
-        0.92,
-        Some("(cbu.create :name \"test\")"),
-    );
+    let matcher =
+        MockIntentMatcher::matched("cbu.create", 0.92, Some("(cbu.create :name \"test\")"));
     let orch = build_orchestrator_with_engine(matcher);
     let session_id = setup_in_pack(&orch).await;
 
@@ -752,11 +746,8 @@ async fn test_b2_direct_dsl_confirm_adds_entry() {
 
 #[tokio::test]
 async fn test_b3_direct_dsl_reject_returns_to_in_pack() {
-    let matcher = MockIntentMatcher::matched(
-        "cbu.create",
-        0.92,
-        Some("(cbu.create :name \"test\")"),
-    );
+    let matcher =
+        MockIntentMatcher::matched("cbu.create", 0.92, Some("(cbu.create :name \"test\")"));
     let orch = build_orchestrator_with_engine(matcher);
     let session_id = setup_in_pack(&orch).await;
 

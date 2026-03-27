@@ -6,7 +6,7 @@
 > **Crates:** 22 active Rust crates (16 ob-poc + 6 sem_os_*)
 > **Verbs:** 1,263 canonical verbs, 15,940 intent patterns (DB-sourced)
 > **MCP Tools:** ~102 tools (DSL, verbs, learning, session, batch, research, taxonomy, sem_reg, stewardship, db_introspect, session_verb_surface)
-> **Migrations:** 128 schema migrations (001–128)
+> **Latest schema addition:** `rust/migrations/20260327_derived_attribute_persistence.sql`
 > **Schema Overview:** `migrations/OB_POC_SCHEMA_ENTITY_OVERVIEW.md`
 > **Embeddings:** Candle local (384-dim, BGE-small-en-v1.5) — 15,940 patterns vectorized
 
@@ -75,6 +75,16 @@ SEM_OS_DATABASE_URL="postgresql:///data_designer" SEM_OS_JWT_SECRET=dev-secret c
 ```
 
 Current schema export target: `migrations/master-schema.sql` (canonical), `schema_export.sql` (convenience copy)
+
+Derived attribute persistence is now cut over to the canonical below-the-line plane:
+- runtime derived values persist in `"ob-poc".derived_attribute_values`
+- dependency lineage persists in `"ob-poc".derived_attribute_dependencies`
+- CBU consumers read canonical derived rows through `"ob-poc".v_cbu_derived_values`
+- legacy `"ob-poc".cbu_attr_values` remains the direct/manual/non-derived observation plane
+
+Verification snapshot for this cutover on 2026-03-27:
+- `env RUSTC_WRAPPER= cargo check`
+- `env RUSTC_WRAPPER= cargo test --features database --test derived_attribute_persistence_integration -- --ignored --nocapture`
 
 ---
 

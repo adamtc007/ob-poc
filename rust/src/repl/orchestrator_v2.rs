@@ -1069,13 +1069,20 @@ impl ReplOrchestratorV2 {
         let lower = input.to_lowercase();
 
         // Exact workspace name matches
-        if lower.contains("kyc") || lower.contains("know your customer") || lower.contains("compliance") {
+        if lower.contains("kyc")
+            || lower.contains("know your customer")
+            || lower.contains("compliance")
+        {
             return Some(WorkspaceKind::Kyc);
         }
         if lower.contains("onboard") || lower.contains("on-board") || lower.contains("on board") {
             return Some(WorkspaceKind::OnBoarding);
         }
-        if lower.contains("deal") || lower.contains("commercial") || lower.contains("contract") || lower.contains("pricing") {
+        if lower.contains("deal")
+            || lower.contains("commercial")
+            || lower.contains("contract")
+            || lower.contains("pricing")
+        {
             return Some(WorkspaceKind::Deal);
         }
         if lower.contains("product") || lower.contains("service") || lower.contains("taxonomy") {
@@ -1084,14 +1091,21 @@ impl ReplOrchestratorV2 {
         if lower.contains("instrument") || lower.contains("matrix") || lower.contains("trading") {
             return Some(WorkspaceKind::InstrumentMatrix);
         }
-        if lower.contains("cbu") || lower.contains("client business") || lower.contains("structure") || lower.contains("maintenance") {
+        if lower.contains("cbu")
+            || lower.contains("client business")
+            || lower.contains("structure")
+            || lower.contains("maintenance")
+        {
             return Some(WorkspaceKind::Cbu);
         }
         None
     }
 
     /// Resolve workspace from numeric selection (1-6).
-    fn resolve_workspace_from_number(input: &str, session: &ReplSessionV2) -> Option<WorkspaceKind> {
+    fn resolve_workspace_from_number(
+        input: &str,
+        session: &ReplSessionV2,
+    ) -> Option<WorkspaceKind> {
         let trimmed = input.trim();
         let index: usize = trimmed.parse().ok()?;
         if index == 0 || index > 6 {
@@ -1121,7 +1135,10 @@ impl ReplOrchestratorV2 {
                 // Try numeric selection first (1, 2, 3, ...)
                 if let Ok(idx) = content.trim().parse::<usize>() {
                     if idx > 0 {
-                        let pack_id = if let ReplStateV2::JourneySelection { candidates: Some(ref packs) } = session.state {
+                        let pack_id = if let ReplStateV2::JourneySelection {
+                            candidates: Some(ref packs),
+                        } = session.state
+                        {
                             packs.get(idx - 1).map(|p| p.pack_id.clone())
                         } else {
                             None

@@ -21,31 +21,45 @@ impl ToolHandlers {
 
     #[allow(dead_code)]
     pub(super) async fn session_load_cluster(&self, _args: Value) -> Result<Value> {
-        Err(anyhow!("session.load-cluster: Use the unified session pipeline instead"))
+        Err(anyhow!(
+            "session.load-cluster: Use the unified session pipeline instead"
+        ))
     }
 
     pub(super) async fn session_load_jurisdiction(&self, _args: Value) -> Result<Value> {
-        Err(anyhow!("session.load-jurisdiction: Use the unified session pipeline instead"))
+        Err(anyhow!(
+            "session.load-jurisdiction: Use the unified session pipeline instead"
+        ))
     }
 
     pub(super) async fn session_load_galaxy(&self, _args: Value) -> Result<Value> {
-        Err(anyhow!("session.load-galaxy: Use the unified session pipeline instead"))
+        Err(anyhow!(
+            "session.load-galaxy: Use the unified session pipeline instead"
+        ))
     }
 
     pub(super) async fn session_unload_cbu(&self, _args: Value) -> Result<Value> {
-        Err(anyhow!("session.unload-cbu: Use the unified session pipeline instead"))
+        Err(anyhow!(
+            "session.unload-cbu: Use the unified session pipeline instead"
+        ))
     }
 
     pub(super) async fn session_clear(&self, _args: Value) -> Result<Value> {
-        Err(anyhow!("session.clear: Use the unified session pipeline instead"))
+        Err(anyhow!(
+            "session.clear: Use the unified session pipeline instead"
+        ))
     }
 
     pub(super) async fn session_undo(&self, _args: Value) -> Result<Value> {
-        Err(anyhow!("session.undo: Use the unified session pipeline instead"))
+        Err(anyhow!(
+            "session.undo: Use the unified session pipeline instead"
+        ))
     }
 
     pub(super) async fn session_redo(&self, _args: Value) -> Result<Value> {
-        Err(anyhow!("session.redo: Use the unified session pipeline instead"))
+        Err(anyhow!(
+            "session.redo: Use the unified session pipeline instead"
+        ))
     }
 
     pub(super) async fn session_info(&self, args: Value) -> Result<Value> {

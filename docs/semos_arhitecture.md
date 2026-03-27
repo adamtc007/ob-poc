@@ -91,8 +91,8 @@ The 2026-03-24 reconciliation landed in four functional slices plus one refineme
 
 - a shared `AttributeIdentityService` now resolves attribute references across SemOS FQNs, operational registry UUID/ID, metadata aliases, and the remaining legacy dictionary identifiers
 - the active runtime/API call paths no longer perform ad-hoc attribute identity lookups; they route through the shared resolver instead
-- the derivation engine in the service-resource population flow is live and now evaluates governed `derivation_spec` snapshots into `cbu_attr_values`
-- derivation writes now persist lineage/explanation envelopes through `evidence_refs` and `explain_refs`
+- the derivation engine in the service-resource population flow is live and now evaluates governed `derivation_spec` snapshots into the canonical `"ob-poc".derived_attribute_values` plane
+- derivation writes now persist dependency lineage in `"ob-poc".derived_attribute_dependencies`, with CBU-facing evidence/explanation envelopes projected through `"ob-poc".v_cbu_derived_values`
 - the SemOS-to-operational attribute bridge is now authored through `attribute_registry.metadata.sem_os` rather than hardcoded in the derivation path
 
 The refinement pass then removed the main hot-path inefficiencies without changing the architecture:
@@ -100,13 +100,14 @@ The refinement pass then removed the main hot-path inefficiencies without changi
 - registry bridge enrichment runs once per population pass, not once per SemOS FQN resolution
 - derivation specs are indexed once per population run instead of scanning all active specs for each target attribute
 - the derivation function registry is a static `LazyLock`, not rebuilt per derivation
-- the current lineage gap is explicit: `input_snapshot_ids` remain unavailable from `cbu_attr_values` v1, and this is surfaced as a stated status rather than implied completeness
+- the current lineage model is explicit: v1 persists write-time dependency rows and input envelopes in the canonical derived plane, while still not carrying full source snapshot replay semantics
 
 This leaves the attribute plane in the intended architectural shape:
 
 - SemOS governs attribute meaning, derivation intent, and cross-object identity
 - `"ob-poc".attribute_registry` remains the operational backbone for runtime UUIDs and persisted values
-- `"ob-poc".cbu_attr_values` is now populated by both direct source collection and governed derivations
+- `"ob-poc".cbu_attr_values` now remains the direct/manual/non-derived CBU value plane, while governed derivations persist canonically in `"ob-poc".derived_attribute_values`
+- CBU read consumers see an effective merged surface through `"ob-poc".v_cbu_derived_values`, `"ob-poc".v_cbu_attr_gaps`, and `"ob-poc".v_cbu_attr_summary`
 - the legacy `data_dictionary/` module remains only as a compatibility layer, not the primary runtime definition source
 
 Remaining work in this plane is now mostly additive and coordinated:

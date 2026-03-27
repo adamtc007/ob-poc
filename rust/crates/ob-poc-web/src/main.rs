@@ -25,11 +25,11 @@ use crate::state::AppState;
 // Import API routers from main ob-poc crate
 use ob_poc::api::{
     control_routes, create_agent_router_with_semantic_and_repl, create_attribute_router,
-    create_client_router, create_constellation_router,
-    create_deal_router, create_dsl_viewer_router, create_entity_router, create_graph_router,
-    create_resolution_router, create_scoped_entity_router, create_session_graph_router,
-    create_session_store, create_stewardship_router, create_taxonomy_router,
-    create_trading_matrix_router, create_universe_router, service_resource_router,
+    create_client_router, create_constellation_router, create_deal_router,
+    create_dsl_viewer_router, create_entity_router, create_graph_router, create_resolution_router,
+    create_scoped_entity_router, create_session_graph_router, create_session_store,
+    create_stewardship_router, create_taxonomy_router, create_trading_matrix_router,
+    create_universe_router, service_resource_router,
 };
 
 // Import gateway resolver for resolution routes
@@ -621,7 +621,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     router
                 }
                 Err(e) => {
-                    tracing::warn!("Failed to load journey packs from {}: {e}", config_dir.display());
+                    tracing::warn!(
+                        "Failed to load journey packs from {}: {e}",
+                        config_dir.display()
+                    );
                     PackRouter::new(vec![])
                 }
             }

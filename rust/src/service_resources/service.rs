@@ -265,8 +265,17 @@ impl ServiceResourcePipelineService {
     // CBU ATTRIBUTE VALUES
     // =========================================================================
 
-    /// Set a CBU attribute value
+    /// Set a CBU attribute value.
+    ///
+    /// Derived values are persisted in the canonical `derived_attribute_values`
+    /// table by the derivation engine — they must never be written here.
     pub async fn set_cbu_attr_value(&self, input: &SetCbuAttrValue) -> Result<()> {
+        if input.source == AttributeSource::Derived {
+            anyhow::bail!(
+                "Derived values must not be written to cbu_attr_values — \
+                 use the canonical derivation engine (PopulationEngine::try_derive_for_entity)"
+            );
+        }
         let evidence = json!(input.evidence_refs);
         let explain = json!(input.explain_refs);
 
@@ -300,15 +309,30 @@ impl ServiceResourcePipelineService {
         );
         Ok(())
     }
-
-    /// Get CBU attribute values
+    /// Get effective CBU attribute values.
+    ///
+    /// This returns legacy non-derived rows from `cbu_attr_values` together with
+    /// canonical derived rows projected from `v_cbu_derived_values`.
     pub async fn get_cbu_attr_values(&self, cbu_id: Uuid) -> Result<Vec<CbuAttrValue>> {
         sqlx::query_as::<_, CbuAttrValue>(
             r#"
+            WITH effective_values AS (
+                SELECT cbu_id, attr_id, value, source, evidence_refs, explain_refs,
+                       as_of, created_at, updated_at
+                FROM "ob-poc".cbu_attr_values
+                WHERE cbu_id = $1
+                  AND source <> 'derived'
+
+                UNION ALL
+
+                SELECT cbu_id, attr_id, value, source, evidence_refs, explain_refs,
+                       as_of, created_at, updated_at
+                FROM "ob-poc".v_cbu_derived_values
+                WHERE cbu_id = $1
+            )
             SELECT cbu_id, attr_id, value, source, evidence_refs, explain_refs,
                    as_of, created_at, updated_at
-            FROM "ob-poc".cbu_attr_values
-            WHERE cbu_id = $1
+            FROM effective_values
             ORDER BY attr_id
             "#,
         )
@@ -318,7 +342,10 @@ impl ServiceResourcePipelineService {
         .context("Failed to get CBU attr values")
     }
 
-    /// Get a specific CBU attribute value
+    /// Get one effective CBU attribute value.
+    ///
+    /// Derived rows resolve from the canonical projection view rather than the
+    /// legacy `cbu_attr_values` table.
     pub async fn get_cbu_attr_value(
         &self,
         cbu_id: Uuid,
@@ -326,10 +353,26 @@ impl ServiceResourcePipelineService {
     ) -> Result<Option<CbuAttrValue>> {
         sqlx::query_as::<_, CbuAttrValue>(
             r#"
+            WITH effective_value AS (
+                SELECT cbu_id, attr_id, value, source, evidence_refs, explain_refs,
+                       as_of, created_at, updated_at
+                FROM "ob-poc".cbu_attr_values
+                WHERE cbu_id = $1
+                  AND attr_id = $2
+                  AND source <> 'derived'
+
+                UNION ALL
+
+                SELECT cbu_id, attr_id, value, source, evidence_refs, explain_refs,
+                       as_of, created_at, updated_at
+                FROM "ob-poc".v_cbu_derived_values
+                WHERE cbu_id = $1
+                  AND attr_id = $2
+            )
             SELECT cbu_id, attr_id, value, source, evidence_refs, explain_refs,
                    as_of, created_at, updated_at
-            FROM "ob-poc".cbu_attr_values
-            WHERE cbu_id = $1 AND attr_id = $2
+            FROM effective_value
+            LIMIT 1
             "#,
         )
         .bind(cbu_id)

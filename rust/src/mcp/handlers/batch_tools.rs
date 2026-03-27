@@ -1067,7 +1067,12 @@ impl ToolHandlers {
         let cbu_id = self.resolve_cbu_id(&args.cbu_id).await?;
 
         let source = match args.source.as_deref() {
-            Some("derived") => AttributeSource::Derived,
+            Some("derived") => {
+                anyhow::bail!(
+                    "Derived values are persisted by the canonical derivation engine, \
+                     not via set_cbu_attr_value"
+                );
+            }
             Some("entity") => AttributeSource::Entity,
             Some("cbu") => AttributeSource::Cbu,
             Some("document") => AttributeSource::Document,

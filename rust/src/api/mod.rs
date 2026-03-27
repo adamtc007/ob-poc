@@ -95,9 +95,9 @@ pub mod deal_routes;
 #[cfg(feature = "server")]
 pub mod stewardship_routes;
 
+pub mod agent_enrichment;
 pub mod repl_routes_v2;
 pub mod response_adapter;
-pub mod agent_enrichment;
 
 #[cfg(feature = "server")]
 pub use attribute_routes::create_attribute_router;

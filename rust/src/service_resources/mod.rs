@@ -15,9 +15,9 @@
 //!        ↓
 //! CbuUnifiedAttrRequirements (per-CBU attr needs)
 //!        ↓
-//! PopulationEngine (fill values from sources)
+//! PopulationEngine (fill values from sources and canonical derived plane)
 //!        ↓
-//! CbuAttrValues (populated values)
+//! Effective CBU values (legacy non-derived rows + canonical derived projection)
 //!        ↓
 //! ProvisioningOrchestrator (when attrs satisfied)
 //!        ↓
@@ -35,7 +35,9 @@
 //! | `service_intents` | What CBU wants |
 //! | `srdef_discovery_reasons` | Why SRDEFs were discovered |
 //! | `cbu_unified_attr_requirements` | Rolled-up attr requirements |
-//! | `cbu_attr_values` | Populated attribute values |
+//! | `cbu_attr_values` | Legacy/manual/non-derived CBU values |
+//! | `derived_attribute_values` | Canonical derived value history |
+//! | `v_cbu_derived_values` | CBU projection of canonical derived values |
 //! | `provisioning_requests` | Append-only request log |
 //! | `provisioning_events` | Append-only event log |
 //! | `cbu_service_readiness` | Derived readiness status |

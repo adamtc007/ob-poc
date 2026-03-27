@@ -67,9 +67,12 @@ async fn utterance_in_scope_gate_returns_scope_required() {
     let id = orch.create_session().await;
 
     let resp = orch
-        .process(id, UserInputV2::Message {
-            content: "hello".to_string(),
-        })
+        .process(
+            id,
+            UserInputV2::Message {
+                content: "hello".to_string(),
+            },
+        )
         .await
         .unwrap();
 
@@ -95,10 +98,13 @@ async fn select_scope_transitions_to_workspace_selection() {
     let id = orch.create_session().await;
 
     let resp = orch
-        .process(id, UserInputV2::SelectScope {
-            group_id: Uuid::new_v4(),
-            group_name: "Test Group".to_string(),
-        })
+        .process(
+            id,
+            UserInputV2::SelectScope {
+                group_id: Uuid::new_v4(),
+                group_name: "Test Group".to_string(),
+            },
+        )
         .await
         .unwrap();
 
@@ -114,7 +120,10 @@ async fn select_scope_transitions_to_workspace_selection() {
 
     // Verify workspace options are present
     if let ReplResponseKindV2::WorkspaceOptions { workspaces } = &resp.kind {
-        assert!(!workspaces.is_empty(), "Workspace options must not be empty");
+        assert!(
+            !workspaces.is_empty(),
+            "Workspace options must not be empty"
+        );
         let labels: Vec<&str> = workspaces.iter().map(|w| w.label.as_str()).collect();
         assert!(labels.contains(&"CBU"), "Must include CBU workspace");
         assert!(labels.contains(&"KYC"), "Must include KYC workspace");
@@ -132,18 +141,24 @@ async fn select_workspace_transitions_to_journey_selection() {
     let id = orch.create_session().await;
 
     // Pass scope gate
-    orch.process(id, UserInputV2::SelectScope {
-        group_id: Uuid::new_v4(),
-        group_name: "Test Group".to_string(),
-    })
+    orch.process(
+        id,
+        UserInputV2::SelectScope {
+            group_id: Uuid::new_v4(),
+            group_name: "Test Group".to_string(),
+        },
+    )
     .await
     .unwrap();
 
     // Select workspace
     let resp = orch
-        .process(id, UserInputV2::SelectWorkspace {
-            workspace: WorkspaceKind::Cbu,
-        })
+        .process(
+            id,
+            UserInputV2::SelectWorkspace {
+                workspace: WorkspaceKind::Cbu,
+            },
+        )
         .await
         .unwrap();
 
@@ -169,9 +184,12 @@ async fn cannot_skip_scope_gate() {
 
     // Try to select workspace directly (skipping scope)
     let resp = orch
-        .process(id, UserInputV2::SelectWorkspace {
-            workspace: WorkspaceKind::Cbu,
-        })
+        .process(
+            id,
+            UserInputV2::SelectWorkspace {
+                workspace: WorkspaceKind::Cbu,
+            },
+        )
         .await
         .unwrap();
 
@@ -194,28 +212,37 @@ async fn full_tollgate_flow_to_in_pack() {
 
     // Gate 1: ScopeGate → WorkspaceSelection
     let resp = orch
-        .process(id, UserInputV2::SelectScope {
-            group_id: Uuid::new_v4(),
-            group_name: "Allianz".to_string(),
-        })
+        .process(
+            id,
+            UserInputV2::SelectScope {
+                group_id: Uuid::new_v4(),
+                group_name: "Allianz".to_string(),
+            },
+        )
         .await
         .unwrap();
     assert!(matches!(resp.state, ReplStateV2::WorkspaceSelection { .. }));
 
     // Gate 2: WorkspaceSelection → JourneySelection
     let resp = orch
-        .process(id, UserInputV2::SelectWorkspace {
-            workspace: WorkspaceKind::OnBoarding,
-        })
+        .process(
+            id,
+            UserInputV2::SelectWorkspace {
+                workspace: WorkspaceKind::OnBoarding,
+            },
+        )
         .await
         .unwrap();
     assert!(matches!(resp.state, ReplStateV2::JourneySelection { .. }));
 
     // Gate 3: JourneySelection → InPack (select a pack matching the workspace)
     let resp = orch
-        .process(id, UserInputV2::SelectPack {
-            pack_id: "onboarding-request".to_string(),
-        })
+        .process(
+            id,
+            UserInputV2::SelectPack {
+                pack_id: "onboarding-request".to_string(),
+            },
+        )
         .await
         .unwrap();
 
@@ -241,10 +268,13 @@ async fn session_feedback_populated_after_scope() {
 
     // Pass scope gate
     let resp = orch
-        .process(id, UserInputV2::SelectScope {
-            group_id: Uuid::new_v4(),
-            group_name: "Allianz".to_string(),
-        })
+        .process(
+            id,
+            UserInputV2::SelectScope {
+                group_id: Uuid::new_v4(),
+                group_name: "Allianz".to_string(),
+            },
+        )
         .await
         .unwrap();
 
@@ -264,17 +294,23 @@ async fn trace_entries_recorded_through_gates() {
     let id = orch.create_session().await;
 
     // Send a message (generates Input trace)
-    orch.process(id, UserInputV2::Message {
-        content: "hello".to_string(),
-    })
+    orch.process(
+        id,
+        UserInputV2::Message {
+            content: "hello".to_string(),
+        },
+    )
     .await
     .unwrap();
 
     // Pass scope gate (generates StateTransition trace)
-    orch.process(id, UserInputV2::SelectScope {
-        group_id: Uuid::new_v4(),
-        group_name: "Test".to_string(),
-    })
+    orch.process(
+        id,
+        UserInputV2::SelectScope {
+            group_id: Uuid::new_v4(),
+            group_name: "Test".to_string(),
+        },
+    )
     .await
     .unwrap();
 
@@ -299,26 +335,38 @@ async fn response_adapter_produces_valid_chat_response() {
 
     // ScopeGate response
     let resp = orch
-        .process(id, UserInputV2::Message {
-            content: "hi".to_string(),
-        })
+        .process(
+            id,
+            UserInputV2::Message {
+                content: "hi".to_string(),
+            },
+        )
         .await
         .unwrap();
 
     let chat = repl_to_chat_response(resp, id);
-    assert!(chat.decision.is_some(), "ScopeGate should produce a decision packet");
+    assert!(
+        chat.decision.is_some(),
+        "ScopeGate should produce a decision packet"
+    );
     assert!(!chat.message.is_empty(), "Message must not be empty");
 
     // WorkspaceSelection response
-    orch.process(id, UserInputV2::SelectScope {
-        group_id: Uuid::new_v4(),
-        group_name: "Test".to_string(),
-    })
+    orch.process(
+        id,
+        UserInputV2::SelectScope {
+            group_id: Uuid::new_v4(),
+            group_name: "Test".to_string(),
+        },
+    )
     .await
     .unwrap();
 
     let session = orch.get_session(id).await.unwrap();
-    assert!(matches!(session.state, ReplStateV2::WorkspaceSelection { .. }));
+    assert!(matches!(
+        session.state,
+        ReplStateV2::WorkspaceSelection { .. }
+    ));
 }
 
 // ---------------------------------------------------------------------------
@@ -331,16 +379,31 @@ async fn writes_counter_tracks_execution() {
     let id = orch.create_session().await;
 
     // Pass through all gates to RunbookEditing
-    orch.process(id, UserInputV2::SelectScope {
-        group_id: Uuid::new_v4(),
-        group_name: "Test".to_string(),
-    }).await.unwrap();
-    orch.process(id, UserInputV2::SelectWorkspace {
-        workspace: WorkspaceKind::OnBoarding,
-    }).await.unwrap();
-    orch.process(id, UserInputV2::SelectPack {
-        pack_id: "onboarding-request".to_string(),
-    }).await.unwrap();
+    orch.process(
+        id,
+        UserInputV2::SelectScope {
+            group_id: Uuid::new_v4(),
+            group_name: "Test".to_string(),
+        },
+    )
+    .await
+    .unwrap();
+    orch.process(
+        id,
+        UserInputV2::SelectWorkspace {
+            workspace: WorkspaceKind::OnBoarding,
+        },
+    )
+    .await
+    .unwrap();
+    orch.process(
+        id,
+        UserInputV2::SelectPack {
+            pack_id: "onboarding-request".to_string(),
+        },
+    )
+    .await
+    .unwrap();
 
     // Verify writes_since_push starts at 0
     let session = orch.get_session(id).await.unwrap();
@@ -360,21 +423,33 @@ async fn scope_persists_through_gates() {
     let group_id = Uuid::new_v4();
 
     // Pass scope gate
-    orch.process(id, UserInputV2::SelectScope {
-        group_id,
-        group_name: "Persistent Corp".to_string(),
-    }).await.unwrap();
+    orch.process(
+        id,
+        UserInputV2::SelectScope {
+            group_id,
+            group_name: "Persistent Corp".to_string(),
+        },
+    )
+    .await
+    .unwrap();
 
     // Select workspace
-    orch.process(id, UserInputV2::SelectWorkspace {
-        workspace: WorkspaceKind::OnBoarding,
-    }).await.unwrap();
+    orch.process(
+        id,
+        UserInputV2::SelectWorkspace {
+            workspace: WorkspaceKind::OnBoarding,
+        },
+    )
+    .await
+    .unwrap();
 
     // Verify scope is still set on workspace frame
     let session = orch.get_session(id).await.unwrap();
     if let Some(tos) = session.workspace_stack.last() {
-        assert_eq!(tos.session_scope.client_group_id, group_id,
-            "Client group ID must persist on workspace frame");
+        assert_eq!(
+            tos.session_scope.client_group_id, group_id,
+            "Client group ID must persist on workspace frame"
+        );
     }
 }
 
@@ -387,19 +462,38 @@ async fn workspace_frame_has_constellation_metadata() {
     let orch = make_orchestrator();
     let id = orch.create_session().await;
 
-    orch.process(id, UserInputV2::SelectScope {
-        group_id: Uuid::new_v4(),
-        group_name: "Test".to_string(),
-    }).await.unwrap();
-    orch.process(id, UserInputV2::SelectWorkspace {
-        workspace: WorkspaceKind::Kyc,
-    }).await.unwrap();
+    orch.process(
+        id,
+        UserInputV2::SelectScope {
+            group_id: Uuid::new_v4(),
+            group_name: "Test".to_string(),
+        },
+    )
+    .await
+    .unwrap();
+    orch.process(
+        id,
+        UserInputV2::SelectWorkspace {
+            workspace: WorkspaceKind::Kyc,
+        },
+    )
+    .await
+    .unwrap();
 
     let session = orch.get_session(id).await.unwrap();
-    let tos = session.workspace_stack.last().expect("Should have workspace frame");
+    let tos = session
+        .workspace_stack
+        .last()
+        .expect("Should have workspace frame");
     assert_eq!(tos.workspace, WorkspaceKind::Kyc);
-    assert!(!tos.constellation_family.is_empty(), "Constellation family must be set");
-    assert!(!tos.constellation_map.is_empty(), "Constellation map must be set");
+    assert!(
+        !tos.constellation_family.is_empty(),
+        "Constellation family must be set"
+    );
+    assert!(
+        !tos.constellation_map.is_empty(),
+        "Constellation map must be set"
+    );
     assert!(!tos.is_peek, "Fresh frame is not a peek");
     assert!(!tos.stale, "Fresh frame is not stale");
 }
@@ -416,13 +510,23 @@ async fn session_state_is_deterministic() {
     let mut states = Vec::new();
     for _ in 0..2 {
         let id = orch.create_session().await;
-        orch.process(id, UserInputV2::SelectScope {
-            group_id: Uuid::nil(), // deterministic UUID
-            group_name: "Allianz".to_string(),
-        }).await.unwrap();
-        orch.process(id, UserInputV2::SelectWorkspace {
-            workspace: WorkspaceKind::Cbu,
-        }).await.unwrap();
+        orch.process(
+            id,
+            UserInputV2::SelectScope {
+                group_id: Uuid::nil(), // deterministic UUID
+                group_name: "Allianz".to_string(),
+            },
+        )
+        .await
+        .unwrap();
+        orch.process(
+            id,
+            UserInputV2::SelectWorkspace {
+                workspace: WorkspaceKind::Cbu,
+            },
+        )
+        .await
+        .unwrap();
 
         let session = orch.get_session(id).await.unwrap();
         let state_json = serde_json::to_value(&session.state).unwrap();
@@ -442,16 +546,24 @@ async fn natural_language_workspace_selection() {
     let id = orch.create_session().await;
 
     // Pass scope gate
-    orch.process(id, UserInputV2::SelectScope {
-        group_id: Uuid::new_v4(),
-        group_name: "Test".to_string(),
-    }).await.unwrap();
+    orch.process(
+        id,
+        UserInputV2::SelectScope {
+            group_id: Uuid::new_v4(),
+            group_name: "Test".to_string(),
+        },
+    )
+    .await
+    .unwrap();
 
     // Select workspace via natural language
     let resp = orch
-        .process(id, UserInputV2::Message {
-            content: "I need to do KYC".to_string(),
-        })
+        .process(
+            id,
+            UserInputV2::Message {
+                content: "I need to do KYC".to_string(),
+            },
+        )
         .await
         .unwrap();
 
@@ -472,16 +584,24 @@ async fn numeric_workspace_selection() {
     let id = orch.create_session().await;
 
     // Pass scope gate
-    orch.process(id, UserInputV2::SelectScope {
-        group_id: Uuid::new_v4(),
-        group_name: "Test".to_string(),
-    }).await.unwrap();
+    orch.process(
+        id,
+        UserInputV2::SelectScope {
+            group_id: Uuid::new_v4(),
+            group_name: "Test".to_string(),
+        },
+    )
+    .await
+    .unwrap();
 
     // Select workspace by number (3 = CBU based on workspace_options order)
     let resp = orch
-        .process(id, UserInputV2::Message {
-            content: "3".to_string(),
-        })
+        .process(
+            id,
+            UserInputV2::Message {
+                content: "3".to_string(),
+            },
+        )
         .await
         .unwrap();
 
@@ -502,16 +622,24 @@ async fn unrecognised_workspace_utterance() {
     let id = orch.create_session().await;
 
     // Pass scope gate
-    orch.process(id, UserInputV2::SelectScope {
-        group_id: Uuid::new_v4(),
-        group_name: "Test".to_string(),
-    }).await.unwrap();
+    orch.process(
+        id,
+        UserInputV2::SelectScope {
+            group_id: Uuid::new_v4(),
+            group_name: "Test".to_string(),
+        },
+    )
+    .await
+    .unwrap();
 
     // Send gibberish
     let resp = orch
-        .process(id, UserInputV2::Message {
-            content: "xyzzy".to_string(),
-        })
+        .process(
+            id,
+            UserInputV2::Message {
+                content: "xyzzy".to_string(),
+            },
+        )
         .await
         .unwrap();
 
@@ -521,7 +649,10 @@ async fn unrecognised_workspace_utterance() {
         "Unrecognised input should stay in WorkspaceSelection, got: {:?}",
         resp.state
     );
-    assert!(resp.message.contains("CBU"), "Error message should list valid workspaces");
+    assert!(
+        resp.message.contains("CBU"),
+        "Error message should list valid workspaces"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -534,19 +665,32 @@ async fn numeric_journey_selection() {
     let id = orch.create_session().await;
 
     // Pass scope + workspace gates
-    orch.process(id, UserInputV2::SelectScope {
-        group_id: Uuid::new_v4(),
-        group_name: "Test".to_string(),
-    }).await.unwrap();
-    orch.process(id, UserInputV2::SelectWorkspace {
-        workspace: WorkspaceKind::OnBoarding,
-    }).await.unwrap();
+    orch.process(
+        id,
+        UserInputV2::SelectScope {
+            group_id: Uuid::new_v4(),
+            group_name: "Test".to_string(),
+        },
+    )
+    .await
+    .unwrap();
+    orch.process(
+        id,
+        UserInputV2::SelectWorkspace {
+            workspace: WorkspaceKind::OnBoarding,
+        },
+    )
+    .await
+    .unwrap();
 
     // Select journey by number
     let resp = orch
-        .process(id, UserInputV2::Message {
-            content: "1".to_string(),
-        })
+        .process(
+            id,
+            UserInputV2::Message {
+                content: "1".to_string(),
+            },
+        )
         .await
         .unwrap();
 

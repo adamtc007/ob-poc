@@ -88,6 +88,10 @@ pub mod traceability;
 #[cfg(feature = "database")]
 pub mod sem_os_runtime;
 
+// Canonical persistence plane for derived attributes
+#[cfg(feature = "database")]
+pub mod derived_attributes;
+
 // Loopback calibration harness
 #[cfg(feature = "database")]
 pub mod calibration;

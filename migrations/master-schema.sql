@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict JeyOdGp12oG1D9M0nFe7A0a0BuRM9xOSMvqWhrOyYmG6SCLCiAHP4d58Qckp4gZ
+\restrict bYWSMDcalNcaRwVDBWfQBwXMcizwidlxx4Uq5PLlYHsw1ljwfchnNp2KLTexMBX
 
 -- Dumped from database version 18.1 (Homebrew)
 -- Dumped by pg_dump version 18.1 (Homebrew)
@@ -3940,6 +3940,82 @@ COMMENT ON FUNCTION "ob-poc".process_provisioning_result(p_request_id uuid, p_pa
 
 
 --
+-- Name: propagate_derived_chain_staleness(uuid, uuid); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".propagate_derived_chain_staleness(p_attr_id uuid, p_entity_id uuid) RETURNS bigint
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    affected bigint;
+BEGIN
+    UPDATE "ob-poc".derived_attribute_values dav
+    SET stale = true
+    WHERE dav.superseded_by IS NULL
+      AND dav.stale = false
+      AND EXISTS (
+          SELECT 1
+          FROM "ob-poc".derived_attribute_dependencies dad
+          WHERE dad.derived_value_id = dav.id
+            AND dad.input_attr_id = p_attr_id
+            AND dad.input_entity_id = p_entity_id
+      );
+
+    GET DIAGNOSTICS affected = ROW_COUNT;
+    RETURN affected;
+END;
+$$;
+
+
+--
+-- Name: propagate_observation_staleness(); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".propagate_observation_staleness() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    UPDATE "ob-poc".derived_attribute_values dav
+    SET stale = true
+    WHERE dav.superseded_by IS NULL
+      AND dav.stale = false
+      AND EXISTS (
+          SELECT 1
+          FROM "ob-poc".derived_attribute_dependencies dad
+          WHERE dad.derived_value_id = dav.id
+            AND dad.input_attr_id = NEW.attribute_id
+            AND dad.input_entity_id = NEW.entity_id
+      );
+
+    RETURN NEW;
+END;
+$$;
+
+
+--
+-- Name: propagate_spec_staleness(text, uuid); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".propagate_spec_staleness(p_spec_fqn text, p_new_snapshot_id uuid) RETURNS bigint
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    affected bigint;
+BEGIN
+    UPDATE "ob-poc".derived_attribute_values
+    SET stale = true
+    WHERE derivation_spec_fqn = p_spec_fqn
+      AND spec_snapshot_id <> p_new_snapshot_id
+      AND superseded_by IS NULL
+      AND stale = false;
+
+    GET DIAGNOSTICS affected = ROW_COUNT;
+    RETURN affected;
+END;
+$$;
+
+
+--
 -- Name: push_scope_history(uuid, character varying, character varying); Type: FUNCTION; Schema: ob-poc; Owner: -
 --
 
@@ -6061,6 +6137,28 @@ CREATE FUNCTION "ob-poc".user_has_domain(p_user_id uuid, p_domain character vary
     LANGUAGE sql STABLE
     AS $$
     SELECT p_domain = ANY(COALESCE(teams.get_user_access_domains(p_user_id), ARRAY[]::varchar[]));
+$$;
+
+
+--
+-- Name: validate_derived_attr_id(); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".validate_derived_attr_id() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM "ob-poc".attribute_registry
+        WHERE uuid = NEW.attr_id
+          AND is_derived = true
+    ) THEN
+        RAISE EXCEPTION 'Attribute % is not marked as derived in attribute_registry', NEW.attr_id;
+    END IF;
+
+    RETURN NEW;
+END;
 $$;
 
 
@@ -10198,6 +10296,50 @@ CREATE TABLE "ob-poc".delegation_relationships (
     effective_from date NOT NULL,
     effective_to date,
     created_at timestamp with time zone DEFAULT now()
+);
+
+
+--
+-- Name: derived_attribute_dependencies; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".derived_attribute_dependencies (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    derived_value_id uuid NOT NULL,
+    input_kind text NOT NULL,
+    input_attr_id uuid NOT NULL,
+    input_entity_id uuid NOT NULL,
+    input_source_row_id uuid,
+    dependency_role text,
+    resolved_value jsonb,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT derived_attribute_dependencies_input_kind_check CHECK ((input_kind = ANY (ARRAY['observation'::text, 'derived_value'::text])))
+);
+
+
+--
+-- Name: derived_attribute_values; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".derived_attribute_values (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    attr_id uuid NOT NULL,
+    entity_id uuid NOT NULL,
+    entity_type text NOT NULL,
+    value jsonb NOT NULL,
+    derivation_spec_fqn text NOT NULL,
+    spec_snapshot_id uuid NOT NULL,
+    content_hash text NOT NULL,
+    input_values jsonb DEFAULT '{}'::jsonb NOT NULL,
+    inherited_security_label jsonb,
+    dependency_depth integer DEFAULT 0 NOT NULL,
+    evaluated_at timestamp with time zone DEFAULT now() NOT NULL,
+    stale boolean DEFAULT false NOT NULL,
+    superseded_by uuid,
+    superseded_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT chk_derived_attribute_not_self_superseded CHECK (((superseded_by IS NULL) OR (superseded_by <> id))),
+    CONSTRAINT chk_derived_attribute_supersession_pair CHECK ((((superseded_by IS NULL) AND (superseded_at IS NULL)) OR ((superseded_by IS NOT NULL) AND (superseded_at IS NOT NULL))))
 );
 
 
@@ -17484,10 +17626,96 @@ COMMENT ON VIEW "ob-poc".v_case_redflag_summary IS 'Summary view of case red-fla
 
 
 --
+-- Name: v_derived_latest; Type: VIEW; Schema: ob-poc; Owner: -
+--
+
+CREATE VIEW "ob-poc".v_derived_latest AS
+ SELECT id,
+    attr_id,
+    entity_id,
+    entity_type,
+    value,
+    derivation_spec_fqn,
+    spec_snapshot_id,
+    content_hash,
+    input_values,
+    inherited_security_label,
+    dependency_depth,
+    evaluated_at,
+    stale,
+    superseded_by,
+    superseded_at,
+    created_at
+   FROM "ob-poc".derived_attribute_values dav
+  WHERE (superseded_by IS NULL);
+
+
+--
+-- Name: v_derived_current; Type: VIEW; Schema: ob-poc; Owner: -
+--
+
+CREATE VIEW "ob-poc".v_derived_current AS
+ SELECT id,
+    attr_id,
+    entity_id,
+    entity_type,
+    value,
+    derivation_spec_fqn,
+    spec_snapshot_id,
+    content_hash,
+    input_values,
+    inherited_security_label,
+    dependency_depth,
+    evaluated_at,
+    stale,
+    superseded_by,
+    superseded_at,
+    created_at
+   FROM "ob-poc".v_derived_latest
+  WHERE (stale = false);
+
+
+--
+-- Name: v_cbu_derived_values; Type: VIEW; Schema: ob-poc; Owner: -
+--
+
+CREATE VIEW "ob-poc".v_cbu_derived_values AS
+ SELECT dav.entity_id AS cbu_id,
+    dav.attr_id,
+    dav.value,
+    'derived'::text AS source,
+    COALESCE(jsonb_agg(DISTINCT jsonb_build_object('type', dad.input_kind, 'id', dad.input_source_row_id, 'path', dad.dependency_role, 'details', jsonb_build_object('input_attr_id', dad.input_attr_id, 'input_entity_id', dad.input_entity_id, 'resolved_value', dad.resolved_value))) FILTER (WHERE (dad.id IS NOT NULL)), '[]'::jsonb) AS evidence_refs,
+    jsonb_build_array(jsonb_build_object('rule', format('derivation:%s'::text, dav.derivation_spec_fqn), 'input', jsonb_build_object('spec_snapshot_id', dav.spec_snapshot_id, 'input_values', dav.input_values, 'dependency_depth', dav.dependency_depth), 'output', jsonb_build_object('value', dav.value, 'evaluated_at', dav.evaluated_at, 'inherited_security_label', dav.inherited_security_label))) AS explain_refs,
+    dav.evaluated_at AS as_of,
+    dav.created_at,
+    dav.created_at AS updated_at
+   FROM ("ob-poc".v_derived_current dav
+     LEFT JOIN "ob-poc".derived_attribute_dependencies dad ON ((dad.derived_value_id = dav.id)))
+  WHERE (dav.entity_type = 'cbu'::text)
+  GROUP BY dav.id, dav.entity_id, dav.attr_id, dav.value, dav.derivation_spec_fqn, dav.spec_snapshot_id, dav.input_values, dav.dependency_depth, dav.inherited_security_label, dav.evaluated_at, dav.created_at;
+
+
+--
 -- Name: v_cbu_attr_gaps; Type: VIEW; Schema: ob-poc; Owner: -
 --
 
 CREATE VIEW "ob-poc".v_cbu_attr_gaps AS
+ WITH effective_cbu_values AS (
+         SELECT cbu_attr_values.cbu_id,
+            cbu_attr_values.attr_id,
+            cbu_attr_values.value,
+            cbu_attr_values.source,
+            cbu_attr_values.as_of
+           FROM "ob-poc".cbu_attr_values
+          WHERE (cbu_attr_values.source <> 'derived'::text)
+        UNION ALL
+         SELECT v_cbu_derived_values.cbu_id,
+            v_cbu_derived_values.attr_id,
+            v_cbu_derived_values.value,
+            v_cbu_derived_values.source,
+            v_cbu_derived_values.as_of
+           FROM "ob-poc".v_cbu_derived_values
+        )
  SELECT r.cbu_id,
     c.name AS cbu_name,
     r.attr_id,
@@ -17504,9 +17732,8 @@ CREATE VIEW "ob-poc".v_cbu_attr_gaps AS
    FROM ((("ob-poc".cbu_unified_attr_requirements r
      JOIN "ob-poc".cbus c ON ((c.cbu_id = r.cbu_id)))
      JOIN "ob-poc".attribute_registry ar ON ((ar.uuid = r.attr_id)))
-     LEFT JOIN "ob-poc".cbu_attr_values v ON (((v.cbu_id = r.cbu_id) AND (v.attr_id = r.attr_id))))
-  WHERE (r.requirement_strength = 'required'::text)
-  ORDER BY r.cbu_id, ar.category, ar.display_name;
+     LEFT JOIN effective_cbu_values v ON (((v.cbu_id = r.cbu_id) AND (v.attr_id = r.attr_id))))
+  WHERE (r.requirement_strength = 'required'::text);
 
 
 --
@@ -17521,6 +17748,18 @@ COMMENT ON VIEW "ob-poc".v_cbu_attr_gaps IS 'Required attributes per CBU with ga
 --
 
 CREATE VIEW "ob-poc".v_cbu_attr_summary AS
+ WITH effective_cbu_values AS (
+         SELECT cbu_attr_values.cbu_id,
+            cbu_attr_values.attr_id,
+            cbu_attr_values.value
+           FROM "ob-poc".cbu_attr_values
+          WHERE (cbu_attr_values.source <> 'derived'::text)
+        UNION ALL
+         SELECT v_cbu_derived_values.cbu_id,
+            v_cbu_derived_values.attr_id,
+            v_cbu_derived_values.value
+           FROM "ob-poc".v_cbu_derived_values
+        )
  SELECT r.cbu_id,
     c.name AS cbu_name,
     count(*) AS total_required,
@@ -17530,10 +17769,9 @@ CREATE VIEW "ob-poc".v_cbu_attr_summary AS
     round(((100.0 * (count(v.value))::numeric) / (NULLIF(count(*), 0))::numeric), 1) AS pct_complete
    FROM (("ob-poc".cbu_unified_attr_requirements r
      JOIN "ob-poc".cbus c ON ((c.cbu_id = r.cbu_id)))
-     LEFT JOIN "ob-poc".cbu_attr_values v ON (((v.cbu_id = r.cbu_id) AND (v.attr_id = r.attr_id))))
+     LEFT JOIN effective_cbu_values v ON (((v.cbu_id = r.cbu_id) AND (v.attr_id = r.attr_id))))
   WHERE (r.requirement_strength = 'required'::text)
-  GROUP BY r.cbu_id, c.name
-  ORDER BY (round(((100.0 * (count(v.value))::numeric) / (NULLIF(count(*), 0))::numeric), 1)), c.name;
+  GROUP BY r.cbu_id, c.name;
 
 
 --
@@ -18617,6 +18855,39 @@ CREATE VIEW "ob-poc".v_deal_summary AS
 --
 
 COMMENT ON VIEW "ob-poc".v_deal_summary IS 'Summary view of deals with related entity counts including products';
+
+
+--
+-- Name: v_derived_recompute_queue; Type: VIEW; Schema: ob-poc; Owner: -
+--
+
+CREATE VIEW "ob-poc".v_derived_recompute_queue AS
+ SELECT dav.id,
+    dav.attr_id,
+    dav.entity_id,
+    dav.entity_type,
+    dav.value,
+    dav.derivation_spec_fqn,
+    dav.spec_snapshot_id,
+    dav.content_hash,
+    dav.input_values,
+    dav.inherited_security_label,
+    dav.dependency_depth,
+    dav.evaluated_at,
+    dav.stale,
+    dav.superseded_by,
+    dav.superseded_at,
+    dav.created_at
+   FROM ("ob-poc".v_derived_latest dav
+     JOIN "ob-poc".attribute_registry ar ON ((ar.uuid = dav.attr_id)))
+  WHERE (dav.stale = true)
+  ORDER BY
+        CASE ar.evidence_grade
+            WHEN 'regulatory_evidence'::text THEN 1
+            WHEN 'allowed_with_constraints'::text THEN 2
+            WHEN 'prohibited'::text THEN 3
+            ELSE 4
+        END, dav.dependency_depth, dav.evaluated_at;
 
 
 --
@@ -22486,6 +22757,22 @@ ALTER TABLE ONLY "ob-poc".deals
 
 ALTER TABLE ONLY "ob-poc".delegation_relationships
     ADD CONSTRAINT delegation_relationships_pkey PRIMARY KEY (delegation_id);
+
+
+--
+-- Name: derived_attribute_dependencies derived_attribute_dependencies_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".derived_attribute_dependencies
+    ADD CONSTRAINT derived_attribute_dependencies_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: derived_attribute_values derived_attribute_values_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".derived_attribute_values
+    ADD CONSTRAINT derived_attribute_values_pkey PRIMARY KEY (id);
 
 
 --
@@ -27265,6 +27552,69 @@ CREATE INDEX idx_delegation_delegator ON "ob-poc".delegation_relationships USING
 
 
 --
+-- Name: idx_derived_attribute_dependencies_dedupe; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_derived_attribute_dependencies_dedupe ON "ob-poc".derived_attribute_dependencies USING btree (derived_value_id, input_kind, input_attr_id, input_entity_id, COALESCE(input_source_row_id, '00000000-0000-0000-0000-000000000000'::uuid), COALESCE(dependency_role, ''::text));
+
+
+--
+-- Name: idx_derived_attribute_dependencies_source_row; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_derived_attribute_dependencies_source_row ON "ob-poc".derived_attribute_dependencies USING btree (input_source_row_id) WHERE (input_source_row_id IS NOT NULL);
+
+
+--
+-- Name: idx_derived_attribute_dependencies_staleness; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_derived_attribute_dependencies_staleness ON "ob-poc".derived_attribute_dependencies USING btree (input_attr_id, input_entity_id);
+
+
+--
+-- Name: idx_derived_attribute_dependencies_value; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_derived_attribute_dependencies_value ON "ob-poc".derived_attribute_dependencies USING btree (derived_value_id);
+
+
+--
+-- Name: idx_derived_attribute_values_current; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_derived_attribute_values_current ON "ob-poc".derived_attribute_values USING btree (entity_type, entity_id, attr_id) WHERE (superseded_by IS NULL);
+
+
+--
+-- Name: idx_derived_attribute_values_entity_scope; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_derived_attribute_values_entity_scope ON "ob-poc".derived_attribute_values USING btree (entity_type, entity_id) WHERE (superseded_by IS NULL);
+
+
+--
+-- Name: idx_derived_attribute_values_history; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_derived_attribute_values_history ON "ob-poc".derived_attribute_values USING btree (entity_type, entity_id, attr_id, evaluated_at DESC);
+
+
+--
+-- Name: idx_derived_attribute_values_spec_lookup; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_derived_attribute_values_spec_lookup ON "ob-poc".derived_attribute_values USING btree (derivation_spec_fqn) WHERE (superseded_by IS NULL);
+
+
+--
+-- Name: idx_derived_attribute_values_stale_queue; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_derived_attribute_values_stale_queue ON "ob-poc".derived_attribute_values USING btree (stale, entity_type, dependency_depth, evaluated_at) WHERE ((superseded_by IS NULL) AND (stale = true));
+
+
+--
 -- Name: idx_detected_patterns_cbu; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -31465,6 +31815,13 @@ CREATE TRIGGER trg_proofs_updated BEFORE UPDATE ON "ob-poc".proofs FOR EACH ROW 
 
 
 --
+-- Name: attribute_observations trg_propagate_observation_staleness; Type: TRIGGER; Schema: ob-poc; Owner: -
+--
+
+CREATE TRIGGER trg_propagate_observation_staleness AFTER INSERT OR UPDATE OF value_text, value_number, value_boolean, value_date, value_datetime, value_json, status, superseded_at ON "ob-poc".attribute_observations FOR EACH ROW EXECUTE FUNCTION "ob-poc".propagate_observation_staleness();
+
+
+--
 -- Name: provisioning_events trg_provisioning_events_immutable; Type: TRIGGER; Schema: ob-poc; Owner: -
 --
 
@@ -31532,6 +31889,13 @@ CREATE TRIGGER trg_teams_updated BEFORE UPDATE ON "ob-poc".teams FOR EACH ROW EX
 --
 
 CREATE TRIGGER trg_ubo_status_transition BEFORE UPDATE ON "ob-poc".ubo_registry FOR EACH ROW EXECUTE FUNCTION "ob-poc".validate_ubo_status_transition();
+
+
+--
+-- Name: derived_attribute_values trg_validate_derived_attr_id; Type: TRIGGER; Schema: ob-poc; Owner: -
+--
+
+CREATE TRIGGER trg_validate_derived_attr_id BEFORE INSERT ON "ob-poc".derived_attribute_values FOR EACH ROW EXECUTE FUNCTION "ob-poc".validate_derived_attr_id();
 
 
 --
@@ -33224,6 +33588,38 @@ ALTER TABLE ONLY "ob-poc".delegation_relationships
 
 ALTER TABLE ONLY "ob-poc".delegation_relationships
     ADD CONSTRAINT delegation_relationships_delegator_entity_id_fkey FOREIGN KEY (delegator_entity_id) REFERENCES "ob-poc".entities(entity_id);
+
+
+--
+-- Name: derived_attribute_dependencies derived_attribute_dependencies_derived_value_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".derived_attribute_dependencies
+    ADD CONSTRAINT derived_attribute_dependencies_derived_value_id_fkey FOREIGN KEY (derived_value_id) REFERENCES "ob-poc".derived_attribute_values(id) ON DELETE CASCADE;
+
+
+--
+-- Name: derived_attribute_dependencies derived_attribute_dependencies_input_attr_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".derived_attribute_dependencies
+    ADD CONSTRAINT derived_attribute_dependencies_input_attr_id_fkey FOREIGN KEY (input_attr_id) REFERENCES "ob-poc".attribute_registry(uuid);
+
+
+--
+-- Name: derived_attribute_values derived_attribute_values_attr_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".derived_attribute_values
+    ADD CONSTRAINT derived_attribute_values_attr_id_fkey FOREIGN KEY (attr_id) REFERENCES "ob-poc".attribute_registry(uuid);
+
+
+--
+-- Name: derived_attribute_values derived_attribute_values_superseded_by_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".derived_attribute_values
+    ADD CONSTRAINT derived_attribute_values_superseded_by_fkey FOREIGN KEY (superseded_by) REFERENCES "ob-poc".derived_attribute_values(id);
 
 
 --
@@ -35862,5 +36258,5 @@ ALTER TABLE ONLY sem_reg_authoring.validation_reports
 -- PostgreSQL database dump complete
 --
 
-\unrestrict JeyOdGp12oG1D9M0nFe7A0a0BuRM9xOSMvqWhrOyYmG6SCLCiAHP4d58Qckp4gZ
+\unrestrict bYWSMDcalNcaRwVDBWfQBwXMcizwidlxx4Uq5PLlYHsw1ljwfchnNp2KLTexMBX
 

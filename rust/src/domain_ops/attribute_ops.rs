@@ -1241,6 +1241,18 @@ async fn publish_snapshot_in_tx(
     .fetch_one(&mut **tx)
     .await?;
 
+    if matches!(meta.object_type, ObjectType::DerivationSpec) && meta.predecessor_id.is_some() {
+        if let Some(spec_fqn) = definition.get("fqn").and_then(|value| value.as_str()) {
+            let _: i64 = sqlx::query_scalar(
+                r#"SELECT COALESCE("ob-poc".propagate_spec_staleness($1, $2), 0)"#,
+            )
+            .bind(spec_fqn)
+            .bind(snapshot_id)
+            .fetch_one(&mut **tx)
+            .await?;
+        }
+    }
+
     Ok(snapshot_id)
 }
 
@@ -1544,6 +1556,16 @@ impl CustomOperation for AttributeDefineDerivedOp {
             );
             publish_snapshot_in_tx(&mut tx, &derivation_meta, &derivation_definition).await?
         };
+        if let Some(previous) = derivation_predecessor.as_ref() {
+            let _affected: i64 = sqlx::query_scalar(
+                r#"SELECT COALESCE("ob-poc".propagate_spec_staleness($1, $2), 0)"#,
+            )
+            .bind(&semantic_id)
+            .bind(derivation_snapshot_id)
+            .fetch_one(&mut *tx)
+            .await?;
+            let _ = previous.snapshot_id;
+        }
 
         patch_attribute_semos_metadata(
             &mut tx,

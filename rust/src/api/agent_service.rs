@@ -395,7 +395,6 @@ pub struct AgentService {
 
 #[allow(dead_code)] // Remaining helpers pending further decomposition
 impl AgentService {
-
     fn response_needs_follow_up(response: &AgentChatResponse) -> bool {
         response.decision.is_some()
             || response.verb_disambiguation.is_some()
@@ -423,7 +422,6 @@ impl AgentService {
         }
     }
 
-
     /// Map Semantic OS stage focus to Sem OS phase-tag goals.
     ///
     /// `semos-data-management` is intentionally expanded to include:
@@ -449,7 +447,6 @@ impl AgentService {
             _ => vec![],
         }
     }
-
 
     /// Create agent service with pool and embedder
     ///
@@ -990,7 +987,6 @@ impl AgentService {
         Ok(envelope)
     }
 
-
     /// Build provenance labels from journey metadata (Tier -2 match).
     ///
     /// Returns an empty map when no journey match is present, so the caller
@@ -1070,7 +1066,6 @@ impl AgentService {
             ),
         }
     }
-
 
     /// Execute all pending DSL in the session runbook
     ///
@@ -1250,8 +1245,8 @@ impl AgentService {
                             })
                             .collect();
 
-        // Verb selection signal recording removed — learning routes deleted
-        let _ = (&executed_verbs, &utterance);
+                        // Verb selection signal recording removed — learning routes deleted
+                        let _ = (&executed_verbs, &utterance);
                     }
                 }
 
@@ -1568,8 +1563,7 @@ impl AgentService {
 
                 // Verb selection signal recording removed — learning routes deleted
                 let _ = (&executed_verbs, &utterance);
-                {
-                }
+                {}
             }
         }
 
@@ -2328,4 +2322,3 @@ impl AgentService {
         }
     }
 }
-

@@ -403,6 +403,18 @@ impl SnapshotStore {
         let snapshot_id =
             Self::insert_snapshot_tx(&mut tx, meta, definition, snapshot_set_id).await?;
 
+        if matches!(meta.object_type, ObjectType::DerivationSpec) && meta.predecessor_id.is_some() {
+            if let Some(spec_fqn) = definition.get("fqn").and_then(|value| value.as_str()) {
+                let _: i64 = sqlx::query_scalar(
+                    r#"SELECT COALESCE("ob-poc".propagate_spec_staleness($1, $2), 0)"#,
+                )
+                .bind(spec_fqn)
+                .bind(snapshot_id)
+                .fetch_one(&mut *tx)
+                .await?;
+            }
+        }
+
         tx.commit().await?;
         Ok(snapshot_id)
     }

@@ -1204,6 +1204,27 @@ async fn handle_publish(ctx: &SemRegToolContext<'_>, args: &serde_json::Value) -
         }
     };
 
+    let stale_result = sqlx::query(
+        r#"
+        SELECT "ob-poc".propagate_spec_staleness(definition->>'fqn', snapshot_id)
+        FROM sem_reg.snapshots
+        WHERE snapshot_set_id = $1
+          AND status = 'active'
+          AND effective_until IS NULL
+          AND object_type = 'derivation_spec'
+        "#,
+    )
+    .bind(changeset_id)
+    .execute(&mut *tx)
+    .await;
+    if let Err(e) = stale_result {
+        let _ = tx.rollback().await;
+        return SemRegToolResult::err(format!(
+            "Failed to mark derived values stale after publish: {}",
+            e
+        ));
+    }
+
     if let Err(e) = tx.commit().await {
         return SemRegToolResult::err(format!("Failed to commit publish transaction: {}", e));
     }

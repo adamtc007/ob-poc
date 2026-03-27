@@ -33,9 +33,7 @@ pub async fn compute_onboarding_state(
     // Load group composite state
     match crate::agent::composite_state_loader::load_group_composite_state(pool, &cbu_ids).await {
         Ok(Some(composite)) => Some(
-            crate::agent::onboarding_state_view::project_onboarding_state(
-                &composite, group_name,
-            ),
+            crate::agent::onboarding_state_view::project_onboarding_state(&composite, group_name),
         ),
         _ => None,
     }

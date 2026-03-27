@@ -6,15 +6,21 @@
 
 use anyhow::{Context, Result};
 use serde_json::{json, Value as JsonValue};
-use sqlx::PgPool;
+use sqlx::{PgPool, Postgres, Transaction};
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, LazyLock};
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 use uuid::Uuid;
 
 use super::service::ServiceResourcePipelineService;
 use super::srdef_loader::SrdefRegistry;
 use super::types::*;
+use crate::derived_attributes::repository::{
+    acquire_derivation_lock, compute_content_hash, get_current, get_current_tx,
+    get_recompute_queue, insert_dependencies_tx, insert_derived_value_tx, supersede_current_tx,
+    BatchRecomputeResult, ContentHashInput, DependencyRowInput, DerivedValueRowInput,
+};
+use crate::entity_kind;
 use crate::sem_reg::{DerivationFunctionRegistry, DerivationSpecBody};
 use crate::services::attribute_identity_service::AttributeIdentityService;
 use crate::services::attribute_registry_enrichment::ensure_semos_registry_bridge;
@@ -444,9 +450,22 @@ struct ActiveDerivationSpec {
 #[derive(Debug)]
 struct DerivationInputCollection {
     inputs: JsonValue,
-    evidence_refs: Vec<EvidenceRef>,
     input_snapshot_ids: Vec<Uuid>,
-    input_snapshot_status: &'static str,
+    dependencies: Vec<DependencyRowInput>,
+    content_hash_inputs: Vec<ContentHashInput>,
+    dependency_depth: i32,
+}
+
+#[derive(Debug, Clone)]
+struct EffectiveAttrValue {
+    value: JsonValue,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RecomputeOutcome {
+    Recomputed,
+    StillStale,
+    UnsupportedEntityType,
 }
 
 impl<'a> PopulationEngine<'a> {
@@ -497,19 +516,24 @@ impl<'a> PopulationEngine<'a> {
                     .await?
                 {
                     Some(value) => {
-                        let input = SetCbuAttrValue {
-                            cbu_id,
-                            attr_id: req.attr_id,
-                            value,
-                            source: parse_source(source),
-                            evidence_refs: None,
-                            explain_refs: Some(vec![ExplainRef {
-                                rule: format!("auto_populate:{}", source),
-                                input: None,
-                                output: None,
-                            }]),
-                        };
-                        self.service.set_cbu_attr_value(&input).await?;
+                        // Derived values are persisted canonically by
+                        // try_derive_for_entity — never dual-write to
+                        // the legacy cbu_attr_values table.
+                        if source != "derived" {
+                            let input = SetCbuAttrValue {
+                                cbu_id,
+                                attr_id: req.attr_id,
+                                value,
+                                source: parse_source(source),
+                                evidence_refs: None,
+                                explain_refs: Some(vec![ExplainRef {
+                                    rule: format!("auto_populate:{}", source),
+                                    input: None,
+                                    output: None,
+                                }]),
+                            };
+                            self.service.set_cbu_attr_value(&input).await?;
+                        }
                         result.populated += 1;
                         break;
                     }
@@ -530,6 +554,86 @@ impl<'a> PopulationEngine<'a> {
         Ok(result)
     }
 
+    /// Recompute a single derived attribute target.
+    pub async fn recompute_derived(
+        &self,
+        entity_type: &str,
+        entity_id: Uuid,
+        attr_id: Uuid,
+    ) -> Result<RecomputeOutcome> {
+        let canonical_entity_type = entity_kind::canonicalize(entity_type);
+        let mut tx = self.pool.begin().await?;
+        let canonical_entity_type = self
+            .validate_entity_type(&mut tx, &canonical_entity_type)
+            .await?;
+        tx.rollback().await?;
+
+        let derivation_specs = self.load_derivation_specs_by_attr().await?;
+        let specs = derivation_specs
+            .get(&attr_id)
+            .map(Vec::as_slice)
+            .unwrap_or(&[]);
+        if specs.is_empty() {
+            return Ok(RecomputeOutcome::StillStale);
+        }
+
+        self.try_derive_for_entity(&canonical_entity_type, entity_id, attr_id, specs)
+            .await?;
+        match get_current(self.pool, &canonical_entity_type, entity_id, attr_id).await? {
+            Some(_) => Ok(RecomputeOutcome::Recomputed),
+            None => Ok(RecomputeOutcome::StillStale),
+        }
+    }
+
+    /// Recompute stale rows from the canonical queue in deterministic order.
+    pub async fn recompute_stale_batch(&self, limit: i64) -> Result<BatchRecomputeResult> {
+        let queue = get_recompute_queue(self.pool, limit).await?;
+        let queue_size = queue.len();
+        let mut result = BatchRecomputeResult::default();
+        let mut seen = HashSet::new();
+
+        for row in queue {
+            let key = (row.entity_type.clone(), row.entity_id, row.attr_id);
+            if !seen.insert(key) {
+                continue;
+            }
+
+            result.picked += 1;
+            match self
+                .recompute_derived(&row.entity_type, row.entity_id, row.attr_id)
+                .await
+            {
+                Ok(RecomputeOutcome::Recomputed) => result.recomputed += 1,
+                Ok(RecomputeOutcome::StillStale | RecomputeOutcome::UnsupportedEntityType) => {
+                    result.still_stale += 1
+                }
+                Err(error) => {
+                    result.failed += 1;
+                    warn!(
+                        entity_type = %row.entity_type,
+                        entity_id = %row.entity_id,
+                        attr_id = %row.attr_id,
+                        dependency_depth = row.dependency_depth,
+                        error = %error,
+                        "Failed stale derived recompute"
+                    );
+                }
+            }
+        }
+
+        info!(
+            queue_size,
+            picked = result.picked,
+            recomputed = result.recomputed,
+            skipped_already_current = result.skipped_already_current,
+            still_stale = result.still_stale,
+            failed = result.failed,
+            "Batch derived recompute complete"
+        );
+
+        Ok(result)
+    }
+
     /// Try to populate a single attribute from a source
     async fn try_populate(
         &self,
@@ -544,7 +648,8 @@ impl<'a> PopulationEngine<'a> {
                     .get(&attr_id)
                     .map(Vec::as_slice)
                     .unwrap_or(&[]);
-                self.try_derive(cbu_id, attr_id, specs).await
+                self.try_derive_for_entity("cbu", cbu_id, attr_id, specs)
+                    .await
             }
             "entity" => self.try_from_entity(cbu_id, attr_id).await,
             "cbu" => self.try_from_cbu(cbu_id, attr_id).await,
@@ -555,9 +660,10 @@ impl<'a> PopulationEngine<'a> {
     }
 
     /// Try to derive a value from other data
-    async fn try_derive(
+    async fn try_derive_for_entity(
         &self,
-        cbu_id: Uuid,
+        entity_type: &str,
+        entity_id: Uuid,
         attr_id: Uuid,
         specs: &[ActiveDerivationSpec],
     ) -> Result<Option<JsonValue>> {
@@ -566,7 +672,43 @@ impl<'a> PopulationEngine<'a> {
         }
 
         for spec in specs {
-            let collected_inputs = self.collect_derivation_inputs(cbu_id, &spec.body).await?;
+            let mut tx = self.pool.begin().await?;
+            let entity_type = self.validate_entity_type(&mut tx, entity_type).await?;
+            let (attr_code, value_type) = self
+                .load_derived_attr_metadata(&mut tx, attr_id)
+                .await
+                .with_context(|| {
+                format!("Failed to load derived attr metadata for {attr_id}")
+            })?;
+
+            acquire_derivation_lock(&mut tx, &entity_type, entity_id, attr_id).await?;
+
+            let collected_inputs = self
+                .collect_derivation_inputs(&mut tx, &entity_type, entity_id, &spec.body)
+                .await?;
+            let content_hash =
+                compute_content_hash(spec.snapshot_id, &collected_inputs.content_hash_inputs);
+
+            if let Some(current) = get_current_tx(&mut tx, &entity_type, entity_id, attr_id).await?
+            {
+                if current.content_hash == content_hash && !current.stale {
+                    info!(
+                        entity_type = %entity_type,
+                        entity_id = %entity_id,
+                        attr_id = %attr_id,
+                        attr_code = %attr_code,
+                        derivation_spec_fqn = %spec.body.fqn,
+                        spec_snapshot_id = %spec.snapshot_id,
+                        old_row_id = %current.id,
+                        dependency_count = collected_inputs.dependencies.len(),
+                        dependency_depth = collected_inputs.dependency_depth,
+                        skip_reason = "content_hash_match",
+                        "Skipped canonical derived write"
+                    );
+                    tx.commit().await?;
+                    return Ok(Some(current.value));
+                }
+            }
 
             let result = match DERIVATION_REGISTRY.evaluate(
                 &spec.body,
@@ -577,44 +719,74 @@ impl<'a> PopulationEngine<'a> {
             ) {
                 Ok(result) => result,
                 Err(err) => {
-                    debug!(
-                        "Derivation {} failed for CBU {}: {}",
-                        spec.body.fqn, cbu_id, err
+                    warn!(
+                        entity_type = %entity_type,
+                        entity_id = %entity_id,
+                        attr_id = %attr_id,
+                        attr_code = %attr_code,
+                        derivation_spec_fqn = %spec.body.fqn,
+                        spec_snapshot_id = %spec.snapshot_id,
+                        error = %err,
+                        "Derivation evaluation failed"
                     );
+                    tx.rollback().await?;
                     continue;
                 }
             };
 
             if result.value.is_null() {
+                tx.rollback().await?;
                 continue;
             }
 
-            let explain_ref = ExplainRef {
-                rule: format!("derivation:{}", spec.body.fqn),
-                input: Some(json!({
-                    "spec_snapshot_id": spec.snapshot_id,
-                    "output_attribute_fqn": spec.body.output_attribute_fqn,
-                    "inputs": collected_inputs.inputs,
-                    "input_snapshot_ids": collected_inputs.input_snapshot_ids,
-                    "input_snapshot_status": collected_inputs.input_snapshot_status,
-                })),
-                output: Some(json!({
-                    "value": result.value,
-                    "evaluated_at": result.evaluated_at,
-                    "inherited_security_label": result.inherited_label,
-                })),
-            };
-
-            let set_input = SetCbuAttrValue {
-                cbu_id,
+            validate_value_shape(&result.value, &value_type).with_context(|| {
+                format!(
+                    "Derived value for attr {} did not match declared type {}",
+                    attr_code, value_type
+                )
+            })?;
+            let new_id = Uuid::new_v4();
+            let superseded_row_id =
+                supersede_current_tx(&mut tx, &entity_type, entity_id, attr_id, new_id).await?;
+            let derived_row = DerivedValueRowInput {
+                id: new_id,
                 attr_id,
+                entity_id,
+                entity_type: entity_type.clone(),
                 value: result.value.clone(),
-                source: AttributeSource::Derived,
-                evidence_refs: Some(collected_inputs.evidence_refs),
-                explain_refs: Some(vec![explain_ref]),
+                derivation_spec_fqn: spec.body.fqn.clone(),
+                spec_snapshot_id: spec.snapshot_id,
+                content_hash,
+                input_values: collected_inputs.inputs.clone(),
+                inherited_security_label: Some(serde_json::to_value(&result.inherited_label)?),
+                dependency_depth: collected_inputs.dependency_depth,
+                evaluated_at: result.evaluated_at,
+                stale: false,
             };
-
-            self.service.set_cbu_attr_value(&set_input).await?;
+            let inserted = insert_derived_value_tx(&mut tx, &derived_row).await?;
+            insert_dependencies_tx(&mut tx, inserted.id, &collected_inputs.dependencies).await?;
+            let stale_propagation_count: i64 = sqlx::query_scalar(
+                r#"SELECT COALESCE("ob-poc".propagate_derived_chain_staleness($1, $2), 0)"#,
+            )
+            .bind(attr_id)
+            .bind(entity_id)
+            .fetch_one(&mut *tx)
+            .await?;
+            info!(
+                entity_type = %entity_type,
+                entity_id = %entity_id,
+                attr_id = %attr_id,
+                attr_code = %attr_code,
+                derivation_spec_fqn = %spec.body.fqn,
+                spec_snapshot_id = %spec.snapshot_id,
+                old_row_id = ?superseded_row_id,
+                new_row_id = %inserted.id,
+                dependency_count = collected_inputs.dependencies.len(),
+                dependency_depth = collected_inputs.dependency_depth,
+                stale_propagation_count,
+                "Persisted canonical derived value"
+            );
+            tx.commit().await?;
             return Ok(Some(result.value));
         }
 
@@ -669,11 +841,15 @@ impl<'a> PopulationEngine<'a> {
 
     async fn collect_derivation_inputs(
         &self,
-        cbu_id: Uuid,
+        tx: &mut Transaction<'_, Postgres>,
+        entity_type: &str,
+        entity_id: Uuid,
         spec: &DerivationSpecBody,
     ) -> Result<DerivationInputCollection> {
         let mut inputs = serde_json::Map::new();
-        let mut evidence_refs = Vec::new();
+        let mut dependencies = Vec::new();
+        let mut content_hash_inputs = Vec::new();
+        let mut max_upstream_depth = 0;
 
         for input in &spec.inputs {
             let Some(input_attr_id) = self
@@ -684,33 +860,47 @@ impl<'a> PopulationEngine<'a> {
             };
 
             let Some(existing) = self
-                .service
-                .get_cbu_attr_value(cbu_id, input_attr_id)
+                .lookup_effective_attr_value(tx, entity_type, entity_id, input_attr_id)
                 .await?
             else {
                 continue;
             };
+            let current_derived = get_current_tx(tx, entity_type, entity_id, input_attr_id).await?;
 
             inputs.insert(input.attribute_fqn.clone(), existing.value.clone());
             inputs.insert(input.role.clone(), existing.value.clone());
-            evidence_refs.push(EvidenceRef {
-                ref_type: "cbu_attr_value".to_string(),
-                id: Some(input_attr_id.to_string()),
-                path: Some(input.attribute_fqn.clone()),
-                details: Some(json!({
-                    "source": existing.source,
-                    "as_of": existing.as_of,
-                })),
+            if let Some(row) = current_derived.as_ref() {
+                max_upstream_depth = max_upstream_depth.max(row.dependency_depth + 1);
+            }
+            let dependency = DependencyRowInput {
+                input_kind: current_derived
+                    .as_ref()
+                    .map(|_| "derived_value")
+                    .unwrap_or("observation")
+                    .to_string(),
+                input_attr_id,
+                input_entity_id: entity_id,
+                input_source_row_id: current_derived.as_ref().map(|row| row.id),
+                dependency_role: Some(input.role.clone()),
+                resolved_value: Some(existing.value.clone()),
+            };
+            content_hash_inputs.push(ContentHashInput {
+                input_kind: dependency.input_kind.clone(),
+                input_attr_id,
+                input_entity_id: entity_id,
+                input_source_row_id: dependency.input_source_row_id,
+                dependency_role: dependency.dependency_role.clone(),
+                resolved_value: existing.value.clone(),
             });
+            dependencies.push(dependency);
         }
 
         Ok(DerivationInputCollection {
             inputs: JsonValue::Object(inputs),
-            evidence_refs,
             input_snapshot_ids: Vec::new(),
-            // Current cbu_attr_values rows do not retain source snapshot ids, so lineage is
-            // explicit about this gap instead of silently implying complete snapshot pinning.
-            input_snapshot_status: "not_available_from_cbu_attr_values_v1",
+            dependencies,
+            content_hash_inputs,
+            dependency_depth: max_upstream_depth,
         })
     }
 
@@ -731,8 +921,8 @@ impl<'a> PopulationEngine<'a> {
             return Ok(None);
         };
 
-        // Try to find in entity attributes (simplified - would need proper mapping)
-        // For now, check if there's a matching attribute in attribute_values_typed
+        // For now, non-CBU entity attributes are sourced from attribute_values_typed
+        // through the commercial client entity linked to the CBU.
         let value: Option<(JsonValue,)> = sqlx::query_as(
             r#"
             SELECT value_json
@@ -776,6 +966,203 @@ impl<'a> PopulationEngine<'a> {
                 Ok(value.map(|(v,)| json!(v)))
             }
             _ => Ok(None),
+        }
+    }
+}
+
+async fn get_cbu_attr_value_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    cbu_id: Uuid,
+    attr_id: Uuid,
+) -> Result<Option<CbuAttrValue>> {
+    sqlx::query_as::<_, CbuAttrValue>(
+        r#"
+        WITH effective_value AS (
+            SELECT cbu_id, attr_id, value, source, evidence_refs, explain_refs,
+                   as_of, created_at, updated_at
+            FROM "ob-poc".cbu_attr_values
+            WHERE cbu_id = $1
+              AND attr_id = $2
+              AND source <> 'derived'
+
+            UNION ALL
+
+            SELECT cbu_id, attr_id, value, source, evidence_refs, explain_refs,
+                   as_of, created_at, updated_at
+            FROM "ob-poc".v_cbu_derived_values
+            WHERE cbu_id = $1
+              AND attr_id = $2
+        )
+        SELECT cbu_id, attr_id, value, source, evidence_refs, explain_refs,
+               as_of, created_at, updated_at
+        FROM effective_value
+        LIMIT 1
+        "#,
+    )
+    .bind(cbu_id)
+    .bind(attr_id)
+    .fetch_optional(&mut **tx)
+    .await
+    .map_err(Into::into)
+}
+
+fn validate_value_shape(value: &JsonValue, value_type: &str) -> Result<()> {
+    let valid = match value_type {
+        "string" | "email" | "phone" | "tax_id" | "currency" | "address" | "enum" => {
+            value.is_string()
+        }
+        "integer" => value.as_i64().is_some() || value.as_u64().is_some(),
+        "number" | "decimal" | "percentage" => value.is_number(),
+        "boolean" => value.is_boolean(),
+        "date" | "datetime" | "timestamp" | "uuid" => value.is_string(),
+        "json" => true,
+        other => return Err(anyhow::anyhow!("Unsupported value_type: {other}")),
+    };
+
+    if valid {
+        Ok(())
+    } else {
+        Err(anyhow::anyhow!(
+            "Value shape did not match declared type {}",
+            value_type
+        ))
+    }
+}
+
+impl<'a> PopulationEngine<'a> {
+    async fn lookup_effective_attr_value(
+        &self,
+        tx: &mut Transaction<'_, Postgres>,
+        entity_type: &str,
+        entity_id: Uuid,
+        attr_id: Uuid,
+    ) -> Result<Option<EffectiveAttrValue>> {
+        if let Some(current) = get_current_tx(tx, entity_type, entity_id, attr_id).await? {
+            return Ok(Some(EffectiveAttrValue {
+                value: current.value,
+            }));
+        }
+
+        if entity_type == "cbu" {
+            return Ok(get_cbu_attr_value_tx(tx, entity_id, attr_id)
+                .await?
+                .map(|value| EffectiveAttrValue { value: value.value }));
+        }
+
+        let attr_code: Option<(String,)> =
+            sqlx::query_as(r#"SELECT id FROM "ob-poc".attribute_registry WHERE uuid = $1"#)
+                .bind(attr_id)
+                .fetch_optional(&mut **tx)
+                .await?;
+        let Some((attr_code,)) = attr_code else {
+            return Ok(None);
+        };
+
+        let row: Option<(
+            Option<String>,
+            Option<rust_decimal::Decimal>,
+            Option<i64>,
+            Option<bool>,
+            Option<chrono::NaiveDate>,
+            Option<chrono::DateTime<chrono::Utc>>,
+            Option<JsonValue>,
+            Option<JsonValue>,
+            Option<chrono::DateTime<chrono::Utc>>,
+        )> = sqlx::query_as(
+            r#"
+            SELECT
+                value_text,
+                value_number,
+                value_integer,
+                value_boolean,
+                value_date,
+                value_datetime,
+                value_json,
+                source,
+                created_at
+            FROM "ob-poc".attribute_values_typed
+            WHERE entity_id = $1
+              AND attribute_id = $2
+              AND effective_to IS NULL
+            ORDER BY created_at DESC
+            LIMIT 1
+            "#,
+        )
+        .bind(entity_id)
+        .bind(attr_code)
+        .fetch_optional(&mut **tx)
+        .await?;
+        let Some(row) = row else {
+            return Ok(None);
+        };
+
+        let value = if let Some(text) = row.0 {
+            json!(text)
+        } else if let Some(number) = row.1 {
+            json!(number)
+        } else if let Some(integer) = row.2 {
+            json!(integer)
+        } else if let Some(boolean) = row.3 {
+            json!(boolean)
+        } else if let Some(date) = row.4 {
+            json!(date.to_string())
+        } else if let Some(datetime) = row.5 {
+            json!(datetime)
+        } else if let Some(json_value) = row.6 {
+            json_value
+        } else {
+            return Ok(None);
+        };
+
+        Ok(Some(EffectiveAttrValue { value }))
+    }
+
+    async fn load_derived_attr_metadata(
+        &self,
+        tx: &mut Transaction<'_, Postgres>,
+        attr_id: Uuid,
+    ) -> Result<(String, String)> {
+        let row: Option<(String, String)> = sqlx::query_as(
+            r#"
+            SELECT id, value_type
+            FROM "ob-poc".attribute_registry
+            WHERE uuid = $1
+              AND is_derived = true
+            "#,
+        )
+        .bind(attr_id)
+        .fetch_optional(&mut **tx)
+        .await?;
+
+        row.ok_or_else(|| anyhow::anyhow!("Attribute {} is not registered as derived", attr_id))
+    }
+
+    async fn validate_entity_type(
+        &self,
+        tx: &mut Transaction<'_, Postgres>,
+        entity_type: &str,
+    ) -> Result<String> {
+        let canonical = entity_kind::canonicalize(entity_type);
+        let exists: bool = sqlx::query_scalar(
+            r#"
+            SELECT EXISTS (
+                SELECT 1
+                FROM "ob-poc".entity_types
+                WHERE lower(COALESCE(type_code, '')) = $1
+                   OR lower(name) = $1
+            )
+            "#,
+        )
+        .bind(&canonical)
+        .fetch_one(&mut **tx)
+        .await?;
+
+        if exists {
+            Ok(canonical)
+        } else if canonical == "cbu" {
+            Ok(canonical)
+        } else {
+            Err(anyhow::anyhow!("Unknown entity_type: {}", entity_type))
         }
     }
 }

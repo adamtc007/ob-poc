@@ -34,9 +34,8 @@ use crate::database::generation_log_repository::{
     CompileResult, ExecutionStatus, GenerationAttempt, LintResult, ParseResult,
 };
 use crate::dsl_v2::{
-    compile, expand_templates_simple, parse_program, runtime_registry,
-    AtomicExecutionResult, BatchPolicy, ExecutionContext, ExecutionResult as DslV2Result,
-    SemanticValidator,
+    compile, expand_templates_simple, parse_program, runtime_registry, AtomicExecutionResult,
+    BatchPolicy, ExecutionContext, ExecutionResult as DslV2Result, SemanticValidator,
 };
 use crate::ontology::SemanticStageRegistry;
 use ob_poc_types::{SessionInputRequest, SessionInputResponse};
@@ -68,7 +67,6 @@ pub use crate::api::agent_types::{
     ValidationError, ValidationResult, VerbInfo, VerbSurfaceQuery, VocabQuery, VocabResponse,
     WatchQuery, WatchResponse,
 };
-
 
 // ============================================================================
 // State — see agent_state.rs for AgentState and create_agent_router_with_semantic()
@@ -159,9 +157,7 @@ async fn session_input(
 ) -> Result<Json<SessionInputResponse>, StatusCode> {
     // Try routing through REPL V2 orchestrator first (unified pipeline).
     if let Some(ref orchestrator) = state.repl_v2_orchestrator {
-        if let Some(repl_response) =
-            try_route_through_repl(&req, orchestrator, session_id).await
-        {
+        if let Some(repl_response) = try_route_through_repl(&req, orchestrator, session_id).await {
             let mut chat_response =
                 crate::api::response_adapter::repl_to_chat_response(repl_response, session_id);
 
@@ -214,11 +210,9 @@ async fn try_route_through_repl(
     }
 
     let input = match req {
-        SessionInputRequest::Utterance { message } => {
-            UserInputV2::Message {
-                content: message.clone(),
-            }
-        }
+        SessionInputRequest::Utterance { message } => UserInputV2::Message {
+            content: message.clone(),
+        },
         SessionInputRequest::DecisionReply { reply, .. } => {
             // Convert decision reply to a REPL message.
             // The REPL orchestrator handles numeric/name resolution.
@@ -228,14 +222,10 @@ async fn try_route_through_repl(
                         content: format!("{}", index + 1), // 1-indexed for REPL
                     }
                 }
-                ob_poc_types::UserReply::TypeExact { text } => {
-                    UserInputV2::Message {
-                        content: text.clone(),
-                    }
-                }
-                ob_poc_types::UserReply::Confirm { .. } => {
-                    UserInputV2::Confirm
-                }
+                ob_poc_types::UserReply::TypeExact { text } => UserInputV2::Message {
+                    content: text.clone(),
+                },
+                ob_poc_types::UserReply::Confirm { .. } => UserInputV2::Confirm,
                 _ => return None, // Narrow/More/Reject — fall through to legacy
             }
         }
@@ -254,7 +244,6 @@ async fn try_route_through_repl(
         }
     }
 }
-
 
 fn is_raw_execute_request(req: &Option<ExecuteDslRequest>) -> bool {
     req.as_ref()
@@ -1521,11 +1510,6 @@ Deal (root)
 *Type `/verbs agent` for agent verbs, `/verbs session` for session verbs.*"#
         .to_string()
 }
-
-
-
-
-
 
 /// POST /api/session/:id/execute - legacy raw-DSL endpoint only.
 async fn execute_session_dsl_legacy_raw_only(
@@ -3265,5 +3249,4 @@ mod tests {
             "routes should not branch on SEMTAXONOMY_ENABLED"
         );
     }
-
 }

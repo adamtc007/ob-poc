@@ -56,8 +56,12 @@ const STOP_WORDS: &[&str] = &[
 fn edit_distance(a: &str, b: &str) -> usize {
     let a_len = a.len();
     let b_len = b.len();
-    if a_len == 0 { return b_len; }
-    if b_len == 0 { return a_len; }
+    if a_len == 0 {
+        return b_len;
+    }
+    if b_len == 0 {
+        return a_len;
+    }
 
     let mut prev: Vec<usize> = (0..=b_len).collect();
     let mut curr = vec![0usize; b_len + 1];
@@ -66,9 +70,7 @@ fn edit_distance(a: &str, b: &str) -> usize {
         curr[0] = i + 1;
         for (j, cb) in b.chars().enumerate() {
             let cost = if ca == cb { 0 } else { 1 };
-            curr[j + 1] = (prev[j] + cost)
-                .min(prev[j + 1] + 1)
-                .min(curr[j] + 1);
+            curr[j + 1] = (prev[j] + cost).min(prev[j + 1] + 1).min(curr[j] + 1);
         }
         std::mem::swap(&mut prev, &mut curr);
     }
@@ -266,7 +268,8 @@ pub async fn resolve_client_input(input: &str, pool: &PgPool) -> BootstrapOutcom
                     let dist = edit_distance(sw, nw);
                     // Allow up to 2 edits for words >= 4 chars
                     if dist <= 2 {
-                        let confidence = 0.4 + (1.0 - dist as f32 / sw.len().max(nw.len()) as f32) * 0.4;
+                        let confidence =
+                            0.4 + (1.0 - dist as f32 / sw.len().max(nw.len()) as f32) * 0.4;
                         candidates.push(BootstrapCandidate {
                             group_id: group.id,
                             group_name: group.canonical_name.clone(),
@@ -279,7 +282,11 @@ pub async fn resolve_client_input(input: &str, pool: &PgPool) -> BootstrapOutcom
             }
         }
         // Deduplicate by group_id (keep highest confidence)
-        candidates.sort_by(|a, b| b.confidence.partial_cmp(&a.confidence).unwrap_or(std::cmp::Ordering::Equal));
+        candidates.sort_by(|a, b| {
+            b.confidence
+                .partial_cmp(&a.confidence)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         candidates.dedup_by_key(|c| c.group_id);
     }
 
