@@ -52,6 +52,29 @@ const STOP_WORDS: &[&str] = &[
     "it", "let", "me", "can", "you", "do", "of",
 ];
 
+/// Levenshtein edit distance for typo-tolerant matching.
+fn edit_distance(a: &str, b: &str) -> usize {
+    let a_len = a.len();
+    let b_len = b.len();
+    if a_len == 0 { return b_len; }
+    if b_len == 0 { return a_len; }
+
+    let mut prev: Vec<usize> = (0..=b_len).collect();
+    let mut curr = vec![0usize; b_len + 1];
+
+    for (i, ca) in a.chars().enumerate() {
+        curr[0] = i + 1;
+        for (j, cb) in b.chars().enumerate() {
+            let cost = if ca == cb { 0 } else { 1 };
+            curr[j + 1] = (prev[j] + cost)
+                .min(prev[j + 1] + 1)
+                .min(curr[j] + 1);
+        }
+        std::mem::swap(&mut prev, &mut curr);
+    }
+    prev[b_len]
+}
+
 /// Extract significant words from user input, removing stop words.
 fn extract_significant_words(input: &str) -> Vec<String> {
     input
@@ -194,7 +217,7 @@ pub async fn resolve_client_input(input: &str, pool: &PgPool) -> BootstrapOutcom
         }
     }
 
-    // If no substring matches, try fuzzy word overlap
+    // If no substring matches, try fuzzy word overlap (prefix + edit distance)
     if candidates.is_empty() && !significant_words.is_empty() {
         for group in &groups {
             let name_lower = group.canonical_name.to_lowercase();
@@ -207,9 +230,11 @@ pub async fn resolve_client_input(input: &str, pool: &PgPool) -> BootstrapOutcom
             let fuzzy_hits: usize = significant_words
                 .iter()
                 .filter(|sw| {
-                    name_words
-                        .iter()
-                        .any(|nw| nw.starts_with(sw.as_str()) || sw.starts_with(nw.as_str()))
+                    name_words.iter().any(|nw| {
+                        nw.starts_with(sw.as_str())
+                            || sw.starts_with(nw.as_str())
+                            || (sw.len() >= 4 && edit_distance(sw, nw) <= 2)
+                    })
                 })
                 .count();
 
@@ -223,6 +248,39 @@ pub async fn resolve_client_input(input: &str, pool: &PgPool) -> BootstrapOutcom
                 });
             }
         }
+    }
+
+    // Phase 4: Edit distance on full canonical name (catches typos like "Alianz" → "Allianz")
+    if candidates.is_empty() {
+        for group in &groups {
+            let name_lower = group.canonical_name.to_lowercase();
+            // Check each significant word against each word in the canonical name
+            for sw in &significant_words {
+                if sw.len() < 4 {
+                    continue;
+                }
+                for nw in name_lower.split_whitespace() {
+                    if nw.len() < 4 {
+                        continue;
+                    }
+                    let dist = edit_distance(sw, nw);
+                    // Allow up to 2 edits for words >= 4 chars
+                    if dist <= 2 {
+                        let confidence = 0.4 + (1.0 - dist as f32 / sw.len().max(nw.len()) as f32) * 0.4;
+                        candidates.push(BootstrapCandidate {
+                            group_id: group.id,
+                            group_name: group.canonical_name.clone(),
+                            match_source: "typo".to_string(),
+                            confidence,
+                        });
+                        break; // One match per group is enough
+                    }
+                }
+            }
+        }
+        // Deduplicate by group_id (keep highest confidence)
+        candidates.sort_by(|a, b| b.confidence.partial_cmp(&a.confidence).unwrap_or(std::cmp::Ordering::Equal));
+        candidates.dedup_by_key(|c| c.group_id);
     }
 
     // Sort by confidence descending
@@ -477,5 +535,28 @@ mod tests {
         let phrases = default_example_phrases();
         assert!(!phrases.is_empty());
         assert!(phrases.len() <= 5);
+    }
+
+    #[test]
+    fn test_edit_distance_exact() {
+        assert_eq!(edit_distance("allianz", "allianz"), 0);
+    }
+
+    #[test]
+    fn test_edit_distance_one_typo() {
+        // "alianz" → "allianz" (missing 'l')
+        assert_eq!(edit_distance("alianz", "allianz"), 1);
+    }
+
+    #[test]
+    fn test_edit_distance_two_typos() {
+        // "allinanz" → "allianz" (extra 'n')
+        assert_eq!(edit_distance("allinanz", "allianz"), 1);
+    }
+
+    #[test]
+    fn test_edit_distance_too_far() {
+        // "xyzzy" → "allianz" (completely different)
+        assert!(edit_distance("xyzzy", "allianz") > 2);
     }
 }
