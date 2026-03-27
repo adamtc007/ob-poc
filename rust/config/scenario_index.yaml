@@ -473,3 +473,82 @@ scenarios:
       macro_fqn: struct.pe.cross-border
     explain:
       summary: "Cross-border private equity fund structure"
+
+  # ── SemOS Governance ────────────────────────────────────────────────
+  - id: semos-bootstrap-registry
+    title: "Bootstrap Attribute Registry"
+    modes: [stewardship]
+    requires:
+      all_of: [compound_action]
+    signals:
+      actions: [bootstrap, bridge, reconcile, govern, populate]
+      nouns_any: [registry, attributes, semos, "semantic os", governance, stewardship]
+      phrases_any:
+        - "bootstrap attribute registry"
+        - "bridge ungoverned attributes"
+        - "bootstrap governance"
+        - "populate semos registry"
+        - "reconcile attribute registry"
+    routes:
+      kind: macro
+      macro_fqn: governance.bootstrap-attribute-registry
+    explain:
+      summary: "Bridge ungoverned attributes into SemOS, sync SRDEFs, check gaps"
+
+  - id: semos-define-service-dictionary
+    title: "Define Service Resource Dictionary"
+    modes: [stewardship]
+    requires:
+      all_of: [compound_action]
+    signals:
+      actions: [define, populate, build, create, "set up"]
+      nouns_any: [dictionary, "service resource", srdef, "resource dictionary", attributes]
+      phrases_any:
+        - "define service resource dictionary"
+        - "populate service dictionary"
+        - "build resource dictionary"
+        - "define and populate service resources"
+        - "set up the service resource attributes"
+    routes:
+      kind: macro
+      macro_fqn: governance.define-service-dictionary
+    explain:
+      summary: "Check SRDEF gaps, define missing attributes, sync, verify coverage"
+
+  - id: semos-full-publish
+    title: "Full Governance Publish Pipeline"
+    modes: [stewardship]
+    requires:
+      all_of: [compound_action]
+    signals:
+      actions: [publish, release, promote, "push live"]
+      nouns_any: [changeset, changes, registry, governance]
+      phrases_any:
+        - "publish changeset"
+        - "run full publish pipeline"
+        - "publish registry changes"
+        - "promote changeset to live"
+    routes:
+      kind: macro
+      macro_fqn: governance.full-publish-pipeline
+    explain:
+      summary: "Validate, dry-run, plan, and publish through governance pipeline"
+
+  - id: semos-reconcile
+    title: "Reconcile Registry"
+    modes: [stewardship]
+    requires:
+      all_of: [compound_action]
+    signals:
+      actions: [reconcile, refresh, recompute, sync]
+      nouns_any: [registry, derived, stale, attributes, semos]
+      phrases_any:
+        - "reconcile the registry"
+        - "refresh stale derived values"
+        - "sync and recompute registry"
+        - "reconcile semos"
+    routes:
+      kind: macro
+      macro_fqn: governance.reconcile-registry
+    explain:
+      summary: "Bridge ungoverned, sync SRDEFs, recompute stale derived values"

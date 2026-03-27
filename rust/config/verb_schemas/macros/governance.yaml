@@ -1,0 +1,183 @@
+# Governance Domain Macros
+#
+# Compound workflows for SemOS registry governance.
+# These macros wrap governance/attribute/service-resource verbs
+# into deterministic multi-step sequences.
+#
+# Matched at Tier -2B (MacroIndex, score 0.96) before semantic search.
+
+governance.bootstrap-attribute-registry:
+  kind: macro
+
+  ui:
+    label: "Bootstrap Attribute Registry"
+    description: "Bridge ungoverned attributes into SemOS, sync service resource definitions, and check for gaps"
+    target-label: "Bootstrap Report"
+
+  routing:
+    mode-tags: [stewardship]
+    operator-domain: governance
+
+  target:
+    operates-on: null
+    produces: null
+
+  args:
+    style: keyworded
+    required: {}
+    optional:
+      limit:
+        type: str
+        ui-label: "Batch Limit"
+        description: "Maximum attributes to bridge per batch"
+        default: "100"
+
+  prereqs: []
+
+  expands-to:
+    - verb: attribute.bridge-to-semos
+      args:
+        limit: "${arg.limit}"
+    - verb: service-resource.sync-definitions
+      args: {}
+    - verb: service-resource.check-attribute-gaps
+      args: {}
+
+  sets-state:
+    - key: governance.registry_bootstrapped
+      value: true
+
+  unlocks:
+    - governance.define-service-dictionary
+
+governance.define-service-dictionary:
+  kind: macro
+
+  ui:
+    label: "Define Service Resource Dictionary"
+    description: "Check SRDEF attribute gaps, define missing attributes, re-sync, and verify coverage"
+    target-label: "Dictionary Coverage Report"
+
+  routing:
+    mode-tags: [stewardship]
+    operator-domain: governance
+
+  target:
+    operates-on: null
+    produces: null
+
+  args:
+    style: keyworded
+    required: {}
+    optional: {}
+
+  prereqs:
+    - type: state_exists
+      key: governance.registry_bootstrapped
+
+  expands-to:
+    - verb: service-resource.check-attribute-gaps
+      args: {}
+    - verb: service-resource.sync-definitions
+      args: {}
+    - verb: attributes.rollup
+      args: {}
+    - verb: attributes.gaps
+      args: {}
+
+  sets-state:
+    - key: governance.dictionary_defined
+      value: true
+
+  unlocks:
+    - governance.full-publish-pipeline
+
+governance.full-publish-pipeline:
+  kind: macro
+
+  ui:
+    label: "Full Publish Pipeline"
+    description: "Validate, dry-run, plan, and publish a changeset through the full governance pipeline"
+    target-label: "Publish Result"
+
+  routing:
+    mode-tags: [stewardship]
+    operator-domain: governance
+
+  target:
+    operates-on: changeset-ref
+    produces: null
+
+  args:
+    style: keyworded
+    required:
+      changeset:
+        type: str
+        ui-label: "Changeset ID"
+        description: "The changeset to publish"
+    optional: {}
+
+  prereqs:
+    - type: state_exists
+      key: changeset.exists
+
+  expands-to:
+    - verb: governance.gate-precheck
+      args: {}
+    - verb: governance.validate
+      args: {}
+    - verb: governance.dry-run
+      args: {}
+    - verb: governance.plan-publish
+      args: {}
+    - verb: governance.publish
+      args: {}
+
+  sets-state:
+    - key: governance.changeset_published
+      value: true
+
+  unlocks: []
+
+governance.reconcile-registry:
+  kind: macro
+
+  ui:
+    label: "Reconcile Registry"
+    description: "Bridge ungoverned attributes, sync service resource definitions, and recompute stale derived values"
+    target-label: "Reconciliation Report"
+
+  routing:
+    mode-tags: [stewardship]
+    operator-domain: governance
+
+  target:
+    operates-on: null
+    produces: null
+
+  args:
+    style: keyworded
+    required: {}
+    optional:
+      limit:
+        type: str
+        ui-label: "Batch Limit"
+        default: "100"
+
+  prereqs: []
+
+  expands-to:
+    - verb: attribute.bridge-to-semos
+      args:
+        limit: "${arg.limit}"
+    - verb: service-resource.sync-definitions
+      args: {}
+    - verb: derivation.recompute-stale
+      args:
+        limit: "${arg.limit}"
+
+  sets-state:
+    - key: governance.registry_reconciled
+      value: true
+
+  unlocks: []
