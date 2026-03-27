@@ -1,0 +1,93 @@
+constellation: registry.stewardship
+description: SemOS registry governance constellation — changeset authoring, attribute lifecycle, derivation specs, and service resource gap analysis
+jurisdiction: ALL
+slots:
+  changeset:
+    type: entity
+    entity_kinds: [registry]
+    cardinality: optional
+    state_machine: changeset_lifecycle
+    verbs:
+      compose: { verb: changeset.compose, when: [empty, filled] }
+      add_item: { verb: changeset.add-item, when: filled }
+      remove_item: { verb: changeset.remove-item, when: filled }
+      refine_item: { verb: changeset.refine-item, when: filled }
+      suggest: { verb: changeset.suggest, when: [empty, filled] }
+      apply_template: { verb: changeset.apply-template, when: filled }
+      attach_basis: { verb: changeset.attach-basis, when: filled }
+      validate_edit: { verb: changeset.validate-edit, when: filled }
+      cross_reference: { verb: changeset.cross-reference, when: filled }
+      impact_analysis: { verb: changeset.impact-analysis, when: filled }
+      resolve_conflict: { verb: changeset.resolve-conflict, when: filled }
+      list: { verb: changeset.list, when: [empty, filled] }
+      get: { verb: changeset.get, when: filled }
+      diff: { verb: changeset.diff, when: filled }
+
+  governance:
+    type: entity
+    entity_kinds: [registry]
+    cardinality: optional
+    depends_on: [changeset]
+    verbs:
+      gate_precheck: { verb: governance.gate-precheck, when: filled }
+      submit_for_review: { verb: governance.submit-for-review, when: filled }
+      record_review: { verb: governance.record-review, when: filled }
+      validate: { verb: governance.validate, when: filled }
+      dry_run: { verb: governance.dry-run, when: filled }
+      plan_publish: { verb: governance.plan-publish, when: filled }
+      publish: { verb: governance.publish, when: filled }
+      publish_batch: { verb: governance.publish-batch, when: filled }
+      rollback: { verb: governance.rollback, when: filled }
+
+  attribute_def:
+    type: entity
+    entity_kinds: [attribute]
+    cardinality: optional
+    state_machine: attribute_def_lifecycle
+    verbs:
+      define: { verb: attribute.define, when: [empty, filled] }
+      define_derived: { verb: attribute.define-derived, when: [empty, filled] }
+      bridge: { verb: attribute.bridge-to-semos, when: [empty, filled] }
+      set_evidence_grade: { verb: attribute.set-evidence-grade, when: filled }
+      deprecate: { verb: attribute.deprecate, when: filled }
+      inspect: { verb: attribute.inspect, when: [empty, filled] }
+      classify: { verb: attribute.classify, when: filled }
+      list: { verb: attribute.list, when: [empty, filled] }
+      read: { verb: attribute.read, when: filled }
+
+  derivation_spec:
+    type: entity
+    entity_kinds: [attribute]
+    cardinality: optional
+    depends_on: [attribute_def]
+    state_machine: derivation_spec_lifecycle
+    verbs:
+      recompute_stale: { verb: derivation.recompute-stale, when: [empty, filled] }
+
+  typed_attribute:
+    type: entity
+    entity_kinds: [attribute]
+    cardinality: optional
+    depends_on: [attribute_def]
+    verbs:
+      record: { verb: typed-attribute.record, when: [empty, filled] }
+      get: { verb: typed-attribute.get, when: filled }
+      list_for_entity: { verb: typed-attribute.list-for-entity, when: [empty, filled] }
+
+  service_resource_def:
+    type: entity
+    entity_kinds: [resource_type]
+    cardinality: optional
+    state_machine: service_resource_def_lifecycle
+    verbs:
+      sync_definitions: { verb: service-resource.sync-definitions, when: [empty, filled] }
+      check_gaps: { verb: service-resource.check-attribute-gaps, when: [empty, filled] }
+      list: { verb: service-resource.list, when: [empty, filled] }
+
+  registry:
+    type: entity
+    entity_kinds: [registry]
+    cardinality: optional
+    verbs:
+      describe: { verb: registry.describe-object, when: filled }
+      search: { verb: registry.search, when: [empty, filled] }

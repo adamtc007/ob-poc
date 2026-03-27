@@ -1,0 +1,31 @@
+state_machine: derivation_spec_lifecycle
+description: Derivation specification lifecycle — from draft through active computation
+states: [draft, active, stale, recomputed]
+initial: draft
+transitions:
+  - from: draft
+    to: active
+    verbs: [governance.publish]
+  - from: active
+    to: stale
+    verbs: []
+  - from: stale
+    to: active
+    verbs: [derivation.recompute-stale]
+  - from: recomputed
+    to: active
+    verbs: []
+reducer:
+  overlay_sources: {}
+  conditions:
+    has_active_snapshot:
+      expr: "scope.derivation_snapshot_status = 'active'"
+    has_stale_rows:
+      expr: "scope.stale_derived_count > 0"
+  rules:
+    - state: stale
+      requires: [has_stale_rows]
+    - state: active
+      requires: [has_active_snapshot]
+    - state: draft
+      requires: []

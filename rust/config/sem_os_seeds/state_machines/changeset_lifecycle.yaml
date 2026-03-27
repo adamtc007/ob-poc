@@ -1,0 +1,46 @@
+state_machine: changeset_lifecycle
+description: ChangeSet lifecycle — from composition through governance review to publication
+states: [composing, submitted, reviewing, approved, published, rejected]
+initial: composing
+transitions:
+  - from: composing
+    to: submitted
+    verbs: [governance.submit-for-review]
+  - from: submitted
+    to: reviewing
+    verbs: [governance.record-review]
+  - from: reviewing
+    to: approved
+    verbs: [governance.record-review]
+  - from: reviewing
+    to: rejected
+    verbs: [governance.record-review]
+  - from: approved
+    to: published
+    verbs: [governance.publish, governance.publish-batch]
+  - from: published
+    to: composing
+    verbs: [governance.rollback]
+  - from: rejected
+    to: composing
+    verbs: [changeset.compose]
+reducer:
+  overlay_sources: {}
+  conditions:
+    has_items:
+      expr: "scope.changeset_item_count > 0"
+    all_validated:
+      expr: "scope.changeset_validation_passed = true"
+  rules:
+    - state: published
+      requires: []
+    - state: rejected
+      requires: []
+    - state: approved
+      requires: [all_validated]
+    - state: reviewing
+      requires: [has_items]
+    - state: submitted
+      requires: [has_items]
+    - state: composing
+      requires: []

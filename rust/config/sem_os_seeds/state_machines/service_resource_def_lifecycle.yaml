@@ -1,0 +1,39 @@
+state_machine: service_resource_def_lifecycle
+description: Service resource definition sync lifecycle
+states: [unsynced, synced, gaps_found, complete]
+initial: unsynced
+transitions:
+  - from: unsynced
+    to: synced
+    verbs: [service-resource.sync-definitions]
+  - from: synced
+    to: gaps_found
+    verbs: [service-resource.check-attribute-gaps]
+  - from: synced
+    to: complete
+    verbs: [service-resource.check-attribute-gaps]
+  - from: gaps_found
+    to: synced
+    verbs: [service-resource.sync-definitions]
+  - from: gaps_found
+    to: complete
+    verbs: [attribute.define, attribute.bridge-to-semos]
+  - from: complete
+    to: gaps_found
+    verbs: [service-resource.check-attribute-gaps]
+reducer:
+  overlay_sources: {}
+  conditions:
+    has_synced_srdefs:
+      expr: "scope.synced_srdef_count > 0"
+    has_attribute_gaps:
+      expr: "scope.attribute_gap_count > 0"
+  rules:
+    - state: complete
+      requires: [has_synced_srdefs]
+    - state: gaps_found
+      requires: [has_synced_srdefs, has_attribute_gaps]
+    - state: synced
+      requires: [has_synced_srdefs]
+    - state: unsynced
+      requires: []

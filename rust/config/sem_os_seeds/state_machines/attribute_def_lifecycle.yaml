@@ -1,0 +1,35 @@
+state_machine: attribute_def_lifecycle
+description: Attribute definition lifecycle — from ungoverned discovery through governed activation
+states: [ungoverned, draft, active, deprecated, retired]
+initial: ungoverned
+transitions:
+  - from: ungoverned
+    to: draft
+    verbs: [attribute.bridge-to-semos, attribute.define]
+  - from: draft
+    to: active
+    verbs: [governance.publish]
+  - from: active
+    to: deprecated
+    verbs: [attribute.deprecate]
+  - from: deprecated
+    to: retired
+    verbs: []
+reducer:
+  overlay_sources: {}
+  conditions:
+    has_semos_snapshot:
+      expr: "scope.sem_reg_snapshot_id IS NOT NULL"
+    snapshot_is_active:
+      expr: "scope.snapshot_status = 'active'"
+  rules:
+    - state: retired
+      requires: []
+    - state: deprecated
+      requires: []
+    - state: active
+      requires: [has_semos_snapshot, snapshot_is_active]
+    - state: draft
+      requires: [has_semos_snapshot]
+    - state: ungoverned
+      requires: []

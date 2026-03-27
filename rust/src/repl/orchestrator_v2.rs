@@ -970,6 +970,16 @@ impl ReplOrchestratorV2 {
                     _ => None,
                 };
 
+                // Infrastructure / SemOS intent — bypass client group resolution.
+                if super::bootstrap::is_infrastructure_intent(&content) {
+                    return self.complete_infrastructure_scope_gate(session).await;
+                }
+
+                // Numeric "2" with no pending candidates → infrastructure shortcut.
+                if content.trim() == "2" && pending_candidates.is_none() {
+                    return self.complete_infrastructure_scope_gate(session).await;
+                }
+
                 // If we have candidates, try numeric or name selection first.
                 if let Some(ref cands) = pending_candidates {
                     if let Some(selected) =
@@ -1975,6 +1985,40 @@ impl ReplOrchestratorV2 {
         }
     }
 
+    /// Complete scope gate for infrastructure sessions (no client group).
+    ///
+    /// Sets the nil-UUID scope sentinel, jumps directly to
+    /// `JourneySelection` with workspace pinned to `SemOsMaintenance`,
+    /// and returns the available packs for that workspace.
+    async fn complete_infrastructure_scope_gate(
+        &self,
+        session: &mut ReplSessionV2,
+    ) -> ReplResponseV2 {
+        // Set scope to nil UUID — marks this as an infrastructure session.
+        session.set_client_scope(Uuid::nil());
+
+        // Pin workspace to SemOS Maintenance — skip WorkspaceSelection tollgate.
+        session.set_workspace_root(WorkspaceKind::SemOsMaintenance);
+        session.set_state(ReplStateV2::JourneySelection { candidates: None });
+
+        let packs = self
+            .pack_router
+            .list_packs_for_workspace(&WorkspaceKind::SemOsMaintenance);
+
+        ReplResponseV2 {
+            state: session.state.clone(),
+            kind: ReplResponseKindV2::JourneyOptions {
+                packs: packs.clone(),
+            },
+            message: "SemOS Infrastructure session — no client group required.\n\
+                      Which journey would you like to start?"
+                .to_string(),
+            runbook_summary: None,
+            step_count: 0,
+            session_feedback: Some(session.build_session_feedback(false)),
+        }
+    }
+
     fn workspace_options(&self) -> Vec<WorkspaceOption> {
         vec![
             WorkspaceOption {
@@ -2103,6 +2147,10 @@ impl ReplOrchestratorV2 {
                     step_count: 0,
                     session_feedback: Some(session.build_session_feedback(false)),
                 }
+            }
+
+            super::bootstrap::BootstrapOutcome::Infrastructure => {
+                self.complete_infrastructure_scope_gate(session).await
             }
         }
     }

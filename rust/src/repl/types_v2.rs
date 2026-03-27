@@ -257,6 +257,26 @@ pub struct SessionScope {
     pub client_group_name: Option<String>,
 }
 
+impl SessionScope {
+    /// Sentinel UUID for infrastructure-only sessions (no client group).
+    pub fn infrastructure_scope_id() -> Uuid {
+        Uuid::nil()
+    }
+
+    /// Whether this scope represents an infrastructure session.
+    pub fn is_infrastructure(&self) -> bool {
+        self.client_group_id == Uuid::nil()
+    }
+
+    /// Create an infrastructure scope (no client group).
+    pub fn infrastructure() -> Self {
+        Self {
+            client_group_id: Uuid::nil(),
+            client_group_name: Some("SemOS Infrastructure".to_string()),
+        }
+    }
+}
+
 /// Sage vs REPL mode at the current top-of-stack context.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "snake_case")]

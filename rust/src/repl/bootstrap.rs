@@ -40,6 +40,8 @@ pub enum BootstrapOutcome {
     NoMatch { original_input: String },
     /// Database is empty — skip bootstrap entirely.
     Empty,
+    /// User selected infrastructure / SemOS maintenance (no client group).
+    Infrastructure,
 }
 
 // ---------------------------------------------------------------------------
@@ -86,6 +88,22 @@ fn extract_significant_words(input: &str) -> Vec<String> {
         .map(|w| w.trim_matches(|c: char| !c.is_alphanumeric()).to_string())
         .filter(|w| !w.is_empty() && w.len() >= 2)
         .collect()
+}
+
+// ---------------------------------------------------------------------------
+// Infrastructure intent detection
+// ---------------------------------------------------------------------------
+
+/// Whether the user input indicates an infrastructure / SemOS maintenance intent
+/// rather than a client-group-scoped operational session.
+pub fn is_infrastructure_intent(input: &str) -> bool {
+    let lower = input.trim().to_lowercase();
+    lower.contains("infrastructure")
+        || lower.contains("semantic os")
+        || lower.contains("semos")
+        || lower.contains("sem os")
+        || lower.contains("registry governance")
+        || lower.contains("stewardship")
 }
 
 // ---------------------------------------------------------------------------
@@ -363,7 +381,11 @@ pub fn try_numeric_or_name_selection<'a>(
 
 /// Generate the initial greeting message for session creation.
 pub fn format_greeting() -> String {
-    "Welcome! Which client group would you like to work with today?".to_string()
+    "What would you like to work on?\n\n\
+     1. **Client group** — operational workspaces (KYC, Deal, CBU, OnBoarding, ...)\n\
+     2. **Semantic OS infrastructure** — registry governance, attribute lifecycle\n\n\
+     Enter a client group name, or select option 2 for SemOS maintenance."
+        .to_string()
 }
 
 /// Format the disambiguation prompt showing numbered candidates.
