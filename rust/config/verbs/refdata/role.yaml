@@ -87,7 +87,6 @@ domains:
         - "show available roles"
         - "what roles are defined"
         - "display role reference table"
-        - "enumerate role types"
         - "get all role records"
         - "which roles can be assigned"
         - "show me the role list"

@@ -144,7 +144,6 @@ domains:
         description: List who controls an entity
         invocation_phrases:
         - "list controllers"
-        - "who controls this"
         - "show controllers"
         - "find controllers"
         - "list who controls"
@@ -432,7 +431,6 @@ domains:
           Returns the path and cumulative control percentage.
         invocation_phrases:
         - "show ownership chain"
-        - "trace ownership"
         - "ownership chain"
         - "follow ownership"
         - "trace control chain"
@@ -562,7 +560,6 @@ domains:
           with derivation explanation, confidence level, and data gaps.
         invocation_phrases:
         - "show board controller"
-        - "who controls the board"
         - "board controller for"
         - "get board controller"
         - "display board of directors controller"

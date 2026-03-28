@@ -21,7 +21,7 @@ domains:
         - "coverage analysis"
         - "what's the coverage"
         - "compute prong coverage"
-        - "gap analysis"
+        - "coverage gap analysis"
         metadata:
           tier: intent
           source_of_truth: operational

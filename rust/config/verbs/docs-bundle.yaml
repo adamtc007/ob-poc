@@ -18,7 +18,6 @@ domains:
         - apply document bundle
         - apply docs bundle
         - set up required documents
-        - add document requirements
         - apply ucits documents
         - apply aif documents
         - configure fund documents

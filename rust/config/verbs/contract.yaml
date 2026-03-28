@@ -403,8 +403,8 @@ domains:
           harm_class: read_only
         invocation_phrases:
           - "list rate cards"
-          - "show rate cards"
           - "all pricing schedules"
+          - "contract rate cards"
         args: []
         returns:
           type: record_set
@@ -430,7 +430,6 @@ domains:
           side_effects: state_write
           harm_class: reversible
         invocation_phrases:
-          - "subscribe cbu to product"
           - "onboard cbu to product"
           - "add cbu to contract product"
           - "subscribe to custody"
@@ -479,7 +478,6 @@ domains:
           side_effects: state_write
           harm_class: destructive
         invocation_phrases:
-          - "unsubscribe cbu from product"
           - "remove cbu from contract product"
           - "offboard cbu from product"
         args:
@@ -516,8 +514,6 @@ domains:
           harm_class: read_only
         invocation_phrases:
           - "list subscriptions"
-          - "show cbu subscriptions"
-          - "what products is cbu subscribed to"
           - "cbu product subscriptions"
         args:
           - name: cbu-id

@@ -392,9 +392,7 @@ domains:
           side_effects: state_write
         invocation_phrases:
         - "show parent entities"
-        - "who owns this entity"
         - "trace ownership upward"
-        - "find ultimate parent"
         - "show ownership chain above"
         - "list controlling entities"
         - "walk up the ownership tree"

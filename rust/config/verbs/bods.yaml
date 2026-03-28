@@ -8,13 +8,12 @@ domains:
         - "discover UBOs"
         - "find UBOs"
         - "find beneficial owners"
-        - "who are the UBOs"
-        - "trace ownership"
         - "pull the BODS data"
         - "BODS lookup"
         - "get BODS data for this LEI"
         - "check BODS for this entity"
         - "beneficial ownership data standard lookup"
+        - "trace BODS ownership"
         metadata:
           tier: composite
           source_of_truth: external
@@ -257,10 +256,8 @@ domains:
           phase_tags: [kyc]
           side_effects: facts_only
         invocation_phrases:
-        - "list beneficial owners"
         - "show BODS persons"
         - "list UBO persons"
-        - "who are the beneficial owners"
         - "show natural persons in BODS"
         - "list persons with ownership"
         - "get beneficial owner persons"
@@ -298,7 +295,6 @@ domains:
         invocation_phrases:
         - "list ownership statements"
         - "show ownership chains"
-        - "who owns this entity"
         - "display ownership records"
         - "get ownership data for entity"
         - "show BODS ownership links"

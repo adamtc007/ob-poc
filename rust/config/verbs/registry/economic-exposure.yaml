@@ -93,7 +93,6 @@ domains:
         - "compute economic exposure"
         - "calculate look-through"
         - "find ultimate owners"
-        - "trace ownership chain"
         - "economic ownership analysis"
         - "diluted ownership report"
         - "who are the real owners"

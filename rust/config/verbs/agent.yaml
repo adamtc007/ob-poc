@@ -46,7 +46,6 @@ domains:
           - "start autonomous mode"
           - "resolve gaps for"
           - "enrich"
-          - "research this entity"
         args:
           - name: task
             type: string

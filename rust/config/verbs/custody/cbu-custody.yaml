@@ -27,7 +27,6 @@ domains:
         - "display instrument coverage"
         - "what can this structure trade"
         - "show DVP and FOP instruments"
-        - "check universe completeness"
         crud:
           operation: list_by_fk
           table: cbu_instrument_universe

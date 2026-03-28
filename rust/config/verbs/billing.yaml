@@ -605,11 +605,11 @@ domains:
           - "finalize billing approval"
           - "approve billing for invoice"
           - "grant billing approval"
-          - "sign off on the fees"
           - "the billing looks right approve it"
           - "approve these charges"
           - "fees are correct go ahead"
           - "green light the billing"
+          - "approve the billing period"
         args:
           - name: period-id
             type: uuid

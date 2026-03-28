@@ -122,7 +122,7 @@ domains:
         behavior: plugin
         invocation_phrases:
         - find controller for CBU
-        - who manages this CBU
+        - which manco manages this CBU
         - get CBU group
         - which book
         metadata:
@@ -213,8 +213,7 @@ domains:
         - control chain
         - who controls the controller
         - ultimate parent
-        - trace ownership upward
-        - ownership chain
+        - trace manco control upward
         metadata:
           tier: diagnostics
           source_of_truth: operational

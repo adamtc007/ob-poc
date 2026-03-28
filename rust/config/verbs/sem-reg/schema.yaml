@@ -135,7 +135,6 @@ domains:
         handler: SchemaEntityListRelationshipsOp
         invocation_phrases:
           - "list schema relationships"
-          - "show entity relationships"
           - "what does this entity relate to"
           - "show foreign key relationships"
         args:

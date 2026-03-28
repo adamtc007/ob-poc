@@ -315,7 +315,6 @@ domains:
           - "close the deal"
           - "agree the commercial terms"
           - "move to contracted"
-          - "kick off onboarding for this deal"
           - "the deal is signed move it forward"
         args:
           - name: deal-id
@@ -1248,7 +1247,6 @@ domains:
         invocation_phrases:
           - "add sla to deal"
           - "create deal sla"
-          - "add service level agreement"
         args:
           - name: deal-id
             type: uuid

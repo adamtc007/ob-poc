@@ -183,7 +183,6 @@ domains:
         invocation_phrases:
         - "record distribution to partner"
         - "log profit distribution"
-        - "process return of capital"
         - "distribute partnership proceeds"
         - "record LP payout"
         - "log partnership distribution event"

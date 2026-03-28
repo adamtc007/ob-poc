@@ -361,7 +361,6 @@ domains:
       trace-ownership:
         description: Trace ownership chain from entity to UBO terminus via GLEIF parent relationships
         invocation_phrases:
-          - "trace ownership"
           - "find ultimate parent"
           - "who owns this ultimately"
           - "trace to UBO"
@@ -369,6 +368,7 @@ domains:
           - "follow the ownership chain via GLEIF"
           - "trace up to the ultimate parent"
           - "find the top of the corporate tree"
+          - "trace GLEIF hierarchy"
         behavior: plugin
         metadata:
           tier: diagnostics

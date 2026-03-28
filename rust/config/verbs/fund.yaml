@@ -11,13 +11,11 @@ domains:
         invocation_phrases:
           - "create umbrella fund"
           - "create sub-fund"
-          - "create share class"
           - "create standalone fund"
           - "create master fund"
           - "create feeder fund"
           - "new SICAV"
           - "new compartment"
-          - "new share class"
           - "new hedge fund"
           - "new master fund"
           - "new feeder"
@@ -600,7 +598,6 @@ domains:
           - "add a new share class to this fund"
           - "create and attach a share class"
           - "register a share class on the subfund"
-          - "add an institutional share class"
           - "set up a share class on this compartment"
         metadata:
           tier: intent
@@ -659,7 +656,6 @@ domains:
           - "list fund compartments"
           - "show sub-funds in umbrella"
           - "display all sub-funds"
-          - "show sub-funds"
           - "show the umbrella compartments"
           - "what subfunds are under this umbrella"
           - "list the umbrella children"

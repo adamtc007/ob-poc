@@ -21,7 +21,6 @@ domains:
         - "add IM to structure"
         - "link manager to CBU"
         - "set investment manager for fund"
-        - "appoint sub-advisor"
         - "register IM assignment"
         - "assign portfolio manager"
         - "add trading manager to CBU"

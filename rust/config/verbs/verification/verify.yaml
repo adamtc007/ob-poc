@@ -17,7 +17,6 @@ domains:
         invocation_phrases:
         - "detect suspicious patterns"
         - "run pattern detection"
-        - "check for circular ownership"
         - "scan for layering structures"
         - "find nominee usage"
         - "adversarial pattern analysis"

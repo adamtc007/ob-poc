@@ -267,11 +267,6 @@ domains:
         invocation_phrases:
           - "add control"
           - "create control relationship"
-          - "add board member"
-          - "add controller"
-          - "link controller"
-          - "add voting control"
-          - "create control link"
           - "add executive control"
         behavior: crud
         metadata:
@@ -432,7 +427,6 @@ domains:
           - "end ownership"
           - "end control"
           - "end trust role"
-          - "terminate relationship"
           - "close relationship"
           - "relationship has ended"
         behavior: crud
@@ -522,7 +516,6 @@ domains:
           - "list beneficial owners"
           - "find all owners"
           - "show me the owners"
-          - "who owns this entity"
           - "show the ownership chain"
           - "tell me who owns this"
           - "list the owners of this company"
@@ -569,7 +562,6 @@ domains:
           - "what do they own"
           - "show holdings"
           - "view owned companies"
-          - "list subsidiaries"
           - "show what's owned"
         behavior: crud
         metadata:

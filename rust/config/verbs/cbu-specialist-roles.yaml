@@ -110,7 +110,6 @@ domains:
           phase_tags: [onboarding]
           side_effects: state_write
         invocation_phrases:
-          - "appoint director to board"
           - "assign conducting officer"
           - "add managing director"
           - "who is the company secretary"

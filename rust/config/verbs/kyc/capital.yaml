@@ -452,7 +452,6 @@ domains:
         invocation_phrases:
         - "list share classes for issuer"
         - "show capital structure"
-        - "what share classes exist"
         - "get all share types"
         - "display company equity classes"
         - "view share register summary"

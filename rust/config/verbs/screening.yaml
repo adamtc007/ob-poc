@@ -79,7 +79,6 @@ domains:
           - "do the AML checks"
           - "check for OFAC hits"
           - "OFAC screening"
-          - "run the RBA assessment"
           - "risk based approach screening"
           - "KYC refresh for this entity"
           - "run CDD on this entity"

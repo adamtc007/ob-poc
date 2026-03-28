@@ -126,7 +126,6 @@ domains:
         - "load book"
         - "show book"
           # Group-level triggers
-        - "show all cbus"
         - "show cbu book"
         - "cbu book"
         - "show funds for"
@@ -301,9 +300,7 @@ domains:
         - "unload system"
         - "unload cbu"
         - "unload cbu from session"
-        - "remove cbu"
         - "remove cbu from session"
-        - "close cbu"
         - "drop cbu from scope"
         - "take cbu out of session"
         - "remove structure from workspace"
@@ -455,7 +452,6 @@ domains:
       list:
         description: List loaded CBUs
         invocation_phrases:
-        - "list CBUs"
         - "show loaded CBUs"
         - "what CBUs are loaded"
         - "list loaded"
@@ -642,7 +638,6 @@ domains:
         - "work on case"
         - "set case"
         - "focus on case"
-        - "open case"
         - "pick kyc case to review"
         - "set active case context"
         - "switch to this kyc case"

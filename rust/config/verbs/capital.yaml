@@ -168,11 +168,11 @@ domains:
       share-class.list:
         description: List share classes for an issuer
         invocation_phrases:
-        - "list share classes"
         - "show share classes"
         - "get all share classes"
         - "what share classes exist"
         - "display share classes"
+        - "capital share class list"
         metadata:
           tier: reference
           source_of_truth: register
@@ -288,7 +288,6 @@ domains:
       issue.new:
         description: Subsequent issuance (capital raise)
         invocation_phrases:
-        - "issue new shares"
         - "secondary issuance"
         - "additional share issue"
         - "issue more shares"

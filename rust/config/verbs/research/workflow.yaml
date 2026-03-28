@@ -131,9 +131,8 @@ domains:
         description: "User rejects a suggested decision"
         invocation_phrases:
         - "no that's wrong"
-        - "reject"
         - "not that one"
-        - "none of these"
+        - "reject research decision"
         metadata:
           tier: intent
           source_of_truth: workflow

@@ -199,7 +199,6 @@ domains:
           - "plan publish"
           - "preview publish impact"
           - "what will publishing change"
-          - "diff against active snapshots"
         args:
           - name: changeset-id
             type: uuid

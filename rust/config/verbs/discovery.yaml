@@ -19,9 +19,9 @@ domains:
           action_class: search
         invocation_phrases:
           - "find entity"
-          - "search entities"
           - "look up company"
           - "find BNP"
+          - "discover entities"
         behavior: plugin
         handler: DiscoverySearchEntitiesOp
         args:

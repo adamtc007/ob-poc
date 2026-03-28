@@ -747,7 +747,6 @@ domains:
         description: Persist a parent-child structure link between two CBUs
         invocation_phrases:
           - "link CBU structure"
-          - "link feeder to master"
           - "link parallel fund"
           - "connect child CBU to parent"
           - "attach feeder structure"
@@ -893,10 +892,8 @@ domains:
           - "remove entity from CBU"
           - "unlink entity role"
           - "remove participant"
-          - "revoke entity role"
           - "detach party from structure"
           - "remove party role"
-          - "strip role from entity"
         behavior: crud
         metadata:
           tier: intent
@@ -1483,8 +1480,6 @@ domains:
         description: Mark evidence as verified or rejected
         invocation_phrases:
           - "verify CBU evidence"
-          - "approve evidence"
-          - "reject evidence"
           - "mark evidence as verified"
           - "validate CBU evidence"
           - "review evidence status"

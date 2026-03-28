@@ -92,7 +92,6 @@ domains:
           phase_tags: [trading]
           side_effects: facts_only
         invocation_phrases:
-          - "list relationships"
           - "show client relationships"
           - "booking relationships for client"
           - "client principal history"

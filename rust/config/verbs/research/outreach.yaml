@@ -288,7 +288,6 @@ domains:
       list-overdue:
         description: "List overdue outreach requests"
         invocation_phrases:
-        - "show overdue requests"
         - "what's overdue"
         - "pending outreach"
         - "who hasn't responded"

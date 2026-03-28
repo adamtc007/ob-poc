@@ -861,7 +861,6 @@ domains:
         behavior: plugin
         handler: ClientGroupAddRelationshipOp
         invocation_phrases:
-          - "add ownership"
           - "this owns"
           - "set parent"
           - "link ownership"

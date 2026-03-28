@@ -26,7 +26,6 @@ domains:
           - "view all CBUs"
           - "show the universe"
           - "display all clients"
-          - "show me all entities"
           - "view entire portfolio"
           - "show global view"
           - "display everything"
@@ -138,7 +137,6 @@ domains:
         invocation_phrases:
           - "focus on CBU"
           - "view this CBU"
-          - "show CBU details"
           - "open the CBU"
           - "zoom into CBU"
           - "display CBU view"
@@ -282,7 +280,6 @@ domains:
           - "reset the view"
           - "remove all refinements"
           - "clear current filters"
-          - "start fresh"
           - "reset to base view"
           - "clear refinements"
           - "remove filters"

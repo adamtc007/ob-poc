@@ -291,10 +291,10 @@ domains:
         - "compare two versions"
         - "what changed between"
         - "diff profile versions"
-        - "compare changes"
         - "show profile delta"
         - "highlight mandate differences"
         - "what is different between versions"
+        - "compare trading profile changes"
         behavior: plugin
         handler: diff_trading_profiles
         metadata:
@@ -901,7 +901,6 @@ domains:
         - "check universe completeness"
         - "verify instrument coverage"
         - "check SSI coverage"
-        - "validate settlement coverage"
         - "coverage validation"
         - "check all markets covered"
         - "are all instruments mapped to SSIs"
@@ -942,13 +941,13 @@ domains:
         - "submit profile for approval"
         - "submit trading profile"
         - "request profile approval"
-        - "submit for review"
         - "send for approval"
         - "submit profile changes"
         - "request go-live approval"
         - "submit profile for review"
         - "send mandate to client for sign-off"
         - "route profile for client approval"
+        - "submit trading profile for review"
         behavior: plugin
         handler: submit_trading_profile
         metadata:

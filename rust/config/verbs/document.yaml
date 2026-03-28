@@ -154,7 +154,7 @@ domains:
           - solicit document set
           - ask for passport and proof of address
           - get KYC documents
-          - request identity documents
+          - request identity document set
           - send out the full document request pack
           - send out the whole doc pack for this entity
           - request the full CDD document pack
@@ -528,7 +528,6 @@ domains:
         invocation_phrases:
           - "waive document requirement"
           - "skip this document request"
-          - "override document requirement"
           - "approve document exemption"
           - "grant a waiver for this document"
           - "exempt entity from this document requirement"

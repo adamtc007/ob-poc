@@ -394,7 +394,6 @@ domains:
           side_effects: state_write
         invocation_phrases:
         - "identify trust UBOs"
-        - "who are the beneficial owners"
         - "find UBOs from trust structure"
         - "determine beneficial ownership of trust"
         - "run trust UBO discovery"
