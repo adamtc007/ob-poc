@@ -62,6 +62,9 @@ domains:
         - "enumerate service resource definitions"
         - "get all resource types"
         - "search resource type catalog"
+        - "browse service resources"
+        - "list resources"
+        - "show resources"
         behavior: crud
         crud:
           operation: select
@@ -150,6 +153,9 @@ domains:
         - "which attributes are required for provisioning"
         - "enumerate resource attribute requirements"
         - "check attribute needs for resource type"
+        - "show resource attributes"
+        - "list attributes for resource"
+        - "resource attribute list"
         behavior: crud
         crud:
           operation: list_by_fk
@@ -430,6 +436,8 @@ domains:
         - "is this resource ready for activation"
         - "check attribute compliance for resource"
         - "validate provisioning attribute requirements"
+        - "check resource attribute requirements"
+        - "validate resource attributes"
         behavior: plugin
         handler: resource_validate_attrs
         args:

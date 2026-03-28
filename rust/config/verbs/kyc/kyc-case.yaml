@@ -18,6 +18,9 @@ domains:
           - "initiate kyc case"
           - "begin kyc case"
           - "start new case"
+          - "open a new client KYC case"
+          - "create client KYC case"
+          - "new KYC case for client"
         metadata:
           tier: intent
           source_of_truth: workflow

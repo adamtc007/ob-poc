@@ -2471,7 +2471,7 @@ workspace = "onboarding"
 [[test]]
 utterance = "configure UCITS SICAV structure"
 expected_verb = "cbu.create"
-alt_verbs = ["fund.create-umbrella"]
+alt_verbs = ["fund.create-umbrella", "struct.lux.ucits.sicav"]
 category = "natural"
 difficulty = "hard"
 workspace = "onboarding"
@@ -2479,7 +2479,7 @@ workspace = "onboarding"
 [[test]]
 utterance = "onboard a cross-border hedge fund"
 expected_verb = "cbu.create"
-alt_verbs = ["fund.create-umbrella"]
+alt_verbs = ["fund.create-umbrella", "struct.hedge.cross-border"]
 category = "natural"
 difficulty = "hard"
 workspace = "onboarding"
@@ -2518,7 +2518,8 @@ workspace = "instrument_matrix"
 
 [[test]]
 utterance = "configure counterparty limits"
-expected_verb = "trading-profile.set-counterparty-limit"
+expected_verb = "trading-profile.add-isda-config"
+alt_verbs = ["trading-profile.add-csa-config"]
 category = "natural"
 difficulty = "hard"
 workspace = "instrument_matrix"
@@ -2539,7 +2540,8 @@ workspace = "instrument_matrix"
 
 [[test]]
 utterance = "set CA policy for this CBU"
-expected_verb = "trading-profile.set-ca-policy"
+expected_verb = "trading-profile.ca.set-election-policy"
+alt_verbs = ["trading-profile.ca.set-notification-policy", "trading-profile.ca.enable-event-types"]
 category = "natural"
 difficulty = "hard"
 workspace = "instrument_matrix"

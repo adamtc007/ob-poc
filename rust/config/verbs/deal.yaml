@@ -1571,6 +1571,10 @@ domains:
           - "initiate the ops handoff"
           - "start setting up the deal products"
           - "launch onboarding for this client"
+          - "submit onboarding handoff"
+          - "handoff deal to operations"
+          - "request deal onboarding"
+          - "onboarding handoff"
         args:
           - name: deal-id
             type: uuid

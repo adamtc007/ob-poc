@@ -24,6 +24,9 @@ domains:
           - "create onboarding unit"
           - "open a new onboarding cbu"
           - "set up a new onboarding unit"
+          - "set up a Luxembourg fund book"
+          - "configure fund structure"
+          - "create fund book"
         behavior: plugin
         handler: CbuCreateOp
         metadata:

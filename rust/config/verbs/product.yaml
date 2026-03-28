@@ -22,6 +22,8 @@ domains:
         - "fetch product record"
         - "read product catalog entry"
         - "describe this product"
+        - "product details"
+        - "read product information"
         behavior: crud
         crud:
           operation: select
@@ -67,6 +69,8 @@ domains:
         - "show active products"
         - "browse product catalog"
         - "enumerate custody products"
+        - "list all products"
+        - "browse products"
         behavior: crud
         crud:
           operation: select

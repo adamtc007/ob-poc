@@ -26,6 +26,7 @@ domains:
         - "import mandate from file"
         - "load profile from JSON"
         - "import trading setup document"
+        - "upload trading mandate"
         metadata:
           tier: intent
           source_of_truth: matrix
@@ -92,6 +93,9 @@ domains:
         - "retrieve trading profile record"
         - "look up trading profile"
         - "show mandate setup"
+        - "show trading matrix"
+        - "display trading profile"
+        - "view trading profile"
         metadata:
           tier: diagnostics
           source_of_truth: matrix

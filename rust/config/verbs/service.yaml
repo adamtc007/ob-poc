@@ -20,6 +20,8 @@ domains:
         - "describe this service"
         - "what is this service"
         - "display service information"
+        - "show service details"
+        - "read service"
         behavior: crud
         crud:
           operation: select
@@ -61,6 +63,9 @@ domains:
         - "enumerate custody services"
         - "get service list with filters"
         - "search services by type"
+        - "list all service types"
+        - "list services"
+        - "show all services"
         behavior: crud
         crud:
           operation: select
@@ -104,6 +109,10 @@ domains:
         - "display product service offerings"
         - "find services by product"
         - "enumerate mandatory services for product"
+        - "list services for this product"
+        - "what services does this product provide"
+        - "show services for product"
+        - "which services are available"
         behavior: crud
         crud:
           operation: select_with_join
