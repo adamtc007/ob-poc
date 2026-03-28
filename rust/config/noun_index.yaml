@@ -1342,3 +1342,65 @@ nouns:
   # "LEI" appears in many contexts; GLEIF verbs already covered by gleif noun
       trace: [ubo.trace-chains]
       discover: [ubo.discover]
+
+  # =========================================================================
+  # CROSS-DOMAIN: Service Resources, Derived Attributes, Governance
+  # =========================================================================
+
+  service-resource-def:
+    aliases:
+      - service resource
+      - srdef
+      - resource definition
+    natural_aliases:
+      - service resource definition
+      - resource type
+    noun_keys: [service_resource]
+    action_verbs:
+      list: [service-resource.list, service-resource.list-by-service]
+      read: [service-resource.read]
+      check: [service-resource.check-attribute-gaps, service-resource.validate-attrs]
+      sync: [service-resource.sync-definitions]
+
+  derived-attribute:
+    aliases:
+      - derived attribute
+      - derivation
+      - below the line
+    natural_aliases:
+      - derived value
+      - computed attribute
+      - stale derivation
+    noun_keys: [derivation]
+    action_verbs:
+      compute: [derivation.recompute-stale]
+
+  typed-attribute-value:
+    aliases:
+      - typed attribute
+      - attribute value
+    natural_aliases:
+      - typed value
+      - entity attribute
+    noun_keys: [attribute_value]
+    action_verbs:
+      create: [typed-attribute.record]
+      read: [typed-attribute.get]
+      list: [typed-attribute.list-for-entity]
+
+  governance-changeset:
+    aliases:
+      - changeset
+      - governance
+      - registry change
+    natural_aliases:
+      - registry update
+      - schema change
+      - publish changes
+    noun_keys: [governance, changeset]
+    action_verbs:
+      create: [changeset.compose]
+      read: [changeset.get, changeset.list]
+      publish: [governance.publish, governance.publish-batch]
+      validate: [governance.validate, governance.dry-run]
+      review: [governance.submit-for-review, governance.record-review]

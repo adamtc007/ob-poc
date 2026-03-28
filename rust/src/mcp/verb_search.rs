@@ -532,6 +532,19 @@ impl HybridVerbSearcher {
             None
         };
 
+        // Scale fallback threshold for short queries — BGE asymmetric prefix
+        // adds noise for very short inputs
+        let effective_fallback_threshold = {
+            let word_count = query.split_whitespace().count();
+            if word_count <= 2 {
+                (self.fallback_threshold - 0.15).max(0.35)
+            } else if word_count <= 4 {
+                (self.fallback_threshold - 0.10).max(0.40)
+            } else {
+                self.fallback_threshold
+            }
+        };
+
         // ── Feature extraction: compound signals (shared by Tier -2A and ECIR gate) ──
         let compound_signals = extract_compound_signals(&normalized);
         let has_compound = compound_signals.has_any();
@@ -666,8 +679,8 @@ impl HybridVerbSearcher {
                             ResolvedRoute::NeedsSelection { .. } => None,
                         };
                         if let Some(fqn) = route_fqn {
-                            if self.matches_domain(&fqn, domain_filter)
-                                && self.matches_entity_kind(&fqn, entity_kind)
+                            // Scenarios are compound intents — domain_filter should not suppress them
+                            if self.matches_entity_kind(&fqn, entity_kind)
                                 && allowed_verbs.is_none_or(|av| av.contains(&fqn))
                                 && !seen_verbs.contains(&fqn)
                             {
@@ -716,8 +729,8 @@ impl HybridVerbSearcher {
                                 ResolvedRoute::NeedsSelection { .. } => None,
                             };
                             if let Some(fqn) = route_fqn {
-                                if self.matches_domain(&fqn, domain_filter)
-                                    && allowed_verbs.is_none_or(|av| av.contains(&fqn))
+                                // Scenarios are compound intents — domain_filter should not suppress them
+                                if allowed_verbs.is_none_or(|av| av.contains(&fqn))
                                     && !seen_verbs.contains(&fqn)
                                 {
                                     seen_verbs.insert(fqn.clone());
@@ -757,8 +770,8 @@ impl HybridVerbSearcher {
             let outcome = macro_idx.resolve(query, None, None);
             match outcome {
                 MacroResolveOutcome::Matched(m) => {
-                    if self.matches_domain(&m.fqn, domain_filter)
-                        && allowed_verbs.is_none_or(|av| av.contains(&m.fqn))
+                    // Macros are compound intents — domain_filter should not suppress them
+                    if allowed_verbs.is_none_or(|av| av.contains(&m.fqn))
                         && !seen_verbs.contains(&m.fqn)
                     {
                         tracing::info!(
@@ -796,8 +809,8 @@ impl HybridVerbSearcher {
                         "MacroIndex: ambiguous, returning multiple candidates"
                     );
                     for m in candidates {
-                        if self.matches_domain(&m.fqn, domain_filter)
-                            && self.matches_entity_kind(&m.fqn, entity_kind)
+                        // Macros bypass domain_filter — pack scoring handles relevance
+                        if self.matches_entity_kind(&m.fqn, entity_kind)
                             && allowed_verbs.is_none_or(|av| av.contains(&m.fqn))
                             && !seen_verbs.contains(&m.fqn)
                         {
@@ -900,10 +913,10 @@ impl HybridVerbSearcher {
         }
 
         // 1. User-specific learned phrases (exact match)
+        // Learned phrases are user-validated — domain_filter should not suppress them
         if let Some(uid) = user_id {
             if let Some(result) = self.search_user_learned_exact(uid, &normalized).await? {
-                if self.matches_domain(&result.verb, domain_filter)
-                    && self.matches_entity_kind(&result.verb, entity_kind)
+                if self.matches_entity_kind(&result.verb, entity_kind)
                     && allowed_verbs.is_none_or(|av| av.contains(&result.verb))
                 {
                     seen_verbs.insert(result.verb.clone());
@@ -913,12 +926,12 @@ impl HybridVerbSearcher {
         }
 
         // 2. Global learned phrases (exact match)
+        // Learned phrases are user-validated — domain_filter should not suppress them
         if results.is_empty() {
             if let Some(learned) = &self.learned_data {
                 let guard = learned.read().await;
                 if let Some(verb) = guard.resolve_phrase(&normalized) {
-                    if self.matches_domain(verb, domain_filter)
-                        && self.matches_entity_kind(verb, entity_kind)
+                    if self.matches_entity_kind(verb, entity_kind)
                         && allowed_verbs.is_none_or(|av| av.contains(verb))
                     {
                         let description = self.get_verb_description(verb).await;
@@ -980,14 +993,14 @@ impl HybridVerbSearcher {
         }
 
         // 3. User-specific learned (SEMANTIC match) - top-k for ambiguity detection
+        // Learned phrases are user-validated — domain_filter should not suppress them
         if results.is_empty() {
             if let (Some(user_id), Some(embedding)) = (user_id, query_embedding.as_ref()) {
                 let user_results = self
                     .search_user_learned_semantic_with_embedding(user_id, embedding, 3)
                     .await?;
                 for result in user_results {
-                    if self.matches_domain(&result.verb, domain_filter)
-                        && self.matches_entity_kind(&result.verb, entity_kind)
+                    if self.matches_entity_kind(&result.verb, entity_kind)
                         && !seen_verbs.contains(&result.verb)
                     {
                         seen_verbs.insert(result.verb.clone());
@@ -1042,6 +1055,7 @@ impl HybridVerbSearcher {
                         limit - results.len(),
                         ecir_domain.as_deref(),
                         allowed_verbs,
+                        effective_fallback_threshold,
                     )
                     .await
                 {
@@ -1054,9 +1068,10 @@ impl HybridVerbSearcher {
                             if seen_verbs.contains(&result.verb) {
                                 continue;
                             }
-                            if !self.matches_domain(&result.verb, domain_filter)
-                                || !self.matches_entity_kind(&result.verb, entity_kind)
-                            {
+                            // Semantic search results are NOT filtered by domain_hint —
+                            // pack scoring handles domain relevance via boost/penalty.
+                            // domain_filter is too aggressive for cross-domain packs.
+                            if !self.matches_entity_kind(&result.verb, entity_kind) {
                                 continue;
                             }
                             if self
@@ -1106,9 +1121,9 @@ impl HybridVerbSearcher {
                             if seen_verbs.contains(&pm.verb) {
                                 continue;
                             }
-                            if !self.matches_domain(&pm.verb, domain_filter)
-                                || !self.matches_entity_kind(&pm.verb, entity_kind)
-                            {
+                            // Phonetic fallback is NOT filtered by domain_hint —
+                            // same rationale as semantic search above.
+                            if !self.matches_entity_kind(&pm.verb, entity_kind) {
                                 continue;
                             }
                             // Score phonetic matches slightly below semantic threshold
@@ -1233,11 +1248,23 @@ impl HybridVerbSearcher {
 
         let query_embedding = embedder.embed_query(query).await?;
 
+        // Scale fallback threshold for short queries
+        let effective_fallback_threshold = {
+            let word_count = query.split_whitespace().count();
+            if word_count <= 2 {
+                (self.fallback_threshold - 0.15).max(0.35)
+            } else if word_count <= 4 {
+                (self.fallback_threshold - 0.10).max(0.40)
+            } else {
+                self.fallback_threshold
+            }
+        };
+
         if let Some(allowed) = allowed_verbs {
             if !allowed.is_empty() && allowed.len() <= 100 {
                 let verb_fqns: Vec<String> = allowed.iter().cloned().collect();
                 return self
-                    .search_patterns_constrained(verb_service, &query_embedding, limit, &verb_fqns)
+                    .search_patterns_constrained(verb_service, &query_embedding, limit, &verb_fqns, effective_fallback_threshold)
                     .await;
             }
         }
@@ -1247,6 +1274,7 @@ impl HybridVerbSearcher {
             limit,
             ecir_domain,
             allowed_verbs,
+            effective_fallback_threshold,
         )
         .await
     }
@@ -1355,6 +1383,7 @@ impl HybridVerbSearcher {
         limit: usize,
         ecir_domain: Option<&str>,
         allowed_verbs: Option<&HashSet<String>>,
+        fallback_threshold: f32,
     ) -> Result<Vec<VerbSearchResult>> {
         let verb_service = match &self.verb_service {
             Some(s) => s,
@@ -1367,7 +1396,7 @@ impl HybridVerbSearcher {
             if !allowed.is_empty() && allowed.len() <= 100 {
                 let verb_fqns: Vec<String> = allowed.iter().cloned().collect();
                 let constrained_results = self
-                    .search_patterns_constrained(verb_service, query_embedding, limit, &verb_fqns)
+                    .search_patterns_constrained(verb_service, query_embedding, limit, &verb_fqns, fallback_threshold)
                     .await?;
 
                 let has_good_result = constrained_results
@@ -1392,7 +1421,7 @@ impl HybridVerbSearcher {
         // Strategy 2: Domain-scoped search (if ECIR identified a domain)
         if let Some(domain) = ecir_domain {
             let scoped_results = self
-                .search_patterns_directly_scoped(verb_service, query_embedding, limit, Some(domain))
+                .search_patterns_directly_scoped(verb_service, query_embedding, limit, Some(domain), fallback_threshold)
                 .await?;
 
             let has_good_result = scoped_results
@@ -1414,7 +1443,7 @@ impl HybridVerbSearcher {
         }
 
         // Strategy 3: Full-space search (fallback)
-        self.search_patterns_directly_scoped(verb_service, query_embedding, limit, None)
+        self.search_patterns_directly_scoped(verb_service, query_embedding, limit, None, fallback_threshold)
             .await
     }
 
@@ -1425,13 +1454,14 @@ impl HybridVerbSearcher {
         query_embedding: &[f32],
         limit: usize,
         verb_fqns: &[String],
+        fallback_threshold: f32,
     ) -> Result<Vec<VerbSearchResult>> {
         use std::collections::HashMap;
 
         let learned_matches = verb_service
             .find_global_learned_semantic_topk_constrained(
                 query_embedding,
-                self.fallback_threshold,
+                fallback_threshold,
                 limit,
                 verb_fqns,
             )
@@ -1442,7 +1472,7 @@ impl HybridVerbSearcher {
             .search_verb_patterns_semantic_constrained(
                 query_embedding,
                 limit,
-                self.fallback_threshold,
+                fallback_threshold,
                 verb_fqns,
             )
             .await
@@ -1502,6 +1532,7 @@ impl HybridVerbSearcher {
         query_embedding: &[f32],
         limit: usize,
         domain_prefix: Option<&str>,
+        fallback_threshold: f32,
     ) -> Result<Vec<VerbSearchResult>> {
         use std::collections::HashMap;
 
@@ -1509,7 +1540,7 @@ impl HybridVerbSearcher {
         let learned_matches = verb_service
             .find_global_learned_semantic_topk_scoped(
                 query_embedding,
-                self.fallback_threshold,
+                fallback_threshold,
                 limit,
                 domain_prefix,
             )
@@ -1520,7 +1551,7 @@ impl HybridVerbSearcher {
             .search_verb_patterns_semantic_scoped(
                 query_embedding,
                 limit,
-                self.fallback_threshold,
+                fallback_threshold,
                 domain_prefix,
             )
             .await

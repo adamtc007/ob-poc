@@ -303,6 +303,11 @@ fn derive_dominant_domain(allowed_verbs: &HashSet<String>) -> Option<String> {
             *counts.entry(domain).or_insert(0) += 1;
         }
     }
+    // Multi-domain packs (>3 domains) have no dominant domain — prevents
+    // cross-domain suppression in verb search
+    if counts.len() > 3 {
+        return None;
+    }
     counts
         .into_iter()
         .max_by_key(|(_, count)| *count)
