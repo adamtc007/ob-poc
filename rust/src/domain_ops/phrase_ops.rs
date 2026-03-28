@@ -108,10 +108,25 @@ pub struct CrossWorkspaceConflict {
     pub workspace: Option<String>,
 }
 
-/// Stub result for unimplemented operations
+
+
+/// Result from phrase proposal creation
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StubResult {
-    pub status: String,
+pub struct PhraseProposalResult {
+    pub snapshot_id: Uuid,
+    pub phrase: String,
+    pub verb_fqn: String,
+    pub confidence: f64,
+    pub risk_tier: String,
+    pub collision_safe: bool,
+    pub state: String,
+}
+
+/// Result from batch proposal generation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BatchProposeResult {
+    pub proposals_generated: i64,
+    pub skipped_duplicates: i64,
     pub message: String,
 }
 
@@ -179,6 +194,173 @@ fn get_optional_string(verb_call: &VerbCall, key: &str) -> Option<String> {
         .iter()
         .find(|a| a.key == key)
         .and_then(|a| a.value.as_string().map(|s| s.to_string()))
+}
+
+// ============================================================================
+// Collision Check Helper (shared between check-collisions, propose, batch-propose)
+// ============================================================================
+
+/// Run collision analysis for a candidate phrase against phrase_bank and embeddings.
+///
+/// Returns a `CollisionReport` and the maximum semantic similarity score observed
+/// (used for confidence calculation).
+#[cfg(feature = "database")]
+async fn run_collision_check(
+    pool: &PgPool,
+    phrase: &str,
+    target_verb: &str,
+    workspace: Option<&str>,
+) -> Result<(CollisionReport, f64)> {
+    let mut exact_conflicts = Vec::new();
+    let mut cross_workspace_conflicts = Vec::new();
+
+    // 1. Check exact match in phrase_bank
+    let bank_rows: Vec<(String, Option<String>, String)> = sqlx::query_as(
+        r#"
+        SELECT verb_fqn, workspace, source
+        FROM "ob-poc".phrase_bank
+        WHERE phrase = $1 AND active = TRUE
+        "#,
+    )
+    .bind(phrase)
+    .fetch_all(pool)
+    .await
+    .unwrap_or_default();
+
+    for (verb_fqn, ws, source) in &bank_rows {
+        if verb_fqn != target_verb {
+            if ws.as_deref() == workspace {
+                exact_conflicts.push(ExactConflict {
+                    existing_verb: verb_fqn.clone(),
+                    source: format!("phrase_bank ({})", source),
+                });
+            } else {
+                cross_workspace_conflicts.push(CrossWorkspaceConflict {
+                    phrase: phrase.to_string(),
+                    verb_fqn: verb_fqn.clone(),
+                    workspace: ws.clone(),
+                });
+            }
+        }
+    }
+
+    // 2. Check exact match in verb_pattern_embeddings
+    let embed_rows: Vec<(String,)> = sqlx::query_as(
+        r#"
+        SELECT DISTINCT verb_fqn
+        FROM "ob-poc".verb_pattern_embeddings
+        WHERE pattern = $1 AND verb_fqn != $2
+        "#,
+    )
+    .bind(phrase)
+    .bind(target_verb)
+    .fetch_all(pool)
+    .await
+    .unwrap_or_default();
+
+    for (verb_fqn,) in embed_rows {
+        exact_conflicts.push(ExactConflict {
+            existing_verb: verb_fqn,
+            source: "verb_pattern_embeddings".to_string(),
+        });
+    }
+
+    // 3. Semantic near-miss check via embedding cosine similarity
+    let semantic_rows: Vec<(String, String, f64)> = sqlx::query_as(
+        r#"
+        SELECT pattern, verb_fqn, 1.0 - (embedding <=> (
+            SELECT embedding FROM "ob-poc".verb_pattern_embeddings
+            WHERE pattern = $1
+            LIMIT 1
+        )) AS similarity
+        FROM "ob-poc".verb_pattern_embeddings
+        WHERE verb_fqn != $2
+          AND pattern != $1
+        ORDER BY embedding <=> (
+            SELECT embedding FROM "ob-poc".verb_pattern_embeddings
+            WHERE pattern = $1
+            LIMIT 1
+        )
+        LIMIT 10
+        "#,
+    )
+    .bind(phrase)
+    .bind(target_verb)
+    .fetch_all(pool)
+    .await
+    .unwrap_or_default();
+
+    // Track the max similarity for confidence scoring
+    let max_similarity = semantic_rows
+        .iter()
+        .map(|(_, _, sim)| *sim)
+        .fold(0.0_f64, f64::max);
+
+    let semantic_near_misses: Vec<SemanticNearMiss> = semantic_rows
+        .into_iter()
+        .filter(|(_, _, sim)| *sim > 0.85)
+        .map(|(p, v, sim)| SemanticNearMiss {
+            phrase: p,
+            verb_fqn: v,
+            similarity: (sim * 1000.0).round() / 1000.0,
+        })
+        .collect();
+
+    let safe_to_propose = exact_conflicts.is_empty() && cross_workspace_conflicts.is_empty();
+
+    let report = CollisionReport {
+        candidate_phrase: phrase.to_string(),
+        target_verb: target_verb.to_string(),
+        workspace: workspace.map(|s| s.to_string()),
+        exact_conflicts,
+        semantic_near_misses,
+        cross_workspace_conflicts,
+        safe_to_propose,
+    };
+
+    Ok((report, max_similarity))
+}
+
+/// Determine risk tier from a verb FQN based on keyword heuristics.
+///
+/// Returns "critical", "standard", or "elevated" (default fail-safe).
+#[cfg(feature = "database")]
+fn risk_tier_for_verb(verb_fqn: &str) -> &'static str {
+    let lower = verb_fqn.to_lowercase();
+    let critical_keywords = [
+        "approve", "reject", "terminate", "delete", "close", "certify",
+    ];
+    let standard_keywords = ["read", "list", "get", "show", "describe", "search"];
+
+    if critical_keywords.iter().any(|kw| lower.contains(kw)) {
+        "critical"
+    } else if standard_keywords.iter().any(|kw| lower.contains(kw)) {
+        "standard"
+    } else {
+        "elevated"
+    }
+}
+
+/// Compute 5-signal confidence score for a manual proposal (no observation data).
+///
+/// Formula: 0.25*frequency + 0.20*breadth + 0.20*collision_safety
+///        + 0.15*rephrase_confirmation + 0.20*wrong_match_severity
+#[cfg(feature = "database")]
+fn compute_proposal_confidence(max_semantic_similarity: f64) -> f64 {
+    let frequency = 0.5; // moderate default for manual proposal
+    let breadth = 0.5; // moderate default for manual proposal
+    let collision_safety = 1.0 - max_semantic_similarity.clamp(0.0, 1.0);
+    let rephrase_confirmation = 0.0; // no observation data
+    let wrong_match_severity = 0.0; // no observation data
+
+    let raw = 0.25 * frequency
+        + 0.20 * breadth
+        + 0.20 * collision_safety
+        + 0.15 * rephrase_confirmation
+        + 0.20 * wrong_match_severity;
+
+    // Round to 3 decimal places
+    (raw * 1000.0).round() / 1000.0
 }
 
 // ============================================================================
@@ -556,109 +738,8 @@ impl CustomOperation for PhraseCheckCollisionsOp {
         let target_verb = get_required_string(verb_call, "target-verb")?;
         let workspace = get_optional_string(verb_call, "workspace");
 
-        let mut exact_conflicts = Vec::new();
-        let mut cross_workspace_conflicts = Vec::new();
-
-        // 1. Check exact match in phrase_bank (if table exists)
-        let bank_rows: Vec<(String, Option<String>, String)> = sqlx::query_as(
-            r#"
-            SELECT verb_fqn, workspace, source
-            FROM "ob-poc".phrase_bank
-            WHERE phrase = $1 AND active = TRUE
-            "#,
-        )
-        .bind(&phrase)
-        .fetch_all(pool)
-        .await
-        .unwrap_or_default();
-
-        for (verb_fqn, ws, source) in &bank_rows {
-            if verb_fqn != &target_verb {
-                if ws.as_deref() == workspace.as_deref() {
-                    exact_conflicts.push(ExactConflict {
-                        existing_verb: verb_fqn.clone(),
-                        source: format!("phrase_bank ({})", source),
-                    });
-                } else {
-                    cross_workspace_conflicts.push(CrossWorkspaceConflict {
-                        phrase: phrase.clone(),
-                        verb_fqn: verb_fqn.clone(),
-                        workspace: ws.clone(),
-                    });
-                }
-            }
-        }
-
-        // 2. Check exact match in verb_pattern_embeddings
-        let embed_rows: Vec<(String,)> = sqlx::query_as(
-            r#"
-            SELECT DISTINCT verb_fqn
-            FROM "ob-poc".verb_pattern_embeddings
-            WHERE pattern = $1 AND verb_fqn != $2
-            "#,
-        )
-        .bind(&phrase)
-        .bind(&target_verb)
-        .fetch_all(pool)
-        .await
-        .unwrap_or_default();
-
-        for (verb_fqn,) in embed_rows {
-            exact_conflicts.push(ExactConflict {
-                existing_verb: verb_fqn,
-                source: "verb_pattern_embeddings".to_string(),
-            });
-        }
-
-        // 3. Semantic near-miss check via embedding cosine similarity
-        //    Query the top-N most similar embeddings to the candidate phrase.
-        //    We use pgvector cosine distance operator (<=>).
-        let semantic_rows: Vec<(String, String, f64)> = sqlx::query_as(
-            r#"
-            SELECT pattern, verb_fqn, 1.0 - (embedding <=> (
-                SELECT embedding FROM "ob-poc".verb_pattern_embeddings
-                WHERE pattern = $1
-                LIMIT 1
-            )) AS similarity
-            FROM "ob-poc".verb_pattern_embeddings
-            WHERE verb_fqn != $2
-              AND pattern != $1
-            ORDER BY embedding <=> (
-                SELECT embedding FROM "ob-poc".verb_pattern_embeddings
-                WHERE pattern = $1
-                LIMIT 1
-            )
-            LIMIT 10
-            "#,
-        )
-        .bind(&phrase)
-        .bind(&target_verb)
-        .fetch_all(pool)
-        .await
-        .unwrap_or_default();
-
-        let semantic_near_misses: Vec<SemanticNearMiss> = semantic_rows
-            .into_iter()
-            .filter(|(_, _, sim)| *sim > 0.85)
-            .map(|(p, v, sim)| SemanticNearMiss {
-                phrase: p,
-                verb_fqn: v,
-                similarity: (sim * 1000.0).round() / 1000.0,
-            })
-            .collect();
-
-        let safe_to_propose =
-            exact_conflicts.is_empty() && cross_workspace_conflicts.is_empty();
-
-        let report = CollisionReport {
-            candidate_phrase: phrase,
-            target_verb,
-            workspace,
-            exact_conflicts,
-            semantic_near_misses,
-            cross_workspace_conflicts,
-            safe_to_propose,
-        };
+        let (report, _max_similarity) =
+            run_collision_check(pool, &phrase, &target_verb, workspace.as_deref()).await?;
 
         Ok(ExecutionResult::Record(serde_json::to_value(report)?))
     }
@@ -698,14 +779,66 @@ impl CustomOperation for PhraseProposeOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        _pool: &PgPool,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
     ) -> Result<ExecutionResult> {
-        let result = StubResult {
-            status: "not_implemented".to_string(),
-            message: "phrase.propose is not yet implemented — Phase 3/4".to_string(),
+        let phrase = get_required_string(verb_call, "phrase")?;
+        let target_verb = get_required_string(verb_call, "target-verb")?;
+        let workspace = get_optional_string(verb_call, "workspace");
+        let rationale = get_optional_string(verb_call, "rationale");
+
+        // 1. Run collision check
+        let (collision_report, max_similarity) =
+            run_collision_check(pool, &phrase, &target_verb, workspace.as_deref()).await?;
+
+        // 2. Compute confidence score (manual proposal — no observation data)
+        let confidence = compute_proposal_confidence(max_similarity);
+
+        // 3. Determine risk tier from verb name heuristics
+        let risk_tier = risk_tier_for_verb(&target_verb);
+
+        // 4. Build the proposal definition
+        let collision_report_json = serde_json::to_value(&collision_report)?;
+        let definition = serde_json::json!({
+            "phrase": phrase,
+            "verb_fqn": target_verb,
+            "workspace": workspace,
+            "source": "governed",
+            "risk_tier": risk_tier,
+            "state": "proposed",
+            "confidence": confidence,
+            "rationale": rationale,
+            "collision_report": collision_report_json,
+        });
+
+        // 5. Compute deterministic object_id and create SemOS snapshot
+        let semantic_id = format!("phrase:{}:{}", target_verb, phrase);
+        let object_id =
+            crate::sem_reg::ids::object_id_for(ObjectType::PhraseMapping, &semantic_id);
+
+        let mut tx = pool.begin().await?;
+        let meta = next_phrase_meta(
+            None,
+            object_id,
+            ctx.audit_user.as_deref().unwrap_or("phrase.propose"),
+            ChangeType::NonBreaking,
+            rationale.clone(),
+            SnapshotStatus::Active,
+        );
+        let snapshot_id = publish_phrase_snapshot_in_tx(&mut tx, &meta, &definition).await?;
+        tx.commit().await?;
+
+        let result = PhraseProposalResult {
+            snapshot_id,
+            phrase,
+            verb_fqn: target_verb,
+            confidence,
+            risk_tier: risk_tier.to_string(),
+            collision_safe: collision_report.safe_to_propose,
+            state: "proposed".to_string(),
         };
+
         Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
 
@@ -738,15 +871,205 @@ impl CustomOperation for PhraseBatchProposeOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        _pool: &PgPool,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
     ) -> Result<ExecutionResult> {
-        let result = StubResult {
-            status: "not_implemented".to_string(),
-            message: "phrase.batch-propose is not yet implemented — Phase 3/4".to_string(),
+        let limit = get_optional_integer(verb_call, "limit").unwrap_or(50) as usize;
+
+        // 1. Read current watermark from phrase_observation_state
+        let watermark_result: Result<(i64,), _> = sqlx::query_as(
+            r#"SELECT last_observed_sequence FROM "ob-poc".phrase_observation_state WHERE id = 1"#,
+        )
+        .fetch_one(pool)
+        .await;
+
+        let last_seq = match watermark_result {
+            Ok((seq,)) => seq,
+            Err(_) => {
+                // No observation state — return helpful message
+                let result = BatchProposeResult {
+                    proposals_generated: 0,
+                    skipped_duplicates: 0,
+                    message: "No phrase observation state found. Run phrase.observe-misses first."
+                        .to_string(),
+                };
+                return Ok(ExecutionResult::Record(serde_json::to_value(result)?));
+            }
         };
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+
+        // 2. Query session_traces for miss patterns since watermark
+        let miss_rows: Vec<(String,)> = sqlx::query_as(
+            r#"
+            SELECT DISTINCT op->>'utterance' AS utterance
+            FROM "ob-poc".session_traces
+            WHERE sequence > $1
+              AND op->>'kind' = 'utterance'
+              AND (
+                  op->'result'->>'match_status' = 'no_match'
+                  OR op->'result'->>'match_status' IS NULL
+              )
+              AND op->>'utterance' IS NOT NULL
+            ORDER BY utterance
+            "#,
+        )
+        .bind(last_seq)
+        .fetch_all(pool)
+        .await
+        .unwrap_or_default();
+
+        if miss_rows.is_empty() {
+            let result = BatchProposeResult {
+                proposals_generated: 0,
+                skipped_duplicates: 0,
+                message: "No session trace data available for observation".to_string(),
+            };
+            return Ok(ExecutionResult::Record(serde_json::to_value(result)?));
+        }
+
+        // 3. For each miss pattern, find the best matching verb via embedding search
+        //    and generate a proposal. Deduplicate by phrase.
+        let mut seen_phrases = std::collections::HashSet::new();
+        let mut proposals: Vec<serde_json::Value> = Vec::new();
+        let mut skipped = 0_i64;
+
+        for (utterance,) in &miss_rows {
+            if proposals.len() >= limit {
+                break;
+            }
+
+            let phrase = utterance.trim().to_string();
+            if phrase.is_empty() || !seen_phrases.insert(phrase.clone()) {
+                skipped += 1;
+                continue;
+            }
+
+            // Find the best matching verb for this utterance via embedding similarity
+            let best_match: Option<(String, f64)> = sqlx::query_as(
+                r#"
+                SELECT verb_fqn, 1.0 - (embedding <=> (
+                    SELECT embedding FROM "ob-poc".verb_pattern_embeddings
+                    WHERE pattern = $1
+                    LIMIT 1
+                )) AS similarity
+                FROM "ob-poc".verb_pattern_embeddings
+                WHERE pattern != $1
+                ORDER BY embedding <=> (
+                    SELECT embedding FROM "ob-poc".verb_pattern_embeddings
+                    WHERE pattern = $1
+                    LIMIT 1
+                )
+                LIMIT 1
+                "#,
+            )
+            .bind(&phrase)
+            .fetch_optional(pool)
+            .await
+            .ok()
+            .flatten();
+
+            // Skip if no embedding match found (phrase not in embeddings table)
+            let (target_verb, _best_sim) = match best_match {
+                Some(m) => m,
+                None => {
+                    skipped += 1;
+                    continue;
+                }
+            };
+
+            // Run collision check
+            let (collision_report, max_similarity) =
+                run_collision_check(pool, &phrase, &target_verb, None).await?;
+
+            let confidence = compute_proposal_confidence(max_similarity);
+            let risk_tier = risk_tier_for_verb(&target_verb);
+
+            // Build definition and create snapshot
+            let collision_report_json = serde_json::to_value(&collision_report)?;
+            let definition = serde_json::json!({
+                "phrase": phrase,
+                "verb_fqn": target_verb,
+                "workspace": null,
+                "source": "governed",
+                "risk_tier": risk_tier,
+                "state": "proposed",
+                "confidence": confidence,
+                "rationale": "Auto-generated from session trace miss patterns",
+                "collision_report": collision_report_json,
+            });
+
+            let semantic_id = format!("phrase:{}:{}", target_verb, phrase);
+            let object_id =
+                crate::sem_reg::ids::object_id_for(ObjectType::PhraseMapping, &semantic_id);
+
+            let mut tx = pool.begin().await?;
+            let meta = next_phrase_meta(
+                None,
+                object_id,
+                ctx.audit_user
+                    .as_deref()
+                    .unwrap_or("phrase.batch-propose"),
+                ChangeType::NonBreaking,
+                Some("Auto-generated from session trace miss patterns".to_string()),
+                SnapshotStatus::Active,
+            );
+            let snapshot_id =
+                publish_phrase_snapshot_in_tx(&mut tx, &meta, &definition).await?;
+            tx.commit().await?;
+
+            let proposal = PhraseProposalResult {
+                snapshot_id,
+                phrase,
+                verb_fqn: target_verb,
+                confidence,
+                risk_tier: risk_tier.to_string(),
+                collision_safe: collision_report.safe_to_propose,
+                state: "proposed".to_string(),
+            };
+
+            proposals.push(serde_json::to_value(proposal)?);
+        }
+
+        // 4. Sort by risk_tier (critical first), then confidence descending
+        proposals.sort_by(|a, b| {
+            let tier_order = |t: &str| -> u8 {
+                match t {
+                    "critical" => 0,
+                    "elevated" => 1,
+                    "standard" => 2,
+                    _ => 3,
+                }
+            };
+            let a_tier = a.get("risk_tier").and_then(|v| v.as_str()).unwrap_or("elevated");
+            let b_tier = b.get("risk_tier").and_then(|v| v.as_str()).unwrap_or("elevated");
+            let tier_cmp = tier_order(a_tier).cmp(&tier_order(b_tier));
+            if tier_cmp != std::cmp::Ordering::Equal {
+                return tier_cmp;
+            }
+            // Confidence descending
+            let a_conf = a.get("confidence").and_then(|v| v.as_f64()).unwrap_or(0.0);
+            let b_conf = b.get("confidence").and_then(|v| v.as_f64()).unwrap_or(0.0);
+            b_conf
+                .partial_cmp(&a_conf)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+
+        let generated = proposals.len() as i64;
+
+        // Wrap in a summary envelope: first element is the summary, rest are proposals
+        let mut result_set = Vec::with_capacity(proposals.len() + 1);
+        let summary = BatchProposeResult {
+            proposals_generated: generated,
+            skipped_duplicates: skipped,
+            message: format!(
+                "Generated {} proposals from session trace miss patterns",
+                generated
+            ),
+        };
+        result_set.push(serde_json::to_value(summary)?);
+        result_set.extend(proposals);
+
+        Ok(ExecutionResult::RecordSet(result_set))
     }
 
     #[cfg(not(feature = "database"))]
