@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict QFgJAWIQUwepbwGfVBRaWlc92EeIrTufvvgOz459FJRNLQ59YicvMtLBWCaevTU
+\restrict fBSdEBeJCrqgqDKhPnGndkl6WAANsDpCZCr0yu9mSMOHHwDMU73drsTsVCnHvgM
 
 -- Dumped from database version 18.1 (Homebrew)
 -- Dumped by pg_dump version 18.1 (Homebrew)
@@ -326,7 +326,8 @@ CREATE TYPE sem_reg.object_type AS ENUM (
     'evidence_requirement',
     'document_type_def',
     'observation_def',
-    'derivation_spec'
+    'derivation_spec',
+    'phrase_mapping'
 );
 
 
@@ -6712,6 +6713,58 @@ BEGIN
             true
         ),
         updated_at = NOW();
+
+    RETURN NEW;
+END;
+$$;
+
+
+--
+-- Name: materialize_phrase_mapping_to_bank(); Type: FUNCTION; Schema: sem_reg; Owner: -
+--
+
+CREATE FUNCTION sem_reg.materialize_phrase_mapping_to_bank() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_phrase    text;
+    v_verb_fqn  text;
+    v_workspace text;
+    v_source    text;
+    v_risk_tier text;
+BEGIN
+    IF NEW.object_type::text <> 'phrase_mapping'
+       OR NEW.status::text <> 'active'
+       OR NEW.effective_until IS NOT NULL
+    THEN
+        RETURN NEW;
+    END IF;
+
+    v_phrase    := NEW.definition ->> 'phrase';
+    v_verb_fqn  := NEW.definition ->> 'verb_fqn';
+    v_workspace := NEW.definition ->> 'workspace';
+    v_source    := COALESCE(NEW.definition ->> 'source', 'governed');
+    v_risk_tier := COALESCE(NEW.definition ->> 'risk_tier', 'elevated');
+
+    IF v_phrase IS NULL OR v_verb_fqn IS NULL THEN
+        RETURN NEW;
+    END IF;
+
+    -- Deactivate any existing active row for this (phrase, workspace)
+    UPDATE "ob-poc".phrase_bank
+    SET active = FALSE
+    WHERE phrase = v_phrase
+      AND COALESCE(workspace, '__global__') = COALESCE(v_workspace, '__global__')
+      AND active = TRUE;
+
+    -- Insert new active row
+    INSERT INTO "ob-poc".phrase_bank (
+        phrase, verb_fqn, workspace, source, risk_tier,
+        sem_reg_snapshot_id, active
+    ) VALUES (
+        v_phrase, v_verb_fqn, v_workspace, v_source, v_risk_tier,
+        NEW.snapshot_id, TRUE
+    );
 
     RETURN NEW;
 END;
@@ -14509,6 +14562,51 @@ COMMENT ON TABLE "ob-poc".person_pep_status IS 'BODS-compliant PEP status tracki
 
 
 --
+-- Name: phrase_bank; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".phrase_bank (
+    id integer NOT NULL,
+    phrase text NOT NULL,
+    verb_fqn text NOT NULL,
+    workspace text,
+    source text DEFAULT 'governed'::text NOT NULL,
+    risk_tier text DEFAULT 'elevated'::text NOT NULL,
+    sem_reg_snapshot_id uuid,
+    supersedes_id integer,
+    active boolean DEFAULT true NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: TABLE phrase_bank; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".phrase_bank IS 'Governed phrase bank — curated phrase-to-verb mappings with collision safety';
+
+
+--
+-- Name: phrase_bank_id_seq; Type: SEQUENCE; Schema: ob-poc; Owner: -
+--
+
+CREATE SEQUENCE "ob-poc".phrase_bank_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: phrase_bank_id_seq; Type: SEQUENCE OWNED BY; Schema: ob-poc; Owner: -
+--
+
+ALTER SEQUENCE "ob-poc".phrase_bank_id_seq OWNED BY "ob-poc".phrase_bank.id;
+
+
+--
 -- Name: phrase_blocklist; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -14549,6 +14647,47 @@ CREATE SEQUENCE "ob-poc".phrase_blocklist_id_seq
 --
 
 ALTER SEQUENCE "ob-poc".phrase_blocklist_id_seq OWNED BY "ob-poc".phrase_blocklist.id;
+
+
+--
+-- Name: phrase_observation_state; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".phrase_observation_state (
+    id integer NOT NULL,
+    last_observed_sequence bigint DEFAULT 0 NOT NULL,
+    last_run_at timestamp with time zone DEFAULT now() NOT NULL,
+    patterns_found integer DEFAULT 0 NOT NULL,
+    wrong_match_patterns_found integer DEFAULT 0 NOT NULL,
+    next_run_at timestamp with time zone
+);
+
+
+--
+-- Name: TABLE phrase_observation_state; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".phrase_observation_state IS 'Watermark state for phrase observation batch runs';
+
+
+--
+-- Name: phrase_observation_state_id_seq; Type: SEQUENCE; Schema: ob-poc; Owner: -
+--
+
+CREATE SEQUENCE "ob-poc".phrase_observation_state_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: phrase_observation_state_id_seq; Type: SEQUENCE OWNED BY; Schema: ob-poc; Owner: -
+--
+
+ALTER SEQUENCE "ob-poc".phrase_observation_state_id_seq OWNED BY "ob-poc".phrase_observation_state.id;
 
 
 --
@@ -19617,7 +19756,8 @@ CREATE TABLE "ob-poc".verb_pattern_embeddings (
     priority integer DEFAULT 50 NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    match_method text DEFAULT 'semantic'::text
+    match_method text DEFAULT 'semantic'::text,
+    workspace text
 );
 
 
@@ -21597,10 +21737,24 @@ ALTER TABLE ONLY "ob-poc".lexicon_tokens ALTER COLUMN id SET DEFAULT nextval('"o
 
 
 --
+-- Name: phrase_bank id; Type: DEFAULT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".phrase_bank ALTER COLUMN id SET DEFAULT nextval('"ob-poc".phrase_bank_id_seq'::regclass);
+
+
+--
 -- Name: phrase_blocklist id; Type: DEFAULT; Schema: ob-poc; Owner: -
 --
 
 ALTER TABLE ONLY "ob-poc".phrase_blocklist ALTER COLUMN id SET DEFAULT nextval('"ob-poc".phrase_blocklist_id_seq'::regclass);
+
+
+--
+-- Name: phrase_observation_state id; Type: DEFAULT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".phrase_observation_state ALTER COLUMN id SET DEFAULT nextval('"ob-poc".phrase_observation_state_id_seq'::regclass);
 
 
 --
@@ -24200,11 +24354,27 @@ ALTER TABLE ONLY "ob-poc".person_pep_status
 
 
 --
+-- Name: phrase_bank phrase_bank_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".phrase_bank
+    ADD CONSTRAINT phrase_bank_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: phrase_blocklist phrase_blocklist_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
 ALTER TABLE ONLY "ob-poc".phrase_blocklist
     ADD CONSTRAINT phrase_blocklist_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: phrase_observation_state phrase_observation_state_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".phrase_observation_state
+    ADD CONSTRAINT phrase_observation_state_pkey PRIMARY KEY (id);
 
 
 --
@@ -29567,6 +29737,20 @@ CREATE INDEX idx_persons_search_name_trgm ON "ob-poc".entity_proper_persons USIN
 
 
 --
+-- Name: idx_phrase_bank_active_unique; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_phrase_bank_active_unique ON "ob-poc".phrase_bank USING btree (phrase, COALESCE(workspace, '__global__'::text)) WHERE (active = true);
+
+
+--
+-- Name: idx_phrase_bank_lookup; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_phrase_bank_lookup ON "ob-poc".phrase_bank USING btree (phrase, workspace) WHERE (active = true);
+
+
+--
 -- Name: idx_phrase_blocklist_embedding; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -32035,6 +32219,13 @@ CREATE TRIGGER trigger_update_attribute_registry_timestamp BEFORE UPDATE ON "ob-
 --
 
 CREATE TRIGGER trg_materialize_attribute_def AFTER INSERT ON sem_reg.snapshots FOR EACH ROW EXECUTE FUNCTION sem_reg.materialize_attribute_def_to_registry();
+
+
+--
+-- Name: snapshots trg_materialize_phrase_mapping; Type: TRIGGER; Schema: sem_reg; Owner: -
+--
+
+CREATE TRIGGER trg_materialize_phrase_mapping AFTER INSERT ON sem_reg.snapshots FOR EACH ROW EXECUTE FUNCTION sem_reg.materialize_phrase_mapping_to_bank();
 
 
 --
@@ -35190,6 +35381,14 @@ ALTER TABLE ONLY "ob-poc".person_pep_status
 
 
 --
+-- Name: phrase_bank phrase_bank_supersedes_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".phrase_bank
+    ADD CONSTRAINT phrase_bank_supersedes_id_fkey FOREIGN KEY (supersedes_id) REFERENCES "ob-poc".phrase_bank(id);
+
+
+--
 -- Name: product_services product_services_product_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -36369,5 +36568,5 @@ ALTER TABLE ONLY sem_reg_authoring.validation_reports
 -- PostgreSQL database dump complete
 --
 
-\unrestrict QFgJAWIQUwepbwGfVBRaWlc92EeIrTufvvgOz459FJRNLQ59YicvMtLBWCaevTU
+\unrestrict fBSdEBeJCrqgqDKhPnGndkl6WAANsDpCZCr0yu9mSMOHHwDMU73drsTsVCnHvgM
 

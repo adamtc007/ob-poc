@@ -4,9 +4,9 @@
 > **Frontend:** React/TypeScript (`ob-poc-ui-react/`) — Chat UI with scope panel, Inspector, Semantic OS Tab
 > **Backend:** Rust/Axum (`rust/crates/ob-poc-web/`) — Serves React + REST API
 > **Crates:** 22 active Rust crates (16 ob-poc + 6 sem_os_*)
-> **Verbs:** 1,433 canonical verbs, 23,700 intent patterns (DB-sourced)
+> **Verbs:** 1,442 canonical verbs, 24,075 intent patterns (DB-sourced)
 > **MCP Tools:** ~102 tools (DSL, verbs, learning, session, batch, research, taxonomy, sem_reg, stewardship, db_introspect, session_verb_surface)
-> **Latest schema addition:** `rust/migrations/20260328_semos_attribute_materialization.sql`
+> **Latest schema addition:** `rust/migrations/20260329_phrase_bank_materialization.sql`
 > **Workspaces:** 7 (CBU, KYC, Deal, OnBoarding, ProductMaintenance, InstrumentMatrix, SemOsMaintenance)
 > **Schema Overview:** `migrations/OB_POC_SCHEMA_ENTITY_OVERVIEW.md`
 > **Embeddings:** Candle local (384-dim, BGE-small-en-v1.5) — 15,940 patterns vectorized
@@ -105,8 +105,9 @@ SemOS Maintenance workspace (2026-03-28):
 - 4 governance scenarios (Tier -2A): compound intent resolution for SemOS maintenance utterances
 - New verbs: `service-resource.check-attribute-gaps`, `service-resource.sync-definitions`, `typed-attribute.record/get/list-for-entity`, `derivation.recompute-stale`, `attribute.bridge-to-semos`
 - Verb search: 6 phrasing detection improvements (domain_filter bypass for semantic/macro/scenario/learned tiers, short query threshold scaling, multi-domain pack dominant_domain suppression, noun index for new domains)
-- Utterance test harness: 235 test cases across all 7 workspaces, per-workspace hit rate reporting
-- Hit rates: 63.8% first-attempt, 86.4% two-attempt (all workspaces above 30%)
+- Utterance test harness: 271 test cases across all 7 workspaces, per-workspace hit rate reporting
+- Hit rates: 62.4% first-attempt, 84.5% two-attempt (all workspaces above 30%)
+- Governed phrase authoring (v1.2): `phrase_bank` table (13,570 entries), `phrase_mapping` SemOS object type, `phrase_authoring_lifecycle` state machine (8 states), 9 phrase.* verbs (observe-misses, coverage-report, check-collisions, propose, batch-propose, review-proposals, approve, reject, defer), AI proposal pipeline with 5-signal confidence scoring + risk-tiered approval routing
 - `cargo clippy` clean across entire codebase
 
 ---

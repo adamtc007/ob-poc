@@ -136,7 +136,20 @@ SemOS Maintenance workspace + session lifecycle (2026-03-28):
 - Multi-domain packs (>3 distinct domains) derive no `dominant_domain`, preventing cross-domain suppression
 - Noun index expanded with 4 new domain entries: service-resource-def, derived-attribute, typed-attribute-value, governance-changeset
 - 235 workspace-tagged utterance test cases across all 7 workspaces with per-workspace hit rate reporting
-- Results: 63.8% first-attempt, 86.4% two-attempt, all workspaces above 30%, zero regressions
+- Results: 62.4% first-attempt, 84.5% two-attempt, all workspaces above 30%, zero regressions
+
+### Governed Phrase Authoring (2026-03-28)
+
+SemOS-governed phrase feedback loop — AI observes session utterance misses, proposes context-grounded phrase additions, validates against the phrase bank for collisions, and submits through SemOS governance for human review.
+
+- `phrase_bank` table: 13,570 active entries (32 legacy + 13,538 YAML), sole materialization target
+- `phrase_mapping` SemOS object type with `phrase_authoring_lifecycle` state machine (8 states: proposed → collision_checked → quality_checked → reviewed → published | rejected, with refined backward arc and deferred parking state)
+- Materialization trigger: SemOS phrase_mapping publish → auto-writes to `phrase_bank`
+- Tier 0 lookup: `phrase_bank` first (workspace-qualified, precedence-ordered: governed > legacy > yaml, workspace-specific > global), falls through to `dsl_verbs.yaml_intent_patterns` if no match
+- 9 phrase.* verbs: observe-misses, coverage-report, check-collisions, propose, batch-propose, review-proposals, approve, reject, defer
+- AI proposal pipeline: 5-signal confidence scoring (frequency, breadth, collision_safety, rephrase_confirmation, wrong_match_severity), risk-tiered approval routing (critical/elevated/standard)
+- `phrase_authoring` slot in `registry.stewardship` constellation with verb gates
+- Spec: `docs/todo/GOVERNED_PHRASE_AUTHORING_v1.0.md` (v1.2)
 
 ### Attribute DSL + Phase 4 Schema State (2026-03-24)
 
