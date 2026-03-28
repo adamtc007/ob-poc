@@ -4,7 +4,7 @@
 > **Frontend:** React/TypeScript (`ob-poc-ui-react/`) — Chat UI with scope panel, Inspector, Semantic OS Tab
 > **Backend:** Rust/Axum (`rust/crates/ob-poc-web/`) — Serves React + REST API
 > **Crates:** 22 active Rust crates (16 ob-poc + 6 sem_os_*)
-> **Verbs:** 1,270+ canonical verbs, 15,940 intent patterns (DB-sourced)
+> **Verbs:** 1,433 canonical verbs, 23,700 intent patterns (DB-sourced)
 > **MCP Tools:** ~102 tools (DSL, verbs, learning, session, batch, research, taxonomy, sem_reg, stewardship, db_introspect, session_verb_surface)
 > **Latest schema addition:** `rust/migrations/20260328_semos_attribute_materialization.sql`
 > **Workspaces:** 7 (CBU, KYC, Deal, OnBoarding, ProductMaintenance, InstrumentMatrix, SemOsMaintenance)
@@ -104,7 +104,10 @@ SemOS Maintenance workspace (2026-03-28):
 - 4 governance macros (Tier -2B): `governance.bootstrap-attribute-registry`, `governance.define-service-dictionary`, `governance.full-publish-pipeline`, `governance.reconcile-registry`
 - 4 governance scenarios (Tier -2A): compound intent resolution for SemOS maintenance utterances
 - New verbs: `service-resource.check-attribute-gaps`, `service-resource.sync-definitions`, `typed-attribute.record/get/list-for-entity`, `derivation.recompute-stale`, `attribute.bridge-to-semos`
-- Verb search fix: exact invocation phrase matches bypass domain_filter and always run (not suppressed by ECIR)
+- Verb search: 6 phrasing detection improvements (domain_filter bypass for semantic/macro/scenario/learned tiers, short query threshold scaling, multi-domain pack dominant_domain suppression, noun index for new domains)
+- Utterance test harness: 235 test cases across all 7 workspaces, per-workspace hit rate reporting
+- Hit rates: 63.8% first-attempt, 86.4% two-attempt (all workspaces above 30%)
+- `cargo clippy` clean across entire codebase
 
 ---
 

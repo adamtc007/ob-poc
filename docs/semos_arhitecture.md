@@ -128,11 +128,21 @@ SemOS Maintenance workspace + session lifecycle (2026-03-28):
 - Verb search fix: exact invocation phrase matches bypass domain_filter and always run — ECIR candidates from a different domain no longer suppress exact matches for the user's actual intent
 - Infrastructure scope bypass in verb surface domain filter: all domains available without client group restriction
 
+### Utterance Phrasing Detection (2026-03-28)
+
+6 improvements to the verb search pipeline working in concert:
+- Semantic search, MacroIndex, ScenarioIndex, and learned phrase results bypass `domain_filter` — pack scoring (boost/penalty) handles relevance instead of hard domain prefix filtering
+- `fallback_threshold` scales by query word count: 1-2 words → 0.40, 3-4 words → 0.45, 5+ words → 0.55 (BGE asymmetric prefix compensation)
+- Multi-domain packs (>3 distinct domains) derive no `dominant_domain`, preventing cross-domain suppression
+- Noun index expanded with 4 new domain entries: service-resource-def, derived-attribute, typed-attribute-value, governance-changeset
+- 235 workspace-tagged utterance test cases across all 7 workspaces with per-workspace hit rate reporting
+- Results: 63.8% first-attempt, 86.4% two-attempt, all workspaces above 30%, zero regressions
+
 ### Attribute DSL + Phase 4 Schema State (2026-03-24)
 
 The attribute-management DSL and the final reconciliation schema pass are now live in code:
 
-- `attribute.define` dual-writes the operational registry and governed `attribute_def` snapshots
+- `attribute.define` publishes SemOS snapshot FIRST, then materializes to store via `materialize_to_store()`
 - `attribute.define-derived` publishes coupled `attribute_def` + `derivation_spec` snapshots
 - `attribute.set-evidence-grade`, `attribute.deprecate`, and `attribute.inspect` are wired through the same governed path
 - attribute seed macros are authored through the SemOS macro surface rather than legacy JSON packs

@@ -430,7 +430,7 @@ async fn prepare_turn_context(
         has_group_scope,
         is_infrastructure_scope: ctx.scope.as_ref()
             .and_then(|s| s.client_group_id)
-            .map_or(false, |id| id == uuid::Uuid::nil()),
+            .is_some_and(|id| id == uuid::Uuid::nil()),
         composite_state: composite_state.as_ref(),
     };
     let surface = compute_session_verb_surface(&surface_ctx);
@@ -1587,7 +1587,7 @@ pub async fn legacy_handle_utterance(
         has_group_scope: has_group_scope_2,
         is_infrastructure_scope: ctx.scope.as_ref()
             .and_then(|s| s.client_group_id)
-            .map_or(false, |id| id == uuid::Uuid::nil()),
+            .is_some_and(|id| id == uuid::Uuid::nil()),
         composite_state: None, // TODO: load from group composite when available
     };
     let surface = compute_session_verb_surface(&surface_ctx);

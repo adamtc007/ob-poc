@@ -1058,6 +1058,7 @@ impl<'a> PopulationEngine<'a> {
             return Ok(None);
         };
 
+        #[allow(clippy::type_complexity)]
         let row: Option<(
             Option<String>,
             Option<rust_decimal::Decimal>,
@@ -1157,9 +1158,7 @@ impl<'a> PopulationEngine<'a> {
         .fetch_one(&mut **tx)
         .await?;
 
-        if exists {
-            Ok(canonical)
-        } else if canonical == "cbu" {
+        if exists || canonical == "cbu" {
             Ok(canonical)
         } else {
             Err(anyhow::anyhow!("Unknown entity_type: {}", entity_type))
