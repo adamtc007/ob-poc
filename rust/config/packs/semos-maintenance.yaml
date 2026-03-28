@@ -62,6 +62,15 @@ allowed_verbs:
   - derivation.recompute-stale
   - service-resource.check-attribute-gaps
   - service-resource.sync-definitions
+  - phrase.observe-misses
+  - phrase.coverage-report
+  - phrase.check-collisions
+  - phrase.propose
+  - phrase.batch-propose
+  - phrase.review-proposals
+  - phrase.approve
+  - phrase.reject
+  - phrase.defer
 
 forbidden_verbs: []
 
@@ -84,6 +93,9 @@ section_layout:
   - title: "Governance"
     verb_prefixes:
       - "governance."
+  - title: "Phrase Authoring"
+    verb_prefixes:
+      - "phrase."
   - title: "Registry"
     verb_prefixes:
       - "registry."

@@ -65,6 +65,7 @@ mod outreach_plan_ops;
 mod ownership_ops;
 mod pack_ops;
 mod partnership_ops;
+mod phrase_ops;
 mod refdata_loader;
 mod refdata_ops;
 mod regulatory_ops;
