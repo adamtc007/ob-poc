@@ -121,6 +121,115 @@ Phrase active → next utterance match improves
 - State machine: `proposed → collision_checked → reviewed → published | rejected`
 - Verb gates: propose (always), check-collisions (after propose), publish (after review)
 
+## AI Pre-Processing Phase — The Suggestions Pipeline
+
+This is the critical differentiator. Phrase proposals don't come from humans typing random suggestions. They come from **AI analysis of session history** — the agent trawls accumulated session traces, identifies patterns in misses, and offers grounded proposals to the human-in-the-loop.
+
+### Why AI, not human
+
+Humans can't:
+- Remember 24,025 existing phrases to avoid collisions
+- Hold 7 workspaces × 17 state machines × 1,433 verbs in their head simultaneously
+- Spot that "close it out" failed in KYC workspace at review state but would succeed at assessment state
+- Notice that 12 users typed "pull the cap table" last week but it matched `capital.cap-table` instead of `capital.list-shareholders`
+- See that a phrase works in Deal workspace but shadows a better verb in OnBoarding workspace
+
+The agent CAN do all of this because it has:
+- Full session trace history (append-only mutation log per session)
+- Stack machine state at each utterance (workspace, pack, constellation, entity state)
+- The complete phrase bank for collision checking
+- Cross-session pattern aggregation
+
+### The pipeline
+
+```
+Phase 1: OBSERVE
+  Agent trawls session traces (session_traces table)
+  Identifies utterance misses:
+    - NoMatch outcomes (user utterance → nothing matched)
+    - Wrong verb matches (user rejected the proposal)
+    - Clarification cycles (2+ turns to resolve one intent)
+  Captures full context at each miss:
+    - session_id, timestamp
+    - workspace, pack, constellation_family
+    - entity_type, entity_state (from stack machine)
+    - utterance text
+    - what was matched (if anything), what was expected (if known)
+    - what the user did next (accepted, rejected, rephrased)
+
+Phase 2: ANALYSE
+  Agent groups misses by pattern:
+    - Same utterance across multiple sessions → high-confidence proposal
+    - Similar utterances (semantic clustering) → phrase family proposal
+    - State-specific misses → context-gated phrase proposal
+  Agent checks each candidate against:
+    - Existing phrase bank (collision detection)
+    - Verb contract definition (is the target verb valid for this context?)
+    - Constellation state machine (is this verb available in this state?)
+    - Pack allowed_verbs (is this verb in the pack the user was in?)
+
+Phase 3: PROPOSE
+  Agent generates structured proposals:
+    {
+      phrase: "close it out",
+      target_verb: "kyc-case.close",
+      context: {
+        workspace: "kyc",
+        constellation_state: "review",
+        entity_type: "case",
+        pack: "kyc-case"
+      },
+      evidence: {
+        miss_count: 7,
+        sessions: ["abc123", "def456", ...],
+        rejection_count: 0,
+        rephrase_to: "close the kyc case" (what users typed next)
+      },
+      collision_report: {
+        checked_against: 24025,
+        conflicts: [],
+        nearest_phrase: "close kyc case" (sim: 0.92, same verb — safe)
+      }
+    }
+
+Phase 4: PRESENT TO HIL
+  The SemOS Maintenance workspace shows:
+    - Ranked proposals (by miss frequency × confidence)
+    - Full context for each (workspace, state, entity type)
+    - Collision report
+    - Session evidence (which users hit this, how often)
+  Human reviews:
+    - Approve → changeset → publish
+    - Reject with reason → agent learns what NOT to propose
+    - Modify → human refines the phrase, agent learns the refinement pattern
+
+Phase 5: CLOSE THE LOOP
+  Published phrase → materialized to phrase bank → next session benefits
+  Rejected phrase → agent adjusts future proposals
+  Modified phrase → agent learns human's domain vocabulary preferences
+```
+
+### Session context is non-negotiable
+
+Every proposal MUST carry the session stack context:
+- **Workspace** — which workspace was active when the miss occurred
+- **Pack** — which pack was loaded
+- **Constellation state** — which state machine state was active
+- **Entity type** — what kind of entity was in scope
+- **Stack depth** — was this a nested workspace or top-level
+
+Without this context, proposals are ungrounded — "close it out" could mean anything. WITH context, "close it out" in KYC workspace at review state with a case entity = `kyc-case.close`. That's a valid, safe, governed phrase proposal.
+
+### The SemOS Maintenance workspace as the review surface
+
+The suggestions pipeline presents proposals in the SemOS Maintenance workspace:
+- New verb: `phrase.review-proposals` — lists pending proposals with context
+- New verb: `phrase.approve-proposal` — accepts and publishes
+- New verb: `phrase.reject-proposal` — rejects with reason
+- The constellation's `phrase_authoring` slot gates these verbs
+
+This is the AI proposing, human deciding. The breadth and depth that humans can't maintain is exactly what the AI handles — cross-session pattern recognition, collision detection, context grounding.
+
 ## What NOT to do
 
 - Don't let phrases bypass SemOS — no direct DB writes to invocation_phrases
