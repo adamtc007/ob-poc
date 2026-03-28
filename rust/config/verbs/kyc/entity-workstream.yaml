@@ -9,6 +9,12 @@ domains:
         - "add entity workstream"
         - "add entity to case"
         - "create entity workstream"
+        - "open a workstream for this entity"
+        - "add this person to the KYC case"
+        - "start due diligence on this entity"
+        - "spin up a workstream"
+        - "add an entity to the review"
+        - "this entity needs KYC too"
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -97,6 +103,11 @@ domains:
         - "advance workstream"
         - "change workstream status"
         - "move workstream to"
+        - "push this workstream forward"
+        - "advance to screening phase"
+        - "move to collect"
+        - "progress the entity review"
+        - "bump this workstream along"
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -144,6 +155,11 @@ domains:
         - "block workstream"
         - "hold workstream"
         - "pause workstream"
+        - "put this on hold"
+        - "block this entity's review"
+        - "stop work on this entity"
+        - "freeze this workstream"
+        - "we can't proceed on this entity"
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -186,6 +202,11 @@ domains:
         - "finish workstream"
         - "mark workstream complete"
         - "close workstream"
+        - "this entity is done"
+        - "sign off on this workstream"
+        - "entity review is complete"
+        - "wrap up this entity's due diligence"
+        - "all clear on this workstream"
         metadata:
           tier: intent
           source_of_truth: workflow

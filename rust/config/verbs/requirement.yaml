@@ -18,6 +18,11 @@ domains:
         - add document requirement
         - require document
         - set up document requirement
+        - we need a passport from this entity
+        - add a doc requirement to the checklist
+        - what do we need from this person
+        - require proof of address
+        - set up the evidence checklist
         metadata:
           tier: intent
           source_of_truth: operational
@@ -158,6 +163,11 @@ domains:
         - skip document requirement
         - override document requirement
         - exempt from document
+        - we don't need this doc anymore
+        - waive it they're low risk
+        - skip the passport requirement
+        - grant an exemption for this document
+        - drop this requirement from the checklist
         metadata:
           tier: intent
           source_of_truth: operational
@@ -310,6 +320,10 @@ domains:
         - show requirements for entity
         - list entity requirements
         - what does entity need to provide
+        - what's outstanding for this entity
+        - show the checklist for this person
+        - what documents are pending
+        - entity document tracker
         metadata:
           tier: intent
           source_of_truth: operational
@@ -371,6 +385,12 @@ domains:
         - list unsatisfied requirements
         - what requirements are not met
         - incomplete requirements
+        - what's still outstanding
+        - any requirements missing
+        - what docs are we still waiting for
+        - pending requirements for this workflow
+        - what hasn't been satisfied yet
+        - check if everything is in
         metadata:
           tier: intent
           source_of_truth: operational

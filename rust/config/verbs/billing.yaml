@@ -41,6 +41,11 @@ domains:
           - "initialize fee billing"
           - "set up fee profile"
           - "create new billing configuration"
+          - "set up the fee schedule"
+          - "configure fees for this client"
+          - "link billing to the deal"
+          - "how do we bill this client"
+          - "create the billing setup"
         args:
           - name: deal-id
             type: uuid
@@ -475,6 +480,11 @@ domains:
           - "add billing period"
           - "create new fee period"
           - "start new billing period"
+          - "open a new billing cycle"
+          - "set up this month's billing"
+          - "create the Q1 billing run"
+          - "start the fee calculation period"
+          - "new monthly billing window"
         args:
           - name: profile-id
             type: uuid
@@ -595,6 +605,11 @@ domains:
           - "finalize billing approval"
           - "approve billing for invoice"
           - "grant billing approval"
+          - "sign off on the fees"
+          - "the billing looks right approve it"
+          - "approve these charges"
+          - "fees are correct go ahead"
+          - "green light the billing"
         args:
           - name: period-id
             type: uuid
@@ -633,6 +648,11 @@ domains:
           - "generate billing invoice"
           - "emit invoice for period"
           - "prepare invoice"
+          - "send the invoice"
+          - "bill the client"
+          - "charge the client"
+          - "create the fee invoice"
+          - "raise an invoice for this period"
         args:
           - name: period-id
             type: uuid

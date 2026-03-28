@@ -40,6 +40,12 @@ domains:
           - "start a new commercial deal"
           - "create a deal record"
           - "kick off a new deal"
+          - "new mandate from the client"
+          - "log a new sales opportunity"
+          - "we've got a new prospect"
+          - "start the commercial process"
+          - "new IMA deal"
+          - "create a custody deal"
         args:
           - name: deal-name
             type: string
@@ -306,6 +312,11 @@ domains:
           - "escalate the deal to onboarding"
           - "move deal status to contracted"
           - "update the deal pipeline stage"
+          - "close the deal"
+          - "agree the commercial terms"
+          - "move to contracted"
+          - "kick off onboarding for this deal"
+          - "the deal is signed move it forward"
         args:
           - name: deal-id
             type: uuid
@@ -347,6 +358,12 @@ domains:
           - "cancel deal"
           - "abort deal"
           - "close deal as lost"
+          - "kill this deal"
+          - "deal is dead"
+          - "we lost this one"
+          - "client walked away cancel the deal"
+          - "pull the plug on this deal"
+          - "mark this deal as lost"
         args:
           - name: deal-id
             type: uuid
@@ -659,6 +676,11 @@ domains:
           - "add contract to deal"
           - "link contract to deal"
           - "attach contract"
+          - "sign the IMA"
+          - "link the agreement to this deal"
+          - "contract is signed attach it"
+          - "hook the contract up to the deal"
+          - "associate this MSA with the deal"
         args:
           - name: deal-id
             type: uuid

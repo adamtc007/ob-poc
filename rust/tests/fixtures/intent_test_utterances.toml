@@ -2545,3 +2545,339 @@ alt_verbs = ["trading-profile.ca.set-notification-policy", "trading-profile.ca.e
 category = "natural"
 difficulty = "hard"
 workspace = "instrument_matrix"
+
+# ============================================================================
+# LEFT-FIELD / PRACTITIONER UTTERANCE TESTS (2026-03-28)
+# Tests informal, jargon-heavy, question-form, and abbreviated utterances
+# that practitioners actually use. These test the phrase bank enrichment.
+# ============================================================================
+
+# ── Informal / Conversational ──────────────────────────────────────────────
+
+[[test]]
+utterance = "spin up a new fund"
+expected_verb = "cbu.create"
+alt_verbs = ["fund.create"]
+category = "natural"
+difficulty = "medium"
+workspace = "cbu"
+notes = "Practitioner slang for fund creation"
+
+[[test]]
+utterance = "who owns this thing?"
+expected_verb = "ubo.list-ubos"
+alt_verbs = ["ubo.discover", "ownership.list-owners", "ownership.who-controls"]
+category = "natural"
+difficulty = "hard"
+workspace = "kyc"
+notes = "Informal UBO query"
+
+[[test]]
+utterance = "are we good to go?"
+expected_verb = "readiness.compute"
+alt_verbs = ["trading-profile.validate-go-live-ready"]
+category = "natural"
+difficulty = "hard"
+workspace = "onboarding"
+notes = "Informal readiness check"
+
+[[test]]
+utterance = "close it out"
+expected_verb = "kyc-case.close"
+alt_verbs = ["deal.cancel"]
+category = "natural"
+difficulty = "hard"
+workspace = "kyc"
+notes = "Informal case closure"
+
+[[test]]
+utterance = "kill this deal"
+expected_verb = "deal.cancel"
+category = "natural"
+difficulty = "medium"
+workspace = "deal"
+notes = "Informal deal cancellation"
+
+[[test]]
+utterance = "chase the passport"
+expected_verb = "document.solicit"
+alt_verbs = ["document.chase"]
+category = "natural"
+difficulty = "hard"
+workspace = "kyc"
+notes = "Practitioner slang for document solicitation"
+
+# ── Industry Jargon ────────────────────────────────────────────────────────
+
+[[test]]
+utterance = "run EDD"
+expected_verb = "screening.run"
+alt_verbs = ["screening.sanctions", "screening.pep"]
+category = "natural"
+difficulty = "hard"
+workspace = "kyc"
+notes = "Enhanced Due Diligence abbreviation"
+
+[[test]]
+utterance = "pull the cap table"
+expected_verb = "capital.list-shareholders"
+alt_verbs = ["capital.cap-table"]
+category = "natural"
+difficulty = "medium"
+workspace = "cbu"
+notes = "Capital structure jargon"
+
+[[test]]
+utterance = "what's the LEI?"
+expected_verb = "gleif.search"
+alt_verbs = ["gleif.enrich", "gleif.lookup-lei"]
+category = "natural"
+difficulty = "medium"
+workspace = "kyc"
+notes = "Legal Entity Identifier lookup"
+
+[[test]]
+utterance = "any sanctions hits?"
+expected_verb = "screening.sanctions"
+alt_verbs = ["screening.review-hit"]
+category = "natural"
+difficulty = "medium"
+workspace = "kyc"
+notes = "Sanctions screening result check"
+
+[[test]]
+utterance = "sign the IMA"
+expected_verb = "contract.create"
+alt_verbs = ["contract.subscribe", "deal.add-contract"]
+category = "natural"
+difficulty = "hard"
+workspace = "deal"
+notes = "Investment Management Agreement"
+
+[[test]]
+utterance = "set up the SSIs"
+expected_verb = "trading-profile.add-standing-instruction"
+category = "natural"
+difficulty = "hard"
+workspace = "instrument_matrix"
+notes = "Standing Settlement Instructions"
+
+[[test]]
+utterance = "ISDA terms for this counterparty"
+expected_verb = "trading-profile.add-isda-config"
+alt_verbs = ["trading-profile.add-isda-coverage"]
+category = "natural"
+difficulty = "hard"
+workspace = "instrument_matrix"
+notes = "ISDA Master Agreement configuration"
+
+# ── Question Form ──────────────────────────────────────────────────────────
+
+[[test]]
+utterance = "what's still outstanding?"
+expected_verb = "requirement.unsatisfied"
+alt_verbs = ["attributes.gaps"]
+category = "natural"
+difficulty = "hard"
+workspace = "kyc"
+notes = "Question form for requirement gaps"
+
+[[test]]
+utterance = "who's reviewing this case?"
+expected_verb = "kyc-case.read"
+alt_verbs = ["kyc-case.assign"]
+category = "natural"
+difficulty = "hard"
+workspace = "kyc"
+notes = "Question form for case assignment"
+
+[[test]]
+utterance = "what documents do we need?"
+expected_verb = "document.missing-for-entity"
+alt_verbs = ["requirement.unsatisfied", "document.compute-requirements"]
+category = "natural"
+difficulty = "medium"
+workspace = "kyc"
+notes = "Question form for document requirements"
+
+[[test]]
+utterance = "how many shareholders are there?"
+expected_verb = "capital.list-shareholders"
+alt_verbs = ["investor.list"]
+category = "natural"
+difficulty = "medium"
+workspace = "cbu"
+notes = "Question form for shareholder count"
+
+[[test]]
+utterance = "what's the ownership structure?"
+expected_verb = "ubo.discover"
+alt_verbs = ["ownership.list-owners", "ubo.trace-chains"]
+category = "natural"
+difficulty = "medium"
+workspace = "kyc"
+notes = "Question form for UBO structure"
+
+# ── Abbreviated / Short Form ───────────────────────────────────────────────
+
+[[test]]
+utterance = "PEP check"
+expected_verb = "screening.pep"
+alt_verbs = ["screening.pep-check"]
+category = "direct"
+difficulty = "easy"
+workspace = "kyc"
+notes = "Two-word abbreviated screening"
+
+[[test]]
+utterance = "sanctions scan"
+expected_verb = "screening.sanctions"
+alt_verbs = ["screening.sanctions-check"]
+category = "direct"
+difficulty = "easy"
+workspace = "kyc"
+notes = "Two-word abbreviated screening"
+
+[[test]]
+utterance = "KYC check"
+expected_verb = "kyc-case.create"
+alt_verbs = ["kyc.create-case"]
+category = "natural"
+difficulty = "medium"
+workspace = "kyc"
+notes = "Abbreviated KYC case creation"
+
+[[test]]
+utterance = "doc collection"
+expected_verb = "document.solicit"
+alt_verbs = ["document.compute-requirements"]
+category = "natural"
+difficulty = "hard"
+workspace = "kyc"
+notes = "Abbreviated document solicitation"
+
+[[test]]
+utterance = "LEI lookup"
+expected_verb = "gleif.search"
+alt_verbs = ["gleif.enrich"]
+category = "direct"
+difficulty = "easy"
+workspace = "kyc"
+notes = "Short LEI search"
+
+[[test]]
+utterance = "cap table"
+expected_verb = "capital.list-shareholders"
+alt_verbs = ["capital.cap-table"]
+category = "direct"
+difficulty = "easy"
+workspace = "cbu"
+notes = "Two-word abbreviation"
+
+[[test]]
+utterance = "fee schedule"
+expected_verb = "billing.create-profile"
+alt_verbs = ["billing.get-profile", "deal.create-rate-card"]
+category = "natural"
+difficulty = "hard"
+workspace = "deal"
+notes = "Abbreviated billing reference"
+
+# ── Cross-domain / Contextual ──────────────────────────────────────────────
+
+[[test]]
+utterance = "onboard BlackRock as a new client"
+expected_verb = "deal.create"
+alt_verbs = ["client-group.create", "kyc-case.create"]
+category = "contextual"
+difficulty = "hard"
+workspace = "onboarding"
+notes = "Cross-domain onboarding intent"
+
+[[test]]
+utterance = "set up custody for this fund"
+expected_verb = "cbu.assign-product"
+alt_verbs = ["service-intent.create"]
+category = "natural"
+difficulty = "hard"
+workspace = "cbu"
+notes = "Product assignment in fund context"
+
+[[test]]
+utterance = "process a redemption"
+expected_verb = "capital.redeem"
+alt_verbs = ["investor.redeem", "movement.redeem", "investor.start-redemption"]
+category = "natural"
+difficulty = "medium"
+workspace = "cbu"
+notes = "Capital event processing"
+
+[[test]]
+utterance = "new compartment for the SICAV"
+expected_verb = "fund.create-sub-fund"
+alt_verbs = ["cbu.create", "fund.upsert-compartment"]
+category = "natural"
+difficulty = "medium"
+workspace = "cbu"
+notes = "Luxembourg fund jargon"
+
+[[test]]
+utterance = "amend the contract terms"
+expected_verb = "contract.update"
+alt_verbs = ["contract.amend"]
+category = "natural"
+difficulty = "medium"
+workspace = "deal"
+notes = "Contract modification"
+
+[[test]]
+utterance = "waive the requirement"
+expected_verb = "requirement.waive"
+category = "direct"
+difficulty = "easy"
+workspace = "kyc"
+notes = "Direct requirement waiver"
+
+[[test]]
+utterance = "block this entity from onboarding"
+expected_verb = "entity-workstream.block"
+alt_verbs = ["entity-workstream.update-status"]
+category = "natural"
+difficulty = "medium"
+workspace = "kyc"
+notes = "Entity blocking"
+
+[[test]]
+utterance = "trace the ownership chain"
+expected_verb = "ubo.trace-chains"
+alt_verbs = ["ownership.trace"]
+category = "direct"
+difficulty = "easy"
+workspace = "kyc"
+notes = "Direct UBO chain trace"
+
+[[test]]
+utterance = "import the GLEIF hierarchy"
+expected_verb = "gleif.import-tree"
+category = "direct"
+difficulty = "easy"
+workspace = "kyc"
+notes = "Direct GLEIF import"
+
+[[test]]
+utterance = "issue new shares"
+expected_verb = "capital.issue-shares"
+alt_verbs = ["capital.issue", "capital.issue.new"]
+category = "direct"
+difficulty = "easy"
+workspace = "cbu"
+notes = "Capital action"
+
+[[test]]
+utterance = "dividend distribution"
+expected_verb = "capital.distribute"
+alt_verbs = ["capital.distribute-dividend", "capital.distribute-dividends"]
+category = "natural"
+difficulty = "medium"
+workspace = "cbu"
+notes = "Capital distribution"

@@ -21,6 +21,13 @@ domains:
           - "open a new client KYC case"
           - "create client KYC case"
           - "new KYC case for client"
+          - "open a case for this client"
+          - "kick off the KYC"
+          - "start the CDD process"
+          - "spin up a new KYC case"
+          - "we need to KYC this client"
+          - "onboard this client start the KYC"
+          - "fast-track this case setup"
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -123,6 +130,12 @@ domains:
           - "update kyc case status"
           - "change kyc status"
           - "move case forward"
+          - "push the case to the next stage"
+          - "bump the case status"
+          - "where should this case go next"
+          - "progress this case"
+          - "advance to discovery"
+          - "move it along"
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -175,6 +188,12 @@ domains:
           - "flag case for escalation"
           - "refer case to senior"
           - "raise kyc escalation"
+          - "this needs senior sign-off"
+          - "get a second pair of eyes on this"
+          - "refer this to the MLRO"
+          - "this case needs to go upstairs"
+          - "flag for compliance review"
+          - "escalate to the head of KYC"
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -225,6 +244,12 @@ domains:
           - "assign reviewer to case"
           - "hand off case to"
           - "transfer case to"
+          - "who's reviewing this case"
+          - "give this case to"
+          - "pass this case over to"
+          - "put this on someone else's desk"
+          - "change the analyst on this case"
+          - "who's got this case"
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -286,6 +311,12 @@ domains:
           - "mark case as high risk"
           - "set risk classification"
           - "assign kyc risk rating"
+          - "flag this as high risk"
+          - "what's the risk rating on this"
+          - "tag this client as medium risk"
+          - "this is a PEP mark it high risk"
+          - "downgrade the risk to low"
+          - "bump the risk rating up"
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -337,6 +368,13 @@ domains:
           - "finish case"
           - "resolve case"
           - "mark case closed"
+          - "close out the KYC"
+          - "sign off on this case"
+          - "we're done with this case"
+          - "wrap up the KYC review"
+          - "are we good to go on this case"
+          - "KYC is clear close it"
+          - "approve and close the case"
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -390,6 +428,11 @@ domains:
           - "display case information"
           - "show kyc case details"
           - "get case info"
+          - "pull up this KYC case"
+          - "what's the story on this case"
+          - "give me the case summary"
+          - "check on this case"
+          - "where does this case stand"
         metadata:
           tier: reference
           source_of_truth: workflow
@@ -472,6 +515,12 @@ domains:
           - "open case again"
           - "restart kyc review"
           - "trigger periodic review"
+          - "bring this case back"
+          - "we need to redo the KYC"
+          - "client needs re-KYC"
+          - "trigger a refresh review"
+          - "KYC expired reopen it"
+          - "start the periodic KYC refresh"
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -536,6 +585,11 @@ domains:
           - "show case progress"
           - "what is the case state"
           - "get case overview with workstreams"
+          - "how's this case looking overall"
+          - "give me the full picture on this case"
+          - "what's outstanding on this case"
+          - "case dashboard"
+          - "where are we on each workstream"
         metadata:
           tier: intent
           source_of_truth: workflow

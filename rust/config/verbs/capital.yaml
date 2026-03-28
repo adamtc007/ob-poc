@@ -22,6 +22,10 @@ domains:
         - "create equity class"
         - "set up share class"
         - "register share class"
+        - "set up a new class of shares"
+        - "add an institutional share class"
+        - "create a retail share class"
+        - "new class of units"
         metadata:
           tier: intent
           source_of_truth: register
@@ -289,6 +293,10 @@ domains:
         - "additional share issue"
         - "issue more shares"
         - "new share issuance"
+        - "print more shares"
+        - "capital raise"
+        - "do a rights issue"
+        - "allot new shares"
         metadata:
           tier: intent
           source_of_truth: register
@@ -383,6 +391,10 @@ domains:
         - "stock buyback"
         - "repurchase shares"
         - "treasury share purchase"
+        - "buy shares back from investors"
+        - "treasury stock purchase"
+        - "share repurchase program"
+        - "retire some shares"
         metadata:
           tier: intent
           source_of_truth: register
@@ -881,6 +893,9 @@ domains:
         - "get dilution overview"
         - "fully diluted summary"
         - "dilution analysis"
+        - "what's the dilution on this entity"
+        - "how diluted is the cap table"
+        - "show me the option pool impact"
         metadata:
           tier: reference
           source_of_truth: register
@@ -1046,6 +1061,11 @@ domains:
         - "display cap table"
         - "view capitalization"
         - "who owns what shares"
+        - "pull the cap table"
+        - "show me the shareholding breakdown"
+        - "what does the equity structure look like"
+        - "cap table for this entity"
+        - "fully diluted cap table"
         metadata:
           tier: intent
           source_of_truth: register
@@ -1096,6 +1116,11 @@ domains:
         - "who holds shares"
         - "get shareholder list"
         - "display shareholders"
+        - "who are the shareholders"
+        - "pull the shareholder register"
+        - "list the investors"
+        - "who holds shares in this entity"
+        - "shareholder register"
         metadata:
           tier: intent
           source_of_truth: register

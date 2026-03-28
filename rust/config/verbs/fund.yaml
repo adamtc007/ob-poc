@@ -37,6 +37,14 @@ domains:
           - "add another compartment"
           - "launch a new sub-fund"
           - "set up a new fund"
+          - "spin up a fund"
+          - "SICAV setup"
+          - "ICAV launch"
+          - "OEIC creation"
+          - "create a compartment"
+          - "new regulatory wrapper"
+          - "launch a fund vehicle"
+          - "set up a Lux SICAV"
         metadata:
           tier: intent
           source_of_truth: register

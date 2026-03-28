@@ -36,6 +36,12 @@ domains:
           - "add contract"
           - "create legal agreement"
           - "new master service agreement"
+          - "draw up a contract"
+          - "draft the MSA"
+          - "set up the legal agreement"
+          - "create a custody agreement"
+          - "new service agreement for this client"
+          - "sign a new contract"
         args:
           - name: client
             type: string
@@ -88,6 +94,10 @@ domains:
           - "get contract"
           - "show contract"
           - "contract details"
+          - "what's in the contract"
+          - "pull up the agreement"
+          - "show me this contract"
+          - "check the contract terms"
         args:
           - name: contract-id
             type: uuid
@@ -117,6 +127,9 @@ domains:
           - "show contracts"
           - "all contracts"
           - "contracts for client"
+          - "what contracts do we have"
+          - "show all active contracts"
+          - "list the agreements"
         args:
           - name: client
             type: string
@@ -192,6 +205,11 @@ domains:
           - "terminate contract"
           - "end contract"
           - "cancel contract"
+          - "kill the contract"
+          - "terminate the agreement"
+          - "wind down this contract"
+          - "close out the agreement"
+          - "end the MSA"
         args:
           - name: contract-id
             type: uuid
@@ -230,6 +248,10 @@ domains:
           - "assign rate card"
           - "add custody to contract"
           - "add fund admin to contract"
+          - "add a product line to the agreement"
+          - "include TA services in the contract"
+          - "add a new service to this contract"
+          - "bolt on another product"
         args:
           - name: contract-id
             type: uuid
@@ -336,6 +358,10 @@ domains:
           - "create rate card"
           - "new rate card"
           - "add pricing schedule"
+          - "set up a rate card"
+          - "agree the fees"
+          - "create a fee schedule"
+          - "define the pricing"
         args:
           - name: name
             type: string
@@ -409,6 +435,11 @@ domains:
           - "add cbu to contract product"
           - "subscribe to custody"
           - "onboard to fund admin"
+          - "sign up for custody"
+          - "subscribe this CBU to the product"
+          - "add them to the service"
+          - "enroll in fund admin"
+          - "subscription agreement for this CBU"
         args:
           - name: cbu-id
             type: uuid

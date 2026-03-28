@@ -65,6 +65,11 @@ domains:
           - request the CDD documents
           - chase the outstanding documents
           - ask them for their passport
+          - chase the client for the passport
+          - we need proof of address from this entity
+          - send a doc request
+          - ask them for their ID
+          - KYC document request
         metadata:
           tier: intent
           source_of_truth: operational
@@ -837,6 +842,11 @@ domains:
           - this document looks good approve it
           - pass the document through QA
           - the document is fine mark it verified
+          - verify the passport
+          - ID looks good approve it
+          - stamp this document as verified
+          - this doc checks out
+          - QA pass on this document
         metadata:
           tier: intent
           source_of_truth: operational
@@ -879,6 +889,11 @@ domains:
           - reject this document version it has the wrong entity
           - this document has the wrong entity reject it
           - reject this uploaded document
+          - this passport is expired send it back
+          - doc is unreadable reject it
+          - wrong person on this document
+          - kick this back to the client
+          - fail this document
         metadata:
           tier: intent
           source_of_truth: operational
@@ -1099,6 +1114,10 @@ domains:
           - which KYC documents haven't been received yet
           - are there any outstanding document requirements
           - what's still missing from the doc pack
+          - chase the outstanding docs
+          - what do we still need from this client
+          - doc pack status check
+          - any gaps in the document collection
           - show incomplete document requirements for this person
           - what evidence is still needed from this entity
           - list the unfulfilled document requirements

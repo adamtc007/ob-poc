@@ -27,6 +27,12 @@ domains:
           - "set up a Luxembourg fund book"
           - "configure fund structure"
           - "create fund book"
+          - "spin up a new fund"
+          - "register a new client"
+          - "set up a new custody client"
+          - "onboard a new entity"
+          - "create a new onboarding unit for this fund"
+          - "new client setup"
         behavior: plugin
         handler: CbuCreateOp
         metadata:

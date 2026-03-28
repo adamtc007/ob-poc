@@ -18,6 +18,11 @@ domains:
           - "record who owns this entity"
           - "add a beneficial ownership link"
           - "register an ownership relationship"
+          - "this person owns 30% of that company"
+          - "record the shareholding"
+          - "link the owner to this entity"
+          - "set the ownership stake"
+          - "who holds what percentage"
         behavior: crud
         metadata:
           tier: intent
@@ -525,6 +530,12 @@ domains:
           - "what are the ownership stakes"
           - "list all ownership interests"
           - "who has equity in this entity"
+          - "who owns this company"
+          - "pull the ownership structure"
+          - "show me the shareholders"
+          - "who's behind this entity"
+          - "trace the ownership"
+          - "25% threshold check who qualifies"
         behavior: plugin
         metadata:
           tier: diagnostics
@@ -605,6 +616,12 @@ domains:
           - "show the beneficial owners"
           - "list the ultimate beneficial owners"
           - "who are the ultimate owners"
+          - "pull the UBO list"
+          - "find the beneficial owners"
+          - "who are the natural persons behind this"
+          - "UBO determination for this CBU"
+          - "show me the UBO candidates"
+          - "anyone over the 25% threshold"
         behavior: crud
         metadata:
           tier: diagnostics
@@ -729,6 +746,12 @@ domains:
           - "look through the nominee structure"
           - "nominee structure need to pierce the veil"
           - "pierce through nominee to find UBO"
+          - "who's really behind this"
+          - "trace ownership to the natural persons"
+          - "follow the chain to the top"
+          - "look through the shell companies"
+          - "pull the UBO tree"
+          - "unwind the ownership structure"
         metadata:
           tier: intent
           source_of_truth: operational
@@ -795,6 +818,11 @@ domains:
           - "compute beneficial ownership chains"
           - "run chain computation"
           - "find UBO chains for case"
+          - "work out who the UBOs are"
+          - "run the ownership computation"
+          - "compute the beneficial ownership for this case"
+          - "figure out the UBO structure"
+          - "run the chain analysis"
         behavior: plugin
         metadata:
           tier: intent

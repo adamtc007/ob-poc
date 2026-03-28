@@ -24,6 +24,10 @@ domains:
           - "get LEI data"
           - "fetch LEI record"
           - "import from GLEIF"
+          - "pull the LEI data"
+          - "enrich this entity from LEI"
+          - "get the GLEIF record for this company"
+          - "look up and import LEI data"
         behavior: plugin
         metadata:
           tier: intent
@@ -65,6 +69,12 @@ domains:
           - "find in GLEIF"
           - "look up LEI"
           - "search for entity"
+          - "what's the LEI"
+          - "look up the LEI number"
+          - "find this company in GLEIF"
+          - "LEI search"
+          - "check the LEI database"
+          - "search GLEIF by name"
         behavior: plugin
         metadata:
           tier: diagnostics
@@ -117,6 +127,11 @@ domains:
           - "get parent chain from GLEIF"
           - "load corporate structure"
           - "import ownership tree"
+          - "pull the corporate hierarchy"
+          - "import the group structure from GLEIF"
+          - "get the parent chain"
+          - "load the subsidiary tree"
+          - "GLEIF hierarchy import"
         behavior: plugin
         metadata:
           tier: intent
@@ -350,6 +365,10 @@ domains:
           - "find ultimate parent"
           - "who owns this ultimately"
           - "trace to UBO"
+          - "who owns this company ultimately"
+          - "follow the ownership chain via GLEIF"
+          - "trace up to the ultimate parent"
+          - "find the top of the corporate tree"
         behavior: plugin
         metadata:
           tier: diagnostics
