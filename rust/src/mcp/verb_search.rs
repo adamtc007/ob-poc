@@ -949,9 +949,45 @@ impl HybridVerbSearcher {
             }
         }
 
+        // 2.4 Governed phrase_bank lookup (highest precedence exact match).
+        // Workspace-qualified, precedence-ordered per §4.5.2.
+        // Falls through to dsl_verbs if no match.
+        if let Some(ref verb_service) = self.verb_service {
+            let allowed_vec =
+                allowed_verbs.map(|verbs| verbs.iter().cloned().collect::<Vec<String>>());
+            // TODO: pass workspace from MatchContext when available
+            let workspace: Option<&str> = None;
+            match verb_service
+                .find_phrase_bank_exact(&normalized, workspace, allowed_vec.as_deref())
+                .await
+            {
+                Ok(Some(matched)) => {
+                    if !seen_verbs.contains(&matched.verb) {
+                        let description = self.get_verb_description(&matched.verb).await;
+                        seen_verbs.insert(matched.verb.clone());
+                        results.push(VerbSearchResult {
+                            verb: matched.verb,
+                            score: 1.0,
+                            source: VerbSearchSource::GlobalLearned,
+                            matched_phrase: matched.phrase,
+                            description,
+                            journey: None,
+                        });
+                        tracing::debug!(
+                            query = %normalized,
+                            "VerbSearch: phrase_bank exact match"
+                        );
+                    }
+                }
+                Ok(None) => {}
+                Err(e) => {
+                    tracing::warn!(error = %e, "VerbSearch: phrase_bank lookup failed");
+                }
+            }
+        }
+
         // 2.5 Exact pattern match from dsl_verbs arrays (yaml_intent_patterns + intent_patterns).
-        // This enables deterministic phrase matching immediately after YAML sync,
-        // without requiring a populate_embeddings run.
+        // Fallback for phrases not yet migrated to phrase_bank.
         // Always runs — ECIR results from a different domain must not suppress
         // exact matches for the user's actual intent.
         if let Some(ref verb_service) = self.verb_service {

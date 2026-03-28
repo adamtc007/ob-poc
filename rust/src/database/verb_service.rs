@@ -318,6 +318,84 @@ impl VerbService {
             .collect())
     }
 
+    /// Look up a phrase in the governed phrase_bank (Tier 0, highest precedence).
+    ///
+    /// Workspace-qualified with precedence ordering:
+    /// 1. Workspace-specific governed phrases
+    /// 2. Workspace-specific legacy/yaml phrases
+    /// 3. Global governed phrases
+    /// 4. Global legacy/yaml phrases
+    pub async fn find_phrase_bank_exact(
+        &self,
+        phrase: &str,
+        workspace: Option<&str>,
+        allowed_verbs: Option<&[String]>,
+    ) -> Result<Option<SemanticMatch>, sqlx::Error> {
+        let normalized = phrase.trim().to_lowercase();
+        if normalized.is_empty() {
+            return Ok(None);
+        }
+
+        let row = if let Some(allowed) = allowed_verbs {
+            if allowed.is_empty() {
+                return Ok(None);
+            }
+            sqlx::query_as::<_, ExactPatternRow>(
+                r#"
+                SELECT phrase, verb_fqn AS verb
+                FROM "ob-poc".phrase_bank
+                WHERE phrase = $1
+                  AND active = TRUE
+                  AND verb_fqn = ANY($3)
+                  AND (workspace IS NULL OR workspace = $2)
+                ORDER BY
+                    CASE WHEN workspace IS NOT NULL THEN 0 ELSE 1 END,
+                    CASE source
+                        WHEN 'governed' THEN 0
+                        WHEN 'legacy'   THEN 1
+                        WHEN 'yaml'     THEN 2
+                    END
+                LIMIT 1
+                "#,
+            )
+            .bind(&normalized)
+            .bind(workspace)
+            .bind(allowed)
+            .fetch_optional(&self.pool)
+            .await?
+        } else {
+            sqlx::query_as::<_, ExactPatternRow>(
+                r#"
+                SELECT phrase, verb_fqn AS verb
+                FROM "ob-poc".phrase_bank
+                WHERE phrase = $1
+                  AND active = TRUE
+                  AND (workspace IS NULL OR workspace = $2)
+                ORDER BY
+                    CASE WHEN workspace IS NOT NULL THEN 0 ELSE 1 END,
+                    CASE source
+                        WHEN 'governed' THEN 0
+                        WHEN 'legacy'   THEN 1
+                        WHEN 'yaml'     THEN 2
+                    END
+                LIMIT 1
+                "#,
+            )
+            .bind(&normalized)
+            .bind(workspace)
+            .fetch_optional(&self.pool)
+            .await?
+        };
+
+        Ok(row.map(|r| SemanticMatch {
+            phrase: r.phrase,
+            verb: r.verb,
+            similarity: 1.0,
+            confidence: None,
+            category: Some("phrase_bank".to_string()),
+        }))
+    }
+
     /// Find global learned phrase by semantic similarity
     pub async fn find_global_learned_semantic(
         &self,
