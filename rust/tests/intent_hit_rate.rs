@@ -58,6 +58,9 @@ struct TestCase {
     expected_scenario_id: Option<String>,
     #[serde(default)]
     expected_route_target: Option<String>,
+    // Workspace tag for per-workspace reporting
+    #[serde(default)]
+    workspace: Option<String>,
 }
 
 // ============================================================================
@@ -271,6 +274,7 @@ mod tests {
         print_tier2_report(&results);
         print_category_breakdown(&results);
         print_difficulty_breakdown(&results);
+        print_workspace_breakdown(&results);
         print_domain_breakdown(&results);
         print_failures(&results);
         print_latency_stats(&results);
@@ -1077,6 +1081,54 @@ fn print_difficulty_breakdown(results: &[TestResult]) {
             two,
             subset.len(),
             two as f64 / subset.len() as f64 * 100.0,
+        );
+    }
+    println!();
+}
+
+fn print_workspace_breakdown(results: &[TestResult]) {
+    // ── Per-workspace report ──
+    let workspace_results: HashMap<String, Vec<&TestResult>> = {
+        let mut map: HashMap<String, Vec<&TestResult>> = HashMap::new();
+        for r in results {
+            let ws = r
+                .case
+                .workspace
+                .clone()
+                .unwrap_or_else(|| "untagged".to_string());
+            map.entry(ws).or_default().push(r);
+        }
+        map
+    };
+
+    println!("\n══════════════════════════════════════════");
+    println!("  Per-Workspace Hit Rates");
+    println!("══════════════════════════════════════════");
+    let mut ws_entries: Vec<_> = workspace_results.iter().collect();
+    ws_entries.sort_by_key(|(k, _)| k.to_string());
+    for (workspace, ws_results) in &ws_entries {
+        let total = ws_results.len();
+        let hits = ws_results
+            .iter()
+            .filter(|r| matches!(r.outcome, Outcome::Hit))
+            .count();
+        let hit_or_clar = ws_results
+            .iter()
+            .filter(|r| matches!(r.outcome, Outcome::Hit | Outcome::HitWithClarification))
+            .count();
+        let pct = if total > 0 {
+            (hits as f64 / total as f64) * 100.0
+        } else {
+            0.0
+        };
+        let pct2 = if total > 0 {
+            (hit_or_clar as f64 / total as f64) * 100.0
+        } else {
+            0.0
+        };
+        let status = if pct >= 30.0 { "✓" } else { "⚠" };
+        println!(
+            "  {status} {workspace:30} {hits:3}/{total:3} ({pct:5.1}%)  two-attempt: {hit_or_clar}/{total} ({pct2:.1}%)"
         );
     }
     println!();

@@ -2003,3 +2003,543 @@ expected_scenario_id = "kyc-case-documents"
 expected_route_target = "kyc-case.create"
 notes = "Alternative phrasing for case + document collection"
 ecir_path = "fallthrough"
+
+# ============================================================================
+# WORKSPACE-TAGGED UTTERANCE TESTS (2026-03-28)
+# Covers all 7 workspaces with realistic utterances for per-workspace
+# hit rate reporting and data gap detection.
+# ============================================================================
+
+# ── SemOS Maintenance ──────────────────────────────────────────────────────
+
+[[test]]
+utterance = "check attribute gaps"
+expected_verb = "service-resource.check-attribute-gaps"
+category = "direct"
+difficulty = "easy"
+workspace = "semos_maintenance"
+notes = "Exact invocation phrase match"
+
+[[test]]
+utterance = "what attributes are missing from SRDEFs"
+expected_verb = "service-resource.check-attribute-gaps"
+category = "natural"
+difficulty = "medium"
+workspace = "semos_maintenance"
+
+[[test]]
+utterance = "sync service resource definitions"
+expected_verb = "service-resource.sync-definitions"
+category = "direct"
+difficulty = "easy"
+workspace = "semos_maintenance"
+
+[[test]]
+utterance = "reload SRDEF configuration"
+expected_verb = "service-resource.sync-definitions"
+category = "natural"
+difficulty = "medium"
+workspace = "semos_maintenance"
+
+[[test]]
+utterance = "bridge ungoverned attributes to semos"
+expected_verb = "attribute.bridge-to-semos"
+category = "direct"
+difficulty = "easy"
+workspace = "semos_maintenance"
+
+[[test]]
+utterance = "govern existing attributes in semantic os"
+expected_verb = "attribute.bridge-to-semos"
+category = "natural"
+difficulty = "medium"
+workspace = "semos_maintenance"
+
+[[test]]
+utterance = "recompute stale derived values"
+expected_verb = "derivation.recompute-stale"
+category = "direct"
+difficulty = "easy"
+workspace = "semos_maintenance"
+
+[[test]]
+utterance = "refresh derived attributes"
+expected_verb = "derivation.recompute-stale"
+category = "natural"
+difficulty = "medium"
+workspace = "semos_maintenance"
+
+[[test]]
+utterance = "define a new attribute for KYC risk"
+expected_verb = "attribute.define"
+category = "natural"
+difficulty = "medium"
+workspace = "semos_maintenance"
+
+[[test]]
+utterance = "record typed attribute value"
+expected_verb = "typed-attribute.record"
+category = "direct"
+difficulty = "easy"
+workspace = "semos_maintenance"
+
+[[test]]
+utterance = "list typed attributes for entity"
+expected_verb = "typed-attribute.list-for-entity"
+category = "direct"
+difficulty = "easy"
+workspace = "semos_maintenance"
+
+[[test]]
+utterance = "compose a changeset"
+expected_verb = "changeset.compose"
+category = "direct"
+difficulty = "easy"
+workspace = "semos_maintenance"
+
+[[test]]
+utterance = "publish registry changes"
+expected_verb = "governance.publish"
+category = "natural"
+difficulty = "medium"
+workspace = "semos_maintenance"
+
+[[test]]
+utterance = "dry run the changeset"
+expected_verb = "governance.dry-run"
+category = "natural"
+difficulty = "medium"
+workspace = "semos_maintenance"
+
+[[test]]
+utterance = "inspect attribute definition"
+expected_verb = "attribute.inspect"
+category = "direct"
+difficulty = "easy"
+workspace = "semos_maintenance"
+
+# ── Deal ───────────────────────────────────────────────────────────────────
+
+[[test]]
+utterance = "create a new deal"
+expected_verb = "deal.create"
+category = "direct"
+difficulty = "easy"
+workspace = "deal"
+
+[[test]]
+utterance = "start a commercial deal for BlackRock"
+expected_verb = "deal.create"
+category = "natural"
+difficulty = "medium"
+workspace = "deal"
+
+[[test]]
+utterance = "show deal status"
+expected_verb = "deal.read-record"
+category = "natural"
+difficulty = "easy"
+workspace = "deal"
+
+[[test]]
+utterance = "list all active deals"
+expected_verb = "deal.list"
+category = "direct"
+difficulty = "easy"
+workspace = "deal"
+
+[[test]]
+utterance = "create rate card for this deal"
+expected_verb = "deal.create-rate-card"
+category = "natural"
+difficulty = "medium"
+workspace = "deal"
+
+[[test]]
+utterance = "add a contract to the deal"
+expected_verb = "deal.add-contract"
+category = "natural"
+difficulty = "medium"
+workspace = "deal"
+
+[[test]]
+utterance = "negotiate rate card line"
+expected_verb = "deal.update-rate-card-line"
+category = "natural"
+difficulty = "hard"
+workspace = "deal"
+
+[[test]]
+utterance = "activate this deal"
+expected_verb = "deal.activate"
+category = "direct"
+difficulty = "easy"
+workspace = "deal"
+
+[[test]]
+utterance = "request onboarding for this deal"
+expected_verb = "deal.request-onboarding"
+category = "natural"
+difficulty = "medium"
+workspace = "deal"
+
+[[test]]
+utterance = "create billing profile"
+expected_verb = "billing.create-profile"
+category = "natural"
+difficulty = "medium"
+workspace = "deal"
+
+[[test]]
+utterance = "show contract details"
+expected_verb = "contract.read"
+category = "natural"
+difficulty = "easy"
+workspace = "deal"
+
+[[test]]
+utterance = "cancel the deal"
+expected_verb = "deal.cancel"
+category = "direct"
+difficulty = "easy"
+workspace = "deal"
+
+# ── CBU ────────────────────────────────────────────────────────────────────
+
+[[test]]
+utterance = "create a new CBU"
+expected_verb = "cbu.create"
+category = "direct"
+difficulty = "easy"
+workspace = "cbu"
+
+[[test]]
+utterance = "set up a Luxembourg SICAV"
+expected_verb = "cbu.create"
+alt_verbs = ["fund.create-umbrella"]
+category = "natural"
+difficulty = "medium"
+workspace = "cbu"
+
+[[test]]
+utterance = "list all CBUs"
+expected_verb = "cbu.list"
+category = "direct"
+difficulty = "easy"
+workspace = "cbu"
+
+[[test]]
+utterance = "read CBU details"
+expected_verb = "cbu.read"
+category = "direct"
+difficulty = "easy"
+workspace = "cbu"
+
+[[test]]
+utterance = "suspend this CBU"
+expected_verb = "cbu.suspend"
+category = "direct"
+difficulty = "easy"
+workspace = "cbu"
+
+[[test]]
+utterance = "assign custody product to CBU"
+expected_verb = "cbu.assign-product"
+category = "natural"
+difficulty = "medium"
+workspace = "cbu"
+
+[[test]]
+utterance = "add depositary role to entity"
+expected_verb = "cbu.assign-role"
+alt_verbs = ["entity.assign-role"]
+category = "natural"
+difficulty = "hard"
+workspace = "cbu"
+
+[[test]]
+utterance = "create sub-fund"
+expected_verb = "fund.create-sub-fund"
+category = "natural"
+difficulty = "medium"
+workspace = "cbu"
+
+[[test]]
+utterance = "create share class for this fund"
+expected_verb = "fund.create-share-class"
+alt_verbs = ["share-class.create"]
+category = "natural"
+difficulty = "medium"
+workspace = "cbu"
+
+[[test]]
+utterance = "show entity details"
+expected_verb = "entity.read"
+category = "natural"
+difficulty = "easy"
+workspace = "cbu"
+
+[[test]]
+utterance = "create a trading profile"
+expected_verb = "trading-profile.create"
+category = "natural"
+difficulty = "medium"
+workspace = "cbu"
+
+[[test]]
+utterance = "rename the CBU"
+expected_verb = "cbu.rename"
+category = "direct"
+difficulty = "easy"
+workspace = "cbu"
+
+# ── KYC ────────────────────────────────────────────────────────────────────
+
+[[test]]
+utterance = "open a KYC case"
+expected_verb = "kyc-case.create"
+alt_verbs = ["kyc.create-case"]
+category = "direct"
+difficulty = "easy"
+workspace = "kyc"
+
+[[test]]
+utterance = "start KYC review for new client"
+expected_verb = "kyc-case.create"
+alt_verbs = ["kyc.create-case"]
+category = "natural"
+difficulty = "medium"
+workspace = "kyc"
+
+[[test]]
+utterance = "run sanctions screening"
+expected_verb = "screening.sanctions"
+category = "direct"
+difficulty = "easy"
+workspace = "kyc"
+
+[[test]]
+utterance = "check for PEP status"
+expected_verb = "screening.pep"
+category = "natural"
+difficulty = "medium"
+workspace = "kyc"
+
+[[test]]
+utterance = "solicit passport document"
+expected_verb = "document.solicit"
+category = "natural"
+difficulty = "medium"
+workspace = "kyc"
+
+[[test]]
+utterance = "discover UBO structure"
+expected_verb = "ubo.discover"
+category = "natural"
+difficulty = "medium"
+workspace = "kyc"
+
+[[test]]
+utterance = "set risk rating to high"
+expected_verb = "kyc-case.set-risk-rating"
+alt_verbs = ["kyc.set-risk"]
+category = "natural"
+difficulty = "medium"
+workspace = "kyc"
+
+[[test]]
+utterance = "approve KYC case"
+expected_verb = "kyc-case.close"
+alt_verbs = ["kyc.approve-case", "kyc-case.approve"]
+category = "natural"
+difficulty = "medium"
+workspace = "kyc"
+
+[[test]]
+utterance = "list outstanding KYC requirements"
+expected_verb = "requirement.unsatisfied"
+alt_verbs = ["requirement.list"]
+category = "natural"
+difficulty = "hard"
+workspace = "kyc"
+
+[[test]]
+utterance = "create entity workstream"
+expected_verb = "entity-workstream.create"
+category = "natural"
+difficulty = "medium"
+workspace = "kyc"
+
+[[test]]
+utterance = "add identifier to entity"
+expected_verb = "identifier.add"
+category = "natural"
+difficulty = "medium"
+workspace = "kyc"
+
+[[test]]
+utterance = "evaluate tollgate readiness"
+expected_verb = "tollgate.evaluate"
+alt_verbs = ["tollgate.get-decision-readiness"]
+category = "natural"
+difficulty = "hard"
+workspace = "kyc"
+
+# ── Product Maintenance ────────────────────────────────────────────────────
+
+[[test]]
+utterance = "list all products"
+expected_verb = "product.list"
+category = "direct"
+difficulty = "easy"
+workspace = "product_maintenance"
+
+[[test]]
+utterance = "show product details"
+expected_verb = "product.read"
+category = "direct"
+difficulty = "easy"
+workspace = "product_maintenance"
+
+[[test]]
+utterance = "list services for this product"
+expected_verb = "service.list-by-product"
+category = "natural"
+difficulty = "medium"
+workspace = "product_maintenance"
+
+[[test]]
+utterance = "browse service resources"
+expected_verb = "service-resource.list"
+category = "natural"
+difficulty = "medium"
+workspace = "product_maintenance"
+
+[[test]]
+utterance = "show resource attributes"
+expected_verb = "service-resource.list-attributes"
+category = "natural"
+difficulty = "medium"
+workspace = "product_maintenance"
+
+[[test]]
+utterance = "what services does custody provide"
+expected_verb = "service.list-by-product"
+category = "natural"
+difficulty = "hard"
+workspace = "product_maintenance"
+
+[[test]]
+utterance = "check resource attribute requirements"
+expected_verb = "service-resource.validate-attrs"
+category = "natural"
+difficulty = "hard"
+workspace = "product_maintenance"
+
+[[test]]
+utterance = "list all service types"
+expected_verb = "service.list"
+category = "direct"
+difficulty = "easy"
+workspace = "product_maintenance"
+
+# ── OnBoarding ─────────────────────────────────────────────────────────────
+
+[[test]]
+utterance = "request onboarding"
+expected_verb = "deal.request-onboarding"
+category = "direct"
+difficulty = "easy"
+workspace = "onboarding"
+
+[[test]]
+utterance = "submit onboarding handoff"
+expected_verb = "deal.request-onboarding"
+alt_verbs = ["deal.request-onboarding-batch"]
+category = "natural"
+difficulty = "medium"
+workspace = "onboarding"
+
+[[test]]
+utterance = "set up a Luxembourg fund book"
+expected_verb = "cbu.create"
+alt_verbs = ["fund.create-umbrella"]
+category = "natural"
+difficulty = "medium"
+workspace = "onboarding"
+
+[[test]]
+utterance = "configure UCITS SICAV structure"
+expected_verb = "cbu.create"
+alt_verbs = ["fund.create-umbrella"]
+category = "natural"
+difficulty = "hard"
+workspace = "onboarding"
+
+[[test]]
+utterance = "onboard a cross-border hedge fund"
+expected_verb = "cbu.create"
+alt_verbs = ["fund.create-umbrella"]
+category = "natural"
+difficulty = "hard"
+workspace = "onboarding"
+
+[[test]]
+utterance = "handoff deal to operations"
+expected_verb = "deal.request-onboarding"
+category = "natural"
+difficulty = "medium"
+workspace = "onboarding"
+
+[[test]]
+utterance = "open a new client KYC case"
+expected_verb = "kyc-case.create"
+alt_verbs = ["kyc.create-case"]
+category = "natural"
+difficulty = "medium"
+workspace = "onboarding"
+
+# ── Instrument Matrix ──────────────────────────────────────────────────────
+
+[[test]]
+utterance = "show trading matrix"
+expected_verb = "trading-profile.read"
+alt_verbs = ["trading-profile.list"]
+category = "natural"
+difficulty = "medium"
+workspace = "instrument_matrix"
+
+[[test]]
+utterance = "import trading profile"
+expected_verb = "trading-profile.import"
+category = "direct"
+difficulty = "easy"
+workspace = "instrument_matrix"
+
+[[test]]
+utterance = "configure counterparty limits"
+expected_verb = "trading-profile.set-counterparty-limit"
+category = "natural"
+difficulty = "hard"
+workspace = "instrument_matrix"
+
+[[test]]
+utterance = "list instrument classes"
+expected_verb = "instrument-class.list"
+category = "direct"
+difficulty = "easy"
+workspace = "instrument_matrix"
+
+[[test]]
+utterance = "validate go-live readiness"
+expected_verb = "trading-profile.validate-go-live-ready"
+category = "natural"
+difficulty = "hard"
+workspace = "instrument_matrix"
+
+[[test]]
+utterance = "set CA policy for this CBU"
+expected_verb = "trading-profile.set-ca-policy"
+category = "natural"
+difficulty = "hard"
+workspace = "instrument_matrix"
