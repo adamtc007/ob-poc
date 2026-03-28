@@ -90,6 +90,7 @@ pub enum ObjectType {
     EvidenceStrategyDef,
     ObservationDef,
     DerivationSpec,
+    PhraseMapping,
 }
 
 // ── Security label ────────────────────────────────────────────

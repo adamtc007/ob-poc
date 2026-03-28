@@ -51,6 +51,7 @@ pub enum ObjectType {
     DocumentTypeDef,
     ObservationDef,
     DerivationSpec,
+    PhraseMapping,
 }
 
 /// Classification level — mirrors `sem_os_core::types::Classification`.

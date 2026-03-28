@@ -107,6 +107,42 @@ impl SnapshotStore {
         Ok(result.rows_affected())
     }
 
+    // ── Lookup ────────────────────────────────────────────────
+
+    /// Fetch a single snapshot by its primary key (`snapshot_id`).
+    pub async fn get_by_id(pool: &PgPool, snapshot_id: Uuid) -> Result<Option<SnapshotRow>> {
+        let row = sqlx::query_as::<_, PgSnapshotRow>(
+            r#"
+            SELECT
+                snapshot_id,
+                snapshot_set_id,
+                object_type::text AS object_type,
+                object_id,
+                version_major,
+                version_minor,
+                status::text AS status,
+                governance_tier::text AS governance_tier,
+                trust_class::text AS trust_class,
+                security_label,
+                effective_from,
+                effective_until,
+                predecessor_id,
+                change_type::text AS change_type,
+                change_rationale,
+                created_by,
+                approved_by,
+                definition,
+                created_at
+            FROM sem_reg.snapshots
+            WHERE snapshot_id = $1
+            "#,
+        )
+        .bind(snapshot_id)
+        .fetch_optional(pool)
+        .await?;
+        row.map(SnapshotRow::try_from).transpose()
+    }
+
     // ── Resolve ───────────────────────────────────────────────
 
     /// Resolve the currently active snapshot for an object (as of now).

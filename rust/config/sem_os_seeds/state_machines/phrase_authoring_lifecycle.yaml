@@ -1,0 +1,59 @@
+state_machine: phrase_authoring_lifecycle
+description: Phrase proposal lifecycle — from proposal through quality gates to governed publication
+states: [proposed, collision_checked, quality_checked, reviewed, published, rejected, refined, deferred]
+initial: proposed
+transitions:
+  - from: proposed
+    to: collision_checked
+    verbs: [phrase.check-collisions]
+  - from: collision_checked
+    to: quality_checked
+    verbs: [phrase.check-collisions]
+  - from: collision_checked
+    to: deferred
+    verbs: [phrase.defer]
+  - from: quality_checked
+    to: reviewed
+    verbs: [phrase.review-proposals]
+  - from: reviewed
+    to: published
+    verbs: [phrase.approve]
+  - from: reviewed
+    to: rejected
+    verbs: [phrase.reject]
+  - from: reviewed
+    to: refined
+    verbs: [phrase.propose]
+  - from: reviewed
+    to: deferred
+    verbs: [phrase.defer]
+  - from: refined
+    to: collision_checked
+    verbs: [phrase.check-collisions]
+  - from: deferred
+    to: reviewed
+    verbs: [phrase.review-proposals]
+reducer:
+  overlay_sources: {}
+  conditions:
+    has_collision_report:
+      expr: "scope.collision_report_exists = true"
+    quality_gates_passed:
+      expr: "scope.quality_gates_passed = true"
+  rules:
+    - state: published
+      requires: []
+    - state: rejected
+      requires: []
+    - state: deferred
+      requires: []
+    - state: reviewed
+      requires: [has_collision_report, quality_gates_passed]
+    - state: quality_checked
+      requires: [has_collision_report]
+    - state: collision_checked
+      requires: []
+    - state: refined
+      requires: []
+    - state: proposed
+      requires: []

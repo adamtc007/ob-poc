@@ -84,6 +84,23 @@ slots:
       check_gaps: { verb: service-resource.check-attribute-gaps, when: [empty, filled] }
       list: { verb: service-resource.list, when: [empty, filled] }
 
+  phrase_authoring:
+    type: entity
+    entity_kinds: [phrase]
+    cardinality: optional
+    state_machine: phrase_authoring_lifecycle
+    verbs:
+      observe: { verb: phrase.observe-misses, when: [empty, filled] }
+      analyse: { verb: phrase.analyse-candidates, when: filled }
+      propose: { verb: phrase.propose, when: [empty, filled] }
+      batch_propose: { verb: phrase.batch-propose, when: [empty, filled] }
+      check_collisions: { verb: phrase.check-collisions, when: [empty, filled] }
+      review: { verb: phrase.review-proposals, when: filled }
+      approve: { verb: phrase.approve, when: filled }
+      reject: { verb: phrase.reject, when: filled }
+      defer: { verb: phrase.defer, when: filled }
+      coverage: { verb: phrase.coverage-report, when: [empty, filled] }
+
   registry:
     type: entity
     entity_kinds: [registry]

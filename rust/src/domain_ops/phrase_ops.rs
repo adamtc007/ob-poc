@@ -1,11 +1,12 @@
-//! Phrase authoring custom operations (Governed Phrase Authoring — Phases 1+2)
+//! Phrase authoring custom operations (Governed Phrase Authoring — Phases 1-3)
 //!
 //! Operations for phrase observation, coverage analysis, collision checking,
 //! and governed phrase lifecycle (propose/approve/reject/defer).
 //!
 //! Phase 1: Observation infrastructure (observe-misses, coverage-report)
 //! Phase 2: Phrase bank + collision checking (check-collisions)
-//! Phase 3/4: Proposal lifecycle (propose, batch-propose, review, approve, reject, defer) — stubs
+//! Phase 3: Proposal lifecycle (review-proposals, approve, reject, defer)
+//! Phase 4: Batch operations (propose, batch-propose) — stubs
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -16,6 +17,21 @@ use super::{CustomOperation, ExecutionContext, ExecutionResult, VerbCall};
 
 #[cfg(feature = "database")]
 use sqlx::PgPool;
+
+#[cfg(feature = "database")]
+use uuid::Uuid;
+
+#[cfg(feature = "database")]
+use anyhow::anyhow;
+
+#[cfg(feature = "database")]
+use sqlx::{Postgres, Transaction};
+
+#[cfg(feature = "database")]
+use crate::sem_reg::store::SnapshotStore;
+
+#[cfg(feature = "database")]
+use crate::sem_reg::types::{ChangeType, ObjectType, SnapshotMeta, SnapshotStatus};
 
 // ============================================================================
 // Result Types (Type Safety First — CLAUDE.md §1)
@@ -99,6 +115,37 @@ pub struct StubResult {
     pub message: String,
 }
 
+/// Result from phrase approval
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PhraseApproveResult {
+    pub published_snapshot_id: Uuid,
+    pub phrase: String,
+    pub verb_fqn: String,
+    pub status: String,
+}
+
+/// Result from phrase rejection or deferral
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PhraseLifecycleResult {
+    pub snapshot_id: Uuid,
+    pub state: String,
+    pub reason: Option<String>,
+}
+
+/// Summary of a phrase proposal for review listing
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PhraseProposalSummary {
+    pub snapshot_id: Uuid,
+    pub phrase: String,
+    pub verb_fqn: String,
+    pub workspace: Option<String>,
+    pub state: String,
+    pub created_by: String,
+    pub version: String,
+    pub collision_report: Option<serde_json::Value>,
+    pub evidence: Option<serde_json::Value>,
+}
+
 // ============================================================================
 // Helper Functions
 // ============================================================================
@@ -132,6 +179,104 @@ fn get_optional_string(verb_call: &VerbCall, key: &str) -> Option<String> {
         .iter()
         .find(|a| a.key == key)
         .and_then(|a| a.value.as_string().map(|s| s.to_string()))
+}
+
+// ============================================================================
+// SemOS Snapshot Helpers (Phase 3)
+// ============================================================================
+
+/// Build a `SnapshotMeta` for a phrase_mapping snapshot, optionally superseding
+/// a predecessor.
+#[cfg(feature = "database")]
+fn next_phrase_meta(
+    predecessor: Option<&crate::sem_reg::types::SnapshotRow>,
+    object_id: Uuid,
+    created_by: &str,
+    change_type: ChangeType,
+    change_rationale: Option<String>,
+    status: SnapshotStatus,
+) -> SnapshotMeta {
+    let mut meta =
+        SnapshotMeta::new_operational(ObjectType::PhraseMapping, object_id, created_by.to_string());
+    meta.change_type = change_type;
+    meta.change_rationale = change_rationale;
+    meta.status = status;
+    if let Some(pred) = predecessor {
+        meta.version_major = pred.version_major;
+        meta.version_minor = pred.version_minor + 1;
+        meta.predecessor_id = Some(pred.snapshot_id);
+    }
+    meta
+}
+
+/// Publish a phrase_mapping snapshot within an existing transaction.
+///
+/// If the meta has a predecessor, the predecessor's `effective_until` is set to
+/// NOW() before the new snapshot is inserted.
+#[cfg(feature = "database")]
+async fn publish_phrase_snapshot_in_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    meta: &SnapshotMeta,
+    definition: &serde_json::Value,
+) -> Result<Uuid> {
+    // Close predecessor if present
+    if let Some(predecessor_id) = meta.predecessor_id {
+        let affected = sqlx::query(
+            r#"
+            UPDATE sem_reg.snapshots
+            SET effective_until = NOW()
+            WHERE snapshot_id = $1 AND effective_until IS NULL
+            "#,
+        )
+        .bind(predecessor_id)
+        .execute(&mut **tx)
+        .await?
+        .rows_affected();
+        if affected == 0 {
+            return Err(anyhow!(
+                "Predecessor snapshot {} not found or already superseded",
+                predecessor_id
+            ));
+        }
+    }
+
+    let security_label = serde_json::to_value(&meta.security_label)?;
+    let snapshot_id = sqlx::query_scalar::<_, Uuid>(
+        r#"
+        INSERT INTO sem_reg.snapshots (
+            snapshot_set_id, object_type, object_id,
+            version_major, version_minor, status,
+            governance_tier, trust_class, security_label,
+            predecessor_id, change_type, change_rationale,
+            created_by, approved_by, definition
+        ) VALUES (
+            NULL, $1::sem_reg.object_type, $2,
+            $3, $4, $5::sem_reg.snapshot_status,
+            $6::sem_reg.governance_tier, $7::sem_reg.trust_class, $8,
+            $9, $10::sem_reg.change_type, $11,
+            $12, $13, $14
+        )
+        RETURNING snapshot_id
+        "#,
+    )
+    .bind(meta.object_type.as_ref())
+    .bind(meta.object_id)
+    .bind(meta.version_major)
+    .bind(meta.version_minor)
+    .bind(meta.status.as_ref())
+    .bind(meta.governance_tier.as_ref())
+    .bind(meta.trust_class.as_ref())
+    .bind(security_label)
+    .bind(meta.predecessor_id)
+    .bind(meta.change_type.as_ref())
+    .bind(&meta.change_rationale)
+    .bind(&meta.created_by)
+    .bind(&meta.approved_by)
+    .bind(definition)
+    .fetch_one(&mut **tx)
+    .await?;
+
+    Ok(snapshot_id)
 }
 
 // ============================================================================
@@ -616,7 +761,11 @@ impl CustomOperation for PhraseBatchProposeOp {
     }
 }
 
-/// List pending phrase proposals grouped by risk tier.
+/// List pending phrase proposals from SemOS snapshots.
+///
+/// Queries `sem_reg.snapshots` for active `phrase_mapping` objects whose
+/// definition state is not yet `published`, returning evidence and collision
+/// reports embedded in each proposal's definition JSON.
 #[register_custom_op]
 pub struct PhraseReviewProposalsOp;
 
@@ -637,13 +786,69 @@ impl CustomOperation for PhraseReviewProposalsOp {
         &self,
         _verb_call: &VerbCall,
         _ctx: &mut ExecutionContext,
-        _pool: &PgPool,
+        pool: &PgPool,
     ) -> Result<ExecutionResult> {
-        let result = StubResult {
-            status: "not_implemented".to_string(),
-            message: "phrase.review-proposals is not yet implemented — Phase 3/4".to_string(),
-        };
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+        // Query active phrase_mapping snapshots that are not yet published
+        let rows: Vec<(Uuid, serde_json::Value, String, i32, i32)> = sqlx::query_as(
+            r#"
+            SELECT
+                snapshot_id,
+                definition,
+                created_by,
+                version_major,
+                version_minor
+            FROM sem_reg.snapshots
+            WHERE object_type = 'phrase_mapping'
+              AND status = 'active'
+              AND effective_until IS NULL
+              AND COALESCE(definition->>'state', 'proposed') != 'published'
+            ORDER BY effective_from DESC
+            "#,
+        )
+        .fetch_all(pool)
+        .await?;
+
+        let proposals: Vec<serde_json::Value> = rows
+            .into_iter()
+            .map(|(snapshot_id, definition, created_by, ver_major, ver_minor)| {
+                let phrase = definition
+                    .get("phrase")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let verb_fqn = definition
+                    .get("verb_fqn")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let workspace = definition
+                    .get("workspace")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
+                let state = definition
+                    .get("state")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("proposed")
+                    .to_string();
+                let collision_report = definition.get("collision_report").cloned();
+                let evidence = definition.get("evidence").cloned();
+
+                serde_json::to_value(PhraseProposalSummary {
+                    snapshot_id,
+                    phrase,
+                    verb_fqn,
+                    workspace,
+                    state,
+                    created_by,
+                    version: format!("{}.{}", ver_major, ver_minor),
+                    collision_report,
+                    evidence,
+                })
+                .unwrap_or_default()
+            })
+            .collect();
+
+        Ok(ExecutionResult::RecordSet(proposals))
     }
 
     #[cfg(not(feature = "database"))]
@@ -659,6 +864,11 @@ impl CustomOperation for PhraseReviewProposalsOp {
 }
 
 /// Approve a phrase proposal and publish through SemOS governance.
+///
+/// Looks up the proposal snapshot by `proposal-id`, extracts the phrase mapping
+/// definition, creates a superseding snapshot with state=published and
+/// status=active. The materialization trigger (Phase 2.5) automatically writes
+/// the phrase to `phrase_bank`.
 #[register_custom_op]
 pub struct PhraseApproveOp;
 
@@ -677,14 +887,75 @@ impl CustomOperation for PhraseApproveOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        _pool: &PgPool,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
     ) -> Result<ExecutionResult> {
-        let result = StubResult {
-            status: "not_implemented".to_string(),
-            message: "phrase.approve is not yet implemented — Phase 3/4".to_string(),
+        let proposal_id_str = get_required_string(verb_call, "proposal-id")?;
+        let proposal_id: Uuid = proposal_id_str
+            .parse()
+            .map_err(|_| anyhow!("Invalid UUID for proposal-id: {}", proposal_id_str))?;
+        let rationale = get_optional_string(verb_call, "rationale");
+
+        // 1. Look up the proposal snapshot
+        let proposal = SnapshotStore::get_by_id(pool, proposal_id)
+            .await?
+            .ok_or_else(|| {
+                anyhow!(
+                    "Phrase proposal snapshot {} not found",
+                    proposal_id
+                )
+            })?;
+
+        // Verify it's a phrase_mapping
+        if proposal.object_type != ObjectType::PhraseMapping {
+            return Err(anyhow!(
+                "Snapshot {} is not a phrase_mapping (found {:?})",
+                proposal_id,
+                proposal.object_type
+            ));
+        }
+
+        // 2. Extract and update definition with published state
+        let mut definition: serde_json::Value = proposal.definition.clone();
+        definition["state"] = serde_json::Value::String("published".to_string());
+        if let Some(ref r) = rationale {
+            definition["approval_rationale"] = serde_json::Value::String(r.clone());
+        }
+
+        // 3. Create superseding published snapshot in a transaction
+        let mut tx = pool.begin().await?;
+        let meta = next_phrase_meta(
+            Some(&proposal),
+            proposal.object_id,
+            ctx.audit_user.as_deref().unwrap_or("phrase.approve"),
+            ChangeType::NonBreaking,
+            rationale,
+            SnapshotStatus::Active,
+        );
+        let published_snapshot_id =
+            publish_phrase_snapshot_in_tx(&mut tx, &meta, &definition).await?;
+        tx.commit().await?;
+
+        // 4. Read back the phrase_bank entry (created by materialization trigger)
+        let phrase = definition
+            .get("phrase")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+        let verb_fqn = definition
+            .get("verb_fqn")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+
+        let result = PhraseApproveResult {
+            published_snapshot_id,
+            phrase,
+            verb_fqn,
+            status: "published".to_string(),
         };
+
         Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
 
@@ -699,6 +970,9 @@ impl CustomOperation for PhraseApproveOp {
 }
 
 /// Reject a phrase proposal with reason code.
+///
+/// Creates a superseding snapshot with state=rejected and records the rejection
+/// reason in the definition. The predecessor snapshot is closed (effective_until set).
 #[register_custom_op]
 pub struct PhraseRejectOp;
 
@@ -717,14 +991,54 @@ impl CustomOperation for PhraseRejectOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        _pool: &PgPool,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
     ) -> Result<ExecutionResult> {
-        let result = StubResult {
-            status: "not_implemented".to_string(),
-            message: "phrase.reject is not yet implemented — Phase 3/4".to_string(),
+        let proposal_id_str = get_required_string(verb_call, "proposal-id")?;
+        let proposal_id: Uuid = proposal_id_str
+            .parse()
+            .map_err(|_| anyhow!("Invalid UUID for proposal-id: {}", proposal_id_str))?;
+        let reason = get_required_string(verb_call, "reason")?;
+
+        // 1. Look up the proposal snapshot
+        let proposal = SnapshotStore::get_by_id(pool, proposal_id)
+            .await?
+            .ok_or_else(|| anyhow!("Phrase proposal snapshot {} not found", proposal_id))?;
+
+        if proposal.object_type != ObjectType::PhraseMapping {
+            return Err(anyhow!(
+                "Snapshot {} is not a phrase_mapping (found {:?})",
+                proposal_id,
+                proposal.object_type
+            ));
+        }
+
+        // 2. Update definition with rejected state
+        let mut definition: serde_json::Value = proposal.definition.clone();
+        definition["state"] = serde_json::Value::String("rejected".to_string());
+        definition["rejection_reason"] = serde_json::Value::String(reason.clone());
+
+        // 3. Create superseding snapshot marking rejection
+        let mut tx = pool.begin().await?;
+        let meta = next_phrase_meta(
+            Some(&proposal),
+            proposal.object_id,
+            ctx.audit_user.as_deref().unwrap_or("phrase.reject"),
+            ChangeType::NonBreaking,
+            Some(reason.clone()),
+            SnapshotStatus::Deprecated,
+        );
+        let rejected_snapshot_id =
+            publish_phrase_snapshot_in_tx(&mut tx, &meta, &definition).await?;
+        tx.commit().await?;
+
+        let result = PhraseLifecycleResult {
+            snapshot_id: rejected_snapshot_id,
+            state: "rejected".to_string(),
+            reason: Some(reason),
         };
+
         Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
 
@@ -739,6 +1053,9 @@ impl CustomOperation for PhraseRejectOp {
 }
 
 /// Park a phrase proposal for later review.
+///
+/// Creates a superseding snapshot with state=deferred. Unlike rejection,
+/// deferred proposals can later be resumed via `phrase.review-proposals`.
 #[register_custom_op]
 pub struct PhraseDeferOp;
 
@@ -757,14 +1074,56 @@ impl CustomOperation for PhraseDeferOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        _pool: &PgPool,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
     ) -> Result<ExecutionResult> {
-        let result = StubResult {
-            status: "not_implemented".to_string(),
-            message: "phrase.defer is not yet implemented — Phase 3/4".to_string(),
+        let proposal_id_str = get_required_string(verb_call, "proposal-id")?;
+        let proposal_id: Uuid = proposal_id_str
+            .parse()
+            .map_err(|_| anyhow!("Invalid UUID for proposal-id: {}", proposal_id_str))?;
+        let reason = get_optional_string(verb_call, "reason");
+
+        // 1. Look up the proposal snapshot
+        let proposal = SnapshotStore::get_by_id(pool, proposal_id)
+            .await?
+            .ok_or_else(|| anyhow!("Phrase proposal snapshot {} not found", proposal_id))?;
+
+        if proposal.object_type != ObjectType::PhraseMapping {
+            return Err(anyhow!(
+                "Snapshot {} is not a phrase_mapping (found {:?})",
+                proposal_id,
+                proposal.object_type
+            ));
+        }
+
+        // 2. Update definition with deferred state
+        let mut definition: serde_json::Value = proposal.definition.clone();
+        definition["state"] = serde_json::Value::String("deferred".to_string());
+        if let Some(ref r) = reason {
+            definition["deferral_reason"] = serde_json::Value::String(r.clone());
+        }
+
+        // 3. Create superseding snapshot — status stays Active so it can be resumed
+        let mut tx = pool.begin().await?;
+        let meta = next_phrase_meta(
+            Some(&proposal),
+            proposal.object_id,
+            ctx.audit_user.as_deref().unwrap_or("phrase.defer"),
+            ChangeType::NonBreaking,
+            reason.clone(),
+            SnapshotStatus::Active,
+        );
+        let deferred_snapshot_id =
+            publish_phrase_snapshot_in_tx(&mut tx, &meta, &definition).await?;
+        tx.commit().await?;
+
+        let result = PhraseLifecycleResult {
+            snapshot_id: deferred_snapshot_id,
+            state: "deferred".to_string(),
+            reason,
         };
+
         Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
 
