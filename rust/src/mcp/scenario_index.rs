@@ -136,7 +136,29 @@ pub enum ScenarioRouteYaml {
 pub struct SelectorOption {
     /// The value to match (e.g., "LU", "IE").
     pub value: String,
-    /// The macro FQN to route to.
+    /// The macro FQN to route to (leaf option). Optional when `sub_select` is used.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub macro_fqn: Option<String>,
+    /// Nested second-axis selector. When present, `macro_fqn` is ignored.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sub_select: Option<SubSelector>,
+}
+
+/// Nested second-axis selector within a macro_selector option.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SubSelector {
+    /// Field from CompoundSignals to select on (e.g., "vehicle_type").
+    pub select_on: String,
+    /// Fallback macro FQN when the second axis is undetected.
+    pub default_fqn: String,
+    /// Options for the second axis.
+    pub options: Vec<SubSelectorOption>,
+}
+
+/// Leaf option in a two-axis selector.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SubSelectorOption {
+    pub value: String,
     pub macro_fqn: String,
 }
 
@@ -649,45 +671,80 @@ impl ScenarioIndex {
                 options,
                 then,
             } => {
-                // Try to auto-resolve based on extracted signals
-                let selected = match select_on.as_str() {
-                    "jurisdiction" => {
-                        if let Some(ref jur) = signals.jurisdiction {
-                            options
-                                .iter()
-                                .find(|o| o.value.eq_ignore_ascii_case(jur))
-                                .map(|o| o.macro_fqn.clone())
+                // Try to auto-resolve the primary axis
+                let primary_match = self.resolve_selector_axis(select_on, options, signals);
+
+                match primary_match {
+                    Some(opt) if opt.sub_select.is_some() => {
+                        // Two-axis: resolve the nested sub_select
+                        let sub = opt.sub_select.as_ref().unwrap();
+                        let leaf_fqn = self
+                            .resolve_sub_selector(sub, signals)
+                            .unwrap_or_else(|| sub.default_fqn.clone());
+                        if then.is_empty() {
+                            ResolvedRoute::Macro {
+                                macro_fqn: leaf_fqn,
+                            }
                         } else {
-                            None
+                            let mut macros = vec![leaf_fqn];
+                            macros.extend(then.clone());
+                            ResolvedRoute::MacroSequence { macros }
                         }
                     }
-                    "structure_type" => signals.structure_nouns.first().and_then(|sn| {
-                        options
-                            .iter()
-                            .find(|o| o.value.eq_ignore_ascii_case(sn))
-                            .map(|o| o.macro_fqn.clone())
-                    }),
-                    _ => None,
-                };
-
-                if let Some(macro_fqn) = selected {
-                    if then.is_empty() {
-                        ResolvedRoute::Macro { macro_fqn }
-                    } else {
-                        let mut macros = vec![macro_fqn];
-                        macros.extend(then.clone());
-                        ResolvedRoute::MacroSequence { macros }
+                    Some(opt) if opt.macro_fqn.is_some() => {
+                        // Single-axis leaf
+                        let macro_fqn = opt.macro_fqn.clone().unwrap();
+                        if then.is_empty() {
+                            ResolvedRoute::Macro { macro_fqn }
+                        } else {
+                            let mut macros = vec![macro_fqn];
+                            macros.extend(then.clone());
+                            ResolvedRoute::MacroSequence { macros }
+                        }
                     }
-                } else {
-                    // Can't auto-resolve — return for disambiguation
-                    ResolvedRoute::NeedsSelection {
-                        select_on: select_on.clone(),
-                        options: options.clone(),
-                        then: then.clone(),
+                    _ => {
+                        // Can't auto-resolve — return for disambiguation
+                        ResolvedRoute::NeedsSelection {
+                            select_on: select_on.clone(),
+                            options: options.clone(),
+                            then: then.clone(),
+                        }
                     }
                 }
             }
         }
+    }
+
+    /// Resolve a selector axis against compound signals.
+    fn resolve_selector_axis<'a>(
+        &self,
+        select_on: &str,
+        options: &'a [SelectorOption],
+        signals: &CompoundSignals,
+    ) -> Option<&'a SelectorOption> {
+        let value = match select_on {
+            "jurisdiction" => signals.jurisdiction.as_deref(),
+            "vehicle_type" => signals.vehicle_type.as_deref(),
+            "structure_type" => signals.structure_nouns.first().map(|s| s.as_str()),
+            _ => None,
+        };
+        value.and_then(|v| options.iter().find(|o| o.value.eq_ignore_ascii_case(v)))
+    }
+
+    /// Resolve a nested sub-selector against compound signals.
+    fn resolve_sub_selector(&self, sub: &SubSelector, signals: &CompoundSignals) -> Option<String> {
+        let value = match sub.select_on.as_str() {
+            "vehicle_type" => signals.vehicle_type.as_deref(),
+            "jurisdiction" => signals.jurisdiction.as_deref(),
+            "structure_type" => signals.structure_nouns.first().map(|s| s.as_str()),
+            _ => None,
+        };
+        value.and_then(|v| {
+            sub.options
+                .iter()
+                .find(|o| o.value.eq_ignore_ascii_case(v))
+                .map(|o| o.macro_fqn.clone())
+        })
     }
 
     /// Extract target FQN(s) from a scenario route.
@@ -696,7 +753,18 @@ impl ScenarioIndex {
             ScenarioRouteYaml::Macro { macro_fqn } => vec![macro_fqn.clone()],
             ScenarioRouteYaml::MacroSequence { macros } => macros.clone(),
             ScenarioRouteYaml::MacroSelector { options, then, .. } => {
-                let mut fqns: Vec<String> = options.iter().map(|o| o.macro_fqn.clone()).collect();
+                let mut fqns: Vec<String> = Vec::new();
+                for o in options {
+                    if let Some(ref fqn) = o.macro_fqn {
+                        fqns.push(fqn.clone());
+                    }
+                    if let Some(ref sub) = o.sub_select {
+                        fqns.push(sub.default_fqn.clone());
+                        for so in &sub.options {
+                            fqns.push(so.macro_fqn.clone());
+                        }
+                    }
+                }
                 fqns.extend(then.clone());
                 fqns
             }

@@ -358,7 +358,7 @@ ob-poc/
 │   ├── config/packs/           # 5 V2 REPL journey packs (onboarding, book-setup, kyc-case, deal-lifecycle, product-service-taxonomy)
 │   ├── config/sem_os_seeds/    # Domain metadata, constellation maps, state machines
 │   ├── config/noun_index.yaml  # 99-noun ECIR taxonomy
-│   ├── config/scenario_index.yaml  # 16 journey scenario definitions
+│   ├── config/scenario_index.yaml  # Journey scenarios (assemble-cbu + KYC + cross-border + SemOS + product)
 │   ├── crates/
 │   │   ├── dsl-core/           # Parser, AST, compiler (no DB)
 │   │   ├── dsl-lsp/            # LSP server + Zed extension + tree-sitter grammar

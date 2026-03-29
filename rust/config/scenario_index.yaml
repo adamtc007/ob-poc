@@ -10,293 +10,94 @@
 # Hard gates: G1 (compound signal), G2 (mode compat), G3 (score >= 8)
 
 scenarios:
-  # ── Luxembourg UCITS SICAV ─────────────────────────────────────────────
-  - id: lux-sicav-setup
-    title: "Luxembourg UCITS SICAV Setup"
-    modes: [onboarding, structure]
-    requires:
-      all_of: [compound_action, jurisdiction]
-    signals:
-      actions: [onboard, "set up", establish, launch, configure]
-      jurisdictions: [LU]
-      nouns_any: [sicav, ucits, fund, umbrella, compartment, sub-fund]
-    routes:
-      kind: macro
-      macro_fqn: struct.lux.ucits.sicav
-    explain:
-      summary: "Full Luxembourg UCITS SICAV structure setup (13 steps)"
-
-  # ── Luxembourg AIF RAIF ────────────────────────────────────────────────
-  - id: lux-raif-setup
-    title: "Luxembourg AIF RAIF Setup"
-    modes: [onboarding, structure]
-    requires:
-      all_of: [compound_action, jurisdiction]
-    signals:
-      actions: [onboard, "set up", establish, launch, configure]
-      jurisdictions: [LU]
-      nouns_any: [raif, aif]
-    routes:
-      kind: macro
-      macro_fqn: struct.lux.aif.raif
-    explain:
-      summary: "Luxembourg Reserved Alternative Investment Fund setup"
-
-  # ── Luxembourg PE SCSp ─────────────────────────────────────────────────
-  - id: lux-pe-setup
-    title: "Luxembourg PE SCSp Setup"
-    modes: [onboarding, structure]
-    requires:
-      all_of: [compound_action, jurisdiction]
-    signals:
-      actions: [onboard, "set up", establish, launch, configure]
-      jurisdictions: [LU]
-      nouns_any: [scsp, slp, lp, "private equity", pe, "pe structure", "pe fund"]
-    routes:
-      kind: macro
-      macro_fqn: struct.lux.pe.scsp
-    explain:
-      summary: "Luxembourg Special Limited Partnership (SCSp) for private equity"
-
-  # ── Ireland UCITS ICAV ─────────────────────────────────────────────────
-  - id: ie-icav-setup
-    title: "Ireland UCITS ICAV Setup"
-    modes: [onboarding, structure]
-    requires:
-      all_of: [compound_action, jurisdiction]
-    signals:
-      actions: [onboard, "set up", establish, launch, configure]
-      jurisdictions: [IE]
-      nouns_any: [icav, ucits, fund]
-    routes:
-      kind: macro
-      macro_fqn: struct.ie.ucits.icav
-    explain:
-      summary: "Irish Collective Asset-management Vehicle (ICAV) UCITS setup"
-
-  # ── Ireland AIF ICAV ───────────────────────────────────────────────────
-  - id: ie-aif-icav-setup
-    title: "Ireland AIF ICAV Setup"
-    modes: [onboarding, structure]
-    requires:
-      all_of: [compound_action, jurisdiction]
-    signals:
-      actions: [onboard, "set up", establish, launch, configure]
-      jurisdictions: [IE]
-      nouns_any: [qiaif, riaif, "aif icav", "alternative icav"]
-      phrases_any: ["aif icav", "alternative investment fund"]
-    routes:
-      kind: macro
-      macro_fqn: struct.ie.aif.icav
-    explain:
-      summary: "Irish AIF ICAV setup"
-
-  # ── Ireland Hedge ICAV ─────────────────────────────────────────────────
-  - id: ie-hedge-icav-setup
-    title: "Ireland Hedge ICAV Setup"
-    modes: [onboarding, structure]
-    requires:
-      all_of: [compound_action, jurisdiction]
-    signals:
-      actions: [onboard, "set up", establish, launch, configure]
-      jurisdictions: [IE]
-      nouns_any: [hedge, qiaif]
-      phrases_any: ["hedge icav", "irish hedge fund", "hedge fund icav"]
-    routes:
-      kind: macro
-      macro_fqn: struct.ie.hedge.icav
-    explain:
-      summary: "Irish hedge fund ICAV setup"
-
-  # ── UK Authorised OEIC ─────────────────────────────────────────────────
-  - id: uk-oeic-setup
-    title: "UK Authorised OEIC Setup"
-    modes: [onboarding, structure]
-    requires:
-      all_of: [compound_action, jurisdiction]
-    signals:
-      actions: [onboard, "set up", establish, launch, configure]
-      jurisdictions: [UK]
-      nouns_any: [oeic, fund, ucits, "oeic structure", "uk fund"]
-    routes:
-      kind: macro
-      macro_fqn: struct.uk.authorised.oeic
-    explain:
-      summary: "UK Open-Ended Investment Company (OEIC) setup"
-
-  # ── UK Authorised Unit Trust ───────────────────────────────────────────
-  - id: uk-aut-setup
-    title: "UK Authorised Unit Trust Setup"
-    modes: [onboarding, structure]
-    requires:
-      all_of: [compound_action, jurisdiction]
-    signals:
-      actions: [onboard, "set up", establish, launch, configure]
-      jurisdictions: [UK]
-      nouns_any: [aut, "unit trust", authorised]
-    routes:
-      kind: macro
-      macro_fqn: struct.uk.authorised.aut
-    explain:
-      summary: "UK Authorised Unit Trust setup"
-
-  # ── UK Authorised Contractual Scheme ───────────────────────────────────
-  - id: uk-acs-setup
-    title: "UK Authorised Contractual Scheme Setup"
-    modes: [onboarding, structure]
-    requires:
-      all_of: [compound_action, jurisdiction]
-    signals:
-      actions: [onboard, "set up", establish, launch, configure]
-      jurisdictions: [UK]
-      nouns_any: [acs, "contractual scheme", co-ownership]
-    routes:
-      kind: macro
-      macro_fqn: struct.uk.authorised.acs
-    explain:
-      summary: "UK Authorised Contractual Scheme setup"
-
-  # ── UK Long-Term Asset Fund ────────────────────────────────────────────
-  - id: uk-ltaf-setup
-    title: "UK Long-Term Asset Fund Setup"
-    modes: [onboarding, structure]
-    requires:
-      all_of: [compound_action, jurisdiction]
-    signals:
-      actions: [onboard, "set up", establish, launch, configure]
-      jurisdictions: [UK]
-      nouns_any: [ltaf, "long-term asset fund", "long term asset fund"]
-    routes:
-      kind: macro
-      macro_fqn: struct.uk.authorised.ltaf
-    explain:
-      summary: "UK Long-Term Asset Fund setup"
-
-  # ── UK Manager LLP ─────────────────────────────────────────────────────
-  - id: uk-manager-llp-setup
-    title: "UK Manager LLP Setup"
-    modes: [onboarding, structure]
-    requires:
-      all_of: [compound_action, jurisdiction]
-    signals:
-      actions: [onboard, "set up", establish, launch, configure]
-      jurisdictions: [UK]
-      nouns_any: [manager, llp, management]
-      phrases_any: ["manager llp", "management llp"]
-    routes:
-      kind: macro
-      macro_fqn: struct.uk.manager.llp
-    explain:
-      summary: "UK manager LLP setup"
-
-  # ── UK Private Equity LP ───────────────────────────────────────────────
-  - id: uk-private-equity-lp-setup
-    title: "UK Private Equity LP Setup"
-    modes: [onboarding, structure]
-    requires:
-      all_of: [compound_action, jurisdiction]
-    signals:
-      actions: [onboard, "set up", establish, launch, configure]
-      jurisdictions: [UK]
-      nouns_any: ["private equity", pe, lp]
-      phrases_any: ["uk pe fund", "private equity lp"]
-    routes:
-      kind: macro
-      macro_fqn: struct.uk.private-equity.lp
-    explain:
-      summary: "UK private equity LP setup"
-
-  # ── US 40-Act Open-End Fund ────────────────────────────────────────────
-  - id: us-40act-setup
-    title: "US 40-Act Open-End Fund Setup"
-    modes: [onboarding, structure]
-    requires:
-      all_of: [compound_action, jurisdiction]
-    signals:
-      actions: [onboard, "set up", establish, launch, configure]
-      jurisdictions: [US]
-      nouns_any: [fund, "open-end", "mutual fund", "40-act", "40 act"]
-    routes:
-      kind: macro
-      macro_fqn: struct.us.40act.open-end
-    explain:
-      summary: "US Investment Company Act of 1940 open-end fund setup"
-
-  # ── US 40-Act Closed-End Fund ──────────────────────────────────────────
-  - id: us-40act-closed-end-setup
-    title: "US 40-Act Closed-End Fund Setup"
-    modes: [onboarding, structure]
-    requires:
-      all_of: [compound_action, jurisdiction]
-    signals:
-      actions: [onboard, "set up", establish, launch, configure]
-      jurisdictions: [US]
-      nouns_any: ["closed-end", "closed end", "closed-end fund"]
-      phrases_any: ["closed-end", "closed end fund"]
-    routes:
-      kind: macro
-      macro_fqn: struct.us.40act.closed-end
-    explain:
-      summary: "US Investment Company Act of 1940 closed-end fund setup"
-
-  # ── US 40-Act ETF ──────────────────────────────────────────────────────
-  - id: us-etf-setup
-    title: "US 40-Act ETF Setup"
-    modes: [onboarding, structure]
-    requires:
-      all_of: [compound_action, jurisdiction]
-    signals:
-      actions: [onboard, "set up", establish, launch, configure]
-      jurisdictions: [US]
-      nouns_any: [etf, "exchange traded"]
-      phrases_any: ["us etf", "40-act etf", "exchange traded fund"]
-    routes:
-      kind: macro
-      macro_fqn: struct.us.etf.40act
-    explain:
-      summary: "US 40-Act ETF setup"
-
-  # ── US Private Fund Delaware LP ────────────────────────────────────────
-  - id: us-private-fund-delaware-lp-setup
-    title: "US Private Fund Delaware LP Setup"
-    modes: [onboarding, structure]
-    requires:
-      all_of: [compound_action, jurisdiction]
-    signals:
-      actions: [onboard, "set up", establish, launch, configure]
-      jurisdictions: [US]
-      nouns_any: ["private fund", delaware, lp]
-      phrases_any: ["delaware lp", "delaware private fund"]
-    routes:
-      kind: macro
-      macro_fqn: struct.us.private-fund.delaware-lp
-    explain:
-      summary: "US private fund Delaware LP setup"
-
-  # ── Jurisdiction Selector (generic onboarding) ─────────────────────────
-  - id: generic-fund-onboarding
-    title: "Fund Structure Onboarding (by jurisdiction)"
+  # ── CBU Assembly (verb: assemble-cbu) ────────────────────────────────────
+  # The intent is always "assemble a CBU". Jurisdiction and vehicle type are
+  # parameters that select the macro template, not different intents.
+  # Vehicle type is extracted by CompoundSignals.vehicle_type; jurisdiction
+  # by CompoundSignals.jurisdiction (or inferred from vehicle type).
+  - id: assemble-cbu
+    title: "CBU Assembly — Fund Structure Setup"
     modes: [onboarding, structure]
     requires:
       any_of: [compound_action]
     signals:
-      actions:
-        [onboard, "set up", establish, launch, configure, prepare, initiate]
-      nouns_any: [fund, structure, vehicle, ucits, sicav, icav, oeic]
+      actions: [onboard, "set up", establish, launch, configure, prepare, initiate]
+      nouns_any:
+        [fund, structure, vehicle, sicav, ucits, raif, aif, scsp, slp,
+         icav, qiaif, riaif, oeic, aut, "unit trust", acs, ltaf,
+         "long-term asset fund", llp, manager, etf, "40-act", "40 act",
+         "closed-end", "open-end", "mutual fund", delaware, lp, pe,
+         "private equity", umbrella, compartment, sub-fund]
     routes:
       kind: macro_selector
       select_on: jurisdiction
       options:
         - value: LU
-          macro_fqn: struct.lux.ucits.sicav
+          sub_select:
+            select_on: vehicle_type
+            default_fqn: struct.lux.ucits.sicav
+            options:
+              - value: sicav
+                macro_fqn: struct.lux.ucits.sicav
+              - value: raif
+                macro_fqn: struct.lux.aif.raif
+              - value: scsp
+                macro_fqn: struct.lux.pe.scsp
+              - value: pe
+                macro_fqn: struct.lux.pe.scsp
+              - value: aif
+                macro_fqn: struct.lux.aif.raif
         - value: IE
-          macro_fqn: struct.ie.ucits.icav
+          sub_select:
+            select_on: vehicle_type
+            default_fqn: struct.ie.ucits.icav
+            options:
+              - value: icav
+                macro_fqn: struct.ie.ucits.icav
+              - value: aif-icav
+                macro_fqn: struct.ie.aif.icav
+              - value: hedge
+                macro_fqn: struct.ie.hedge.icav
+              - value: aif
+                macro_fqn: struct.ie.aif.icav
         - value: UK
-          macro_fqn: struct.uk.authorised.oeic
+          sub_select:
+            select_on: vehicle_type
+            default_fqn: struct.uk.authorised.oeic
+            options:
+              - value: oeic
+                macro_fqn: struct.uk.authorised.oeic
+              - value: aut
+                macro_fqn: struct.uk.authorised.aut
+              - value: acs
+                macro_fqn: struct.uk.authorised.acs
+              - value: ltaf
+                macro_fqn: struct.uk.authorised.ltaf
+              - value: manager-llp
+                macro_fqn: struct.uk.manager.llp
+              - value: pe
+                macro_fqn: struct.uk.private-equity.lp
+              - value: lp
+                macro_fqn: struct.uk.private-equity.lp
         - value: US
-          macro_fqn: struct.us.40act.open-end
+          sub_select:
+            select_on: vehicle_type
+            default_fqn: struct.us.40act.open-end
+            options:
+              - value: 40act-open-end
+                macro_fqn: struct.us.40act.open-end
+              - value: 40act-closed-end
+                macro_fqn: struct.us.40act.closed-end
+              - value: etf
+                macro_fqn: struct.us.etf.40act
+              - value: delaware-lp
+                macro_fqn: struct.us.private-fund.delaware-lp
+              - value: pe
+                macro_fqn: struct.us.private-fund.delaware-lp
+              - value: lp
+                macro_fqn: struct.us.private-fund.delaware-lp
     explain:
-      summary: "Fund onboarding — select jurisdiction to determine structure type"
+      summary: "CBU assembly — jurisdiction + vehicle type select the macro template"
 
   # ── Full KYC Screening ─────────────────────────────────────────────────
   - id: full-screening

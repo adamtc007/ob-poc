@@ -182,6 +182,66 @@ static JURISDICTION_MAP: &[(&str, &str)] = &[
     ("gg", "GG"),
 ];
 
+// ─── Vehicle Type Mapping ─────────────────────────────────────────────────
+//
+// Maps structure nouns to canonical vehicle types for two-axis macro selection.
+// Ordered most-specific first — first match wins.
+
+static VEHICLE_TYPE_MAP: &[(&str, &str)] = &[
+    // Luxembourg
+    ("sicav", "sicav"),
+    ("ucits", "sicav"),
+    ("raif", "raif"),
+    ("scsp", "scsp"),
+    ("slp", "scsp"),
+    // Ireland
+    ("qiaif", "aif-icav"),
+    ("riaif", "aif-icav"),
+    ("icav", "icav"),
+    // UK
+    ("oeic", "oeic"),
+    ("unit trust", "aut"),
+    ("aut", "aut"),
+    ("acs", "acs"),
+    ("ltaf", "ltaf"),
+    ("long-term asset fund", "ltaf"),
+    ("llp", "manager-llp"),
+    // US
+    ("etf", "etf"),
+    ("closed-end", "40act-closed-end"),
+    ("closed end", "40act-closed-end"),
+    ("open-end", "40act-open-end"),
+    ("mutual fund", "40act-open-end"),
+    ("40-act", "40act-open-end"),
+    ("40 act", "40act-open-end"),
+    ("delaware", "delaware-lp"),
+    // Cross-jurisdiction (resolved with jurisdiction context)
+    ("hedge", "hedge"),
+    ("pe", "pe"),
+    ("private equity", "pe"),
+    ("aif", "aif"),
+    ("lp", "lp"),
+];
+
+/// Maps vehicle types that uniquely identify a jurisdiction.
+/// Used as fallback when jurisdiction is not explicitly stated.
+static VEHICLE_JURISDICTION_MAP: &[(&str, &str)] = &[
+    ("sicav", "LU"),
+    ("raif", "LU"),
+    ("scsp", "LU"),
+    ("icav", "IE"),
+    ("aif-icav", "IE"),
+    ("oeic", "UK"),
+    ("aut", "UK"),
+    ("acs", "UK"),
+    ("ltaf", "UK"),
+    ("manager-llp", "UK"),
+    ("etf", "US"),
+    ("40act-open-end", "US"),
+    ("40act-closed-end", "US"),
+    ("delaware-lp", "US"),
+];
+
 // ─── Core Types ────────────────────────────────────────────────────────────
 
 /// Extracted compound signals from an utterance.
@@ -207,6 +267,9 @@ pub struct CompoundSignals {
     pub has_jurisdiction_structure_pair: bool,
     /// Compound: multiple phase/structure nouns indicating a workflow.
     pub has_multi_noun_workflow: bool,
+    /// Canonical vehicle type derived from structure nouns (e.g., "sicav", "oeic", "etf").
+    /// Used for two-axis macro selection, not for scoring.
+    pub vehicle_type: Option<String>,
 }
 
 impl CompoundSignals {
@@ -298,7 +361,21 @@ pub fn extract_compound_signals(utterance: &str) -> CompoundSignals {
         }
     }
 
-    // 6. Derived compound signals
+    // 6. Vehicle type extraction (from structure nouns, most-specific-first)
+    signals.vehicle_type = extract_vehicle_type(&lower);
+
+    // 6b. Vehicle-implies-jurisdiction fallback: if no explicit jurisdiction
+    // was detected but the vehicle type uniquely identifies one, infer it.
+    if signals.jurisdiction.is_none() {
+        if let Some(ref vt) = signals.vehicle_type {
+            if let Some((_, jur)) = VEHICLE_JURISDICTION_MAP.iter().find(|(v, _)| *v == vt.as_str())
+            {
+                signals.jurisdiction = Some(jur.to_string());
+            }
+        }
+    }
+
+    // 7. Derived compound signals
     signals.has_jurisdiction_structure_pair =
         signals.jurisdiction.is_some() && !signals.structure_nouns.is_empty();
 
@@ -308,6 +385,23 @@ pub fn extract_compound_signals(utterance: &str) -> CompoundSignals {
     };
 
     signals
+}
+
+/// Extract canonical vehicle type from an utterance.
+///
+/// Uses `VEHICLE_TYPE_MAP` ordered most-specific-first. Prefers multi-word
+/// matches (longer aliases) over single-word matches.
+pub fn extract_vehicle_type(utterance: &str) -> Option<String> {
+    // Sort by alias length descending so "unit trust" beats "aut"
+    let mut sorted: Vec<_> = VEHICLE_TYPE_MAP.iter().collect();
+    sorted.sort_by(|a, b| b.0.len().cmp(&a.0.len()));
+
+    for (alias, canonical) in sorted {
+        if contains_phrase(utterance, alias) {
+            return Some(canonical.to_string());
+        }
+    }
+    None
 }
 
 /// Extract jurisdiction ISO code from an utterance.

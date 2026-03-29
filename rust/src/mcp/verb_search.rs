@@ -122,7 +122,12 @@ impl From<&ResolvedRoute> for JourneyRoute {
                 select_on: select_on.clone(),
                 options: options
                     .iter()
-                    .map(|o| (o.value.clone(), o.macro_fqn.clone()))
+                    .filter_map(|o| {
+                        o.macro_fqn
+                            .clone()
+                            .or_else(|| o.sub_select.as_ref().map(|s| s.default_fqn.clone()))
+                            .map(|fqn| (o.value.clone(), fqn))
+                    })
                     .collect(),
                 then: then.clone(),
             },
